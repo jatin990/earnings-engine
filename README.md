@@ -20,7 +20,7 @@ ingest (yfinance → parquet cache)
 |-------|-------------|-----|--------|
 | 1 | Scaffold + data layer (prices, earnings, cache, CLI) | [docs/phase-1-data-layer.md](docs/phase-1-data-layer.md) | ✅ Done |
 | 2 | Event dataset: features + 1-day direction labels | [docs/phase-2-features-labels.md](docs/phase-2-features-labels.md) | ✅ Done |
-| 3 | Statistical baseline + event backtester | docs/phase-3 (backtest methodology) | Pending |
+| 3 | Statistical baseline + event backtester | [docs/phase-3-backtest-baseline.md](docs/phase-3-backtest-baseline.md) | ✅ Done |
 | 4 | LightGBM classifier + calibration | docs/phase-4 (model card) | Pending |
 | 5 | Prediction CLI + reports | docs/phase-5 (user guide) | Pending |
 
