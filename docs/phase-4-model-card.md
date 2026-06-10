@@ -47,6 +47,26 @@ same metrics as the baselines.
   step is the full ~100-ticker ingest (→ several thousand events), then rerun
   this table. Numbers here define the *protocol*, not an expectation.
 
+## Results — full universe (4,182 events / 95 tickers, 2,511 tested)
+
+Added after the Phase 5 full ingest:
+
+| Model | Threshold | Coverage | Hit rate | Avg trade | Sharpe/event |
+|---|---|---|---|---|---|
+| past_up_rate | 0.50 | 100% | **52.3%** | +0.06% | 0.010 |
+| gbm | 0.50 | 100% | 49.7% | −0.10% | −0.018 |
+| gbm | 0.55 | 0.3% (7 trades) | 42.9% | +2.12% | 0.216 |
+
+**Honest reading at scale:** the calibrated GBM pushes nearly all its
+probabilities to ~0.5 — it is correctly reporting that the current 16
+price/history features carry no strong per-event directional edge. The
+8-ticker result above was small-sample optimism. `past_up_rate` keeps a
+modest +3.2pp hit-rate edge over chance but earns roughly zero after 10 bps
+costs. Conclusion: the pipeline is sound and leak-free; the *features* are
+the binding constraint. The highest-value additions are options-implied
+moves, estimate revisions, and proper NSE announcement dates (see Phase 5
+doc, future directions).
+
 ## Known limitations
 
 - No hyperparameter tuning (would need nested walk-forward to stay honest).

@@ -125,5 +125,34 @@ def backtest(model_name, threshold, cost, market) -> None:
     click.echo(f"  Sharpe/event  : {m['sharpe_per_event']:.3f}")
 
 
+@cli.command()
+@click.option("--model", "model_name", default="gbm", show_default=True)
+@click.option("--days", default=14, show_default=True, help="Look-ahead window for upcoming earnings.")
+@click.option("--market", type=click.Choice(["IN", "US"], case_sensitive=False), default=None)
+@click.option("--ticker", "-t", multiple=True)
+@click.option("--report/--no-report", "write_report", default=True, show_default=True,
+              help="Also write CSV + HTML to reports/output/.")
+def predict(model_name, days, market, ticker, write_report) -> None:
+    """Predict direction + confidence for upcoming earnings events."""
+    from earnings_engine.predict import predict_upcoming
+    from earnings_engine.reports.render import render_predictions
+
+    settings = Settings()
+    tickers = _resolve_tickers(market, ticker)
+    preds = predict_upcoming(tickers, settings, model_name=model_name, days=days)
+    if preds.empty:
+        click.echo("No upcoming earnings with sufficient data. "
+                   "Run `earnings-engine ingest` to refresh the calendar.")
+        return
+    show = preds[["ticker", "market", "earnings_date", "direction", "confidence", "p_up", "n_past_events"]].copy()
+    show["earnings_date"] = show["earnings_date"].dt.date
+    show["confidence"] = show["confidence"].map("{:.1%}".format)
+    show["p_up"] = show["p_up"].map("{:.1%}".format)
+    click.echo(show.to_string(index=False))
+    if write_report:
+        csv_path, html_path = render_predictions(preds)
+        click.echo(f"\nReport: {html_path}\nCSV   : {csv_path}")
+
+
 if __name__ == "__main__":
     cli()

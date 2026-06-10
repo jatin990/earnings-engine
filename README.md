@@ -22,7 +22,7 @@ ingest (yfinance → parquet cache)
 | 2 | Event dataset: features + 1-day direction labels | [docs/phase-2-features-labels.md](docs/phase-2-features-labels.md) | ✅ Done |
 | 3 | Statistical baseline + event backtester | [docs/phase-3-backtest-baseline.md](docs/phase-3-backtest-baseline.md) | ✅ Done |
 | 4 | LightGBM classifier + calibration | [docs/phase-4-model-card.md](docs/phase-4-model-card.md) | ✅ Done |
-| 5 | Prediction CLI + reports | docs/phase-5 (user guide) | Pending |
+| 5 | Prediction CLI + reports | [docs/phase-5-user-guide.md](docs/phase-5-user-guide.md) | ✅ Done |
 
 ## Quick start
 
