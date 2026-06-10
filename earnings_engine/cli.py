@@ -69,5 +69,26 @@ def calendar(market, days) -> None:
     click.echo(df.to_string(index=False))
 
 
+@cli.command("build-dataset")
+@click.option("--market", type=click.Choice(["IN", "US"], case_sensitive=False), default=None)
+@click.option("--ticker", "-t", multiple=True, help="Specific ticker(s) instead of the universe.")
+def build_dataset_cmd(market, ticker) -> None:
+    """Build the event dataset (features + labels) from cached data."""
+    from earnings_engine.dataset import DATASET_PATH, build_dataset
+
+    settings = Settings()
+    tickers = _resolve_tickers(market, ticker)
+    df = build_dataset(tickers, settings)
+    if df.empty:
+        click.echo("No events built. Run `earnings-engine ingest` first.")
+        return
+    by_market = df["market"].value_counts().to_dict()
+    up_rate = df["label"].mean()
+    click.echo(f"Built {len(df)} events from {df['ticker'].nunique()} tickers -> {DATASET_PATH}")
+    click.echo(f"  By market: {by_market}")
+    click.echo(f"  Date range: {df['earnings_date'].min().date()} -> {df['earnings_date'].max().date()}")
+    click.echo(f"  Up-label rate: {up_rate:.1%}")
+
+
 if __name__ == "__main__":
     cli()
