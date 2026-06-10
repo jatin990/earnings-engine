@@ -91,8 +91,8 @@ def build_dataset_cmd(market, ticker) -> None:
 
 
 @cli.command()
-@click.option("--model", "model_name", default="past_up_rate",
-              help="Model to backtest (always_up, past_up_rate).")
+@click.option("--model", "model_name", default="gbm",
+              help="Model to backtest (always_up, past_up_rate, gbm).")
 @click.option("--threshold", default=0.5, show_default=True,
               help="Min P(up) confidence to take a trade (0.5 trades everything).")
 @click.option("--cost", default=0.001, show_default=True, help="Round-trip cost per trade.")
@@ -102,15 +102,17 @@ def backtest(model_name, threshold, cost, market) -> None:
     """Walk-forward backtest of a model on the event dataset."""
     from earnings_engine.backtest.engine import BacktestConfig, run_backtest
     from earnings_engine.dataset import load_dataset
-    from earnings_engine.models.baseline import BASELINES
+    from earnings_engine.models.registry import make_model
 
-    if model_name not in BASELINES:
-        raise click.BadParameter(f"Unknown model {model_name!r}; choose from {list(BASELINES)}")
+    try:
+        model = make_model(model_name)
+    except ValueError as e:
+        raise click.BadParameter(str(e))
     df = load_dataset()
     if market:
         df = df[df["market"] == market.upper()]
     cfg = BacktestConfig(threshold=threshold, cost_per_trade=cost)
-    result = run_backtest(df, BASELINES[model_name](), cfg)
+    result = run_backtest(df, model, cfg)
     if result.predictions.empty:
         click.echo("Not enough events to backtest. Build a bigger dataset first.")
         return

@@ -8,6 +8,9 @@ dependencies = [
     "pandas>=2.0",
     "pyarrow>=14.0",
     "lxml>=5.0",
+    "numpy>=1.26",
+    "lightgbm>=4.0",
+    "scikit-learn>=1.4",
     "click>=8.0",
 ]
 
