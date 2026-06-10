@@ -1,0 +1,25 @@
+[project]
+name = "earnings-engine"
+version = "0.1.0"
+description = "Earnings prediction engine: predicts 1-day post-earnings price direction for NSE (India) and US stocks"
+requires-python = ">=3.11"
+dependencies = [
+    "yfinance>=0.2.40",
+    "pandas>=2.0",
+    "pyarrow>=14.0",
+    "lxml>=5.0",
+    "click>=8.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+earnings-engine = "earnings_engine.cli:cli"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["earnings_engine*"]
