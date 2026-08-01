@@ -34,22 +34,39 @@ def _cleanup_previous_artifacts(root: Path | None = None) -> None:
     archive_dir = reports_dir / "archive"
     logs_dir = root_path / "logs"
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    archive_dir.mkdir(parents=True, exist_ok=True)
-    logs_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        logs_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return
 
-    for artifact in sorted(output_dir.iterdir()):
-        if not artifact.is_file():
-            continue
-        target = archive_dir / artifact.name
-        if target.exists():
-            target.unlink()
-        shutil.move(str(artifact), str(target))
+    try:
+        for artifact in sorted(output_dir.iterdir()):
+            if not artifact.is_file():
+                continue
+            target = archive_dir / artifact.name
+            try:
+                if target.exists():
+                    target.unlink()
+                shutil.move(str(artifact), str(target))
+            except (OSError, shutil.Error):
+                continue
+    except OSError:
+        pass
 
     cutoff = datetime.now() - timedelta(days=3)
-    for log_file in sorted(logs_dir.glob("earnings_engine-*.log")):
-        if log_file.is_file() and log_file.stat().st_mtime < cutoff.timestamp():
-            log_file.unlink(missing_ok=True)
+    try:
+        for log_file in sorted(logs_dir.glob("earnings_engine-*.log")):
+            if not log_file.is_file():
+                continue
+            try:
+                if log_file.stat().st_mtime < cutoff.timestamp():
+                    log_file.unlink(missing_ok=True)
+            except OSError:
+                continue
+    except OSError:
+        pass
 
 
 def _resolve_tickers(market: str | None, ticker: tuple[str, ...], universe_file: str | Path | None = None) -> list[str]:
@@ -140,7 +157,7 @@ def upcoming_results(market, days, universe_file) -> None:
     tickers = _resolve_tickers(market, (), universe_file)
     logger = _get_cli_logger()
     click.echo(f"Upcoming results for {len(tickers)} tickers")
-    logger.info("upcoming-results requested market=%s days=%s tickers=%s", market, days, tickers)
+    logger.info("upcoming-results requested market=%s days=%s tickers=%s", market, days, len(tickers))
     click.echo(f"Tickers: {', '.join(tickers)}")
     df = earnings_mod.upcoming_earnings(tickers, settings, days=days)
     logger.info("upcoming-results raw rows=%s", len(df))

@@ -247,6 +247,18 @@ def render_upcoming_results_report(enriched: pd.DataFrame, csv_path: Path | None
                 return f"{prefix}{value:,.2f}"
             return str(v)
 
+        def _to_float(v: object, default: float = 0.0) -> float:
+            """Safely convert a value to float, handling strings like '4.2%'."""
+            if v is None or pd.isna(v):
+                return default
+            if isinstance(v, (int, float)):
+                return float(v)
+            s = str(v).strip().rstrip("%").replace(",", "")
+            try:
+                return float(s)
+            except ValueError:
+                return default
+
         market_cap = _fmt(row.get("market_cap"), suffix="Cr")
         current_price = _fmt(row.get("current_price"))
         week_change = _fmt(row.get("earnings_week_move_pct"), "%", signed=True)
@@ -259,8 +271,8 @@ def render_upcoming_results_report(enriched: pd.DataFrame, csv_path: Path | None
         next_resistance = _fmt(row.get("next_resistance"))
         current_support = _fmt(row.get("current_support"))
 
-        thirty_day_return_value = float(row.get("thirty_day_return_pct", 0) or 0)
-        earnings_week_move_value = float(row.get("earnings_week_move_pct", 0) or 0)
+        thirty_day_return_value = _to_float(row.get("thirty_day_return_pct"))
+        earnings_week_move_value = _to_float(row.get("earnings_week_move_pct"))
         signal = "Bullish" if thirty_day_return_value > 0 else "Mixed"
         badge_class = "badge-bullish" if signal == "Bullish" else "badge-neutral"
         if thirty_day_return_value > 3 and earnings_week_move_value > 2:
@@ -271,8 +283,8 @@ def render_upcoming_results_report(enriched: pd.DataFrame, csv_path: Path | None
             setup_signal = "Cautious"
 
         reward_potential = "High" if thirty_day_return_value > 5 else "Medium" if thirty_day_return_value > 0 else "Low"
-        support_value = float(row.get("current_support", 0) or 0)
-        resistance_value = float(row.get("next_resistance", 0) or 0)
+        support_value = _to_float(row.get("current_support"))
+        resistance_value = _to_float(row.get("next_resistance"))
         risk_buffer = "Wide" if support_value and resistance_value and (resistance_value - support_value) > 10 else "Tight"
         if thirty_day_return_value > 0 and earnings_week_move_value > 0:
             momentum_bias = "Positive"

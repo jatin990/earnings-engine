@@ -11,3 +11,4 @@ reports/output/
 *.env
 secrets.env
 logs
+reports
