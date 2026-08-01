@@ -6,3 +6,8 @@ data/
 .pytest_cache/
 .DS_Store
 reports/output/
+.env
+.env.*
+*.env
+secrets.env
+logs

@@ -15,6 +15,9 @@ from earnings_engine.data.prices import load_prices
 from earnings_engine.features.earnings_features import EARNINGS_FEATURES, compute_earnings_features
 from earnings_engine.features.price_features import PRICE_FEATURES, compute_price_features
 from earnings_engine.labels import compute_reaction
+from earnings_engine.logging_utils import get_logger
+
+logger = get_logger("earnings_engine.dataset")
 
 DATASET_PATH = CACHE_DIR / "dataset.parquet"
 
@@ -28,6 +31,7 @@ def build_ticker_events(ticker: str, settings: Settings) -> pd.DataFrame:
     prices = load_prices(ticker, settings)
     earnings = load_earnings(ticker, settings)
     if prices.empty or earnings.empty:
+        logger.info("dataset build skipped ticker=%s reason=missing-data", ticker)
         return pd.DataFrame()
 
     today = pd.Timestamp.today().normalize()
@@ -57,6 +61,7 @@ def build_ticker_events(ticker: str, settings: Settings) -> pd.DataFrame:
             "reaction_return": reaction.reaction_return,
             "label": reaction.label,
         })
+    logger.info("dataset built ticker=%s rows=%s", ticker, len(rows))
     return pd.DataFrame(rows)
 
 
@@ -70,6 +75,7 @@ def build_dataset(tickers: list[str], settings: Settings, save: bool = True) -> 
     if save:
         DATASET_PATH.parent.mkdir(parents=True, exist_ok=True)
         dataset.to_parquet(DATASET_PATH)
+        logger.info("dataset saved path=%s rows=%s", DATASET_PATH, len(dataset))
     return dataset
 
 

@@ -43,6 +43,14 @@ def test_reaction_none_outside_history():
     assert compute_reaction(prices, prices.index[-1] + pd.Timedelta(days=30)) is None
 
 
+def test_reaction_none_for_missing_close_values():
+    prices = make_prices(days=40)
+    event = prices.index[10]
+    prices.loc[prices.index[9], "close"] = None
+    prices.loc[prices.index[11], "close"] = float("nan")
+    assert compute_reaction(prices, event) is None
+
+
 def test_price_features_point_in_time():
     prices = make_prices()
     asof = prices.index[200]

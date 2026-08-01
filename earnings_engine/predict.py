@@ -15,11 +15,15 @@ from earnings_engine.dataset import FEATURE_COLUMNS, load_dataset
 from earnings_engine.features.earnings_features import compute_earnings_features
 from earnings_engine.features.price_features import compute_price_features
 from earnings_engine.models.registry import make_model
+from earnings_engine.logging_utils import get_logger
+
+logger = get_logger("earnings_engine.predict")
 
 
 def build_upcoming_events(tickers: list[str], settings: Settings, days: int = 14) -> pd.DataFrame:
     """Feature rows for upcoming earnings, mirroring the training schema."""
     calendar = upcoming_earnings(tickers, settings, days=days)
+    logger.info("building upcoming events tickers=%s days=%s rows=%s", tickers, days, len(calendar))
     if calendar.empty:
         return pd.DataFrame()
 
@@ -53,6 +57,7 @@ def build_upcoming_events(tickers: list[str], settings: Settings, days: int = 14
             **ef,
             "is_in_market": int(market_of(ticker) == "IN"),
         })
+    logger.info("built upcoming feature rows rows=%s", len(rows))
     return pd.DataFrame(rows)
 
 
@@ -69,6 +74,7 @@ def predict_upcoming(
     """
     upcoming = build_upcoming_events(tickers, settings, days=days)
     if upcoming.empty:
+        logger.info("predict_upcoming skipped: no upcoming events")
         return pd.DataFrame()
 
     train = load_dataset()
@@ -82,4 +88,5 @@ def predict_upcoming(
     out["n_past_events"] = upcoming["n_past_events"].values
     out["model"] = model_name
     out["train_events"] = len(train)
+    logger.info("predict_upcoming completed rows=%s train_events=%s", len(out), len(train))
     return out.sort_values("confidence", ascending=False).reset_index(drop=True)

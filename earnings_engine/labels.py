@@ -42,9 +42,12 @@ def compute_reaction(prices: pd.DataFrame, earnings_date: pd.Timestamp) -> React
     # Guard against stale events with huge gaps (delisted/halted tickers).
     if (t_plus - t_minus).days > 10:
         return None
-    c0 = float(prices.loc[t_minus, "close"])
-    c1 = float(prices.loc[t_plus, "close"])
-    if c0 <= 0:
+    try:
+        c0 = float(prices.loc[t_minus, "close"])
+        c1 = float(prices.loc[t_plus, "close"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if pd.isna(c0) or pd.isna(c1) or c0 <= 0:
         return None
     ret = c1 / c0 - 1.0
     return Reaction(
