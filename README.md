@@ -74,9 +74,32 @@ earnings-engine backtest --model past_up_rate   # baseline reference
 earnings-engine predict --days 14
 earnings-engine predict --market IN --days 30
 earnings-engine predict -t TCS.NS -t AAPL
+
+# 5. Launch interactive dashboard for exploring ticker data
+earnings-engine dashboard
 ```
 
-Sample `predict` output:
+The `dashboard` command starts the API server and opens the fully interactive dashboard in your browser. It provides:
+- Ticker search with autocomplete
+- Interactive price charts (line/candlestick with SMA/EMA/volume indicators)
+- Earnings history with surprise percentages and sorting/filtering
+- Market context (market cap, 52-week high/low, earnings scores, support/resistance)
+- Watchlist management (saved to localStorage)
+- Multi-ticker comparison
+- CSV data export
+- Dark/light theme toggle
+- Auto-refresh every 5 minutes
+- Fully responsive mobile design
+
+The dashboard is served at `http://localhost:8000/dashboard` and calls the FastAPI REST endpoints directly. You can also access it manually:
+
+```bash
+# Start the API server
+python -m earnings_engine.api.server
+
+# Then open the dashboard
+open http://localhost:8000/dashboard
+```
 
 ```
 ticker market earnings_date direction confidence  p_up  n_past_events
@@ -96,6 +119,8 @@ The candid takeaway: ticker-level reaction history carries a real +3.2pp hit-rat
 
 ## Documentation
 
+### Core Documentation
+
 Each build phase has a detailed design document:
 
 | Doc | Covers |
@@ -105,6 +130,20 @@ Each build phase has a detailed design document:
 | [docs/phase-3-backtest-baseline.md](docs/phase-3-backtest-baseline.md) | Walk-forward methodology, baseline models, trade simulation |
 | [docs/phase-4-model-card.md](docs/phase-4-model-card.md) | Model card: architecture, calibration, results, limitations |
 | [docs/phase-5-user-guide.md](docs/phase-5-user-guide.md) | End-to-end user guide and operational notes |
+
+### API Server Documentation
+
+- **[API_README.md](API_README.md)** - Complete guide to the FastAPI REST server, including setup, all endpoints, usage examples, and Postman integration
+- **[POSTMAN_GUIDE.md](POSTMAN_GUIDE.md)** - Detailed Postman setup guide with example requests and test scenarios
+
+**Quick API Start:**
+```bash
+# Start the API server
+python -m earnings_engine.api.server
+
+# Visit interactive docs
+open http://localhost:8000/docs
+```
 
 ## Testing
 
