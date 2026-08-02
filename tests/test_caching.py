@@ -95,6 +95,34 @@ def test_earnings_mixed_timezone_offsets(settings, monkeypatch):
     assert df["earnings_date"].dt.tz is None
 
 
+def test_upcoming_earnings_no_duplicates(settings, monkeypatch):
+    # A ticker appearing more than once in the input list (e.g. overlapping
+    # watchlist + market universes) must not produce duplicate result rows.
+    future = pd.Timestamp.today().normalize() + pd.Timedelta(days=5)
+    raw = pd.DataFrame(
+        {
+            "EPS Estimate": [1.0],
+            "Reported EPS": [1.1],
+            "Surprise(%)": [10.0],
+        },
+        index=pd.DatetimeIndex([future], name="Earnings Date").tz_localize("UTC"),
+    )
+
+    class FakeTicker:
+        def __init__(self, symbol):
+            pass
+
+        def get_earnings_dates(self, limit=60):
+            return raw
+
+    monkeypatch.setattr(earnings_mod.yf, "Ticker", FakeTicker)
+    earnings_mod.fetch_earnings("DUP", settings)
+
+    upcoming = earnings_mod.upcoming_earnings(["DUP", "DUP", "DUP"], settings, days=14)
+    assert len(upcoming) == 1
+    assert upcoming.iloc[0]["ticker"] == "DUP"
+
+
 def test_earnings_empty_result_cached(settings, monkeypatch):
     calls = {"n": 0}
 

@@ -12,7 +12,7 @@ from earnings_engine.data import market_context as market_context_mod
 from earnings_engine.logging_utils import get_logger
 from earnings_engine.dataset import FEATURE_COLUMNS
 from earnings_engine.predict import build_upcoming_events, predict_upcoming
-from earnings_engine.reports.render import render_predictions
+from earnings_engine.reports.render import render_dashboard, render_predictions
 
 
 def make_prices(days=400, seed=5):
@@ -91,6 +91,51 @@ def test_render_predictions(wired, tmp_path, monkeypatch):
     assert len(pd.read_csv(csv_path)) == 2
 
 
+def test_render_dashboard(tmp_path, monkeypatch):
+    """Test that render_dashboard creates a valid HTML dashboard file."""
+    import earnings_engine.reports.render as render_mod
+    monkeypatch.setattr(render_mod, "OUTPUT_DIR", tmp_path)
+    
+    html_path = render_dashboard()
+    
+    assert html_path.exists()
+    content = html_path.read_text(encoding="utf-8")
+    
+    # Verify it's valid HTML with key dashboard elements
+    assert "<!DOCTYPE html>" in content
+    assert "<title>Earnings Engine Dashboard</title>" in content
+    assert "tickerSearch" in content
+    assert "autocompleteDropdown" in content
+    
+    # Verify tab-based layout (Results, Swing, Kronos, Watchlist)
+    assert "tab-results" in content
+    assert "tab-swing" in content
+    assert "tab-kronos" in content
+    assert "tab-watchlist" in content
+    
+    # Verify widget containers
+    assert "resultsWidgets" in content
+    assert "swingWidgets" in content
+    assert "kronosWidgets" in content
+    assert "watchlistItems" in content
+    
+    # Verify results table
+    assert "resultsTable" in content
+
+    # Verify refresh with timestamp
+    assert "lastRefreshed" in content
+    assert "refreshBtn" in content
+    assert "dashboard/refresh" in content
+
+    # Verify SQLite & NSE-file backed endpoints
+    assert "dashboard/overview" in content
+    assert "dashboard/results" in content
+    assert "dashboard/swing" in content
+    assert "dashboard/kronos" in content
+    assert "watchlist" in content.lower()
+    assert "universeFilesTable" in content
+
+
 def test_cleanup_previous_artifacts_archives_reports_and_prunes_logs(tmp_path):
     output_dir = tmp_path / "reports" / "output"
     archive_dir = tmp_path / "reports" / "archive"
@@ -151,7 +196,8 @@ def test_enrich_upcoming_results_computes_momentum_and_support_levels(monkeypatc
 
     assert enriched["thirty_day_return_pct"].iloc[0] == pytest.approx(4.0)
     assert enriched["earnings_week_move_pct"].iloc[0] == pytest.approx(4.0)
-    assert enriched["prev_3q_earnings_score"].iloc[0] == 7
+    # Most recent quarter (Q3) score = 5 (from surprise -3% maps to score 5)
+    assert enriched["prev_quarter_earnings_score"].iloc[0] == 5
     assert enriched["next_resistance"].iloc[0] == 104.0
     assert enriched["current_support"].iloc[0] == 100.0
 
@@ -181,8 +227,84 @@ def test_upcoming_results_renders_ledger_section(tmp_path, monkeypatch):
 
     assert "Upcoming Results Ledger" in html
     assert "AAA" in html
-    assert "Risk/Reward" in html
+    assert "risk/reward" in html
     assert "Momentum Bias" in html
+
+
+def test_upcoming_results_formats_market_cap_quality_and_52w_gaps(tmp_path, monkeypatch):
+    """Regression: market cap in Cr, quality as /9, 52W gaps with price, signed percents."""
+    import earnings_engine.reports.render as render_mod
+    from earnings_engine.reports.render import render_upcoming_results_report
+
+    enriched = pd.DataFrame([
+        {
+            "ticker": "DIVISLAB.NS",
+            "earnings_date": pd.Timestamp("2026-08-01"),
+            "market_cap": 2138614792192,          # rupees
+            "current_price": 8056.0,
+            "week_change": 0.192,
+            "pct_from_52w_high": 0.4,             # already ×100
+            "pct_from_52w_low": 42.9,
+            "thirty_day_return_pct": 19.2,
+            "earnings_week_move_pct": 8.7,
+            "earnings_week_high_pct": 8.7,
+            "earnings_week_low_pct": 0.0,
+            "earnings_week_high_price": 8500.0,
+            "earnings_week_low_price": 7800.0,
+            "week_high": 8090.0,
+            "week_low": 5636.5,
+            "prev_quarter_earnings_score": 6,
+            "prev_3q_earnings_score": 6,
+            "q1_earnings_score": 9,
+            "q2_earnings_score": 9,
+            "q3_earnings_score": 6,
+            "q1_week_high_pct": 5.0,
+            "q1_week_low_pct": -2.0,
+            "q1_week_high_price": 8200.0,
+            "q1_week_low_price": 7600.0,
+            "q2_week_high_pct": 6.5,
+            "q2_week_low_pct": -1.5,
+            "q2_week_high_price": 8300.0,
+            "q2_week_low_price": 7700.0,
+            "q3_week_high_pct": 8.7,
+            "q3_week_low_pct": 0.0,
+            "q3_week_high_price": 8500.0,
+            "q3_week_low_price": 7800.0,
+            "next_resistance": 8056.0,
+            "current_support": 6727.26,
+        }
+    ])
+    monkeypatch.setattr(render_mod, "OUTPUT_DIR", tmp_path)
+
+    html_path = render_upcoming_results_report(enriched)
+    html = html_path.read_text(encoding="utf-8")
+
+    # Market cap in crores (not "k Cr")
+    assert "213,861.5 Cr" in html
+    assert "k Cr" not in html
+
+    # Quality scores as /9 (not bare numbers)
+    assert "6/9" in html
+
+    # 52W gaps with percentages on one line, prices on second line
+    assert "+0.4%/+42.9%" in html  # 52W high/low percentages
+    assert "(8,090/5,636)" in html  # 52W prices on separate line
+
+    # Week high/low with percentages on one line, prices on second line
+    assert "+8.7%/+0.0%" in html  # Q3 week high/low percentages
+    assert "(8,500/7,800)" in html  # Q3 prices on separate line
+    assert "+6.5%/-1.5%" in html  # Q2 week high/low percentages
+    assert "(8,300/7,700)" in html  # Q2 prices on separate line
+
+    # Signed percents
+    assert "+19.20%" in html
+    assert "+8.70%" in html
+
+    # Quality scores in format "Q1 | Q2 | Q3" (just scores, no prefix)
+    assert "9/9 | 9/9 | 6/9" in html
+
+    # 3Q average in separate column
+    assert "6/9" in html  # prev_3q_score
 
 
 def test_upcoming_results_exports_timestamped_csv(tmp_path, monkeypatch):
@@ -378,6 +500,71 @@ def test_load_email_settings_reads_environment(monkeypatch):
     assert settings.smtp_password == "secret"
     assert settings.from_address == "sender@example.com"
     assert settings.to_addresses == ("first@example.com", "second@example.com")
+
+
+def test_quality_score_last_quarter_is_last_element():
+    """Regression: last quarter score must be the most recent quarter's score,
+    not an average across multiple quarters."""
+    from earnings_engine.data.market_context import _score_surprise
+
+    # Last quarter weak (2% → 6), prior quarters strong (20% → 9, 18% → 9)
+    earnings = pd.DataFrame({
+        "earnings_date": pd.to_datetime(["2026-01-01", "2026-04-01", "2026-07-01"]),
+        "surprise_pct": [20.0, 18.0, 2.0],
+    })
+
+    # Individual quarter scores: [20%→9, 18%→9, 2%→6]
+    # Last quarter (most recent) = 6
+    recent = earnings.sort_values("earnings_date").tail(1)
+    surprises = pd.to_numeric(recent.get("surprise_pct", pd.Series([0])), errors="coerce").fillna(0)
+    scores = [_score_surprise(float(s)) for s in surprises]
+    assert scores[-1] == 6
+
+    # Verify individual scoring function
+    assert _score_surprise(20.0) == 9
+    assert _score_surprise(18.0) == 9
+    assert _score_surprise(2.0) == 6
+
+
+def test_enrich_upcoming_results_adds_last_quarter_score_and_week_hl(monkeypatch):
+    """Regression: last quarter score and week high/low from last earnings date."""
+    class DummyTicker:
+        def __init__(self, ticker):
+            self.fast_info = {"market_cap": 1_000_000_000, "last_price": 100.0, "year_high": 110.0, "year_low": 90.0, "year_change": 0.05}
+            self.info = {"marketCap": 1_000_000_000, "currentPrice": 100.0, "fiftyTwoWeekHigh": 110.0, "fiftyTwoWeekLow": 90.0}
+
+    # Prices spanning the earnings dates with a clear high/low around each
+    dates = pd.bdate_range("2024-01-01", periods=200)
+    closes = [100.0] * len(dates)
+    # Add a spike around 2024-07-01 (last quarter earnings)
+    for i, d in enumerate(dates):
+        if pd.Timestamp("2024-06-27") <= d <= pd.Timestamp("2024-07-05"):
+            closes[i] = 120.0
+    prices = pd.DataFrame(
+        {"open": closes, "high": [c * 1.01 for c in closes], "low": [c * 0.99 for c in closes],
+         "close": closes, "volume": [1_000] * len(dates)},
+        index=pd.DatetimeIndex(dates, name="date"),
+    )
+    earnings = pd.DataFrame(
+        {
+            "earnings_date": [pd.Timestamp("2024-01-01"), pd.Timestamp("2024-04-01"), pd.Timestamp("2024-07-01")],
+            "surprise_pct": [20.0, 18.0, 2.0],
+        }
+    )
+
+    monkeypatch.setattr(market_context_mod, "fetch_prices", lambda ticker, settings, force=False: prices)
+    monkeypatch.setattr(market_context_mod, "load_earnings", lambda ticker, settings: earnings)
+    monkeypatch.setattr(market_context_mod.yf, "Ticker", lambda ticker: DummyTicker(ticker))
+
+    df = pd.DataFrame([{"ticker": "AAA", "earnings_date": pd.Timestamp("2024-08-01")}])
+    enriched = market_context_mod.enrich_upcoming_results(df, Settings())
+
+    # Last quarter score = most recent quarter (2% → 6)
+    assert enriched["prev_quarter_earnings_score"].iloc[0] == 6
+    # Last quarter week high/low computed from last earnings date (±4 business days)
+    # Last earnings (2024-07-01) has spike to 120, so should have positive high_pct
+    assert enriched["last_week_high_pct"].iloc[0] is not None
+    assert enriched["last_week_high_price"].iloc[0] == 120.0
 
 
 def test_enrich_upcoming_results_adds_earnings_context(monkeypatch):
