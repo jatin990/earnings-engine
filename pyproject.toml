@@ -13,10 +13,21 @@ dependencies = [
     "scikit-learn>=1.4",
     "click>=8.0",
     "python-dotenv>=1.0",
+    "nsetools>=2.0",
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "pydantic>=2.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --ignore=tests/manual"
 
 [project.scripts]
 earnings-engine = "earnings_engine.cli:cli"

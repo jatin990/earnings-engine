@@ -1,0 +1,300 @@
+# Cline Rule Book — Earnings Engine
+
+> These rules govern how Cline (AI assistant) interacts with this codebase.
+> Always follow these rules when making changes or answering questions.
+
+---
+
+## 1. Knowledge Base First
+
+**Rule:** Before making any change, read `KNOWLEDGE_BASE.md` to understand:
+- Where the relevant code lives
+- What data schemas are involved
+- How modules interact
+- What the existing patterns are
+
+**Rule:** After completing any change that affects behavior, update `KNOWLEDGE_BASE.md`:
+- Add to the **Recent Changes Log** (Section 10)
+- Update module references if signatures change
+- Update data schemas if columns are added/removed
+- Update implementation notes if patterns change
+
+---
+
+## 2. Code Location Rules
+
+| Goal | File(s) to change |
+|------|-------------------|
+| Add a new feature | `features/price_features.py` or `features/earnings_features.py` + `dataset.py` `FEATURE_COLUMNS` |
+| Change label definition | `labels.py` `compute_reaction()` |
+| Add a new model | `models/` new class + `registry.py` `MODELS` dict |
+| Change backtest logic | `backtest/engine.py` `run_backtest()` or `compute_metrics()` |
+| Modify report layout | `reports/templates/*.html` |
+| Change report data/formatting | `reports/render.py` |
+| Add CLI command | `cli.py` |
+| Change cache behavior | `data/prices.py` or `data/earnings.py` |
+| Modify universe | `data/universe.py` + `data/universes/*.txt` |
+| Change email behavior | `emailing.py` + `config.py` `EmailSettings` |
+
+---
+
+## 3. Template System Rules
+
+**Rule:** HTML templates are in `earnings_engine/reports/templates/` as standalone `.html` files.
+
+**Rule:** Templates use `{placeholder}` tokens, NOT Python `str.format()` syntax, to avoid CSS brace conflicts.
+
+**Rule:** Template substitution is done via `_render_template(name, **values)` in `render.py`, which uses `str.replace()`.
+
+**Rule:** When adding a new placeholder to a template, ensure the corresponding key is passed to `_render_template()` in `render.py`.
+
+**Rule:** When changing template structure (adding/removing columns, sections), also update:
+- The `_RESULT_ROW` / `card.html` template
+- The column width CSS in `earnings_report_page.html`
+- The `colspan` in the empty-state row
+
+---
+
+## 4. Data Formatting Rules
+
+**Rule:** All percent displays in reports must include `+`/`-` signs (e.g. `+5.2%`, `-3.1%`).
+
+**Rule:** 52-week gap displays must include the price in brackets: `-12.5% (120)`.
+
+**Rule:** Use `_to_float()` helper in `render.py` for safe string-to-float conversion (handles `'4.2%'`).
+
+**Rule:** Use `_fmt_pct_with_price()` for 52W gap formatting in reports.
+
+**Rule:** CLI output uses `_fmt_52w()` helper with the same format as HTML reports for consistency.
+
+---
+
+## 5. Logging Rules
+
+**Rule:** Never log per-ticker/per-item messages in batch operations — use summary logs only.
+
+**Rule:** Summary logs should show counts, not full lists:
+- ✅ `"loaded cached earnings for 3/50 tickers"`
+- ✅ `"loaded cached prices for 2 tickers:\nticker  rows\nRELIANCE  0\nTCS       0"`
+- ❌ `"loaded cached earnings ticker=RELIANCE rows=120"` (per-ticker spam)
+
+**Rule:** CLI logs should show counts, not full ticker lists:
+- ✅ `"upcoming-results requested market=IN days=14 tickers=50"`
+- ❌ `"upcoming-results requested market=IN days=14 tickers=['RELIANCE', 'TCS', ...]"`
+
+---
+
+## 6. HTML Layout Rules
+
+**Rule:** All cards and metrics must have `min-width: 0; overflow: hidden` to prevent grid blowouts.
+
+**Rule:** All text content that could be long must have `overflow-wrap: break-word; word-break: break-word`.
+
+**Rule:** Tables must use `table-layout: fixed` with explicit column widths to prevent overflow.
+
+**Rule:** The ledger table must be wrapped in `<div class="table-wrapper">` for horizontal scroll on narrow screens.
+
+**Rule:** Body padding should be `1rem` (not `2rem`) to maximize usable width.
+
+---
+
+## 7. Point-in-Time Guarantee
+
+**Rule:** Never use data from after the event date when computing features or labels.
+
+**Rule:** `compute_price_features()` must filter `prices.loc[prices.index <= asof_date]`.
+
+**Rule:** `compute_earnings_features()` must use only `earnings_date < current` events.
+
+**Rule:** Backtest folds must cut by `earnings_date < fold_start`.
+
+---
+
+## 8. Cache Rules
+
+**Rule:** Prices cache is SQLite at `data/cache/prices/prices.sqlite3`.
+
+**Rule:** Earnings cache is Parquet at `data/cache/earnings/{ticker}.parquet`.
+
+**Rule:** Dataset cache is Parquet at `data/cache/dataset.parquet`.
+
+**Rule:** Cache freshness is controlled by `settings.cache_max_age_days` (default 1 day).
+
+**Rule:** `--force` flag bypasses freshness checks.
+
+**Rule:** Download failures must be logged but must not crash ingestion.
+
+---
+
+## 9. Testing Rules
+
+**Rule:** After making ANY change (bug fix, feature, refactor, formatting, config), run the full test suite:
+```bash
+python -m pytest tests/ -v
+```
+
+**Rule:** All tests must pass before declaring a task complete. If a test fails, fix the code — do NOT modify test assertions to make them pass (unless the user explicitly asked to update tests).
+
+**Rule:** If adding new functionality, ALWAYS write a test for it. New code without tests is not complete.
+
+**Rule:** If fixing a bug, ALWAYS add a regression test that reproduces the original bug and verifies the fix. The regression test must fail on the old code and pass on the new code.
+
+**Rule:** When changing report formatting, add a test that asserts the exact expected output strings (e.g. `"213,861.5 Cr"`, `"6/9"`, `"+0.4% (8,090)"`).
+
+**Rule:** When changing data schemas or column names, add a test that verifies the new columns exist and have the expected types.
+
+**Rule:** When changing CLI behavior, add a test using `CliRunner` that invokes the command and asserts the output/exit code.
+
+**Rule:** When changing calculations (percentages, conversions, scores), add a test with known input values and assert the exact expected numeric result.
+
+**Rule:** Test files live in `tests/` and follow the pattern `test_<module>.py`. Use `pytest` fixtures and `monkeypatch` for mocking external dependencies (yfinance, SMTP, etc.).
+
+**Rule:** After adding a test, run it specifically first, then run the full suite:
+```bash
+python -m pytest tests/test_predict.py -v   # specific file
+python -m pytest tests/ -v                  # full suite
+```
+
+**Rule:** Update `KNOWLEDGE_BASE.md` Section 7 (Test Coverage) whenever tests are added or removed.
+
+---
+
+## 10. Documentation Rules
+
+**Rule:** Update `KNOWLEDGE_BASE.md` after any change that affects:
+- Function signatures
+- Data schemas/columns
+- Module behavior
+- CLI commands/options
+- Report layout/formatting
+
+**Rule:** Update the **Recent Changes Log** in `KNOWLEDGE_BASE.md` with date and description.
+
+**Rule:** If adding a new feature, document it in the appropriate section of `KNOWLEDGE_BASE.md`.
+
+---
+
+## 11. Code Style Rules
+
+**Rule:** Use type hints for all function signatures.
+
+**Rule:** Use `from __future__ import annotations` at the top of every module.
+
+**Rule:** Use `pd.NA` for missing values in DataFrames, not `None` or `np.nan`.
+
+**Rule:** Use `pd.notna()` for null checks, not `is not None`.
+
+**Rule:** Use f-strings for string formatting.
+
+**Rule:** Use `pathlib.Path` for file paths, not `os.path`.
+
+**Rule:** Use `dict[str, int]` syntax (Python 3.9+), not `Dict[int, str]`.
+
+---
+
+## 12. yfinance Rules
+
+**Rule:** NSE tickers must have `.NS` suffix; use `market_of(ticker)` to infer market.
+
+**Rule:** Always wrap yfinance calls in try/except — download failures are common.
+
+**Rule:** Try `fast_info` first, fall back to `.info` for market data.
+
+**Rule:** Use `get_earnings_dates(limit=60)` for earnings; handle None/empty returns.
+
+**Rule:** Add pauses between requests (`request_pause_secs`) to avoid rate limits.
+
+---
+
+## 13. Report Rendering Rules
+
+**Rule:** Always use `_fmt()` helper for formatting numbers in reports.
+
+**Rule:** Always use `_to_float()` for converting user-provided or cached values to float.
+
+**Rule:** Always use `_fmt_pct_with_price()` for 52W gap displays.
+
+**Rule:** Card metrics must be grouped in 2-column grids (`.metrics-grid`).
+
+**Rule:** Each card must include: market cap, price, 30D return, week high/low, 52W gaps, earnings week move, quality scores, resistance/support, setup signal, risk/reward, momentum bias, quality rating explanation, and take commentary.
+
+---
+
+## 14. Model Rules
+
+**Rule:** All models must implement `DirectionModel` interface (`fit`, `predict_proba`).
+
+**Rule:** All models must have a `name` attribute for CLI/registry lookup.
+
+**Rule:** Register new models in `models/registry.py` `MODELS` dict.
+
+**Rule:** Use conservative hyperparameters — datasets are small and noisy.
+
+**Rule:** Calibrate probabilities if `len(train) >= 150` and both labels present.
+
+---
+
+## 15. Backtest Rules
+
+**Rule:** Walk-forward folds must be cut by calendar time (`earnings_date`), not by row count.
+
+**Rule:** Model must be refit each fold (no peeking into the future).
+
+**Rule:** Trade simulation: long if `proba >= threshold`, short if `proba <= 1-threshold`, else skip.
+
+**Rule:** Subtract round-trip cost from every trade: `trade_return = side * reaction_return - cost_per_trade`.
+
+**Rule:** Report both per-fold and overall metrics.
+
+---
+
+## 16. When in Doubt
+
+**Rule:** If unsure where to make a change, read `KNOWLEDGE_BASE.md` Section 9 (Common Modification Points).
+
+**Rule:** If `KNOWLEDGE_BASE.md` is missing information, update it after resolving the uncertainty.
+
+**Rule:** If a change affects multiple modules, update all affected sections of `KNOWLEDGE_BASE.md`.
+
+**Rule:** When in doubt about data formats, check the actual DataFrame columns in the code rather than guessing.
+
+---
+
+## 17. Prohibited Actions
+
+- ❌ Do NOT use `str.format()` on HTML templates (use `_render_template()` instead)
+- ❌ Do NOT log per-item messages in batch operations
+- ❌ Do NOT use future data in features or labels
+- ❌ Do NOT modify `data/cache/` files directly — use the provided functions
+- ❌ Do NOT hardcode ticker lists in code — use universe files
+- ❌ Do NOT commit secrets/passwords — use `.env` and `EmailSettings`
+- ❌ Do NOT use `np.nan` in DataFrames — use `pd.NA`
+- ❌ Do NOT use `is None` for null checks on DataFrame values — use `pd.isna()`/`pd.notna()`
+
+---
+
+## 18. Quick Reference
+
+**Key files to read first:**
+1. `KNOWLEDGE_BASE.md` — always read this first
+2. `config.py` — understand paths and settings
+3. `cli.py` — understand the command flow
+
+**Key functions to know:**
+- `build_dataset()` — builds the training data
+- `predict_upcoming()` — scores upcoming events
+- `run_backtest()` — evaluates model performance
+- `render_upcoming_results_report()` — generates HTML report
+- `enrich_upcoming_results()` — adds market context
+
+**Key data locations:**
+- `data/cache/prices/` — SQLite price data
+- `data/cache/earnings/` — Parquet earnings data
+- `data/cache/dataset.parquet` — built event dataset
+- `reports/output/` — generated reports
+- `logs/` — log files
+
+---
+
+*Last updated: 2026-08-01*
+*These rules are enforced by Cline during all code interactions.*
