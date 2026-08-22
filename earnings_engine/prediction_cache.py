@@ -1,39 +1,43 @@
-"""Daily JSON cache for Kronos + GBM predictions.
+"""SQLite-backed daily cache for Kronos + GBM predictions.
 
-Cached predictions are keyed by the calendar date on which they were generated.
-When the ``upcoming-results`` command runs again on the same day, the cached
-predictions are reused instead of re-training the GBM model and re-running the
-Kronos model + Ollama calls.
-
-Cache layout: data/cache/predictions/predictions-YYYY-MM-DD.json
-{
-  "generated_date": "2026-08-04",
-  "kronos": {"TICKER.NS": {full kronos dict}, ...},
-  "gbm": {"TICKER.NS": {p_up, direction, confidence, earnings_date,
-                         train_events, model}, ...}
-}
+Cached predictions are stored directly in the primary SQLite database (table `daily_prediction_cache`).
+When the ``upcoming-results`` command or dashboard runs again on the same day, cached predictions
+are reused instead of re-training the GBM model and re-running the Kronos model + Ollama calls.
 """
 
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from earnings_engine.config import CACHE_DIR
+from earnings_engine.config import Settings
+from earnings_engine.data.prices import _cache_path
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.prediction_cache")
 
-PREDICTIONS_DIR = CACHE_DIR / "predictions"
 
-
-def cache_path(date_str: str | None = None) -> Path:
-    """Path to the daily predictions cache file."""
-    if date_str is None:
-        date_str = datetime.now().strftime("%Y-%m-%d")
-    return PREDICTIONS_DIR / f"predictions-{date_str}.json"
+def _connect(settings: Settings | None = None) -> sqlite3.Connection:
+    s = settings or Settings()
+    s.ensure_dirs()
+    conn = sqlite3.connect(_cache_path(s))
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS daily_prediction_cache (
+            cache_date TEXT NOT NULL,
+            model_type TEXT NOT NULL,
+            ticker TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (cache_date, model_type, ticker)
+        )
+        """
+    )
+    conn.commit()
+    return conn
 
 
 def _normalize_ticker(ticker: str) -> str:
@@ -49,101 +53,100 @@ def _normalize_ticker(ticker: str) -> str:
 def load_prediction_cache(
     tickers: list[str],
     date_str: str | None = None,
+    settings: Settings | None = None,
 ) -> dict[str, dict[str, dict[str, Any]]] | None:
-    """Load today's cached predictions, keyed by the caller's ticker strings.
+    """Load today's cached predictions from SQLite.
 
     Returns {"kronos": {...}, "gbm": {...}} if the cache exists for today and
     covers ALL requested tickers; otherwise returns None so the caller
     recomputes and calls save_prediction_cache.
     """
-    path = cache_path(date_str)
-    if not path.exists():
-        logger.info("[PRED-CACHE] No cache at %s", path)
+    if date_str is None:
+        date_str = datetime.now().strftime("%Y-%m-%d")
+
+    norm_to_orig = {_normalize_ticker(t): t for t in tickers}
+    requested_norm = set(norm_to_orig.keys())
+
+    conn = _connect(settings)
+    rows = conn.execute(
+        "SELECT model_type, ticker, payload FROM daily_prediction_cache WHERE cache_date = ?",
+        (date_str,),
+    ).fetchall()
+    conn.close()
+
+    kronos_dict: dict[str, Any] = {}
+    gbm_dict: dict[str, Any] = {}
+
+    for model_type, ticker, payload_str in rows:
+        norm_t = _normalize_ticker(ticker)
+        if norm_t in requested_norm:
+            try:
+                val = json.loads(payload_str)
+                if model_type == "kronos":
+                    kronos_dict[norm_t] = val
+                elif model_type == "gbm":
+                    gbm_dict[norm_t] = val
+            except Exception:
+                pass
+
+    if requested_norm - set(kronos_dict.keys()) or requested_norm - set(gbm_dict.keys()):
+        logger.info(
+            "[PRED-CACHE] Partial cache in SQLite for %s: missing %d/%d -> recomputing",
+            date_str,
+            len(requested_norm - set(kronos_dict.keys())),
+            len(tickers),
+        )
         return None
 
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("[PRED-CACHE] Corrupt cache %s: %s", path, exc)
-        return None
-
-    expected_date = path.stem.replace("predictions-", "")
-    if data.get("generated_date") != expected_date:
-        logger.info("[PRED-CACHE] Cache is from a previous day: %s (expected %s)",
-                    data.get("generated_date"), expected_date)
-        return None
-
-    def _norm(cache_map: dict) -> dict[str, dict[str, Any]]:
-        return {_normalize_ticker(k): v for k, v in (cache_map or {}).items()}
-
-    norm_kronos = _norm(data.get("kronos") or {})
-    norm_gbm = _norm(data.get("gbm") or {})
-
-    requested = {_normalize_ticker(t) for t in tickers}
-    missing_kronos = requested - set(norm_kronos.keys())
-    missing_gbm = requested - set(norm_gbm.keys())
-    if missing_kronos or missing_gbm:
-        logger.info("[PRED-CACHE] Partial cache: missing kronos=%s gbm=%s -> recomputing",
-                    sorted(missing_kronos), sorted(missing_gbm))
-        return None
-
-    result_kronos: dict[str, dict[str, Any]] = {}
-    result_gbm: dict[str, dict[str, Any]] = {}
-    for t in tickers:
-        base = _normalize_ticker(t)
-        result_kronos[t] = norm_kronos[base]
-        result_gbm[t] = norm_gbm[base]
-
-    logger.info("[PRED-CACHE] Cache hit for %d tickers (%s)", len(tickers), path)
+    result_kronos = {t: kronos_dict[_normalize_ticker(t)] for t in tickers}
+    result_gbm = {t: gbm_dict[_normalize_ticker(t)] for t in tickers}
+    logger.info("[PRED-CACHE] Cache hit in SQLite for %d tickers (%s)", len(tickers), date_str)
     return {"kronos": result_kronos, "gbm": result_gbm}
 
 
 def load_prediction_cache_partial(
     tickers: list[str],
     date_str: str | None = None,
+    settings: Settings | None = None,
 ) -> dict[str, dict[str, dict[str, Any]]]:
-    """Load available per-ticker coverage from today's cache (not all-or-nothing).
+    """Load available per-ticker coverage from SQLite (not all-or-nothing)."""
+    if date_str is None:
+        date_str = datetime.now().strftime("%Y-%m-%d")
 
-    Unlike :func:`load_prediction_cache` (which returns ``None`` unless EVERY
-    requested ticker is covered), this returns whatever per-ticker entries exist
-    for today so callers can reuse partial coverage and compute only the gaps.
+    norm_to_orig = {_normalize_ticker(t): t for t in tickers}
+    requested_norm = set(norm_to_orig.keys())
 
-    Returns ``{"kronos": {...}, "gbm": {...}}`` keyed by the caller's ticker
-    strings (only the entries that are present).  Empty dicts if no cache.
-    """
-    path = cache_path(date_str)
-    if not path.exists():
-        return {"kronos": {}, "gbm": {}}
+    conn = _connect(settings)
+    rows = conn.execute(
+        "SELECT model_type, ticker, payload FROM daily_prediction_cache WHERE cache_date = ?",
+        (date_str,),
+    ).fetchall()
+    conn.close()
 
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("[PRED-CACHE] Corrupt cache %s: %s", path, exc)
-        return {"kronos": {}, "gbm": {}}
+    result_kronos: dict[str, Any] = {}
+    result_gbm: dict[str, Any] = {}
 
-    expected_date = path.stem.replace("predictions-", "")
-    if data.get("generated_date") != expected_date:
-        logger.info("[PRED-CACHE] Cache is from a previous day: %s (expected %s)",
-                    data.get("generated_date"), expected_date)
-        return {"kronos": {}, "gbm": {}}
+    for model_type, ticker, payload_str in rows:
+        norm_t = _normalize_ticker(ticker)
+        if norm_t in requested_norm:
+            orig_t = norm_to_orig[norm_t]
+            try:
+                val = json.loads(payload_str)
+                if model_type == "kronos":
+                    result_kronos[orig_t] = val
+                elif model_type == "gbm":
+                    result_gbm[orig_t] = val
+            except Exception:
+                pass
 
-    def _norm(cache_map: dict) -> dict[str, dict[str, Any]]:
-        return {_normalize_ticker(k): v for k, v in (cache_map or {}).items()}
-
-    norm_kronos = _norm(data.get("kronos") or {})
-    norm_gbm = _norm(data.get("gbm") or {})
-
-    result_kronos: dict[str, dict[str, Any]] = {}
-    result_gbm: dict[str, dict[str, Any]] = {}
-    for t in tickers:
-        base = _normalize_ticker(t)
-        if base in norm_kronos:
-            result_kronos[t] = norm_kronos[base]
-        if base in norm_gbm:
-            result_gbm[t] = norm_gbm[base]
-
-    logger.info("[PRED-CACHE] Partial cache hit: kronos=%d/%d gbm=%d/%d tickers (%s)",
-                len(result_kronos), len(tickers), len(result_gbm), len(tickers), path)
+    logger.info(
+        "[PRED-CACHE] Partial SQLite hit: kronos=%d/%d gbm=%d/%d tickers (%s)",
+        len(result_kronos),
+        len(tickers),
+        len(result_gbm),
+        len(tickers),
+        date_str,
+    )
     return {"kronos": result_kronos, "gbm": result_gbm}
 
 
@@ -151,28 +154,39 @@ def save_prediction_cache(
     kronos_map: dict[str, dict[str, Any]],
     gbm_map: dict[str, dict[str, Any]],
     date_str: str | None = None,
-) -> Path:
-    """Persist a daily predictions cache file, merging with any existing one."""
-    PREDICTIONS_DIR.mkdir(parents=True, exist_ok=True)
+    settings: Settings | None = None,
+) -> None:
+    """Persist daily predictions cache directly into SQLite."""
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
-    path = cache_path(date_str)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    existing: dict[str, Any] = {}
-    if path.exists():
-        try:
-            existing = json.loads(path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            existing = {}
-
-    existing.setdefault("kronos", {}).update(kronos_map or {})
-    existing.setdefault("gbm", {}).update(gbm_map or {})
-    existing["generated_date"] = date_str
-
-    path.write_text(
-        json.dumps(existing, indent=2, ensure_ascii=False, default=str),
-        encoding="utf-8",
+    conn = _connect(settings)
+    with conn:
+        for ticker, payload in (kronos_map or {}).items():
+            payload_json = json.dumps(payload, default=str)
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO daily_prediction_cache
+                (cache_date, model_type, ticker, payload, updated_at)
+                VALUES (?, 'kronos', ?, ?, ?)
+                """,
+                (date_str, ticker, payload_json, now_str),
+            )
+        for ticker, payload in (gbm_map or {}).items():
+            payload_json = json.dumps(payload, default=str)
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO daily_prediction_cache
+                (cache_date, model_type, ticker, payload, updated_at)
+                VALUES (?, 'gbm', ?, ?, ?)
+                """,
+                (date_str, ticker, payload_json, now_str),
+            )
+    conn.close()
+    logger.info(
+        "[PRED-CACHE] Saved %d kronos + %d gbm predictions to SQLite (%s)",
+        len(kronos_map or {}),
+        len(gbm_map or {}),
+        date_str,
     )
-    logger.info("[PRED-CACHE] Saved %d kronos + %d gbm predictions to %s",
-                len(existing.get("kronos", {})), len(existing.get("gbm", {})), path)
-    return path
