@@ -9,20 +9,49 @@
 
             // ---------- Watchlist tab (multi-list manager) ----------
             watchlistTab: {
-                names: {},  // symbol -> display name cache for chip tooltips / autocomplete
-                ranges: {}, // watchlist:ticker -> swing range object
+                names: {},       // symbol -> display name cache for chip tooltips / autocomplete
+                ranges: {},      // watchlist:ticker -> swing range object
+                customLists: [], // Custom user watchlists
+                universes: [],   // Built-in universes (NSE Top, US Top, NSE Large Cap, etc.)
+                activeFilter: 'all', // 'all', 'under_100', 'universes', 'custom'
+                searchQuery: '',
+
+                setFilter(filterName) {
+                    this.activeFilter = filterName || 'all';
+                    ['all', 'under_100', 'universes', 'custom'].forEach(f => {
+                        const btn = document.getElementById('wlFilter' + (f === 'all' ? 'All' : (f === 'under_100' ? 'Under100' : (f === 'universes' ? 'Universes' : 'Custom'))));
+                        if (btn) {
+                            if (f === this.activeFilter) {
+                                btn.classList.add('active');
+                                btn.style.fontWeight = '700';
+                            } else {
+                                btn.classList.remove('active');
+                                btn.style.fontWeight = 'normal';
+                            }
+                        }
+                    });
+                    this.renderCards();
+                },
+
+                handleSearch(q) {
+                    this.searchQuery = (q || '').trim().toLowerCase();
+                    this.renderCards();
+                },
 
                 async load() {
                     const el = document.getElementById('watchlistCards');
                     if (!el) return;
-                    if (!el.children.length) el.innerHTML = '<div class="timestamp" style="padding:0.5rem;">Loading watchlists...</div>';
+                    if (!el.children.length) el.innerHTML = '<div class="timestamp" style="padding:0.5rem;">Loading watchlists & universes...</div>';
                     try {
                         const res = await fetch(API_BASE + '/api/v1/watchlist/all');
                         const data = await res.json();
-                        const lists = data.watchlists || [];
-                        if (!lists.length) {
-                            el.innerHTML = '<div class="card" style="margin:0">No watchlists yet — click <strong>＋ New Watchlist</strong> to create one.</div>';
-                            return;
+                        this.customLists = data.watchlists || [];
+                        this.universes = data.universes || [];
+
+                        const totalBadge = document.getElementById('wlTotalBadge');
+                        if (totalBadge) {
+                            const totalLists = this.customLists.length + this.universes.length;
+                            totalBadge.textContent = totalLists + ' lists (' + this.universes.length + ' universes, ' + this.customLists.length + ' custom)';
                         }
 
                         // Pre-fetch stored swing ranges for all watchlists in 1 fast query
@@ -36,8 +65,8 @@
                             });
                         } catch (err) {}
 
-                        el.innerHTML = lists.map((w, wi) => this._card(w, wi)).join('');
-                        lists.forEach((w, wi) => this._wireRowAutocomplete(wi, w.name));
+                        this.renderCards();
+
                         if (app.populateWatchlistDropdowns) app.populateWatchlistDropdowns();
                         if (app.populateKronosWatchlist) app.populateKronosWatchlist();
                     } catch (e) {
@@ -46,9 +75,129 @@
                     }
                 },
 
-                _card(w, wi) {
+                renderCards() {
+                    const el = document.getElementById('watchlistCards');
+                    if (!el) return;
+
+                    let filteredCustom = [...this.customLists];
+                    let filteredUniverses = [...this.universes];
+
+                    if (this.activeFilter === 'under_100') {
+                        filteredCustom = filteredCustom.filter(w => (w.tickers || []).length <= 100);
+                        filteredUniverses = filteredUniverses.filter(u => (u.tickers || []).length <= 100);
+                    } else if (this.activeFilter === 'universes') {
+                        filteredCustom = [];
+                    } else if (this.activeFilter === 'custom') {
+                        filteredUniverses = [];
+                    }
+
+                    if (this.searchQuery) {
+                        const q = this.searchQuery;
+                        filteredCustom = filteredCustom.filter(w => {
+                            const nameMatch = (w.name || '').toLowerCase().includes(q);
+                            const tickerMatch = (w.tickers || []).some(t => t.toLowerCase().includes(q));
+                            return nameMatch || tickerMatch;
+                        });
+                        filteredUniverses = filteredUniverses.filter(u => {
+                            const nameMatch = (u.name || '').toLowerCase().includes(q) || (u.display_name || '').toLowerCase().includes(q) || (u.explanation || '').toLowerCase().includes(q);
+                            const tickerMatch = (u.tickers || []).some(t => t.toLowerCase().includes(q));
+                            return nameMatch || tickerMatch;
+                        });
+                    }
+
+                    if (!filteredCustom.length && !filteredUniverses.length) {
+                        el.innerHTML = '<div class="card" style="margin:0;padding:1.5rem;text-align:center;color:var(--muted);">' +
+                            'No watchlists found matching this filter.' +
+                            (this.activeFilter !== 'all' || this.searchQuery ? '<br><button class="btn btn-sm btn-primary" onclick="app.watchlistTab.setFilter(\'all\'); if(document.getElementById(\'wlSearchInput\')) document.getElementById(\'wlSearchInput\').value=\'\'; app.watchlistTab.handleSearch(\'\');" style="margin-top:0.75rem;">Reset Filters</button>' : '') +
+                            '</div>';
+                        return;
+                    }
+
+                    let html = '';
+
+                    // 1. Built-in Universes (if any match filter)
+                    if (filteredUniverses.length) {
+                        html += '<div style="margin-top:0.25rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;">' +
+                            '<h4 style="margin:0;font-size:0.95rem;color:#c7d2fe;display:flex;align-items:center;gap:0.35rem;">🏛️ Built-in Universes & Indices <span style="font-size:0.75rem;background:rgba(99,102,241,0.2);padding:0.1rem 0.4rem;border-radius:9999px;">' + filteredUniverses.length + '</span></h4>' +
+                            '</div>';
+                        html += filteredUniverses.map((u, ui) => this._universeCard(u, ui)).join('');
+                    }
+
+                    // 2. Custom User Watchlists (if any match filter)
+                    if (filteredCustom.length) {
+                        html += '<div style="margin-top:1rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;">' +
+                            '<h4 style="margin:0;font-size:0.95rem;color:#e9d5ff;display:flex;align-items:center;gap:0.35rem;">⭐ Custom User Watchlists <span style="font-size:0.75rem;background:rgba(168,85,247,0.2);padding:0.1rem 0.4rem;border-radius:9999px;">' + filteredCustom.length + '</span></h4>' +
+                            '</div>';
+                        html += filteredCustom.map((w, wi) => this._customCard(w, wi)).join('');
+                    }
+
+                    el.innerHTML = html;
+                    filteredCustom.forEach((w, wi) => this._wireRowAutocomplete(wi, w.name));
+                },
+
+                _universeCard(u, ui) {
+                    const name = u.display_name || u.name;
+                    const tickers = u.tickers || [];
+                    const isUnder100 = tickers.length <= 100;
+                    const chips = tickers.length
+                        ? tickers.map(t => {
+                            const r = this.ranges[u.name + ':' + t] || this.ranges['ALL:' + t];
+                            const hasRange = r && r.lower_bound != null && r.upper_bound != null;
+                            const isUser = r && r.source === 'user';
+                            const rangeBadge = hasRange
+                                ? '<span style="font-size:0.72rem;opacity:0.85;margin-left:0.25rem;color:' + (isUser ? '#c084fc' : '#60a5fa') + ';" title="' + (isUser ? 'Custom swing range' : 'Auto swing range') + '">' +
+                                  r.lower_bound + '–' + r.upper_bound + (r.cycles ? ' ⤫' + r.cycles : '') +
+                                  '</span>'
+                                : '';
+                            return '<span style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(99,102,241,0.12);border:1px solid ' + (isUser ? 'rgba(139,92,246,0.45)' : 'rgba(99,102,241,0.25)') + ';padding:0.25rem 0.6rem;border-radius:9999px;font-size:0.78rem;" title="' + (this.names[t] || t) + '">' +
+                                '<strong>' + t + '</strong>' +
+                                rangeBadge +
+                                '<button onclick="app.openSwingRangeModal(\'' + u.name.replace(/'/g, "\\'") + '\',\'' + t.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--light);opacity:0.7;cursor:pointer;font-size:0.75rem;line-height:1;padding:0 0.15rem;" title="Edit Swing Range">⚙</button>' +
+                                '</span>';
+                          }).join('')
+                        : '<span class="timestamp" style="font-size:0.8rem;">No symbols in universe.</span>';
+
+                    const under100Badge = isUnder100
+                        ? '<span style="background:rgba(234,179,8,0.2);color:#fef08a;border:1px solid rgba(234,179,8,0.4);font-size:0.7rem;font-weight:700;padding:0.12rem 0.45rem;border-radius:9999px;">⚡ Under 100 Stocks</span>'
+                        : '';
+
+                    const marketBadge = u.market === 'IN'
+                        ? '<span style="background:rgba(16,185,129,0.15);color:#6ee7b7;font-size:0.7rem;padding:0.12rem 0.45rem;border-radius:9999px;font-weight:600;">🇮🇳 India (NSE)</span>'
+                        : '<span style="background:rgba(59,130,246,0.15);color:#93c5fd;font-size:0.7rem;padding:0.12rem 0.45rem;border-radius:9999px;font-weight:600;">🇺🇸 US (NYSE/NASDAQ)</span>';
+
+                    const explanationHtml = u.explanation
+                        ? '<div style="background:rgba(255,255,255,0.03);border-left:3px solid #818cf8;padding:0.5rem 0.75rem;border-radius:0 0.4rem 0.4rem 0;margin-bottom:0.65rem;font-size:0.8rem;line-height:1.45;color:#e2e8f0;">' +
+                          '<div style="font-weight:600;color:#c7d2fe;margin-bottom:0.15rem;display:flex;align-items:center;gap:0.3rem;">💡 <span>Knowledge Base & Selection Criteria:</span></div>' +
+                          '<div>' + u.explanation + '</div>' +
+                          (u.selection_criteria ? '<div style="font-size:0.72rem;color:var(--muted);margin-top:0.25rem;"><strong>Criteria:</strong> ' + u.selection_criteria + '</div>' : '') +
+                          '</div>'
+                        : '';
+
+                    return '<div class="card" id="uCard' + ui + '" style="margin:0 0 0.75rem 0;border:1px solid rgba(99,102,241,0.25);background:linear-gradient(180deg, rgba(30,41,59,0.6) 0%, rgba(15,23,42,0.6) 100%);">' +
+                        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">' +
+                            '<div>' +
+                                '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.25rem;">' +
+                                    '<h4 style="margin:0;font-size:1.05rem;color:#f8fafc;">' + name + '</h4>' +
+                                    '<span style="background:rgba(99,102,241,0.2);color:#c7d2fe;font-size:0.7rem;font-weight:600;padding:0.12rem 0.45rem;border-radius:9999px;">🏛️ Built-in Universe</span>' +
+                                    under100Badge +
+                                    marketBadge +
+                                '</div>' +
+                                '<span class="timestamp" style="font-size:0.72rem;">' + tickers.length + ' stocks tracked</span>' +
+                            '</div>' +
+                            '<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">' +
+                                '<button class="btn btn-sm" onclick="app.watchlistTab.copyToCustom(\'' + u.name.replace(/'/g, "\\'") + '\',\'' + (u.display_name || u.name).replace(/'/g, "\\'") + '\',' + JSON.stringify(tickers).replace(/"/g, '&quot;') + ')" style="background:rgba(168,85,247,0.15);color:#e9d5ff;border:1px solid rgba(168,85,247,0.35);" title="Copy all tickers into a customizable custom watchlist">📋 Copy to Custom</button>' +
+                                '<button class="btn btn-sm" onclick="app.switchTab(\'results\'); const el = document.getElementById(\'resultsMarket\'); if(el) { el.value=\'' + u.name.toUpperCase() + '\'; app.loadResultsReport(); }" style="background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.35);" title="View in Corporate Results tab">📈 Results</button>' +
+                            '</div>' +
+                        '</div>' +
+                        explanationHtml +
+                        '<div style="display:flex;flex-wrap:wrap;gap:0.35rem;max-height:220px;overflow-y:auto;padding-right:0.25rem;">' + chips + '</div>' +
+                    '</div>';
+                },
+
+                _customCard(w, wi) {
                     const name = w.name || ('Watchlist ' + (wi + 1));
                     const tickers = w.tickers || [];
+                    const isUnder100 = tickers.length <= 100;
                     const chips = tickers.length
                         ? tickers.map(t => {
                             const r = this.ranges[name + ':' + t];
@@ -67,10 +216,21 @@
                                 '</span>';
                           }).join('')
                         : '<span class="timestamp" style="font-size:0.8rem;">Empty — add a ticker below.</span>';
-                    return '<div class="card" id="wlCard' + wi + '" style="margin:0;position:relative;z-index:' + (200 - wi) + ';">' +
+
+                    const under100Badge = isUnder100
+                        ? '<span style="background:rgba(234,179,8,0.2);color:#fef08a;border:1px solid rgba(234,179,8,0.4);font-size:0.7rem;font-weight:700;padding:0.12rem 0.45rem;border-radius:9999px;">⚡ Under 100 Stocks</span>'
+                        : '';
+
+                    return '<div class="card" id="wlCard' + wi + '" style="margin:0 0 0.75rem 0;position:relative;z-index:' + (200 - wi) + ';border:1px solid rgba(168,85,247,0.25);">' +
                         '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.6rem;">' +
-                            '<div><h4 style="margin:0;">' + name + '</h4>' +
-                            '<span class="timestamp" style="font-size:0.72rem;">' + tickers.length + ' stock' + (tickers.length === 1 ? '' : 's') + '</span></div>' +
+                            '<div>' +
+                                '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.2rem;">' +
+                                    '<h4 style="margin:0;font-size:1.05rem;">' + name + '</h4>' +
+                                    '<span style="background:rgba(168,85,247,0.2);color:#e9d5ff;font-size:0.7rem;font-weight:600;padding:0.12rem 0.45rem;border-radius:9999px;">⭐ Custom Watchlist</span>' +
+                                    under100Badge +
+                                '</div>' +
+                                '<span class="timestamp" style="font-size:0.72rem;">' + tickers.length + ' stock' + (tickers.length === 1 ? '' : 's') + '</span>' +
+                            '</div>' +
                             '<div style="display:flex;gap:0.35rem;">' +
                                 '<button class="btn btn-sm" onclick="app.watchlistTab.rename(\'' + name.replace(/'/g, "\\'") + '\')">✎ Rename</button>' +
                                 '<button class="btn btn-sm btn-danger" onclick="app.watchlistTab.remove(\'' + name.replace(/'/g, "\\'") + '\')">🗑 Delete</button>' +
@@ -83,6 +243,29 @@
                         '</div>' +
                         '<div id="wlChips' + wi + '" style="display:flex;flex-wrap:wrap;gap:0.4rem;">' + chips + '</div>' +
                     '</div>';
+                },
+
+                async copyToCustom(sourceName, displayName, tickers) {
+                    const defaultName = (displayName || sourceName).replace(/[^a-zA-Z0-9 ]/g, '').trim() + ' Copy';
+                    const name = prompt('Create a new custom watchlist copied from ' + (displayName || sourceName) + ':', defaultName);
+                    if (!name || !name.trim()) return;
+                    try {
+                        const res = await fetch(API_BASE + '/api/v1/watchlist/create', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({name: name.trim(), tickers: tickers || []})
+                        });
+                        const data = await res.json();
+                        if (!data.success) {
+                            alert(data.error || 'Failed to create watchlist');
+                            return;
+                        }
+                        await this.load();
+                        this.setFilter('custom');
+                    } catch (e) {
+                        console.error('copyToCustom error:', e);
+                        alert('Error copying watchlist: ' + (e.message || e));
+                    }
                 },
 
                 _wireRowAutocomplete(wi, name) {
@@ -230,6 +413,68 @@
                 }
             },
 
+            activeFetchControllers: {},
+
+            fetchWithAbort(taskName, url, options = {}) {
+                if (this.activeFetchControllers[taskName]) {
+                    try {
+                        this.activeFetchControllers[taskName].abort('Superseded by new request');
+                    } catch (e) {}
+                }
+                const controller = new AbortController();
+                this.activeFetchControllers[taskName] = controller;
+                return fetch(url, { ...options, signal: controller.signal })
+                    .finally(() => {
+                        if (this.activeFetchControllers[taskName] === controller) {
+                            delete this.activeFetchControllers[taskName];
+                        }
+                    });
+            },
+
+            cancelReportLoad(taskName) {
+                if (this.activeFetchControllers[taskName]) {
+                    try {
+                        this.activeFetchControllers[taskName].abort('User cancelled');
+                    } catch (e) {}
+                    delete this.activeFetchControllers[taskName];
+                }
+                this.resetTaskLoadingUI(taskName, '⚠️ Request cancelled by user.');
+            },
+
+            cancelAllPendingRequests(reason = 'Tab switched') {
+                Object.keys(this.activeFetchControllers || {}).forEach(taskName => {
+                    try {
+                        if (this.activeFetchControllers[taskName]) {
+                            this.activeFetchControllers[taskName].abort(reason);
+                        }
+                    } catch (e) {}
+                    this.resetTaskLoadingUI(taskName, '⚠️ Loading cancelled (' + reason + ').');
+                });
+                this.activeFetchControllers = {};
+            },
+
+            resetTaskLoadingUI(taskName, statusMessage) {
+                if (taskName === 'results') {
+                    const topBtn = document.getElementById('resultsLoadBtn');
+                    if (topBtn) { topBtn.disabled = false; topBtn.innerHTML = '▶ Load Report'; }
+                    const centerBtn = document.getElementById('resultsCenterLoadBtn');
+                    if (centerBtn) { centerBtn.disabled = false; centerBtn.innerHTML = '▶ Load Results Report (±2 Months)'; }
+                    const cancelBtn = document.getElementById('resultsCancelBtn');
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                    const statusEl = document.getElementById('resultsReportStatus');
+                    if (statusEl && statusMessage) statusEl.textContent = statusMessage;
+                } else if (taskName === 'monthfilter') {
+                    const syncBtn = document.getElementById('mfSyncBtn');
+                    if (syncBtn) { syncBtn.disabled = false; syncBtn.innerHTML = '🔄 Sync Delta'; }
+                    const refreshBtn = document.getElementById('mfRefreshBtn');
+                    if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.innerHTML = '↻ Refresh'; }
+                    const cancelBtn = document.getElementById('mfCancelBtn');
+                    if (cancelBtn) cancelBtn.style.display = 'none';
+                    const statusEl = document.getElementById('mfReportStatus');
+                    if (statusEl && statusMessage) statusEl.textContent = statusMessage;
+                }
+            },
+
             getInitialTab() {
                 // 1. Check URL Hash (e.g. #swing or #tab=swing)
                 let hash = window.location.hash ? window.location.hash.replace(/^#/, '').trim() : '';
@@ -242,7 +487,7 @@
                 // 3. Check LocalStorage
                 const storedTab = localStorage.getItem('dashboard_active_tab');
 
-                const validTabs = ['results', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 
                 if (hash && validTabs.includes(hash.toLowerCase())) return hash.toLowerCase();
                 if (queryTab && validTabs.includes(queryTab.toLowerCase())) return queryTab.toLowerCase();
@@ -400,8 +645,11 @@
 
             switchTab(name, updateUrl = true) {
                 name = (name || 'results').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['results', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'results';
+
+                // Abort any pending fetch requests when switching tabs
+                this.cancelAllPendingRequests('Tab switched to ' + name);
 
                 document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
                 document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -431,7 +679,8 @@
                 // Keep every market/watchlist dropdown synced with the user's watchlists
                 if (this.populateWatchlistDropdowns) this.populateWatchlistDropdowns();
                 if (name === 'watchlist') this.watchlistTab.load();
-                // results tab is not auto-loaded by default per user request; user clicks 'Load Report'
+                if (name === 'results') this.loadResultsReport();
+                if (name === 'monthfilter') this.loadMonthFilterTab();
                 if (name === 'scanner') this.loadScanner();
                 if (name === 'catalysts') this.loadCatalysts();
                 if (name === 'gainers') this.loadGainersTab();
@@ -1317,14 +1566,16 @@
                 const query = '?days=' + days + '&past_days=' + pastDays + (market ? '&market=' + encodeURIComponent(market) : '');
                 
                 const loadBtns = [document.getElementById('resultsLoadBtn'), document.getElementById('resultsCenterLoadBtn')].filter(Boolean);
-                loadBtns.forEach(b => { b.disabled = true; b.innerHTML = '<span class="loading-spinner"></span> Loading ±2M...'; });
+                loadBtns.forEach(b => { b.disabled = true; b.innerHTML = '<span class="loading-spinner"></span> Loading...'; });
+                const cancelBtn = document.getElementById('resultsCancelBtn');
+                if (cancelBtn) cancelBtn.style.display = 'inline-block';
                 
                 const statusEl = document.getElementById('resultsReportStatus');
                 const countBadge = document.getElementById('resultsCount');
                 if (statusEl) statusEl.textContent = 'Fetching corporate results across ±2 months...';
                 
                 try {
-                    const res = await fetch(API_BASE + '/api/v1/dashboard/results/report' + query);
+                    const res = await this.fetchWithAbort('results', API_BASE + '/api/v1/dashboard/results/report' + query);
                     const data = await res.json();
                     if (!data.success) {
                         if (statusEl) statusEl.textContent = data.error || 'No report data';
@@ -1415,13 +1666,15 @@
                         document.body.appendChild(wrap);
                     }
                 } catch (e) {
+                    if (e.name === 'AbortError') {
+                        console.log('Results report fetch aborted:', e.message);
+                        if (statusEl) statusEl.textContent = '⚠️ Request cancelled (' + (e.message || 'aborted') + ').';
+                        return;
+                    }
                     console.error('Error loading results report:', e);
                     if (statusEl) statusEl.textContent = 'Error loading report: ' + (e.message || e);
                 } finally {
-                    const topBtn = document.getElementById('resultsLoadBtn');
-                    if (topBtn) { topBtn.disabled = false; topBtn.innerHTML = '▶ Load Report'; }
-                    const centerBtn = document.getElementById('resultsCenterLoadBtn');
-                    if (centerBtn) { centerBtn.disabled = false; centerBtn.innerHTML = '▶ Load Results Report (±2 Months)'; }
+                    this.resetTaskLoadingUI('results');
                 }
             },
 
@@ -1539,6 +1792,196 @@
                     this.resultsShowDays = Math.min(this.resultsShowDays + 5, (this.resultsDaySections || []).length);
                     this.renderResultsDays();
                 }
+            },
+
+            // =========================================================================
+            // 🗓️ Month Filter & Earnings Calendar Dedicated Tab
+            // =========================================================================
+            async loadMonthFilterTab(forceSync = false) {
+                const statusEl = document.getElementById('mfReportStatus');
+                const sectionsEl = document.getElementById('mfReportSections');
+                const countBadge = document.getElementById('mfCount');
+                const market = document.getElementById('mfMarket')?.value || 'ALL';
+                const cancelBtn = document.getElementById('mfCancelBtn');
+                if (cancelBtn) cancelBtn.style.display = 'inline-block';
+
+                if (statusEl) statusEl.textContent = forceSync ? 'Syncing present day delta...' : 'Loading precalculated Month Filter data...';
+
+                try {
+                    const url = '/api/v1/dashboard/month-filter?market=' + encodeURIComponent(market) + (forceSync ? '&force_sync=true' : '');
+                    const res = await this.fetchWithAbort('monthfilter', url);
+                    const data = await res.json();
+
+                    if (!data || data.error) {
+                        if (sectionsEl) sectionsEl.innerHTML = '<div class="card" style="padding:1.5rem;color:var(--muted);text-align:center;">' + (data.error || 'Failed to load month filter') + '</div>';
+                        return;
+                    }
+
+                    // Render Fetch Record Banner
+                    const rec = data.fetch_record || {};
+                    const syncBannerText = document.getElementById('mfSyncText');
+                    const statusBadge = document.getElementById('mfStatusBadge');
+                    const lastSyncedEl = document.getElementById('mfLastSynced');
+                    const totalEventsEl = document.getElementById('mfTotalEvents');
+                    const insertedCountEl = document.getElementById('mfInsertedCount');
+
+                    if (rec) {
+                        if (statusBadge) {
+                            statusBadge.textContent = rec.synced_today ? '🟢 UP TO DATE' : '🟡 STALE';
+                            statusBadge.style.background = rec.synced_today ? '#10b981' : '#f59e0b';
+                        }
+                        if (syncBannerText) {
+                            syncBannerText.textContent = rec.synced_today
+                                ? 'Present day earnings calendar is up-to-date for ' + rec.today + '.'
+                                : 'Earnings data not synced for today (' + rec.today + '). Delta fetch recommended.';
+                        }
+                        if (lastSyncedEl) lastSyncedEl.textContent = rec.last_fetched_at || rec.today || '--';
+                        if (totalEventsEl) totalEventsEl.textContent = rec.events_count || data.total_stocks || 0;
+                        if (insertedCountEl) insertedCountEl.textContent = rec.inserted_count || 0;
+                    }
+
+                    if (data.popups) {
+                        let wrap = document.getElementById('resultsReportPopups');
+                        if (!wrap) {
+                            wrap = document.createElement('div');
+                            wrap.id = 'resultsReportPopups';
+                            document.body.appendChild(wrap);
+                        }
+                        wrap.innerHTML += data.popups;
+                    }
+
+                    this.mfDaySections = data.day_sections_list || [];
+                    this.mfDaySectionsMeta = data.day_sections_meta || [];
+                    this.mfMonths = data.months || [];
+                    this.mfTotalStocks = data.total_stocks || 0;
+                    this.mfActiveMonth = 'ALL';
+
+                    this.renderMfMonthTabs();
+                    this.renderMfSections();
+                    this.populateMfIndustryFilter();
+
+                    if (countBadge) {
+                        countBadge.textContent = this.mfTotalStocks + ' results (' + this.mfDaySectionsMeta.length + ' dates)';
+                    }
+                    if (statusEl) statusEl.textContent = 'Month Filter loaded: ' + this.mfTotalStocks + ' results across ' + this.mfDaySectionsMeta.length + ' dates (' + new Date().toLocaleTimeString() + ')';
+                } catch (e) {
+                    if (e.name === 'AbortError') {
+                        console.log('Month Filter fetch aborted:', e.message);
+                        if (statusEl) statusEl.textContent = '⚠️ Request cancelled (' + (e.message || 'aborted') + ').';
+                        return;
+                    }
+                    console.error('Error loading Month Filter tab:', e);
+                    if (statusEl) statusEl.textContent = 'Error loading Month Filter: ' + (e.message || e);
+                } finally {
+                    this.resetTaskLoadingUI('monthfilter');
+                }
+            },
+
+            async syncMonthFilter() {
+                const syncBtn = document.getElementById('mfSyncBtn');
+                if (syncBtn) {
+                    syncBtn.disabled = true;
+                    syncBtn.innerHTML = '🔄 Syncing...';
+                }
+                try {
+                    await this.loadMonthFilterTab(true);
+                } finally {
+                    if (syncBtn) {
+                        syncBtn.disabled = false;
+                        syncBtn.innerHTML = '🔄 Sync Delta';
+                    }
+                }
+            },
+
+            renderMfMonthTabs() {
+                const el = document.getElementById('mfMonthTabs');
+                if (!el || !this.mfMonths || !this.mfMonths.length) return;
+
+                let html = '<span style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-right:0.25rem;">🗓️ Month Filter:</span>';
+                const allActive = (this.mfActiveMonth === 'ALL');
+                const allBtnStyle = allActive
+                    ? 'background:var(--accent);color:#fff;font-weight:700;border:1px solid var(--accent);'
+                    : 'background:rgba(255,255,255,0.06);color:var(--light);border:1px solid rgba(255,255,255,0.15);';
+
+                html += '<button type="button" onclick="app.filterMfByMonth(\'ALL\')" class="btn btn-sm" style="' + allBtnStyle + 'padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.75rem;cursor:pointer;">' +
+                    '🌐 All (±2M) <span style="background:rgba(0,0,0,0.25);padding:0.1rem 0.35rem;border-radius:9999px;font-size:0.7rem;margin-left:0.2rem;">' + this.mfTotalStocks + '</span>' +
+                    '</button>';
+
+                this.mfMonths.forEach(m => {
+                    const isActive = (this.mfActiveMonth === m.month_key);
+                    const tag = m.is_current ? '⭐ ' : (m.is_past ? '◀ ' : '▶ ');
+                    let btnStyle = isActive
+                        ? 'background:#2563eb;color:#fff;font-weight:700;border:1px solid #3b82f6;'
+                        : (m.is_current ? 'background:rgba(16,185,129,0.15);color:#6ee7b7;border:1px solid rgba(16,185,129,0.35);'
+                        : 'background:rgba(255,255,255,0.06);color:var(--light);border:1px solid rgba(255,255,255,0.15);');
+
+                    html += '<button type="button" onclick="app.filterMfByMonth(\'' + m.month_key + '\')" class="btn btn-sm" style="' + btnStyle + 'padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.75rem;cursor:pointer;">' +
+                        tag + m.month_label + ' ' +
+                        '<span style="background:rgba(0,0,0,0.25);padding:0.1rem 0.35rem;border-radius:9999px;font-size:0.7rem;font-weight:700;margin-left:0.2rem;">' + (m.stocks_count || 0) + '</span>' +
+                        '</button>';
+                });
+
+                el.innerHTML = html;
+            },
+
+            filterMfByMonth(monthKey) {
+                this.mfActiveMonth = monthKey;
+                this.renderMfMonthTabs();
+                this.renderMfSections();
+            },
+
+            renderMfSections() {
+                const el = document.getElementById('mfReportSections');
+                if (!el) return;
+
+                let items = this.mfDaySectionsMeta || [];
+                if (this.mfActiveMonth !== 'ALL') {
+                    items = items.filter(m => m.month_key === this.mfActiveMonth);
+                }
+
+                const htmls = items.map(m => m.html);
+                el.innerHTML = htmls.length ? htmls.join('\n') : '<p class="timestamp">No earnings data for this month selection.</p>';
+            },
+
+            populateMfIndustryFilter() {
+                const select = document.getElementById('mfIndustryFilter');
+                if (!select) return;
+                const industries = new Set();
+
+                (this.mfDaySectionsMeta || []).forEach(m => {
+                    const matches = m.html.match(/Industry:\s*([^<]+)/g) || [];
+                    matches.forEach(str => {
+                        const ind = str.replace('Industry:', '').trim();
+                        if (ind) industries.add(ind);
+                    });
+                });
+
+                let options = '<option value="ALL">All Industries (' + industries.size + ')</option>';
+                Array.from(industries).sort().forEach(ind => {
+                    options += '<option value="' + ind.replace(/"/g, '&quot;') + '">' + ind + '</option>';
+                });
+                select.innerHTML = options;
+            },
+
+            filterMonthFilterRows() {
+                const query = (document.getElementById('mfSearchInput')?.value || '').toLowerCase().trim();
+                const selectedInd = document.getElementById('mfIndustryFilter')?.value || 'ALL';
+                const el = document.getElementById('mfReportSections');
+                if (!el) return;
+
+                let items = this.mfDaySectionsMeta || [];
+                if (this.mfActiveMonth !== 'ALL') {
+                    items = items.filter(m => m.month_key === this.mfActiveMonth);
+                }
+
+                const filteredHtml = [];
+                items.forEach(m => {
+                    if (selectedInd !== 'ALL' && !m.html.includes(selectedInd)) return;
+                    if (query && !m.html.toLowerCase().includes(query)) return;
+                    filteredHtml.push(m.html);
+                });
+
+                el.innerHTML = filteredHtml.length ? filteredHtml.join('\n') : '<p class="timestamp">No matching results for your query/industry filter.</p>';
             },
 
             renderResultsWidgets() {
@@ -2113,6 +2556,69 @@
                     if (btn) {
                         btn.disabled = false;
                         btn.innerHTML = origHtml;
+                    }
+                }
+            },
+
+            async runRowPrediction(ticker, engine, btn) {
+                ticker = (ticker || '').toUpperCase().trim();
+                if (!ticker) return;
+                engine = (engine || 'kronos').toLowerCase();
+
+                if (!btn && window.event) {
+                    btn = window.event.target ? window.event.target.closest('button') : null;
+                }
+
+                const origHtml = btn ? btn.innerHTML : '';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading-spinner"></span>...';
+                }
+
+                try {
+                    const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : '';
+                    const res = await fetch(apiBase + '/api/v1/dashboard/predict/run', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ticker: ticker, engine: engine, lookback: 120, pred_len: 14 })
+                    });
+
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.detail || err.error || ('HTTP ' + res.status));
+                    }
+
+                    const data = await res.json();
+                    if (!data || !data.success) {
+                        throw new Error(data.error || 'Prediction failed');
+                    }
+
+                    const pred = data.prediction || {};
+                    if (engine === 'kronos') {
+                        const ret = Number(pred.return_pct || 0);
+                        const trend = pred.trend || 'Neutral';
+                        const cls = trend === 'Bullish' ? 'pred-bullish' : (trend === 'Bearish' ? 'pred-bearish' : 'pred-neutral');
+                        const sign = ret >= 0 ? '+' : '';
+                        if (btn) {
+                            btn.outerHTML = '<span class="' + cls + '">' + sign + ret.toFixed(1) + '%</span>';
+                        }
+                    } else if (engine === 'gbm') {
+                        const direction = pred.direction || '?';
+                        const conf = pred.confidence;
+                        const confStr = conf != null ? Math.round(conf * 100) + '%' : '—';
+                        const cls = direction === 'UP' ? 'pred-bullish' : 'pred-bearish';
+                        if (btn) {
+                            btn.outerHTML = '<span class="' + cls + '">' + direction + ' ' + confStr + '</span>';
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error running ' + engine + ' row prediction:', e);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.style.borderColor = '#f87171';
+                        btn.style.color = '#f87171';
+                        btn.title = 'Error: ' + (e.message || e);
+                        btn.innerHTML = '⚠️ Error';
                     }
                 }
             },
@@ -5491,8 +5997,13 @@
             document.body.style.overflow = '';
         };
 
+        window.runRowPrediction = function(ticker, engine, btn) {
+            app.runRowPrediction(ticker, engine, btn);
+        };
+
         app.openPopup = window.openPopup;
         app.closePopups = window.closePopups;
+        app.runRowPrediction = app.runRowPrediction;
 
         // Initialize & export to window
         window.app = app;

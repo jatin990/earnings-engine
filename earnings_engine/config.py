@@ -8,7 +8,12 @@ from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
-DATA_DIR = PROJECT_ROOT / "data"
+
+if os.getenv("VERCEL") == "1" and not os.getenv("EARNINGS_ENGINE_DATA_DIR"):
+    DATA_DIR = Path("/tmp/data")
+else:
+    DATA_DIR = Path(os.getenv("EARNINGS_ENGINE_DATA_DIR", str(PROJECT_ROOT / "data")))
+
 CACHE_DIR = DATA_DIR / "cache"
 PRICES_DIR = CACHE_DIR / "prices"
 EARNINGS_DIR = CACHE_DIR / "earnings"

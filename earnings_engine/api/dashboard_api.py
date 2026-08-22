@@ -244,6 +244,33 @@ def get_results_report_components(
 
     fragments = build_upcoming_results_fragments(enriched, on_demand=True)
     fragments["success"] = True
+    fragments["fetch_record"] = earnings_mod.get_fetch_record_status(settings)
+    return fragments
+
+
+def get_month_filter_report_components(
+    days: int = 60,
+    market: str | None = None,
+    past_days: int = 60,
+    force_sync: bool = False,
+) -> dict[str, Any]:
+    """Get precalculated Month Filter report components with present-day delta sync."""
+    settings = _settings()
+    
+    # Always ensure present-day earnings calendar is synced
+    fetch_rec = earnings_mod.sync_present_day_earnings_delta(settings, force=force_sync)
+
+    cache_key = f"month_filter_{market or 'ALL'}_{past_days}_{days}"
+    if not force_sync:
+        cached = earnings_mod.get_cached_month_filter(settings, cache_key)
+        if cached:
+            cached["fetch_record"] = fetch_rec
+            return cached
+
+    fragments = get_results_report_components(days=days, market=market, past_days=past_days)
+    if fragments.get("success"):
+        fragments["fetch_record"] = fetch_rec
+        earnings_mod.set_cached_month_filter(settings, cache_key, fragments)
     return fragments
 
 
@@ -780,9 +807,31 @@ def create_watchlist_api(name: str | None = None, tickers: list[str] | None = No
     return create_universe_file(safe, tickers=tickers)
 
 
-def get_all_watchlists() -> list[dict[str, Any]]:
+def get_all_watchlists(include_universes: bool = False) -> list[dict[str, Any]]:
     """Return every watchlist with its full ticker list (for the Watchlist tab)."""
-    return watchlists_mod.all_watchlists(_settings())
+    settings = _settings()
+    custom_lists = watchlists_mod.all_watchlists(settings)
+    for c in custom_lists:
+        c["type"] = "custom"
+        c["is_builtin"] = False
+        c["is_under_100"] = len(c.get("tickers", [])) <= 100
+        c["display_name"] = c.get("name", "")
+        c["summary"] = "Custom user-defined watchlist."
+        c["explanation"] = "Custom watchlist created and managed by the user for tracking swing trading ranges, price moves, and earnings."
+    return custom_lists
+
+
+def get_all_watchlists_and_universes() -> dict[str, Any]:
+    """Return custom watchlists and built-in universes with full metadata and explanations."""
+    settings = _settings()
+    custom_lists = get_all_watchlists(include_universes=False)
+    from earnings_engine.data.universe import get_universe_details
+    universes = get_universe_details(settings)
+    return {
+        "watchlists": custom_lists,
+        "universes": universes,
+        "all_lists": custom_lists + universes,
+    }
 
 
 def rename_watchlist_api(name: str, new_name: str) -> dict[str, Any]:

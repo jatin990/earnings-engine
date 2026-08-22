@@ -8,6 +8,7 @@ data/
 reports/output/
 .env
 .env.*
+!.env.example
 *.env
 secrets.env
 logs
@@ -15,3 +16,15 @@ reports
 *.log
 .continue/
 .tmp_*
+
+# Recovery codes, keys, certificates, & credentials
+*recovery*
+*recovery-codes*
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+credentials.json
+client_secret*.json

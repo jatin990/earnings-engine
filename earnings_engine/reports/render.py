@@ -406,26 +406,64 @@ def _fmt_num(v: object) -> str:
         return s if s else "\u2014"
 
 
-def _build_cap_section(title: str, badge_cls: str, rows: list[str]) -> str:
-    """Build a collapsible cap-category section (large/small) with just the ledger."""
+def _build_cap_section(title: str, badge_cls: str, rows: list[str] | dict[str, list[str]]) -> str:
+    """Build a collapsible cap-category section (large/small) with industry sub-grouping."""
     if not rows:
         return ""
-    count = len(rows)
+    
+    # Support both flat list of row htmls or dict of {industry: [row_html, ...]}
+    if isinstance(rows, list):
+        count = len(rows)
+        if not count:
+            return ""
+        return (
+            f'<details class="cap-section" open>'
+            f'<summary><span class="{badge_cls}">{title}</span>'
+            f'<span class="cap-count">{count} stock{"s" if count != 1 else ""}</span>'
+            f'<span class="chevron">▾</span></summary>'
+            f'<div class="cap-section-body">{_build_ledger_table(rows)}</div>'
+            f'</details>'
+        )
+
+    # Dict of {industry_name: [row_html, ...]}
+    total_count = sum(len(r) for r in rows.values())
+    if not total_count:
+        return ""
+    
+    industry_blocks = []
+    for ind_name in sorted(rows.keys()):
+        ind_rows = rows[ind_name]
+        if not ind_rows:
+            continue
+        ind_count = len(ind_rows)
+        industry_blocks.append(
+            f'<div class="industry-subgroup" style="margin: 0.5rem 0 0.75rem 0; padding: 0.4rem 0.6rem; background: rgba(255,255,255,0.02); border-radius: 0.4rem; border: 1px solid rgba(255,255,255,0.05);">'
+            f'<div style="font-size: 0.78rem; font-weight: 700; color: #a7f3d0; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem;">'
+            f'<span>🏭 Industry: {ind_name}</span>'
+            f'<span style="background: rgba(16,185,129,0.2); color: #34d399; padding: 0.05rem 0.4rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 700;">{ind_count}</span>'
+            f'</div>'
+            f'{_build_ledger_table(ind_rows)}'
+            f'</div>'
+        )
+
     return (
         f'<details class="cap-section" open>'
         f'<summary><span class="{badge_cls}">{title}</span>'
-        f'<span class="cap-count">{count} stock{"s" if count != 1 else ""}</span>'
+        f'<span class="cap-count">{total_count} stock{"s" if total_count != 1 else ""} ({len(rows)} industries)</span>'
         f'<span class="chevron">▾</span></summary>'
-        f'<div class="cap-section-body">{_build_ledger_table(rows)}</div>'
-        "</details>"
+        f'<div class="cap-section-body">{"".join(industry_blocks)}</div>'
+        f'</details>'
     )
 
 
 def _build_day_section(date_str: str, day_class: str, color: str,
-                        large_rows: list[str],
-                        small_rows: list[str]) -> str:
-    """Build a collapsible day section with large/small cap subsections."""
-    total = len(large_rows) + len(small_rows)
+                        large_rows: list[str] | dict[str, list[str]],
+                        small_rows: list[str] | dict[str, list[str]]) -> str:
+    """Build a collapsible day section with large/small cap and industry subsections."""
+    total_large = sum(len(r) for r in large_rows.values()) if isinstance(large_rows, dict) else len(large_rows)
+    total_small = sum(len(r) for r in small_rows.values()) if isinstance(small_rows, dict) else len(small_rows)
+    total = total_large + total_small
+    
     body = []
     large_section = _build_cap_section("Large Cap (>1000 Cr)", "cap-badge-large", large_rows)
     small_section = _build_cap_section("Small Cap (≤1000 Cr)", "cap-badge-small", small_rows)
@@ -439,7 +477,7 @@ def _build_day_section(date_str: str, day_class: str, color: str,
         f'<span class="day-count">{total} stock{"s" if total != 1 else ""}</span>'
         f'<span class="chevron">▾</span></summary>'
         f'<div class="day-section-body">{"".join(body)}</div>'
-        "</details>"
+        f'</details>'
     )
 
 
@@ -793,15 +831,33 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
         mcap_value = _to_float(row.get("market_cap"))
         is_large = mcap_value > LARGE_CAP_THRESHOLD
 
-        # Group by day
+        # Load industry mapping for ticker
+        try:
+            from earnings_engine.config import Settings
+            from earnings_engine.data.industry import load_industry
+            ind_val = load_industry(ticker, Settings())
+        except Exception:
+            ind_val = None
+        industry_name = ind_val or row.get("industry") or row.get("sector") or "General / Multi-Sector"
+
+        # Group by day -> cap -> industry
         if earnings_text not in day_groups:
-            day_groups[earnings_text] = {"large_rows": [], "large_popups": [], "small_rows": [], "small_popups": []}
+            day_groups[earnings_text] = {
+                "large_by_ind": {},
+                "large_popups": [],
+                "small_by_ind": {},
+                "small_popups": [],
+            }
         group = day_groups[earnings_text]
         if is_large:
-            group["large_rows"].append(row_html)
+            if industry_name not in group["large_by_ind"]:
+                group["large_by_ind"][industry_name] = []
+            group["large_by_ind"][industry_name].append(row_html)
             group["large_popups"].append(popup_html)
         else:
-            group["small_rows"].append(row_html)
+            if industry_name not in group["small_by_ind"]:
+                group["small_by_ind"][industry_name] = []
+            group["small_by_ind"][industry_name].append(row_html)
             group["small_popups"].append(popup_html)
 
     # Build day sections with metadata
@@ -817,8 +873,8 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
         color = _DAY_COLORS[int(day_class.split("-")[1]) % len(_DAY_COLORS)] if day_class else "#94a3b8"
         section_html = _build_day_section(
             date_str, day_class, color,
-            group["large_rows"],
-            group["small_rows"],
+            group["large_by_ind"],
+            group["small_by_ind"],
         )
         day_sections.append(section_html)
 
@@ -831,7 +887,7 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             m_key = "other"
             m_label = "Other"
 
-        stocks_count = len(group["large_rows"]) + len(group["small_rows"])
+        stocks_count = sum(len(r) for r in group["large_by_ind"].values()) + sum(len(r) for r in group["small_by_ind"].values())
         day_sections_meta.append({
             "date": date_str,
             "month_key": m_key,

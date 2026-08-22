@@ -610,6 +610,7 @@ from earnings_engine.api.dashboard_api import (
     get_patterns_api,
     get_refresh_status,
     get_results_report_components,
+    get_month_filter_report_components,
     get_swing_cycle_history_api,
     get_swing_range_api,
     get_swing_setups,
@@ -684,6 +685,43 @@ async def dashboard_results_report(
         return _dash_api.get_results_report_components(days=days, market=market, past_days=past_days, start_date=start_date)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching results report: {str(e)}")
+
+
+@app.get("/api/v1/dashboard/month-filter", tags=["Dashboard"])
+async def dashboard_month_filter(
+    days: int = Query(60, description="Look-ahead window in days", ge=0, le=180),
+    past_days: int = Query(60, description="Look-back window in days", ge=0, le=180),
+    market: str | None = Query(None, description="Market universe (IN, US, NSE_ALL, NSE_LARGE_CAP)"),
+    force_sync: bool = Query(False, description="Force present-day delta sync and recalculate"),
+):
+    """Get precalculated Month Filter report components with present-day delta sync."""
+    try:
+        import importlib
+        import earnings_engine.api.dashboard_api as _dash_api
+        importlib.reload(_dash_api)
+        return _dash_api.get_month_filter_report_components(
+            days=days, market=market, past_days=past_days, force_sync=force_sync
+        )
+    except Exception as e:
+        logger.exception("Error in dashboard_month_filter: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching month filter report: {str(e)}")
+
+
+@app.post("/api/v1/dashboard/month-filter/sync", tags=["Dashboard"])
+async def dashboard_month_filter_sync(
+    market: str | None = Query(None, description="Market universe"),
+):
+    """Force present-day delta fetch and refresh precalculated Month Filter report."""
+    try:
+        import importlib
+        import earnings_engine.api.dashboard_api as _dash_api
+        importlib.reload(_dash_api)
+        return _dash_api.get_month_filter_report_components(
+            days=60, market=market, past_days=60, force_sync=True
+        )
+    except Exception as e:
+        logger.exception("Error in dashboard_month_filter_sync: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error syncing month filter report: {str(e)}")
 
 
 @app.get("/api/v1/dashboard/swing", tags=["Dashboard"])
@@ -1174,6 +1212,19 @@ async def dashboard_kronos_audit_delete(ticker: str, run_at: str):
         raise HTTPException(status_code=500, detail=f"Error deleting prediction: {str(e)}")
 
 
+@app.get("/api/v1/watchlist/all", tags=["Dashboard"])
+async def watchlist_all():
+    """Return every watchlist and built-in universe with full ordered ticker lists and metadata."""
+    from earnings_engine.api.dashboard_api import get_all_watchlists_and_universes
+    return get_all_watchlists_and_universes()
+
+
+@app.get("/api/v1/watchlist/list", tags=["Dashboard"])
+async def watchlist_list():
+    """List all named watchlists in the SQLite DB."""
+    return {"watchlists": get_universe_files()}
+
+
 @app.get("/api/v1/watchlist/{name}", tags=["Dashboard"])
 async def watchlist_get_by_path(name: str):
     """Get a named watchlist or universe from the SQLite DB / universe files."""
@@ -1198,40 +1249,6 @@ async def watchlist_get(
     if not tickers:
         tickers = fetch_universe_tickers(name, _settings)
     return {"name": name, "tickers": tickers or []}
-
-
-@app.get("/api/v1/watchlist/list", tags=["Dashboard"])
-async def watchlist_list():
-    """List all named watchlists in the SQLite DB."""
-    return {"watchlists": get_universe_files()}
-
-
-@app.post("/api/v1/watchlist/add", tags=["Dashboard"])
-async def watchlist_add(request: dict):
-    """Add a ticker to a named watchlist in the SQLite DB."""
-    ticker = request.get("ticker", "")
-    name = request.get("name", "my_watchlist")
-    result = add_to_watchlist(ticker, name=name)
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Failed to add ticker"))
-    return result
-
-
-@app.post("/api/v1/watchlist/remove", tags=["Dashboard"])
-async def watchlist_remove(request: dict):
-    """Remove a ticker from a named watchlist in the SQLite DB."""
-    ticker = request.get("ticker", "")
-    name = request.get("name", "my_watchlist")
-    result = remove_from_watchlist(ticker, name=name)
-    if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Failed to remove ticker"))
-    return result
-
-
-@app.get("/api/v1/watchlist/all", tags=["Dashboard"])
-async def watchlist_all():
-    """Return every watchlist with its full ordered ticker list (Watchlist tab)."""
-    return {"watchlists": get_all_watchlists()}
 
 
 @app.post("/api/v1/watchlist/create", tags=["Dashboard"])
