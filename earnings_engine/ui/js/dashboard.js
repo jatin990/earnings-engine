@@ -1335,7 +1335,66 @@
                     this.resultsDaySections = (data.day_sections_list && data.day_sections_list.length)
                         ? data.day_sections_list
                         : (data.day_sections ? [data.day_sections] : []);
+
+                    this.resultsDaySectionsMeta = (data.day_sections_meta && data.day_sections_meta.length) ? data.day_sections_meta : [];
+                    this.resultsMonths = (data.months && data.months.length) ? data.months : [];
+                    this.resultsTotalStocks = data.total_stocks || 0;
+                    this.resultsActiveMonth = 'ALL';
+
+                    // Fallback: If months array was not provided by API, construct from day_sections
+                    if (!this.resultsMonths.length && this.resultsDaySections.length) {
+                        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                        const monthsMap = {};
+                        const meta = [];
+                        const curMonthKey = new Date().toISOString().slice(0, 7);
+
+                        this.resultsDaySections.forEach(secHtml => {
+                            const match = secHtml.match(/<span class=["']day-dot["'][^>]*><\/span>\s*(\d{4}-\d{2}-\d{2})/i) || secHtml.match(/(\d{4}-\d{2}-\d{2})/);
+                            const dateStr = match ? match[1] : '';
+                            let mKey = 'other';
+                            let mLabel = 'Other';
+                            
+                            const countMatch = secHtml.match(/class=["']day-count["']>\s*(\d+)/i);
+                            let count = countMatch ? parseInt(countMatch[1], 10) : ((secHtml.match(/<tr/g) || []).length || 1);
+
+                            if (dateStr) {
+                                mKey = dateStr.slice(0, 7);
+                                const parts = dateStr.split('-');
+                                const y = parts[0];
+                                const mIdx = parseInt(parts[1], 10) - 1;
+                                mLabel = (monthNames[mIdx] || parts[1]) + ' ' + y;
+                            }
+
+                            meta.push({
+                                date: dateStr,
+                                month_key: mKey,
+                                month_label: mLabel,
+                                stocks_count: count,
+                                html: secHtml
+                            });
+
+                            if (!monthsMap[mKey]) {
+                                monthsMap[mKey] = {
+                                    month_key: mKey,
+                                    month_label: mLabel,
+                                    stocks_count: 0,
+                                    dates_count: 0,
+                                    is_current: (mKey === curMonthKey),
+                                    is_past: (mKey < curMonthKey)
+                                };
+                            }
+                            monthsMap[mKey].stocks_count += count;
+                            monthsMap[mKey].dates_count += 1;
+                        });
+
+                        this.resultsDaySectionsMeta = meta;
+                        this.resultsMonths = Object.keys(monthsMap).sort().map(k => monthsMap[k]);
+                        this.resultsTotalStocks = this.resultsMonths.reduce((acc, m) => acc + m.stocks_count, 0);
+                    }
                     
+                    // Render Month breakdown tabs (e.g. 4 tabs for 4 months)
+                    this.renderResultsMonthTabs();
+
                     // Show first 10 dates by default (or all if fewer)
                     this.resultsShowDays = Math.min(10, (this.resultsDaySections || []).length || 1);
                     this.renderResultsDays();
@@ -1343,9 +1402,9 @@
                     const totalDates = (this.resultsDaySections || []).length;
                     if (countBadge) {
                         countBadge.style.display = 'inline-block';
-                        countBadge.textContent = totalDates + ' dates loaded';
+                        countBadge.textContent = this.resultsTotalStocks + ' results (' + totalDates + ' dates)';
                     }
-                    if (statusEl) statusEl.textContent = 'Report loaded: ' + totalDates + ' result dates in ±2 months window (' + new Date().toLocaleTimeString() + ')';
+                    if (statusEl) statusEl.textContent = 'Report loaded: ' + this.resultsTotalStocks + ' corporate results across ' + totalDates + ' dates in ±2 months window (' + new Date().toLocaleTimeString() + ')';
                     
                     if (data.popups) {
                         const existing = document.getElementById('resultsReportPopups');
@@ -1363,6 +1422,94 @@
                     if (topBtn) { topBtn.disabled = false; topBtn.innerHTML = '▶ Load Report'; }
                     const centerBtn = document.getElementById('resultsCenterLoadBtn');
                     if (centerBtn) { centerBtn.disabled = false; centerBtn.innerHTML = '▶ Load Results Report (±2 Months)'; }
+                }
+            },
+
+            renderResultsMonthTabs() {
+                let el = document.getElementById('resultsMonthTabs');
+                if (!el) {
+                    const sectionsEl = document.getElementById('resultsReportLegend') || document.getElementById('resultsReportSections');
+                    if (sectionsEl && sectionsEl.parentNode) {
+                        el = document.createElement('div');
+                        el.id = 'resultsMonthTabs';
+                        el.style.cssText = 'display:flex;gap:0.5rem;margin:0.75rem 0 1rem 0;flex-wrap:wrap;align-items:center;padding:0.5rem 0.75rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.6rem;';
+                        sectionsEl.parentNode.insertBefore(el, sectionsEl);
+                    }
+                }
+                if (!el) return;
+
+                if (!this.resultsMonths || !this.resultsMonths.length) {
+                    el.style.display = 'none';
+                    return;
+                }
+
+                const totalStocks = this.resultsTotalStocks || this.resultsDaySectionsMeta.reduce((acc, m) => acc + (m.stocks_count || 1), 0);
+                const totalDates = this.resultsDaySectionsMeta.length;
+
+                let html = '<span style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-right:0.25rem;">🗓️ Month Filter:</span>';
+                
+                // 1. "All Months" tab
+                const allActive = (this.resultsActiveMonth === 'ALL');
+                const allBtnStyle = allActive
+                    ? 'background:var(--accent);color:#fff;font-weight:700;border:1px solid var(--accent);'
+                    : 'background:rgba(255,255,255,0.06);color:var(--light);border:1px solid rgba(255,255,255,0.15);';
+                html += '<button type="button" onclick="app.filterResultsByMonth(\'ALL\')" class="btn btn-sm" style="' + allBtnStyle + 'padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.75rem;cursor:pointer;">' +
+                    '🌐 All (±2M) <span style="background:rgba(0,0,0,0.25);padding:0.1rem 0.35rem;border-radius:9999px;font-size:0.7rem;margin-left:0.2rem;">' + totalStocks + '</span>' +
+                    '</button>';
+
+                // 2. Individual month tabs (4 tabs for 4 months)
+                this.resultsMonths.forEach((m, idx) => {
+                    const isActive = (this.resultsActiveMonth === m.month_key);
+                    const tag = m.is_current ? '⭐ ' : (m.is_past ? '◀ ' : '▶ ');
+                    const badgeBg = isActive ? 'rgba(0,0,0,0.3)' : (m.is_current ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.12)');
+                    const badgeColor = isActive ? '#fff' : (m.is_current ? '#34d399' : 'var(--light)');
+                    
+                    let btnStyle = '';
+                    if (isActive) {
+                        btnStyle = 'background:#2563eb;color:#fff;font-weight:700;border:1px solid #3b82f6;box-shadow:0 2px 8px rgba(37,99,235,0.4);';
+                    } else if (m.is_current) {
+                        btnStyle = 'background:rgba(16,185,129,0.15);color:#6ee7b7;border:1px solid rgba(16,185,129,0.35);';
+                    } else if (m.is_past) {
+                        btnStyle = 'background:rgba(148,163,184,0.1);color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);';
+                    } else {
+                        btnStyle = 'background:rgba(192,132,252,0.12);color:#d8b4fe;border:1px solid rgba(192,132,252,0.3);';
+                    }
+
+                    html += '<button type="button" onclick="app.filterResultsByMonth(\'' + m.month_key + '\')" class="btn btn-sm" style="' + btnStyle + 'padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.75rem;cursor:pointer;">' +
+                        tag + m.month_label + ' ' +
+                        '<span style="background:' + badgeBg + ';color:' + badgeColor + ';padding:0.1rem 0.35rem;border-radius:9999px;font-size:0.7rem;font-weight:700;margin-left:0.2rem;">' + (m.stocks_count || 0) + '</span>' +
+                        '</button>';
+                });
+
+                el.innerHTML = html;
+                el.style.display = 'flex';
+            },
+
+            filterResultsByMonth(monthKey) {
+                this.resultsActiveMonth = monthKey;
+                this.renderResultsMonthTabs();
+
+                let filtered = [];
+                let filteredStocks = 0;
+
+                if (monthKey === 'ALL') {
+                    filtered = this.resultsDaySectionsMeta.map(m => m.html);
+                    filteredStocks = this.resultsTotalStocks || this.resultsDaySectionsMeta.reduce((acc, m) => acc + (m.stocks_count || 1), 0);
+                } else {
+                    const matchingMeta = this.resultsDaySectionsMeta.filter(m => m.month_key === monthKey);
+                    filtered = matchingMeta.map(m => m.html);
+                    filteredStocks = matchingMeta.reduce((acc, m) => acc + (m.stocks_count || 0), 0);
+                }
+
+                this.resultsDaySections = filtered;
+                this.resultsShowDays = Math.min(10, filtered.length || 1);
+                this.renderResultsDays();
+
+                const countBadge = document.getElementById('resultsCount');
+                if (countBadge) {
+                    const mObj = (this.resultsMonths || []).find(m => m.month_key === monthKey);
+                    const label = (monthKey === 'ALL') ? '±2 Months' : (mObj ? mObj.month_label : monthKey);
+                    countBadge.textContent = filteredStocks + ' results (' + filtered.length + ' dates in ' + label + ')';
                 }
             },
 

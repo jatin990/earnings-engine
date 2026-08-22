@@ -804,19 +804,57 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             group["small_rows"].append(row_html)
             group["small_popups"].append(popup_html)
 
-    # Build day sections
+    # Build day sections with metadata
     day_sections: list[str] = []
+    day_sections_meta: list[dict[str, Any]] = []
+    months_map: dict[str, dict[str, Any]] = {}
+    today_dt = pd.Timestamp.today().normalize()
+    current_month_key = today_dt.strftime("%Y-%m")
+
     for date_str in sorted(day_groups.keys()):
         group = day_groups[date_str]
         day_class = day_classes.get(date_str, "")
         color = _DAY_COLORS[int(day_class.split("-")[1]) % len(_DAY_COLORS)] if day_class else "#94a3b8"
-        day_sections.append(
-            _build_day_section(
-                date_str, day_class, color,
-                group["large_rows"],
-                group["small_rows"],
-            )
+        section_html = _build_day_section(
+            date_str, day_class, color,
+            group["large_rows"],
+            group["small_rows"],
         )
+        day_sections.append(section_html)
+
+        # Parse date and month
+        try:
+            date_obj = pd.Timestamp(date_str)
+            m_key = date_obj.strftime("%Y-%m")
+            m_label = date_obj.strftime("%b %Y")
+        except Exception:
+            m_key = "other"
+            m_label = "Other"
+
+        stocks_count = len(group["large_rows"]) + len(group["small_rows"])
+        day_sections_meta.append({
+            "date": date_str,
+            "month_key": m_key,
+            "month_label": m_label,
+            "stocks_count": stocks_count,
+            "html": section_html,
+        })
+
+        if m_key not in months_map:
+            is_cur = (m_key == current_month_key)
+            is_past = (m_key < current_month_key)
+            months_map[m_key] = {
+                "month_key": m_key,
+                "month_label": m_label,
+                "stocks_count": 0,
+                "dates_count": 0,
+                "is_current": is_cur,
+                "is_past": is_past,
+            }
+        months_map[m_key]["stocks_count"] += stocks_count
+        months_map[m_key]["dates_count"] += 1
+
+    months_list = [months_map[k] for k in sorted(months_map.keys())]
 
     popups_html = "".join(
         "".join(g["large_popups"]) + "".join(g["small_popups"])
@@ -827,6 +865,9 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
         "day_legend": day_legend,
         "day_sections": "\n".join(day_sections) if day_sections else "<p>No upcoming earnings data.</p>",
         "day_sections_list": day_sections,
+        "day_sections_meta": day_sections_meta,
+        "months": months_list,
+        "total_stocks": sum(m["stocks_count"] for m in months_list),
         "popups": popups_html,
     }
 

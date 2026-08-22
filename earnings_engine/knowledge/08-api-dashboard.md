@@ -54,7 +54,7 @@
 - `POST /api/v1/audit/backtest` — execute 1-year multi-strategy backtest simulation (body: `{"strategy", "days", "universe"}`)
 - `POST /api/v1/backtest/run` — unified multi-strategy backtest engine dispatcher (`strategy`: `swing`, `kronos`, `earnings`, `news`, `auditor_all`; returns standardized KPIs, equity curve, and trade log)
 - `POST /api/v1/backtest/swing/run` — dedicated swing channel backtest simulation
-- `GET /api/v1/dashboard/results/report?days=&past_days=&market=` — report-style HTML fragments (day sections, legend, popups) for Results tab (defaults to ±2 months / 60D past & 60D future)
+- `GET /api/v1/dashboard/results/report?days=&past_days=&market=` — report-style HTML fragments (day sections, legend, popups, `months` summary array, `day_sections_meta`) for Results tab (defaults to ±2 months / 60D past & 60D future with 4-month interactive pill tabs)
 - `GET /api/v1/gainers/top?market=` — top daily market gainers with volume surge multiples & drivers (supports Indian and US markets)
 - `GET /api/v1/gainers/patterns` — recurring 52W / breakout pattern matrix
 - `GET /api/v1/scanner/categories?universe=` — active category scanner hub counts and metadata

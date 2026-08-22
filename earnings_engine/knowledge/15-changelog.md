@@ -12,10 +12,12 @@
     5. 🏆 **Multi-Strategy Benchmark (All)**: Unified cross-strategy performance comparison matrix.
   - Added strategy selector dropdown `#btStrategy` in Backtest tab (`_backtest.html`) with dynamic KPIs, trade logs, and equity curves.
   - Fixed `load_universe_from_file(name_or_path, settings)` in `data/universe.py` to handle both settings and database/text watchlists cleanly.
-- **Results Tab Enhancements & ±2 Months Window** (`_results.html`, `dashboard_api.py`, `server.py`, `dashboard.js`):
+- **Results Tab Enhancements, ±2 Months Window & 4-Month Sub-Tabs Breakdown** (`_results.html`, `dashboard_api.py`, `render.py`, `server.py`, `dashboard.js`):
   - Results tab no longer auto-loads by default on page open; presents a clean call-to-action empty state.
   - Added range presets selector defaulting to **`⚡ ±2 Months (Past 60D & Next 60D)`** along with ±1 Month, Upcoming 14/30/60D, Past 60D, and Custom range.
-  - Updated backend `get_upcoming_results` and `get_results_report_components` to query `[-past_days, +days]` window (120 days total).
+  - Updated backend `get_upcoming_results` and `get_results_report_components` (`render.py`) to query `[-past_days, +days]` window (120 days total) and compute `months` array + `day_sections_meta`.
+  - **4-Month Sub-Tabs**: Added interactive pill buttons above report sections showing count badges across the ±2 months window (e.g. `🌐 All (±2M) (44)`, `◀ Jul 2026 (35)`, `⭐ Aug 2026 (8)`, `▶ Sep 2026 (1)`).
+  - **Dynamic Month Filtering**: Clicking any month tab instantly filters the day sections, updates pagination, and updates the header badge (e.g. `35 results across 15 dates in Jul 2026`).
   - Fixed ticker extraction in `_resolve_tickers` so dictionary items from SQLite watchlists are properly unwrapped into strings.
 - **Results Popups & Stock Modal Fix** (`dashboard.js`, `_head.html`):
   - Implemented `window.openPopup(ticker)` and `window.closePopups()` in `dashboard.js` with keyboard `Escape` shortcut support.

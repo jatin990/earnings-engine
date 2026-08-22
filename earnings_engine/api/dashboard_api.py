@@ -214,7 +214,10 @@ def get_results_report_components(
     standalone HTML report.  Kronos/GBM predictions are attached via the
     cache-aware runners (reuse today's cached predictions, never re-train).
     """
-    from earnings_engine.reports.render import build_upcoming_results_fragments
+    import importlib
+    import earnings_engine.reports.render as _render_mod
+    importlib.reload(_render_mod)
+    build_upcoming_results_fragments = _render_mod.build_upcoming_results_fragments
 
     settings = _settings()
     tickers = _resolve_tickers(market)

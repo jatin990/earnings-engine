@@ -52,6 +52,7 @@ _templates_dir = Path(__file__).resolve().parent.parent / "reports" / "templates
 _jinja_env = Environment(
     loader=FileSystemLoader(str(_templates_dir)),
     autoescape=True,
+    auto_reload=True,
 )
 
 # Mount static UI assets (JS, CSS, icons)
@@ -566,7 +567,14 @@ async def serve_dashboard():
     without CORS or origin issues.
     """
     try:
-        template = _jinja_env.get_template("dashboard.html")
+        from jinja2 import Environment, FileSystemLoader
+        env = Environment(
+            loader=FileSystemLoader(str(_templates_dir)),
+            autoescape=True,
+            auto_reload=True,
+            cache_size=0,
+        )
+        template = env.get_template("dashboard.html")
         html = template.render()
         return HTMLResponse(html)
     except Exception as exc:
@@ -669,9 +677,11 @@ async def dashboard_results_report(
     market: str | None = Query(None, description="Market universe (IN, US, NSE_ALL, NSE_LARGE_CAP)"),
     start_date: str | None = Query(None, description="Explicit start date YYYY-MM-DD"),
 ):
-    """Get report-style HTML fragments (day sections, legend, popups) for the Results tab."""
     try:
-        return get_results_report_components(days=days, market=market, past_days=past_days, start_date=start_date)
+        import importlib
+        import earnings_engine.api.dashboard_api as _dash_api
+        importlib.reload(_dash_api)
+        return _dash_api.get_results_report_components(days=days, market=market, past_days=past_days, start_date=start_date)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching results report: {str(e)}")
 
