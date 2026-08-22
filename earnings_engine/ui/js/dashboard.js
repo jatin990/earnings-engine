@@ -1316,9 +1316,8 @@
                 const market = document.getElementById('resultsMarket')?.value || '';
                 const query = '?days=' + days + '&past_days=' + pastDays + (market ? '&market=' + encodeURIComponent(market) : '');
                 
-                const loadBtn = document.getElementById('resultsLoadBtn');
-                const origBtnText = loadBtn ? loadBtn.innerHTML : '▶ Load Report';
-                if (loadBtn) { loadBtn.disabled = true; loadBtn.innerHTML = '<span class="loading-spinner"></span> Loading ±2M...'; }
+                const loadBtns = [document.getElementById('resultsLoadBtn'), document.getElementById('resultsCenterLoadBtn')].filter(Boolean);
+                loadBtns.forEach(b => { b.disabled = true; b.innerHTML = '<span class="loading-spinner"></span> Loading ±2M...'; });
                 
                 const statusEl = document.getElementById('resultsReportStatus');
                 const countBadge = document.getElementById('resultsCount');
@@ -1329,7 +1328,7 @@
                     const data = await res.json();
                     if (!data.success) {
                         if (statusEl) statusEl.textContent = data.error || 'No report data';
-                        document.getElementById('resultsReportSections').innerHTML = '<div class="card" style="margin:1rem 0;color:var(--muted);text-align:center;padding:1.5rem;">' + (data.error || 'No results data found for this selection.') + '</div>';
+                        document.getElementById('resultsReportSections').innerHTML = '<div class="card" style="margin:1rem 0;color:var(--muted);text-align:center;padding:1.5rem;">' + (data.error || 'No results data found for this selection.') + '<br><br><button onclick="app.loadResultsReport()" class="btn btn-sm btn-primary">↻ Try Again</button></div>';
                         return;
                     }
                     document.getElementById('resultsReportLegend').innerHTML = data.day_legend || '';
@@ -1358,9 +1357,12 @@
                     }
                 } catch (e) {
                     console.error('Error loading results report:', e);
-                    if (statusEl) statusEl.textContent = 'Error loading report';
+                    if (statusEl) statusEl.textContent = 'Error loading report: ' + (e.message || e);
                 } finally {
-                    if (loadBtn) { loadBtn.disabled = false; loadBtn.innerHTML = origBtnText; }
+                    const topBtn = document.getElementById('resultsLoadBtn');
+                    if (topBtn) { topBtn.disabled = false; topBtn.innerHTML = '▶ Load Report'; }
+                    const centerBtn = document.getElementById('resultsCenterLoadBtn');
+                    if (centerBtn) { centerBtn.disabled = false; centerBtn.innerHTML = '▶ Load Results Report (±2 Months)'; }
                 }
             },
 
