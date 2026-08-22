@@ -54,6 +54,12 @@ _jinja_env = Environment(
     autoescape=True,
 )
 
+# Mount static UI assets (JS, CSS, icons)
+_ui_dir = Path(__file__).resolve().parent.parent / "ui"
+if _ui_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_ui_dir)), name="static")
+    app.mount("/ui", StaticFiles(directory=str(_ui_dir)), name="ui")
+
 
 # ---------------------------------------------------------------------------
 # Pydantic Models
