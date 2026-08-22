@@ -11,6 +11,8 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+import re
+from jinja2 import Environment, FileSystemLoader
 import pandas as pd
 
 from earnings_engine.config import PROJECT_ROOT
@@ -19,6 +21,14 @@ OUTPUT_DIR = PROJECT_ROOT / "reports" / "output"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 _TEMPLATE_CACHE: dict[str, str] = {}
+
+# Large cap threshold: 1000 crore rupees = 1e10 rupees
+LARGE_CAP_THRESHOLD = 1e10
+
+_JINJA_ENV = Environment(
+    loader=FileSystemLoader(str(TEMPLATES_DIR)),
+    autoescape=True,
+)
 
 
 def _load_template(name: str) -> str:
@@ -47,7 +57,19 @@ def render_dashboard(html_path: Path | None = None) -> Path:
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         html_path = OUTPUT_DIR / "dashboard.html"
     
-    html = _render_template("dashboard.html")
+    template = _JINJA_ENV.get_template("dashboard.html")
+    html = template.render()
+
+    import re
+    js_path = TEMPLATES_DIR.parent.parent / "ui" / "js" / "dashboard.js"
+    if js_path.exists():
+        js_content = js_path.read_text(encoding="utf-8")
+        html = re.sub(
+            r'<script src="/static/js/dashboard\.js[^"]*"></script>',
+            f"<script>\n{js_content}\n</script>",
+            html,
+        )
+
     html_path.write_text(html, encoding="utf-8")
     return html_path
 
@@ -87,25 +109,392 @@ def render_predictions(preds: pd.DataFrame, name: str = "predictions") -> tuple[
     return csv_path, html_path
 
 
-def render_upcoming_results_report(enriched: pd.DataFrame, csv_path: Path | None = None,
-                                   html_path: Path | None = None) -> Path:
-    """Render a polished HTML report for upcoming-results data."""
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    if html_path is None:
-        stamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-        html_path = OUTPUT_DIR / f"upcoming-results-{stamp}.html"
-    if csv_path is None:
-        csv_path = html_path.with_suffix(".csv")
+# Dark-theme-friendly palette for per-day color grouping (cycles after 8 days).
+_DAY_COLORS = [
+    "#60a5fa",  # blue
+    "#34d399",  # green
+    "#fbbf24",  # amber
+    "#f472b6",  # pink
+    "#a78bfa",  # purple
+    "#fb923c",  # orange
+    "#2dd4bf",  # teal
+    "#f87171",  # red
+]
 
-    cards: list[str] = []
-    rows: list[str] = []
+
+def _assign_day_classes(enriched: pd.DataFrame) -> dict[str, str]:
+    """Assign a CSS class (day-0..day-7) to each distinct earnings_date.
+
+    Returns a dict mapping the YYYY-MM-DD string -> CSS class name.
+    """
+    dates = sorted(enriched["earnings_date"].dropna().unique())
+    return {
+        pd.Timestamp(d).strftime("%Y-%m-%d"): f"day-{i % len(_DAY_COLORS)}"
+        for i, d in enumerate(dates)
+    }
+
+
+def _build_day_legend(day_classes: dict[str, str]) -> str:
+    """Build the HTML legend strip showing date -> color chips."""
+    if not day_classes:
+        return ""
+    chips: list[str] = []
+    for date_str, cls in day_classes.items():
+        color = _DAY_COLORS[int(cls.split("-")[1]) % len(_DAY_COLORS)]
+        chips.append(
+            f'<span class="day-chip"><span class="swatch" style="background:{color}"></span>{date_str}</span>'
+        )
+    return f'<div class="day-legend">{"".join(chips)}</div>'
+
+
+def _pred_float(value: object, key: str, default: float = 0.0) -> float:
+    """Safely extract a numeric field from a prediction dict (Kronos/GBM)."""
+    if isinstance(value, dict):
+        v = value.get(key)
+        if v is not None:
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return default
+    return default
+
+
+def _sort_per_day(enriched: pd.DataFrame) -> pd.DataFrame:
+    """Group rows by earnings_date, sort each day's sublist best→worst.
+
+    Ranking (momentum is the PRIMARY driver, per user preference):
+      1. momentum = thirty_day_return_pct + earnings_week_move_pct
+      2. tie-break: Kronos 14D return (bullish model signal)
+      3. tie-break: GBM direction (UP=+1, DOWN=-1) × confidence
+      4. tie-break: prev_3q_earnings_score
+      5. tie-break: market_cap
+    """
+    if enriched.empty:
+        return enriched
+
+    def _rank_key(row: pd.Series) -> tuple[float, float, float, float, float]:
+        thirty = float(row.get("thirty_day_return_pct")) if pd.notna(row.get("thirty_day_return_pct")) else 0.0
+        week = float(row.get("earnings_week_move_pct")) if pd.notna(row.get("earnings_week_move_pct")) else 0.0
+        momentum = thirty + week
+
+        # Kronos 14D return as a tie-breaker (higher = better).
+        kronos_ret = _pred_float(row.get("kronos_14d"), "return_pct")
+
+        # GBM direction × confidence as a tie-breaker (UP=+1, DOWN=-1).
+        gbm = row.get("gbm_prediction")
+        gbm_score = 0.0
+        if isinstance(gbm, dict):
+            direction = gbm.get("direction")
+            conf = gbm.get("confidence")
+            if direction in ("UP", "DOWN") and conf is not None:
+                try:
+                    gbm_score = (1.0 if direction == "UP" else -1.0) * float(conf)
+                except (TypeError, ValueError):
+                    gbm_score = 0.0
+
+        quality = float(row.get("prev_3q_earnings_score")) if pd.notna(row.get("prev_3q_earnings_score")) else 0.0
+        mcap = float(row.get("market_cap")) if pd.notna(row.get("market_cap")) else 0.0
+        # Higher is better for all → sort descending.
+        return (momentum, kronos_ret, gbm_score, quality, mcap)
+
+    parts: list[pd.DataFrame] = []
+    for date_val in sorted(enriched["earnings_date"].dropna().unique()):
+        day_df = enriched[enriched["earnings_date"] == date_val].copy()
+        day_df["_rank"] = day_df.apply(_rank_key, axis=1)
+        day_df = day_df.sort_values("_rank", ascending=False).drop(columns="_rank")
+        parts.append(day_df)
+    # Rows with no earnings_date go at the end (unchanged order)
+    no_date = enriched[enriched["earnings_date"].isna()]
+    if not no_date.empty:
+        parts.append(no_date)
+    return pd.concat(parts, ignore_index=True)
+
+
+def _fmt_prediction(value: object, kind: str = "kronos",
+                    ticker: str = "", on_demand: bool = False) -> str:
+    """Format a prediction value for display in the ledger.
+
+    kind='kronos': value is a dict with return_pct, trend, support, resistance.
+    kind='gbm': value is a dict with direction, confidence, p_up.
+
+    When ``on_demand`` is True and there is no value yet, render a per-row
+    "Run" button that computes just that ticker (used by the dashboard Results
+    report so Kronos/GBM are NOT computed for the whole universe upfront).
+    """
+    is_empty = value is None or (isinstance(value, float) and pd.isna(value))
+    if is_empty:
+        if on_demand and ticker:
+            engine = "kronos" if kind == "kronos" else "gbm"
+            label = "🤖" if kind == "kronos" else "📈"
+            return (
+                f'<span class="pred-cell">'
+                f'<button class="btn btn-sm pred-run-btn" data-ticker="{ticker}" '
+                f'data-engine="{engine}" '
+                f'onclick="app.runRowPrediction(\'{ticker}\',\'{engine}\',this)">'
+                f'{label} Run</button></span>'
+            )
+        return '<span class="pred-muted">—</span>'
+    if isinstance(value, dict):
+        if kind == "kronos":
+            ret = value.get("return_pct")
+            trend = value.get("trend", "Neutral")
+            if ret is None:
+                return '<span class="pred-muted">—</span>'
+            cls = "pred-bullish" if trend == "Bullish" else ("pred-bearish" if trend == "Bearish" else "pred-neutral")
+            return f'<span class="{cls}">{ret:+.1f}%</span>'
+        elif kind == "gbm":
+            direction = value.get("direction", "?")
+            confidence = value.get("confidence")
+            if direction == "?":
+                return '<span class="pred-muted">—</span>'
+            cls = "pred-bullish" if direction == "UP" else "pred-bearish"
+            conf_str = f"{confidence:.0%}" if confidence is not None else "—"
+            return f'<span class="{cls}">{direction} {conf_str}</span>'
+    return '<span class="pred-muted">—</span>'
+
+
+def _build_card_sections(row: pd.Series, fmt: dict[str, str]) -> str:
+    """Build the card's inner sections, skipping any section with no values.
+
+    Returns the HTML for all non-empty sections.
+    """
+    sections: list[str] = []
+
+    # 📊 Stock & Price Info
+    stock_metrics = []
+    for label, key in [
+        ("Market Cap", "market_cap"),
+        ("Current Price", "current_price"),
+        ("52W High/Low", "pct_from_52w_high_low"),
+        ("30D Return", "thirty_day_return"),
+        ("EPS Estimate", "eps_estimate"),
+        ("EPS Reported", "eps_reported"),
+        ("Surprise", "surprise_pct"),
+    ]:
+        val = fmt.get(key, "—")
+        if val != "—":
+            stock_metrics.append(f'<div class="metric"><span>{label}</span><strong>{val}</strong></div>')
+    if stock_metrics:
+        sections.append(
+            '<div class="card-title" style="margin-top: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: #60a5fa;">📊 Stock & Price Info</div>'
+            f'<div class="metrics-grid">{"".join(stock_metrics)}</div>'
+        )
+
+    # 📈 Quarterly Metrics
+    q_metrics = []
+    for label, key in [
+        ("Q1 Week H/L", "q1_week_hl"),
+        ("Q2 Week H/L", "q2_week_hl"),
+        ("Q3 Week H/L", "q3_week_hl"),
+        ("Earnings Week Move", "earnings_week_move"),
+    ]:
+        val = fmt.get(key, "—")
+        if val != "—":
+            q_metrics.append(f'<div class="metric"><span>{label}</span><strong>{val}</strong></div>')
+    if q_metrics:
+        sections.append(
+            '<div class="card-title" style="margin-top: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: #60a5fa;">📈 Quarterly Metrics (Result Week ±4 Days)</div>'
+            f'<div class="metrics-grid">{"".join(q_metrics)}</div>'
+        )
+
+    # ⭐ Quality Scores
+    quality_metrics = []
+    for label, key in [
+        ("Q1 Quality", "q1_score"),
+        ("Q2 Quality", "q2_score"),
+        ("Q3 Quality", "q3_score"),
+        ("3Q Average", "prev_3q_score"),
+    ]:
+        val = fmt.get(key, "—")
+        if val != "—":
+            quality_metrics.append(f'<div class="metric"><span>{label}</span><strong>{val}</strong></div>')
+    if quality_metrics:
+        sections.append(
+            '<div class="card-title" style="margin-top: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: #60a5fa;">⭐ Quality Scores</div>'
+            f'<div class="metrics-grid">{"".join(quality_metrics)}</div>'
+        )
+
+    # 🎯 Setup & Risk/Reward
+    setup_metrics = []
+    for label, key in [
+        ("Setup Signal", "setup_signal"),
+        ("Momentum Bias", "momentum_bias"),
+        ("Reward Potential", "reward_potential"),
+        ("Risk Buffer", "risk_buffer"),
+        ("Next Resistance", "next_resistance"),
+        ("Current Support", "current_support"),
+    ]:
+        val = fmt.get(key, "—")
+        if val != "—":
+            setup_metrics.append(f'<div class="metric"><span>{label}</span><strong>{val}</strong></div>')
+    if setup_metrics:
+        sections.append(
+            '<div class="card-title" style="margin-top: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: #60a5fa;">🎯 Setup & Risk/Reward</div>'
+            f'<div class="metrics-grid">{"".join(setup_metrics)}</div>'
+        )
+
+    # 💡 Analysis (commentary)
+    take = fmt.get("take", "")
+    if take and take != "—":
+        sections.append(
+            '<div class="commentary" style="margin-top: 0.75rem; padding-top: 0.75rem;">'
+            '<div class="card-title" style="margin-bottom: 0.4rem; font-size: 0.85rem;">💡 Analysis</div>'
+            f'<span style="font-size: 0.8rem; line-height: 1.5;">{take}</span>'
+            '</div>'
+        )
+
+    return "\n".join(sections)
+
+
+def _build_ledger_table(rows: list[str], day_class: str = "") -> str:
+    """Build a compact ledger table HTML from pre-rendered row strings."""
+    if not rows:
+        return ""
+    return (
+        '<div class="table-wrapper">'
+        '<table class="results-table">'
+        "<thead><tr>"
+        "<th>Stock</th><th>Result Date</th><th>Mkt Cap</th><th>Price</th>"
+        "<th>30D Ret</th><th>Q1 Wk H/L</th><th>Q2 Wk H/L</th><th>Q3 Wk H/L</th>"
+        "<th>52W H/L</th><th>Quality</th><th>3Q Avg</th><th>Resist</th><th>Support</th>"
+        "<th>Kronos 14D</th><th>GBM</th>"
+        "</tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody>"
+        "</table></div>"
+    )
+
+
+
+
+
+def _popup_id(ticker: str) -> str:
+    """Sanitize a ticker for use as a DOM element id."""
+    return re.sub(r"[^a-zA-Z0-9]", "_", str(ticker))
+
+
+def _popup_metric(label: str, value: str) -> str:
+    """A single metric cell for the popup metrics grid."""
+    return (
+        '<div class="metric">'
+        '<span>' + label + '</span>'
+        '<strong>' + value + '</strong>'
+        '</div>'
+    )
+
+
+def _popup_section(title: str, cls: str, body: str) -> str:
+    """A titled section inside the popup body."""
+    return (
+        '<div class="popup-section ' + cls + '">'
+        '<div class="popup-section-title">' + title + '</div>'
+        + body
+        + '</div>'
+    )
+
+
+def _fmt_num(v: object) -> str:
+    """Format a number nicely, or em-dash when missing."""
+    if v is None:
+        return "\u2014"
+    try:
+        fv = float(v)
+        if fv != fv:  # NaN
+            return "\u2014"
+        return f"{fv:,.2f}"
+    except (TypeError, ValueError):
+        s = str(v).strip()
+        return s if s else "\u2014"
+
+
+def _build_cap_section(title: str, badge_cls: str, rows: list[str]) -> str:
+    """Build a collapsible cap-category section (large/small) with just the ledger."""
+    if not rows:
+        return ""
+    count = len(rows)
+    return (
+        f'<details class="cap-section" open>'
+        f'<summary><span class="{badge_cls}">{title}</span>'
+        f'<span class="cap-count">{count} stock{"s" if count != 1 else ""}</span>'
+        f'<span class="chevron">▾</span></summary>'
+        f'<div class="cap-section-body">{_build_ledger_table(rows)}</div>'
+        "</details>"
+    )
+
+
+def _build_day_section(date_str: str, day_class: str, color: str,
+                        large_rows: list[str],
+                        small_rows: list[str]) -> str:
+    """Build a collapsible day section with large/small cap subsections."""
+    total = len(large_rows) + len(small_rows)
+    body = []
+    large_section = _build_cap_section("Large Cap (>1000 Cr)", "cap-badge-large", large_rows)
+    small_section = _build_cap_section("Small Cap (≤1000 Cr)", "cap-badge-small", small_rows)
+    if large_section:
+        body.append(large_section)
+    if small_section:
+        body.append(small_section)
+    return (
+        f'<details class="day-section" open>'
+        f'<summary><span class="day-dot" style="background:{color}"></span>{date_str}'
+        f'<span class="day-count">{total} stock{"s" if total != 1 else ""}</span>'
+        f'<span class="chevron">▾</span></summary>'
+        f'<div class="day-section-body">{"".join(body)}</div>'
+        "</details>"
+    )
+
+
+def build_upcoming_results_fragments(enriched: pd.DataFrame,
+                                     on_demand: bool = False) -> dict[str, str]:
+    """Build the HTML fragments (day legend, day sections, popups) for the report.
+
+    Returns a dict with ``day_legend``, ``day_sections`` and ``popups`` keys so
+    callers (e.g. the dashboard API) can inject the exact report layout without
+    writing a file.
+    """
+    # Merge the same stock across multiple earnings events (normalize .NS/.BO
+    # suffixes for the comparison).  Each ticker appears once, but the Result
+    # Date column shows BOTH the nse and yfinance dates with their source labels.
+    enriched = enriched.copy()
+    enriched["_ticker_key"] = enriched["ticker"].astype(str).str.replace(r"\.(NS|BO)$", "", regex=True)
+    enriched = enriched.sort_values("earnings_date", na_position="last")
+
+    # Merge each ticker's rows into one, combining all (date, source) pairs.
+    merged_rows: list[pd.Series] = []
+    for _, group in enriched.groupby("_ticker_key", sort=False):
+        rep = group.iloc[0].copy()
+        parts = []
+        for _, r in group.iterrows():
+            d = r.get("earnings_date")
+            if pd.notna(d):
+                d_str = pd.Timestamp(d).strftime("%Y-%m-%d")
+            else:
+                d_str = "\u2014"
+            src = str(r.get("source", "yfinance")).lower()
+            parts.append(f"{d_str} ({src})")
+        rep["earnings_date_display"] = " / ".join(parts)
+        merged_rows.append(rep)
+    enriched = pd.DataFrame(merged_rows).drop(columns="_ticker_key")
+
+    # Per-day color grouping + best-to-worst ranking within each day.  Runs
+    # AFTER the merge so the Kronos/GBM prediction dicts are available to the
+    # rank key (momentum primary, model signals as tie-breakers).
+    enriched = _sort_per_day(enriched)
+
+    day_classes = _assign_day_classes(enriched)
+    day_legend = _build_day_legend(day_classes)
+
+    # Group rows by day, then by cap category
+    day_groups: dict[str, dict[str, list]] = {}
     for _, row in enriched.iterrows():
         ticker = str(row.get("ticker", ""))
+        company_name = str(row.get("company_name", "")) or ticker
         earnings_date = row.get("earnings_date")
         if pd.notna(earnings_date):
             earnings_text = pd.Timestamp(earnings_date).strftime("%Y-%m-%d")
         else:
             earnings_text = "—"
+        # Combined date+source display (e.g. "2026-08-04 (nse) / 2026-08-04 (yfinance)")
+        earnings_date_display = str(row.get("earnings_date_display", "")) or earnings_text
 
         def _fmt(v: object, suffix: str = "", signed: bool = False) -> str:
             if pd.isna(v):
@@ -154,9 +543,38 @@ def render_upcoming_results_report(enriched: pd.DataFrame, csv_path: Path | None
                 prices_str = f"<br>({hp}/{lp})"
             return f"{high_str}/{low_str}{prices_str}"
         
-        def _fmt_quarter_week_hl(high_pct: object, high_price: object, low_pct: object, low_price: object) -> str:
-            """Format quarter week high/low as '+8.7%/+2.3%<br>(8,500/7,800)'."""
-            return _fmt_hl_pair(high_pct, high_price, low_pct, low_price)
+        def _fmt_quarter_week_hl(high_pct: object, high_price: object, low_pct: object, low_price: object,
+                                  high_date: object = None, low_date: object = None, price_7d: object = None,
+                                  earnings_date: object = None) -> str:
+            """Format quarter week high/low as '+8.7%/+2.3%<br>(8,500/7,800)<br>Jan 18 / Jan 16 | 7D: ₹245'."""
+            base = _fmt_hl_pair(high_pct, high_price, low_pct, low_price)
+            
+            # Add dates if available (handle None, NaN, and NaT)
+            def _is_valid_date(d: object) -> bool:
+                if d is None:
+                    return False
+                try:
+                    return not pd.isna(d)
+                except (TypeError, ValueError):
+                    return False
+
+            parts: list[str] = []
+            if _is_valid_date(high_date) or _is_valid_date(low_date):
+                high_d = pd.Timestamp(high_date).strftime("%b %d") if _is_valid_date(high_date) else "—"
+                low_d = pd.Timestamp(low_date).strftime("%b %d") if _is_valid_date(low_date) else "—"
+                parts.append(f"{high_d} / {low_d}")
+            
+            # Add 7-day price if available
+            if price_7d is not None and not pd.isna(price_7d):
+                parts.append(f"7D: ₹{float(price_7d):,.0f}")
+
+            # Add the quarter's earnings date if available (e.g. "earned Jan 15")
+            if _is_valid_date(earnings_date):
+                earned = pd.Timestamp(earnings_date).strftime("%b %d")
+                parts.append(f"earn {earned}")
+
+            extra = "<br>" + "<br>".join(parts) if parts else ""
+            return f"{base}{extra}"
 
         market_cap = _fmt(row.get("market_cap"), suffix="Cr")
         current_price = _fmt(row.get("current_price"))
@@ -169,13 +587,21 @@ def render_upcoming_results_report(enriched: pd.DataFrame, csv_path: Path | None
                                               row.get("pct_from_52w_low"), row.get("week_low"))
         earnings_week_move = _fmt(row.get("earnings_week_move_pct"), "%", signed=True)
         
-        # Per-quarter week high/low (±4 business days around each earnings date)
+        # Per-quarter week high/low (±4 business days around each earnings date).
+        # The earnings date for each quarter is shown so the reader knows WHICH
+        # quarter the signal belongs to (Q1 = most recent).
         q1_week_hl = _fmt_quarter_week_hl(row.get("q1_week_high_pct"), row.get("q1_week_high_price"),
-                                           row.get("q1_week_low_pct"), row.get("q1_week_low_price"))
+                                           row.get("q1_week_low_pct"), row.get("q1_week_low_price"),
+                                           row.get("q1_week_high_date"), row.get("q1_week_low_date"),
+                                           row.get("q1_price_7d"), row.get("q1_earnings_date"))
         q2_week_hl = _fmt_quarter_week_hl(row.get("q2_week_high_pct"), row.get("q2_week_high_price"),
-                                           row.get("q2_week_low_pct"), row.get("q2_week_low_price"))
+                                           row.get("q2_week_low_pct"), row.get("q2_week_low_price"),
+                                           row.get("q2_week_high_date"), row.get("q2_week_low_date"),
+                                           row.get("q2_price_7d"), row.get("q2_earnings_date"))
         q3_week_hl = _fmt_quarter_week_hl(row.get("q3_week_high_pct"), row.get("q3_week_high_price"),
-                                           row.get("q3_week_low_pct"), row.get("q3_week_low_price"))
+                                           row.get("q3_week_low_pct"), row.get("q3_week_low_price"),
+                                           row.get("q3_week_high_date"), row.get("q3_week_low_date"),
+                                           row.get("q3_price_7d"), row.get("q3_earnings_date"))
         
         prev_quarter_score = _fmt(row.get("prev_quarter_earnings_score"), suffix="/9")
         prev_3q_score = _fmt(row.get("prev_3q_earnings_score"), suffix="/9")
@@ -184,6 +610,14 @@ def render_upcoming_results_report(enriched: pd.DataFrame, csv_path: Path | None
         q3_score = _fmt(row.get("q3_earnings_score"), suffix="/9")
         next_resistance = _fmt(row.get("next_resistance"))
         current_support = _fmt(row.get("current_support"))
+
+        # Kronos 14-day prediction
+        kronos_pred = row.get("kronos_14d") if "kronos_14d" in row.index else None
+        kronos_14d = _fmt_prediction(kronos_pred, kind="kronos", ticker=ticker, on_demand=on_demand)
+
+        # GBM earnings prediction
+        gbm_pred = row.get("gbm_prediction") if "gbm_prediction" in row.index else None
+        gbm_prediction = _fmt_prediction(gbm_pred, kind="gbm", ticker=ticker, on_demand=on_demand)
 
         thirty_day_return_value = _to_float(row.get("thirty_day_return_pct"))
         earnings_week_move_value = _to_float(row.get("earnings_week_move_pct"))
@@ -242,42 +676,102 @@ def render_upcoming_results_report(enriched: pd.DataFrame, csv_path: Path | None
                 f"This is the kind of setup that rewards patience and a close look at the earnings details: {earnings_text_items}."
             )
 
-        card_values = {
-            "ticker": ticker,
-            "earnings_date": earnings_text,
-            "badge_class": badge_class,
-            "signal": signal,
+        day_class = day_classes.get(earnings_text, "")
+
+        # Build formatted values dict for card sections
+        fmt = {
             "market_cap": market_cap,
             "current_price": current_price,
-            "week_change": week_change,
-            "thirty_day_return": thirty_day_return,
             "pct_from_52w_high_low": pct_from_52w_high_low,
-            "earnings_week_move": earnings_week_move,
-            "q1_week_hl": q1_week_hl,
-            "q2_week_hl": q2_week_hl,
-            "q3_week_hl": q3_week_hl,
-            "prev_quarter_score": prev_quarter_score,
-            "prev_3q_score": prev_3q_score,
-            "q1_score": q1_score,
-            "q2_score": q2_score,
-            "q3_score": q3_score,
-            "next_resistance": next_resistance,
-            "current_support": current_support,
+            "thirty_day_return": thirty_day_return,
             "eps_estimate": eps_estimate,
             "eps_reported": eps_reported,
             "surprise_pct": surprise_pct,
+            "q1_week_hl": q1_week_hl,
+            "q2_week_hl": q2_week_hl,
+            "q3_week_hl": q3_week_hl,
+            "earnings_week_move": earnings_week_move,
+            "q1_score": q1_score,
+            "q2_score": q2_score,
+            "q3_score": q3_score,
+            "prev_3q_score": prev_3q_score,
             "setup_signal": setup_signal,
+            "momentum_bias": momentum_bias,
             "reward_potential": reward_potential,
             "risk_buffer": risk_buffer,
-            "momentum_bias": momentum_bias,
-            "breakout_context": breakout_context,
+            "next_resistance": next_resistance,
+            "current_support": current_support,
             "take": take,
         }
-        cards.append(_render_template("card.html", **card_values))
+
+        # Build per-stock popup (Kronos + GBM + Ollama + Setup) shown on click.
+        kronos_dict = kronos_pred if isinstance(kronos_pred, dict) else {}
+        gbm_dict = gbm_pred if isinstance(gbm_pred, dict) else {}
+        popup_sections: list[str] = []
+
+        # 🤖 Kronos 14-Day Forecast
+        if kronos_dict.get("current_price") is not None or kronos_dict.get("return_pct") is not None:
+            kp = []
+            kp.append(_popup_metric("Current Price", _fmt_num(kronos_dict.get("current_price"))))
+            kp.append(_popup_metric("Projected Close", _fmt_num(kronos_dict.get("projected_close"))))
+            ret = kronos_dict.get("return_pct")
+            if ret is not None:
+                ktrend = kronos_dict.get("trend", "Neutral")
+                kcls = "pred-bullish" if ktrend == "Bullish" else ("pred-bearish" if ktrend == "Bearish" else "pred-neutral")
+                kp.append(_popup_metric("Expected Return", '<span class="' + kcls + '">' + f"{ret:+.1f}%" + '</span>'))
+            kp.append(_popup_metric("Trend", str(kronos_dict.get("trend", "\u2014"))))
+            kp.append(_popup_metric("Support", _fmt_num(kronos_dict.get("support"))))
+            kp.append(_popup_metric("Resistance", _fmt_num(kronos_dict.get("resistance"))))
+            popup_sections.append(_popup_section(
+                "\U0001f916 Kronos 14-Day Forecast", "src-kronos",
+                '<div class="popup-metrics">' + "".join(kp) + '</div>',
+            ))
+
+        # \U0001f4ca GBM Earnings Prediction (source of truth: gbm_prediction column)
+        if gbm_dict.get("direction") not in (None, "?"):
+            dcls = "pred-bullish" if gbm_dict.get("direction") == "UP" else "pred-bearish"
+            conf = gbm_dict.get("confidence")
+            conf_str = f"{conf:.0%}" if conf is not None else "\u2014"
+            gp = _popup_metric("Direction", '<span class="' + dcls + '">' + str(gbm_dict.get("direction")) + " " + conf_str + '</span>')
+            pu = gbm_dict.get("p_up")
+            gp += _popup_metric("Probability Up", f"{pu:.0%}" if pu is not None else "\u2014")
+            gp += _popup_metric("Earnings Date", str(gbm_dict.get("earnings_date", "\u2014")))
+            gp += _popup_metric("Train Events", str(gbm_dict.get("train_events", "\u2014")))
+            popup_sections.append(_popup_section(
+                "\U0001f4ca GBM Earnings Prediction", "src-gbm",
+                '<div class="popup-metrics">' + gp + '</div>',
+            ))
+
+        # \U0001f9e0 Ollama Analysis
+        if kronos_dict.get("explanation"):
+            popup_sections.append(_popup_section(
+                "\U0001f9e0 Ollama Analysis", "src-ollama",
+                '<div class="popup-text">' + str(kronos_dict.get("explanation")) + '</div>',
+            ))
+
+        # \U0001f4c8 Setup, Quality & Momentum (reuse existing card content)
+        setup_html = _build_card_sections(row, fmt)
+        if setup_html:
+            popup_sections.append(_popup_section(
+                "\U0001f4c8 Setup, Quality & Momentum", "src-setup", setup_html,
+            ))
+
+        popup_values = {
+            "popup_id": _popup_id(ticker),
+            "company_name": company_name,
+            "ticker": ticker,
+            "earnings_date": earnings_date_display,
+            "source": str(row.get("source", "yfinance")).upper(),
+            "popup_sections": "\n".join(popup_sections) if popup_sections
+                              else '<div class="popup-text">No prediction data available.</div>',
+        }
+        popup_html = _render_template("popup.html", **popup_values)
 
         row_values = {
             "ticker": ticker,
-            "earnings_date": earnings_text,
+            "company_name": company_name,
+            "earnings_date": earnings_date_display,
+            "day_class": day_class,
             "market_cap": market_cap,
             "current_price": current_price,
             "thirty_day_return": thirty_day_return,
@@ -290,13 +784,69 @@ def render_upcoming_results_report(enriched: pd.DataFrame, csv_path: Path | None
             "prev_3q_score": prev_3q_score,
             "next_resistance": next_resistance,
             "current_support": current_support,
+            "kronos_14d": kronos_14d,
+            "gbm_prediction": gbm_prediction,
         }
-        rows.append(_render_template("result_row.html", **row_values))
+        row_html = _render_template("result_row.html", **row_values)
 
+        # Determine cap category: large cap > 1000 Cr (1e10 rupees)
+        mcap_value = _to_float(row.get("market_cap"))
+        is_large = mcap_value > LARGE_CAP_THRESHOLD
+
+        # Group by day
+        if earnings_text not in day_groups:
+            day_groups[earnings_text] = {"large_rows": [], "large_popups": [], "small_rows": [], "small_popups": []}
+        group = day_groups[earnings_text]
+        if is_large:
+            group["large_rows"].append(row_html)
+            group["large_popups"].append(popup_html)
+        else:
+            group["small_rows"].append(row_html)
+            group["small_popups"].append(popup_html)
+
+    # Build day sections
+    day_sections: list[str] = []
+    for date_str in sorted(day_groups.keys()):
+        group = day_groups[date_str]
+        day_class = day_classes.get(date_str, "")
+        color = _DAY_COLORS[int(day_class.split("-")[1]) % len(_DAY_COLORS)] if day_class else "#94a3b8"
+        day_sections.append(
+            _build_day_section(
+                date_str, day_class, color,
+                group["large_rows"],
+                group["small_rows"],
+            )
+        )
+
+    popups_html = "".join(
+        "".join(g["large_popups"]) + "".join(g["small_popups"])
+        for g in day_groups.values()
+    )
+
+    return {
+        "day_legend": day_legend,
+        "day_sections": "\n".join(day_sections) if day_sections else "<p>No upcoming earnings data.</p>",
+        "day_sections_list": day_sections,
+        "popups": popups_html,
+    }
+
+
+def render_upcoming_results_report(enriched: pd.DataFrame, csv_path: Path | None = None,
+                                    html_path: Path | None = None) -> Path:
+    """Render a polished HTML report for upcoming-results data."""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if html_path is None:
+        stamp = datetime.now().strftime("%Y-%m-%d")
+        html_path = OUTPUT_DIR / f"upcoming-results-{stamp}.html"
+    if csv_path is None:
+        csv_path = html_path.with_suffix(".csv")
+
+    fragments = build_upcoming_results_fragments(enriched)
     html = _render_template(
         "earnings_report_page.html",
-        cards="\n".join(cards) if cards else "<p>No upcoming earnings data.</p>",
-        results_rows="\n".join(rows) if rows else "<tr><td colspan='13'>No upcoming results.</td></tr>",
+        day_legend=fragments["day_legend"],
+        day_sections=fragments["day_sections"],
+        popups=fragments["popups"],
     )
     html_path.write_text(html, encoding="utf-8")
     return html_path

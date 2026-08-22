@@ -34,10 +34,24 @@ def test_dashboard_endpoint():
     assert "swingWidgets" in content
     assert "kronosWidgets" in content
     assert "watchlistItems" in content
-    
-    # Verify refresh with timestamp
+
+    # Buy-the-Dip enhancements: date range, gap-down threshold, dip-recovery
+    # section, and the opt-in earnings-quality (verdict) controls.
+    assert "bdStartDate" in content
+    assert "bdEndDate" in content
+    assert "bdDrop" in content
+    assert "bdDipRecovery" in content
+    assert "/api/v1/dashboard/recent-results/verdict" in content
+
+    # Patterns tab: market/date controls, industry table, patterns endpoint.
+    assert "tab-patterns" in content
+    assert "patStartDate" in content
+    assert "patIndustries" in content
+    assert "/api/v1/dashboard/patterns" in content
+
+    # Verify refresh timestamp with (the global "Refresh Now" button was removed
+    # per user request, but per-tab refresh remains)
     assert "lastRefreshed" in content
-    assert "refreshBtn" in content
 
 
 def test_dashboard_endpoint_calls_apis():
@@ -50,9 +64,20 @@ def test_dashboard_endpoint_calls_apis():
     assert "/api/v1/dashboard/results" in content
     assert "/api/v1/dashboard/swing" in content
     assert "/api/v1/dashboard/kronos" in content
-    assert "/api/v1/dashboard/refresh" in content
     assert "/api/v1/watchlist" in content
     assert "/api/v1/universe/" in content
+
+
+def test_dashboard_patterns_endpoint():
+    """The Patterns endpoint returns the aggregated industry/buy-the-dip shape."""
+    response = client.get("/api/v1/dashboard/patterns?market=IN&start_date=2026-08-01&end_date=2026-08-10")
+    assert response.status_code == 200
+    data = response.json()
+    assert "total" in data
+    assert "positive" in data and "negative" in data
+    assert "best_positive_industry" in data and "best_ratio_industry" in data
+    assert "positive_dipped_total" in data and "comeback_50_total" in data and "kept_dipping_total" in data
+    assert "industries" in data and "rows" in data
 
 
 def test_dashboard_overview_endpoint():

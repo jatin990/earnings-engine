@@ -1,76 +1,114 @@
 # Implementation Plan
 
-## Overview
-Add an auditable, persistent trail for every Kronos AI price prediction: store each run in the shared SQLite cache, surface it on the Kronos tab as "Latest" and "Audit" views (with live current price + change since prediction), plus fix two bugs (duplicate Results rows, weak date filter) and add the ability to create new watchlist files.
+[Overview]
+A new "Data Coverage" dashboard tab showing per-stock price/earnings data ranges and row counts, filterable by universe, plus an incremental earnings-fetch feature that only fetches missing earnings using listing dates derived from price history.
 
-## Feature List (executed one-by-one)
-1. **Audit persistence layer** — new `data/predictions.py` module + `kronos_predictions` table in `prices.sqlite3`.
-2. **Persist on run** — `dashboard_api.get_kronos_predictions()` stores every forecast dict before returning.
-3. **API endpoints** — `GET /api/v1/dashboard/kronos/audit`, `GET .../kronos/latest`, `POST /api/v1/universe/create`.
-4. **Kronos tab UI** — split into Latest + Audit tabs; Audit table shows run date, predicted price, live current price, change vs prediction.
-5. **Create watchlist UI** — input + button in Watchlist tab → `POST /api/v1/universe/create`.
-6. **Bug: duplicate earnings rows** — dedup `earnings.py` normalize path by `earnings_date` (regression test).
-7. **Bug: date filter** — verify `days` param flows end-to-end; surface count in UI.
-8. **Tests** — `tests/test_kronos_audit.py` + regression tests in `test_caching.py`.
-9. **Docs** — update `KNOWLEDGE_BASE.md` Section 10 + module refs per Cline rules.
+The dashboard currently has tabs for Results, Swing, Kronos, Watchlist, and Playground, but no way to see which stocks have price/earnings data cached, what date ranges are covered, or how many rows exist. This makes it hard to identify data gaps before running predictions or building datasets. The incremental earnings fetch solves the problem of re-downloading all 2,390 tickers' earnings when most are already cached — only tickers with missing or stale earnings are fetched, using the first price-history date as a listing-date proxy (since yfinance's `firstTradeDateEpochUtc` is None for NSE stocks).
 
-## Types / Data Schema
-New SQLite table `kronos_predictions`:
-- `id` INTEGER PRIMARY KEY AUTOINCREMENT
-- `ticker` TEXT NOT NULL
-- `run_at` TEXT NOT NULL (ISO timestamp of the prediction run)
-- `predicted_at` TEXT NOT NULL (the price-date the prediction was made at)
-- `lookback` INTEGER, `pred_len` INTEGER
-- `prediction_json` TEXT NOT NULL (full forecast dict as JSON)
-- `current_price` REAL (price at prediction time)
-- `support` REAL, `resistance` REAL
-- `return_pct` REAL, `trend` TEXT
-- `explanation` TEXT
-- Index on `(ticker, run_at DESC)`.
+[Types]
+No new Python type system changes; the feature uses existing dict/list return patterns matching the dashboard_api conventions.
 
-## Files
-### New
-- `earnings_engine/data/predictions.py` — SQLite audit CRUD for Kronos predictions.
-- `tests/test_kronos_audit.py` — audit persistence + latest-per-ticker tests.
+New API response shape for data coverage:
+```python
+# GET /api/v1/dashboard/data-coverage?market=NSE_ALL
+{
+  "total": 2396,
+  "with_prices": 2396,
+  "with_earnings": 1165,
+  "rows": [
+    {
+      "ticker": "RELIANCE.NS",
+      "price_start": "2015-01-01",
+      "price_end": "2026-07-31",
+      "price_rows": 2861,
+      "earnings_start": "2013-05-30",
+      "earnings_end": "2026-10-15",
+      "earnings_rows": 24,
+      "has_prices": true,
+      "has_earnings": true,
+      "listing_date": "2015-01-01",  # derived from price_history MIN(date)
+      "earnings_fresh": true,        # from earnings_freshness table
+    },
+    ...
+  ]
+}
+```
 
-### Modified
-- `earnings_engine/api/dashboard_api.py` — persist forecasts in `get_kronos_predictions`; add `get_kronos_predictions_audit()` + `get_kronos_latest_predictions()` + `create_universe_file()`.
-- `earnings_engine/api/server.py` — new endpoints: `/audit`, `/latest`, `POST /api/v1/universe/create`.
-- `earnings_engine/data/earnings.py` — dedup normalize path (bug fix).
-- `earnings_engine/reports/templates/dashboard.html` — Kronos Latest/Audit sub-tabs, current-price-change column, create-watchlist control.
-- `earnings_engine/KNOWLEDGE_BASE.md` — Section 10 + module section updates.
+New API response for incremental earnings fetch:
+```python
+# POST /api/v1/dashboard/earnings/incremental
+{
+  "success": true,
+  "total": 2396,
+  "already_cached": 1165,
+  "fetched": 800,
+  "skipped_no_listing": 431,
+  "errors": 0,
+}
+```
 
-## Functions
-### New
-- `data/predictions.py`:
-  - `store_prediction(ticker, settings, payload) -> int`
-  - `load_prediction_history(tickers=None, limit=None) -> list[dict]` (full audit)
-  - `load_latest_predictions(tickers=None) -> list[dict]` (latest per ticker)
-- `dashboard_api.py`:
-  - `get_kronos_predictions_audit(tickers=None, limit=None) -> list[dict]`
-  - `get_kronos_latest_predictions(tickers=None) -> list[dict]`
-  - `create_universe_file(name, tickers) -> dict`
-- `server.py`: new route handlers (thin wrappers).
+[Files]
+New and modified files for the Data Coverage tab and incremental earnings fetch.
 
-### Modified
-- `get_kronos_predictions()` — call `store_prediction` for each result.
-- `earnings.py` `_write_earnings` / normalize — add `drop_duplicates(subset=["earnings_date"])`.
+- **New**: `earnings_engine/data/coverage.py` — SQLite queries for per-ticker data coverage stats (price/earnings date ranges, row counts, listing dates)
+- **Modified**: `earnings_engine/api/dashboard_api.py` — add `get_data_coverage()` and `ingest_earnings_incremental()` functions
+- **Modified**: `earnings_engine/api/server.py` — add `GET /api/v1/dashboard/data-coverage` and `POST /api/v1/dashboard/earnings/incremental` endpoints
+- **Modified**: `earnings_engine/reports/templates/dashboard.html` — add "📋 Data Coverage" tab with filterable table + "Fetch Missing Earnings" button
+- **Modified**: `earnings_engine/data/earnings.py` — add `ingest_earnings_incremental()` function that only fetches for tickers missing earnings
+- **Modified**: `earnings_engine/cli.py` — add `--incremental` flag to `ingest` command for earnings-only-missing fetch
+- **New**: `tests/test_coverage.py` — tests for data coverage queries and incremental earnings fetch
 
-## Classes
-None new (follow existing module-function pattern).
+[Functions]
+New and modified functions.
 
-## Dependencies
-None new (uses existing `sqlite3`, `pandas`, `json`, `Settings`).
+- **New**: `get_data_coverage(tickers: list[str], settings: Settings) -> dict` in `earnings_engine/data/coverage.py`
+  - Runs a single SQL JOIN query across `price_history` and `earnings_history` grouped by ticker
+  - Returns per-ticker: price_start, price_end, price_rows, earnings_start, earnings_end, earnings_rows, listing_date (from price_history MIN(date)), earnings_fresh (from earnings_freshness)
+  - Filters to the requested ticker list (universe-filtered)
 
-## Testing
-- `tests/test_kronos_audit.py`: store+load round-trip, latest-per-ticker, dedup-by-timestamp, JSON payload fidelity. Uses `tmp_path` Settings override (no network).
-- `tests/test_caching.py`: add `test_upcoming_earnings_no_duplicates`.
-- Full suite: `python -m pytest tests/ -v`.
+- **New**: `ingest_earnings_incremental(tickers: list[str], settings: Settings) -> dict` in `earnings_engine/data/earnings.py`
+  - Identifies tickers with NO earnings rows in `earnings_history`
+  - For those, checks `price_history` for a listing date (MIN(date)) — skips tickers with no price history or listed < 90 days ago (too new for earnings)
+  - Only fetches earnings for tickers that should have earnings but don't
+  - Returns `{total, already_cached, fetched, skipped_no_listing, errors}`
 
-## Implementation Order
-1. Create `data/predictions.py` + tests, verify in isolation.
-2. Wire persistence into `dashboard_api.get_kronos_predictions`.
-3. Add API endpoints in `server.py`.
-4. Frontend Kronos Latest/Audit tabs + create-watchlist.
-5. Fix duplicate-earnings bug in `earnings.py` + regression test.
-6. Run full test suite; update KNOWLEDGE_BASE.md.
+- **New**: `get_data_coverage(market: str | None = None) -> dict` in `earnings_engine/api/dashboard_api.py`
+  - Resolves tickers via `_resolve_tickers(market)`
+  - Calls `coverage.get_data_coverage(tickers, settings)`
+  - Returns the coverage dict for the API endpoint
+
+- **New**: `ingest_earnings_incremental_api(market: str | None = None) -> dict` in `earnings_engine/api/dashboard_api.py`
+  - Resolves tickers via `_resolve_tickers(market)`
+  - Calls `earnings_mod.ingest_earnings_incremental(tickers, settings)`
+  - Returns the result dict for the API endpoint
+
+- **Modified**: `ingest` command in `earnings_engine/cli.py`
+  - Add `--incremental` flag: when set with `--earnings`, only fetches tickers missing earnings data (calls `ingest_earnings_incremental` instead of `ingest_earnings`)
+
+[Classes]
+No new classes. All changes are function-level additions to existing modules.
+
+[Dependencies]
+No new dependencies. Uses existing SQLite, FastAPI, and yfinance infrastructure.
+
+[Testing]
+Test file: `tests/test_coverage.py`
+
+- `test_get_data_coverage_returns_per_ticker_stats` — verifies price/earnings date ranges and row counts for a mock SQLite DB
+- `test_get_data_coverage_filters_by_ticker_list` — verifies only requested tickers are returned
+- `test_ingest_earnings_incremental_skips_cached` — verifies tickers with existing earnings are not re-fetched
+- `test_ingest_earnings_incremental_skips_no_listing` — verifies tickers with no price history or listed < 90 days are skipped
+- `test_ingest_earnings_incremental_fetches_missing` — verifies tickers missing earnings are fetched
+- `test_data_coverage_api_endpoint` — verifies the API endpoint returns the correct shape
+
+Existing tests should not be affected since all changes are additive (new functions, new endpoints, new tab).
+
+[Implementation Order]
+1. Create `earnings_engine/data/coverage.py` with `get_data_coverage()` SQL query function
+2. Add `ingest_earnings_incremental()` to `earnings_engine/data/earnings.py`
+3. Add `get_data_coverage()` and `ingest_earnings_incremental_api()` to `earnings_engine/api/dashboard_api.py`
+4. Add API endpoints to `earnings_engine/api/server.py`
+5. Add `--incremental` flag to `ingest` CLI command in `earnings_engine/cli.py`
+6. Add "Data Coverage" tab to `earnings_engine/reports/templates/dashboard.html`
+7. Create `tests/test_coverage.py` and verify all tests pass
+8. Run full test suite to confirm no regressions

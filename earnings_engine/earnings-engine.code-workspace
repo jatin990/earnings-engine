@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../../RayCodes_Kronos"
+		},
+		{
+			"path": "../../trade/india-trade-cli"
 		}
 	],
 	"settings": {}

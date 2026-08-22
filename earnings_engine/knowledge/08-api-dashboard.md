@@ -19,18 +19,49 @@
 - `GET /dashboard` — serve interactive dashboard HTML
 - `GET /api/v1/dashboard/overview` — dataset summary + refresh status + watchlist + universe files
 - `GET /api/v1/dashboard/results` — upcoming earnings with market context
-- `GET /api/v1/dashboard/swing` — swing setups with support/resistance
+- `GET /api/v1/dashboard/swing` — swing setups with support/resistance and enriched swing range
+- `GET /api/v1/swing-range?watchlist=&ticker=` — current swing range and cycle history for a ticker
+- `POST /api/v1/swing-range` — set user override for swing range (support, resistance, cycles)
+- `DELETE /api/v1/swing-range?watchlist=&ticker=` — clear user override (reverts to auto)
+- `GET /api/v1/swing-range/history?watchlist=&ticker=` — cycle timing history ("time each time")
+- `GET /api/v1/swing-range/list?watchlist=` — list all stored swing ranges for a watchlist
 - `GET /api/v1/dashboard/kronos` — Kronos predictions
 - `POST /api/v1/dashboard/kronos/run` — run Kronos predictions on-demand
 - `GET /api/v1/dashboard/kronos/latest?tickers=` — latest prediction per ticker
 - `GET /api/v1/dashboard/kronos/audit?tickers=&limit=` — full prediction history
 - `POST /api/v1/dashboard/refresh` — refresh prices/earnings/market caps
 - `GET /api/v1/dashboard/refresh-status` — last-refresh timestamps
+- `GET /api/v1/dashboard/data-coverage?market=` — per-ticker price/earnings coverage for a universe (Data Coverage tab)
+- `POST /api/v1/dashboard/earnings/incremental` — fetch earnings only for tickers missing them (body `{"market"|"tickers"}`)
 - `GET /api/v1/watchlist` — get watchlist from `my_watchlist.txt`
 - `POST /api/v1/watchlist/add` — add ticker to watchlist
 - `POST /api/v1/watchlist/remove` — remove ticker from watchlist
+- `GET /api/v1/playground/endpoints` — raw API endpoint catalog for the Playground API console
+- `GET /api/v1/playground/search?q=` — symbol autocomplete across NSE_ALL + US (live nsetools refresh + typed-symbol fallback)
+- `GET /api/v1/playground/ticker/{ticker}` — raw yfinance snapshot (fast_info/.info, price, market cap, earnings dates)
+- `GET /api/v1/playground/ticker/{ticker}/history?period=&interval=` — raw yfinance OHLCV history (capped 120 rows)
+- `GET /api/v1/playground/nse?force_refresh=` — NSE universe sizes + samples
+- `GET /api/v1/playground/nse/result-calendar?from_date=&to_date=` — raw NSE result-calendar payload (companies + result dates) from nseindia.com
+- `GET /api/v1/playground/nse/event-calendar?from_date=&to_date=` — raw NSE event-calendar payload (board meetings, results, dividends) from nseindia.com
+- `GET /api/v1/playground/nse/financial-calendar/{symbol}?from_date=&to_date=` — normalized NSE result dates for one symbol (raw payload kept separate)
+- `POST /api/v1/audit/log` — log daily news/catalyst stock prediction (body: `ticker`, `strategy_name`, `signal`, `entry_price`, `horizon`, `headline`)
+- `POST /api/v1/audit/log/bulk` — bulk-log predictions array
+- `POST /api/v1/audit/run` — execute automated evaluation of pending predictions against actual prices
+- `GET /api/v1/audit/metrics?strategy=` — retrieve performance scorecard (Win Rate %, Profit Factor, Sharpe Ratio, Brier Score, etc.)
+- `GET /api/v1/audit/history?strategy=&ticker=&status=&limit=&offset=` — paginated audit ledger
+- `GET /api/v1/audit/strategies` — list all strategies with prediction counts
+- `POST /api/v1/audit/import-kronos` — import historical Kronos forecasts and audit outcomes
+- `POST /api/v1/audit/backtest` — execute 1-year multi-strategy backtest simulation (body: `{"strategy", "days", "universe"}`)
+- `POST /api/v1/backtest/run` — unified multi-strategy backtest engine dispatcher (`strategy`: `swing`, `kronos`, `earnings`, `news`, `auditor_all`; returns standardized KPIs, equity curve, and trade log)
+- `POST /api/v1/backtest/swing/run` — dedicated swing channel backtest simulation
+- `GET /api/v1/dashboard/results/report?days=&past_days=&market=` — report-style HTML fragments (day sections, legend, popups) for Results tab (defaults to ±2 months / 60D past & 60D future)
+- `GET /api/v1/gainers/top?market=` — top daily market gainers with volume surge multiples & drivers (supports Indian and US markets)
+- `GET /api/v1/gainers/patterns` — recurring 52W / breakout pattern matrix
+- `GET /api/v1/scanner/categories?universe=` — active category scanner hub counts and metadata
+- `GET /api/v1/scanner/category/{category_id}?universe=&limit=` — candidates matching specific category setups
+- `POST /api/v1/dashboard/predict/run` — on-demand Kronos AI forecast for individual ticker or batch
 
-Root endpoint lists: `universe_create`, `kronos_predictions`, `kronos_run`, `kronos_latest`, `kronos_audit`.
+Root endpoint lists: `universe_create`, `kronos_predictions`, `kronos_run`, `kronos_latest`, `kronos_audit`, `audit_strategy`, `backtest_run`.
 
 ## `api/dashboard_api.py`
 **Purpose:** Data aggregation for the interactive dashboard tabs.
@@ -48,6 +79,8 @@ Root endpoint lists: `universe_create`, `kronos_predictions`, `kronos_run`, `kro
 - `get_watchlist()` / `add_to_watchlist(ticker)` / `remove_from_watchlist(ticker)` — server-side watchlist CRUD via `my_watchlist.txt`
 - `get_universe_files()` — list NSE universe files with metadata
 - `refresh_data(market, tickers, force)` — refresh prices/earnings/market caps
+- `get_data_coverage(market)` — per-ticker price/earnings coverage for a universe (Data Coverage tab)
+- `ingest_earnings_incremental_api(market, tickers)` — fetch earnings for tickers missing them, in batches
 
 **Data sources:**
 - SQLite `prices.sqlite3` (event_dataset, price_history, earnings_history, ticker_market_cap, kronos_predictions)

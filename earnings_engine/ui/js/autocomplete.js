@@ -49,10 +49,27 @@ class Autocomplete {
     }
     
     async fetchTickers(market) {
+        market = (market || '').toUpperCase().trim();
+        if (window.app && typeof window.app.getUniverse === 'function') {
+            const u = await window.app.getUniverse(market);
+            return (u && u.tickers) || [];
+        }
         try {
+            const cacheKey = 'ee_uni_' + market;
+            const stored = sessionStorage.getItem(cacheKey);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (parsed && Array.isArray(parsed.tickers) && parsed.ts && (Date.now() - parsed.ts < 3600000)) {
+                    return parsed.tickers;
+                }
+            }
             const response = await fetch(`/api/v1/universe/${market}`);
             const data = await response.json();
-            return data.tickers || [];
+            const tickers = data.tickers || [];
+            try {
+                sessionStorage.setItem(cacheKey, JSON.stringify({ market, count: tickers.length, tickers, ts: Date.now() }));
+            } catch (e) {}
+            return tickers;
         } catch (error) {
             console.error(`Error fetching ${market} tickers:`, error);
             return [];

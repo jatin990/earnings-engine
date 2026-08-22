@@ -49,6 +49,17 @@
 - `--universe-file`: plain-text ticker list
 - `--force`: ignore cache freshness
 - `--days`: look-ahead window (default 14)
+- `--incremental`: `ingest` only fetches earnings for tickers that are missing earnings data (skips already-cached and too-new/na-listed tickers) — faster than a full earnings fetch
+- `--start-date` / `--from`: start date (YYYY-MM-DD) for the look-ahead window on `calendar`, `upcoming-results`, and `predict` (defaults to today; window = `[start_date, start_date + days)`)
+- `--check`: run the report checker subworkflow after generating an `upcoming-results` report
+- `check-report --csv <path>`: standalone command that verifies every field in an existing report CSV against the database
+- `audit-strategy` command group:
+  - `audit-strategy log`: log single or bulk prediction (`--ticker`, `--strategy`, `--signal`, `--confidence`, `--file`)
+  - `audit-strategy run`: evaluate pending predictions against actual closing prices (`--force`)
+  - `audit-strategy metrics`: display terminal performance table with Win Rate %, Profit Factor, Sharpe, Brier Score (`-s <strategy>`)
+  - `audit-strategy import-kronos`: import existing Kronos predictions from `kronos_predictions` into the audit ledger
+  - `audit-strategy backtest`: run 1-year historical simulation across all strategies (`--strategy`, `--days`, `--universe`)
+
 
 ## `logging_utils.py`
 **Functions:**

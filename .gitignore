@@ -12,3 +12,5 @@ reports/output/
 secrets.env
 logs
 reports
+*.log
+.continue/

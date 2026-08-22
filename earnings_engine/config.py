@@ -20,6 +20,17 @@ MARKETS = {
 }
 
 
+def _env_int(name: str, default: int) -> int:
+    """Read an integer from the environment with a fallback default."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
 @dataclass
 class Settings:
     """Runtime settings for data ingestion."""
@@ -36,6 +47,36 @@ class Settings:
             "earnings": EARNINGS_DIR,
         }
     )
+    # Concurrency: price/earnings ingestion workers.
+    price_fetch_workers: int = field(
+        default_factory=lambda: _env_int("EARNINGS_ENGINE_PRICE_FETCH_WORKERS", 10)
+    )
+    # Concurrency: GBM feature-building loop (per upcoming-earnings event).
+    gbm_feature_workers: int = field(
+        default_factory=lambda: _env_int("EARNINGS_ENGINE_GBM_FEATURE_WORKERS", 8)
+    )
+    # Concurrency: Kronos historical-data fetch (I/O-bound, parallel).
+    kronos_fetch_workers: int = field(
+        default_factory=lambda: _env_int("EARNINGS_ENGINE_KRONOS_FETCH_WORKERS", 8)
+    )
+    # Kronos GPU batch size: number of ticker sequences per forward pass.
+    # Batching sequences into one tensor is far more efficient (and safer on a
+    # 6GB 3060) than spawning concurrent threads that hammer the same model.
+    kronos_gpu_batch_size: int = field(
+        default_factory=lambda: _env_int("EARNINGS_ENGINE_KRONOS_GPU_BATCH_SIZE", 2)
+    )
+    # Concurrency: Ollama explanation calls (local network, parallel).
+    kronos_explain_workers: int = field(
+        default_factory=lambda: _env_int("EARNINGS_ENGINE_KRONOS_EXPLAIN_WORKERS", 4)
+    )
+    # Inference device for Kronos model: "cuda", "cuda:0", "cpu", or "" (auto-detect).
+    kronos_device: str = field(
+        default_factory=lambda: os.getenv("EARNINGS_ENGINE_KRONOS_DEVICE", "").strip()
+    )
+
+    def resolve_device(self, preferred: str | None = None) -> str:
+        """Resolve the model inference device for Kronos."""
+        return get_default_device(preferred or self.kronos_device)
 
     def ensure_dirs(self) -> None:
         for d in self.data_dirs.values():
@@ -48,11 +89,11 @@ class EmailSettings:
 
     enabled: bool = False
     smtp_host: str = "smtp.gmail.com"
-    smtp_port: int = 587 
-    smtp_username: str = "jatin990.service@gmail.com"
-    smtp_password: str = "yptc iqes rcud nngu"
-    from_address: str = "jatin990.service@gmail.com"
-    to_addresses: tuple[str, ...] = ("jatinabrol4@gmail.com",)
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    from_address: str = ""
+    to_addresses: tuple[str, ...] = ()
 
 
 def _parse_env_list(value: str | None) -> tuple[str, ...]:
@@ -62,25 +103,45 @@ def _parse_env_list(value: str | None) -> tuple[str, ...]:
 
 
 def load_email_settings() -> EmailSettings:
-    """Load email settings from environment variables."""
-    enabled = os.getenv("EARNINGS_ENGINE_EMAIL_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
-    smtp_host = os.getenv("EARNINGS_ENGINE_SMTP_HOST", "").strip()
-    smtp_port = int(os.getenv("EARNINGS_ENGINE_SMTP_PORT", "587"))
-    smtp_username = os.getenv("EARNINGS_ENGINE_SMTP_USERNAME", "").strip()
-    smtp_password = os.getenv("EARNINGS_ENGINE_SMTP_PASSWORD", "").strip()
-    from_address = os.getenv("EARNINGS_ENGINE_EMAIL_FROM", "").strip()
-    to_addresses = _parse_env_list(os.getenv("EARNINGS_ENGINE_EMAIL_TO", ""))
     return EmailSettings(
-        enabled=enabled,
-        smtp_host=smtp_host,
-        smtp_port=smtp_port,
-        smtp_username=smtp_username,
-        smtp_password=smtp_password,
-        from_address=from_address,
-        to_addresses=to_addresses,
+        enabled=os.getenv("EARNINGS_ENGINE_EMAIL_ENABLED", "false").strip().lower() == "true",
+        smtp_host=os.getenv("EARNINGS_ENGINE_SMTP_HOST", "smtp.gmail.com"),
+        smtp_port=_env_int("EARNINGS_ENGINE_SMTP_PORT", 587),
+        smtp_username=os.getenv("EARNINGS_ENGINE_SMTP_USERNAME", ""),
+        smtp_password=os.getenv("EARNINGS_ENGINE_SMTP_PASSWORD", ""),
+        from_address=os.getenv("EARNINGS_ENGINE_EMAIL_FROM", ""),
+        to_addresses=_parse_env_list(os.getenv("EARNINGS_ENGINE_EMAIL_TO")),
     )
 
 
 def market_of(ticker: str) -> str:
     """Infer market code from a yfinance ticker symbol."""
     return "IN" if ticker.endswith(".NS") else "US"
+
+
+def get_default_device(preferred: str | None = None) -> str:
+    """Return the resolved PyTorch device for Kronos inference.
+
+    Checks preferred argument, then EARNINGS_ENGINE_KRONOS_DEVICE, then auto-detects CUDA.
+    """
+    if preferred and preferred.strip():
+        pref = preferred.strip().lower()
+        if pref == "cuda":
+            return "cuda:0"
+        return pref
+    env_dev = os.getenv("EARNINGS_ENGINE_KRONOS_DEVICE", "").strip().lower()
+    if env_dev:
+        if env_dev == "cuda":
+            return "cuda:0"
+        return env_dev
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return "cuda:0"
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return "mps"
+    except Exception:
+        pass
+    return "cpu"
+

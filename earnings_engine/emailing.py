@@ -15,6 +15,7 @@ def send_report_email(csv_path: Path, settings: EmailSettings, body: str | None 
     logger = get_logger("earnings_engine.emailing")
     if not settings.enabled:
         logger.info("Email delivery is disabled")
+        logger.info(settings)
         return
     if not settings.smtp_host or not settings.from_address or not settings.to_addresses:
         logger.info("Email delivery is enabled but SMTP host/from/to are not fully configured")

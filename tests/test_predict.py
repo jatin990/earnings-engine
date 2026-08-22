@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -54,7 +55,7 @@ def wired(monkeypatch, tmp_path):
     monkeypatch.setattr(predict_mod, "load_earnings", lambda t, s: earnings)
     monkeypatch.setattr(
         predict_mod, "upcoming_earnings",
-        lambda tickers, s, days=14: pd.DataFrame(
+        lambda tickers, s, days=14, start_date=None: pd.DataFrame(
             [{"ticker": t, "earnings_date": future} for t in tickers]
         ),
     )
@@ -107,25 +108,38 @@ def test_render_dashboard(tmp_path, monkeypatch):
     assert "tickerSearch" in content
     assert "autocompleteDropdown" in content
     
-    # Verify tab-based layout (Results, Swing, Kronos, Watchlist)
+    # Verify tab-based layout (Results, Swing, Kronos, Data Coverage, Industries, Buy the Dip, Playground)
     assert "tab-results" in content
     assert "tab-swing" in content
     assert "tab-kronos" in content
-    assert "tab-watchlist" in content
+    assert "tab-coverage" in content
+    assert "tab-industries" in content
+    assert "tab-patterns" in content
+    assert "tab-buydip" in content
+    assert "tab-playground" in content
     
     # Verify widget containers
     assert "resultsWidgets" in content
     assert "swingWidgets" in content
     assert "kronosWidgets" in content
-    assert "watchlistItems" in content
+
+    # Verify the global-only watchlist model (no per-tab watchlist strips) +
+    # the Data Coverage / Industries / Buy-the-Dip / Patterns tables
+    assert "resultsWatchlistItems" not in content
+    assert "tabWatchlists" not in content
+    assert "coverageTable" in content
+    assert "indGroups" in content
+    assert "bdTodayTable" in content
+    assert "bdYesterdayTable" in content
+    assert "patIndustries" in content
+    assert "/api/v1/dashboard/patterns" in content
     
     # Verify results table
     assert "resultsTable" in content
 
-    # Verify refresh with timestamp
+    # Verify refresh timestamp is still shown (the global "Refresh Now" button
+    # was removed per user request, but per-tab refresh remains)
     assert "lastRefreshed" in content
-    assert "refreshBtn" in content
-    assert "dashboard/refresh" in content
 
     # Verify SQLite & NSE-file backed endpoints
     assert "dashboard/overview" in content
@@ -144,8 +158,12 @@ def test_cleanup_previous_artifacts_archives_reports_and_prunes_logs(tmp_path):
     archive_dir.mkdir(parents=True, exist_ok=True)
     logs_dir.mkdir(parents=True, exist_ok=True)
 
-    (output_dir / "old-report.csv").write_text("old", encoding="utf-8")
-    (output_dir / "old-report.html").write_text("old", encoding="utf-8")
+    # Previous-day report (date-stamped) should be moved to archive/.
+    (output_dir / "upcoming-results-2026-08-01.csv").write_text("old", encoding="utf-8")
+    (output_dir / "upcoming-results-2026-08-01.html").write_text("old", encoding="utf-8")
+    # Same-day report should be deleted (the new run regenerates it).
+    today = datetime.now().strftime("%Y-%m-%d")
+    (output_dir / f"upcoming-results-{today}.csv").write_text("today", encoding="utf-8")
     old_log = logs_dir / "earnings_engine-old.log"
     old_log.write_text("old", encoding="utf-8")
     recent_log = logs_dir / "earnings_engine-recent.log"
@@ -156,15 +174,20 @@ def test_cleanup_previous_artifacts_archives_reports_and_prunes_logs(tmp_path):
 
     cli_mod._cleanup_previous_artifacts(tmp_path)
 
-    assert not (output_dir / "old-report.csv").exists()
-    assert not (output_dir / "old-report.html").exists()
-    assert (archive_dir / "old-report.csv").exists()
-    assert (archive_dir / "old-report.html").exists()
+    assert not (output_dir / "upcoming-results-2026-08-01.csv").exists()
+    assert not (output_dir / "upcoming-results-2026-08-01.html").exists()
+    assert (archive_dir / "upcoming-results-2026-08-01.csv").exists()
+    assert (archive_dir / "upcoming-results-2026-08-01.html").exists()
+    # Same-day files are kept (keep-last-3 policy) rather than deleted.
+    assert (output_dir / f"upcoming-results-{today}.csv").exists()
     assert not old_log.exists()
     assert recent_log.exists()
 
 
 def test_enrich_upcoming_results_computes_momentum_and_support_levels(monkeypatch):
+    # Bypass the once-per-day price-metrics cache so the test always recomputes.
+    monkeypatch.setattr(market_context_mod, "load_price_metrics", lambda ticker, settings: None)
+
     class DummyTicker:
         def __init__(self, ticker):
             self.fast_info = {"market_cap": 1_000_000_000, "last_price": 100.0, "year_high": 110.0, "year_low": 90.0, "year_change": 0.05}
@@ -202,6 +225,168 @@ def test_enrich_upcoming_results_computes_momentum_and_support_levels(monkeypatc
     assert enriched["current_support"].iloc[0] == 100.0
 
 
+def test_enrich_upcoming_results_handles_empty_prices(monkeypatch):
+    """Regression: a ticker with no price data must not crash enrichment.
+
+    ``seven_day_return_pct`` is computed inside the ``len(closes) >= 2`` branch
+    and previously had no ``None`` default, so an empty/too-short price history
+    (e.g. a delisted ticker whose download failed) left it unbound
+    (UnboundLocalError), which dropped the whole row from the upcoming-results
+    report.
+    """
+    monkeypatch.setattr(market_context_mod, "load_price_metrics", lambda ticker, settings: None)
+    empty_prices = pd.DataFrame(columns=["close"])
+    monkeypatch.setattr(market_context_mod, "fetch_prices", lambda ticker, settings, force=False: empty_prices)
+    monkeypatch.setattr(market_context_mod, "load_prices", lambda ticker, settings: empty_prices)
+
+    class DummyTicker:
+        def __init__(self, ticker):
+            self.fast_info = {"market_cap": 1_000_000_000, "last_price": 100.0,
+                              "year_high": 110.0, "year_low": 90.0, "year_change": 0.05}
+            self.info = {"marketCap": 1_000_000_000, "currentPrice": 100.0,
+                         "fiftyTwoWeekHigh": 110.0, "fiftyTwoWeekLow": 90.0}
+
+    earnings = pd.DataFrame({
+        "earnings_date": [pd.Timestamp("2024-01-01"), pd.Timestamp("2024-04-01"),
+                          pd.Timestamp("2024-07-01")],
+        "surprise_pct": [12.0, 8.0, -3.0],
+    })
+    monkeypatch.setattr(market_context_mod, "load_earnings", lambda ticker, settings: earnings)
+    monkeypatch.setattr(market_context_mod.yf, "Ticker", lambda ticker: DummyTicker(ticker))
+
+    df = pd.DataFrame([{"ticker": "AAA", "earnings_date": pd.Timestamp("2024-08-01")}])
+    enriched = market_context_mod.enrich_upcoming_results(df, Settings())
+
+    assert len(enriched) == 1
+    assert enriched["ticker"].iloc[0] == "AAA"
+    assert enriched["seven_day_return_pct"].iloc[0] is None
+    assert enriched["thirty_day_return_pct"].iloc[0] is None
+    assert "earnings_week_move_pct" in enriched.columns
+
+
+def test_day_color_assignment():
+    """Per-day color classes are assigned correctly to distinct earnings dates."""
+    from earnings_engine.reports.render import _assign_day_classes, _DAY_COLORS
+
+    df = pd.DataFrame([
+        {"ticker": "AAA", "earnings_date": pd.Timestamp("2026-08-04")},
+        {"ticker": "BBB", "earnings_date": pd.Timestamp("2026-08-05")},
+        {"ticker": "CCC", "earnings_date": pd.Timestamp("2026-08-04")},
+    ])
+    classes = _assign_day_classes(df)
+    assert classes["2026-08-04"] == f"day-0"
+    assert classes["2026-08-05"] == f"day-1"
+    # Same date gets the same class
+    assert classes["2026-08-04"] == classes["2026-08-04"]
+
+
+def test_per_day_ranking():
+    """Per-day ranking sorts each day's sublist best→worst by momentum."""
+    from earnings_engine.reports.render import _sort_per_day
+
+    df = pd.DataFrame([
+        {"ticker": "WORST", "earnings_date": pd.Timestamp("2026-08-04"),
+         "thirty_day_return_pct": -5.0, "earnings_week_move_pct": -2.0,
+         "prev_3q_earnings_score": 3, "market_cap": 1e9},
+        {"ticker": "BEST", "earnings_date": pd.Timestamp("2026-08-04"),
+         "thirty_day_return_pct": 10.0, "earnings_week_move_pct": 5.0,
+         "prev_3q_earnings_score": 8, "market_cap": 5e9},
+        {"ticker": "MID", "earnings_date": pd.Timestamp("2026-08-04"),
+         "thirty_day_return_pct": 2.0, "earnings_week_move_pct": 1.0,
+         "prev_3q_earnings_score": 6, "market_cap": 2e9},
+        {"ticker": "OTHER_DAY", "earnings_date": pd.Timestamp("2026-08-05"),
+         "thirty_day_return_pct": 0.0, "earnings_week_move_pct": 0.0,
+         "prev_3q_earnings_score": 5, "market_cap": 1e9},
+    ])
+    sorted_df = _sort_per_day(df)
+    # Day 2026-08-04: BEST (15) > MID (3) > WORST (-7)
+    day1 = sorted_df[sorted_df["earnings_date"] == pd.Timestamp("2026-08-04")]
+    assert list(day1["ticker"]) == ["BEST", "MID", "WORST"]
+    # Day 2026-08-05: only one row
+    day2 = sorted_df[sorted_df["earnings_date"] == pd.Timestamp("2026-08-05")]
+    assert list(day2["ticker"]) == ["OTHER_DAY"]
+    # Days are in chronological order
+    assert sorted_df.iloc[0]["earnings_date"] == pd.Timestamp("2026-08-04")
+    assert sorted_df.iloc[-1]["earnings_date"] == pd.Timestamp("2026-08-05")
+
+
+def test_upcoming_results_check_flag_runs_checker(tmp_path, monkeypatch):
+    """The --check flag runs the report checker after rendering."""
+    monkeypatch.setattr(cli_mod, "Settings", lambda: Settings())
+    monkeypatch.setattr(cli_mod, "_resolve_tickers", lambda market, ticker, universe_file=None: ["AAA"])
+    monkeypatch.setattr(
+        cli_mod.earnings_mod,
+        "upcoming_earnings",
+        lambda tickers, settings, days=14, source=None, start_date=None: pd.DataFrame([
+            {"ticker": "AAA", "earnings_date": pd.Timestamp("2026-08-01")}
+        ]),
+    )
+    monkeypatch.setattr(cli_mod, "enrich_upcoming_results", lambda df: df.assign(
+        market_cap=1_000_000_000,
+        current_price=100.0,
+        week_change=0.05,
+        pct_from_52w_high=10.0,
+        pct_from_52w_low=5.0,
+    ))
+    monkeypatch.setattr(cli_mod, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setenv("EARNINGS_ENGINE_EMAIL_ENABLED", "false")
+    monkeypatch.setattr(cli_mod, "load_email_settings", lambda: EmailSettings(enabled=False))
+
+    # Use a fake checker that returns a known result to avoid DB access.
+    from earnings_engine.reports import checker as checker_mod
+    from earnings_engine.reports.checker import CheckResult, Inconsistency
+
+    def fake_check(df, settings=None):
+        return CheckResult(verified=3, verified_empty=1, inconsistencies=[
+            Inconsistency(
+                ticker="AAA", field="current_price", report_value=100.0,
+                expected_value=110.0, reason="report value differs from the original source",
+            )
+        ])
+
+    monkeypatch.setattr(checker_mod, "check_report_frame", fake_check)
+
+    runner = CliRunner()
+    result = runner.invoke(cli_mod.cli, ["upcoming-results", "--market", "IN", "--days", "14", "--check"])
+
+    assert result.exit_code == 0
+    assert "Report checker" in result.output
+    assert "INCONSISTENCY AAA current_price" in result.output
+
+
+def test_upcoming_results_start_date_passed_through(tmp_path, monkeypatch):
+    """The --start-date option is passed to upcoming_earnings."""
+    captured = {}
+
+    monkeypatch.setattr(cli_mod, "Settings", lambda: Settings())
+    monkeypatch.setattr(cli_mod, "_resolve_tickers", lambda market, ticker, universe_file=None: ["AAA"])
+    monkeypatch.setattr(
+        cli_mod.earnings_mod,
+        "upcoming_earnings",
+        lambda tickers, settings, days=14, source=None, start_date=None: (
+            captured.update({"start_date": start_date, "days": days}) or
+            pd.DataFrame([{"ticker": "AAA", "earnings_date": pd.Timestamp("2026-08-01")}])
+        ),
+    )
+    monkeypatch.setattr(cli_mod, "enrich_upcoming_results", lambda df: df.assign(
+        market_cap=1_000_000_000,
+        current_price=100.0,
+        week_change=0.05,
+        pct_from_52w_high=10.0,
+        pct_from_52w_low=5.0,
+    ))
+    monkeypatch.setattr(cli_mod, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setenv("EARNINGS_ENGINE_EMAIL_ENABLED", "false")
+    monkeypatch.setattr(cli_mod, "load_email_settings", lambda: EmailSettings(enabled=False))
+
+    runner = CliRunner()
+    result = runner.invoke(cli_mod.cli, ["upcoming-results", "--market", "IN", "--start-date", "2026-09-01", "--days", "5"])
+
+    assert result.exit_code == 0
+    assert captured["start_date"] == "2026-09-01"
+    assert captured["days"] == 5
+
+
 def test_upcoming_results_renders_ledger_section(tmp_path, monkeypatch):
     import earnings_engine.reports.render as render_mod
     from earnings_engine.reports.render import render_upcoming_results_report
@@ -209,6 +394,7 @@ def test_upcoming_results_renders_ledger_section(tmp_path, monkeypatch):
     enriched = pd.DataFrame([
         {
             "ticker": "AAA",
+            "company_name": "Alpha Corp",
             "earnings_date": pd.Timestamp("2026-08-01"),
             "market_cap": 1_000_000_000,
             "current_price": 100.0,
@@ -218,6 +404,24 @@ def test_upcoming_results_renders_ledger_section(tmp_path, monkeypatch):
             "thirty_day_return_pct": 4.2,
             "earnings_week_move_pct": 3.1,
             "prev_quarter_earnings_score": 7,
+            "kronos_14d": {
+                "symbol": "AAA",
+                "name": "Alpha Corp",
+                "current_price": 100.0,
+                "projected_close": 105.0,
+                "support": 95.0,
+                "resistance": 110.0,
+                "return_pct": 5.0,
+                "trend": "Bullish",
+                "explanation": "Alpha Corp shows a constructive 14-day setup with support near 95.",
+            },
+            "gbm_prediction": {
+                "direction": "UP",
+                "confidence": 0.62,
+                "p_up": 0.62,
+                "earnings_date": "2026-08-01",
+                "train_events": 300,
+            },
         }
     ])
     monkeypatch.setattr(render_mod, "OUTPUT_DIR", tmp_path)
@@ -225,10 +429,78 @@ def test_upcoming_results_renders_ledger_section(tmp_path, monkeypatch):
     html_path = render_upcoming_results_report(enriched)
     html = html_path.read_text(encoding="utf-8")
 
-    assert "Upcoming Results Ledger" in html
+    # New layout: day-wise collapsible sections with cap categorization
+    assert "day-section" in html
+    assert "2026-08-01" in html
+    assert "Large Cap" in html or "Small Cap" in html
     assert "AAA" in html
-    assert "risk/reward" in html
+    assert "Kronos 14D" in html
+    assert "GBM" in html
     assert "Momentum Bias" in html
+
+    # Ledger stock cell shows company name + clickable popup link
+    assert "Alpha Corp" in html
+    assert "stock-link" in html
+    assert "onclick=\"openPopup('AAA')\"" in html
+
+    # Popup modal with Kronos + GBM + Ollama sections
+    assert "popup-modal" in html
+    assert "Kronos 14-Day Forecast" in html
+    assert "GBM Earnings Prediction" in html
+    assert "Ollama Analysis" in html
+    assert "Setup, Quality & Momentum" in html
+    assert "Alpha Corp shows a constructive 14-day setup" in html
+    assert "UP 62%" in html
+
+
+def test_upcoming_results_dedupes_same_stock(tmp_path, monkeypatch):
+    """The same stock appearing on multiple earnings dates is merged (earliest kept)."""
+    import earnings_engine.reports.render as render_mod
+    from earnings_engine.reports.render import render_upcoming_results_report
+
+    enriched = pd.DataFrame([
+        {
+            "ticker": "AAA",
+            "company_name": "Alpha Corp",
+            "earnings_date": pd.Timestamp("2026-08-01"),
+            "source": "nse",
+            "market_cap": 1_000_000_000,
+            "current_price": 100.0,
+            "week_change": 0.05,
+            "pct_from_52w_high": 10.0,
+            "pct_from_52w_low": 5.0,
+            "thirty_day_return_pct": 4.2,
+            "earnings_week_move_pct": 3.1,
+            "prev_quarter_earnings_score": 7,
+        },
+        {
+            "ticker": "AAA",
+            "company_name": "Alpha Corp",
+            "earnings_date": pd.Timestamp("2026-08-05"),
+            "source": "yfinance",
+            "market_cap": 1_000_000_000,
+            "current_price": 102.0,
+            "week_change": 0.06,
+            "pct_from_52w_high": 11.0,
+            "pct_from_52w_low": 6.0,
+            "thirty_day_return_pct": 5.0,
+            "earnings_week_move_pct": 4.0,
+            "prev_quarter_earnings_score": 8,
+        },
+    ])
+    monkeypatch.setattr(render_mod, "OUTPUT_DIR", tmp_path)
+
+    html_path = render_upcoming_results_report(enriched)
+    html = html_path.read_text(encoding="utf-8")
+
+    # Only one day section should exist (earliest date kept), one popup, one row
+    assert html.count("class=\"day-section\"") == 1
+    assert html.count("class=\"popup-modal\"") == 1
+    assert "2026-08-01" in html
+    assert "2026-08-05" in html  # both dates shown
+    assert "2026-08-01 (nse)" in html
+    assert "2026-08-05 (yfinance)" in html
+    assert html.count("Alpha Corp") == 2  # once in ledger, once in popup header
 
 
 def test_upcoming_results_formats_market_cap_quality_and_52w_gaps(tmp_path, monkeypatch):
@@ -313,7 +585,7 @@ def test_upcoming_results_exports_timestamped_csv(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cli_mod.earnings_mod,
         "upcoming_earnings",
-        lambda tickers, settings, days=14: pd.DataFrame([
+        lambda tickers, settings, days=14, source=None, start_date=None: pd.DataFrame([
             {"ticker": "AAA", "earnings_date": pd.Timestamp("2026-08-01")}
         ]),
     )
@@ -345,7 +617,7 @@ def test_upcoming_results_sends_email_when_configured(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cli_mod.earnings_mod,
         "upcoming_earnings",
-        lambda tickers, settings, days=14: pd.DataFrame([
+        lambda tickers, settings, days=14, source=None, start_date=None: pd.DataFrame([
             {"ticker": "AAA", "earnings_date": pd.Timestamp("2026-08-01")}
         ]),
     )
@@ -384,7 +656,7 @@ def test_upcoming_results_writes_log_file(tmp_path, monkeypatch):
     monkeypatch.setattr(
         cli_mod.earnings_mod,
         "upcoming_earnings",
-        lambda tickers, settings, days=14: pd.DataFrame([
+        lambda tickers, settings, days=14, source=None, start_date=None: pd.DataFrame([
             {"ticker": "AAA", "earnings_date": pd.Timestamp("2026-08-01")}
         ]),
     )
@@ -414,7 +686,7 @@ def test_upcoming_results_generates_html_report_for_email(tmp_path, monkeypatch)
     monkeypatch.setattr(
         cli_mod.earnings_mod,
         "upcoming_earnings",
-        lambda tickers, settings, days=14: pd.DataFrame([
+        lambda tickers, settings, days=14, source=None, start_date=None: pd.DataFrame([
             {"ticker": "AAA", "earnings_date": pd.Timestamp("2026-08-01")}
         ]),
     )
@@ -452,7 +724,7 @@ def test_upcoming_results_sends_email_when_smtp_config_present(tmp_path, monkeyp
     monkeypatch.setattr(
         cli_mod.earnings_mod,
         "upcoming_earnings",
-        lambda tickers, settings, days=14: pd.DataFrame([
+        lambda tickers, settings, days=14, source=None, start_date=None: pd.DataFrame([
             {"ticker": "AAA", "earnings_date": pd.Timestamp("2026-08-01")}
         ]),
     )
@@ -528,6 +800,9 @@ def test_quality_score_last_quarter_is_last_element():
 
 def test_enrich_upcoming_results_adds_last_quarter_score_and_week_hl(monkeypatch):
     """Regression: last quarter score and week high/low from last earnings date."""
+    # Bypass the once-per-day price-metrics cache so the test always recomputes.
+    monkeypatch.setattr(market_context_mod, "load_price_metrics", lambda ticker, settings: None)
+
     class DummyTicker:
         def __init__(self, ticker):
             self.fast_info = {"market_cap": 1_000_000_000, "last_price": 100.0, "year_high": 110.0, "year_low": 90.0, "year_change": 0.05}
@@ -567,7 +842,139 @@ def test_enrich_upcoming_results_adds_last_quarter_score_and_week_hl(monkeypatch
     assert enriched["last_week_high_price"].iloc[0] == 120.0
 
 
+def test_enrich_upcoming_results_adds_individual_quarter_scores_and_week_hl(monkeypatch):
+    """Regression: per-quarter scores + week high/low are restored for Q1/Q2/Q3."""
+    # Bypass the once-per-day price-metrics cache so the test always recomputes.
+    monkeypatch.setattr(market_context_mod, "load_price_metrics", lambda ticker, settings: None)
+
+    class DummyTicker:
+        def __init__(self, ticker):
+            self.fast_info = {"market_cap": 1_000_000_000, "last_price": 100.0, "year_high": 110.0, "year_low": 90.0, "year_change": 0.05}
+            self.info = {"marketCap": 1_000_000_000, "currentPrice": 100.0, "fiftyTwoWeekHigh": 110.0, "fiftyTwoWeekLow": 90.0}
+
+    # Prices spanning the earnings dates with a clear high/low around each.
+    # Start before Q1's earnings so _week_high_low_around has a base close.
+    dates = pd.bdate_range("2023-12-01", periods=200)
+    closes = [100.0] * len(dates)
+    # Add spikes around each quarter's earnings date
+    for i, d in enumerate(dates):
+        if pd.Timestamp("2024-01-01") <= d <= pd.Timestamp("2024-01-09"):
+            closes[i] = 110.0
+        elif pd.Timestamp("2024-04-01") <= d <= pd.Timestamp("2024-04-09"):
+            closes[i] = 120.0
+        elif pd.Timestamp("2024-07-01") <= d <= pd.Timestamp("2024-07-09"):
+            closes[i] = 130.0
+    prices = pd.DataFrame(
+        {"open": closes, "high": [c * 1.01 for c in closes], "low": [c * 0.99 for c in closes],
+         "close": closes, "volume": [1_000] * len(dates)},
+        index=pd.DatetimeIndex(dates, name="date"),
+    )
+    earnings = pd.DataFrame(
+        {
+            "earnings_date": [pd.Timestamp("2024-01-01"), pd.Timestamp("2024-04-01"), pd.Timestamp("2024-07-01")],
+            "surprise_pct": [20.0, 18.0, 2.0],
+        }
+    )
+
+    monkeypatch.setattr(market_context_mod, "fetch_prices", lambda ticker, settings, force=False: prices)
+    monkeypatch.setattr(market_context_mod, "load_earnings", lambda ticker, settings: earnings)
+    monkeypatch.setattr(market_context_mod.yf, "Ticker", lambda ticker: DummyTicker(ticker))
+
+    df = pd.DataFrame([{"ticker": "AAA", "earnings_date": pd.Timestamp("2024-08-01")}])
+    enriched = market_context_mod.enrich_upcoming_results(df, Settings())
+
+    # Individual quarter scores with Q1 = MOST recent quarter:
+    #   Q1 (2024-07-01) has 2% → 6
+    #   Q2 (2024-04-01) has 18% → 9
+    #   Q3 (2024-01-01) has 20% → 9
+    assert enriched["q1_earnings_score"].iloc[0] == 6
+    assert enriched["q2_earnings_score"].iloc[0] == 9
+    assert enriched["q3_earnings_score"].iloc[0] == 9
+    # 3Q average = round((6+9+9)/3) = 8, capped at max individual (9)
+    assert enriched["prev_3q_earnings_score"].iloc[0] == 8
+    # Last quarter score = most recent quarter (2% → 6)
+    assert enriched["prev_quarter_earnings_score"].iloc[0] == 6
+
+    # Per-quarter week high/low computed from each quarter's earnings date (±4 business days)
+    # Q1 (2024-07-01) has spike to 130
+    assert enriched["q1_week_high_pct"].iloc[0] is not None
+    assert enriched["q1_week_high_price"].iloc[0] == 130.0
+    # Q2 (2024-04-01) has spike to 120
+    assert enriched["q2_week_high_pct"].iloc[0] is not None
+    assert enriched["q2_week_high_price"].iloc[0] == 120.0
+    # Q3 (2024-01-01) has spike to 110
+    assert enriched["q3_week_high_pct"].iloc[0] is not None
+    assert enriched["q3_week_high_price"].iloc[0] == 110.0
+    # Last week high/low mirrors Q1 (most recent)
+    assert enriched["last_week_high_price"].iloc[0] == 130.0
+
+
+def test_enrich_upcoming_results_excludes_upcoming_event_from_quarters(monkeypatch):
+    """Regression: the upcoming earnings event (e.g. +4d) must NOT leak into the
+    Q1/Q2/Q3 quarter breakdown — only PAST earnings events contribute to the
+    quarter scores, week-high/low, and price-after-earnings."""
+    # Bypass the once-per-day price-metrics cache so the test always recomputes.
+    monkeypatch.setattr(market_context_mod, "load_price_metrics", lambda ticker, settings: None)
+
+    class DummyTicker:
+        def __init__(self, ticker):
+            self.fast_info = {"market_cap": 1_000_000_000, "last_price": 100.0, "year_high": 110.0, "year_low": 90.0, "year_change": 0.05}
+            self.info = {"marketCap": 1_000_000_000, "currentPrice": 100.0, "fiftyTwoWeekHigh": 110.0, "fiftyTwoWeekLow": 90.0}
+
+    # Prices spanning the earnings dates with a clear high/low around each.
+    dates = pd.bdate_range("2023-12-01", periods=200)
+    closes = [100.0] * len(dates)
+    for i, d in enumerate(dates):
+        if pd.Timestamp("2024-01-01") <= d <= pd.Timestamp("2024-01-09"):
+            closes[i] = 110.0
+        elif pd.Timestamp("2024-04-01") <= d <= pd.Timestamp("2024-04-09"):
+            closes[i] = 120.0
+        elif pd.Timestamp("2024-07-01") <= d <= pd.Timestamp("2024-07-09"):
+            closes[i] = 130.0
+    prices = pd.DataFrame(
+        {"open": closes, "high": [c * 1.01 for c in closes], "low": [c * 0.99 for c in closes],
+         "close": closes, "volume": [1_000] * len(dates)},
+        index=pd.DatetimeIndex(dates, name="date"),
+    )
+
+    # Earnings include 3 PAST quarters + 1 UPCOMING event (+4d from today).
+    # The upcoming event has surprise_pct=None (no result yet).
+    upcoming = pd.Timestamp.today().normalize() + pd.Timedelta(days=4)
+    earnings = pd.DataFrame(
+        {
+            "earnings_date": [pd.Timestamp("2024-01-01"), pd.Timestamp("2024-04-01"),
+                              pd.Timestamp("2024-07-01"), upcoming],
+            "surprise_pct": [20.0, 18.0, 2.0, None],
+        }
+    )
+
+    monkeypatch.setattr(market_context_mod, "fetch_prices", lambda ticker, settings, force=False: prices)
+    monkeypatch.setattr(market_context_mod, "load_earnings", lambda ticker, settings: earnings)
+    monkeypatch.setattr(market_context_mod.yf, "Ticker", lambda ticker: DummyTicker(ticker))
+
+    df = pd.DataFrame([{"ticker": "AAA", "earnings_date": upcoming}])
+    enriched = market_context_mod.enrich_upcoming_results(df, Settings())
+
+    # Q1 = most recent PAST quarter (2024-07-01, surprise 2% → score 6).
+    # The upcoming event must NOT be Q1 — if it leaked, Q1 would be None
+    # (no surprise yet) and the week-high/low would reflect the pre-earnings move.
+    assert enriched["q1_earnings_score"].iloc[0] == 6
+    assert enriched["q1_earnings_date"].iloc[0] == pd.Timestamp("2024-07-01")
+    assert enriched["q1_week_high_price"].iloc[0] == 130.0  # spike around 2024-07-01
+    # Q2 = middle past quarter (2024-04-01, surprise 18% → score 9)
+    assert enriched["q2_earnings_score"].iloc[0] == 9
+    assert enriched["q2_earnings_date"].iloc[0] == pd.Timestamp("2024-04-01")
+    # Q3 = oldest past quarter (2024-01-01, surprise 20% → score 9)
+    assert enriched["q3_earnings_score"].iloc[0] == 9
+    assert enriched["q3_earnings_date"].iloc[0] == pd.Timestamp("2024-01-01")
+    # Last quarter = most recent PAST quarter (2% → 6), NOT the upcoming event
+    assert enriched["prev_quarter_earnings_score"].iloc[0] == 6
+
+
 def test_enrich_upcoming_results_adds_earnings_context(monkeypatch):
+    # Bypass the once-per-day price-metrics cache so the test always recomputes.
+    monkeypatch.setattr(market_context_mod, "load_price_metrics", lambda ticker, settings: None)
+
     df = pd.DataFrame([{"ticker": "AAA", "earnings_date": pd.Timestamp("2026-08-01")}])
     prices = pd.DataFrame(
         {"close": [100.0, 105.0, 110.0]},

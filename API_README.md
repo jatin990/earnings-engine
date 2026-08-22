@@ -423,18 +423,39 @@ Refreshes prices, earnings, and market caps on-demand.
 
 Returns the last-refresh timestamp for each data source (prices, earnings, market_caps, results, swing, kronos, watchlist).
 
+#### Swing Range Endpoints
+
+**GET** `/api/v1/swing-range?watchlist=MyPicks&ticker=PCJ` - Get current swing range, source (`auto` / `user`), and cycle history.
+
+**POST** `/api/v1/swing-range` - Set user override for swing range (support, resistance, cycles):
+```json
+{
+  "watchlist": "MyPicks",
+  "ticker": "PCJ",
+  "lower": 9.0,
+  "upper": 10.0,
+  "cycles": 3
+}
+```
+
+**DELETE** `/api/v1/swing-range?watchlist=MyPicks&ticker=PCJ` - Clear user override and revert to auto-detected swing range.
+
+**GET** `/api/v1/swing-range/history?watchlist=MyPicks&ticker=PCJ` - Get detected cycle history and timing for a ticker.
+
+**GET** `/api/v1/swing-range/list?watchlist=MyPicks` - List all stored swing ranges for a watchlist.
+
 #### Watchlist Endpoints
 
-**GET** `/api/v1/watchlist` - Get current watchlist from `my_watchlist.txt`
+**GET** `/api/v1/watchlist` - Get current watchlist from SQLite DB
 
 **POST** `/api/v1/watchlist/add` - Add ticker to watchlist
 ```json
-{"ticker": "RELIANCE.NS"}
+{"ticker": "RELIANCE.NS", "name": "MyPicks"}
 ```
 
 **POST** `/api/v1/watchlist/remove` - Remove ticker from watchlist
 ```json
-{"ticker": "RELIANCE.NS"}
+{"ticker": "RELIANCE.NS", "name": "MyPicks"}
 ```
 
 ---

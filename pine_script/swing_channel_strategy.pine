@@ -1,0 +1,79 @@
+//@version=5
+strategy("Swing Channel Multi-Factor Strategy", overlay=true, initial_capital=100000, default_qty_type=strategy.percent_of_equity, default_qty_value=15, commission_type=strategy.commission.percent, commission_value=0.10)
+
+// -----------------------------------------------------------------------------
+// Inputs & Parameters
+// -----------------------------------------------------------------------------
+lookbackChannel   = input.int(20, title="Channel Lookback (Bars)", minval=5, maxval=100)
+buyZoneThresh     = input.float(0.25, title="Buy Zone Threshold (0.0 - 1.0)", minval=0.05, maxval=0.5, step=0.05)
+volSurgeMult      = input.float(1.25, title="Volume Surge Multiplier (vs SMA20)", minval=1.0, maxval=3.0, step=0.05)
+stopLossBufferPct = input.float(2.0, title="Stop Loss Buffer Below Support (%)", minval=0.5, maxval=10.0, step=0.5) / 100.0
+takeProfitRatio   = input.float(0.985, title="Take Profit Target (% of Resistance)", minval=0.9, maxval=1.0, step=0.005)
+maxHoldBars       = input.int(21, title="Time Stop (Max Hold Bars)", minval=3, maxval=60)
+riskPerTradePct   = input.float(1.5, title="Risk Per Trade (% of Equity)", minval=0.5, maxval=5.0, step=0.1) / 100.0
+
+// -----------------------------------------------------------------------------
+// Channel & Indicator Calculations (Shifted by 1 bar to prevent lookahead)
+// -----------------------------------------------------------------------------
+resHigh = ta.highest(high, lookbackChannel)[1]
+supLow  = ta.lowest(low, lookbackChannel)[1]
+spread  = resHigh - supLow
+
+channelPos = spread > 0 ? (close - supLow) / spread : 0.5
+volSma20   = ta.sma(volume, 20)
+
+// -----------------------------------------------------------------------------
+// Conditions
+// -----------------------------------------------------------------------------
+inBuyZone   = channelPos >= 0.0 and channelPos <= buyZoneThresh
+isVolSurge  = volume >= (volSurgeMult * volSma20)
+validSpread = resHigh > supLow and (spread / supLow) >= 0.03
+
+entrySignal = inBuyZone and isVolSurge and validSpread and strategy.position_size == 0
+
+// -----------------------------------------------------------------------------
+// Trade Execution & Risk Management
+// -----------------------------------------------------------------------------
+var float entryPrice = na
+var float stopLossPrice = na
+var float takeProfitPrice = na
+var int entryBar = na
+
+if (entrySignal)
+    stopPriceCalc = supLow * (1.0 - stopLossBufferPct)
+    riskPerShare  = close - stopPriceCalc
+    
+    if (riskPerShare > 0)
+        dollarRisk = strategy.equity * riskPerTradePct
+        posQty     = math.floor(dollarRisk / riskPerShare)
+        // Cap single position size at 15% equity
+        maxQty     = math.floor((strategy.equity * 0.15) / close)
+        tradeQty   = math.min(posQty, maxQty)
+        
+        if (tradeQty > 0)
+            strategy.entry("Long Swing", strategy.long, qty=tradeQty)
+            entryPrice      := close
+            stopLossPrice   := stopPriceCalc
+            takeProfitPrice := resHigh * takeProfitRatio
+            entryBar        := bar_index
+
+// Manage exits
+if (strategy.position_size > 0)
+    // 1. Stop Loss
+    if (low <= stopLossPrice)
+        strategy.close("Long Swing", comment="Stop Loss")
+    // 2. Take Profit
+    else if (high >= takeProfitPrice)
+        strategy.close("Long Swing", comment="Take Profit")
+    // 3. Time Stop
+    else if (bar_index - entryBar >= maxHoldBars)
+        strategy.close("Long Swing", comment="Time Stop")
+
+// -----------------------------------------------------------------------------
+// Visual Plots
+// -----------------------------------------------------------------------------
+plot(resHigh, "Resistance (Upper)", color=color.new(color.red, 30), linewidth=2, style=plot.style_line)
+plot(supLow, "Support (Lower)", color=color.new(color.green, 30), linewidth=2, style=plot.style_line)
+plot(supLow + (spread * buyZoneThresh), "Buy Zone Ceiling", color=color.new(color.teal, 60), style=plot.style_stepline)
+
+bgcolor(inBuyZone ? color.new(color.green, 90) : na, title="Buy Zone Highlight")

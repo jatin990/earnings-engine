@@ -20,8 +20,8 @@
 
 ## `predict.py`
 **Functions:**
-- `build_upcoming_events(tickers, settings, days=14) -> pd.DataFrame`
-  - Calls `upcoming_earnings()`, then for each event loads prices + earnings, computes features
-- `predict_upcoming(tickers, settings, model_name="gbm", days=14) -> pd.DataFrame`
+- `build_upcoming_events(tickers, settings, days=14, start_date=None) -> pd.DataFrame`
+  - Calls `upcoming_earnings()` (window = `[start_date, start_date + days)`, default start_date = today), then for each event loads prices + earnings, computes features
+- `predict_upcoming(tickers, settings, model_name="gbm", days=14, start_date=None) -> pd.DataFrame`
   - Trains on ALL labeled events, scores upcoming ones
   - Returns columns: `ticker`, `market`, `earnings_date`, `asof_date`, `p_up`, `direction`, `confidence`, `n_past_events`, `model`, `train_events`
