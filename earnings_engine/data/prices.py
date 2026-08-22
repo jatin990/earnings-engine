@@ -11,16 +11,30 @@ from typing import Any
 import pandas as pd
 import yfinance as yf
 
+import os
+import shutil
+
 from earnings_engine.config import Settings
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.prices")
 
 COLUMNS = ["open", "high", "low", "close", "volume"]
+DB_FILENAME = os.getenv("EARNINGS_ENGINE_DB_NAME", "money_club.sqlite3")
 
 
 def _cache_path(settings: Settings) -> Path:
-    return settings.data_dirs["prices"] / "prices.sqlite3"
+    target_path = settings.data_dirs["prices"] / DB_FILENAME
+    if not target_path.exists():
+        legacy_path = settings.data_dirs["prices"] / "prices.sqlite3"
+        if legacy_path.exists() and legacy_path.stat().st_size > 0:
+            try:
+                shutil.copy2(legacy_path, target_path)
+                logger.info("Migrated legacy prices.sqlite3 to %s", target_path)
+            except Exception as exc:
+                logger.warning("Could not migrate legacy DB: %s; using legacy", exc)
+                return legacy_path
+    return target_path
 
 
 def _empty_frame() -> pd.DataFrame:

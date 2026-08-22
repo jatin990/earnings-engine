@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from earnings_engine.config import Settings
+from earnings_engine.data.prices import _cache_path
 from earnings_engine.data.news_sentiment import (
     POSITIVE_WORDS,
     NEGATIVE_WORDS,
@@ -119,10 +120,6 @@ URGENCY_BOOSTERS = {
     "soars": 6, "crashes": 8, "billion": 6, "crore": 5, "approved": 7, "warning": 7,
     "banned": 9, "exclusive": 5, "multibagger": 5, "all-time high": 6, "52-week high": 5
 }
-
-
-def _cache_path(settings: Settings) -> Path:
-    return settings.data_dirs["prices"] / "prices.sqlite3"
 
 
 def _connect(settings: Settings) -> sqlite3.Connection:

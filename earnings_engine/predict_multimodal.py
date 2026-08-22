@@ -20,7 +20,7 @@ import pandas as pd
 
 from earnings_engine.config import Settings
 from earnings_engine.data.news_sentiment import get_ticker_news_and_sentiment
-from earnings_engine.data.prices import load_prices
+from earnings_engine.data.prices import _cache_path, load_prices
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 
 def _get_db_path(settings: Settings | None = None) -> Path:
     s = settings or Settings()
-    return s.data_dirs["prices"] / "prices.sqlite3"
+    return _cache_path(s)
 
 
 def init_multimodal_db(settings: Settings | None = None) -> None:

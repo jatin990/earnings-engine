@@ -320,7 +320,7 @@ def run_prediction_for_ticker(
 
 def get_event_dataset_summary() -> dict[str, Any]:
     """Get summary stats from SQLite event_dataset table."""
-    db = Path(__file__).resolve().parent.parent.parent / "data" / "cache" / "prices" / "prices.sqlite3"
+    db = prices_mod._cache_path(Settings())
     if not db.exists():
         return {"available": False, "rows": 0}
 
