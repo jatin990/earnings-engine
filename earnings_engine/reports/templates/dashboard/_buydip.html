@@ -1,0 +1,72 @@
+{% import 'dashboard/_components.html' as comps %}
+        <div id="tab-buydip" class="tab-content">
+            <section class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <h3 style="margin: 0; font-size: 1.1rem;">🛒 Recent Results — Buy the Dip</h3>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+    {{ comps.market_dropdown('bdMarket', 'IN', '') }}
+                        <label class="timestamp" style="display:flex;align-items:center;gap:0.35rem;">From
+                            <input type="date" id="bdStartDate" style="padding:0.3rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color-scheme:dark;">
+                        </label>
+                        <label class="timestamp" style="display:flex;align-items:center;gap:0.35rem;">To
+                            <input type="date" id="bdEndDate" style="padding:0.3rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color-scheme:dark;">
+                        </label>
+                        <select id="bdPreset" onchange="app.applyBdPreset()" style="padding:0.3rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);"
+                            title="Quick date range preset">
+                            <option value="7">Last 7 days</option>
+                            <option value="30">Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="">Custom / All history</option>
+                        </select>
+                        <label for="bdDrop" class="timestamp" style="display:flex;align-items:center;gap:0.35rem;">Gap-down ≥
+                            <input type="number" id="bdDrop" value="3" min="0" max="50" step="0.5" style="width:70px;padding:0.4rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);">%
+                        </label>
+                        <label for="bdCorrection" class="timestamp" style="display:flex;align-items:center;gap:0.35rem;">Pullback ≥
+                            <input type="number" id="bdCorrection" value="5" min="0" max="50" step="0.5" style="width:70px;padding:0.4rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);">%
+                        </label>
+                        <button onclick="app.loadRecentResults()" class="btn btn-primary btn-sm">🔄 Refresh</button>
+                    </div>
+                </div>
+                <p class="timestamp" style="margin: 0 0 0.75rem 0;">
+                    <span id="bdMarketHours"></span> Scans earnings (default last 7 days; use the date range to validate the strategy historically). Watch for stocks that gapped <strong>down at the open</strong> after results, then <strong>recovered</strong> intraday / next day. Earnings-quality ("verdict") is opt-in via the button below.
+                </p>
+                <div id="bdSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 1rem;"></div>
+                <div id="bdDipRecovery"></div>
+                <div id="bdCandidates"></div>
+                <div class="bd-section">
+                    <button class="bd-section-header" onclick="app.toggleBdSection('today')">
+                        <span>📈 Today's Results</span>
+                        <span id="bdTodayToggle" class="bd-toggle">▼</span>
+                    </button>
+                    <div id="bdTodaySection" class="bd-section-body">
+                        <div class="table-wrapper">
+                            <table class="results-table">
+                                <thead><tr>
+                                    <th>Ticker</th><th>Time</th><th>Current</th><th>Change</th><th>Gap at Open</th><th>Result Day (OHLC)</th>
+                                    <th>Next Day (O/C)</th><th>Momentum (3D/7D/30D)</th><th>Recovery</th><th>Pullback</th><th>Signal</th><th>Verdict</th>
+                                </tr></thead>
+                                <tbody id="bdTodayTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="bd-section" style="margin-top: 1rem;">
+                    <button class="bd-section-header" onclick="app.toggleBdSection('yesterday')">
+                        <span>📊 Yesterday's Results with Price Action</span>
+                        <span id="bdYesterdayToggle" class="bd-toggle">▼</span>
+                    </button>
+                    <div id="bdYesterdaySection" class="bd-section-body">
+                        <div class="table-wrapper">
+                            <table class="results-table">
+                                <thead><tr>
+                                    <th>Ticker</th><th>Time</th><th>Current</th><th>Change</th><th>Gap at Open</th><th>Result Day (OHLC)</th>
+                                    <th>Next Day (O/C)</th><th>Momentum (3D/7D/30D)</th><th>Recovery</th><th>Pullback</th><th>Signal</th><th>Verdict</th>
+                                </tr></thead>
+                                <tbody id="bdYesterdayTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div id="bdStatus" class="timestamp" style="margin-top: 0.5rem;"></div>
+            </section>
+        </div>

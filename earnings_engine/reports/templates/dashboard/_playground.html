@@ -1,0 +1,66 @@
+        <div id="tab-playground" class="tab-content">
+            <!-- Request builder -->
+            <section class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <h3 style="margin: 0;">🧪 API Console</h3>
+                    <span class="timestamp">Postman-style raw JSON explorer for Market Data / NSE / yfinance / Kronos</span>
+                </div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                    <div class="search-wrap" style="flex:1;min-width:200px;position:relative;">
+                        <input type="text" id="pgSymbol" placeholder="Symbol (e.g., RELIANCE.NS, ZOMATO.NS, AAPL)" value="RELIANCE.NS" style="width:100%;padding:0.4rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);" autocomplete="off">
+                        <div id="pgSymbolDropdown" class="dropdown"></div>
+                    </div>
+                    <select id="pgGroup" style="padding:0.4rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);">
+                        <option value="Market Data">Market Data</option>
+                        <option value="NSE">NSE</option>
+                        <option value="yfinance">yfinance</option>
+                        <option value="Kronos">Kronos</option>
+                    </select>
+                    <select id="pgEndpoint" style="flex:1;min-width:220px;padding:0.4rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);"></select>
+                    <button id="pgSendBtn" onclick="app.pg.send()" class="btn btn-primary">▶ Send</button>
+                    <label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.8rem;color:var(--muted);cursor:pointer;" title="Always hit the live source (yfinance / NSE) — no cache or DB fallback where the endpoint supports it">
+                        <input type="checkbox" id="pgLive" checked style="accent-color:var(--accent);"> LIVE</label>
+                </div>
+                <div id="pgParams" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem;"></div>
+                <p id="pgRequestLine" class="timestamp" style="margin:0.5rem 0 0 0;">Select an endpoint and click Send.</p>
+            </section>
+
+            <!-- Response viewer -->
+            <section class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <h3 style="margin: 0; font-size: 1rem;">📦 Raw JSON Response</h3>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span id="pgStatus" class="timestamp"></span>
+                        <button onclick="app.pg.copyJson()" class="btn btn-primary btn-sm">📋 Copy</button>
+                    </div>
+                </div>
+                <div id="pgResponse" class="table-wrapper" style="max-height:480px;overflow:auto;background:rgba(0,0,0,0.35);border-radius:0.5rem;padding:0.75rem;font-family:monospace;font-size:0.8rem;white-space:pre-wrap;word-break:break-word;">
+                    <span class="timestamp">No request sent yet.</span>
+                </div>
+            </section>
+
+            <!-- Secondary: NSE universe stats + Kronos quick run (preserved) -->
+            <details>
+                <summary style="cursor:pointer;color:var(--muted);font-weight:600;margin-bottom:0.5rem;">📁 NSE Universe Stats & 🤖 Kronos Quick Run (secondary)</summary>
+                <section class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <h3 style="margin: 0;">🇮🇳 NSE Universe Stats</h3>
+                        <button onclick="app.loadPlaygroundNse()" class="btn btn-primary btn-sm">🔄 Load</button>
+                    </div>
+                    <p class="timestamp" style="margin: 0 0 0.75rem 0;">Universe sizes from nsetools (<code>NSE_ALL</code>) and yfinance fast_info (<code>NSE_LARGE_CAP</code>, > 1000 cr).</p>
+                    <div id="pgNseStats" class="widget-grid"></div>
+                </section>
+                <section class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <h3 style="margin: 0;">🤖 Kronos Quick Run</h3>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <input type="text" id="pgKronosTickers" placeholder="Comma-separated tickers (blank = watchlist)" style="flex:1;min-width:200px;padding:0.4rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);">
+                            <button id="pgKronosRunBtn" onclick="app.runPlaygroundKronos()" class="btn btn-primary btn-sm">▶ Run</button>
+                        </div>
+                    </div>
+                    <p class="timestamp" style="margin: 0 0 0.75rem 0;">Runs the bulk Kronos prediction action (<code>POST /api/v1/dashboard/kronos/run</code>) and persists everything to the audit trail.</p>
+                    <div id="pgKronosResults" class="widget-grid"></div>
+                </section>
+            </details>
+        </div>
+        <!-- ================= WATCHLIST TAB ================= -->

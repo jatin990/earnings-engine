@@ -1,0 +1,78 @@
+        <!-- ================= ACTIVE MULTI-CATEGORY SCANNER TAB ================= -->
+        <div id="tab-scanner" class="tab-content">
+            <!-- Scanner Header & Deep Sweep Control -->
+            <section class="card" style="padding: 0.85rem 1.1rem; margin-bottom: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.2rem; background: linear-gradient(to right, #38bdf8, #818cf8, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🔍 Active Multi-Category Stock Scanner Hub</h3>
+                        <p class="timestamp" style="margin: 0.25rem 0 0 0; font-size: 0.8rem;">
+                            Unified scanner across Fundamental News Catalysts, Technical Squeeze Coils, 52W High Breakouts & Sector Momentum.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.4rem; background: rgba(255,255,255,0.04); padding: 0.35rem 0.65rem; border-radius: 0.45rem; border: 1px solid rgba(59,130,246,0.3);">
+                            <span style="font-size: 0.78rem; font-weight: 700; color: #60a5fa;">⭐ Watchlist / Universe:</span>
+                            <select id="scannerWatchlistSelect" onchange="app.onScannerWatchlistChange(this.value)" style="padding: 0.3rem 0.6rem; border: 1px solid rgba(59,130,246,0.4); border-radius: 0.35rem; background: #0f172a; color: #f8fafc; font-size: 0.82rem; font-weight: 600; cursor: pointer; outline: none;" title="Select Watchlist or Universe to scan">
+                                <option value="NSE_TOP">NSE_TOP (Top Active ~50)</option>
+                                <option value="NSE_LARGE_CAP">NSE_LARGE_CAP (> 1000 Cr)</option>
+                                <option value="NSE_ALL">NSE_ALL (All Traded Equities)</option>
+                                <option value="US_TOP">US_TOP (US Mega-Caps)</option>
+                            </select>
+                        </div>
+                        <button onclick="app.deepSweepScanner()" id="scannerSweepBtn" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); padding: 0.45rem 0.9rem; font-weight: 700;">
+                            ⚡ Deep Sweep All Categories
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Category Pills Bar -->
+            <section class="card" style="padding: 0.75rem 1rem; margin-bottom: 0.85rem;">
+                <div style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; margin-bottom: 0.45rem; font-weight: 700;">
+                    Select Category to Scan:
+                </div>
+                <div id="scannerCategoryPills" style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+                    <!-- Category pills populated by JS -->
+                </div>
+            </section>
+
+            <!-- Active Category Banner & Candidates Section -->
+            <section class="card">
+                <div id="activeCategoryBanner" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; padding: 0.75rem 1rem; margin-bottom: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <h4 id="activeCatTitle" style="margin: 0; font-size: 1.1rem; color: #f8fafc;">Category Candidates</h4>
+                            <span id="activeCatCountBadge" class="signal-badge" style="font-size: 0.72rem; background: rgba(59,130,246,0.2); color: #60a5fa;">0 stocks</span>
+                        </div>
+                        <p id="activeCatDescription" style="margin: 0.25rem 0 0 0; font-size: 0.78rem; color: var(--muted);"></p>
+                    </div>
+                    <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="scannerSearchInput" oninput="app.filterScannerCandidates()" placeholder="🔍 Filter ticker or name..." style="padding:0.35rem 0.6rem;font-size:0.8rem;background:rgba(255,255,255,0.05);color:var(--light);border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;min-width:170px;">
+                        <select id="scannerSortBy" onchange="app.filterScannerCandidates()" style="padding:0.35rem 0.5rem;font-size:0.8rem;background:#1e293b;color:var(--light);border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;">
+                            <option value="confidence">Sort by Confidence Score</option>
+                            <option value="gain">Sort by Daily Gain (%)</option>
+                            <option value="volume">Sort by Volume Surge</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Candidates Table View -->
+                <div class="table-wrapper">
+                    <table class="results-table" style="font-size:0.82rem;">
+                        <thead><tr>
+                            <th style="width: 40px; text-align:center;">#</th>
+                            <th>Stock / Ticker</th>
+                            <th>Live Price</th>
+                            <th>Day Return</th>
+                            <th>Volume Surge</th>
+                            <th>Trigger Entry Level</th>
+                            <th>Confidence</th>
+                            <th>Expected Horizon</th>
+                            <th>Catalyst / Setup Rationale</th>
+                            <th style="text-align:center;">Actions</th>
+                        </tr></thead>
+                        <tbody id="scannerCandidatesTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>

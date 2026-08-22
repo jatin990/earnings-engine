@@ -1,0 +1,10 @@
+{% macro market_dropdown(id, selected='ALL', extra_class='') %}
+<select id="{{ id }}" class="{{ extra_class }}" style="padding: 0.4rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 0.4rem; background: rgba(255,255,255,0.05); color: var(--light);">
+    <option value="ALL"{% if selected == 'ALL' %} selected{% endif %}>All Markets</option>
+    <option value="WATCHLIST"{% if selected == 'WATCHLIST' %} selected{% endif %}>My Watchlist</option>
+    <option value="IN"{% if selected == 'IN' %} selected{% endif %}>NSE Top</option>
+    <option value="US"{% if selected == 'US' %} selected{% endif %}>US Top</option>
+    <option value="NSE_LARGE_CAP"{% if selected == 'NSE_LARGE_CAP' %} selected{% endif %}>NSE Large Cap</option>
+    <option value="NSE_ALL"{% if selected == 'NSE_ALL' %} selected{% endif %}>NSE All</option>
+</select>
+{% endmacro %}

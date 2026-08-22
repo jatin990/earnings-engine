@@ -1,0 +1,15 @@
+<div class="popup-modal" id="popup-{popup_id}">
+        <div class="popup-backdrop" onclick="closePopups()"></div>
+        <div class="popup-content">
+            <div class="popup-header">
+                <div>
+                    <div class="popup-title">{company_name}</div>
+                    <span class="popup-sub">{ticker} · Earnings: {earnings_date} · Source: {source}</span>
+                </div>
+                <button class="popup-close" onclick="closePopups()">✕</button>
+            </div>
+            <div class="popup-body">
+                {popup_sections}
+            </div>
+        </div>
+    </div>

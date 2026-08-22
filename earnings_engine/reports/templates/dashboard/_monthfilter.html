@@ -1,0 +1,57 @@
+{% import 'dashboard/_components.html' as comps %}
+        <div id="tab-monthfilter" class="tab-content">
+            <section class="card">
+                <!-- Header & Present-Day Fetch Record Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <span>🗓️ Month Filter & Earnings Calendar</span>
+                            <span id="mfCount" class="signal-badge" style="font-size:0.75rem;display:inline-block;"></span>
+                        </h3>
+                        <p class="timestamp" style="margin:0.2rem 0 0 0;font-size:0.78rem;">Precalculated earnings calendar categorized by Date → Market Cap → Industry with present-day delta syncing.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                        <select id="mfMarket" onchange="app.loadMonthFilterTab()" style="padding: 0.4rem 0.6rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 0.4rem; background: #1e293b; color: var(--light); font-size: 0.8rem; font-weight: 600;">
+                            <option value="ALL" selected>🌐 All Markets</option>
+                            <option value="IN">🇮🇳 NSE India</option>
+                            <option value="US">🇺🇸 US Markets</option>
+                            <option value="NSE_LARGE_CAP">🏛️ NSE LargeCap</option>
+                        </select>
+                        <button onclick="app.syncMonthFilter()" id="mfSyncBtn" class="btn btn-primary btn-sm" style="font-weight:600; background:#059669; border-color:#10b981;">🔄 Sync Delta</button>
+                        <button onclick="app.loadMonthFilterTab(true)" id="mfRefreshBtn" class="btn btn-sm" style="background:rgba(255,255,255,0.06);color:var(--light);">↻ Refresh</button>
+                        <button onclick="app.cancelReportLoad('monthfilter')" id="mfCancelBtn" class="btn btn-sm btn-danger" style="display:none;font-weight:600;background:#dc2626;border-color:#ef4444;" title="Cancel pending load request">⏹ Cancel</button>
+                    </div>
+                </div>
+
+                <!-- Fetch Record & Sync Banner -->
+                <div id="mfFetchRecordBanner" style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; margin-bottom: 1rem; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); border-radius: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem;">
+                        <span id="mfStatusBadge" style="background: #10b981; color: #fff; padding: 0.15rem 0.5rem; border-radius: 9999px; font-weight: 700; font-size: 0.7rem;">🟢 UP TO DATE</span>
+                        <span style="color: var(--light); font-weight: 600;" id="mfSyncText">Present day earnings calendar is up-to-date.</span>
+                    </div>
+                    <div style="font-size: 0.76rem; color: var(--muted); display: flex; gap: 1rem;">
+                        <span>Last Synced: <strong id="mfLastSynced" style="color: var(--light);">--</strong></span>
+                        <span>Present Day Events: <strong id="mfTotalEvents" style="color: #60a5fa;">--</strong></span>
+                        <span>New Delta: <strong id="mfInsertedCount" style="color: #34d399;">0</strong></span>
+                    </div>
+                </div>
+
+                <!-- Industry & Quick Filter Bar -->
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; align-items: center;">
+                    <span style="font-size: 0.75rem; font-weight: 700; color: var(--muted); text-transform: uppercase;">🔍 Quick Filter:</span>
+                    <input type="text" id="mfSearchInput" oninput="app.filterMonthFilterRows()" placeholder="Search ticker or industry..." style="padding: 0.3rem 0.6rem; font-size: 0.8rem; border-radius: 0.4rem; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: var(--light); width: 220px;">
+                    <select id="mfIndustryFilter" onchange="app.filterMonthFilterRows()" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; border-radius: 0.4rem; border: 1px solid rgba(255,255,255,0.15); background: #1e293b; color: var(--light);">
+                        <option value="ALL">All Industries</option>
+                    </select>
+                </div>
+
+                <!-- 📅 Month Breakdown Sub-Tabs -->
+                <div id="mfMonthTabs" style="display: flex; gap: 0.5rem; margin: 0.75rem 0 1rem 0; flex-wrap: wrap; align-items: center; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.6rem;"></div>
+
+                <div id="mfReportLegend" class="day-legend"></div>
+                <div id="mfReportSections">
+                    <div style="text-align:center; padding: 2rem; color: var(--muted);">Loading precalculated Month Filter data...</div>
+                </div>
+                <div id="mfReportStatus" class="timestamp" style="margin-top: 0.5rem;"></div>
+            </section>
+        </div>

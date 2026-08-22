@@ -1,0 +1,110 @@
+    <!-- Swing Range Edit & Cycle Timing Modal -->
+    <div id="swingRangeModal" onclick="if(event.target === this) app.closeSwingRangeModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);z-index:2000;padding:1.5rem;overflow-y:auto;">
+        <div class="card" style="max-width:640px;margin:3vh auto;position:relative;background:#1e293b;border:1px solid rgba(255,255,255,0.15);box-shadow:0 25px 60px rgba(0,0,0,0.5);">
+            <button onclick="app.closeSwingRangeModal()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--light);font-size:1.5rem;cursor:pointer;" title="Close">&times;</button>
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
+                <h3 style="margin:0;">🔄 Swing Range & Trading Band</h3>
+                <span id="srModalSourceBadge" class="signal-badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;">Auto</span>
+            </div>
+            <p id="srModalSubtitle" class="timestamp" style="margin-bottom:0.75rem;font-size:0.85rem;"></p>
+
+            <!-- Current Price & Found Range Summary Box -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.75rem;">
+                <div>
+                    <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;font-weight:600;margin-bottom:0.2rem;">Current Market Price</div>
+                    <div id="srModalCurrentPrice" style="font-size:1.25rem;font-weight:700;color:var(--light);">₹—</div>
+                </div>
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+                        <span style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;font-weight:600;">Found Trading Range (20D)</span>
+                        <button type="button" onclick="app.fillFoundRange()" class="btn btn-sm" style="padding:0.1rem 0.35rem;font-size:0.68rem;background:rgba(59,130,246,0.2);color:#60a5fa;" title="Copy detected bounds to custom inputs">⚡ Use Detected</button>
+                    </div>
+                    <div id="srModalFoundRange" style="font-size:0.95rem;font-weight:600;color:#94a3b8;">₹— – ₹—</div>
+                    <div id="srModalFoundMeta" class="timestamp" style="font-size:0.72rem;"></div>
+                </div>
+            </div>
+
+            <!-- Custom Range Settings Form -->
+            <form id="srModalForm" onsubmit="event.preventDefault(); app.saveSwingRange();" style="display:flex;flex-direction:column;gap:0.85rem;">
+                <input type="hidden" id="srModalWatchlist">
+                <input type="hidden" id="srModalTicker">
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                    <div>
+                        <label style="display:block;font-size:0.8rem;color:var(--muted);margin-bottom:0.25rem;">Support / Lower Bound (Buy Zone)</label>
+                        <input type="number" step="any" id="srModalLower" required placeholder="e.g. 9.00" style="width:100%;padding:0.5rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);font-size:1rem;font-weight:600;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.8rem;color:var(--muted);margin-bottom:0.25rem;">Resistance / Upper Bound (Sell Zone)</label>
+                        <input type="number" step="any" id="srModalUpper" required placeholder="e.g. 10.00" style="width:100%;padding:0.5rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);font-size:1rem;font-weight:600;">
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                    <div>
+                        <label style="display:block;font-size:0.8rem;color:var(--muted);margin-bottom:0.25rem;">Cycles Observed / Target</label>
+                        <input type="number" step="1" min="0" id="srModalCycles" placeholder="e.g. 3" style="width:100%;padding:0.5rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);font-size:0.95rem;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.8rem;color:var(--muted);margin-bottom:0.25rem;">Avg Cycle Duration</label>
+                        <input type="text" id="srModalAvgDays" readonly disabled style="width:100%;padding:0.5rem;border:1px solid rgba(255,255,255,0.1);border-radius:0.4rem;background:rgba(255,255,255,0.02);color:var(--muted);font-size:0.95rem;">
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+                    <button type="submit" id="srModalSaveBtn" class="btn btn-primary" style="flex:1;">💾 Save Custom Range</button>
+                    <button type="button" id="srModalResetBtn" onclick="app.resetSwingRange()" class="btn btn-danger" style="flex:1;">🔄 Reset to Auto</button>
+                </div>
+            </form>
+
+            <div id="srModalStatus" class="timestamp" style="margin-top:0.6rem;min-height:1.2rem;"></div>
+
+            <!-- 3-Month Range History & Monthly Breakdown -->
+            <div id="srModal3MSection" style="margin-top:0.75rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:0.75rem;">
+                <h4 style="margin:0 0 0.5rem 0;font-size:0.9rem;display:flex;justify-content:space-between;align-items:center;">
+                    <span>📊 3-Month Trading Range History</span>
+                    <span id="srModal3MOverall" class="timestamp" style="font-size:0.75rem;font-weight:600;color:#60a5fa;"></span>
+                </h4>
+                <div id="srModal3MContent"></div>
+            </div>
+
+            <!-- Historical Cycle Timing -->
+            <div id="srModalHistorySection" style="margin-top:0.75rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:0.75rem;">
+                <h4 style="margin:0 0 0.5rem 0;font-size:0.9rem;display:flex;justify-content:space-between;align-items:center;">
+                    <span>⏱️ Historical Cycle Timing (Past Oscillations)</span>
+                    <span id="srModalCycleCount" class="timestamp" style="font-size:0.75rem;"></span>
+                </h4>
+                <div id="srModalHistoryContent"></div>
+            </div>
+
+            <!-- AI Multi-Modal & News Synthesis Section -->
+            <div id="srModalAiSection" style="margin-top:0.75rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:0.75rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                    <h4 style="margin:0;font-size:0.9rem;display:flex;align-items:center;gap:0.4rem;">
+                        <span>🧠 AI Multi-Modal Synthesis (News + Volume + Range)</span>
+                        <span id="srModalAiSignalBadge" class="signal-badge" style="font-size:0.7rem;display:none;"></span>
+                    </h4>
+                    <button type="button" id="srModalAiRunBtn" onclick="app.runModalAiForecast()" class="btn btn-sm" style="background:rgba(59,130,246,0.25);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);font-size:0.75rem;">⚡ Run AI Synthesis</button>
+                </div>
+                <div id="srModalAiContent">
+                    <p class="timestamp" style="margin:0;font-size:0.8rem;">Click "Run AI Synthesis" to evaluate recent news headlines, world events, and volume accumulation.</p>
+                </div>
+            </div>
+
+            <!-- AI Kronos Prediction (On Demand) -->
+            <div id="srModalKronosSection" style="margin-top:0.75rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:0.75rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                    <h4 style="margin:0;font-size:0.9rem;display:flex;align-items:center;gap:0.4rem;">
+                        <span>🔮 Kronos AI 14-Day Prediction</span>
+                        <span id="srModalKronosBadge" class="signal-badge" style="font-size:0.7rem;display:none;"></span>
+                    </h4>
+                    <button type="button" id="srModalKronosRunBtn" onclick="app.runModalKronos()" class="btn btn-sm" style="background:rgba(139,92,246,0.25);color:#c084fc;border:1px solid rgba(139,92,246,0.4);font-size:0.75rem;">⚡ Run Kronos AI</button>
+                </div>
+                <div id="srModalKronosContent">
+                    <p class="timestamp" style="margin:0;font-size:0.8rem;">Click "Run Kronos AI" to generate real-time deep learning forecasts for this stock.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js?v=20260822_v12_months"></script>

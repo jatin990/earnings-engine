@@ -1,0 +1,30 @@
+        <div id="tab-watchlist" class="tab-content">
+            <section class="card" style="padding: 0.85rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <h3 style="margin:0; font-size:1.15rem; font-weight:700;">⭐ Watchlists & Universes</h3>
+                        <span id="wlTotalBadge" style="background:rgba(59,130,246,0.2);color:#93c5fd;font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:9999px;font-weight:600;">--</span>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button onclick="app.watchlistTab.load()" class="btn btn-primary btn-sm">🔄 Refresh</button>
+                        <button onclick="app.watchlistTab.addWatchlist()" class="btn btn-primary btn-sm">＋ New Watchlist</button>
+                    </div>
+                </div>
+
+                <!-- Filter Sub-Tabs and Search Bar -->
+                <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.65rem;">
+                    <div id="wlFilterPills" style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-sm active" id="wlFilterAll" onclick="app.watchlistTab.setFilter('all')" style="padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.78rem;">🌐 All</button>
+                        <button type="button" class="btn btn-sm" id="wlFilterUnder100" onclick="app.watchlistTab.setFilter('under_100')" style="padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.78rem;background:rgba(234,179,8,0.15);color:#fef08a;border:1px solid rgba(234,179,8,0.3);">⚡ Under 100 Stocks</button>
+                        <button type="button" class="btn btn-sm" id="wlFilterUniverses" onclick="app.watchlistTab.setFilter('universes')" style="padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.78rem;background:rgba(99,102,241,0.15);color:#c7d2fe;border:1px solid rgba(99,102,241,0.3);">🏛️ Built-in Universes</button>
+                        <button type="button" class="btn btn-sm" id="wlFilterCustom" onclick="app.watchlistTab.setFilter('custom')" style="padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.78rem;background:rgba(168,85,247,0.15);color:#e9d5ff;border:1px solid rgba(168,85,247,0.3);">⭐ Custom Watchlists</button>
+                    </div>
+                    <div style="flex:1; min-width: 200px; max-width: 320px;">
+                        <input id="wlSearchInput" oninput="app.watchlistTab.handleSearch(this.value)" placeholder="🔍 Search list or ticker..." style="width:100%;padding:0.35rem 0.65rem;border:1px solid rgba(255,255,255,0.15);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);font-size:0.8rem;" autocomplete="off">
+                    </div>
+                </div>
+            </section>
+            <div id="watchlistCards" style="display: flex; flex-direction: column; gap: 1rem; padding: 0.25rem; min-height: 50vh;"></div>
+        </div>
+    </div>
+

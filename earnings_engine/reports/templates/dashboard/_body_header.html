@@ -1,0 +1,47 @@
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; position: relative; z-index: 1000;">
+            <div>
+                <h1 style="margin: 0; font-size: 2rem; background: linear-gradient(to right, #60a5fa, #c084fc, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">📈 Earnings Engine Dashboard</h1>
+                <p id="lastRefreshed" class="timestamp" style="margin: 0.25rem 0 0 0;">Loading... </p>
+            </div>
+            <!-- Global Watchlist / Universe Selector on top of all elements -->
+            <div style="display: flex; align-items: center; gap: 0.6rem; background: rgba(255,255,255,0.04); padding: 0.5rem 0.85rem; border-radius: 0.6rem; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+                <label for="globalWatchlist" style="font-size: 0.85rem; font-weight: 700; color: #cbd5e1; display: flex; align-items: center; gap: 0.4rem; white-space: nowrap;">
+                    <span>⭐ Universe / Watchlist:</span>
+                </label>
+                <select id="globalWatchlist" onchange="app.onGlobalWatchlistChange(this.value)" style="min-width: 230px; padding: 0.45rem 0.8rem; border: 1px solid rgba(59,130,246,0.5); border-radius: 0.45rem; background: #1e293b; color: #f8fafc; font-size: 0.88rem; font-weight: 600; cursor: pointer; outline: none;" title="Active universe or watchlist across all dashboard tabs">
+                    <option value="">🌐 All Stocks (Global)</option>
+                </select>
+                <button onclick="app.switchTab('watchlist')" class="btn btn-sm" style="padding: 0.35rem 0.65rem; background: rgba(59,130,246,0.2); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4); border-radius: 0.4rem; font-size: 0.78rem;" title="Manage custom watchlists">⚙ Manage</button>
+            </div>
+        </header>
+
+        <!-- Search -->
+        <section class="card">
+            <div class="search-wrap">
+                <input type="text" id="tickerSearch" placeholder="Search ticker (e.g., AAPL, RELIANCE.NS)..." style="width: 100%; padding: 0.75rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 0.5rem; background: rgba(255,255,255,0.05); color: var(--light); font-size: 1rem;" autocomplete="off">
+                <div id="autocompleteDropdown" class="dropdown"></div>
+            </div>
+        </section>
+
+        <!-- Tabs -->
+        <section class="card" style="padding: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="tab-btn active" onclick="app.switchTab('results')">📊 Results</button>
+            <button class="tab-btn" onclick="app.switchTab('monthfilter')">🗓️ Month Filter</button>
+            <button class="tab-btn" onclick="app.switchTab('scanner')">🔍 Scanner</button>
+            <button class="tab-btn" onclick="app.switchTab('catalysts')">📰 Catalysts</button>
+            <button class="tab-btn" onclick="app.switchTab('gainers')">🚀 Gainers & Patterns</button>
+            <button class="tab-btn" onclick="app.switchTab('swing')">🔄 Swing</button>
+            <button class="tab-btn" onclick="app.switchTab('kronos')">🤖 Kronos</button>
+            <button class="tab-btn" onclick="app.switchTab('playground')">🧪 Playground</button>
+            <button class="tab-btn" onclick="app.switchTab('coverage')">📊 Data Coverage</button>
+            <button class="tab-btn" onclick="app.switchTab('industries')">🏭 Industries</button>
+            <button class="tab-btn" onclick="app.switchTab('patterns')">📊 Patterns</button>
+            <button class="tab-btn" onclick="app.switchTab('buydip')">🛒 Buy the Dip</button>
+            <button class="tab-btn" onclick="app.switchTab('backtest')">📈 Backtest</button>
+            <button class="tab-btn" onclick="app.switchTab('watchlist')">⭐ Watchlist</button>
+        </section>
+
+        <!-- ================= RESULTS TAB ================= -->

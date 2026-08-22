@@ -1,0 +1,463 @@
+"""Short-term Market Catalysts and High-Impact News Scanner.
+
+Fetches real-time financial headlines and corporate announcements across
+multiple feeds (Yahoo RSS, Google News RSS, yfinance, NSE announcements),
+scores their short-term price urgency/magnitude, categorizes catalyst drivers,
+and estimates price impact horizons (1-5 trading days).
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+import sqlite3
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from earnings_engine.config import Settings
+from earnings_engine.data.news_sentiment import (
+    POSITIVE_WORDS,
+    NEGATIVE_WORDS,
+    _clean_text,
+    calculate_headline_sentiment,
+)
+from earnings_engine.data.names import get_name
+
+logger = logging.getLogger(__name__)
+
+# High-impact short-term catalyst keyword patterns and weights
+CATALYST_RULES: dict[str, dict[str, Any]] = {
+    "Order Wins & Contracts": {
+        "keywords": [
+            "order win", "bags order", "secures order", "awarded contract", "receives order",
+            "major contract", "multi-year deal", "commercial deal", "strategic deal",
+            "crore order", "million order", "billion contract", "pact with", "signs agreement",
+            "wins bid", "lowest bidder", "l1 bidder", "defense order", "railway contract"
+        ],
+        "base_impact": 82,
+        "default_direction": "BULLISH",
+        "horizon": "⚡ 1-2 Days (Immediate)",
+        "volatility_est": "±4% to ±9%",
+    },
+    "Earnings & Guidance Surprise": {
+        "keywords": [
+            "profit surges", "profit jumps", "revenue beats", "earnings beat", "net profit up",
+            "guidance raised", "upward revision", "strong q1", "strong q2", "strong q3", "strong q4",
+            "q1 net profit", "q2 net profit", "q3 net profit", "q4 net profit", "ebitda surges",
+            "profit plunges", "net loss", "margin expands", "guidance slashed", "revenue misses"
+        ],
+        "base_impact": 88,
+        "default_direction": "BULLISH",
+        "horizon": "⚡ 1-2 Days (Immediate)",
+        "volatility_est": "±5% to ±12%",
+    },
+    "Regulatory, Approvals & Policy": {
+        "keywords": [
+            "fda approval", "usfda nod", "regulatory nod", "clearance", "rbi approval",
+            "sebi nod", "government approval", "patent granted", "licence granted", "pli scheme",
+            "tariff hike", "duty cut", "import duty", "subsidies", "anti-dumping",
+            "environmental clearance"
+        ],
+        "base_impact": 80,
+        "default_direction": "BULLISH",
+        "horizon": "📅 2-4 Days (Swing)",
+        "volatility_est": "±3% to ±8%",
+    },
+    "M&A, Stake & Expansion": {
+        "keywords": [
+            "acquisition", "acquires stake", "buys stake", "stake sale", "merger", "joint venture",
+            "capacity expansion", "new plant", "capex", "investment of", "open offer",
+            "block deal", "bulk deal", "promoter buys", "insider buying", "fund raising", "qip"
+        ],
+        "base_impact": 78,
+        "default_direction": "BULLISH",
+        "horizon": "📅 3-5 Days (Swing Momentum)",
+        "volatility_est": "±4% to ±10%",
+    },
+    "Analyst Ratings & Targets": {
+        "keywords": [
+            "upgrade", "upgrades", "raised target", "price target raised", "buy rating",
+            "outperform", "overweight", "initiates coverage", "strong buy", "downgrade",
+            "slashes target", "underperform"
+        ],
+        "base_impact": 65,
+        "default_direction": "BULLISH",
+        "horizon": "📅 1-3 Days (Short-term)",
+        "volatility_est": "±2% to ±6%",
+    },
+    "Corporate Action & Dividends": {
+        "keywords": [
+            "bonus issue", "bonus shares", "stock split", "dividend declared", "special dividend",
+            "interim dividend", "record date", "share buyback", "board meeting for dividend"
+        ],
+        "base_impact": 68,
+        "default_direction": "BULLISH",
+        "horizon": "📅 2-5 Days",
+        "volatility_est": "±2% to ±6%",
+    },
+    "Litigation, Risk & Probes": {
+        "keywords": [
+            "sebi probe", "sebi notice", "probe", "initiates probe", "ed search", "it raid", "fraud", "scam", "auditor resigns",
+            "default on debt", "insolvency", "nclt", "penalty imposed", "lawsuit filed", "inquiry",
+            "court stays", "usfda warning letter", "import alert", "downgraded to junk", "rbi ban"
+        ],
+        "base_impact": 90,
+        "default_direction": "BEARISH",
+        "horizon": "⚡ 1-2 Days (Immediate Panic)",
+        "volatility_est": "±5% to ±15%",
+    },
+}
+
+# High urgency booster words
+URGENCY_BOOSTERS = {
+    "breaking": 8, "huge": 6, "record": 6, "massive": 7, "surges": 6, "plunges": 7,
+    "soars": 6, "crashes": 8, "billion": 6, "crore": 5, "approved": 7, "warning": 7,
+    "banned": 9, "exclusive": 5, "multibagger": 5, "all-time high": 6, "52-week high": 5
+}
+
+
+def _cache_path(settings: Settings) -> Path:
+    return settings.data_dirs["prices"] / "prices.sqlite3"
+
+
+def _connect(settings: Settings) -> sqlite3.Connection:
+    settings.ensure_dirs()
+    conn = sqlite3.connect(_cache_path(settings))
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS news_catalysts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            stock_name TEXT,
+            title TEXT NOT NULL,
+            publisher TEXT,
+            link TEXT,
+            published_at TEXT NOT NULL,
+            summary TEXT,
+            impact_score INTEGER NOT NULL,
+            impact_level TEXT NOT NULL,
+            category TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            expected_horizon TEXT NOT NULL,
+            volatility_est TEXT NOT NULL,
+            why_it_matters TEXT,
+            source TEXT,
+            created_at TEXT NOT NULL,
+            UNIQUE(ticker, title)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_news_catalysts_ticker_impact
+        ON news_catalysts (ticker, impact_score DESC, published_at DESC)
+        """
+    )
+    conn.commit()
+    return conn
+
+
+def score_catalyst_headline(title: str, summary: str = "") -> dict[str, Any]:
+    """Score the short-term market impact of a financial news headline and summary."""
+    full_text = (title + " " + summary).lower()
+
+    best_category = "General Financial News"
+    best_impact = 40
+    direction = "NEUTRAL"
+    horizon = "📅 1-3 Days"
+    volatility_est = "±1% to ±4%"
+
+    # Match catalyst rules
+    for cat_name, rule in CATALYST_RULES.items():
+        matches = [kw for kw in rule["keywords"] if kw in full_text]
+        if matches:
+            score = rule["base_impact"] + (len(matches) - 1) * 3
+            if score > best_impact:
+                best_impact = score
+                best_category = cat_name
+                horizon = rule["horizon"]
+                volatility_est = rule["volatility_est"]
+                direction = rule["default_direction"]
+
+    # Sentiment adjustment
+    sentiment_score, sentiment_label = calculate_headline_sentiment(title, summary)
+    if best_category == "Litigation, Risk & Probes":
+        direction = "BEARISH"
+    elif sentiment_label == "Bearish" and ("profit" in full_text and ("plunge" in full_text or "drop" in full_text or "loss" in full_text)):
+        direction = "BEARISH"
+    elif sentiment_label == "Bearish":
+        direction = "BEARISH"
+    elif sentiment_label == "Bullish":
+        direction = "BULLISH"
+
+    # Urgency keyword boost
+    for kw, boost in URGENCY_BOOSTERS.items():
+        if kw in full_text:
+            best_impact += boost
+
+    # Clamp impact score
+    impact_score = min(99, max(25, best_impact))
+
+    if impact_score >= 75:
+        impact_level = "HIGH"
+    elif impact_score >= 50:
+        impact_level = "MEDIUM"
+    else:
+        impact_level = "LOW"
+
+    # Human-readable "Why this matters" rationale
+    why_it_matters = _generate_why_it_matters(best_category, direction, horizon, volatility_est, title)
+
+    return {
+        "impact_score": impact_score,
+        "impact_level": impact_level,
+        "category": best_category,
+        "direction": direction,
+        "expected_horizon": horizon,
+        "volatility_est": volatility_est,
+        "why_it_matters": why_it_matters,
+        "sentiment_score": sentiment_score,
+        "sentiment_label": sentiment_label,
+    }
+
+
+def _generate_why_it_matters(category: str, direction: str, horizon: str, volatility: str, title: str) -> str:
+    """Generate concise trading rationale for why the headline can drive short-term price."""
+    if category == "Order Wins & Contracts":
+        return f"Direct revenue accretive trigger. Order wins typically cause immediate re-rating and volume surge ({volatility}) over {horizon}."
+    elif category == "Earnings & Guidance Surprise":
+        dir_text = "bullish momentum gap-up" if direction == "BULLISH" else "downward margin compression"
+        return f"Fundamental quarter surprise. Expect {dir_text} with heightened volume over {horizon}."
+    elif category == "Regulatory, Approvals & Policy":
+        return f"Regulatory catalyst clears commercial hurdles. Can trigger strong institutional sector accumulation over {horizon}."
+    elif category == "M&A, Stake & Expansion":
+        return f"Capacity/strategic expansion. Positive for medium-term EPS growth with expected {volatility} move."
+    elif category == "Analyst Ratings & Targets":
+        return f"Brokerage target upgrade/downgrade provides institutional price target anchors over {horizon}."
+    elif category == "Litigation, Risk & Probes":
+        return f"⚠️ High-risk overhang. Probes or penalties can cause swift sentiment breakdown ({volatility}) over {horizon}."
+    elif category == "Corporate Action & Dividends":
+        return f"Corporate reward action. Often supports price floor leading into the announced record date."
+    return f"Market news headline creating short-term sentiment momentum ({volatility})."
+
+
+def fetch_ticker_catalysts(ticker: str, limit: int = 8, settings: Settings | None = None) -> list[dict[str, Any]]:
+    """Fetch and score short-term news catalysts for a single ticker."""
+    settings = settings or Settings()
+    ticker = ticker.strip().upper()
+    name = get_name(ticker, settings) or ticker
+
+    articles: list[dict[str, Any]] = []
+    seen_titles: set[str] = set()
+
+    # Sources: Yahoo RSS, Google News RSS, yfinance
+    from earnings_engine.data.news_sentiment import fetch_yahoo_rss_news, fetch_google_news_rss, fetch_yfinance_news
+
+    raw_items = fetch_yahoo_rss_news(ticker) + fetch_yfinance_news(ticker)
+    if len(raw_items) < limit:
+        market = "IN" if ticker.endswith(".NS") or ticker.endswith(".BO") else "US"
+        raw_items += fetch_google_news_rss(ticker, market=market)
+
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    from earnings_engine.data.news_sentiment import _parse_iso_pubdate
+
+    with _connect(settings) as conn:
+        for item in raw_items:
+            title = _clean_text(item.get("title", ""))
+            if not title or title.lower() in seen_titles:
+                continue
+            seen_titles.add(title.lower())
+
+            summary = _clean_text(item.get("summary", ""))
+            publisher = item.get("publisher", "Market News")
+            link = item.get("link", "")
+            raw_pub = item.get("published_at")
+            pub_date = _parse_iso_pubdate(raw_pub)
+
+            scored = score_catalyst_headline(title, summary)
+
+            record = {
+                "ticker": ticker,
+                "stock_name": name,
+                "title": title,
+                "publisher": publisher,
+                "link": link,
+                "published_at": pub_date,
+                "summary": summary,
+                "impact_score": scored["impact_score"],
+                "impact_level": scored["impact_level"],
+                "category": scored["category"],
+                "direction": scored["direction"],
+                "expected_horizon": scored["expected_horizon"],
+                "volatility_est": scored["volatility_est"],
+                "why_it_matters": scored["why_it_matters"],
+                "source": item.get("source", "rss"),
+                "created_at": now_str,
+            }
+            articles.append(record)
+
+            # Store in SQLite cache
+            try:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO news_catalysts (
+                        ticker, stock_name, title, publisher, link, published_at,
+                        summary, impact_score, impact_level, category, direction,
+                        expected_horizon, volatility_est, why_it_matters, source, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        record["ticker"], record["stock_name"], record["title"],
+                        record["publisher"], record["link"], record["published_at"],
+                        record["summary"], record["impact_score"], record["impact_level"],
+                        record["category"], record["direction"], record["expected_horizon"],
+                        record["volatility_est"], record["why_it_matters"], record["source"],
+                        record["created_at"]
+                    )
+                )
+            except Exception as e:
+                logger.debug("Failed saving catalyst record: %s", e)
+
+        conn.commit()
+
+    # Sort by newest published date descending, then impact score
+    articles.sort(key=lambda a: (a.get("published_at", ""), a.get("impact_score", 0)), reverse=True)
+    return articles[:limit]
+
+
+def get_short_term_catalysts(
+    watchlist_or_universe: str | None = None,
+    impact_filter: str | None = None,
+    category_filter: str | None = None,
+    direction_filter: str | None = None,
+    search_query: str | None = None,
+    limit: int = 50,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Query short-term impact catalysts from SQLite cache sorted chronologically (newest first)."""
+    settings = settings or Settings()
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+
+        query = "SELECT * FROM news_catalysts WHERE 1=1"
+        params: list[Any] = []
+
+        # Filter by watchlist / universe if supplied
+        if watchlist_or_universe and watchlist_or_universe.upper() not in ("", "ALL", "GLOBAL", "NSE_ALL"):
+            from earnings_engine.data.watchlists import get_watchlist
+            from earnings_engine.data.universe import get_universe
+
+            tickers = get_watchlist(watchlist_or_universe, settings) or get_universe(watchlist_or_universe, settings)
+            if tickers:
+                placeholders = ",".join("?" for _ in tickers)
+                query += f" AND ticker IN ({placeholders})"
+                params.extend(tickers)
+
+        if impact_filter and impact_filter.upper() != "ALL":
+            if impact_filter.upper() == "HIGH":
+                query += " AND impact_level = 'HIGH'"
+            elif impact_filter.upper() == "MEDIUM+":
+                query += " AND impact_level IN ('HIGH', 'MEDIUM')"
+
+        if category_filter and category_filter.upper() != "ALL":
+            query += " AND category = ?"
+            params.append(category_filter)
+
+        if direction_filter and direction_filter.upper() != "ALL":
+            query += " AND direction = ?"
+            params.append(direction_filter.upper())
+
+        if search_query:
+            sq = f"%{search_query.strip().lower()}%"
+            query += " AND (LOWER(ticker) LIKE ? OR LOWER(stock_name) LIKE ? OR LOWER(title) LIKE ?)"
+            params.extend([sq, sq, sq])
+
+        # ALWAYS sort by newest published date first, then created_at, then impact score
+        query += " ORDER BY published_at DESC, created_at DESC, impact_score DESC LIMIT ?"
+        params.append(limit)
+
+        rows = conn.execute(query, params).fetchall()
+        results = [dict(row) for row in rows]
+
+        return results
+
+
+def get_catalyst_summary_stats(settings: Settings | None = None) -> dict[str, Any]:
+    """Get high-level summary KPI metrics for short-term catalysts."""
+    settings = settings or Settings()
+    with _connect(settings) as conn:
+        total = conn.execute("SELECT COUNT(*) FROM news_catalysts").fetchone()[0]
+        high_impact = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_level = 'HIGH'").fetchone()[0]
+        bullish = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE direction = 'BULLISH'").fetchone()[0]
+        bearish = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE direction = 'BEARISH'").fetchone()[0]
+
+        top_cats = conn.execute(
+            """
+            SELECT category, COUNT(*) as c
+            FROM news_catalysts
+            GROUP BY category
+            ORDER BY c DESC LIMIT 4
+            """
+        ).fetchall()
+
+        top_stocks = conn.execute(
+            """
+            SELECT ticker, stock_name, COUNT(*) as c, MAX(impact_score) as max_imp
+            FROM news_catalysts
+            GROUP BY ticker
+            ORDER BY max_imp DESC, c DESC LIMIT 5
+            """
+        ).fetchall()
+
+        return {
+            "total_catalysts": total,
+            "high_impact_count": high_impact,
+            "bullish_count": bullish,
+            "bearish_count": bearish,
+            "top_categories": [{"category": row[0], "count": row[1]} for row in top_cats],
+            "top_stocks": [
+                {"ticker": row[0], "name": row[1] or row[0], "count": row[2], "max_impact": row[3]}
+                for row in top_stocks
+            ],
+        }
+
+
+def scan_watchlist_catalysts(watchlist_name: str | None = None, limit_per_stock: int = 3, settings: Settings | None = None) -> dict[str, Any]:
+    """Scan and fetch real-time catalysts for all stocks in a watchlist/universe."""
+    settings = settings or Settings()
+    from earnings_engine.data.watchlists import get_watchlist
+    from earnings_engine.data.universe import get_universe
+
+    tickers: list[str] = []
+    if watchlist_name and watchlist_name.upper() not in ("", "ALL", "GLOBAL"):
+        tickers = get_watchlist(watchlist_name, settings)
+        if not tickers:
+            tickers = get_universe(watchlist_name, settings)
+    
+    if not tickers:
+        # Default scan sample of active tickers
+        tickers = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS", "BHARTIARTL.NS", "SBIN.NS", "LT.NS", "PCJEWELLER.NS", "FORCEMOT.NS"]
+
+    all_found = 0
+    high_impact_found = 0
+    for t in tickers:
+        try:
+            items = fetch_ticker_catalysts(t, limit=limit_per_stock, settings=settings)
+            all_found += len(items)
+            high_impact_found += sum(1 for i in items if i.get("impact_level") == "HIGH")
+        except Exception as e:
+            logger.debug("Catalyst scan error for %s: %s", t, e)
+
+    stats = get_catalyst_summary_stats(settings)
+    return {
+        "scanned_tickers": len(tickers),
+        "catalysts_fetched": all_found,
+        "high_impact_found": high_impact_found,
+        "stats": stats,
+    }

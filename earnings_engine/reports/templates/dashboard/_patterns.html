@@ -1,0 +1,55 @@
+{% import 'dashboard/_components.html' as comps %}
+        <!-- endpoint: /api/v1/dashboard/patterns -->
+        <div id="tab-patterns" class="tab-content">
+            <section class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <h3 style="margin: 0; font-size: 1.1rem;">📊 Patterns — Results by Industry & Buy-the-Dip</h3>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+    {{ comps.market_dropdown('patternsMarket', 'IN', '') }}
+                        <label class="timestamp" style="display:flex;align-items:center;gap:0.35rem;">From
+                            <input type="date" id="patStartDate" style="padding:0.3rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color-scheme:dark;">
+                        </label>
+                        <label class="timestamp" style="display:flex;align-items:center;gap:0.35rem;">To
+                            <input type="date" id="patEndDate" style="padding:0.3rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color-scheme:dark;">
+                        </label>
+                        <select id="patPreset" onchange="app.applyPatternsPreset()" style="padding:0.3rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);"
+                            title="Quick date range preset">
+                            <option value="7">Last 7 days</option>
+                            <option value="30">Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="">Custom / All history</option>
+                        </select>
+                        <button onclick="app.loadPatterns()" class="btn btn-primary btn-sm">🔄 Refresh</button>
+                    </div>
+                </div>
+                <p class="timestamp" style="margin: 0 0 0.75rem 0;">
+                    Classifies each result by price reaction (first full-session close vs pre-result close) and rolls it up by industry: totals, positive/negative, best-positive & best-ratio industries, and the buy-the-dip pattern (positive results that dipped → recovered ≥&nbsp;50% of the drop, or kept dipping).
+                </p>
+                <div id="patSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 1rem;"></div>
+                <div id="patTodayCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 1rem;"></div>
+                <div id="patStocksSection">
+                    <h4 style="margin: 0.5rem 0 0.25rem 0; font-size: 0.95rem;">📋 Today's Earnings — Stocks</h4>
+                    <div class="table-wrapper">
+                        <table class="results-table">
+                            <thead><tr>
+                                <th onclick="app.patStocksSort('ticker')" style="cursor:pointer">Ticker</th>
+                                <th onclick="app.patStocksSort('industry')" style="cursor:pointer">Industry</th>
+                                <th onclick="app.patStocksSort('result_class')" style="cursor:pointer">Result</th>
+                                <th onclick="app.patStocksSort('reaction_return_pct')" style="cursor:pointer">Reaction %</th>
+                                <th>Day Open</th><th>Day High</th><th>Day Low</th><th>Day Close</th>
+                                <th onclick="app.patStocksSort('dipped')" style="cursor:pointer">Dipped</th>
+                                <th onclick="app.patStocksSort('comeback_50')" style="cursor:pointer">Comeback≥50%</th>
+                                <th onclick="app.patStocksSort('kept_dipping')" style="cursor:pointer">Kept Dipping</th>
+                            </tr></thead>
+                            <tbody id="patStocksTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="patDip"></div>
+                <div id="patKept"></div>
+                <div id="patIndustries"></div>
+                <div id="patStatus" class="timestamp" style="margin-top: 0.5rem;"></div>
+            </section>
+        </div>
+
+        <!-- ================= BUY THE DIP TAB ================= -->

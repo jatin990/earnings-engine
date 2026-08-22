@@ -1,21 +1,27 @@
+# Top-level runtime data & output directories
+/data/
+/logs/
+/reports/
+
+# Python cache & build artifacts
 __pycache__/
-*.pyc
-.venv/
-data/
+**/__pycache__/
+*.py[cod]
+*$py.class
 *.egg-info/
+.venv/
 .pytest_cache/
 .DS_Store
-reports/output/
+*.log
+.continue/
+.tmp_*
+
+# Environment & Secrets
 .env
 .env.*
 !.env.example
 *.env
 secrets.env
-logs
-reports
-*.log
-.continue/
-.tmp_*
 
 # Recovery codes, keys, certificates, & credentials
 *recovery*

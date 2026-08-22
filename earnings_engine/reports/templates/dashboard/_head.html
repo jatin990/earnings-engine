@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earnings Engine Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: rgba(30,41,59,0.7);
+            --accent: #3b82f6;
+            --green: #10b981;
+            --red: #ef4444;
+            --light: #f8fafc;
+            --muted: #94a3b8;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; margin: 0; padding: 1rem; min-height: 100vh; background: linear-gradient(135deg, var(--bg), #1e1b4b); color: var(--light); }
+        .container { max-width: 1600px; margin: 0 auto; }
+        .card { background: var(--card); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); border-radius: 1rem; padding: 1.25rem; margin-bottom: 1rem; }
+        .tab-btn { padding: 0.6rem 1.25rem; border: 1px solid rgba(255,255,255,0.15); background: transparent; color: var(--muted); border-radius: 0.5rem; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all 0.2s; }
+        .tab-btn:hover { color: var(--light); border-color: var(--accent); }
+        .tab-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .btn { padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-danger { background: var(--red); color: white; }
+        .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+        .price-positive { color: var(--green); }
+        .price-negative { color: var(--red); }
+        .autocomplete-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .autocomplete-item:hover, .autocomplete-item.selected { background: rgba(59,130,246,0.25); }
+        .results-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .results-table th, .results-table td { padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; white-space: normal; word-wrap: break-word; }
+        .results-table th { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; user-select: none; }
+        .results-table th:hover { color: var(--accent); }
+        .metric { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.6rem; padding: 0.75rem; }
+        .metric span { display: block; font-size: 0.7rem; color: var(--muted); margin-bottom: 0.25rem; }
+        .metric strong { font-size: 0.95rem; }
+        .widget-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+        .widget-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 0.75rem; padding: 1rem; }
+        /* Kronos forecast cards are wide enough to lay the full 14-day OHLCV series
+           out at once — no scrollable viewports inside the cards. */
+        #kronosWidgets { grid-template-columns: repeat(auto-fill, minmax(640px, 1fr)); }
+        .widget-card h4 { margin: 0 0 0.5rem 0; color: var(--light); }
+        .signal-badge { padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; }
+        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        /* Buy-the-Dip collapsible sections (Today / Yesterday) */
+        .bd-section { border: 1px solid rgba(255,255,255,0.1); border-radius: 0.6rem; background: rgba(255,255,255,0.02); overflow: hidden; }
+        .bd-section-header { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0.6rem 0.85rem; background: rgba(255,255,255,0.04); border: none; border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--light); font-size: 0.85rem; font-weight: 600; cursor: pointer; text-align: left; }
+        .bd-section-header:hover { background: rgba(255,255,255,0.08); }
+        .bd-toggle { font-size: 0.7rem; color: var(--muted); }
+        .bd-section-body { padding: 0.25rem; }
+        .search-wrap { position: relative; z-index: 1000; }
+        .dropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #1e293b; border: 1px solid rgba(255,255,255,0.25); border-radius: 0.5rem; margin-top: 0.25rem; max-height: 320px; overflow-y: auto; z-index: 10000; box-shadow: 0 14px 35px rgba(0,0,0,0.6); }
+        .timestamp { color: var(--muted); font-size: 0.8rem; }
+        select { background-color: #1e293b !important; color: var(--light) !important; position: relative; z-index: 10; }
+        select:focus { border-color: var(--accent) !important; outline: none; }
+        select option { background-color: #1e293b; color: var(--light); }
+        .loading-spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: var(--accent); animation: spin 1s ease-in-out infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 768px) { body { padding: 0.5rem; } .card { padding: 1rem; } .widget-grid { grid-template-columns: 1fr; } }
+        /* Report / Results day-sections CSS (merged from earnings_report_page) */
+        .day-legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1rem 0; padding: 0.75rem; background: rgba(255,255,255,0.03); border-radius: 0.6rem; }
+        .day-chip { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--muted); }
+        .day-chip .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+        .day-0 { border-left: 4px solid #60a5fa !important; background: rgba(96, 165, 250, 0.06) !important; }
+        .day-1 { border-left: 4px solid #34d399 !important; background: rgba(52, 211, 153, 0.06) !important; }
+        .day-2 { border-left: 4px solid #fbbf24 !important; background: rgba(251, 191, 36, 0.06) !important; }
+        .day-3 { border-left: 4px solid #f472b6 !important; background: rgba(244, 114, 182, 0.06) !important; }
+        .day-4 { border-left: 4px solid #a78bfa !important; background: rgba(167, 139, 250, 0.06) !important; }
+        .day-5 { border-left: 4px solid #fb923c !important; background: rgba(251, 146, 60, 0.06) !important; }
+        .day-6 { border-left: 4px solid #2dd4bf !important; background: rgba(45, 212, 191, 0.06) !important; }
+        .day-7 { border-left: 4px solid #f87171 !important; background: rgba(248, 113, 113, 0.06) !important; }
+        .card.day-0 { border-top: 3px solid #60a5fa !important; }
+        .card.day-1 { border-top: 3px solid #34d399 !important; }
+        .card.day-2 { border-top: 3px solid #fbbf24 !important; }
+        .card.day-3 { border-top: 3px solid #f472b6 !important; }
+        .card.day-4 { border-top: 3px solid #a78bfa !important; }
+        .card.day-5 { border-top: 3px solid #fb923c !important; }
+        .card.day-6 { border-top: 3px solid #2dd4bf !important; }
+        .card.day-7 { border-top: 3px solid #f87171 !important; }
+        .day-section { margin-top: 1.5rem; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.8rem; overflow: hidden; }
+        .day-section > summary { cursor: pointer; padding: 0.9rem 1.2rem; background: rgba(255,255,255,0.04); font-weight: 600; font-size: 1rem; display: flex; align-items: center; gap: 0.75rem; list-style: none; }
+        .day-section > summary::-webkit-details-marker { display: none; }
+        .day-section > summary:hover { background: rgba(255,255,255,0.08); }
+        .day-section > summary .day-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+        .day-section > summary .day-count { color: var(--muted); font-size: 0.8rem; font-weight: 400; }
+        .day-section > summary .chevron { margin-left: auto; transition: transform 0.2s; }
+        .day-section[open] > summary .chevron { transform: rotate(180deg); }
+        .day-section-body { padding: 1rem; }
+        /* Cap category sections */
+        .cap-section { margin-top: 0.75rem; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.6rem; overflow: hidden; }
+        .cap-section > summary { cursor: pointer; padding: 0.6rem 1rem; background: rgba(255,255,255,0.03); font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; list-style: none; }
+        .cap-section > summary::-webkit-details-marker { display: none; }
+        .cap-section > summary:hover { background: rgba(255,255,255,0.06); }
+        .cap-section > summary .cap-count { color: var(--muted); font-size: 0.75rem; font-weight: 400; }
+        .cap-section > summary .chevron { margin-left: auto; transition: transform 0.2s; }
+        .cap-section[open] > summary .chevron { transform: rotate(180deg); }
+        .cap-section-body { padding: 0.75rem; }
+        .cap-badge-large { background: rgba(139, 92, 246, 0.2); color: #c084fc; border: 1px solid #8b5cf6; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; }
+        .cap-badge-small { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 600; }
+        /* Prediction badges */
+        .pred-bullish { color: #34d399; font-weight: 600; }
+        .pred-bearish { color: #f87171; font-weight: 600; }
+        .pred-neutral { color: #fbbf24; font-weight: 600; }
+        .pred-muted { color: var(--muted); }
+        /* Clickable stock cell in ledger */
+        .stock-cell a.stock-link { color: #60a5fa; text-decoration: none; cursor: pointer; font-weight: 600; }
+        .stock-cell a.stock-link:hover { color: #93c5fd; text-decoration: underline; }
+        .ticker-sub { font-size: 0.65rem; color: var(--muted); font-weight: 400; }
+        /* Popup / modal */
+        .popup-modal { display: none; position: fixed; inset: 0; z-index: 3000; }
+        .popup-modal .popup-backdrop { position: absolute; inset: 0; background: rgba(2, 6, 23, 0.75); backdrop-filter: blur(4px); }
+        .popup-modal .popup-content { position: relative; max-width: 760px; width: 92%; margin: 4vh auto; max-height: 88vh; overflow-y: auto; background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 1rem; padding: 1.5rem; box-shadow: 0 25px 60px rgba(0,0,0,0.5); }
+        .popup-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem; margin-bottom: 1rem; }
+        .popup-title { font-size: 1.3rem; font-weight: 700; color: #f8fafc; }
+        .popup-sub { font-size: 0.78rem; color: var(--muted); }
+        .popup-close { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e2e8f0; border-radius: 9999px; width: 32px; height: 32px; cursor: pointer; font-size: 0.9rem; flex-shrink: 0; }
+        .popup-close:hover { background: rgba(255,255,255,0.15); }
+        .popup-section { margin-bottom: 1.1rem; }
+        .popup-section-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; padding-bottom: 0.35rem; border-bottom: 1px dashed rgba(255,255,255,0.12); }
+        .popup-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.6rem; }
+        .popup-text { font-size: 0.85rem; line-height: 1.55; color: #cbd5e1; white-space: pre-wrap; word-wrap: break-word; }
+        .src-kronos .popup-section-title { color: #a78bfa; }
+        .src-gbm .popup-section-title { color: #60a5fa; }
+        .src-ollama .popup-section-title { color: #34d399; }
+        .src-setup .popup-section-title { color: #fbbf24; }
+    </style>
+</head>

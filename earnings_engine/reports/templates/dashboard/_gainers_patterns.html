@@ -1,0 +1,102 @@
+        <!-- ================= TOP GAINERS & PATTERNS TAB ================= -->
+        <div id="tab-gainers" class="tab-content">
+            <!-- Section Header & Sub-Tab Navigation -->
+            <section class="card" style="padding: 0.75rem 1rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem; background: linear-gradient(to right, #34d399, #60a5fa, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🚀 Top 10 Gainers & Pattern Discovery Engine</h3>
+                        <p class="timestamp" style="margin: 0.2rem 0 0 0; font-size: 0.78rem;">Analyze daily top price surges, multi-source driver attribution, and discover recurring pre-breakout patterns.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.4rem; background: rgba(255,255,255,0.04); padding: 0.3rem 0.6rem; border-radius: 0.45rem; border: 1px solid rgba(52,211,153,0.35);">
+                            <span style="font-size: 0.78rem; font-weight: 700; color: #34d399;">⭐ Market:</span>
+                            <select id="gainersMarketSelect" onchange="app.onGainersMarketChange(this.value)" style="padding: 0.25rem 0.55rem; border: 1px solid rgba(52,211,153,0.4); border-radius: 0.35rem; background: #0f172a; color: #f8fafc; font-size: 0.82rem; font-weight: 600; cursor: pointer; outline: none;" title="Select Market / Universe for Top Gainers">
+                                <optgroup label="🇮🇳 Indian Markets">
+                                    <option value="NSE_TOP">🇮🇳 NSE Top Active (~50)</option>
+                                    <option value="NSE_LARGE_CAP">🇮🇳 NSE Large Cap (> 1000 Cr)</option>
+                                    <option value="NSE_ALL">🇮🇳 All NSE Equities</option>
+                                </optgroup>
+                                <optgroup label="🇺🇸 US Markets">
+                                    <option value="US_TOP">🇺🇸 US Mega-Caps</option>
+                                    <option value="US">🇺🇸 All US Equities</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <button class="tab-btn tab-btn-sm active" onclick="app.switchGainersSubTab('gainers')" id="gainersSubTabBtn_gainers" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">🏆 Today's Top 10 Gainers</button>
+                        <button class="tab-btn tab-btn-sm" onclick="app.switchGainersSubTab('patterns')" id="gainersSubTabBtn_patterns" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">🧩 Pattern Archetypes & Win Rates</button>
+                        <button class="tab-btn tab-btn-sm" onclick="app.switchGainersSubTab('setups')" id="gainersSubTabBtn_setups" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">🔮 Watchlist Setups (Coiling)</button>
+                        <button onclick="app.refreshGainersTab()" class="btn btn-primary btn-sm" style="padding: 0.35rem 0.65rem;">🔄 Refresh</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 1. Top 10 Gainers Sub-View -->
+            <div id="gainersSubView_gainers">
+                <section class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <h4 style="margin: 0; font-size: 1rem;">🏆 Top 10 Gaining Stocks & Surge Driver Attribution</h4>
+                            <span id="gainersCountBadge" class="signal-badge" style="font-size:0.72rem;background:rgba(16,185,129,0.2);color:#34d399;">Top 10</span>
+                        </div>
+                        <div class="timestamp" style="font-size: 0.78rem;">Sorted by Daily % Gain &middot; Multi-Source Catalyst Attribution</div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="results-table" style="font-size:0.8rem;">
+                            <thead><tr>
+                                <th style="width: 45px; text-align:center;">#</th>
+                                <th>Stock / Ticker</th>
+                                <th>Close Price</th>
+                                <th>Daily Gain (%)</th>
+                                <th>Volume Surge</th>
+                                <th>52W High Status</th>
+                                <th>Primary Driver Attribution</th>
+                                <th>Matching Pattern</th>
+                                <th style="text-align:center;">Action</th>
+                            </tr></thead>
+                            <tbody id="topGainersTableBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 2. Pattern Archetypes & Statistics Sub-View -->
+            <div id="gainersSubView_patterns" style="display:none;">
+                <section class="card">
+                    <div style="margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 0.35rem 0; font-size: 1.05rem;">🧩 Discovered Recurring Pre-Breakout Pattern Archetypes</h4>
+                        <p class="timestamp" style="margin: 0; font-size: 0.8rem;">
+                            Mined from historical top movers. These 6 technical and catalyst archetypes produce the highest multi-day continuation and win rates.
+                        </p>
+                    </div>
+                    <div id="patternArchetypesGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem;"></div>
+                </section>
+            </div>
+
+            <!-- 3. Watchlist Breakout Setups Sub-View -->
+            <div id="gainersSubView_setups" style="display:none;">
+                <section class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <div>
+                            <h4 style="margin: 0; font-size: 1.05rem;">🔮 Upcoming Breakout Candidates (Watchlist Scanner)</h4>
+                            <p class="timestamp" style="margin: 0.2rem 0 0 0; font-size: 0.8rem;">Stocks currently coiling in tight consolidation channels matching high-win-rate pre-breakout patterns.</p>
+                        </div>
+                        <button onclick="app.loadUpcomingSetups()" class="btn btn-primary btn-sm">🔍 Scan Watchlist</button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="results-table" style="font-size:0.8rem;">
+                            <thead><tr>
+                                <th>Stock / Ticker</th>
+                                <th>Current Price</th>
+                                <th>Matching Pattern</th>
+                                <th>Setup Stage</th>
+                                <th>Breakout Trigger Level</th>
+                                <th>Confidence</th>
+                                <th>Technical Setup Rationale</th>
+                                <th style="text-align:center;">Action</th>
+                            </tr></thead>
+                            <tbody id="upcomingSetupsTableBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>

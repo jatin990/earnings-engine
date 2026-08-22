@@ -1,0 +1,67 @@
+{% import 'dashboard/_components.html' as comps %}
+        <div id="tab-swing" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.2rem;">🔄 Swing Trading Setups</h3>
+                    <p style="margin: 0.2rem 0 0 0; color: var(--muted); font-size: 0.78rem;">Horizontal trading bands, cycle timing, and real-time buy zone detection</p>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                    {{ comps.market_dropdown('swingMarket', 'ALL', 'universe-select') }}
+                    <button onclick="app.refreshSwing(event)" class="btn btn-primary btn-sm" title="Refresh prices and recalculate swing signals">🔄 Refresh</button>
+                    <button onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" style="background:#2563eb;">Load Setups</button>
+                    <button onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-sm" style="background:rgba(139,92,246,0.3);color:#c084fc;border:1px solid #8b5cf6;font-weight:600;" title="Compute Kronos AI predictions for all stocks in the selected watchlist">🔮 Predict All (Kronos)</button>
+                    <button onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-sm" style="background:rgba(59,130,246,0.25);color:#60a5fa;border:1px solid #3b82f6;font-weight:600;" title="Run Multi-Modal AI News, World Events & Volume Synthesis for all stocks">🧠 AI Thesis All</button>
+                </div>
+            </div>
+
+            <!-- Summary & Quick Filters Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.6rem; padding: 0.5rem 0.75rem;">
+                <div id="swingFilterPills" style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
+                    <button onclick="app.filterSwing('all')" id="swingFilter-all" class="btn btn-sm" style="background:var(--accent);color:white;font-size:0.75rem;padding:0.25rem 0.6rem;">All (<span id="count-all">0</span>)</button>
+                    <button onclick="app.filterSwing('buyzone')" id="swingFilter-buyzone" class="btn btn-sm" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid #10b981;font-size:0.75rem;padding:0.25rem 0.6rem;">🟢 In Buy Zone (<span id="count-buyzone">0</span>)</button>
+                    <button onclick="app.filterSwing('strongbuy')" id="swingFilter-strongbuy" class="btn btn-sm" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:0.75rem;padding:0.25rem 0.6rem;">Strong Buy (<span id="count-strongbuy">0</span>)</button>
+                    <button onclick="app.filterSwing('custom')" id="swingFilter-custom" class="btn btn-sm" style="background:rgba(139,92,246,0.15);color:#c084fc;font-size:0.75rem;padding:0.25rem 0.6rem;">Custom Ranges (<span id="count-custom">0</span>)</button>
+                </div>
+
+                <div style="display: flex; gap: 0.3rem; align-items: center;">
+                    <span style="font-size: 0.75rem; color: var(--muted); margin-right: 0.2rem;">View:</span>
+                    <button onclick="app.setSwingView('table')" id="swingViewBtn-table" class="btn btn-sm" style="background:var(--accent);color:white;padding:0.25rem 0.55rem;font-size:0.75rem;">📋 Table</button>
+                    <button onclick="app.setSwingView('cards')" id="swingViewBtn-cards" class="btn btn-sm" style="background:rgba(255,255,255,0.06);color:var(--muted);padding:0.25rem 0.55rem;font-size:0.75rem;">🎴 Cards</button>
+                </div>
+            </div>
+
+            <!-- Table View Container -->
+            <div id="swingTableContainer" class="card" style="padding:0.75rem;margin:0;">
+                <div class="table-wrapper">
+                    <table class="results-table" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th onclick="app.sortSwing('ticker')" style="cursor:pointer;">Ticker ⇅</th>
+                                <th onclick="app.sortSwing('current_price')" style="cursor:pointer;">Current Price ⇅</th>
+                                <th onclick="app.sortSwing('swing_signal')" style="cursor:pointer;">Signal / Zone ⇅</th>
+                                <th onclick="app.sortSwing('current_support')" style="cursor:pointer;">Support (Buy Zone) ⇅</th>
+                                <th onclick="app.sortSwing('next_resistance')" style="cursor:pointer;">Resistance (Sell Zone) ⇅</th>
+                                <th>Trading Band / Spread</th>
+                                <th>Dist. to Support</th>
+                                <th onclick="app.sortSwing('thirty_day_return_pct')" style="cursor:pointer;">30D Return ⇅</th>
+                                <th onclick="app.sortSwing('prev_quarter_earnings_score')" style="cursor:pointer;">Quality ⇅</th>
+                                <th onclick="app.sortSwing('kronos_return')" style="cursor:pointer;">Kronos Trend ⇅</th>
+                                <th onclick="app.sortSwing('ai_sentiment')" style="cursor:pointer;">AI Synthesis (News + Vol) ⇅</th>
+                                <th onclick="app.sortSwing('earnings_date')" style="cursor:pointer;">Next Earnings ⇅</th>
+                                <th style="text-align:right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="swingTableBody">
+                            <tr>
+                                <td colspan="13" style="text-align:center;padding:2rem;color:var(--muted);">
+                                    Click <strong>"Load Setups"</strong> above to load swing trading opportunities.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Cards View Container (hidden by default) -->
+            <div id="swingWidgets" class="widget-grid" style="display:none;margin-top:0.75rem;"></div>
+        </div>
