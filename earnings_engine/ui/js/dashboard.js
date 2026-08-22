@@ -1856,10 +1856,11 @@
                             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;">' +
                             '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(139,92,246,0.22);color:#c084fc;border:1px solid rgba(139,92,246,0.4);">' + (hasKp ? '🔄 Kronos' : '⚡ Kronos AI') + '</button>' +
                             '<button class="btn btn-sm" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(59,130,246,0.22);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);">' + (hasAi ? '🔍 Reasons & News' : '🧠 AI Thesis') + '</button>' +
-                            '</div>' +
                             '</div>';
                     }).join('');
                 }
+            },
+
             async runPredictionForTickerSingle(ticker, eventOrBtn) {
                 ticker = (ticker || '').toUpperCase().trim();
                 if (!ticker) return;
