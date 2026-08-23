@@ -28,22 +28,23 @@
         </section>
 
         <!-- Tabs -->
-        <section class="card" style="padding: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-            <button class="tab-btn active" onclick="app.switchTab('results')">📊 Results</button>
-            <button class="tab-btn" onclick="app.switchTab('monthfilter')">🗓️ Month Filter</button>
-            <button class="tab-btn" onclick="app.switchTab('scanner')">🔍 Scanner</button>
-            <button class="tab-btn" onclick="app.switchTab('catalysts')">📰 Catalysts</button>
-            <button class="tab-btn" onclick="app.switchTab('gainers')">🚀 Gainers & Patterns</button>
-            <button class="tab-btn" onclick="app.switchTab('swing')">🔄 Swing</button>
-            <button class="tab-btn" onclick="app.switchTab('kronos')">🤖 Kronos</button>
-            <button class="tab-btn" onclick="app.switchTab('consensus')">🧠 AI Consensus</button>
-            <button class="tab-btn" onclick="app.switchTab('playground')">🧪 Playground</button>
-            <button class="tab-btn" onclick="app.switchTab('coverage')">📊 Data Coverage</button>
-            <button class="tab-btn" onclick="app.switchTab('industries')">🏭 Industries</button>
-            <button class="tab-btn" onclick="app.switchTab('patterns')">📊 Patterns</button>
-            <button class="tab-btn" onclick="app.switchTab('buydip')">🛒 Buy the Dip</button>
-            <button class="tab-btn" onclick="app.switchTab('backtest')">📈 Backtest</button>
-            <button class="tab-btn" onclick="app.switchTab('watchlist')">⭐ Watchlist</button>
+        <section class="card" style="padding: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+            <button id="tabBtn-results" data-tab="results" class="tab-btn active" onclick="app.switchTab('results')">📊 Results</button>
+            <button id="tabBtn-monthfilter" data-tab="monthfilter" class="tab-btn" onclick="app.switchTab('monthfilter')">🗓️ Month Filter</button>
+            <button id="tabBtn-scanner" data-tab="scanner" class="tab-btn" onclick="app.switchTab('scanner')">🔍 Scanner</button>
+            <button id="tabBtn-catalysts" data-tab="catalysts" class="tab-btn" onclick="app.switchTab('catalysts')">📰 Catalysts</button>
+            <button id="tabBtn-gainers" data-tab="gainers" class="tab-btn" onclick="app.switchTab('gainers')">🚀 Gainers & Patterns</button>
+            <button id="tabBtn-swing" data-tab="swing" class="tab-btn" onclick="app.switchTab('swing')">🔄 Swing</button>
+            <button id="tabBtn-kronos" data-tab="kronos" class="tab-btn" onclick="app.switchTab('kronos')">🤖 Kronos</button>
+            <button id="tabBtn-consensus" data-tab="consensus" class="tab-btn" onclick="app.switchTab('consensus')">🧠 AI Consensus</button>
+            <button id="tabBtn-playground" data-tab="playground" class="tab-btn" onclick="app.switchTab('playground')">🧪 Playground</button>
+            <button id="tabBtn-coverage" data-tab="coverage" class="tab-btn" onclick="app.switchTab('coverage')">📊 Data Coverage</button>
+            <button id="tabBtn-industries" data-tab="industries" class="tab-btn" onclick="app.switchTab('industries')">🏭 Industries</button>
+            <button id="tabBtn-patterns" data-tab="patterns" class="tab-btn" onclick="app.switchTab('patterns')">📊 Patterns</button>
+            <button id="tabBtn-buydip" data-tab="buydip" class="tab-btn" onclick="app.switchTab('buydip')">🛒 Buy the Dip</button>
+            <button id="tabBtn-backtest" data-tab="backtest" class="tab-btn" onclick="app.switchTab('backtest')">📈 Backtest</button>
+            <button id="tabBtn-watchlist" data-tab="watchlist" class="tab-btn" onclick="app.switchTab('watchlist')">⭐ Watchlist</button>
+            <button class="tab-btn" onclick="app.openCustomizerModal('tabs')" style="margin-left: auto; background: rgba(59,130,246,0.12); border: 1px dashed rgba(59,130,246,0.4); color: #93c5fd; display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; padding: 0.45rem 0.85rem;" title="Customize and toggle visible tabs on/off">⚙️ Customize Tabs</button>
         </section>
 
         <!-- ================= RESULTS TAB ================= -->

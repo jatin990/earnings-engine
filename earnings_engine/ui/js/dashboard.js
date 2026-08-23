@@ -6614,12 +6614,12 @@
                 .catch(() => {});
         };
 
-        app.openCustomizerModal = function() {
+        app.openCustomizerModal = function(defaultSubTab = 'tabs') {
             const modal = document.getElementById('controlCenterModal');
             if (!modal) return;
             modal.style.display = 'flex';
             document.body.style.overflow = 'hidden';
-            app.switchCustomizerTab(app._customizer.activeSubTab || 'tabs');
+            app.switchCustomizerTab(defaultSubTab || app._customizer.activeSubTab || 'tabs');
         };
 
         app.closeCustomizerModal = function() {
@@ -6705,12 +6705,17 @@
                 const isVisible = app._customizer.tabVisibility[tab.key] !== false;
                 
                 // Toggle tab button in navbar
-                document.querySelectorAll('.tab-btn').forEach(btn => {
-                    const onclick = btn.getAttribute('onclick') || '';
-                    if (onclick.includes("'" + tab.key + "'") || onclick.includes('"' + tab.key + '"')) {
-                        btn.style.display = isVisible ? 'inline-block' : 'none';
-                    }
-                });
+                const btn = document.querySelector(`button.tab-btn[data-tab="${tab.key}"]`) || document.getElementById(`tabBtn-${tab.key}`);
+                if (btn) {
+                    btn.style.display = isVisible ? 'inline-block' : 'none';
+                } else {
+                    document.querySelectorAll('.tab-btn').forEach(b => {
+                        const onclick = b.getAttribute('onclick') || '';
+                        if (onclick.includes("'" + tab.key + "'") || onclick.includes('"' + tab.key + '"')) {
+                            b.style.display = isVisible ? 'inline-block' : 'none';
+                        }
+                    });
+                }
 
                 // Toggle tab content section
                 const content = document.getElementById('tab-' + tab.key);
