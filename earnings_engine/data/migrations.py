@@ -369,6 +369,160 @@ def _migration_008_passcodes(conn: Any) -> None:
     """)
 
 
+def _migration_009_rbac_and_scoped_access(conn: Any) -> None:
+    """Fine-grained RBAC, Email OTP onboarding, friend access, and scoped data entities."""
+    now_str = datetime.now().isoformat(timespec="seconds")
+    
+    # 1. Users
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('owner', 'friend')),
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            last_login_at TEXT
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)")
+
+    # 2. Invite Codes
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS invite_codes (
+            code TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            allowed_email TEXT,
+            scopes TEXT NOT NULL,
+            max_uses INTEGER DEFAULT 1,
+            uses_count INTEGER NOT NULL DEFAULT 0,
+            expires_at TEXT,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_by TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_invite_codes_active ON invite_codes (is_active)")
+
+    # 3. Friend Access (1:1 with Friend Users)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS friend_access (
+            id TEXT PRIMARY KEY,
+            user_id TEXT UNIQUE NOT NULL,
+            can_view_trips INTEGER NOT NULL DEFAULT 0,
+            can_view_cards INTEGER NOT NULL DEFAULT 0,
+            can_view_net_worth INTEGER NOT NULL DEFAULT 0,
+            granted_via_code TEXT,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_friend_access_user ON friend_access (user_id)")
+
+    # 4. OTP Verifications
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS otp_verifications (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            invite_code TEXT NOT NULL,
+            otp_hash TEXT NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            expires_at TEXT NOT NULL,
+            verified_at TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_otp_email_code ON otp_verifications (email, invite_code)")
+
+    # 5. Trips & Plans
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS trips (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            destination TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT,
+            status TEXT NOT NULL CHECK(status IN ('planning', 'confirmed', 'completed')),
+            notes TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+
+    # 6. Credit Cards (Non-sensitive benefits & rewards)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS credit_cards (
+            id TEXT PRIMARY KEY,
+            card_name TEXT NOT NULL,
+            issuer TEXT NOT NULL,
+            network TEXT NOT NULL,
+            category_perks TEXT NOT NULL,
+            lounge_access_summary TEXT,
+            annual_fee_status TEXT,
+            display_order INTEGER DEFAULT 0
+        )
+    """)
+
+    # 7. High-level Net Worth Summary
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+            id TEXT PRIMARY KEY,
+            as_of_date TEXT NOT NULL,
+            total_net_worth_band TEXT NOT NULL,
+            allocation_pct TEXT NOT NULL,
+            yoy_growth_pct REAL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+
+    # Seed Default Owner and Initial Demo Records
+    try:
+        # Seed Owner
+        conn.execute("""
+            INSERT OR IGNORE INTO users (id, email, name, role, is_active, created_at)
+            VALUES ('usr_owner_001', 'owner@earnings-engine.local', 'Owner Account', 'owner', 1, ?)
+        """, (now_str,))
+
+        # Seed Sample Invite Codes
+        demo_codes = [
+            ("VIP-ALL-ACCESS", "VIP Friend (All Scopes)", None, '["can_view_trips", "can_view_cards", "can_view_net_worth"]', 10, 0, None, 1, "usr_owner_001", now_str),
+            ("TRIP-EXPLORER", "Travel Buddy (Trips Only)", None, '["can_view_trips"]', 5, 0, None, 1, "usr_owner_001", now_str),
+            ("CARDS-REWARDS", "Credit Card Enthusiast", None, '["can_view_cards"]', 5, 0, None, 1, "usr_owner_001", now_str),
+        ]
+        conn.executemany("""
+            INSERT OR IGNORE INTO invite_codes (code, label, allowed_email, scopes, max_uses, uses_count, expires_at, is_active, created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, demo_codes)
+
+        # Seed Trips
+        sample_trips = [
+            ("trip_001", "Kyoto & Tokyo Cherry Blossom Expedition", "Japan (Kyoto / Tokyo)", "2026-10-10", "2026-10-22", "confirmed", "Shinkansen pass booked; stay in Gion & Shinjuku.", now_str),
+            ("trip_002", "Swiss Alps High-Altitude Trekking", "Switzerland (Zermatt / Grindelwald)", "2027-01-15", "2027-01-25", "planning", "Matterhorn glacier trail & mountain rail passes.", now_str),
+        ]
+        conn.executemany("""
+            INSERT OR IGNORE INTO trips (id, title, destination, start_date, end_date, status, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, sample_trips)
+
+        # Seed Credit Cards
+        sample_cards = [
+            ("card_001", "Infinia Metal Edition", "HDFC Bank", "Visa Infinite", '{"flights_hotels": "10x SmartBuy (33.3% reward rate)", "dining": "5x Dineout", "general": "3.3% baseline"}', "Unlimited International & Domestic Lounge Access (Priority Pass)", "Waived (Spend Milestone)", 1),
+            ("card_002", "Platinum Reserve Card", "American Express", "Amex", '{"travel": "3x Membership Rewards", "weekend_dining": "5x", "concierge": "24/7 Global Travel Assistant"}', "Domestic Lounge Access + Centurion Lounges", "Annual Renewal Active", 2),
+            ("card_003", "Magnus for Burgundy", "Axis Bank", "Mastercard World Elite", '{"travel": "12x TravelEdge Boost", "international": "2x Forex Rewards", "forex_markup": "2.0% Low Fee"}', "Unlimited Domestic + 8 Guest Visits per year", "Waived on Burgundy Criteria", 3),
+        ]
+        conn.executemany("""
+            INSERT OR IGNORE INTO credit_cards (id, card_name, issuer, network, category_perks, lounge_access_summary, annual_fee_status, display_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, sample_cards)
+
+        # Seed Net Worth Snapshot
+        conn.execute("""
+            INSERT OR IGNORE INTO net_worth_snapshots (id, as_of_date, total_net_worth_band, allocation_pct, yoy_growth_pct, updated_at)
+            VALUES ('nw_001', '2026-08-01', '₹1.5Cr - ₹2.5Cr Band', '{"Indian Equities": 58, "US Tech": 18, "Debt & Liquid Funds": 14, "Gold & Sovereign Bonds": 7, "Crypto & Sandbox": 3}', 24.8, ?)
+        """, (now_str,))
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -379,6 +533,7 @@ MIGRATIONS: list[Migration] = [
     Migration(6, "006_drop_legacy_ticker_tables", _migration_006_drop_legacy_ticker_tables),
     Migration(7, "007_consolidate_earnings_and_freshness", _migration_007_consolidate_earnings_and_freshness),
     Migration(8, "008_passcodes", _migration_008_passcodes),
+    Migration(9, "009_rbac_and_scoped_access", _migration_009_rbac_and_scoped_access),
 ]
 
 

@@ -39,6 +39,13 @@ def test_migrations_apply_all_in_order(test_settings):
         assert "swing_ranges" in tables
         assert "ticker_audit_log" in tables
         assert "passcodes" in tables
+        assert "users" in tables
+        assert "invite_codes" in tables
+        assert "friend_access" in tables
+        assert "otp_verifications" in tables
+        assert "trips" in tables
+        assert "credit_cards" in tables
+        assert "net_worth_snapshots" in tables
         # Verify legacy tables are dropped
         assert "ticker_names" not in tables
         assert "ticker_market_cap" not in tables

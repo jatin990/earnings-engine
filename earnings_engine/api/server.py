@@ -8,7 +8,7 @@ from typing import Any
 
 import pandas as pd
 import time
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -27,6 +27,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
+from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.migrations import apply_migrations
 from earnings_engine.logging_utils import get_logger, log_startup_diagnostics
 
@@ -579,7 +580,7 @@ if ui_dir.exists():
 
 
 # ---------------------------------------------------------------------------
-# Portal & Passcode Auth Endpoints
+# Portal, Passcode & Email OTP RBAC Endpoints
 # ---------------------------------------------------------------------------
 
 class VerifyCodeRequest(BaseModel):
@@ -594,10 +595,103 @@ class CreatePasscodeRequest(BaseModel):
     expires_at: str | None = None
 
 
+class RequestOtpRequest(BaseModel):
+    invite_code: str
+    email: str
+
+
+class VerifyOtpRequest(BaseModel):
+    invite_code: str
+    email: str
+    otp: str
+
+
+class OwnerLoginRequest(BaseModel):
+    passcode: str
+    email: str | None = None
+
+
+class CreateInviteRequest(BaseModel):
+    label: str
+    scopes: list[str] = ["can_view_trips"]
+    allowed_email: str | None = None
+    max_uses: int = 1
+    expires_in_days: int | None = 7
+    code: str | None = None
+
+
+class UpdateFriendScopesRequest(BaseModel):
+    can_view_trips: bool = False
+    can_view_cards: bool = False
+    can_view_net_worth: bool = False
+
+
+def _get_current_session(request: Request) -> dict[str, Any]:
+    """Resolve active user session from Authorization header, Cookie, or Query param."""
+    from earnings_engine.data.auth import verify_session_token
+    token = None
+
+    auth_hdr = request.headers.get("Authorization", "")
+    if auth_hdr.startswith("Bearer "):
+        token = auth_hdr[7:].strip()
+
+    if not token:
+        token = request.cookies.get("nexus_session")
+
+    if not token:
+        token = request.query_params.get("session_token")
+
+    if not token:
+        # Check if legacy passcode was sent in header or query
+        passcode = request.headers.get("X-Passcode") or request.query_params.get("passcode")
+        if passcode:
+            from earnings_engine.data.passcodes import verify_passcode
+            res = verify_passcode(passcode, _settings)
+            if res.get("valid"):
+                return {
+                    "sub": "passcode_user",
+                    "role": "owner" if res.get("is_admin") else "friend",
+                    "email": "passcode@nexus.local",
+                    "name": res.get("label", "Nexus User"),
+                    "scopes": ["can_view_trips", "can_view_cards", "can_view_net_worth"] if res.get("is_admin") else ["can_view_trips"],
+                }
+
+    if token:
+        session = verify_session_token(token)
+        if session:
+            return session
+
+    return {"role": None, "scopes": []}
+
+
+def require_scope(required_scope: str):
+    """Dependency callable that enforces owner role or explicit friend scope."""
+    async def dependency(request: Request):
+        session = _get_current_session(request)
+        role = session.get("role")
+        scopes = session.get("scopes", [])
+
+        if not role:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required. Please provide a valid session token.",
+            )
+
+        if role == "owner" or "admin" in scopes or required_scope in scopes:
+            return session
+
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access forbidden: your invite does not include permission '{required_scope}'.",
+        )
+    return dependency
+
+
 @app.get("/", tags=["UI"], response_class=HTMLResponse)
 @app.get("/portal", tags=["UI"], response_class=HTMLResponse)
+@app.get("/join", tags=["UI"], response_class=HTMLResponse)
 async def serve_portal():
-    """Serve the Nexus Passcode Portal & App Launcher."""
+    """Serve the Nexus Passcode Portal, Join Onboarding & App Launcher."""
     try:
         from jinja2 import Environment, FileSystemLoader
         env = Environment(
@@ -636,6 +730,8 @@ async def serve_credit_card():
             status_code=500,
         )
 
+
+# --- Passcode Auth & Key Management ---
 
 @app.post("/api/v1/auth/verify-code", tags=["Auth"])
 async def verify_portal_code(req: VerifyCodeRequest):
@@ -683,6 +779,204 @@ async def remove_passcode(code: str):
     from earnings_engine.data.passcodes import delete_passcode
     success = delete_passcode(code, _settings)
     return {"success": success, "code": code}
+
+
+# --- Email OTP Authentication & Session Endpoints ---
+
+@app.post("/api/v1/auth/request-otp", tags=["Auth & RBAC"])
+async def request_otp_endpoint(req: RequestOtpRequest):
+    """Validate invite code and send 6-digit email OTP."""
+    from earnings_engine.data.auth import request_otp_for_invite
+    res = request_otp_for_invite(req.invite_code, req.email, settings=_settings)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to send OTP."))
+    return res
+
+
+@app.post("/api/v1/auth/verify-otp", tags=["Auth & RBAC"])
+async def verify_otp_endpoint(req: VerifyOtpRequest, response: Response):
+    """Verify 6-digit OTP, provision friend account with scopes, and issue session."""
+    from earnings_engine.data.auth import verify_otp_for_invite
+    res = verify_otp_for_invite(req.invite_code, req.email, req.otp, settings=_settings)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "OTP verification failed."))
+
+    token = res.get("session_token")
+    if token:
+        response.set_cookie(
+            key="nexus_session",
+            value=token,
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            max_age=86400 * 14,
+        )
+    return res
+
+
+@app.post("/api/v1/auth/owner-login", tags=["Auth & RBAC"])
+async def owner_login_endpoint(req: OwnerLoginRequest, response: Response):
+    """Authenticate owner via master passcode and return full unrestricted session."""
+    from earnings_engine.data.auth import owner_login
+    res = owner_login(req.passcode, req.email, settings=_settings)
+    if not res.get("success"):
+        raise HTTPException(status_code=401, detail=res.get("error", "Invalid owner credentials."))
+
+    token = res.get("session_token")
+    if token:
+        response.set_cookie(
+            key="nexus_session",
+            value=token,
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            max_age=86400 * 14,
+        )
+    return res
+
+
+@app.get("/api/v1/auth/me", tags=["Auth & RBAC"])
+async def get_current_user_profile(request: Request):
+    """Get active session profile, role, and granted scopes."""
+    session = _get_current_session(request)
+    if not session.get("role"):
+        return {"authenticated": False, "role": None, "scopes": []}
+    return {"authenticated": True, "user": session}
+
+
+# --- Owner Friend Management & Scoped Invites ---
+
+@app.get("/api/v1/friends", tags=["Friend Management"])
+async def list_friends_endpoint(request: Request):
+    """Owner-only list of all registered friends and active scopes."""
+    session = _get_current_session(request)
+    if session.get("role") != "owner" and "admin" not in session.get("scopes", []):
+        raise HTTPException(status_code=403, detail="Owner privileges required.")
+    from earnings_engine.data.auth import list_friends
+    return {"friends": list_friends(_settings)}
+
+
+@app.patch("/api/v1/friends/{user_id}/access", tags=["Friend Management"])
+async def update_friend_access_endpoint(user_id: str, req: UpdateFriendScopesRequest, request: Request):
+    """Owner-only update of friend section permissions."""
+    session = _get_current_session(request)
+    if session.get("role") != "owner" and "admin" not in session.get("scopes", []):
+        raise HTTPException(status_code=403, detail="Owner privileges required.")
+    from earnings_engine.data.auth import update_friend_scopes
+    scopes_dict = {
+        "can_view_trips": req.can_view_trips,
+        "can_view_cards": req.can_view_cards,
+        "can_view_net_worth": req.can_view_net_worth,
+    }
+    success = update_friend_scopes(user_id, scopes_dict, settings=_settings)
+    if not success:
+        raise HTTPException(status_code=404, detail="Friend not found.")
+    return {"success": True, "user_id": user_id, "updated_scopes": scopes_dict}
+
+
+@app.delete("/api/v1/friends/{user_id}", tags=["Friend Management"])
+async def revoke_friend_endpoint(user_id: str, request: Request):
+    """Owner-only revocation and deactivation of friend user."""
+    session = _get_current_session(request)
+    if session.get("role") != "owner" and "admin" not in session.get("scopes", []):
+        raise HTTPException(status_code=403, detail="Owner privileges required.")
+    from earnings_engine.data.auth import revoke_friend_access
+    success = revoke_friend_access(user_id, settings=_settings)
+    return {"success": success, "user_id": user_id}
+
+
+@app.post("/api/v1/invites", tags=["Friend Management"])
+async def create_invite_endpoint(req: CreateInviteRequest, request: Request):
+    """Create a new scoped invite code."""
+    session = _get_current_session(request)
+    if session.get("role") != "owner" and "admin" not in session.get("scopes", []):
+        raise HTTPException(status_code=403, detail="Owner privileges required.")
+    from earnings_engine.data.auth import create_scoped_invite
+    created = create_scoped_invite(
+        label=req.label,
+        scopes=req.scopes,
+        allowed_email=req.allowed_email,
+        max_uses=req.max_uses,
+        expires_in_days=req.expires_in_days,
+        custom_code=req.code,
+        created_by=session.get("sub", "usr_owner_001"),
+        settings=_settings,
+    )
+    return created
+
+
+# --- Protected Scoped Data Endpoints ---
+
+@app.get("/api/v1/trips", tags=["Scoped Hubs"])
+async def get_trips_endpoint(session: dict = Depends(require_scope("can_view_trips"))):
+    """Retrieve personal travel plans and upcoming trip itineraries."""
+    conn = get_db_connection(_settings)
+    with conn:
+        rows = conn.execute("SELECT id, title, destination, start_date, end_date, status, notes, created_at FROM trips ORDER BY start_date ASC").fetchall()
+    trips = [
+        {
+            "id": r[0],
+            "title": r[1],
+            "destination": r[2],
+            "start_date": r[3],
+            "end_date": r[4],
+            "status": r[5],
+            "notes": r[6],
+            "created_at": r[7],
+        }
+        for r in rows
+    ]
+    return {"success": True, "count": len(trips), "trips": trips}
+
+
+@app.get("/api/v1/cards", tags=["Scoped Hubs"])
+async def get_cards_endpoint(session: dict = Depends(require_scope("can_view_cards"))):
+    """Retrieve credit card benefits, reward rates, and lounge access perks."""
+    conn = get_db_connection(_settings)
+    with conn:
+        rows = conn.execute("SELECT id, card_name, issuer, network, category_perks, lounge_access_summary, annual_fee_status, display_order FROM credit_cards ORDER BY display_order ASC").fetchall()
+    cards = []
+    for r in rows:
+        try:
+            perks = json.loads(r[4]) if r[4] else {}
+        except Exception:
+            perks = {}
+        cards.append({
+            "id": r[0],
+            "card_name": r[1],
+            "issuer": r[2],
+            "network": r[3],
+            "category_perks": perks,
+            "lounge_access_summary": r[5],
+            "annual_fee_status": r[6],
+            "display_order": r[7],
+        })
+    return {"success": True, "count": len(cards), "cards": cards}
+
+
+@app.get("/api/v1/net-worth", tags=["Scoped Hubs"])
+async def get_net_worth_endpoint(session: dict = Depends(require_scope("can_view_net_worth"))):
+    """Retrieve high-level net worth range, asset allocation, and YoY growth."""
+    conn = get_db_connection(_settings)
+    with conn:
+        row = conn.execute("SELECT id, as_of_date, total_net_worth_band, allocation_pct, yoy_growth_pct, updated_at FROM net_worth_snapshots ORDER BY as_of_date DESC LIMIT 1").fetchone()
+    if not row:
+        return {"success": True, "snapshot": None}
+    try:
+        alloc = json.loads(row[3]) if row[3] else {}
+    except Exception:
+        alloc = {}
+    return {
+        "success": True,
+        "snapshot": {
+            "id": row[0],
+            "as_of_date": row[1],
+            "total_net_worth_band": row[2],
+            "allocation_pct": alloc,
+            "yoy_growth_pct": row[4],
+            "updated_at": row[5],
+        },
+    }
 
 
 @app.get("/api-info", tags=["Root"])
