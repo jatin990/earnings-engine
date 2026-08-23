@@ -960,13 +960,18 @@ async def dashboard_kronos_ticker_history(ticker: str):
 async def dashboard_kronos_benchmark_ohlcv(
     ticker: str,
     run_at: str | None = Query(None, description="Optional specific run_at timestamp"),
+    force_refresh: bool = Query(False, description="Force re-fetch of latest prices from providers"),
 ):
     """Benchmark the 14-day forecasted OHLCV series against realized daily market bars."""
     try:
         from urllib.parse import unquote
         ticker_decoded = unquote(ticker)
         run_at_decoded = unquote(run_at) if run_at else None
-        return dashboard_api.get_kronos_ohlcv_benchmark_api(ticker=ticker_decoded, run_at=run_at_decoded)
+        return dashboard_api.get_kronos_ohlcv_benchmark_api(
+            ticker=ticker_decoded,
+            run_at=run_at_decoded,
+            force_refresh=force_refresh,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error benchmarking OHLCV series: {str(e)}")
 

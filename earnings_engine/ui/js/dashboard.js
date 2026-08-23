@@ -3087,17 +3087,19 @@
                     '</tr></thead><tbody>' + rows + '</tbody></table>' + benchBtn;
             },
 
-            async showOhlcvBenchmarkModal(ticker, runAt) {
+            async showOhlcvBenchmarkModal(ticker, runAt, forceRefresh = false) {
+                this._activeOhlcvTicker = ticker;
                 const modal = document.getElementById('kronosOhlcvModal');
                 const scorecardsEl = document.getElementById('kronosOhlcvScorecards');
                 const tableEl = document.getElementById('kronosOhlcvTableContainer');
                 const badgeEl = document.getElementById('kronosOhlcvTickerBadge');
                 const runSelectorEl = document.getElementById('kronosOhlcvRunSelector');
                 const explanationEl = document.getElementById('kronosOhlcvExplanation');
+                const fetchBtn = document.getElementById('kronosOhlcvFetchBtn');
 
                 if (badgeEl) badgeEl.textContent = ticker + (runAt ? ' (' + runAt + ')' : '');
                 modal.style.display = 'block';
-                scorecardsEl.innerHTML = '<div class="card" style="grid-column:1/-1;margin:0">Evaluating OHLCV realized bars for ' + ticker + '...</div>';
+                scorecardsEl.innerHTML = '<div class="card" style="grid-column:1/-1;margin:0">Evaluating OHLCV realized bars for ' + ticker + (forceRefresh ? ' (downloading latest market candles)...' : '...') + '</div>';
                 tableEl.innerHTML = '';
 
                 // Populate Run Selector dropdown with all available historical runs for this ticker
@@ -3127,7 +3129,11 @@
 
                 try {
                     let url = API_BASE + '/api/v1/dashboard/kronos/benchmark-ohlcv/' + encodeURIComponent(ticker);
-                    if (runAt) url += '?run_at=' + encodeURIComponent(runAt);
+                    const params = [];
+                    if (runAt) params.push('run_at=' + encodeURIComponent(runAt));
+                    if (forceRefresh) params.push('force_refresh=true');
+                    if (params.length > 0) url += '?' + params.join('&');
+
                     const res = await fetch(url);
                     const data = await res.json();
 
@@ -3151,7 +3157,7 @@
                             explanationEl.innerHTML = '✅ <strong>Evaluated Run (' + settled + '/' + total + ' trading days closed):</strong> Realized market candles are compared against Kronos forecast.';
                             explanationEl.style.color = '#34d399';
                         } else {
-                            explanationEl.innerHTML = '⏳ <strong>Live Active Run (' + total + ' days upcoming):</strong> Forecasted days are in the future. As daily candles close, realized prices settle automatically. <em>Select an earlier run from the dropdown above to benchmark past predictions.</em>';
+                            explanationEl.innerHTML = '⏳ <strong>Live Active Run (' + total + ' days upcoming):</strong> Forecasted days are in the future. As daily candles close, realized prices settle automatically. <em>Select an earlier run from the dropdown above to benchmark past predictions or click "Fetch Latest Prices & Settle".</em>';
                             explanationEl.style.color = '#fbbf24';
                         }
                     }
@@ -3216,6 +3222,27 @@
                 } catch (e) {
                     console.error('Error benchmarking OHLCV series:', e);
                     scorecardsEl.innerHTML = '<div class="card" style="grid-column:1/-1;margin:0">Error evaluating OHLCV benchmark for ' + ticker + '</div>';
+                }
+            },
+
+            async refreshOhlcvBenchmarkPrices() {
+                const ticker = this._activeOhlcvTicker;
+                const runSelectorEl = document.getElementById('kronosOhlcvRunSelector');
+                const runAt = runSelectorEl ? runSelectorEl.value : null;
+                const fetchBtn = document.getElementById('kronosOhlcvFetchBtn');
+                if (fetchBtn) {
+                    fetchBtn.disabled = true;
+                    fetchBtn.innerHTML = '⏳ Fetching Prices & Settling...';
+                }
+                try {
+                    if (ticker) {
+                        await this.showOhlcvBenchmarkModal(ticker, runAt, true);
+                    }
+                } finally {
+                    if (fetchBtn) {
+                        fetchBtn.disabled = false;
+                        fetchBtn.innerHTML = '🔄 Fetch Latest Prices & Settle';
+                    }
                 }
             },
 

@@ -765,6 +765,7 @@ def get_kronos_accuracy_api(
 def get_kronos_ohlcv_benchmark_api(
     ticker: str,
     run_at: str | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Return the OHLCV benchmark comparison for a ticker's latest or specific forecast."""
     settings = _settings()
@@ -786,7 +787,7 @@ def get_kronos_ohlcv_benchmark_api(
     if not series:
         return {"bars": [], "summary": {"total_bars": 0, "settled_bars": 0, "is_evaluated": False}}
 
-    return benchmark_ohlcv_forecast(series, ticker=ticker, settings=settings)
+    return benchmark_ohlcv_forecast(series, ticker=ticker, settings=settings, force_refresh=force_refresh)
 
 
 def create_universe_file(name: str, tickers: list[str] | None = None) -> dict[str, Any]:

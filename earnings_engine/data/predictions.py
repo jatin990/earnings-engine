@@ -415,6 +415,7 @@ def benchmark_ohlcv_forecast(
     actual_prices: pd.DataFrame | list[dict[str, Any]] | None = None,
     ticker: str | None = None,
     settings: Settings | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     """Benchmark a forecasted 14-day OHLCV series against actual realized daily bars.
 
@@ -429,6 +430,8 @@ def benchmark_ohlcv_forecast(
         Stock ticker symbol to load prices for if actual_prices is None.
     settings:
         Settings instance.
+    force_refresh:
+        If True, force download of the latest prices to settle past forecast dates.
 
     Returns
     -------
@@ -444,15 +447,26 @@ def benchmark_ohlcv_forecast(
     elif ticker:
         try:
             from earnings_engine.data.prices import fetch_prices, load_prices
-            act_df = load_prices(ticker, settings)
-            # If forecast dates extend past cached prices and market dates have elapsed, fetch delta
-            series_dates = [str(f.get("date") or "").split(" ")[0] for f in forecast_series if f.get("date")]
-            if series_dates:
-                min_series_date = min(series_dates)
-                max_cached_date = str(act_df.index.max()).split(" ")[0] if act_df is not None and not act_df.empty else ""
+            if force_refresh:
+                act_df = fetch_prices(ticker, settings, force=True)
+            else:
+                act_df = load_prices(ticker, settings)
+                # Check if forecast series dates that have already passed (<= today) are missing in act_df
+                series_dates = [str(f.get("date") or "").split(" ")[0] for f in forecast_series if f.get("date")]
                 today_str = datetime.now().strftime("%Y-%m-%d")
-                if max_cached_date < today_str and (not max_cached_date or max_cached_date <= min_series_date or max_cached_date < max(series_dates)):
-                    act_df = fetch_prices(ticker, settings)
+                past_series_dates = [d for d in series_dates if d <= today_str]
+
+                needs_fetch = False
+                if act_df is None or act_df.empty:
+                    needs_fetch = True
+                elif past_series_dates:
+                    cached_dates = set(str(idx).split(" ")[0] for idx in act_df.index)
+                    # If any past forecast date is missing in cached prices, fetch delta with force=True
+                    if any(d not in cached_dates for d in past_series_dates):
+                        needs_fetch = True
+
+                if needs_fetch:
+                    act_df = fetch_prices(ticker, settings, force=True)
         except Exception:
             act_df = None
 
