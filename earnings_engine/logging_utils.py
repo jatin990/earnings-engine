@@ -40,6 +40,34 @@ def _get_run_log_file(base_dir: Path) -> Path | None:
     return _RUN_LOG_FILES.get(base_key)
 
 
+class ErrorLedgerLoggingHandler(logging.Handler):
+    """Logging handler that captures ERROR and CRITICAL logs to the local error ledger."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.ERROR)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        # Avoid recursion if error_ledger itself logs
+        if record.name.startswith("earnings_engine.data.error_ledger"):
+            return
+        try:
+            from earnings_engine.data.error_ledger import record_error
+            stack_trace = None
+            if record.exc_info:
+                import traceback
+                stack_trace = "".join(traceback.format_exception(*record.exc_info))
+
+            record_error(
+                error_type=f"{record.name}.{record.levelname}",
+                message=record.getMessage(),
+                stack_trace=stack_trace,
+                source_file=record.pathname,
+                line_no=record.lineno,
+            )
+        except Exception:
+            pass
+
+
 def setup_logger(name: str = "earnings_engine", base_dir: Path | None = None) -> logging.Logger:
     """Create and return a logger that writes to a shared per-run log file and stdout."""
     root = Path(base_dir) if base_dir is not None else PROJECT_ROOT
@@ -60,6 +88,10 @@ def setup_logger(name: str = "earnings_engine", base_dir: Path | None = None) ->
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
     root_logger.addHandler(stream_handler)
+
+    # Error ledger handler captures ERROR/CRITICAL logs
+    error_handler = ErrorLedgerLoggingHandler()
+    root_logger.addHandler(error_handler)
 
     # Optional file handler (if file system is writable)
     if log_file is not None:
@@ -82,6 +114,7 @@ def setup_logger(name: str = "earnings_engine", base_dir: Path | None = None) ->
 def get_logger(name: str = "earnings_engine", base_dir: Path | None = None) -> logging.Logger:
     """Return a configured logger instance."""
     return setup_logger(name, base_dir=base_dir)
+
 
 
 def check_module_status(module_name: str) -> tuple[bool, str]:

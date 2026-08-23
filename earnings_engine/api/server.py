@@ -2862,6 +2862,57 @@ async def consensus_detail_endpoint(prediction_id: int):
         raise HTTPException(status_code=500, detail=f"Error fetching prediction details: {str(e)}")
 
 
+# =========================================================================
+# 🐞 LOCAL ERROR LEDGER & SELF-HEALING DIAGNOSTICS API
+# =========================================================================
+
+class ResolveErrorRequest(BaseModel):
+    notes: str = "Resolved by agent task fix"
+
+
+@app.get("/api/v1/errors/summary", tags=["Error Diagnostics"])
+async def get_errors_summary_endpoint():
+    """Return health metrics and count of open vs resolved application errors."""
+    from earnings_engine.data.error_ledger import get_error_summary
+    return get_error_summary(_settings)
+
+
+@app.get("/api/v1/errors/open", tags=["Error Diagnostics"])
+async def get_open_errors_endpoint(limit: int = Query(50, ge=1, le=200)):
+    """List all unresolved application errors requiring diagnosis or fix."""
+    from earnings_engine.data.error_ledger import get_open_errors
+    errors = get_open_errors(_settings, limit=limit)
+    return {"count": len(errors), "open_errors": errors}
+
+
+@app.get("/api/v1/errors", tags=["Error Diagnostics"])
+async def get_all_errors_endpoint(limit: int = Query(100, ge=1, le=500)):
+    """List all recorded application errors in the ledger."""
+    from earnings_engine.data.error_ledger import get_all_errors
+    errors = get_all_errors(_settings, limit=limit)
+    return {"count": len(errors), "errors": errors}
+
+
+@app.post("/api/v1/errors/scan-logs", tags=["Error Diagnostics"])
+async def scan_logs_endpoint():
+    """Scan all log files in logs/ directory and ingest any newly detected errors."""
+    from earnings_engine.data.error_ledger import scan_log_files
+    result = scan_log_files(settings=_settings)
+    return {"success": True, **result}
+
+
+@app.post("/api/v1/errors/{error_id}/resolve", tags=["Error Diagnostics"])
+async def resolve_error_endpoint(error_id: str, req: ResolveErrorRequest | None = None):
+    """Mark an error as resolved with verification explanation."""
+    from earnings_engine.data.error_ledger import mark_error_resolved
+    notes = req.notes if req and req.notes else "Resolved by agent task fix"
+    updated = mark_error_resolved(error_id, resolution_notes=notes, settings=_settings)
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Error with ID or signature '{error_id}' not found.")
+    return {"success": True, "resolved_id": error_id, "notes": notes}
+
+
+
 
 
 

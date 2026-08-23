@@ -1,0 +1,377 @@
+"""Local Error Ledger and Diagnostic Engine for Earnings Engine.
+
+Captures, deduplicates, stores, and manages runtime errors, database query failures,
+unhandled exceptions, and log errors across local SQLite and logs/error_ledger.json.
+Provides utilities for automated pre/post-task error scanning and resolution tracking.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import traceback
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from earnings_engine.config import PROJECT_ROOT, Settings
+from earnings_engine.data.db import get_db_connection
+from earnings_engine.logging_utils import get_logger
+
+logger = get_logger("earnings_engine.data.error_ledger")
+
+
+def _get_signature(error_type: str, message: str, source_file: str | None = None) -> str:
+    """Generate a stable deterministic signature hash for error grouping."""
+    # Normalize message: strip memory addresses, timestamps, dynamic UUIDs/codes
+    norm_msg = re.sub(r"0x[0-9a-fA-F]+", "0x...", message or "")
+    norm_msg = re.sub(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}", "<TIMESTAMP>", norm_msg)
+    norm_msg = re.sub(r"NEXUS-[A-Za-z0-9]+", "NEXUS-<CODE>", norm_msg)
+    norm_msg = norm_msg.strip()
+    
+    raw = f"{error_type.strip()}||{norm_msg}||{(source_file or '').strip()}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def init_error_ledger(settings: Settings | None = None) -> None:
+    """Ensure the error_ledger table and index exist in the database."""
+    settings = settings or Settings()
+    conn = get_db_connection(settings)
+    with conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS error_ledger (
+                id TEXT PRIMARY KEY,
+                signature TEXT UNIQUE NOT NULL,
+                error_type TEXT NOT NULL,
+                message TEXT NOT NULL,
+                stack_trace TEXT,
+                source_file TEXT,
+                line_no INTEGER,
+                context_data TEXT,
+                status TEXT NOT NULL DEFAULT 'OPEN',
+                occurrences INTEGER NOT NULL DEFAULT 1,
+                first_seen_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                resolved_at TEXT,
+                resolution_notes TEXT
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_error_ledger_status ON error_ledger (status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_error_ledger_signature ON error_ledger (signature)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_error_ledger_last_seen ON error_ledger (last_seen_at DESC)")
+
+
+def record_error(
+    error_type: str,
+    message: str,
+    stack_trace: str | None = None,
+    source_file: str | None = None,
+    line_no: int | None = None,
+    context_data: dict[str, Any] | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Record an error in the ledger. Deduplicates by signature and increments occurrences."""
+    settings = settings or Settings()
+    init_error_ledger(settings)
+
+    clean_type = (error_type or "UnknownError").strip()
+    clean_msg = (message or "").strip()
+    now_str = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    signature = _get_signature(clean_type, clean_msg, source_file)
+    context_json = json.dumps(context_data) if context_data else None
+
+    conn = get_db_connection(settings)
+    with conn:
+        existing = conn.execute(
+            "SELECT id, occurrences, status FROM error_ledger WHERE signature = ?",
+            (signature,),
+        ).fetchone()
+
+        if existing:
+            err_id, occ, status = existing
+            # If it was resolved but popped up again, reopen it
+            new_status = "OPEN" if status == "RESOLVED" else status
+            conn.execute(
+                """
+                UPDATE error_ledger
+                SET occurrences = occurrences + 1,
+                    last_seen_at = ?,
+                    message = ?,
+                    stack_trace = COALESCE(?, stack_trace),
+                    source_file = COALESCE(?, source_file),
+                    line_no = COALESCE(?, line_no),
+                    context_data = COALESCE(?, context_data),
+                    status = ?
+                WHERE signature = ?
+                """,
+                (now_str, clean_msg, stack_trace, source_file, line_no, context_json, new_status, signature),
+            )
+            total_occ = occ + 1
+        else:
+            err_id = f"err_{signature[:10]}"
+            conn.execute(
+                """
+                INSERT INTO error_ledger (
+                    id, signature, error_type, message, stack_trace, source_file,
+                    line_no, context_data, status, occurrences, first_seen_at, last_seen_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', 1, ?, ?)
+                """,
+                (err_id, signature, clean_type, clean_msg, stack_trace, source_file, line_no, context_json, now_str, now_str),
+            )
+            total_occ = 1
+
+    # Mirror to local JSON snapshot for agent transparency
+    _export_json_snapshot(settings)
+
+    return {
+        "id": err_id,
+        "signature": signature,
+        "error_type": clean_type,
+        "message": clean_msg,
+        "status": "OPEN",
+        "occurrences": total_occ,
+        "last_seen_at": now_str,
+    }
+
+
+def get_open_errors(settings: Settings | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    """Fetch all active un-resolved errors from the ledger."""
+    settings = settings or Settings()
+    init_error_ledger(settings)
+
+    conn = get_db_connection(settings)
+    with conn:
+        rows = conn.execute(
+            """
+            SELECT id, signature, error_type, message, stack_trace, source_file,
+                   line_no, context_data, status, occurrences, first_seen_at, last_seen_at,
+                   resolved_at, resolution_notes
+            FROM error_ledger
+            WHERE status IN ('OPEN', 'INVESTIGATING')
+            ORDER BY last_seen_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    return [_row_to_dict(r) for r in rows]
+
+
+def get_all_errors(settings: Settings | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    """Fetch all recorded errors in the ledger."""
+    settings = settings or Settings()
+    init_error_ledger(settings)
+
+    conn = get_db_connection(settings)
+    with conn:
+        rows = conn.execute(
+            """
+            SELECT id, signature, error_type, message, stack_trace, source_file,
+                   line_no, context_data, status, occurrences, first_seen_at, last_seen_at,
+                   resolved_at, resolution_notes
+            FROM error_ledger
+            ORDER BY last_seen_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    return [_row_to_dict(r) for r in rows]
+
+
+def mark_error_resolved(
+    identifier: str,
+    resolution_notes: str = "Resolved by agent task fix",
+    settings: Settings | None = None,
+) -> bool:
+    """Mark an error as resolved by its ID or signature hash."""
+    settings = settings or Settings()
+    init_error_ledger(settings)
+
+    now_str = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    clean_id = identifier.strip()
+
+    conn = get_db_connection(settings)
+    with conn:
+        cur = conn.execute(
+            """
+            UPDATE error_ledger
+            SET status = 'RESOLVED',
+                resolved_at = ?,
+                resolution_notes = ?
+            WHERE id = ? OR signature = ?
+            """,
+            (now_str, resolution_notes.strip(), clean_id, clean_id),
+        )
+        updated = cur.rowcount > 0
+
+    if updated:
+        _export_json_snapshot(settings)
+    return updated
+
+
+def get_error_summary(settings: Settings | None = None) -> dict[str, Any]:
+    """Return error summary KPIs and health metrics."""
+    settings = settings or Settings()
+    init_error_ledger(settings)
+
+    conn = get_db_connection(settings)
+    with conn:
+        total = conn.execute("SELECT COUNT(*) FROM error_ledger").fetchone()[0]
+        open_cnt = conn.execute("SELECT COUNT(*) FROM error_ledger WHERE status IN ('OPEN', 'INVESTIGATING')").fetchone()[0]
+        resolved_cnt = conn.execute("SELECT COUNT(*) FROM error_ledger WHERE status = 'RESOLVED'").fetchone()[0]
+        total_occurrences = conn.execute("SELECT COALESCE(SUM(occurrences), 0) FROM error_ledger").fetchone()[0]
+        
+        top_open = conn.execute(
+            """
+            SELECT id, error_type, message, occurrences, last_seen_at
+            FROM error_ledger
+            WHERE status IN ('OPEN', 'INVESTIGATING')
+            ORDER BY occurrences DESC, last_seen_at DESC
+            LIMIT 5
+            """
+        ).fetchall()
+
+    return {
+        "total_unique_errors": total,
+        "open_errors": open_cnt,
+        "resolved_errors": resolved_cnt,
+        "total_occurrences": total_occurrences,
+        "is_healthy": open_cnt == 0,
+        "top_open_errors": [
+            {
+                "id": r[0],
+                "error_type": r[1],
+                "message": r[2],
+                "occurrences": r[3],
+                "last_seen_at": r[4],
+            }
+            for r in top_open
+        ],
+    }
+
+
+def scan_log_files(base_dir: Path | None = None, settings: Settings | None = None) -> dict[str, Any]:
+    """Scan all log files in logs/ directory, parse error lines & tracebacks, and record in ledger."""
+    base = Path(base_dir or PROJECT_ROOT)
+    logs_dir = base / "logs"
+    if not logs_dir.exists():
+        return {"scanned_files": 0, "errors_found": 0, "newly_recorded": 0}
+
+    log_files = sorted(logs_dir.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+    
+    error_pattern = re.compile(
+        r"^(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d{3})\s+(?P<level>ERROR|CRITICAL)\s+(?P<logger>[\w\.\-]+)\s+(?P<message>.*)$"
+    )
+    
+    total_found = 0
+    newly_recorded = 0
+
+    for log_path in log_files:
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+        except Exception:
+            continue
+
+        idx = 0
+        while idx < len(lines):
+            line = lines[idx]
+            match = error_pattern.match(line.strip())
+            if match:
+                total_found += 1
+                level = match.group("level")
+                logger_name = match.group("logger")
+                msg = match.group("message")
+                
+                # Check for subsequent traceback lines
+                traceback_lines = []
+                idx += 1
+                while idx < len(lines) and (lines[idx].startswith("  ") or lines[idx].startswith("Traceback") or "File \"" in lines[idx]):
+                    traceback_lines.append(lines[idx])
+                    idx += 1
+
+                stack_trace = "".join(traceback_lines) if traceback_lines else None
+                
+                # Determine error type
+                error_type = f"{logger_name}.{level}"
+                if "[TURSO-QUERY-ERROR]" in msg:
+                    error_type = "DatabaseQueryError"
+                elif "SQLite input error" in msg:
+                    error_type = "SQLiteInputError"
+                elif stack_trace:
+                    last_line = [l.strip() for l in traceback_lines if l.strip()][-1] if traceback_lines else ""
+                    if ":" in last_line:
+                        error_type = last_line.split(":", 1)[0].strip()
+
+                # Extract source file / line if present
+                source_file = None
+                line_no = None
+                if stack_trace:
+                    file_matches = re.findall(r'File "([^"]+)", line (\d+)', stack_trace)
+                    if file_matches:
+                        source_file, line_no = file_matches[-1]
+                        line_no = int(line_no)
+
+                res = record_error(
+                    error_type=error_type,
+                    message=msg,
+                    stack_trace=stack_trace,
+                    source_file=source_file,
+                    line_no=line_no,
+                    context_data={"log_file": log_path.name},
+                    settings=settings,
+                )
+                if res.get("occurrences", 1) == 1:
+                    newly_recorded += 1
+            else:
+                idx += 1
+
+    return {
+        "scanned_files": len(log_files),
+        "errors_found": total_found,
+        "newly_recorded": newly_recorded,
+    }
+
+
+def _export_json_snapshot(settings: Settings | None = None) -> None:
+    """Export error ledger state to logs/error_ledger.json for fast agent read/inspection."""
+    try:
+        base = PROJECT_ROOT
+        logs_dir = base / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        json_path = logs_dir / "error_ledger.json"
+
+        summary = get_error_summary(settings)
+        open_errs = get_open_errors(settings, limit=100)
+
+        payload = {
+            "last_updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "summary": summary,
+            "open_errors": open_errs,
+        }
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+    except Exception as e:
+        logger.debug("Failed saving error_ledger.json snapshot: %s", e)
+
+
+def _row_to_dict(row: tuple) -> dict[str, Any]:
+    return {
+        "id": row[0],
+        "signature": row[1],
+        "error_type": row[2],
+        "message": row[3],
+        "stack_trace": row[4],
+        "source_file": row[5],
+        "line_no": row[6],
+        "context_data": json.loads(row[7]) if row[7] else None,
+        "status": row[8],
+        "occurrences": row[9],
+        "first_seen_at": row[10],
+        "last_seen_at": row[11],
+        "resolved_at": row[12],
+        "resolution_notes": row[13],
+    }
