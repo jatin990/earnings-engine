@@ -496,22 +496,22 @@
             },
 
             async init() {
-                await this.loadOverview();
                 this._bindWatchlistSelectionPersistence();
                 this._restoreBdControls();
                 this._restorePatternsControls();
                 this.populateWatchlistDropdowns();
+                this.loadOverview();
                 
                 const initialTab = this.getInitialTab();
-                this.switchTab(initialTab, true);
+                this.switchTab(initialTab, true, true);
 
                 window.addEventListener('hashchange', () => {
                     const tab = this.getInitialTab();
-                    this.switchTab(tab, false);
+                    this.switchTab(tab, false, false);
                 });
                 window.addEventListener('popstate', () => {
                     const tab = this.getInitialTab();
-                    this.switchTab(tab, false);
+                    this.switchTab(tab, false, false);
                 });
             },
 
@@ -538,6 +538,29 @@
                             console.error('Error saving watchlist selection:', e);
                         }
                     });
+                });
+            },
+
+            _restoreWatchlistSelections() {
+                const bindings = [
+                    ['globalWatchlist', 'selectedGlobalWatchlist'],
+                    ['resultsMarket', 'selectedWatchlist_results'],
+                    ['swingMarket', 'selectedWatchlist_swing'],
+                    ['coverageMarket', 'selectedWatchlist_coverage'],
+                    ['kronosWatchlist', 'selectedWatchlist_kronos'],
+                    ['bdMarket', 'selectedWatchlist_buydip'],
+                    ['patternsMarket', 'selectedWatchlist_patterns'],
+                    ['indMarket', 'selectedWatchlist_industries'],
+                ];
+                bindings.forEach(([id, key]) => {
+                    const sel = document.getElementById(id);
+                    if (!sel) return;
+                    try {
+                        const saved = localStorage.getItem(key);
+                        if (saved !== null && Array.from(sel.options).some(o => o.value === saved)) {
+                            sel.value = saved;
+                        }
+                    } catch (e) {}
                 });
             },
 
@@ -568,25 +591,37 @@
                         optionsHtml += '<optgroup label="⭐ Custom Watchlists">';
                         lists.forEach(w => {
                             const count = w.tickers ? w.tickers.length : (w.count || 0);
-                            optionsHtml += '<option value="' + w.name + '">' + w.name + ' (' + count + ')</option>';
+                            const name = w.name;
+                            optionsHtml += '<option value="' + name + '">' + (w.title || name) + ' (' + count + ')</option>';
                         });
                         optionsHtml += '</optgroup>';
                     }
 
-                    // Dropdown targets
-                    const targets = ['globalWatchlist', 'kronosWatchlist', 'btWatchlist', 'scannerWatchlistSelect', 'gainersMarketSelect'];
-                    const savedGlobal = localStorage.getItem('selectedGlobalWatchlist') || localStorage.getItem('selectedWatchlist_kronos') || '';
+                    // Populate all watchlist dropdowns across tabs
+                    const dropdownIds = [
+                        'globalWatchlist',
+                        'resultsMarket',
+                        'swingMarket',
+                        'coverageMarket',
+                        'kronosWatchlist',
+                        'bdMarket',
+                        'patternsMarket',
+                        'indMarket',
+                        'btWatchlist',
+                        'scannerWatchlistSelect',
+                        'gainersMarketSelect'
+                    ];
 
-                    targets.forEach(id => {
+                    dropdownIds.forEach(id => {
                         const el = document.getElementById(id);
                         if (el) {
-                            const currentVal = el.value || savedGlobal;
+                            const currentVal = el.value;
                             el.innerHTML = optionsHtml;
-                            if (currentVal && Array.from(el.options).some(o => o.value === currentVal)) {
-                                el.value = currentVal;
-                            }
+                            if (currentVal) el.value = currentVal;
                         }
                     });
+
+                    this._restoreWatchlistSelections();
                 } catch (e) {
                     console.error('Error populating watchlist dropdowns:', e);
                 }
@@ -640,7 +675,7 @@
                 this.refreshGainersTab();
             },
 
-            switchTab(name, updateUrl = true) {
+            switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'results').toLowerCase().replace('#', '').replace('tab=', '');
                 const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'results';
@@ -674,7 +709,7 @@
                 } catch (e) {}
 
                 if (name === 'watchlist') this.watchlistTab.load();
-                if (name === 'results') this.loadResultsReport();
+                if (name === 'results' && !isInitialLoad) this.loadResultsReport();
                 if (name === 'monthfilter') this.loadMonthFilterTab();
                 if (name === 'scanner') this.loadScanner();
                 if (name === 'catalysts') this.loadCatalysts();
