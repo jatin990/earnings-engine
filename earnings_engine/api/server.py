@@ -1262,6 +1262,13 @@ async def watchlist_all():
     return get_all_watchlists_and_universes()
 
 
+@app.get("/api/v1/watchlist/names", tags=["Dashboard"])
+async def watchlist_names():
+    """Fast summary of watchlist names and universe metadata for dropdowns (no heavy ticker arrays)."""
+    from earnings_engine.api.dashboard_api import get_watchlist_names_summary
+    return get_watchlist_names_summary()
+
+
 @app.get("/api/v1/watchlist/list", tags=["Dashboard"])
 async def watchlist_list():
     """List all named watchlists in the SQLite DB."""

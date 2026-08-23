@@ -861,6 +861,28 @@ def get_all_watchlists_and_universes() -> dict[str, Any]:
     }
 
 
+def get_watchlist_names_summary() -> dict[str, Any]:
+    """Fast, lightweight summary of watchlist names and universes for UI dropdowns (no ticker arrays)."""
+    settings = _settings()
+    custom_meta = watchlists_mod.list_watchlists(settings)
+    custom_names = [{"name": w.get("name"), "title": w.get("name"), "count": w.get("tickers", 0)} for w in custom_meta]
+
+    standard_universes = [
+        {"name": "", "title": "🌐 All Stocks (Global)", "count": 89},
+        {"name": "NSE_ALL", "title": "🇮🇳 NSE All Stocks", "count": 4959},
+        {"name": "NSE_TOP", "title": "🇮🇳 NSE Top 50 (Nifty 50)", "count": 50},
+        {"name": "NSE_LARGE_CAP", "title": "🇮🇳 NSE Large Caps", "count": 1417},
+        {"name": "US_TOP", "title": "🇺🇸 US Top Stocks", "count": 45},
+        {"name": "IN", "title": "🇮🇳 All Indian Stocks", "count": 44},
+        {"name": "US", "title": "🇺🇸 All US Stocks", "count": 45},
+    ]
+
+    return {
+        "watchlists": custom_names,
+        "universes": standard_universes,
+    }
+
+
 def rename_watchlist_api(name: str, new_name: str) -> dict[str, Any]:
     return watchlists_mod.rename_watchlist(name, new_name, _settings())
 

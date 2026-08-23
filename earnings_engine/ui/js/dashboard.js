@@ -38,15 +38,21 @@
                     this.renderCards();
                 },
 
-                async load() {
+                async load(forceRefresh = false) {
                     const el = document.getElementById('watchlistCards');
                     if (!el) return;
                     if (!el.children.length) el.innerHTML = '<div class="timestamp" style="padding:0.5rem;">Loading watchlists & universes...</div>';
                     try {
-                        const res = await fetch(API_BASE + '/api/v1/watchlist/all');
-                        const data = await res.json();
-                        this.customLists = data.watchlists || [];
-                        this.universes = data.universes || [];
+                        if (!forceRefresh && app._watchlistAllCache) {
+                            this.customLists = app._watchlistAllCache.watchlists || [];
+                            this.universes = app._watchlistAllCache.universes || [];
+                        } else {
+                            const res = await fetch(API_BASE + '/api/v1/watchlist/all');
+                            const data = await res.json();
+                            app._watchlistAllCache = data;
+                            this.customLists = data.watchlists || [];
+                            this.universes = data.universes || [];
+                        }
 
                         const totalBadge = document.getElementById('wlTotalBadge');
                         if (totalBadge) {
@@ -66,9 +72,6 @@
                         } catch (err) {}
 
                         this.renderCards();
-
-                        if (app.populateWatchlistDropdowns) app.populateWatchlistDropdowns();
-                        if (app.populateKronosWatchlist) app.populateKronosWatchlist();
                     } catch (e) {
                         console.error('Error loading watchlists:', e);
                         el.innerHTML = '<div class="card" style="margin:0;color:var(--red)">Error loading watchlists. Check server logs.</div>';
@@ -564,33 +567,31 @@
                 });
             },
 
-            async populateWatchlistDropdowns() {
+            _watchlistNamesCache: null,
+            _watchlistAllCache: null,
+
+            async populateWatchlistDropdowns(forceRefresh = false) {
                 try {
-                    const res = await fetch(API_BASE + '/api/v1/watchlist/all');
-                    const data = await res.json();
+                    let data = this._watchlistNamesCache;
+                    if (forceRefresh || !data) {
+                        const res = await fetch(API_BASE + '/api/v1/watchlist/names');
+                        data = await res.json();
+                        this._watchlistNamesCache = data;
+                    }
                     const lists = data.watchlists || [];
+                    const universes = data.universes || [];
 
                     // Standard Universes
-                    const standardUniverses = [
-                        { value: '', label: '🌐 All Stocks (Global)' },
-                        { value: 'NSE_ALL', label: '🇮🇳 NSE All Stocks' },
-                        { value: 'NSE_TOP', label: '🇮🇳 NSE Top 50 (Nifty 50)' },
-                        { value: 'NSE_LARGE_CAP', label: '🇮🇳 NSE Large Caps' },
-                        { value: 'US_TOP', label: '🇺🇸 US Top Stocks' },
-                        { value: 'IN', label: '🇮🇳 All Indian Stocks' },
-                        { value: 'US', label: '🇺🇸 All US Stocks' }
-                    ];
-
                     let optionsHtml = '<optgroup label="⚡ Standard Universes">';
-                    standardUniverses.forEach(u => {
-                        optionsHtml += '<option value="' + u.value + '">' + u.label + '</option>';
+                    universes.forEach(u => {
+                        optionsHtml += '<option value="' + u.name + '">' + u.title + '</option>';
                     });
                     optionsHtml += '</optgroup>';
 
                     if (lists.length) {
                         optionsHtml += '<optgroup label="⭐ Custom Watchlists">';
                         lists.forEach(w => {
-                            const count = w.tickers ? w.tickers.length : (w.count || 0);
+                            const count = w.count || 0;
                             const name = w.name;
                             optionsHtml += '<option value="' + name + '">' + (w.title || name) + ' (' + count + ')</option>';
                         });
@@ -1437,80 +1438,6 @@
                 if (!b) return value;
                 const c = this._universeCounts[value];
                 return c != null ? (b.label + ' (' + c + ')') : b.label;
-            },
-
-            WATCHLIST_DROPDOWN_IDS: ['resultsMarket', 'swingMarket', 'coverageMarket', 'indMarket', 'bdMarket', 'patternsMarket'],
-            WATCHLIST_BUILTIN_NAMES: ['ALL', 'WATCHLIST', 'IN', 'US', 'NSE_LARGE_CAP', 'NSE_ALL'],
-
-            async populateWatchlistDropdowns() {
-                try {
-                    const res = await fetch(API_BASE + '/api/v1/watchlist/all');
-                    const data = await res.json();
-                    const watchlists = data.watchlists || [];
-                    const universes = data.universes || [];
-
-                    const counts = {};
-                    universes.forEach(u => {
-                        counts[u.name] = (u.tickers && u.tickers.length) || u.count || 0;
-                    });
-                    if (counts['IN'] != null && counts['US'] != null) {
-                        counts['ALL'] = counts['IN'] + counts['US'];
-                    }
-                    this._universeCounts = counts;
-                    this._countsLoaded = true;
-
-                    const customLists = watchlists.filter(
-                        w => w && w.name && !this.WATCHLIST_BUILTIN_NAMES.includes(w.name)
-                    );
-                    this._renderWatchlistDropdowns(customLists);
-                    if (this.populateKronosWatchlist) { this.populateKronosWatchlist(); }
-                } catch (e) {
-                    console.error('Error loading watchlist dropdowns:', e);
-                }
-            },
-
-            _renderWatchlistDropdowns(lists) {
-                const tabMap = {
-                    resultsMarket: 'results', swingMarket: 'swing', coverageMarket: 'coverage',
-                    indMarket: 'industries', bdMarket: 'buydip', patternsMarket: 'patterns'
-                };
-                const smallest = lists.length
-                    ? lists.slice().sort((a, b) => ((a.tickers || 0) - (b.tickers || 0)) || a.name.localeCompare(b.name))[0]
-                    : null;
-                const fallback = {
-                    resultsMarket: (smallest ? smallest.name : 'ALL'),
-                    swingMarket: (smallest ? smallest.name : 'ALL'),
-                    coverageMarket: (smallest ? smallest.name : 'ALL'),
-                    indMarket: 'IN',
-                    bdMarket: 'IN',
-                    patternsMarket: 'IN',
-                };
-                this.WATCHLIST_DROPDOWN_IDS.forEach(id => {
-                    const sel = document.getElementById(id);
-                    if (!sel) return;
-                    sel.innerHTML = '';
-                    this._BUILTINS.forEach(b => {
-                        const opt = document.createElement('option');
-                        opt.value = b.value;
-                        opt.textContent = this._builtinLabel(b.value);
-                        sel.add(opt);
-                    });
-                    lists.forEach(w => {
-                        const opt = document.createElement('option');
-                        opt.value = w.name;
-                        opt.textContent = w.name + ' (' + (w.tickers || 0) + ')';
-                        sel.add(opt);
-                    });
-                    // Restore saved selection, else apply the per-tab default once.
-                    const key = 'selectedWatchlist_' + tabMap[id];
-                    const saved = localStorage.getItem(key);
-                    if (saved && [...sel.options].some(o => o.value === saved)) {
-                        sel.value = saved;
-                    } else if (!this['_defaultSet_' + id] && fallback[id]) {
-                        sel.value = fallback[id];
-                    }
-                    this['_defaultSet_' + id] = true;
-                });
             },
 
             onResultsPresetChange(preset) {
@@ -4584,28 +4511,8 @@
             },
 
             async populateKronosWatchlist() {
-                const select = document.getElementById('kronosWatchlist');
-                if (!select) return;
-                select.innerHTML = '<option value="">All / Global Watchlist</option>';
-                try {
-                    const res = await fetch(API_BASE + '/api/v1/watchlist/all');
-                    const data = await res.json();
-                    const lists = Array.isArray(data && data.watchlists) ? data.watchlists : [];
-                    lists.forEach(w => {
-                        const name = typeof w === 'string' ? w : (w.name || '');
-                        if (!name) return;
-                        const opt = document.createElement('option');
-                        opt.value = name;
-                        opt.textContent = name + ' (' + (typeof w === 'object' ? (w.count || 0) : '?') + ')';
-                        select.appendChild(opt);
-                    });
-                    // Restore the user's last-selected watchlist for the Kronos tab.
-                    const saved = localStorage.getItem('selectedWatchlist_kronos');
-                    if (saved && [...select.options].some(o => o.value === saved)) {
-                        select.value = saved;
-                    }
-                } catch (e) {
-                    console.error('Error loading kronos watchlist dropdown:', e);
+                if (!this._watchlistNamesCache) {
+                    await this.populateWatchlistDropdowns();
                 }
             },
             async loadWatchlistPredictions() {
