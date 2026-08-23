@@ -22,22 +22,7 @@ logger = get_logger("earnings_engine.prediction_cache")
 
 def _connect(settings: Settings | None = None) -> Any:
     s = settings or Settings()
-    s.ensure_dirs()
-    conn = get_db_connection(s)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS daily_prediction_cache (
-            cache_date TEXT NOT NULL,
-            model_type TEXT NOT NULL,
-            ticker TEXT NOT NULL,
-            payload TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            PRIMARY KEY (cache_date, model_type, ticker)
-        )
-        """
-    )
-    conn.commit()
-    return conn
+    return get_db_connection(s)
 
 
 def _normalize_ticker(ticker: str) -> str:

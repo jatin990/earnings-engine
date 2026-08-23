@@ -308,33 +308,27 @@ def upcoming_earnings(tickers: list[str], settings: Settings, days: int = 14,
             seen.add(t)
             unique_tickers.append(t)
 
-    frames: list[pd.DataFrame] = []
-    loaded_tickers = 0
-    for ticker in unique_tickers:
-        with _connect(settings) as connection:
-            if source is None:
-                rows = connection.execute(
-                    "SELECT earnings_date, source FROM earnings_history WHERE ticker = ? AND earnings_date >= ? AND earnings_date <= ? ORDER BY earnings_date",
-                    (ticker, start_str, end_str),
-                ).fetchall()
-            else:
-                rows = connection.execute(
-                    "SELECT earnings_date, source FROM earnings_history WHERE ticker = ? AND source = ? AND earnings_date >= ? AND earnings_date <= ? ORDER BY earnings_date",
-                    (ticker, source, start_str, end_str),
-                ).fetchall()
-        if not rows:
-            continue
-        loaded_tickers += 1
-        frame = pd.DataFrame(rows, columns=["earnings_date", "source"])
-        frame["earnings_date"] = pd.to_datetime(frame["earnings_date"])
-        frame["ticker"] = ticker
-        frames.append(frame[["ticker", "earnings_date", "source"]])
-
-    logger.info("loaded cached earnings for %s/%s tickers (source=%s)", loaded_tickers, len(unique_tickers), source)
-    if not frames:
+    if not unique_tickers:
         return pd.DataFrame(columns=["ticker", "earnings_date", "source"])
-    result = pd.concat(frames, ignore_index=True)
-    return result.sort_values("earnings_date").reset_index(drop=True)
+
+    placeholders = ", ".join(["?"] * len(unique_tickers))
+    with _connect(settings) as connection:
+        if source is None:
+            sql = f"SELECT ticker, earnings_date, source FROM earnings_history WHERE ticker IN ({placeholders}) AND earnings_date >= ? AND earnings_date <= ? ORDER BY earnings_date"
+            params = unique_tickers + [start_str, end_str]
+        else:
+            sql = f"SELECT ticker, earnings_date, source FROM earnings_history WHERE ticker IN ({placeholders}) AND source = ? AND earnings_date >= ? AND earnings_date <= ? ORDER BY earnings_date"
+            params = unique_tickers + [source, start_str, end_str]
+        rows = connection.execute(sql, params).fetchall()
+
+    if not rows:
+        return pd.DataFrame(columns=["ticker", "earnings_date", "source"])
+
+    df = pd.DataFrame(rows, columns=["ticker", "earnings_date", "source"])
+    df["earnings_date"] = pd.to_datetime(df["earnings_date"])
+    loaded_tickers = df["ticker"].nunique()
+    logger.info("loaded cached earnings for %s/%s tickers (source=%s)", loaded_tickers, len(unique_tickers), source)
+    return df.sort_values("earnings_date").reset_index(drop=True)
 
 
 def _fetch_earnings_for_ticker(args: tuple[str, Settings, bool]) -> tuple[str, int]:

@@ -13,6 +13,7 @@ import logging
 import os
 import sqlite3
 import shutil
+import threading
 from pathlib import Path
 from typing import Any, Iterator, Sequence
 
@@ -27,8 +28,23 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 logger = logging.getLogger("earnings_engine.data.db")
 
-_SESSION: requests.Session | None = None
+_THREAD_LOCAL = threading.local()
 DB_FILENAME = os.getenv("EARNINGS_ENGINE_DB_NAME", "money_club.sqlite3")
+
+
+def _get_thread_session() -> requests.Session:
+    """Return a thread-local requests.Session with Keep-Alive connection pooling."""
+    if not hasattr(_THREAD_LOCAL, "session") or _THREAD_LOCAL.session is None:
+        s = requests.Session()
+        adapter = HTTPAdapter(
+            pool_connections=25,
+            pool_maxsize=25,
+            max_retries=Retry(total=2, backoff_factor=0.1, status_forcelist=[429, 500, 502, 503, 504]),
+        )
+        s.mount("https://", adapter)
+        s.mount("http://", adapter)
+        _THREAD_LOCAL.session = s
+    return _THREAD_LOCAL.session
 
 
 def _cache_path(settings: Settings) -> Path:
@@ -86,37 +102,62 @@ def _deserialize_cell(cell: dict[str, Any]) -> Any:
     return val
 
 
+class TursoRow(tuple):
+    """Row object supporting both index-based and column-name lookups like sqlite3.Row."""
+
+    def __new__(cls, values: Sequence[Any], columns: Sequence[str] | None = None) -> TursoRow:
+        obj = super().__new__(cls, values)
+        obj._columns = tuple(columns or [])
+        obj._col_map = {name: idx for idx, name in enumerate(obj._columns)}
+        return obj
+
+    def __getitem__(self, key: Any) -> Any:
+        if isinstance(key, str):
+            if key in self._col_map:
+                return super().__getitem__(self._col_map[key])
+            raise IndexError(f"No column named '{key}'")
+        return super().__getitem__(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if key in self._col_map:
+            return super().__getitem__(self._col_map[key])
+        return default
+
+    def keys(self) -> Sequence[str]:
+        return self._columns
+
+
 class TursoCursor:
     """Cursor-like wrapper for Turso HTTP execution results."""
 
-    def __init__(self, rows: list[tuple[Any, ...]], description: tuple[Any, ...] | None = None, rowcount: int = -1, lastrowid: int | None = None) -> None:
+    def __init__(self, rows: list[Any], description: tuple[Any, ...] | None = None, rowcount: int = -1, lastrowid: int | None = None) -> None:
         self._rows = rows
         self._pos = 0
         self.description = description
         self.rowcount = rowcount
         self.lastrowid = lastrowid
 
-    def fetchone(self) -> tuple[Any, ...] | None:
+    def fetchone(self) -> Any | None:
         if self._pos < len(self._rows):
             row = self._rows[self._pos]
             self._pos += 1
             return row
         return None
 
-    def fetchall(self) -> list[tuple[Any, ...]]:
+    def fetchall(self) -> list[Any]:
         remaining = self._rows[self._pos :]
         self._pos = len(self._rows)
         return remaining
 
-    def fetchmany(self, size: int = 1) -> list[tuple[Any, ...]]:
+    def fetchmany(self, size: int = 1) -> list[Any]:
         end = min(self._pos + size, len(self._rows))
         chunk = self._rows[self._pos : end]
         self._pos = end
         return chunk
 
-    def __iter__(self) -> Iterator[tuple[Any, ...]]:
+    def __iter__(self) -> Iterator[Any]:
         while self._pos < len(self._rows):
-            yield self.fetchone()  # type: ignore
+            yield self.fetchone()
 
     def __enter__(self) -> TursoCursor:
         return self
@@ -140,7 +181,8 @@ class TursoConnection:
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
-        self.session = requests.Session()
+        self.session = _get_thread_session()
+        self.row_factory: Any = None
 
     def execute(self, sql: str, parameters: Sequence[Any] | None = None) -> TursoCursor:
         """Execute a single SQL statement on Turso."""
@@ -177,14 +219,16 @@ class TursoConnection:
 
         stmt_res = res.get("response", {}).get("result", {})
         cols = stmt_res.get("cols", [])
+        col_names = [c.get("name", "") for c in cols]
         raw_rows = stmt_res.get("rows", [])
         rowcount = stmt_res.get("affected_row_count", len(raw_rows))
         lastrowid = stmt_res.get("last_insert_rowid")
 
         desc = tuple((c.get("name"), None, None, None, None, None, None) for c in cols) if cols else None
-        parsed_rows: list[tuple[Any, ...]] = []
+        parsed_rows: list[Any] = []
         for r in raw_rows:
-            parsed_rows.append(tuple(_deserialize_cell(cell) for cell in r))
+            vals = tuple(_deserialize_cell(cell) for cell in r)
+            parsed_rows.append(TursoRow(vals, col_names))
 
         return TursoCursor(parsed_rows, description=desc, rowcount=rowcount, lastrowid=lastrowid)
 

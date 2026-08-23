@@ -9,7 +9,7 @@ from earnings_engine.config import Settings
 from earnings_engine.data import prices as prices_mod
 from earnings_engine.data.earnings import load_earnings
 from earnings_engine.data.prices import fetch_prices, load_price_metrics, load_prices, store_price_metrics
-from earnings_engine.data.universe import is_market_cap_fresh, load_market_cap, store_market_cap
+from earnings_engine.data.universe import is_market_cap_fresh, load_market_cap, load_all_market_caps, store_market_cap
 from earnings_engine.data.swing_ranges import get_swing_range, record_auto_range
 from earnings_engine.logging_utils import get_logger
 
@@ -260,11 +260,72 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
         return df.copy()
 
     settings = settings or Settings()
+    tickers = df["ticker"].dropna().unique().tolist()
+    if not tickers:
+        return df.copy()
+
+    # Pre-fetch cached market caps, names, metrics, earnings, and prices in bulk
+    all_market_caps = load_all_market_caps(settings) if not force else {}
+    names_map: dict[str, str] = {}
+    metrics_map: dict[str, dict[str, Any]] = {}
+    earnings_map: dict[str, pd.DataFrame] = {}
+    prices_map: dict[str, pd.DataFrame] = {}
+
+    try:
+        from earnings_engine.data.db import get_db_connection
+        from collections import defaultdict
+        conn = get_db_connection(settings)
+        placeholders = ", ".join(["?"] * len(tickers))
+        
+        # 1. Names
+        name_rows = conn.execute(f"SELECT ticker, name FROM ticker_names WHERE ticker IN ({placeholders})", tickers).fetchall()
+        names_map = {r[0]: r[1] for r in name_rows}
+        
+        # 2. Metrics
+        if not force:
+            m_rows = conn.execute(f"SELECT ticker, metrics FROM ticker_metrics WHERE ticker IN ({placeholders})", tickers).fetchall()
+            import json
+            for r in m_rows:
+                try:
+                    metrics_map[r[0]] = json.loads(r[1]) if isinstance(r[1], str) else r[1]
+                except Exception:
+                    pass
+                    
+        # 3. Earnings History (last 2 years)
+        cutoff_e_date = (pd.Timestamp.now() - pd.Timedelta(days=730)).strftime("%Y-%m-%d")
+        e_rows = conn.execute(
+            f"SELECT ticker, earnings_date, eps_estimate, eps_reported, surprise_pct FROM earnings_history WHERE ticker IN ({placeholders}) AND earnings_date >= ? ORDER BY ticker, earnings_date",
+            tickers + [cutoff_e_date],
+        ).fetchall()
+        e_by_ticker = defaultdict(list)
+        for r in e_rows:
+            e_by_ticker[r[0]].append((r[1], r[2], r[3], r[4]))
+        for t, r_list in e_by_ticker.items():
+            f = pd.DataFrame(r_list, columns=["earnings_date", "eps_estimate", "eps_reported", "surprise_pct"])
+            f["earnings_date"] = pd.to_datetime(f["earnings_date"])
+            earnings_map[t] = f
+
+        # 4. Price History (last ~450 days)
+        cutoff_p_date = (pd.Timestamp.now() - pd.Timedelta(days=450)).strftime("%Y-%m-%d")
+        p_rows = conn.execute(
+            f"SELECT ticker, date, open, high, low, close, volume FROM price_history WHERE ticker IN ({placeholders}) AND date >= ? ORDER BY ticker, date",
+            tickers + [cutoff_p_date],
+        ).fetchall()
+        p_by_ticker = defaultdict(list)
+        for r in p_rows:
+            p_by_ticker[r[0]].append((r[1], r[2], r[3], r[4], r[5], r[6]))
+        for t, r_list in p_by_ticker.items():
+            f = pd.DataFrame(r_list, columns=["date", "open", "high", "low", "close", "volume"]).set_index("date")
+            f.index = pd.to_datetime(f.index)
+            prices_map[t] = f
+    except Exception:
+        pass
+
     rows: list[dict] = []
-    for ticker in df["ticker"].dropna().unique():
+    for ticker in tickers:
         try:
-            company_name = None
-            market_cap = None
+            company_name = names_map.get(ticker) or ticker.replace(".NS", "")
+            market_cap = all_market_caps.get(ticker)
             current_price = None
             week_high = None
             week_low = None
@@ -304,18 +365,7 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             eps_reported = None
             surprise_pct = None
 
-            # Check SQLite market cap cache first
-            if not force and is_market_cap_fresh(ticker, settings):
-                market_cap = load_market_cap(ticker, settings)
-            else:
-                market_cap = None
-
-            # Check SQLite price-metrics cache first (stored by store_price_metrics
-            # on the previous run).  Only hit yfinance when the cache is missing.
-            # The ticker_metrics table is keyed by (ticker, as_of_date), so a
-            # fresh row for today means these fields were already computed today
-            # and are reused (once-per-day refresh).
-            cached_metrics = None if force else load_price_metrics(ticker, settings)
+            cached_metrics = metrics_map.get(ticker)
             if cached_metrics is not None:
                 current_price = cached_metrics.get("current_price")
                 week_high = cached_metrics.get("week_high")
@@ -328,38 +378,17 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 earnings_week_move_pct = cached_metrics.get("earnings_week_move_pct")
                 if market_cap is None:
                     market_cap = cached_metrics.get("market_cap")
-            else:
-                current_price = None
-                week_high = None
-                week_low = None
-                week_change = None
-                pct_from_52w_high = None
-                pct_from_52w_low = None
-                thirty_day_return_pct = None
-                seven_day_return_pct = None
-                earnings_week_move_pct = None
 
-            # Fetch company name from SQLite cache or fallback
-            if company_name is None:
-                try:
-                    from earnings_engine.data.names import get_name
-                    company_name = get_name(ticker, settings)
-                except Exception:
-                    company_name = None
-                if not company_name:
-                    company_name = ticker.replace(".NS", "")
-
-            # Load prices from SQLite cache first
-            if load_prices is not _ORIGINAL_LOAD_PRICES:
-                prices = load_prices(ticker, settings)
-                if prices.empty:
-                    prices = fetch_prices(ticker, settings, force=False)
-            else:
-                prices = load_prices(ticker, settings)
-                if prices.empty:
-                    prices = fetch_prices(ticker, settings, force=False)
-            if prices.empty:
-                prices = pd.DataFrame(columns=["close"])
+            # Load prices from preloaded cache
+            prices = prices_map.get(ticker)
+            if prices is None or prices.empty:
+                if force:
+                    try:
+                        prices = fetch_prices(ticker, settings, force=True)
+                    except Exception:
+                        prices = pd.DataFrame(columns=["close"])
+                else:
+                    prices = pd.DataFrame(columns=["close"])
 
             # Compute current price and 52W high/low from prices cache if missing
             if not prices.empty and "close" in prices.columns:
@@ -376,8 +405,8 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                         if prev_c > 0:
                             week_change = ((current_price - prev_c) / prev_c) * 100
 
-            # Only query fast_info if market cap or current price is still missing
-            if market_cap is None or current_price is None:
+            # Only query fast_info over network when force=True
+            if force and (market_cap is None or current_price is None):
                 try:
                     info = yf.Ticker(ticker).fast_info or {}
                     if market_cap is None:
@@ -391,8 +420,8 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 except Exception:
                     pass
 
-            # Store market cap in SQLite cache if we got it
-            if market_cap is not None:
+            # Store market cap in cache only when force-fetching
+            if market_cap is not None and force:
                 store_market_cap(ticker, market_cap, settings)
             if not prices.empty and "close" in prices.columns:
                 closes = pd.to_numeric(prices["close"], errors="coerce").dropna()
@@ -436,19 +465,10 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
 
                     # Auto-detect swing range
                     auto_rng = detect_swing_range(closes)
-                    # Note: 'market' context here is generic, but the plan says
-                    # ranges are per-watchlist. In the Results tab we use 'ALL'.
-                    record_auto_range(
-                        "ALL", ticker,
-                        auto_rng["lower"], auto_rng["upper"],
-                        cycles=auto_rng["cycles"],
-                        avg_days=auto_rng["avg_days"],
-                        cycles_data=auto_rng["cycles_data"],
-                        settings=settings
-                    )
 
-
-            earnings = load_earnings(ticker, settings)
+            earnings = earnings_map.get(ticker)
+            if earnings is None:
+                earnings = pd.DataFrame(columns=["earnings_date", "eps_estimate", "eps_reported", "surprise_pct"])
 
             # Last 3 quarters earnings scores + week high/low (per-quarter)
             last_quarter_score = None

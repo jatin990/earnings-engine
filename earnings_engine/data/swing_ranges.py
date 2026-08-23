@@ -132,14 +132,18 @@ def record_auto_range(
     settings = settings or Settings()
     now = datetime.now().isoformat(timespec="seconds")
     with _connect(settings) as conn:
-        # Check if a user override exists
+        # Check if a user override or existing record exists
         existing = conn.execute(
-            "SELECT source FROM swing_ranges WHERE watchlist = ? AND ticker = ?",
+            "SELECT source, lower_bound, upper_bound FROM swing_ranges WHERE watchlist = ? AND ticker = ?",
             (watchlist, ticker),
         ).fetchone()
 
-        if existing and existing[0] == "user":
-            return  # Don't overwrite user settings
+        if existing:
+            if existing[0] == "user":
+                return  # Don't overwrite user settings
+            # If auto-range values haven't changed, skip redundant write
+            if existing[1] == lower and existing[2] == upper:
+                return
 
         conn.execute(
             """
@@ -155,24 +159,27 @@ def record_auto_range(
                 "DELETE FROM swing_cycle_history WHERE watchlist = ? AND ticker = ?",
                 (watchlist, ticker),
             )
-            for i, c in enumerate(cycles_data):
-                conn.execute(
-                    """
-                    INSERT INTO swing_cycle_history 
-                    (watchlist, ticker, cycle_idx, cycle_start, cycle_end, duration_days, lower_bound, upper_bound)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        watchlist,
-                        ticker,
-                        i,
-                        c["start"],
-                        c["end"],
-                        c["duration"],
-                        c.get("lower", lower),
-                        c.get("upper", upper),
-                    ),
+            cycle_rows = [
+                (
+                    watchlist,
+                    ticker,
+                    i,
+                    c["start"],
+                    c["end"],
+                    c["duration"],
+                    c.get("lower", lower),
+                    c.get("upper", upper),
                 )
+                for i, c in enumerate(cycles_data)
+            ]
+            conn.executemany(
+                """
+                INSERT INTO swing_cycle_history 
+                (watchlist, ticker, cycle_idx, cycle_start, cycle_end, duration_days, lower_bound, upper_bound)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                cycle_rows,
+            )
         conn.commit()
 
 

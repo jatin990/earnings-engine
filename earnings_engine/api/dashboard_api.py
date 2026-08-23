@@ -163,9 +163,9 @@ def get_upcoming_results(
     # never trains/runs the model).  The cache is populated by
     # `cache-predictions` / `predict` / `upcoming-results`.
     try:
-        from earnings_engine.prediction_cache import load_prediction_cache
-        cached = load_prediction_cache(ticker_list)
-        gbm_map = cached["gbm"] if cached is not None else {}
+        from earnings_engine.prediction_cache import load_prediction_cache_partial
+        cached = load_prediction_cache_partial(ticker_list)
+        gbm_map = cached.get("gbm", {})
     except Exception:
         gbm_map = {}
 

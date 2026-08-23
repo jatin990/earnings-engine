@@ -90,12 +90,25 @@ _READ_COLUMNS = (
 )
 
 
-def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-    """Convert a SQLite row into a friendly dict (JSON blob expanded)."""
+def _row_to_dict(row: Any) -> dict[str, Any]:
+    """Convert a row (TursoRow, sqlite3.Row, dict, or tuple) into a friendly dict."""
     result: dict[str, Any] = {}
+    if isinstance(row, (tuple, list)) and not hasattr(row, "_col_map"):
+        row_dict = {col: val for col, val in zip(_READ_COLUMNS, row)}
+    else:
+        row_dict = row  # TursoRow, sqlite3.Row, or dict
+
     for col in _READ_COLUMNS:
-        result[col] = row[col] if col != "prediction_json" else None
-    result["prediction"] = json.loads(row["prediction_json"]) if row["prediction_json"] else {}
+        try:
+            result[col] = row_dict[col] if col != "prediction_json" else None
+        except Exception:
+            result[col] = None
+
+    try:
+        pj = row_dict["prediction_json"]
+        result["prediction"] = json.loads(pj) if isinstance(pj, str) and pj else (pj if isinstance(pj, dict) else {})
+    except Exception:
+        result["prediction"] = {}
     return result
 
 
