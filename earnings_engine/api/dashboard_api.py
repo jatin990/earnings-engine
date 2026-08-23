@@ -336,21 +336,25 @@ def get_event_dataset_summary() -> dict[str, Any]:
 
     try:
         conn = get_db_connection(Settings())
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*), COUNT(DISTINCT ticker), AVG(label) FROM event_dataset")
-        rows, tickers, up_rate = cur.fetchone()
-        cur.execute("SELECT MIN(earnings_date), MAX(earnings_date) FROM event_dataset")
-        min_d, max_d = cur.fetchone()
+        r1 = conn.execute("SELECT COUNT(*), COUNT(DISTINCT ticker), AVG(label) FROM event_dataset").fetchone()
+        rows, tickers, up_rate = r1 if r1 else (0, 0, None)
+        r2 = conn.execute("SELECT MIN(earnings_date), MAX(earnings_date) FROM event_dataset").fetchone()
+        min_d, max_d = r2 if r2 else (None, None)
         conn.close()
+
+        if rows == 0:
+            return {"available": False, "rows": 0}
+
         return {
             "available": True,
-            "rows": rows,
-            "tickers": tickers,
+            "rows": int(rows),
+            "tickers": int(tickers),
             "up_label_rate": round(float(up_rate), 4) if up_rate is not None else None,
             "date_range": {"min": min_d, "max": max_d},
             "source": "database",
         }
     except Exception as exc:
+        logger.warning("get_event_dataset_summary error: %s", exc)
         return {"available": False, "rows": 0, "error": str(exc)}
 
 

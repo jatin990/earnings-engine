@@ -296,15 +296,54 @@ class TursoConnection:
         pass
 
     def close(self) -> None:
+        """No-op for HTTP stateless connection."""
         pass
 
-    def cursor(self) -> TursoConnection:
-        return self
+    def cursor(self) -> TursoConnectionCursor:
+        return TursoConnectionCursor(self)
 
     def __enter__(self) -> TursoConnection:
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        pass
+
+
+class TursoConnectionCursor:
+    """Cursor that delegates execution to TursoConnection and stores the resulting TursoCursor."""
+
+    def __init__(self, connection: TursoConnection) -> None:
+        self._conn = connection
+        self._cursor: TursoCursor | None = None
+
+    def execute(self, sql: str, parameters: Sequence[Any] | None = None) -> TursoConnectionCursor:
+        self._cursor = self._conn.execute(sql, parameters)
+        return self
+
+    def executemany(self, sql: str, seq_of_parameters: Sequence[Sequence[Any]]) -> TursoConnectionCursor:
+        self._cursor = self._conn.executemany(sql, seq_of_parameters)
+        return self
+
+    def fetchone(self) -> Any | None:
+        if self._cursor is not None:
+            return self._cursor.fetchone()
+        return None
+
+    def fetchall(self) -> list[Any]:
+        if self._cursor is not None:
+            return self._cursor.fetchall()
+        return []
+
+    def fetchmany(self, size: int = 1) -> list[Any]:
+        if self._cursor is not None:
+            return self._cursor.fetchmany(size)
+        return []
+
+    def __iter__(self) -> Iterator[Any]:
+        if self._cursor is not None:
+            yield from self._cursor
+
+    def close(self) -> None:
         pass
 
 
