@@ -1,26 +1,26 @@
 <!-- ========================================================================= -->
 <!-- ⚙️ DASHBOARD CONTROL CENTER & CUSTOMIZER MODAL -->
 <!-- ========================================================================= -->
-<div id="controlCenterModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.82); z-index: 999999; backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 1.5rem;">
-    <div style="background: #0b1120; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 1rem; width: 100%; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9); overflow: hidden; color: var(--light);">
+<div id="controlCenterModal" style="display: none; position: fixed; inset: 0; background: rgba(5, 3, 10, 0.88); z-index: 999999; backdrop-filter: blur(12px); align-items: center; justify-content: center; padding: 1.5rem;">
+    <div style="background: #0c0717; border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 1.25rem; width: 100%; max-width: 920px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.95), 0 0 50px rgba(147, 51, 234, 0.25); overflow: hidden; color: var(--light);">
         
         <!-- Modal Header -->
-        <div style="padding: 1.25rem 1.5rem; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; justify-content: space-between; align-items: center;">
+        <div style="padding: 1.25rem 1.75rem; background: rgba(18, 10, 32, 0.85); border-bottom: 1px solid rgba(168, 85, 247, 0.2); display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <span style="font-size: 1.5rem;">⚙️</span>
                 <div>
-                    <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700; background: linear-gradient(to right, #60a5fa, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Dashboard Control Center</h2>
+                    <h2 style="margin: 0; font-size: 1.25rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; background: linear-gradient(to right, #c084fc, #a855f7, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Dashboard Control Center</h2>
                     <p style="margin: 0.15rem 0 0 0; font-size: 0.8rem; color: var(--muted);">Customize dashboard tabs, color themes, and environment configuration</p>
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <span id="ccEnvBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.25rem 0.65rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">🟢 Local Mode</span>
-                <button onclick="app.closeCustomizerModal()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: var(--light); width: 32px; height: 32px; border-radius: 0.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: all 0.2s;">✕</button>
+                <span id="ccEnvBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); padding: 0.25rem 0.65rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);">🟢 Local Mode</span>
+                <button onclick="app.closeCustomizerModal()" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #d8b4fe; width: 32px; height: 32px; border-radius: 0.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: all 0.2s;">✕</button>
             </div>
         </div>
 
         <!-- Modal Sub-Navigation Bar -->
-        <div style="display: flex; gap: 0.5rem; padding: 0.75rem 1.5rem; background: rgba(0, 0, 0, 0.3); border-bottom: 1px solid rgba(255, 255, 255, 0.08); flex-wrap: wrap;">
+        <div style="display: flex; gap: 0.5rem; padding: 0.75rem 1.75rem; background: rgba(12, 7, 23, 0.75); border-bottom: 1px solid rgba(168, 85, 247, 0.15); flex-wrap: wrap;">
             <button id="ccNavTabs" onclick="app.switchCustomizerTab('tabs')" class="tab-btn active" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🗂️ Visible Tabs</button>
             <button id="ccNavThemes" onclick="app.switchCustomizerTab('themes')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🎨 Themes & Colors</button>
             <button id="ccNavEnv" onclick="app.switchCustomizerTab('env')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🔑 Environment Variables</button>
@@ -32,18 +32,18 @@
         </div>
 
         <!-- Modal Scrollable Content -->
-        <div style="padding: 1.5rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 1.25rem;">
+        <div style="padding: 1.5rem 1.75rem; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 1.25rem;">
             
             <!-- ================= SUB-TAB 1: TAB VISIBILITY ================= -->
             <div id="ccSectionTabs" style="display: block;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Dashboard Tab Manager</h3>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">Dashboard Tab Manager</h3>
                         <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--muted);">Turn tabs on or off to declutter your workspace. Changes apply instantly.</p>
                     </div>
                     <div style="display: flex; gap: 0.5rem;">
-                        <button onclick="app.setAllTabsVisibility(true)" class="btn btn-sm" style="background: rgba(255,255,255,0.08); color: var(--light);">Show All</button>
-                        <button onclick="app.setAllTabsVisibility(false)" class="btn btn-sm" style="background: rgba(255,255,255,0.08); color: var(--light);">Hide All</button>
+                        <button onclick="app.setAllTabsVisibility(true)" class="btn btn-sm" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #e9d5ff; font-weight: 700;">Show All</button>
+                        <button onclick="app.setAllTabsVisibility(false)" class="btn btn-sm" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #e9d5ff; font-weight: 700;">Hide All</button>
                     </div>
                 </div>
 
@@ -55,35 +55,35 @@
             <!-- ================= SUB-TAB 2: THEMES & COLORS ================= -->
             <div id="ccSectionThemes" style="display: none;">
                 <div style="margin-bottom: 1.25rem;">
-                    <h3 style="margin: 0 0 0.4rem 0; font-size: 1.05rem; font-weight: 700;">Preset Themes</h3>
+                    <h3 style="margin: 0 0 0.4rem 0; font-size: 1.05rem; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">Preset Themes</h3>
                     <p style="margin: 0 0 1rem 0; font-size: 0.82rem; color: var(--muted);">Select a curated color palette or customize individual tokens below.</p>
                     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.75rem;">
-                        <div onclick="app.applyPresetTheme('obsidian')" class="theme-card" style="background: #0f172a; border: 2px solid #3b82f6; border-radius: 0.6rem; padding: 0.75rem; cursor: pointer; text-align: center; transition: all 0.2s;">
-                            <div style="display: flex; gap: 0.3rem; justify-content: center; margin-bottom: 0.5rem;">
-                                <div style="width: 14px; height: 14px; border-radius: 50%; background: #0f172a; border: 1px solid #fff;"></div>
-                                <div style="width: 14px; height: 14px; border-radius: 50%; background: #3b82f6;"></div>
-                                <div style="width: 14px; height: 14px; border-radius: 50%; background: #10b981;"></div>
+                        <div onclick="app.applyPresetTheme('obsidian')" class="theme-card" style="background: #05030a; border: 2px solid #a855f7; border-radius: 0.75rem; padding: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s; box-shadow: 0 0 16px rgba(168, 85, 247, 0.25);">
+                            <div style="display: flex; gap: 0.35rem; justify-content: center; margin-bottom: 0.5rem;">
+                                <div style="width: 14px; height: 14px; border-radius: 50%; background: #05030a; border: 1px solid #a855f7;"></div>
+                                <div style="width: 14px; height: 14px; border-radius: 50%; background: #9333ea;"></div>
+                                <div style="width: 14px; height: 14px; border-radius: 50%; background: #38bdf8;"></div>
                             </div>
-                            <strong style="font-size: 0.85rem;">🌌 Obsidian (Default)</strong>
+                            <strong style="font-size: 0.85rem; color: #f3e8ff;">🌌 Obsidian Velvet (Default)</strong>
                         </div>
-                        <div onclick="app.applyPresetTheme('sapphire')" class="theme-card" style="background: #030712; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.6rem; padding: 0.75rem; cursor: pointer; text-align: center; transition: all 0.2s;">
-                            <div style="display: flex; gap: 0.3rem; justify-content: center; margin-bottom: 0.5rem;">
+                        <div onclick="app.applyPresetTheme('sapphire')" class="theme-card" style="background: #030712; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.75rem; padding: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s;">
+                            <div style="display: flex; gap: 0.35rem; justify-content: center; margin-bottom: 0.5rem;">
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #030712; border: 1px solid #fff;"></div>
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #06b6d4;"></div>
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #3b82f6;"></div>
                             </div>
                             <strong style="font-size: 0.85rem;">💎 Sapphire Midnight</strong>
                         </div>
-                        <div onclick="app.applyPresetTheme('cyberpunk')" class="theme-card" style="background: #18181b; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.6rem; padding: 0.75rem; cursor: pointer; text-align: center; transition: all 0.2s;">
-                            <div style="display: flex; gap: 0.3rem; justify-content: center; margin-bottom: 0.5rem;">
+                        <div onclick="app.applyPresetTheme('cyberpunk')" class="theme-card" style="background: #18181b; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.75rem; padding: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s;">
+                            <div style="display: flex; gap: 0.35rem; justify-content: center; margin-bottom: 0.5rem;">
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #18181b; border: 1px solid #fff;"></div>
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #10b981;"></div>
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #ec4899;"></div>
                             </div>
                             <strong style="font-size: 0.85rem;">⚡ Cyber Emerald</strong>
                         </div>
-                        <div onclick="app.applyPresetTheme('amethyst')" class="theme-card" style="background: #1e102d; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.6rem; padding: 0.75rem; cursor: pointer; text-align: center; transition: all 0.2s;">
-                            <div style="display: flex; gap: 0.3rem; justify-content: center; margin-bottom: 0.5rem;">
+                        <div onclick="app.applyPresetTheme('amethyst')" class="theme-card" style="background: #1e102d; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.75rem; padding: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s;">
+                            <div style="display: flex; gap: 0.35rem; justify-content: center; margin-bottom: 0.5rem;">
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #1e102d; border: 1px solid #fff;"></div>
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #a855f7;"></div>
                                 <div style="width: 14px; height: 14px; border-radius: 50%; background: #f43f5e;"></div>
@@ -93,31 +93,31 @@
                     </div>
                 </div>
 
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.75rem; padding: 1.25rem;">
+                <div style="background: rgba(18, 10, 32, 0.6); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 0.85rem; padding: 1.25rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Custom Design Tokens</h4>
-                        <button onclick="app.resetDefaultColors()" class="btn btn-sm" style="background: rgba(255,255,255,0.08); color: var(--light);">↺ Reset Defaults</button>
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">Custom Design Tokens</h4>
+                        <button onclick="app.resetDefaultColors()" class="btn btn-sm" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #e9d5ff; font-weight: 700;">↺ Reset Defaults</button>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
                         <div>
                             <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Primary Background</label>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="color" id="pickerBg" oninput="app.onCustomColorInput('--bg', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 0.4rem; cursor: pointer; background: transparent;">
-                                <span id="valBg" style="font-family: monospace; font-size: 0.85rem;">#0f172a</span>
+                                <span id="valBg" style="font-family: monospace; font-size: 0.85rem;">#05030a</span>
                             </div>
                         </div>
                         <div>
                             <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Card / Surface</label>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="color" id="pickerCard" oninput="app.onCustomColorInput('--card', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 0.4rem; cursor: pointer; background: transparent;">
-                                <span id="valCard" style="font-family: monospace; font-size: 0.85rem;">#1e293b</span>
+                                <span id="valCard" style="font-family: monospace; font-size: 0.85rem;">#120a20</span>
                             </div>
                         </div>
                         <div>
                             <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Brand / Accent Color</label>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="color" id="pickerAccent" oninput="app.onCustomColorInput('--accent', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 0.4rem; cursor: pointer; background: transparent;">
-                                <span id="valAccent" style="font-family: monospace; font-size: 0.85rem;">#3b82f6</span>
+                                <span id="valAccent" style="font-family: monospace; font-size: 0.85rem;">#9333ea</span>
                             </div>
                         </div>
                         <div>

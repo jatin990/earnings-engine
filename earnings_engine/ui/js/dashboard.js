@@ -7017,13 +7017,13 @@
 
         const THEME_PRESETS = {
             obsidian: {
-                '--bg': '#0f172a',
-                '--card': 'rgba(30,41,59,0.7)',
-                '--accent': '#3b82f6',
+                '--bg': '#05030a',
+                '--card': 'rgba(18,10,32,0.78)',
+                '--accent': '#9333ea',
                 '--green': '#10b981',
                 '--red': '#ef4444',
                 '--light': '#f8fafc',
-                '--muted': '#94a3b8'
+                '--muted': '#a78bfa'
             },
             sapphire: {
                 '--bg': '#030712',

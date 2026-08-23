@@ -2,33 +2,33 @@
         <div id="tab-consensus" class="tab-content">
             <!-- Top Summary KPI Cards -->
             <div id="consensusKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
-                <div class="card" style="padding: 0.75rem; text-align: center; margin: 0;">
-                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block;">Total Predictions</span>
-                    <strong id="consensusStatTotal" style="font-size: 1.35rem; color: var(--light);">0</strong>
+                <div class="card" style="padding: 0.85rem; text-align: center; margin: 0; background: rgba(18,10,32,0.7); border: 1px solid rgba(168,85,247,0.18);">
+                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block; letter-spacing: 0.04em;">Total Predictions</span>
+                    <strong id="consensusStatTotal" style="font-size: 1.4rem; color: var(--light); font-family: 'JetBrains Mono', monospace;">0</strong>
                 </div>
-                <div class="card" style="padding: 0.75rem; text-align: center; margin: 0;">
-                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block;">🏆 Win Rate (Settled)</span>
-                    <strong id="consensusStatWinRate" style="font-size: 1.35rem; color: #10b981;">0.0%</strong>
+                <div class="card" style="padding: 0.85rem; text-align: center; margin: 0; background: rgba(18,10,32,0.7); border: 1px solid rgba(168,85,247,0.18);">
+                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block; letter-spacing: 0.04em;">🏆 Win Rate (Settled)</span>
+                    <strong id="consensusStatWinRate" style="font-size: 1.4rem; color: #10b981; font-family: 'JetBrains Mono', monospace;">0.0%</strong>
                 </div>
-                <div class="card" style="padding: 0.75rem; text-align: center; margin: 0;">
-                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block;">🎯 Directional Accuracy</span>
-                    <strong id="consensusStatDirAcc" style="font-size: 1.35rem; color: #38bdf8;">0.0%</strong>
+                <div class="card" style="padding: 0.85rem; text-align: center; margin: 0; background: rgba(18,10,32,0.7); border: 1px solid rgba(168,85,247,0.18);">
+                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block; letter-spacing: 0.04em;">🎯 Directional Accuracy</span>
+                    <strong id="consensusStatDirAcc" style="font-size: 1.4rem; color: #38bdf8; font-family: 'JetBrains Mono', monospace;">0.0%</strong>
                 </div>
-                <div class="card" style="padding: 0.75rem; text-align: center; margin: 0;">
-                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block;">⏳ Pending Settlement</span>
-                    <strong id="consensusStatPending" style="font-size: 1.35rem; color: #fbbf24;">0</strong>
+                <div class="card" style="padding: 0.85rem; text-align: center; margin: 0; background: rgba(18,10,32,0.7); border: 1px solid rgba(168,85,247,0.18);">
+                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block; letter-spacing: 0.04em;">⏳ Pending Settlement</span>
+                    <strong id="consensusStatPending" style="font-size: 1.4rem; color: #fbbf24; font-family: 'JetBrains Mono', monospace;">0</strong>
                 </div>
-                <div class="card" style="padding: 0.75rem; text-align: center; margin: 0;">
-                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block;">⚠️ Top Failure Cause</span>
-                    <strong id="consensusStatTopFail" style="font-size: 0.95rem; color: #f87171; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;">—</strong>
+                <div class="card" style="padding: 0.85rem; text-align: center; margin: 0; background: rgba(18,10,32,0.7); border: 1px solid rgba(168,85,247,0.18);">
+                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block; letter-spacing: 0.04em;">⚠️ Top Failure Cause</span>
+                    <strong id="consensusStatTopFail" style="font-size: 0.95rem; color: #f87171; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-family: 'JetBrains Mono', monospace;">—</strong>
                 </div>
             </div>
 
             <!-- Action & Predict Section -->
-            <section class="card" style="margin-bottom: 1rem; padding: 1rem;">
+            <section class="card" style="margin-bottom: 1rem; padding: 1.15rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.2rem; background: linear-gradient(to right, #a855f7, #60a5fa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                        <h3 style="margin: 0; font-size: 1.2rem; background: linear-gradient(to right, #c084fc, #a855f7, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
                             🧠 Multi-Model AI Consensus Engine
                         </h3>
                         <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; color: var(--muted);">
@@ -38,16 +38,16 @@
 
                     <!-- Predict Controls -->
                     <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <input type="text" id="consensusTickerInput" placeholder="Ticker (e.g. RELIANCE.NS)" style="padding: 0.45rem 0.75rem; font-size: 0.85rem; background: rgba(255,255,255,0.05); color: var(--light); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.45rem; min-width: 170px; text-transform: uppercase;">
-                        <select id="consensusTimeframeSelect" style="padding: 0.45rem 0.6rem; font-size: 0.85rem; background: #1e293b; color: var(--light); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.45rem;">
+                        <input type="text" id="consensusTickerInput" placeholder="Ticker (e.g. RELIANCE.NS)" style="padding: 0.45rem 0.75rem; font-size: 0.85rem; background: rgba(12,7,23,0.7); color: var(--light); border: 1px solid rgba(168,85,247,0.25); border-radius: 0.5rem; min-width: 170px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace;">
+                        <select id="consensusTimeframeSelect" style="padding: 0.45rem 0.6rem; font-size: 0.85rem; background: #0c0717; color: var(--light); border: 1px solid rgba(168,85,247,0.25); border-radius: 0.5rem;">
                             <option value="7">7 Days (Swing)</option>
                             <option value="14" selected>14 Days (Standard)</option>
                             <option value="30">30 Days (Monthly)</option>
                         </select>
-                        <button onclick="app.runConsensusPrediction()" id="consensusRunBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #9333ea, #3b82f6); border: none; font-weight: 600;">
+                        <button onclick="app.runConsensusPrediction()" id="consensusRunBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #9333ea, #7c3aed); border: 1px solid rgba(255,255,255,0.15); font-weight: 700; box-shadow: 0 4px 16px rgba(147,51,234,0.4);">
                             ⚡ Run Consensus
                         </button>
-                        <button onclick="app.settleConsensusPredictions()" id="consensusSettleBtn" class="btn btn-secondary" style="background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.4); font-size: 0.82rem;">
+                        <button onclick="app.settleConsensusPredictions()" id="consensusSettleBtn" class="btn btn-secondary" style="background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.35); font-size: 0.82rem; font-weight: 700;">
                             🔄 Settle Due Trades
                         </button>
                     </div>
@@ -58,26 +58,26 @@
             <section class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.6rem;">
                     <div style="display: flex; align-items: center; gap: 0.6rem;">
-                        <h4 style="margin: 0; font-size: 1rem; color: var(--light);">📜 Consensus Predictions & Post-Mortem Audit</h4>
-                        <span id="consensusCountBadge" class="signal-badge" style="font-size:0.72rem;background:rgba(168,85,247,0.2);color:#c084fc;">0 records</span>
+                        <h4 style="margin: 0; font-size: 1rem; color: var(--light); font-family: 'Space Grotesk', sans-serif;">📜 Consensus Predictions & Post-Mortem Audit</h4>
+                        <span id="consensusCountBadge" class="signal-badge" style="font-size:0.72rem;background:rgba(168,85,247,0.2);color:#d8b4fe;border:1px solid rgba(168,85,247,0.3);">0 records</span>
                     </div>
 
                     <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap;">
-                        <input type="text" id="consensusSearchFilter" oninput="app.filterConsensus()" placeholder="🔍 Filter by ticker..." style="padding:0.35rem 0.6rem;font-size:0.82rem;background:rgba(255,255,255,0.05);color:var(--light);border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;min-width:140px;">
-                        <select id="consensusDirectionFilter" onchange="app.filterConsensus()" style="padding:0.35rem 0.5rem;font-size:0.82rem;background:#1e293b;color:var(--light);border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;">
+                        <input type="text" id="consensusSearchFilter" oninput="app.filterConsensus()" placeholder="🔍 Filter by ticker..." style="padding:0.35rem 0.6rem;font-size:0.82rem;background:rgba(12,7,23,0.7);color:var(--light);border:1px solid rgba(168,85,247,0.25);border-radius:0.4rem;min-width:140px;font-family:'JetBrains Mono',monospace;">
+                        <select id="consensusDirectionFilter" onchange="app.filterConsensus()" style="padding:0.35rem 0.5rem;font-size:0.82rem;background:#0c0717;color:var(--light);border:1px solid rgba(168,85,247,0.25);border-radius:0.4rem;">
                             <option value="ALL">All Directions</option>
                             <option value="BULLISH">🟢 Bullish</option>
                             <option value="BEARISH">🔴 Bearish</option>
                             <option value="NEUTRAL">🟡 Neutral</option>
                         </select>
-                        <select id="consensusStatusFilter" onchange="app.filterConsensus()" style="padding:0.35rem 0.5rem;font-size:0.82rem;background:#1e293b;color:var(--light);border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;">
+                        <select id="consensusStatusFilter" onchange="app.filterConsensus()" style="padding:0.35rem 0.5rem;font-size:0.82rem;background:#0c0717;color:var(--light);border:1px solid rgba(168,85,247,0.25);border-radius:0.4rem;">
                             <option value="ALL">All Statuses</option>
                             <option value="PENDING">⏳ Pending</option>
                             <option value="SUCCESS">✅ Success</option>
                             <option value="PARTIAL">🟡 Partial</option>
                             <option value="FAILURE">❌ Failure (Post-Mortems)</option>
                         </select>
-                        <button onclick="app.loadConsensusTab()" class="btn btn-sm" style="background:rgba(255,255,255,0.08);color:var(--light);border:1px solid rgba(255,255,255,0.15);">🔄 Refresh</button>
+                        <button onclick="app.loadConsensusTab()" class="btn btn-sm" style="background:rgba(168,85,247,0.15);color:#e9d5ff;border:1px solid rgba(168,85,247,0.3);">🔄 Refresh</button>
                     </div>
                 </div>
 
@@ -89,10 +89,10 @@
         </div>
 
         <!-- ================= CONSENSUS DETAIL / POST-MORTEM MODAL ================= -->
-        <div id="consensusDetailModal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); justify-content: center; align-items: center; padding: 1rem;">
-            <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.75rem; width: 100%; max-width: 850px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.5); padding: 1.5rem; position: relative;">
+        <div id="consensusDetailModal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(5,3,10,0.85); backdrop-filter: blur(12px); justify-content: center; align-items: center; padding: 1rem;">
+            <div style="background: #0c0717; border: 1px solid rgba(168,85,247,0.35); border-radius: 1.15rem; width: 100%; max-width: 850px; max-height: 90vh; overflow-y: auto; box-shadow: 0 30px 80px rgba(0,0,0,0.9), 0 0 50px rgba(147,51,234,0.25); padding: 1.75rem; position: relative;">
                 <!-- Close button -->
-                <button onclick="app.closeConsensusModal()" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer;">✕</button>
+                <button onclick="app.closeConsensusModal()" style="position: absolute; top: 1rem; right: 1rem; background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.3); border-radius: 50%; width: 32px; height: 32px; color: #d8b4fe; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">✕</button>
 
                 <!-- Modal Content Hook -->
                 <div id="consensusModalBody">

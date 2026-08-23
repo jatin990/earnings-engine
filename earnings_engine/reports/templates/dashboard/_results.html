@@ -3,16 +3,16 @@
             <div id="resultsDatasetSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;"></div>
             <div id="resultsWidgets" class="widget-grid"></div>
             <section class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.65rem;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
-                            <span>📊 Corporate Results & Earnings</span>
-                            <span id="resultsCount" class="signal-badge" style="font-size:0.75rem;display:none;"></span>
+                        <h3 style="margin: 0; font-size: 1.2rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.5rem; background: linear-gradient(135deg, #c084fc 0%, #a855f7 50%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                            <span>📊 Corporate Results & Earnings Announcements</span>
+                            <span id="resultsCount" class="signal-badge" style="font-size:0.75rem;display:none;background:rgba(168,85,247,0.2);color:#d8b4fe;border:1px solid rgba(168,85,247,0.3);"></span>
                         </h3>
-                        <p class="timestamp" style="margin:0.2rem 0 0 0;font-size:0.78rem;">Explore earnings announcements across Indian & US markets with pre-event momentum and past quarterly beats.</p>
+                        <p class="timestamp" style="margin:0.2rem 0 0 0;font-size:0.8rem;color:var(--muted);">Explore earnings announcements across Indian & US markets with pre-event momentum and past quarterly beats.</p>
                     </div>
-                    <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
-                        <select id="resultsRangePreset" onchange="app.onResultsPresetChange(this.value)" style="padding: 0.4rem 0.6rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 0.4rem; background: #1e293b; color: var(--light); font-size: 0.8rem; font-weight: 600;">
+                    <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap;">
+                        <select id="resultsRangePreset" onchange="app.onResultsPresetChange(this.value)" style="padding: 0.45rem 0.7rem; border: 1px solid rgba(168,85,247,0.3); border-radius: 0.5rem; background: #0c0717; color: var(--light); font-size: 0.82rem; font-weight: 600;">
                             <option value="pm60" selected>⚡ ±2 Months (Past 60D & Next 60D)</option>
                             <option value="pm30">📅 ±1 Month (Past 30D & Next 30D)</option>
                             <option value="next14">🔮 Upcoming 14 Days</option>
@@ -22,31 +22,31 @@
                             <option value="custom">⚙️ Custom Range</option>
                         </select>
                         <span id="resultsCustomInputs" style="display: none; align-items: center; gap: 0.3rem;">
-                            <input type="number" id="resultsPastDays" value="60" min="0" max="180" style="width: 65px; padding: 0.35rem 0.4rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 0.4rem; background: rgba(255,255,255,0.05); color: var(--light); font-size: 0.8rem;" title="Days in past (lookback)">
+                            <input type="number" id="resultsPastDays" value="60" min="0" max="180" style="width: 65px; padding: 0.35rem 0.4rem; border: 1px solid rgba(168,85,247,0.3); border-radius: 0.4rem; background: rgba(12,7,23,0.7); color: var(--light); font-size: 0.8rem;" title="Days in past (lookback)">
                             <span style="font-size:0.75rem;color:var(--muted);">Past D / Next D</span>
-                            <input type="number" id="resultsDays" value="60" min="1" max="180" style="width: 65px; padding: 0.35rem 0.4rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 0.4rem; background: rgba(255,255,255,0.05); color: var(--light); font-size: 0.8rem;" title="Days ahead (lookahead)">
+                            <input type="number" id="resultsDays" value="60" min="1" max="180" style="width: 65px; padding: 0.35rem 0.4rem; border: 1px solid rgba(168,85,247,0.3); border-radius: 0.4rem; background: rgba(12,7,23,0.7); color: var(--light); font-size: 0.8rem;" title="Days ahead (lookahead)">
                         </span>
                         {{ comps.market_dropdown('resultsMarket', 'ALL', '') }}
-                        <button onclick="app.loadResultsReport()" id="resultsLoadBtn" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Load Report</button>
-                        <button onclick="app.cancelReportLoad('results')" id="resultsCancelBtn" class="btn btn-sm btn-danger" style="display:none;font-weight:600;background:#dc2626;border-color:#ef4444;" title="Cancel pending load request">⏹ Cancel</button>
-                        <button onclick="app.showMoreResultsDays()" id="resultsMoreDaysBtn" class="btn btn-sm" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);display:none;">📅 Show Next Date</button>
-                        <button onclick="app.summarizeResults()" class="btn btn-sm" style="background:rgba(139,92,246,0.2);color:#c084fc;border:1px solid rgba(139,92,246,0.4);">✨ LLM Summary</button>
-                        <button onclick="app.refreshResults()" class="btn btn-sm" style="background:rgba(255,255,255,0.06);color:var(--light);">🔄 Sync Feed</button>
+                        <button onclick="app.loadResultsReport()" id="resultsLoadBtn" class="btn btn-primary btn-sm" style="font-weight:700;box-shadow:0 4px 16px rgba(147,51,234,0.4);">▶ Load Report</button>
+                        <button onclick="app.cancelReportLoad('results')" id="resultsCancelBtn" class="btn btn-sm btn-danger" style="display:none;font-weight:700;background:#dc2626;border-color:#ef4444;" title="Cancel pending load request">⏹ Cancel</button>
+                        <button onclick="app.showMoreResultsDays()" id="resultsMoreDaysBtn" class="btn btn-sm" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.35);display:none;font-weight:700;">📅 Show Next Date</button>
+                        <button onclick="app.summarizeResults()" class="btn btn-sm" style="background:rgba(168,85,247,0.18);color:#d8b4fe;border:1px solid rgba(168,85,247,0.35);font-weight:700;">✨ LLM Summary</button>
+                        <button onclick="app.refreshResults()" class="btn btn-sm" style="background:rgba(168,85,247,0.12);color:#e9d5ff;border:1px solid rgba(168,85,247,0.25);font-weight:700;">🔄 Sync Feed</button>
                     </div>
                 </div>
 
                 <!-- 📅 ±2 Months Month Breakdown Sub-Tabs -->
-                <div id="resultsMonthTabs" style="display: none; gap: 0.5rem; margin: 0.75rem 0 1rem 0; flex-wrap: wrap; align-items: center; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.6rem;"></div>
+                <div id="resultsMonthTabs" style="display: none; gap: 0.5rem; margin: 0.75rem 0 1rem 0; flex-wrap: wrap; align-items: center; padding: 0.5rem 0.75rem; background: rgba(18,10,32,0.5); border: 1px solid rgba(168,85,247,0.15); border-radius: 0.75rem;"></div>
 
                 <div id="resultsReportLegend" class="day-legend"></div>
                 <div id="resultsReportSections">
-                    <div class="card" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.15);border-radius:0.75rem;margin:1rem 0;">
+                    <div class="card" style="text-align:center;padding:2.75rem 1.5rem;color:var(--muted);background:rgba(18,10,32,0.5);border:1px dashed rgba(168,85,247,0.3);border-radius:1rem;margin:1rem 0;">
                         <div style="font-size:2.4rem;margin-bottom:0.75rem;">📅</div>
-                        <h4 style="margin:0 0 0.4rem 0;color:var(--light);font-size:1.1rem;">Ready to Load Results (±2 Months)</h4>
-                        <p style="max-width:520px;margin:0 auto 1.25rem auto;font-size:0.85rem;line-height:1.45;">
-                            Results are not loaded automatically by default. Select your desired market and click <strong>Load Report</strong> below to fetch past reported numbers and upcoming announcement dates.
+                        <h4 style="margin:0 0 0.4rem 0;color:var(--light);font-size:1.15rem;font-family:'Space Grotesk',sans-serif;">Ready to Load Results (±2 Months)</h4>
+                        <p style="max-width:520px;margin:0 auto 1.25rem auto;font-size:0.85rem;line-height:1.55;color:var(--text-muted);">
+                            Results are served instantaneously from the persistent local cache. Select your desired market and click <strong>Load Report</strong> below to analyze reported quarterly numbers and upcoming earnings catalysts.
                         </p>
-                        <button onclick="app.loadResultsReport()" id="resultsCenterLoadBtn" class="btn btn-primary" style="padding:0.45rem 1.25rem;font-size:0.88rem;font-weight:600;">▶ Load Results Report (±2 Months)</button>
+                        <button onclick="app.loadResultsReport()" id="resultsCenterLoadBtn" class="btn btn-primary" style="padding:0.55rem 1.4rem;font-size:0.88rem;font-weight:700;box-shadow:0 4px 20px rgba(147,51,234,0.5);">▶ Load Results Report (±2 Months)</button>
                     </div>
                 </div>
                 <div id="resultsReportStatus" class="timestamp" style="margin-top: 0.5rem;"></div>
