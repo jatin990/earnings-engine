@@ -358,6 +358,7 @@ def _build_ledger_table(rows: list[str], day_class: str = "") -> str:
         "<th>30D Ret</th><th>Q1 Wk H/L</th><th>Q2 Wk H/L</th><th>Q3 Wk H/L</th>"
         "<th>52W H/L</th><th>Quality</th><th>3Q Avg</th><th>Resist</th><th>Support</th>"
         "<th>Kronos 14D</th><th>GBM</th>"
+        "<th>Actions</th>"
         "</tr></thead>"
         f"<tbody>{''.join(rows)}</tbody>"
         "</table></div>"
@@ -807,6 +808,7 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
 
         row_values = {
             "ticker": ticker,
+            "row_ticker_id": re.sub(r"[^a-zA-Z0-9]", "_", ticker),
             "company_name": company_name,
             "earnings_date": earnings_date_display,
             "day_class": day_class,

@@ -830,6 +830,42 @@ async def swing_range_delete(
         raise HTTPException(status_code=500, detail=f"Error clearing swing range: {str(e)}")
 
 
+# ---------------------------------------------------------------------------
+# Ticker On-Demand Refresh, Recalculate & Audit Trail
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ticker/recalculate", tags=["Ticker"])
+async def ticker_recalculate(
+    ticker: str = Query(..., description="Stock ticker symbol to refresh and recalculate"),
+):
+    """Force refresh earnings date, prices, recalculate technical/quality metrics, and log audit trail."""
+    try:
+        from earnings_engine.api.recalculate_api import recalculate_ticker_metrics
+        res = recalculate_ticker_metrics(ticker=ticker, settings=_settings)
+        if not res.get("success"):
+            raise HTTPException(status_code=400, detail=res.get("error", "Recalculation failed"))
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error recalculating ticker %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error recalculating ticker: {str(e)}")
+
+
+@app.get("/api/v1/ticker/audit-log", tags=["Ticker"])
+async def ticker_audit_log(
+    ticker: str | None = Query(None, description="Optional ticker filter"),
+    limit: int = Query(50, description="Max audit entries to retrieve", ge=1, le=200),
+):
+    """Retrieve audit history of on-demand refreshes and detected metric changes."""
+    try:
+        from earnings_engine.data.ticker_audit import get_audit_history
+        return get_audit_history(ticker=ticker, limit=limit, settings=_settings)
+    except Exception as e:
+        logger.exception("Error retrieving audit history: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error retrieving audit history: {str(e)}")
+
+
 @app.get("/api/v1/swing-range/history", tags=["Swing"])
 @app.get("/api/v1/dashboard/swing-range/history", tags=["Swing"])
 async def swing_range_history(
