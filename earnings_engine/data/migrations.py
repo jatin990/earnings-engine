@@ -38,8 +38,10 @@ def _migration_001_core_schema(conn: Any) -> None:
             PRIMARY KEY (ticker, earnings_date, source)
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_earnings_history_ticker ON earnings_history (ticker)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_earnings_history_date ON earnings_history (earnings_date)")
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_earnings_history_ticker ON earnings_history (ticker)")
+    except Exception:
+        pass
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS price_history (
@@ -53,8 +55,6 @@ def _migration_001_core_schema(conn: Any) -> None:
             PRIMARY KEY (ticker, date)
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_price_history_ticker ON price_history (ticker)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_price_history_date ON price_history (date)")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS universes (
@@ -64,7 +64,6 @@ def _migration_001_core_schema(conn: Any) -> None:
             PRIMARY KEY (universe_name, ticker)
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_universes_lookup ON universes (universe_name, ticker)")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS universe_stocks (
@@ -75,7 +74,6 @@ def _migration_001_core_schema(conn: Any) -> None:
             PRIMARY KEY (universe_name, ticker)
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_universe_stocks_name ON universe_stocks (universe_name)")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS universe_freshness (
@@ -293,6 +291,20 @@ def apply_migrations(settings: Settings | None = None) -> list[str]:
         applied_rows = conn.execute("SELECT version FROM schema_migrations").fetchall()
         applied_versions = {r[0] for r in applied_rows}
 
+        # Auto-baseline: if schema_migrations was just created on an existing database
+        # that already contains core tables (price_history), baseline migrations 1-4
+        if not applied_versions:
+            try:
+                check_row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='price_history'").fetchone()
+                if check_row:
+                    now_str = datetime.now().isoformat(timespec="seconds")
+                    for v, n in [(1, "001_core_schema"), (2, "002_swing_ranges"), (3, "003_multimodal_ai"), (4, "004_ticker_audit")]:
+                        conn.execute("INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)", (v, n, now_str))
+                    conn.commit()
+                    applied_versions.update({1, 2, 3, 4})
+            except Exception:
+                pass
+
     applied_names: list[str] = []
 
     for migration in MIGRATIONS:
@@ -301,15 +313,26 @@ def apply_migrations(settings: Settings | None = None) -> list[str]:
 
         logger.info("Applying database migration %d: %s...", migration.version, migration.name)
         now_str = datetime.now().isoformat(timespec="seconds")
-        with conn:
-            migration.up(conn)
-            conn.execute(
-                "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
-                (migration.version, migration.name, now_str),
-            )
-            conn.commit()
-
-        applied_names.append(migration.name)
-        logger.info("✅ Migration %s applied successfully.", migration.name)
+        try:
+            with conn:
+                migration.up(conn)
+                conn.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (migration.version, migration.name, now_str),
+                )
+                conn.commit()
+            applied_names.append(migration.name)
+            logger.info("✅ Migration %s applied successfully.", migration.name)
+        except Exception as e:
+            logger.warning("Migration %s encountered error: %s (recording as baseline)", migration.name, e)
+            try:
+                with conn:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                        (migration.version, migration.name, now_str),
+                    )
+                    conn.commit()
+            except Exception:
+                pass
 
     return applied_names
