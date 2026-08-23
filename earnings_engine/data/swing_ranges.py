@@ -187,6 +187,63 @@ def record_auto_range(
         conn.commit()
 
 
+def record_auto_ranges_bulk(
+    watchlist: str,
+    ranges_list: list[dict[str, Any]],
+    settings: Settings | None = None,
+) -> None:
+    """Record multiple auto-detected swing ranges in a single atomic batch transaction."""
+    if not ranges_list:
+        return
+    settings = settings or Settings()
+    now = datetime.now().isoformat(timespec="seconds")
+    with _connect(settings) as conn:
+        tickers = [r["ticker"] for r in ranges_list if r.get("ticker")]
+        if not tickers:
+            return
+        placeholders = ", ".join(["?"] * len(tickers))
+        existing_rows = conn.execute(
+            f"SELECT ticker, source, lower_bound, upper_bound FROM swing_ranges WHERE watchlist = ? AND ticker IN ({placeholders})",
+            [watchlist] + tickers,
+        ).fetchall()
+        existing_map = {r[0]: (r[1], r[2], r[3]) for r in existing_rows}
+
+        insert_rows = []
+        for item in ranges_list:
+            t = item.get("ticker")
+            if not t:
+                continue
+            low = round(float(item.get("lower", 0)), 2)
+            up = round(float(item.get("upper", 0)), 2)
+            existing = existing_map.get(t)
+            if existing:
+                if existing[0] == "user":
+                    continue
+                if existing[1] == low and existing[2] == up:
+                    continue
+            insert_rows.append((
+                watchlist,
+                t,
+                low,
+                up,
+                "auto",
+                item.get("cycles"),
+                item.get("avg_days"),
+                now,
+            ))
+
+        if insert_rows:
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO swing_ranges 
+                (watchlist, ticker, lower_bound, upper_bound, source, cycles, avg_cycle_days, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                insert_rows,
+            )
+            conn.commit()
+
+
 def clear_user_range(watchlist: str, ticker: str, settings: Settings | None = None) -> dict[str, Any]:
     """Delete a range entry (useful for reverting to auto)."""
     settings = settings or Settings()

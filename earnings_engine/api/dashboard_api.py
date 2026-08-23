@@ -415,6 +415,7 @@ def get_event_dataset_summary() -> dict[str, Any]:
 # Swing tab
 # ---------------------------------------------------------------------------
 
+@ttl_cache(seconds=60)
 def get_swing_setups(market: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
     """Get swing setups with support/resistance and momentum data."""
     settings = _settings()
@@ -464,6 +465,8 @@ def get_swing_setups(market: str | None = None, limit: int = 50) -> list[dict[st
         stored_ranges_wl = {}
         stored_ranges_all = {}
 
+    missing_auto_ranges = []
+
     for _, row_series in enriched_all.iterrows():
         try:
             row = row_series.to_dict()
@@ -489,19 +492,20 @@ def get_swing_setups(market: str | None = None, limit: int = 50) -> list[dict[st
             # Attach swing range for this watchlist (or ALL fallback) from memory map
             sr = stored_ranges_wl.get(ticker) or stored_ranges_all.get(ticker)
             if not sr and item.get("current_support") is not None and item.get("next_resistance") is not None:
-                try:
-                    swing_ranges_mod.record_auto_range(
-                        wl_name,
-                        ticker,
-                        float(item["current_support"]),
-                        float(item["next_resistance"]),
-                        settings=settings,
-                    )
-                    sr = swing_ranges_mod.get_swing_range(wl_name, ticker, settings)
-                    if sr:
-                        stored_ranges_wl[ticker] = sr
-                except Exception:
-                    pass
+                sr = {
+                    "watchlist": wl_name,
+                    "ticker": ticker,
+                    "lower_bound": round(float(item["current_support"]), 2),
+                    "upper_bound": round(float(item["next_resistance"]), 2),
+                    "source": "auto",
+                    "cycles": None,
+                }
+                stored_ranges_wl[ticker] = sr
+                missing_auto_ranges.append({
+                    "ticker": ticker,
+                    "lower": item["current_support"],
+                    "upper": item["next_resistance"],
+                })
 
             item["swing_range"] = sr
             if sr:
@@ -555,6 +559,12 @@ def get_swing_setups(market: str | None = None, limit: int = 50) -> list[dict[st
             results.append(item)
         except Exception:
             continue
+
+    if missing_auto_ranges:
+        try:
+            swing_ranges_mod.record_auto_ranges_bulk(wl_name, missing_auto_ranges, settings=settings)
+        except Exception as e:
+            logger.debug("Failed bulk recording auto swing ranges: %s", e)
 
     # Enrich each swing setup with the latest multi-modal AI synthesis & news sentiment
     try:
