@@ -2,34 +2,34 @@
         <div id="tab-swing" class="tab-content">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.75rem;">
                 <div>
-                    <h3 style="margin: 0; font-size: 1.25rem; font-family: 'Space Grotesk', sans-serif; background: linear-gradient(135deg, #c084fc 0%, #a855f7 50%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                    <h3 style="margin: 0; font-size: 1.15rem; font-family: var(--font-heading); color: #ffffff;">
                         🔄 Swing Trading & Cycle Oscillators
                     </h3>
-                    <p style="margin: 0.2rem 0 0 0; color: var(--muted); font-size: 0.8rem;">Horizontal trading bands, cycle timing, and real-time buy zone detection</p>
+                    <p style="margin: 0.15rem 0 0 0; color: var(--text-muted); font-size: 0.75rem;">Horizontal trading bands, cycle timing, and real-time buy zone detection</p>
                 </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
                     {{ comps.market_dropdown('swingMarket', 'ALL', 'universe-select') }}
-                    <button onclick="app.refreshSwing(event)" class="btn btn-sm" style="background:rgba(168,85,247,0.18);border:1px solid rgba(168,85,247,0.35);color:#e9d5ff;font-weight:700;" title="Refresh prices and recalculate swing signals">🔄 Refresh</button>
-                    <button onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" style="background:linear-gradient(135deg, #9333ea, #7c3aed);font-weight:700;box-shadow:0 4px 16px rgba(147,51,234,0.4);">Load Setups</button>
-                    <button onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-sm" style="background:rgba(168,85,247,0.2);color:#e9d5ff;border:1px solid rgba(168,85,247,0.4);font-weight:700;" title="Compute Kronos AI predictions for all stocks in the selected watchlist">🔮 Predict All (Kronos)</button>
-                    <button onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-sm" style="background:rgba(56,189,248,0.18);color:#7dd3fc;border:1px solid rgba(56,189,248,0.35);font-weight:700;" title="Run Multi-Modal AI News, World Events & Volume Synthesis for all stocks">🧠 AI Thesis All</button>
-                    <button onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-sm" style="background:linear-gradient(135deg, rgba(147,51,234,0.3), rgba(99,102,241,0.3));color:#f3e8ff;border:1px solid rgba(168,85,247,0.5);font-weight:700;" title="Run 4-Model AI Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral) for all stocks in view">🤖 Consensus All</button>
+                    <button onclick="app.refreshSwing(event)" class="btn btn-sm" title="Refresh prices and recalculate swing signals">🔄 Refresh</button>
+                    <button onclick="app.loadSwing(event)" class="btn btn-primary btn-sm">Load Setups</button>
+                    <button onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-sm" title="Compute Kronos AI predictions for all stocks in the selected watchlist">🔮 Predict All (Kronos)</button>
+                    <button onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-sm" title="Run Multi-Modal AI News, World Events & Volume Synthesis for all stocks">🧠 AI Thesis All</button>
+                    <button onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-sm" title="Run 4-Model AI Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral) for all stocks in view">🤖 Consensus All</button>
                 </div>
             </div>
 
             <!-- Summary & Quick Filters Bar -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; background: rgba(18,10,32,0.65); border: 1px solid rgba(168,85,247,0.18); border-radius: 0.75rem; padding: 0.55rem 0.85rem;">
-                <div id="swingFilterPills" style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
-                    <button onclick="app.filterSwing('all')" id="swingFilter-all" class="btn btn-sm" style="background:linear-gradient(135deg, #9333ea, #7c3aed);color:white;font-size:0.75rem;padding:0.25rem 0.65rem;border:1px solid rgba(255,255,255,0.15);">All (<span id="count-all">0</span>)</button>
-                    <button onclick="app.filterSwing('buyzone')" id="swingFilter-buyzone" class="btn btn-sm" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid #10b981;font-size:0.75rem;padding:0.25rem 0.65rem;">🟢 In Buy Zone (<span id="count-buyzone">0</span>)</button>
-                    <button onclick="app.filterSwing('strongbuy')" id="swingFilter-strongbuy" class="btn btn-sm" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.4);font-size:0.75rem;padding:0.25rem 0.65rem;">Strong Buy (<span id="count-strongbuy">0</span>)</button>
-                    <button onclick="app.filterSwing('custom')" id="swingFilter-custom" class="btn btn-sm" style="background:rgba(168,85,247,0.18);color:#d8b4fe;border:1px solid rgba(168,85,247,0.4);font-size:0.75rem;padding:0.25rem 0.65rem;">Custom Ranges (<span id="count-custom">0</span>)</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem; background: #060609; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; padding: 0.45rem 0.75rem;">
+                <div id="swingFilterPills" style="display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center;">
+                    <button onclick="app.filterSwing('all')" id="swingFilter-all" class="btn btn-primary btn-xs">All (<span id="count-all">0</span>)</button>
+                    <button onclick="app.filterSwing('buyzone')" id="swingFilter-buyzone" class="btn btn-xs" style="color:#34d399;">🟢 In Buy Zone (<span id="count-buyzone">0</span>)</button>
+                    <button onclick="app.filterSwing('strongbuy')" id="swingFilter-strongbuy" class="btn btn-xs" style="color:#10b981;">Strong Buy (<span id="count-strongbuy">0</span>)</button>
+                    <button onclick="app.filterSwing('custom')" id="swingFilter-custom" class="btn btn-xs" style="color:#c084fc;">Custom Ranges (<span id="count-custom">0</span>)</button>
                 </div>
 
-                <div style="display: flex; gap: 0.3rem; align-items: center;">
-                    <span style="font-size: 0.75rem; color: var(--muted); margin-right: 0.2rem;">View:</span>
-                    <button onclick="app.setSwingView('table')" id="swingViewBtn-table" class="btn btn-sm" style="background:linear-gradient(135deg, #9333ea, #7c3aed);color:white;padding:0.25rem 0.65rem;font-size:0.75rem;border:1px solid rgba(255,255,255,0.15);">📋 Table</button>
-                    <button onclick="app.setSwingView('cards')" id="swingViewBtn-cards" class="btn btn-sm" style="background:rgba(168,85,247,0.12);color:var(--muted);border:1px solid rgba(168,85,247,0.2);padding:0.25rem 0.65rem;font-size:0.75rem;">🎴 Cards</button>
+                <div style="display: flex; gap: 0.25rem; align-items: center;">
+                    <span style="font-size: 0.72rem; color: #71717a; margin-right: 0.2rem;">View:</span>
+                    <button onclick="app.setSwingView('table')" id="swingViewBtn-table" class="btn btn-primary btn-xs">📋 Table</button>
+                    <button onclick="app.setSwingView('cards')" id="swingViewBtn-cards" class="btn btn-xs">🎴 Cards</button>
                 </div>
             </div>
 

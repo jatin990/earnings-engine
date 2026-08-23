@@ -1,16 +1,16 @@
         <div id="tab-kronos" class="tab-content">
             <section class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <h3 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 1.2rem; background: linear-gradient(135deg, #c084fc 0%, #a855f7 50%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                    <h3 style="margin: 0; font-family: var(--font-heading); font-size: 1.15rem; color: #ffffff;">
                         🤖 Kronos AI Foundation Forecasting
                     </h3>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <select id="kronosWatchlist" onchange="app.onKronosWatchlistChange()" style="min-width:180px;padding:0.4rem 0.6rem;border:1px solid rgba(168,85,247,0.3);border-radius:0.5rem;background:#0c0717;color:var(--light);" title="Watchlist/universe to filter & run Kronos">
+                    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;">
+                        <select id="kronosWatchlist" onchange="app.onKronosWatchlistChange()" style="min-width:180px;height:32px;" title="Watchlist/universe to filter & run Kronos">
                             <option value="">All / Global Watchlist</option>
                         </select>
-                        <input type="text" id="kronosTickers" placeholder="Tickers (comma-separated, overrides dropdown)" style="flex: 1; min-width: 200px; padding: 0.4rem 0.65rem; border: 1px solid rgba(168,85,247,0.25); border-radius: 0.5rem; background: rgba(12,7,23,0.7); color: var(--light); font-family: 'JetBrains Mono', monospace;">
-                        <button id="kronosRunBtn" onclick="app.runKronos()" class="btn btn-primary" style="background: linear-gradient(135deg, #9333ea, #7c3aed); font-weight: 700; box-shadow: 0 4px 16px rgba(147,51,234,0.4);">▶ Run Predictions</button>
-                        <button onclick="app.refreshKronos()" class="btn btn-sm" style="background: rgba(168,85,247,0.18); border: 1px solid rgba(168,85,247,0.35); color: #e9d5ff; font-weight: 700;">🔄 Refresh Latest</button>
+                        <input type="text" id="kronosTickers" placeholder="Tickers (comma-separated, overrides dropdown)" style="flex: 1; min-width: 200px; height: 32px; font-family: var(--font-mono);">
+                        <button id="kronosRunBtn" onclick="app.runKronos()" class="btn btn-primary">▶ Run Predictions</button>
+                        <button onclick="app.refreshKronos()" class="btn btn-sm">🔄 Refresh Latest</button>
                     </div>
                 </div>
                 <p class="timestamp" style="margin: 0; color: var(--muted);">Runs the Kronos foundation neural model. Every run is saved to the audit trail automatically. Click any card to view prediction history.</p>

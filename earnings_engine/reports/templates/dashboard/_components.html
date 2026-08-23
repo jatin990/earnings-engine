@@ -1,5 +1,5 @@
 {% macro market_dropdown(id, selected='ALL', extra_class='') %}
-<select id="{{ id }}" class="{{ extra_class }}" style="padding: 0.45rem 0.7rem; border: 1px solid rgba(168,85,247,0.3); border-radius: 0.5rem; background: #080312; color: var(--light); font-size: 0.82rem; font-weight: 600;">
+<select id="{{ id }}" class="{{ extra_class }}" style="height: 30px; padding: 0 0.6rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; background: #000000; color: #ededed; font-size: 0.76rem; font-weight: 500; font-family: var(--font-sans); outline: none;">
     <option value="ALL"{% if selected == 'ALL' %} selected{% endif %}>All Markets</option>
     <option value="WATCHLIST"{% if selected == 'WATCHLIST' %} selected{% endif %}>My Watchlist</option>
     <option value="IN"{% if selected == 'IN' %} selected{% endif %}>NSE Top</option>

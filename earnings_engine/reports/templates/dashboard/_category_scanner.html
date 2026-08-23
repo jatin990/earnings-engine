@@ -4,23 +4,23 @@
             <section class="card" style="padding: 0.85rem 1.1rem; margin-bottom: 0.85rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.2rem; background: linear-gradient(to right, #38bdf8, #818cf8, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🔍 Active Multi-Category Stock Scanner Hub</h3>
-                        <p class="timestamp" style="margin: 0.25rem 0 0 0; font-size: 0.8rem;">
+                        <h3 style="margin: 0; font-size: 1.1rem; font-family: var(--font-heading); color: #ffffff;">🔍 Multi-Category Stock Scanner</h3>
+                        <p class="timestamp" style="margin: 0.2rem 0 0 0; font-size: 0.75rem; color: var(--text-muted);">
                             Unified scanner across Fundamental News Catalysts, Technical Squeeze Coils, 52W High Breakouts & Sector Momentum.
                         </p>
                     </div>
-                    <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
-                        <div style="display: flex; align-items: center; gap: 0.4rem; background: rgba(255,255,255,0.04); padding: 0.35rem 0.65rem; border-radius: 0.45rem; border: 1px solid rgba(59,130,246,0.3);">
-                            <span style="font-size: 0.78rem; font-weight: 700; color: #60a5fa;">⭐ Watchlist / Universe:</span>
-                            <select id="scannerWatchlistSelect" onchange="app.onScannerWatchlistChange(this.value)" style="padding: 0.3rem 0.6rem; border: 1px solid rgba(59,130,246,0.4); border-radius: 0.35rem; background: #0f172a; color: #f8fafc; font-size: 0.82rem; font-weight: 600; cursor: pointer; outline: none;" title="Select Watchlist or Universe to scan">
+                    <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.35rem; background: #000000; padding: 0.15rem 0.5rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);">
+                            <span style="font-size: 0.72rem; color: #a1a1aa;">⭐</span>
+                            <select id="scannerWatchlistSelect" onchange="app.onScannerWatchlistChange(this.value)" style="border: none; background: transparent; color: #ededed; font-size: 0.76rem; font-weight: 500; cursor: pointer; outline: none;" title="Select Watchlist or Universe to scan">
                                 <option value="NSE_TOP">NSE_TOP (Top Active ~50)</option>
                                 <option value="NSE_LARGE_CAP">NSE_LARGE_CAP (> 1000 Cr)</option>
                                 <option value="NSE_ALL">NSE_ALL (All Traded Equities)</option>
                                 <option value="US_TOP">US_TOP (US Mega-Caps)</option>
                             </select>
                         </div>
-                        <button onclick="app.deepSweepScanner()" id="scannerSweepBtn" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); padding: 0.45rem 0.9rem; font-weight: 700;">
-                            ⚡ Deep Sweep All Categories
+                        <button onclick="app.deepSweepScanner()" id="scannerSweepBtn" class="btn btn-primary" style="height: 32px; font-weight: 600;">
+                            <span>⚡</span> Deep Sweep All Categories
                         </button>
                     </div>
                 </div>

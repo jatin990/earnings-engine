@@ -37,18 +37,18 @@
                     </div>
 
                     <!-- Predict Controls -->
-                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <input type="text" id="consensusTickerInput" placeholder="Ticker (e.g. RELIANCE.NS)" style="padding: 0.45rem 0.75rem; font-size: 0.85rem; background: rgba(12,7,23,0.7); color: var(--light); border: 1px solid rgba(168,85,247,0.25); border-radius: 0.5rem; min-width: 170px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace;">
-                        <select id="consensusTimeframeSelect" style="padding: 0.45rem 0.6rem; font-size: 0.85rem; background: #0c0717; color: var(--light); border: 1px solid rgba(168,85,247,0.25); border-radius: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                        <input type="text" id="consensusTickerInput" placeholder="Ticker (e.g. RELIANCE.NS)" style="height: 32px; padding: 0 0.65rem; font-size: 0.78rem; background: #000000; color: #ededed; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; min-width: 170px; text-transform: uppercase; font-family: var(--font-mono);">
+                        <select id="consensusTimeframeSelect" style="height: 32px; padding: 0 0.6rem; font-size: 0.78rem; background: #000000; color: #ededed; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-family: var(--font-sans);">
                             <option value="7">7 Days (Swing)</option>
                             <option value="14" selected>14 Days (Standard)</option>
                             <option value="30">30 Days (Monthly)</option>
                         </select>
-                        <button onclick="app.runConsensusPrediction()" id="consensusRunBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #9333ea, #7c3aed); border: 1px solid rgba(255,255,255,0.15); font-weight: 700; box-shadow: 0 4px 16px rgba(147,51,234,0.4);">
-                            ⚡ Run Consensus
+                        <button onclick="app.runConsensusPrediction()" id="consensusRunBtn" class="btn btn-primary">
+                            <span>⚡</span> Run Consensus
                         </button>
-                        <button onclick="app.settleConsensusPredictions()" id="consensusSettleBtn" class="btn btn-secondary" style="background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.35); font-size: 0.82rem; font-weight: 700;">
-                            🔄 Settle Due Trades
+                        <button onclick="app.settleConsensusPredictions()" id="consensusSettleBtn" class="btn btn-secondary">
+                            <span>🔄</span> Settle Due Trades
                         </button>
                     </div>
                 </div>
