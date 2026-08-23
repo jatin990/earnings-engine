@@ -24,8 +24,8 @@
             <button id="ccNavTabs" onclick="app.switchCustomizerTab('tabs')" class="tab-btn active" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🗂️ Visible Tabs</button>
             <button id="ccNavThemes" onclick="app.switchCustomizerTab('themes')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🎨 Themes & Colors</button>
             <button id="ccNavEnv" onclick="app.switchCustomizerTab('env')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🔑 Environment Variables</button>
-            {% if has_tracker_key %}
-            <button id="ccNavAudit" onclick="app.switchCustomizerTab('audit')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🪪 Access & Login Tracker</button>
+            {% if has_diagnostics_key or has_tracker_key %}
+            <button id="ccNavAudit" onclick="app.switchCustomizerTab('audit')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🖥️ System Diagnostics & Telemetry</button>
             {% endif %}
         </div>
 
@@ -189,13 +189,13 @@
                 </div>
             </div>
 
-            {% if has_tracker_key %}
-            <!-- ================= SUB-TAB 4: LOGIN & ACCESS TRACKER ================= -->
+            {% if has_diagnostics_key or has_tracker_key %}
+            <!-- ================= SUB-TAB 4: SYSTEM DIAGNOSTICS & TELEMETRY ================= -->
             <div id="ccSectionAudit" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Login & Client Access Tracker</h3>
-                        <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--muted);">Silently captured client connection records (IP, machine hostname, geolocation, device & route).</p>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">System Diagnostics & Telemetry</h3>
+                        <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--muted);">Diagnostic connection metadata, network routing, and client runtime telemetry.</p>
                     </div>
                     <div style="display: flex; gap: 0.5rem; align-items: center;">
                         <button id="ccToggleEncryptedBtn" onclick="app.toggleEncryptedAuditView()" class="btn btn-sm" style="background: rgba(255,255,255,0.08); color: var(--light); border: 1px solid rgba(255,255,255,0.15); font-size: 0.78rem;">📄 View Raw Decrypted JSON</button>
@@ -210,7 +210,7 @@
                             <tr>
                                 <th>Timestamp</th>
                                 <th>IP Address</th>
-                                <th>Machine / Hostname</th>
+                                <th>Machine & System User</th>
                                 <th>Location & Coordinates</th>
                                 <th>ISP / Org</th>
                                 <th>Device & OS</th>

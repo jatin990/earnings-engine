@@ -35,3 +35,8 @@ secrets.env
 credentials.json
 client_secret*.json
 *.pdf
+.local_secret.key
+
+.local_private.key
+.local_secret.key
+scratch/

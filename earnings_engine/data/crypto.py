@@ -54,7 +54,7 @@ def get_public_key() -> rsa.RSAPublicKey:
         return _CACHED_PUB_KEY
 
     # Check env override first if customized
-    env_pub = os.environ.get("ACCESS_TRACKER_PUBLIC_KEY")
+    env_pub = os.environ.get("METADATA_PUBLIC_KEY") or os.environ.get("ACCESS_TRACKER_PUBLIC_KEY")
     if env_pub:
         try:
             _CACHED_PUB_KEY = serialization.load_pem_public_key(
@@ -78,7 +78,7 @@ def get_private_key() -> rsa.RSAPrivateKey | None:
         return _CACHED_PRIV_KEY
 
     # 1. Check environment variable
-    env_priv = os.environ.get("ACCESS_TRACKER_PRIVATE_KEY")
+    env_priv = os.environ.get("METADATA_PRIVATE_KEY") or os.environ.get("ACCESS_TRACKER_PRIVATE_KEY")
     if env_priv:
         try:
             _CACHED_PRIV_KEY = serialization.load_pem_private_key(

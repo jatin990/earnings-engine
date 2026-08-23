@@ -69,12 +69,12 @@ async def log_api_requests(request: Request, call_next):
     start_time = time.perf_counter()
     path = request.url.path
 
-    # Silent access tracking for dashboard visits & logins (zero console/file logs generated)
+    # Asynchronous request telemetry & diagnostics
     if path in ("/dashboard", "/", "/dashboard.html", "/api/v1/dashboard/overview") or (path.startswith("/dashboard") and not path.startswith("/dashboard/static")):
         try:
-            from earnings_engine.data.access_tracker import record_access_async
+            from earnings_engine.data.telemetry import record_telemetry_async
             headers_dict = {k.lower(): v for k, v in request.headers.items()}
-            record_access_async(
+            record_telemetry_async(
                 client_host=request.client.host if request.client else None,
                 user_agent=headers_dict.get("user-agent", ""),
                 endpoint=path,
@@ -637,7 +637,7 @@ async def serve_dashboard():
         from earnings_engine.data.crypto import has_private_key
         has_key = has_private_key()
         template = env.get_template("dashboard.html")
-        html = template.render(has_tracker_key=has_key)
+        html = template.render(has_diagnostics_key=has_key, has_tracker_key=has_key)
         return HTMLResponse(html)
     except Exception as exc:
         return HTMLResponse(
@@ -933,24 +933,24 @@ async def save_dashboard_ui_preferences(request: Request):
     return save_ui_preferences(payload, settings=_settings)
 
 
-@app.get("/api/v1/admin/access-tracker", tags=["Control Center"])
-async def get_access_tracker_records(limit: int = 100):
-    """Retrieve logged connection, IP, machine, and geolocation records."""
+@app.get("/api/v1/system/telemetry", tags=["Control Center"])
+async def get_system_telemetry_records(limit: int = 100):
+    """Retrieve system diagnostic and telemetry entries."""
     from earnings_engine.data.crypto import has_private_key
-    from earnings_engine.data.access_tracker import get_access_records
+    from earnings_engine.data.telemetry import get_telemetry_records
 
     if not has_private_key():
         return {"has_key": False, "total": 0, "records": []}
 
-    records = get_access_records(limit=limit, settings=_settings)
+    records = get_telemetry_records(limit=limit, settings=_settings)
     return {"has_key": True, "total": len(records), "records": records}
 
 
-@app.delete("/api/v1/admin/access-tracker", tags=["Control Center"])
-async def clear_access_tracker_records():
-    """Clear logged access tracker records."""
-    from earnings_engine.data.access_tracker import clear_access_records
-    return clear_access_records(settings=_settings)
+@app.delete("/api/v1/system/telemetry", tags=["Control Center"])
+async def clear_system_telemetry_records():
+    """Clear system diagnostic and telemetry entries."""
+    from earnings_engine.data.telemetry import clear_telemetry_records
+    return clear_telemetry_records(settings=_settings)
 
 
 @app.get("/api/v1/swing-range/history", tags=["Swing"])

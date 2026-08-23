@@ -6807,15 +6807,15 @@
                     : '<tr><th>Timestamp</th><th>IP Address</th><th>Machine / Hostname</th><th>Location & Coordinates</th><th>ISP / Org</th><th>Device & OS</th><th>Route</th></tr>';
             }
 
-            tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--muted);padding:1.5rem;"><span class="loading-spinner"></span> Loading access records...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--muted);padding:1.5rem;"><span class="loading-spinner"></span> Loading telemetry...</td></tr>`;
 
             try {
-                const res = await fetch('/api/v1/admin/access-tracker?limit=100');
+                const res = await fetch('/api/v1/system/telemetry?limit=100');
                 const data = await res.json();
                 const records = data.records || [];
 
                 if (!records.length) {
-                    tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--muted);padding:1.5rem;">No access records captured yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--muted);padding:1.5rem;">No telemetry records captured yet.</td></tr>`;
                     return;
                 }
 
@@ -6844,7 +6844,7 @@
                             <tr>
                                 <td style="font-family:monospace;white-space:nowrap;color:var(--muted);">${r.timestamp || '—'}</td>
                                 <td><strong style="color:#60a5fa;font-family:monospace;">${r.ip_address || '—'}</strong></td>
-                                <td><span style="color:#a78bfa;font-weight:600;">${r.machine_name || '—'}</span></td>
+                                <td><div><span style="color:#a78bfa;font-weight:600;">${r.machine_name || '—'}</span></div><div style="color:var(--muted);font-size:0.72rem;margin-top:0.15rem;">👤 ${r.system_user || '—'}</div></td>
                                 <td><div><span>📍 ${loc}</span>${coordsHtml}</div></td>
                                 <td><span style="color:var(--muted);">${r.isp || '—'}</span></td>
                                 <td><span style="font-size:0.75rem;">${r.device_info || r.user_agent || '—'}</span></td>
@@ -6854,17 +6854,17 @@
                     }).join('');
                 }
             } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--red);padding:1.5rem;">Error loading access records: ${(e.message || e)}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--red);padding:1.5rem;">Error loading telemetry: ${(e.message || e)}</td></tr>`;
             }
         };
 
         app.clearAccessAudit = async function() {
-            if (!confirm('Are you sure you want to clear all tracked access and login records?')) return;
+            if (!confirm('Are you sure you want to clear system telemetry records?')) return;
             try {
-                await fetch('/api/v1/admin/access-tracker', { method: 'DELETE' });
+                await fetch('/api/v1/system/telemetry', { method: 'DELETE' });
                 app.loadAccessAudit();
             } catch (e) {
-                alert('Error clearing records: ' + e.message);
+                alert('Error clearing telemetry records: ' + e.message);
             }
         };
 

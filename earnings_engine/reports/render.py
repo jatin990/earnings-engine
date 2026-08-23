@@ -59,7 +59,7 @@ def render_dashboard(html_path: Path | None = None) -> Path:
     
     from earnings_engine.data.crypto import has_private_key
     template = _JINJA_ENV.get_template("dashboard.html")
-    html = template.render(has_tracker_key=has_private_key())
+    html = template.render(has_diagnostics_key=has_private_key(), has_tracker_key=has_private_key())
 
     import re
     js_path = TEMPLATES_DIR.parent.parent / "ui" / "js" / "dashboard.js"

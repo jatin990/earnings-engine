@@ -34,6 +34,7 @@ def mock_external_network_in_tests(monkeypatch):
     dummy_ticker.earnings_dates = None
     dummy_ticker.get_earnings_dates = MagicMock(return_value=pd.DataFrame())
     dummy_ticker.history = MagicMock(return_value=pd.DataFrame())
+    dummy_ticker.news = []
     monkeypatch.setattr(yf, "Ticker", lambda *args, **kwargs: dummy_ticker)
 
     # Default dummy download if not overridden by test
