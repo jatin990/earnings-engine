@@ -277,6 +277,82 @@ def _migration_006_drop_legacy_ticker_tables(conn: Any) -> None:
             pass
 
 
+def _migration_007_consolidate_earnings_and_freshness(conn: Any) -> None:
+    """Deduplicate earnings_history to (ticker, earnings_date) and consolidate freshness into tickers."""
+    # 1. Add freshness columns to master tickers table
+    for col in ("earnings_fetched_at", "prices_fetched_at"):
+        try:
+            conn.execute(f"ALTER TABLE tickers ADD COLUMN {col} TEXT")
+        except Exception:
+            pass
+
+    # 2. Migrate existing freshness records into tickers
+    try:
+        conn.execute("""
+            INSERT INTO tickers (ticker, earnings_fetched_at, last_updated)
+            SELECT ticker, fetched_at, DATETIME('now') FROM earnings_freshness
+            WHERE TRUE
+            ON CONFLICT(ticker) DO UPDATE SET
+                earnings_fetched_at = COALESCE(excluded.earnings_fetched_at, tickers.earnings_fetched_at)
+        """)
+    except Exception:
+        pass
+
+    try:
+        conn.execute("""
+            INSERT INTO tickers (ticker, prices_fetched_at, last_updated)
+            SELECT ticker, fetched_at, DATETIME('now') FROM price_fetch_log
+            WHERE TRUE
+            ON CONFLICT(ticker) DO UPDATE SET
+                prices_fetched_at = COALESCE(excluded.prices_fetched_at, tickers.prices_fetched_at)
+        """)
+    except Exception:
+        pass
+
+    # 3. Deduplicate and rebuild earnings_history with PK (ticker, earnings_date)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS earnings_history_new (
+            ticker TEXT NOT NULL,
+            earnings_date TEXT NOT NULL,
+            eps_estimate REAL,
+            eps_reported REAL,
+            surprise_pct REAL,
+            source TEXT NOT NULL DEFAULT 'yfinance',
+            PRIMARY KEY (ticker, earnings_date)
+        )
+    """)
+
+    try:
+        conn.execute("""
+            INSERT INTO earnings_history_new (ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source)
+            SELECT 
+                ticker,
+                earnings_date,
+                MAX(eps_estimate) as eps_estimate,
+                MAX(eps_reported) as eps_reported,
+                MAX(surprise_pct) as surprise_pct,
+                MAX(source) as source
+            FROM earnings_history
+            GROUP BY ticker, earnings_date
+            ON CONFLICT(ticker, earnings_date) DO UPDATE SET
+                eps_estimate = COALESCE(excluded.eps_estimate, earnings_history_new.eps_estimate),
+                eps_reported = COALESCE(excluded.eps_reported, earnings_history_new.eps_reported),
+                surprise_pct = COALESCE(excluded.surprise_pct, earnings_history_new.surprise_pct)
+        """)
+        conn.execute("DROP TABLE earnings_history")
+        conn.execute("ALTER TABLE earnings_history_new RENAME TO earnings_history")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_earnings_history_date ON earnings_history (earnings_date)")
+    except Exception:
+        pass
+
+    # 4. Drop obsolete tables
+    for tbl in ("earnings_freshness", "price_fetch_log", "universe_stocks"):
+        try:
+            conn.execute(f"DROP TABLE IF EXISTS {tbl}")
+        except Exception:
+            pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -285,6 +361,7 @@ MIGRATIONS: list[Migration] = [
     Migration(4, "004_ticker_audit", _migration_004_ticker_audit),
     Migration(5, "005_unified_tickers", _migration_005_unified_tickers),
     Migration(6, "006_drop_legacy_ticker_tables", _migration_006_drop_legacy_ticker_tables),
+    Migration(7, "007_consolidate_earnings_and_freshness", _migration_007_consolidate_earnings_and_freshness),
 ]
 
 

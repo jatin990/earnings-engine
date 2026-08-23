@@ -75,23 +75,34 @@ def _last_cached_date(ticker: str, settings: Settings) -> pd.Timestamp | None:
 
 def _mark_fetched(ticker: str, settings: Settings) -> None:
     """Record the moment this ticker's prices were last written to the cache."""
+    now_str = datetime.now().isoformat(timespec="seconds")
     with _connect(settings) as connection:
         connection.execute(
-            "INSERT OR REPLACE INTO price_fetch_log (ticker, fetched_at, status) VALUES (?, ?, ?)",
-            (ticker, datetime.now().isoformat(timespec="seconds"), "SUCCESS"),
+            """
+            INSERT INTO tickers (ticker, prices_fetched_at, last_updated)
+            VALUES (?, ?, ?)
+            ON CONFLICT(ticker) DO UPDATE SET
+                prices_fetched_at = excluded.prices_fetched_at,
+                last_updated = excluded.last_updated
+            """,
+            (ticker, now_str, now_str),
         )
         connection.commit()
 
 
 def _fetch_log_time(ticker: str, settings: Settings) -> datetime | None:
     """Return the last-fetched timestamp for a ticker (None if never logged)."""
-    path = _cache_path(settings)
-    if not path.exists():
-        return None
     with _connect(settings) as connection:
         row = connection.execute(
-            "SELECT fetched_at FROM price_fetch_log WHERE ticker = ?", (ticker,)
+            "SELECT prices_fetched_at FROM tickers WHERE ticker = ?", (ticker,)
         ).fetchone()
+        if not row or not row[0]:
+            try:
+                row = connection.execute(
+                    "SELECT fetched_at FROM price_fetch_log WHERE ticker = ?", (ticker,)
+                ).fetchone()
+            except Exception:
+                row = None
     if not row or not row[0]:
         return None
     try:

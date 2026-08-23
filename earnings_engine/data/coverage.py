@@ -53,7 +53,7 @@ def get_data_coverage(tickers: list[str], settings: Settings | None = None) -> d
             CASE WHEN p.ticker IS NOT NULL THEN 1 ELSE 0 END AS has_prices,
             CASE WHEN e.earnings_rows IS NOT NULL THEN 1 ELSE 0 END AS has_earnings,
             p.price_start AS listing_date,
-            CASE WHEN f.ticker IS NOT NULL THEN 1 ELSE 0 END AS earnings_fresh
+            CASE WHEN t.earnings_fetched_at IS NOT NULL THEN 1 ELSE 0 END AS earnings_fresh
         FROM (
             SELECT ticker, MIN(date) AS price_start, MAX(date) AS price_end,
                    COUNT(*) AS price_rows
@@ -68,7 +68,7 @@ def get_data_coverage(tickers: list[str], settings: Settings | None = None) -> d
             WHERE ticker IN ({placeholders})
             GROUP BY ticker
         ) e ON e.ticker = p.ticker
-        LEFT JOIN earnings_freshness f ON f.ticker = p.ticker
+        LEFT JOIN tickers t ON t.ticker = p.ticker
     WHERE p.ticker IS NOT NULL
     """
 

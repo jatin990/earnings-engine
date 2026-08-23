@@ -83,7 +83,7 @@ def _connect(settings: Settings) -> Any:
                 eps_reported REAL,
                 surprise_pct REAL,
                 source TEXT NOT NULL DEFAULT 'yfinance',
-                PRIMARY KEY (ticker, earnings_date, source)
+                PRIMARY KEY (ticker, earnings_date)
             )
             """
         )
@@ -94,15 +94,6 @@ def _connect(settings: Settings) -> Any:
             """
         )
 
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS earnings_freshness (
-            ticker TEXT NOT NULL,
-            fetched_at TEXT NOT NULL,
-            PRIMARY KEY (ticker)
-        )
-        """
-    )
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS earnings_fetch_log (
@@ -131,10 +122,10 @@ def _is_fresh(ticker: str, settings: Settings) -> bool:
     """Check if earnings data is fresh in SQLite for the given ticker."""
     with _connect(settings) as connection:
         row = connection.execute(
-            "SELECT fetched_at FROM earnings_freshness WHERE ticker = ?",
+            "SELECT earnings_fetched_at FROM tickers WHERE ticker = ?",
             (ticker,),
         ).fetchone()
-    if not row:
+    if not row or not row[0]:
         return False
     fetched_at = pd.Timestamp(row[0])
     age_days = (pd.Timestamp.now() - fetched_at).total_seconds() / 86400
@@ -142,21 +133,27 @@ def _is_fresh(ticker: str, settings: Settings) -> bool:
 
 
 def _mark_fresh(ticker: str, settings: Settings) -> None:
-    """Mark a ticker as freshly fetched in the freshness tracking table."""
+    """Mark a ticker as freshly fetched in the master tickers table."""
     now = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
     with _connect(settings) as connection:
         connection.execute(
-            "INSERT OR REPLACE INTO earnings_freshness (ticker, fetched_at) VALUES (?, ?)",
-            (ticker, now),
+            """
+            INSERT INTO tickers (ticker, earnings_fetched_at, last_updated)
+            VALUES (?, ?, ?)
+            ON CONFLICT(ticker) DO UPDATE SET
+                earnings_fetched_at = excluded.earnings_fetched_at,
+                last_updated = excluded.last_updated
+            """,
+            (ticker, now, now),
         )
         connection.commit()
 
 
 def _write_earnings(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
-    """Write earnings data to SQLite, replacing any existing rows for the ticker."""
+    """Write earnings data to SQLite with smart merge into earnings_history."""
     if df.empty:
         return
-    # Deduplicate by earnings_date (keep last occurrence) to avoid UNIQUE constraint errors
+    # Deduplicate by earnings_date (keep last occurrence)
     df = df.drop_duplicates(subset=["earnings_date"], keep="last")
     rows = []
     for _, row in df.iterrows():
@@ -168,12 +165,23 @@ def _write_earnings(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
                 float(row["eps_estimate"]) if pd.notna(row.get("eps_estimate")) else None,
                 float(row["eps_reported"]) if pd.notna(row.get("eps_reported")) else None,
                 float(row["surprise_pct"]) if pd.notna(row.get("surprise_pct")) else None,
+                "yfinance",
             )
         )
     with _connect(settings) as connection:
-        connection.execute("DELETE FROM earnings_history WHERE ticker = ? AND source = 'yfinance'", (ticker,))
         connection.executemany(
-            "INSERT OR REPLACE INTO earnings_history (ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source) VALUES (?, ?, ?, ?, ?, 'yfinance')",
+            """
+            INSERT INTO earnings_history (ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(ticker, earnings_date) DO UPDATE SET
+                eps_estimate = COALESCE(excluded.eps_estimate, earnings_history.eps_estimate),
+                eps_reported = COALESCE(excluded.eps_reported, earnings_history.eps_reported),
+                surprise_pct = COALESCE(excluded.surprise_pct, earnings_history.surprise_pct),
+                source = CASE
+                    WHEN earnings_history.source != excluded.source THEN earnings_history.source || '+' || excluded.source
+                    ELSE excluded.source
+                END
+            """,
             rows,
         )
         connection.commit()
@@ -400,7 +408,11 @@ def ingest_nse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
 
     with _connect(settings) as connection:
         inserted = connection.executemany(
-            "INSERT OR IGNORE INTO earnings_history (ticker, earnings_date, source) VALUES (?, ?, 'nse')",
+            """
+            INSERT INTO earnings_history (ticker, earnings_date, source)
+            VALUES (?, ?, 'nse')
+            ON CONFLICT(ticker, earnings_date) DO NOTHING
+            """,
             rows,
         ).rowcount
         connection.commit()
