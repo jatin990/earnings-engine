@@ -7469,27 +7469,39 @@
         };
 
         app.switchCustomizerTab = function(subTab) {
-            app._customizer.activeSubTab = subTab;
+            const tabKey = (subTab || 'tabs').toLowerCase();
+            app._customizer.activeSubTab = tabKey;
             
-            // Toggle nav buttons
-            ['tabs', 'themes', 'env', 'ratelimits', 'keys', 'audit'].forEach(t => {
-                const navBtn = document.getElementById('ccNav' + t.charAt(0).toUpperCase() + t.slice(1));
-                const sec = document.getElementById('ccSection' + t.charAt(0).toUpperCase() + t.slice(1));
-                if (navBtn) navBtn.classList.toggle('active', t === subTab);
-                if (sec) sec.style.display = (t === subTab) ? 'block' : 'none';
+            const tabMap = {
+                'tabs': 'Tabs',
+                'themes': 'Themes',
+                'env': 'Env',
+                'ratelimits': 'RateLimits',
+                'keys': 'Keys',
+                'audit': 'Audit',
+            };
+            
+            // Toggle nav buttons and sections
+            Object.keys(tabMap).forEach(t => {
+                const suffix = tabMap[t];
+                const navBtn = document.getElementById('ccNav' + suffix);
+                const sec = document.getElementById('ccSection' + suffix);
+                const isCurrent = (t === tabKey);
+                if (navBtn) navBtn.classList.toggle('active', isCurrent);
+                if (sec) sec.style.display = isCurrent ? 'block' : 'none';
             });
 
-            if (subTab === 'tabs') {
+            if (tabKey === 'tabs') {
                 app.renderCustomizerTabsGrid();
-            } else if (subTab === 'themes') {
+            } else if (tabKey === 'themes') {
                 app.syncThemePickers();
-            } else if (subTab === 'env') {
+            } else if (tabKey === 'env') {
                 app.loadEnvVars();
-            } else if (subTab === 'ratelimits') {
+            } else if (tabKey === 'ratelimits') {
                 app.loadRateLimits();
-            } else if (subTab === 'keys') {
+            } else if (tabKey === 'keys') {
                 app.loadPasscodesInCustomizer();
-            } else if (subTab === 'audit') {
+            } else if (tabKey === 'audit') {
                 app.loadAccessAudit();
             }
         };
