@@ -3122,11 +3122,39 @@ async def get_all_errors_endpoint(limit: int = Query(100, ge=1, le=500)):
 
 
 @app.post("/api/v1/errors/scan-logs", tags=["Error Diagnostics"])
-async def scan_logs_endpoint():
-    """Scan all log files in logs/ directory and ingest any newly detected errors."""
+async def scan_logs_endpoint(full: bool = Query(False, description="Whether to run full scan across all historical log files")):
+    """Scan error stream or log files and ingest any newly detected errors."""
     from earnings_engine.data.error_ledger import scan_log_files
-    result = scan_log_files(settings=_settings)
+    result = scan_log_files(full_scan=full, settings=_settings)
     return {"success": True, **result}
+
+
+@app.get("/api/v1/errors/stream", tags=["Error Diagnostics"])
+async def get_error_stream_endpoint():
+    """Retrieve unconsumed error records from the live active error stream."""
+    from earnings_engine.data.error_ledger import read_error_stream, get_error_stream_path
+    events = read_error_stream()
+    return {
+        "count": len(events),
+        "stream_file": str(get_error_stream_path()),
+        "events": events,
+    }
+
+
+@app.post("/api/v1/errors/stream/drain", tags=["Error Diagnostics"])
+async def drain_error_stream_endpoint():
+    """Ingest all pending error stream events into ledger and clear stream buffer."""
+    from earnings_engine.data.error_ledger import consume_error_stream
+    result = consume_error_stream(clear_after=True, settings=_settings)
+    return {"success": True, **result}
+
+
+@app.delete("/api/v1/errors/stream", tags=["Error Diagnostics"])
+async def clear_error_stream_endpoint():
+    """Clear/truncate the active error stream buffer."""
+    from earnings_engine.data.error_ledger import clear_error_stream
+    count = clear_error_stream()
+    return {"success": True, "cleared_count": count}
 
 
 @app.post("/api/v1/errors/{error_id}/resolve", tags=["Error Diagnostics"])
@@ -3138,6 +3166,7 @@ async def resolve_error_endpoint(error_id: str, req: ResolveErrorRequest | None 
     if not updated:
         raise HTTPException(status_code=404, detail=f"Error with ID or signature '{error_id}' not found.")
     return {"success": True, "resolved_id": error_id, "notes": notes}
+
 
 
 

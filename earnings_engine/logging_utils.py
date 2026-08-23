@@ -41,7 +41,7 @@ def _get_run_log_file(base_dir: Path) -> Path | None:
 
 
 class ErrorLedgerLoggingHandler(logging.Handler):
-    """Logging handler that captures ERROR and CRITICAL logs to the local error ledger."""
+    """Logging handler that captures ERROR and CRITICAL logs to the active error stream & ledger."""
 
     def __init__(self) -> None:
         super().__init__(level=logging.ERROR)
@@ -51,15 +51,34 @@ class ErrorLedgerLoggingHandler(logging.Handler):
         if record.name.startswith("earnings_engine.data.error_ledger"):
             return
         try:
-            from earnings_engine.data.error_ledger import record_error
+            from datetime import datetime, timezone
+            from earnings_engine.data.error_ledger import append_to_error_stream, record_error
+            
             stack_trace = None
             if record.exc_info:
                 import traceback
                 stack_trace = "".join(traceback.format_exception(*record.exc_info))
 
+            now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            msg = record.getMessage()
+            err_type = f"{record.name}.{record.levelname}"
+
+            # 1. Append to active error stream for instant zero-scan consumption
+            append_to_error_stream({
+                "timestamp": now_iso,
+                "level": record.levelname,
+                "logger": record.name,
+                "error_type": err_type,
+                "message": msg,
+                "stack_trace": stack_trace,
+                "source_file": record.pathname,
+                "line_no": record.lineno,
+            })
+
+            # 2. Ingest into error ledger table
             record_error(
-                error_type=f"{record.name}.{record.levelname}",
-                message=record.getMessage(),
+                error_type=err_type,
+                message=msg,
                 stack_trace=stack_trace,
                 source_file=record.pathname,
                 line_no=record.lineno,
@@ -102,9 +121,13 @@ def setup_logger(name: str = "earnings_engine", base_dir: Path | None = None) ->
         except (OSError, PermissionError):
             pass
 
-    root_logger.propagate = False
+    # Ensure error stream handler is also attached to root logger
+    top_root = logging.getLogger()
+    if not any(isinstance(h, ErrorLedgerLoggingHandler) for h in top_root.handlers):
+        top_root.addHandler(ErrorLedgerLoggingHandler())
 
-    logger = logging.getLogger(name)
+    canonical_name = name if name.startswith("earnings_engine") or name == "" else f"earnings_engine.{name}"
+    logger = logging.getLogger(canonical_name)
     logger.setLevel(logging.INFO)
     logger.handlers.clear()
     logger.propagate = True

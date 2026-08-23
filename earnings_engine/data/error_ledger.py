@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +21,127 @@ from earnings_engine.data.db import get_db_connection
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.error_ledger")
+_STREAM_LOCK = threading.Lock()
+
+
+def get_error_stream_path(base_dir: Path | None = None) -> Path:
+    """Return the absolute path to the active error stream JSONL file."""
+    base = Path(base_dir or PROJECT_ROOT)
+    logs_dir = base / "logs"
+    try:
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        return logs_dir / "active_error_stream.jsonl"
+    except (OSError, PermissionError):
+        tmp_dir = Path("/tmp/logs")
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        return tmp_dir / "active_error_stream.jsonl"
+
+
+def append_to_error_stream(entry: dict[str, Any], base_dir: Path | None = None) -> bool:
+    """Append a structured error event to the active error stream file."""
+    stream_path = get_error_stream_path(base_dir)
+    try:
+        line = json.dumps(entry, ensure_ascii=False) + "\n"
+        with _STREAM_LOCK:
+            with open(stream_path, "a", encoding="utf-8") as f:
+                f.write(line)
+        return True
+    except Exception as e:
+        logger.debug("Failed appending to error stream %s: %s", stream_path, e)
+        return False
+
+
+def read_error_stream(base_dir: Path | None = None) -> list[dict[str, Any]]:
+    """Read all active unconsumed error records from the error stream."""
+    stream_path = get_error_stream_path(base_dir)
+    if not stream_path.exists():
+        return []
+
+    events = []
+    with _STREAM_LOCK:
+        try:
+            with open(stream_path, "r", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        events.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as e:
+            logger.debug("Failed reading error stream: %s", e)
+    return events
+
+
+def clear_error_stream(base_dir: Path | None = None) -> int:
+    """Clear / truncate the active error stream and return the number of items cleared."""
+    stream_path = get_error_stream_path(base_dir)
+    if not stream_path.exists():
+        return 0
+
+    with _STREAM_LOCK:
+        try:
+            # Count lines first
+            count = 0
+            with open(stream_path, "r", encoding="utf-8", errors="replace") as f:
+                count = sum(1 for line in f if line.strip())
+            # Truncate file
+            with open(stream_path, "w", encoding="utf-8") as f:
+                f.truncate(0)
+            return count
+        except Exception as e:
+            logger.debug("Failed clearing error stream: %s", e)
+            return 0
+
+
+def consume_error_stream(
+    base_dir: Path | None = None,
+    clear_after: bool = True,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Read all new error events from the active stream, record them in the ledger, and clear stream."""
+    stream_events = read_error_stream(base_dir)
+    if not stream_events:
+        return {
+            "mode": "stream",
+            "stream_count": 0,
+            "errors_found": 0,
+            "newly_recorded": 0,
+            "cleared": False,
+            "stream_file": str(get_error_stream_path(base_dir)),
+        }
+
+    settings = settings or Settings()
+    newly_recorded = 0
+    total_found = len(stream_events)
+
+    for event in stream_events:
+        res = record_error(
+            error_type=event.get("error_type") or f"{event.get('logger', 'unknown')}.{event.get('level', 'ERROR')}",
+            message=event.get("message", ""),
+            stack_trace=event.get("stack_trace"),
+            source_file=event.get("source_file"),
+            line_no=event.get("line_no"),
+            context_data=event.get("context_data") or {"streamed": True, "timestamp": event.get("timestamp")},
+            settings=settings,
+        )
+        if res.get("occurrences", 1) == 1:
+            newly_recorded += 1
+
+    cleared_count = 0
+    if clear_after:
+        cleared_count = clear_error_stream(base_dir)
+
+    return {
+        "mode": "stream",
+        "stream_count": total_found,
+        "errors_found": total_found,
+        "newly_recorded": newly_recorded,
+        "cleared": clear_after,
+        "cleared_count": cleared_count,
+        "stream_file": str(get_error_stream_path(base_dir)),
+    }
 
 
 def _get_signature(error_type: str, message: str, source_file: str | None = None) -> str:
@@ -253,14 +375,34 @@ def get_error_summary(settings: Settings | None = None) -> dict[str, Any]:
     }
 
 
-def scan_log_files(base_dir: Path | None = None, settings: Settings | None = None) -> dict[str, Any]:
-    """Scan all log files in logs/ directory, parse error lines & tracebacks, and record in ledger."""
+def scan_log_files(
+    base_dir: Path | None = None,
+    full_scan: bool = False,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Scan for errors. Consumes the active error stream by default (O(1)), or performs a full log scan."""
     base = Path(base_dir or PROJECT_ROOT)
+
+    # 1. Fast path: consume active error stream if available
+    if not full_scan:
+        stream_res = consume_error_stream(base_dir=base, clear_after=True, settings=settings)
+        if stream_res.get("stream_count", 0) > 0:
+            return {
+                "mode": "stream",
+                "scanned_files": 1,
+                "errors_found": stream_res["errors_found"],
+                "newly_recorded": stream_res["newly_recorded"],
+                "stream_cleared": stream_res["cleared"],
+            }
+
+    # 2. File scan path
     logs_dir = base / "logs"
     if not logs_dir.exists():
-        return {"scanned_files": 0, "errors_found": 0, "newly_recorded": 0}
+        return {"mode": "files", "scanned_files": 0, "errors_found": 0, "newly_recorded": 0}
 
-    log_files = sorted(logs_dir.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+    all_logs = sorted(logs_dir.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+    # If not full scan and stream was empty, scan top 3 most recent logs
+    log_files = all_logs if full_scan else all_logs[:3]
     
     error_pattern = re.compile(
         r"^(?P<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d{3})\s+(?P<level>ERROR|CRITICAL)\s+(?P<logger>[\w\.\-]+)\s+(?P<message>.*)$"

@@ -114,3 +114,69 @@ def test_error_ledger_api_endpoints():
     resp_scan = client.post("/api/v1/errors/scan-logs")
     assert resp_scan.status_code == 200
     assert resp_scan.json()["success"] is True
+
+    # 5. Error stream endpoints
+    resp_stream = client.get("/api/v1/errors/stream")
+    assert resp_stream.status_code == 200
+    assert "events" in resp_stream.json()
+
+    resp_drain = client.post("/api/v1/errors/stream/drain")
+    assert resp_drain.status_code == 200
+    assert resp_drain.json()["success"] is True
+
+    resp_clear = client.delete("/api/v1/errors/stream")
+    assert resp_clear.status_code == 200
+    assert resp_clear.json()["success"] is True
+
+
+def test_active_error_stream_lifecycle(tmp_path: Path):
+    from earnings_engine.data.error_ledger import (
+        append_to_error_stream,
+        clear_error_stream,
+        consume_error_stream,
+        read_error_stream,
+    )
+    settings = Settings()
+
+    # 1. Append structured errors to stream
+    ev1 = {
+        "timestamp": "2026-08-24T00:01:00Z",
+        "level": "ERROR",
+        "logger": "test.orders",
+        "error_type": "test.orders.ERROR",
+        "message": "Order placement timeout at broker gate",
+        "source_file": "orders.py",
+        "line_no": 105,
+    }
+    ev2 = {
+        "timestamp": "2026-08-24T00:02:00Z",
+        "level": "CRITICAL",
+        "logger": "test.feed",
+        "error_type": "test.feed.CRITICAL",
+        "message": "Market feed websocket disconnected unexpectedly",
+        "source_file": "feed.py",
+        "line_no": 210,
+    }
+    assert append_to_error_stream(ev1, base_dir=tmp_path) is True
+    assert append_to_error_stream(ev2, base_dir=tmp_path) is True
+
+    # 2. Read active error stream without clearing
+    events = read_error_stream(base_dir=tmp_path)
+    assert len(events) == 2
+    assert events[0]["message"] == "Order placement timeout at broker gate"
+    assert events[1]["message"] == "Market feed websocket disconnected unexpectedly"
+
+    # 3. Consume error stream into ledger (with clearing)
+    drain_res = consume_error_stream(base_dir=tmp_path, clear_after=True, settings=settings)
+    assert drain_res["stream_count"] == 2
+    assert drain_res["errors_found"] == 2
+    assert drain_res["cleared"] is True
+
+    # 4. Stream should now be empty
+    events_after = read_error_stream(base_dir=tmp_path)
+    assert len(events_after) == 0
+
+    # 5. Clear stream function on empty stream returns 0
+    cleared_cnt = clear_error_stream(base_dir=tmp_path)
+    assert cleared_cnt == 0
+

@@ -2,11 +2,14 @@
 """CLI utility for scanning, inspecting, and managing the local Error Ledger.
 
 Usage:
-    python scripts/error_ledger.py scan       # Scan log files and update ledger
-    python scripts/error_ledger.py open       # List open unresolved errors
-    python scripts/error_ledger.py summary    # Display error health KPIs
+    python scripts/error_ledger.py scan [--full]  # Ingest active error stream (or full log re-scan)
+    python scripts/error_ledger.py stream         # View live unconsumed errors in active stream
+    python scripts/error_ledger.py drain          # Ingest & clear active error stream
+    python scripts/error_ledger.py clear-stream   # Delete/truncate active error stream contents
+    python scripts/error_ledger.py open           # List open unresolved errors in ledger
+    python scripts/error_ledger.py summary        # Display error health KPIs
     python scripts/error_ledger.py resolve <id_or_sig> [notes]  # Mark error as resolved
-    python scripts/error_ledger.py check      # Pre/post-task health gate (returns non-zero if open errors)
+    python scripts/error_ledger.py check          # Pre/post-task health gate
 """
 from __future__ import annotations
 
@@ -27,20 +30,74 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from earnings_engine.config import Settings
 from earnings_engine.data.error_ledger import (
+    clear_error_stream,
+    consume_error_stream,
+    get_error_stream_path,
     get_error_summary,
     get_open_errors,
     mark_error_resolved,
+    read_error_stream,
     scan_log_files,
 )
 
 
-def cmd_scan(settings: Settings) -> None:
-    print("🔍 Scanning logs/ directory for errors and exceptions...")
-    res = scan_log_files(base_dir=PROJECT_ROOT, settings=settings)
-    print(f"✅ Scanned {res['scanned_files']} log file(s).")
-    print(f"📊 Found {res['errors_found']} total error instances ({res['newly_recorded']} new unique signatures).")
+def cmd_scan(settings: Settings, full_scan: bool = False) -> None:
+    if full_scan:
+        print("🔍 Performing FULL scan across all historical logs/ files...")
+    else:
+        print("⚡ Consuming active real-time error stream (zero-lag O(1))...")
+
+    res = scan_log_files(base_dir=PROJECT_ROOT, full_scan=full_scan, settings=settings)
+    mode = res.get("mode", "files")
+    if mode == "stream":
+        print(f"✅ Ingested {res['errors_found']} error event(s) from active error stream.")
+        print(f"📊 {res['newly_recorded']} new unique signatures recorded into ledger.")
+        if res.get("stream_cleared"):
+            print("🧹 Active error stream flushed and reset.")
+    else:
+        print(f"✅ Scanned {res.get('scanned_files', 0)} log file(s).")
+        print(f"📊 Found {res.get('errors_found', 0)} error instances ({res.get('newly_recorded', 0)} new unique signatures).")
     print()
     cmd_summary(settings)
+
+
+def cmd_stream(settings: Settings) -> None:
+    stream_path = get_error_stream_path(PROJECT_ROOT)
+    events = read_error_stream(PROJECT_ROOT)
+    print(f"📡 ACTIVE REAL-TIME ERROR STREAM ({stream_path})")
+    print("=" * 70)
+    if not events:
+        print("✨ Active error stream is currently empty (0 unconsumed error events).")
+        print("=" * 70)
+        return
+
+    print(f"⚠️ Found {len(events)} unconsumed error event(s) in active stream:\n")
+    for idx, ev in enumerate(events, 1):
+        print(f"[{idx}] {ev.get('timestamp', '?')} | {ev.get('level', 'ERROR')} | {ev.get('logger', 'unknown')}")
+        print(f"    Message : {ev.get('message', '')}")
+        if ev.get("source_file"):
+            print(f"    Source  : {ev.get('source_file')}:{ev.get('line_no', '?')}")
+        if ev.get("stack_trace"):
+            tb_preview = "\n".join(ev["stack_trace"].strip().splitlines()[-3:])
+            print(f"    Trace   :\n{tb_preview}")
+        print("-" * 70)
+
+    print("\n👉 To ingest and clear these stream events into the ledger, run:")
+    print("   python scripts/error_ledger.py drain")
+
+
+def cmd_drain(settings: Settings) -> None:
+    print("🧹 Ingesting and clearing active error stream...")
+    res = consume_error_stream(base_dir=PROJECT_ROOT, clear_after=True, settings=settings)
+    print(f"✅ Consumed {res['stream_count']} event(s), {res['newly_recorded']} new unique signatures.")
+    print("🧹 Active error stream has been cleared.")
+    print()
+    cmd_summary(settings)
+
+
+def cmd_clear_stream() -> None:
+    count = clear_error_stream(PROJECT_ROOT)
+    print(f"🧹 Active error stream cleared ({count} event(s) purged).")
 
 
 def cmd_summary(settings: Settings) -> None:
@@ -100,8 +157,8 @@ def cmd_resolve(identifier: str, notes: str, settings: Settings) -> None:
 
 def cmd_check(settings: Settings) -> int:
     """Pre/post-task check gate."""
-    # First sync latest log files
-    scan_log_files(base_dir=PROJECT_ROOT, settings=settings)
+    # First ingest latest active error stream or log files
+    scan_log_files(base_dir=PROJECT_ROOT, full_scan=False, settings=settings)
     open_errs = get_open_errors(settings, limit=10)
     
     if not open_errs:
@@ -126,7 +183,14 @@ def main() -> None:
 
     cmd = args[0].lower()
     if cmd == "scan":
-        cmd_scan(settings)
+        full_scan = "--full" in args or "-f" in args
+        cmd_scan(settings, full_scan=full_scan)
+    elif cmd in ("stream", "live", "tail"):
+        cmd_stream(settings)
+    elif cmd in ("drain", "consume"):
+        cmd_drain(settings)
+    elif cmd in ("clear-stream", "clear", "purge-stream"):
+        cmd_clear_stream()
     elif cmd == "summary":
         cmd_summary(settings)
     elif cmd == "open":
