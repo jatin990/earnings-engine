@@ -95,13 +95,17 @@ def aggregate_predictions(
     majority_direction = max(direction_counts, key=direction_counts.get)  # type: ignore[arg-type]
     agreement_ratio = direction_counts[majority_direction] / len(valid) if valid else 0.0
 
-    # --- Confidence-Weighted Target Price ---
+    # --- Confidence-Weighted Price Action Metrics ---
     weighted_target = 0.0
     weighted_return = 0.0
     weighted_support = 0.0
     weighted_resistance = 0.0
+    weighted_stop_loss = 0.0
     support_weight = 0.0
     resistance_weight = 0.0
+    stop_weight = 0.0
+    rr_ratios: list[float] = []
+    actions: list[str] = []
 
     for p in valid:
         conf = float(p.get("confidence_pct", 50))
@@ -124,10 +128,36 @@ def aggregate_predictions(
             weighted_resistance += float(resistance) * conf
             resistance_weight += conf
 
+        stop_loss = p.get("stop_loss_price")
+        if stop_loss and float(stop_loss) > 0:
+            weighted_stop_loss += float(stop_loss) * conf
+            stop_weight += conf
+
+        rr = p.get("risk_reward_ratio")
+        if rr and float(rr) > 0:
+            rr_ratios.append(float(rr))
+
+        act = p.get("recommended_action")
+        if act:
+            actions.append(str(act).strip().upper())
+
     consensus_target_price = weighted_target / total_confidence if total_confidence > 0 else as_of_price
     consensus_return_pct = weighted_return / total_confidence if total_confidence > 0 else 0.0
     consensus_support = weighted_support / support_weight if support_weight > 0 else None
     consensus_resistance = weighted_resistance / resistance_weight if resistance_weight > 0 else None
+    consensus_stop_loss = weighted_stop_loss / stop_weight if stop_weight > 0 else None
+    consensus_rr = (sum(rr_ratios) / len(rr_ratios)) if rr_ratios else None
+
+    # Determine recommended action
+    if actions:
+        from collections import Counter
+        consensus_action = Counter(actions).most_common(1)[0][0]
+    elif consensus_direction == "BULLISH":
+        consensus_action = "ACCUMULATE ON DIPS" if consensus_strength < 80 else "STRONG BUY"
+    elif consensus_direction == "BEARISH":
+        consensus_action = "AVOID / TAKE PROFITS"
+    else:
+        consensus_action = "HOLD / WAIT FOR BREAKOUT"
 
     # --- Synthesized Thesis ---
     thesis = _synthesize_thesis(valid, errored, consensus_direction, consensus_strength, agreement_ratio)
@@ -141,6 +171,9 @@ def aggregate_predictions(
         "consensus_target_price": round(consensus_target_price, 2),
         "consensus_support": round(consensus_support, 2) if consensus_support else None,
         "consensus_resistance": round(consensus_resistance, 2) if consensus_resistance else None,
+        "consensus_stop_loss": round(consensus_stop_loss, 2) if consensus_stop_loss else None,
+        "consensus_risk_reward": round(consensus_rr, 1) if consensus_rr else None,
+        "consensus_recommended_action": consensus_action,
         "model_count": len(model_results),
         "agreement_ratio": round(agreement_ratio, 2),
         "models_breakdown": model_results,

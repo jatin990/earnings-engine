@@ -3042,72 +3042,152 @@
                         content.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:0.5rem;padding:0.75rem;">' +
                             '<div>' +
                             '<strong style="display:block;font-size:0.85rem;color:var(--light);">No Multi-Model Consensus on Record</strong>' +
-                            '<span style="font-size:0.78rem;color:var(--muted);">Trigger an ensemble run to gather calibrated votes from DeepSeek-R1, Claude 3.5 Sonnet, Llama-3.3, and Gemini Flash.</span>' +
+                            '<span style="font-size:0.78rem;color:var(--muted);">Trigger an ensemble run to gather calibrated votes, support/resistance targets, and chart patterns from DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral Large.</span>' +
                             '</div>' +
                             '<button class="btn btn-sm" onclick="app.runModalConsensus()" style="background:linear-gradient(135deg, #6366f1, #a855f7);color:#fff;border:none;font-size:0.78rem;font-weight:700;padding:0.4rem 0.85rem;border-radius:0.4rem;box-shadow:0 2px 8px rgba(99,102,241,0.3);">⚡ Run Consensus Now</button>' +
                             '</div>';
                         return;
                     }
 
-                    // Render Consensus Details
-                    const dir = pred.consensus_direction || 'NEUTRAL';
+                    // Extract Consensus Metrics
+                    const dir = (pred.consensus_direction || 'NEUTRAL').toUpperCase();
                     const isBull = dir.includes('BULL');
                     const isBear = dir.includes('BEAR');
                     const dirColor = isBull ? '#34d399' : isBear ? '#ef4444' : '#fbbf24';
                     const dirBg = isBull ? 'rgba(16,185,129,0.2)' : isBear ? 'rgba(239,68,68,0.2)' : 'rgba(251,191,36,0.2)';
                     
-                    const confPct = pred.confidence_score ? Math.round(pred.confidence_score * 100) : 80;
-                    const agreePct = pred.agreement_rate ? Math.round(pred.agreement_rate * 100) : 75;
-                    const expRet = pred.expected_move_pct != null ? (pred.expected_move_pct > 0 ? '+' : '') + Number(pred.expected_move_pct).toFixed(1) + '%' : '—';
-                    const horizon = pred.time_horizon_days ? (pred.time_horizon_days + ' Days') : '14 Days';
+                    const strengthPct = pred.consensus_strength != null ? Math.round(pred.consensus_strength) : 80;
+                    const agreeRatio = pred.agreement_ratio != null ? Math.round(pred.agreement_ratio * 100) : (pred.agreement_rate ? Math.round(pred.agreement_rate * 100) : 75);
+                    const retPct = pred.consensus_return_pct != null ? pred.consensus_return_pct : (pred.expected_move_pct != null ? pred.expected_move_pct : null);
+                    const expRetStr = retPct != null ? ((retPct > 0 ? '+' : '') + Number(retPct).toFixed(2) + '%') : '—';
+                    
+                    const curPrice = pred.as_of_price != null ? ('₹' + Number(pred.as_of_price).toFixed(2)) : '—';
+                    const tgtPrice = pred.consensus_target_price != null ? ('₹' + Number(pred.consensus_target_price).toFixed(2)) : '—';
+                    const supPrice = pred.consensus_support != null ? ('₹' + Number(pred.consensus_support).toFixed(2)) : '—';
+                    const resPrice = pred.consensus_resistance != null ? ('₹' + Number(pred.consensus_resistance).toFixed(2)) : '—';
+                    const stopPrice = pred.consensus_stop_loss != null ? ('₹' + Number(pred.consensus_stop_loss).toFixed(2)) : '—';
+                    const rrRatio = pred.consensus_risk_reward != null ? ('1 : ' + Number(pred.consensus_risk_reward).toFixed(1)) : '—';
+                    const recAction = pred.consensus_recommended_action || (isBull ? (strengthPct >= 80 ? 'STRONG BUY' : 'ACCUMULATE ON DIPS') : isBear ? 'AVOID / TAKE PROFITS' : 'HOLD / WAIT FOR BREAKOUT');
+                    const actColor = recAction.includes('BUY') || recAction.includes('ACCUMULATE') ? '#34d399' : recAction.includes('AVOID') || recAction.includes('TAKE PROFIT') ? '#f87171' : '#fbbf24';
 
                     if (badge) {
                         badge.style.display = 'inline-block';
                         badge.style.background = dirBg;
                         badge.style.color = dirColor;
-                        badge.textContent = dir + ' (' + expRet + ' · ' + agreePct + '% Agreement · ' + confPct + '% Conf)';
+                        badge.textContent = dir + ' (' + expRetStr + ' · ' + agreeRatio + '% Agreement · ' + strengthPct + '% Strength)';
                     }
 
-                    // Parse individual model votes if available
-                    let votesHtml = '';
-                    if (pred.model_outputs || pred.model_votes) {
-                        const votes = typeof pred.model_outputs === 'object' ? pred.model_outputs : (typeof pred.model_votes === 'object' ? pred.model_votes : {});
-                        const modelCards = Object.entries(votes).map(([modelKey, mData]) => {
-                            const mDir = (typeof mData === 'object' ? mData.direction : mData) || 'NEUTRAL';
-                            const mReason = typeof mData === 'object' ? (mData.reasoning || mData.thesis || '') : '';
-                            const mBull = String(mDir).toUpperCase().includes('BULL');
-                            const mBear = String(mDir).toUpperCase().includes('BEAR');
+                    // 1. Five-Pillar Price Action Matrix
+                    const priceMatrixHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.5rem;margin:0.6rem 0;">' +
+                        '<div class="metric" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.6rem 0.75rem;">' +
+                        '<span style="font-size:0.72rem;color:var(--muted);">Entry / As-Of Price</span>' +
+                        '<strong style="font-size:1.05rem;color:var(--light);">' + curPrice + '</strong>' +
+                        '</div>' +
+                        '<div class="metric" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.25);border-radius:0.5rem;padding:0.6rem 0.75rem;">' +
+                        '<span style="font-size:0.72rem;color:#6ee7b7;">Consensus Target</span>' +
+                        '<strong style="font-size:1.05rem;color:#34d399;">' + tgtPrice + ' <small style="font-size:0.75rem;">(' + expRetStr + ')</small></strong>' +
+                        '</div>' +
+                        '<div class="metric" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:0.5rem;padding:0.6rem 0.75rem;">' +
+                        '<span style="font-size:0.72rem;color:#93c5fd;">Support Floor</span>' +
+                        '<strong style="font-size:1.05rem;color:#60a5fa;">' + supPrice + '</strong>' +
+                        '</div>' +
+                        '<div class="metric" style="background:rgba(244,63,94,0.08);border:1px solid rgba(244,63,94,0.25);border-radius:0.5rem;padding:0.6rem 0.75rem;">' +
+                        '<span style="font-size:0.72rem;color:#fda4af;">Resistance Ceiling</span>' +
+                        '<strong style="font-size:1.05rem;color:#fb7185;">' + resPrice + '</strong>' +
+                        '</div>' +
+                        '<div class="metric" style="background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.25);border-radius:0.5rem;padding:0.6rem 0.75rem;">' +
+                        '<span style="font-size:0.72rem;color:#fde047;">Stop-Loss & R:R</span>' +
+                        '<strong style="font-size:1.05rem;color:#facc15;">' + stopPrice + (rrRatio !== '—' ? (' <small style="font-size:0.72rem;color:var(--muted);">(' + rrRatio + ')</small>') : '') + '</strong>' +
+                        '</div>' +
+                        '</div>';
+
+                    // 2. Verdict & Action Ribbon
+                    const actionRibbonHtml = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.6rem;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.6rem 0.85rem;margin-bottom:0.6rem;">' +
+                        '<div style="display:flex;align-items:center;gap:0.5rem;">' +
+                        '<span style="font-size:0.78rem;color:var(--muted);">Ensemble Action:</span>' +
+                        '<span class="signal-badge" style="font-size:0.8rem;font-weight:700;background:rgba(255,255,255,0.08);color:' + actColor + ';border:1px solid ' + actColor + '44;padding:0.2rem 0.6rem;">🎯 ' + recAction + '</span>' +
+                        '</div>' +
+                        '<div style="display:flex;align-items:center;gap:0.8rem;font-size:0.75rem;color:var(--muted);">' +
+                        '<span>Consensus Strength: <strong style="color:' + dirColor + ';">' + strengthPct + '%</strong></span>' +
+                        '<span>Model Agreement: <strong style="color:var(--light);">' + agreeRatio + '% (' + (pred.valid_count || pred.model_count || 4) + ' Models)</strong></span>' +
+                        '</div>' +
+                        '</div>';
+
+                    // 3. Synthesis Thesis Callout
+                    const thesisText = pred.synthesized_thesis || pred.synthesis_reasoning || pred.synthesis_summary;
+                    const thesisHtml = thesisText ? ('<div style="background:linear-gradient(135deg, rgba(99,102,241,0.1), rgba(168,85,247,0.1));border:1px solid rgba(99,102,241,0.35);border-radius:0.5rem;padding:0.75rem 0.95rem;margin-bottom:0.75rem;">' +
+                        '<strong style="color:#a5b4fc;font-size:0.82rem;display:flex;align-items:center;gap:0.35rem;margin-bottom:0.3rem;">✨ Ensemble Quantitative Thesis:</strong>' +
+                        '<p style="margin:0;font-size:0.82rem;line-height:1.55;color:var(--light);">' + thesisText + '</p>' +
+                        '</div>') : '';
+
+                    // 4. Individual Model Detail Cards
+                    let modelCardsHtml = '';
+                    const rawModels = pred.models_breakdown || pred.model_outputs || pred.model_votes || [];
+                    const modelsList = Array.isArray(rawModels) ? rawModels : Object.entries(rawModels).map(([k, v]) => ({ model_name: k, ...(typeof v === 'object' ? v : { direction: v }) }));
+
+                    if (modelsList.length) {
+                        const cards = modelsList.map(m => {
+                            const mName = m.model_name || m.model_id || 'Unknown Model';
+                            const mDir = (m.direction || 'NEUTRAL').toUpperCase();
+                            const mBull = mDir.includes('BULL');
+                            const mBear = mDir.includes('BEAR');
                             const mColor = mBull ? '#34d399' : mBear ? '#f87171' : '#fbbf24';
+                            const mBg = mBull ? 'rgba(52,211,153,0.15)' : mBear ? 'rgba(248,113,113,0.15)' : 'rgba(251,191,36,0.15)';
+                            
+                            const mConf = m.confidence_pct != null ? (m.confidence_pct + '% Conf') : '';
+                            const mTgt = m.target_price != null ? ('₹' + Number(m.target_price).toFixed(2)) : '—';
+                            const mRet = m.target_return_pct != null ? ((m.target_return_pct > 0 ? '+' : '') + Number(m.target_return_pct).toFixed(2) + '%') : '—';
+                            const mSup = m.support_level != null ? ('₹' + Number(m.support_level).toFixed(2)) : '—';
+                            const mRes = m.resistance_level != null ? ('₹' + Number(m.resistance_level).toFixed(2)) : '—';
+                            const mStop = m.stop_loss_price != null ? ('₹' + Number(m.stop_loss_price).toFixed(2)) : '—';
+                            const mRr = m.risk_reward_ratio != null ? ('1 : ' + Number(m.risk_reward_ratio).toFixed(1)) : '—';
+                            const mPattern = m.chart_pattern || '';
+                            const mVolume = m.volume_profile_insight || '';
+                            const mAction = m.recommended_action || '';
+                            const mDrivers = Array.isArray(m.key_drivers) ? m.key_drivers : [];
+                            const mRisk = m.primary_risk || '';
+                            const mLatency = m.latency_ms ? (m.latency_ms + 'ms') : '';
 
-                            const cleanModelName = modelKey.replace(/_/g, ' ').replace(/-/g, ' ').toUpperCase();
-
-                            return '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.6rem 0.75rem;">' +
-                                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">' +
-                                '<strong style="font-size:0.78rem;color:#93c5fd;">🤖 ' + cleanModelName + '</strong>' +
-                                '<span class="signal-badge" style="font-size:0.65rem;background:rgba(255,255,255,0.06);color:' + mColor + ';font-weight:700;">' + mDir + '</span>' +
+                            return '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.75rem;display:flex;flex-direction:column;gap:0.45rem;">' +
+                                '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0.4rem;">' +
+                                '<div style="display:flex;align-items:center;gap:0.4rem;">' +
+                                '<strong style="font-size:0.82rem;color:#93c5fd;">🤖 ' + mName + '</strong>' +
+                                (mLatency ? '<span style="font-size:0.68rem;color:var(--muted);font-family:monospace;">⚡ ' + mLatency + '</span>' : '') +
                                 '</div>' +
-                                (mReason ? '<p style="margin:0.2rem 0 0 0;font-size:0.72rem;color:var(--muted);line-height:1.35;">' + mReason.slice(0, 140) + (mReason.length > 140 ? '...' : '') + '</p>' : '') +
+                                '<div style="display:flex;align-items:center;gap:0.35rem;">' +
+                                '<span class="signal-badge" style="font-size:0.7rem;font-weight:700;background:' + mBg + ';color:' + mColor + ';padding:0.15rem 0.45rem;">' + mDir + (mConf ? (' · ' + mConf) : '') + '</span>' +
+                                '</div>' +
+                                '</div>' +
+
+                                // Model Price Levels Row
+                                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.35rem;font-size:0.75rem;background:rgba(0,0,0,0.2);padding:0.45rem 0.6rem;border-radius:0.35rem;">' +
+                                '<div><span style="color:var(--muted);">Target:</span> <strong style="color:#34d399;">' + mTgt + ' (' + mRet + ')</strong></div>' +
+                                '<div><span style="color:var(--muted);">Support:</span> <strong style="color:#60a5fa;">' + mSup + '</strong></div>' +
+                                '<div><span style="color:var(--muted);">Resistance:</span> <strong style="color:#fb7185;">' + mRes + '</strong></div>' +
+                                '<div><span style="color:var(--muted);">Stop / R:R:</span> <strong style="color:#facc15;">' + mStop + (mRr !== '—' ? (' (' + mRr + ')') : '') + '</strong></div>' +
+                                '</div>' +
+
+                                // Pattern & Order Flow
+                                (mPattern ? ('<div style="font-size:0.73rem;color:#c084fc;">📐 <strong>Pattern:</strong> ' + mPattern + '</div>') : '') +
+                                (mVolume ? ('<div style="font-size:0.73rem;color:#38bdf8;">📊 <strong>Order Flow:</strong> ' + mVolume + '</div>') : '') +
+                                (mAction ? ('<div style="font-size:0.73rem;color:#fcd34d;">🎯 <strong>Recommended:</strong> ' + mAction + '</div>') : '') +
+
+                                // Drivers & Risk
+                                (mDrivers.length ? ('<div style="font-size:0.72rem;color:var(--light);line-height:1.35;margin-top:0.15rem;">' +
+                                mDrivers.map(d => '<div>🎯 ' + d + '</div>').join('') +
+                                '</div>') : '') +
+                                (mRisk ? ('<div style="font-size:0.72rem;color:#fca5a5;margin-top:0.1rem;">⚠️ <strong>Risk:</strong> ' + mRisk + '</div>') : '') +
                                 '</div>';
                         }).join('');
 
-                        if (modelCards) {
-                            votesHtml = '<div style="margin-top:0.6rem;"><strong style="font-size:0.8rem;color:var(--light);display:block;margin-bottom:0.35rem;">🗳️ Individual Model Votes & Signals:</strong>' +
-                                '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:0.5rem;">' + modelCards + '</div></div>';
-                        }
+                        modelCardsHtml = '<div>' +
+                            '<strong style="font-size:0.8rem;color:var(--light);display:block;margin:0.75rem 0 0.4rem 0;">🗳️ Individual Model Predictions & Price Action Insights:</strong>' +
+                            '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:0.6rem;">' + cards + '</div>' +
+                            '</div>';
                     }
 
-                    // Render main KPI grid + Synthesis Thesis
-                    content.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.4rem;margin:0.5rem 0;">' +
-                        '<div class="metric"><span>Consensus Direction</span><strong style="color:' + dirColor + ';">' + dir + ' (' + expRet + ')</strong></div>' +
-                        '<div class="metric"><span>Model Agreement</span><strong>' + agreePct + '% (' + (pred.agreement_count || '3/4') + ' Models)</strong></div>' +
-                        '<div class="metric"><span>Confidence Rating</span><strong>' + confPct + '% Calibrated</strong></div>' +
-                        '<div class="metric"><span>Forecast Horizon</span><strong>' + horizon + '</strong></div>' +
-                        '</div>' +
-                        (pred.synthesis_reasoning || pred.synthesis_summary ? ('<div style="background:linear-gradient(135deg, rgba(99,102,241,0.08), rgba(168,85,247,0.08));border:1px solid rgba(99,102,241,0.3);border-radius:0.5rem;padding:0.65rem 0.85rem;margin-top:0.5rem;">' +
-                        '<strong style="color:#a5b4fc;font-size:0.82rem;display:flex;align-items:center;gap:0.35rem;margin-bottom:0.25rem;">✨ Ensemble Synthesis Thesis:</strong>' +
-                        '<p style="margin:0;font-size:0.82rem;line-height:1.5;color:var(--light);">' + (pred.synthesis_reasoning || pred.synthesis_summary) + '</p>' +
-                        '</div>') : '') +
-                        votesHtml;
+                    // Assemble Complete Content
+                    content.innerHTML = actionRibbonHtml + priceMatrixHtml + thesisHtml + modelCardsHtml;
 
                 } catch (err) {
                     console.error('Error rendering modal consensus:', err);
