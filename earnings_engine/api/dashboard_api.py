@@ -37,6 +37,9 @@ from earnings_engine.data.predictions import (
 )
 from earnings_engine.data import watchlists as watchlists_mod
 from earnings_engine.data.buy_the_dip import get_buydip_today, get_buydip_yesterday
+from earnings_engine.logging_utils import get_logger
+
+logger = get_logger("earnings_engine.api.dashboard_api")
 
 UNIVERSES_DIR = Path(__file__).resolve().parent.parent / "data" / "universes"
 
@@ -133,6 +136,14 @@ def get_upcoming_results(
     """
     settings = _settings()
     tickers = _resolve_tickers(market)
+    logger.info(
+        "get_upcoming_results: market=%s, days=%d, past_days=%d, start_date=%s (resolved %d tickers)",
+        market,
+        days,
+        past_days,
+        start_date,
+        len(tickers),
+    )
     if not tickers:
         return []
 
@@ -149,6 +160,7 @@ def get_upcoming_results(
 
     enriched = enrich_upcoming_results(df)
     mark_refreshed("results", rows=len(enriched))
+    logger.info("get_upcoming_results: returning %d enriched upcoming results", len(enriched))
 
     ticker_list = [str(t) for t in enriched["ticker"].dropna().unique()]
 
@@ -716,12 +728,18 @@ def get_kronos_latest_predictions(
     """Return the most-recent Kronos prediction per ticker (optionally filtered by ticker/watchlist)."""
     settings = _settings()
     resolved = _resolve_kronos_tickers(watchlist, tickers, settings)
+    logger.info(
+        "get_kronos_latest_predictions: watchlist=%s, tickers_count=%s",
+        watchlist or "ALL",
+        len(resolved) if resolved else "ALL",
+    )
     return load_latest_predictions(tickers=resolved, settings=settings)
 
 
 def get_kronos_predictions_for_ticker(ticker: str) -> list[dict[str, Any]]:
     """Return all historical predictions for a specific ticker."""
     settings = _settings()
+    logger.info("get_kronos_predictions_for_ticker: ticker=%s", ticker)
     return load_prediction_history(tickers=[ticker], settings=settings)
 
 
@@ -732,6 +750,11 @@ def get_kronos_accuracy_api(
     """Return overall and per-stock accuracy statistics for all Kronos predictions (optionally filtered)."""
     settings = _settings()
     resolved = _resolve_kronos_tickers(watchlist, tickers, settings)
+    logger.info(
+        "get_kronos_accuracy_api: watchlist=%s, tickers_count=%s",
+        watchlist or "ALL",
+        len(resolved) if resolved else "ALL",
+    )
     return get_kronos_accuracy_summary(tickers=resolved, settings=settings)
 
 

@@ -6,7 +6,8 @@ from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query, Response
+import time
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -43,6 +44,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_api_requests(request: Request, call_next):
+    """Log concise API call details including input query filters, status code, and latency."""
+    start_time = time.perf_counter()
+    path = request.url.path
+
+    # Extract non-empty query parameters / filters
+    query_params = dict(request.query_params)
+    filters_repr = f" filters={query_params}" if query_params else ""
+
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start_time) * 1000
+
+    # Skip logging high-frequency static asset hits to avoid log spam
+    if not (path.startswith("/static") or path.startswith("/ui")):
+        logger.info(
+            "API [%s] %s%s -> %d (%.1fms)",
+            request.method,
+            path,
+            filters_repr,
+            response.status_code,
+            duration_ms,
+        )
+
+    return response
 
 # Global settings instance
 _settings = Settings()
