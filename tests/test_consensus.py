@@ -206,8 +206,8 @@ def test_consensus_api_endpoints():
     """Test REST API endpoints via FastAPI TestClient."""
     client = TestClient(app)
 
-    # 1. Latest predictions endpoint
-    res = client.get("/api/v1/consensus/latest")
+    # 1. Latest predictions endpoint (including limit=500)
+    res = client.get("/api/v1/consensus/latest?limit=500")
     assert res.status_code == 200
     data = res.json()
     assert data["success"] is True
@@ -221,8 +221,8 @@ def test_consensus_api_endpoints():
     assert "win_rate" in stats
     assert "model_stats" in stats
 
-    # 3. Audit endpoint
-    res_audit = client.get("/api/v1/consensus/audit")
+    # 3. Audit endpoint (including limit=500)
+    res_audit = client.get("/api/v1/consensus/audit?limit=500")
     assert res_audit.status_code == 200
     assert res_audit.json()["success"] is True
 

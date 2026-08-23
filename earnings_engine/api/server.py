@@ -3015,7 +3015,7 @@ async def consensus_latest_endpoint(
     ticker: str | None = Query(default=None),
     direction: str | None = Query(default=None),
     status: str | None = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=1000),
 ):
     """Retrieve latest consensus predictions with optional filtering."""
     from earnings_engine.consensus import storage
@@ -3036,7 +3036,7 @@ async def consensus_latest_endpoint(
 async def consensus_audit_endpoint(
     ticker: str | None = Query(default=None),
     status: str | None = Query(default=None),
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=1000),
 ):
     """Historical audit of consensus predictions including settlement outcomes and failure analyses."""
     from earnings_engine.consensus import storage
