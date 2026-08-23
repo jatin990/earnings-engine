@@ -327,7 +327,8 @@ def upcoming_earnings(tickers: list[str], settings: Settings, days: int = 14,
     df = pd.DataFrame(rows, columns=["ticker", "earnings_date", "source"])
     df["earnings_date"] = pd.to_datetime(df["earnings_date"])
     loaded_tickers = df["ticker"].nunique()
-    logger.info("loaded cached earnings for %s/%s tickers (source=%s)", loaded_tickers, len(unique_tickers), source)
+    source_label = source if source is not None else "ALL_SOURCES"
+    logger.info("[EARNINGS-CACHE] Loaded cached earnings dates for %s/%s tickers (source=%s, window: %s to %s)", loaded_tickers, len(unique_tickers), source_label, start_str, end_str)
     return df.sort_values("earnings_date").reset_index(drop=True)
 
 
