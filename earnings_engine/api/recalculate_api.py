@@ -63,7 +63,7 @@ def _snapshot_ticker_state(ticker: str, settings: Settings) -> dict[str, Any]:
             state["earnings_date"] = str(e_row[0])
 
         # 2. Metrics cache
-        m_row = conn.execute("SELECT metrics FROM ticker_metrics WHERE ticker = ?", (ticker,)).fetchone()
+        m_row = conn.execute("SELECT metrics FROM tickers WHERE ticker = ?", (ticker,)).fetchone()
         if m_row and m_row[0]:
             try:
                 m_data = json.loads(m_row[0]) if isinstance(m_row[0], str) else m_row[0]

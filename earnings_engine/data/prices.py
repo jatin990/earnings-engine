@@ -96,13 +96,6 @@ def _fetch_log_time(ticker: str, settings: Settings) -> datetime | None:
         row = connection.execute(
             "SELECT prices_fetched_at FROM tickers WHERE ticker = ?", (ticker,)
         ).fetchone()
-        if not row or not row[0]:
-            try:
-                row = connection.execute(
-                    "SELECT fetched_at FROM price_fetch_log WHERE ticker = ?", (ticker,)
-                ).fetchone()
-            except Exception:
-                row = None
     if not row or not row[0]:
         return None
     try:
@@ -326,14 +319,6 @@ def store_price_metrics(ticker: str, settings: Settings, metrics: dict[str, Any]
             """,
             (ticker, payload, as_of_date_value, as_of_date_value),
         )
-        # Also maintain legacy ticker_metrics for backward compatibility
-        try:
-            connection.execute(
-                "INSERT OR REPLACE INTO ticker_metrics (ticker, as_of_date, metrics) VALUES (?, ?, ?)",
-                (ticker, as_of_date_value, payload),
-            )
-        except Exception:
-            pass
         connection.commit()
 
 
@@ -342,7 +327,7 @@ def store_price_metrics_bulk(
     settings: Settings,
     as_of_date: str | None = None,
 ) -> None:
-    """Persist derived metrics for multiple tickers in a single atomic batch transaction."""
+    """Persist derived metrics for multiple tickers in a single atomic batch transaction into unified tickers master table."""
     if not metrics_by_ticker:
         return
     as_of_date_value = as_of_date or pd.Timestamp.now().strftime("%Y-%m-%d")
@@ -350,12 +335,7 @@ def store_price_metrics_bulk(
         (ticker, json.dumps(m, sort_keys=True, default=str), as_of_date_value, as_of_date_value)
         for ticker, m in metrics_by_ticker.items()
     ]
-    legacy_rows = [
-        (ticker, as_of_date_value, json.dumps(m, sort_keys=True, default=str))
-        for ticker, m in metrics_by_ticker.items()
-    ]
     with _connect(settings) as connection:
-        # 1. Bulk upsert into unified tickers master table
         connection.executemany(
             """
             INSERT INTO tickers (ticker, metrics, metrics_as_of_date, last_updated)
@@ -367,33 +347,17 @@ def store_price_metrics_bulk(
             """,
             master_rows,
         )
-        # 2. Maintain legacy table
-        try:
-            connection.executemany(
-                "INSERT OR REPLACE INTO ticker_metrics (ticker, as_of_date, metrics) VALUES (?, ?, ?)",
-                legacy_rows,
-            )
-        except Exception:
-            pass
         connection.commit()
 
 
 def load_price_metrics(ticker: str, settings: Settings, as_of_date: str | None = None) -> dict[str, Any] | None:
-    """Load previously persisted metrics for a ticker and day if they exist."""
+    """Load previously persisted metrics for a ticker and day if they exist from tickers master table."""
     as_of_date_value = as_of_date or pd.Timestamp.now().strftime("%Y-%m-%d")
     with _connect(settings) as connection:
         row = connection.execute(
             "SELECT metrics FROM tickers WHERE ticker = ? AND metrics_as_of_date = ?",
             (ticker, as_of_date_value),
         ).fetchone()
-        if not row or not row[0]:
-            try:
-                row = connection.execute(
-                    "SELECT metrics FROM ticker_metrics WHERE ticker = ? AND as_of_date = ?",
-                    (ticker, as_of_date_value),
-                ).fetchone()
-            except Exception:
-                row = None
 
     if not row or not row[0]:
         return None
