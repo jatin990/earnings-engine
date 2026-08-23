@@ -225,3 +225,25 @@ def test_consensus_api_endpoints():
     res_audit = client.get("/api/v1/consensus/audit")
     assert res_audit.status_code == 200
     assert res_audit.json()["success"] is True
+
+
+def test_parse_model_json():
+    """Test model json extraction across thinking tags, markdown, and raw strings."""
+    from earnings_engine.consensus.model_runner import _parse_model_json
+
+    assert _parse_model_json(None) is None
+    assert _parse_model_json("") is None
+    assert _parse_model_json("invalid json string") is None
+
+    # DeepSeek-R1 thinking tag format
+    r1_resp = "<think>Analyzing RELIANCE fundamentals... Target looks strong.</think>{\"direction\": \"BULLISH\", \"confidence_pct\": 85}"
+    parsed = _parse_model_json(r1_resp)
+    assert parsed is not None
+    assert parsed["direction"] == "BULLISH"
+    assert parsed["confidence_pct"] == 85
+
+    # Markdown fence
+    md_resp = "Here is the forecast:\n```json\n{\"direction\": \"BEARISH\", \"confidence_pct\": 60}\n```"
+    parsed_md = _parse_model_json(md_resp)
+    assert parsed_md is not None
+    assert parsed_md["direction"] == "BEARISH"

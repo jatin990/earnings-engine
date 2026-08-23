@@ -24,7 +24,7 @@ DEFAULT_MODELS = [
     "deepseek/deepseek-r1",
     "meta-llama/llama-3.3-70b-instruct",
     "qwen/qwen-2.5-72b-instruct",
-    "mistralai/mistral-large-2411",
+    "mistralai/mistral-large",
 ]
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -56,7 +56,9 @@ MODEL_DISPLAY_NAMES: dict[str, str] = {
     "deepseek/deepseek-chat": "DeepSeek-V3",
     "meta-llama/llama-3.3-70b-instruct": "Llama-3.3-70B",
     "qwen/qwen-2.5-72b-instruct": "Qwen-2.5-72B",
+    "mistralai/mistral-large": "Mistral-Large",
     "mistralai/mistral-large-2411": "Mistral-Large",
+    "mistralai/mistral-large-2407": "Mistral-Large",
 }
 
 
@@ -101,7 +103,7 @@ def _query_single_model(
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": 0.3,
-                "max_tokens": 1024,
+                "max_tokens": 2048,
             },
             timeout=timeout,
         )
@@ -114,13 +116,21 @@ def _query_single_model(
             return {"model_name": display_name, "model_id": model_id, "error": f"HTTP {resp.status_code}", "raw": resp.text[:200]}
 
         data = resp.json()
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        choice = (data.get("choices") or [{}])[0]
+        msg = choice.get("message") or {}
+        content = msg.get("content") or ""
+        reasoning = msg.get("reasoning") or ""
 
-        # Parse the JSON response — handle markdown code fences
+        # For reasoning models where content might be null/empty, check reasoning or alternative fields
+        if not content and reasoning:
+            content = reasoning
+
+        # Parse the JSON response — handle markdown code fences and reasoning tags
         prediction = _parse_model_json(content)
         if prediction is None:
-            logger.warning("[CONSENSUS] %s returned unparseable response: %.200s", display_name, content)
-            return {"model_name": display_name, "model_id": model_id, "error": "Unparseable JSON", "raw_response": content[:500]}
+            raw_preview = (content if isinstance(content, str) else str(content)) or ""
+            logger.warning("[CONSENSUS] %s returned unparseable response: %.200s", display_name, raw_preview)
+            return {"model_name": display_name, "model_id": model_id, "error": "Unparseable JSON", "raw_response": raw_preview[:500]}
 
         prediction["model_name"] = display_name
         prediction["model_id"] = model_id
@@ -141,9 +151,9 @@ def _query_single_model(
         return {"model_name": display_name, "model_id": model_id, "error": str(e)}
 
 
-def _parse_model_json(content: str) -> dict[str, Any] | None:
+def _parse_model_json(content: Any) -> dict[str, Any] | None:
     """Extract and parse JSON from model response, handling code fences and thinking tags."""
-    if not content:
+    if not content or not isinstance(content, str):
         return None
 
     # Strip thinking tags (DeepSeek-R1 uses <think>...</think>)
@@ -152,17 +162,21 @@ def _parse_model_json(content: str) -> dict[str, Any] | None:
 
     # Try direct parse first
     try:
-        return json.loads(content)
+        parsed = json.loads(content)
+        if isinstance(parsed, dict):
+            return parsed
     except json.JSONDecodeError:
         pass
 
     # Try extracting from markdown code fences
-    for pattern in [r"```json\s*(.*?)\s*```", r"```\s*(.*?)\s*```", r"\{[^{}]*\}"]:
-        match = re.search(pattern, content, re.DOTALL)
+    for pattern in [r"```json\s*(\{[\s\S]*?\})\s*```", r"```\s*(\{[\s\S]*?\})\s*```", r"(\{[\s\S]*\})"]:
+        match = re.search(pattern, content)
         if match:
             try:
-                candidate = match.group(1) if "```" in pattern else match.group(0)
-                return json.loads(candidate)
+                candidate = match.group(1)
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
             except (json.JSONDecodeError, IndexError):
                 continue
 
