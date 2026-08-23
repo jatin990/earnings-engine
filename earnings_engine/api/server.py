@@ -578,32 +578,123 @@ if ui_dir.exists():
     app.mount("/static", StaticFiles(directory=ui_dir), name="static")
 
 
-@app.get("/", tags=["Root"])
-async def root():
-    """Root endpoint - serves UI or API info."""
+# ---------------------------------------------------------------------------
+# Portal & Passcode Auth Endpoints
+# ---------------------------------------------------------------------------
+
+class VerifyCodeRequest(BaseModel):
+    code: str
+
+
+class CreatePasscodeRequest(BaseModel):
+    label: str
+    allowed_routes: list[str] = ["dashboard"]
+    code: str | None = None
+    max_uses: int | None = None
+    expires_at: str | None = None
+
+
+@app.get("/", tags=["UI"], response_class=HTMLResponse)
+@app.get("/portal", tags=["UI"], response_class=HTMLResponse)
+async def serve_portal():
+    """Serve the Nexus Passcode Portal & App Launcher."""
+    try:
+        from jinja2 import Environment, FileSystemLoader
+        env = Environment(
+            loader=FileSystemLoader(str(_templates_dir)),
+            autoescape=True,
+            auto_reload=True,
+            cache_size=0,
+        )
+        template = env.get_template("portal.html")
+        html = template.render()
+        return HTMLResponse(html)
+    except Exception as exc:
+        return HTMLResponse(
+            f"<html><body><h1>Portal render error</h1><p>{exc}</p></body></html>",
+            status_code=500,
+        )
+
+
+@app.get("/credit-card", tags=["UI"], response_class=HTMLResponse)
+async def serve_credit_card():
+    """Serve the Credit Card & Wealth Hub page."""
+    try:
+        from jinja2 import Environment, FileSystemLoader
+        env = Environment(
+            loader=FileSystemLoader(str(_templates_dir)),
+            autoescape=True,
+            auto_reload=True,
+            cache_size=0,
+        )
+        template = env.get_template("credit_card.html")
+        html = template.render()
+        return HTMLResponse(html)
+    except Exception as exc:
+        return HTMLResponse(
+            f"<html><body><h1>Credit Card Hub render error</h1><p>{exc}</p></body></html>",
+            status_code=500,
+        )
+
+
+@app.post("/api/v1/auth/verify-code", tags=["Auth"])
+async def verify_portal_code(req: VerifyCodeRequest):
+    """Verify input passcode and return authorized applications and permissions."""
+    from earnings_engine.data.passcodes import verify_passcode
+    result = verify_passcode(req.code, _settings)
+    if not result.get("valid"):
+        raise HTTPException(status_code=401, detail=result.get("error", "Invalid access passcode."))
+    return result
+
+
+@app.get("/api/v1/auth/session", tags=["Auth"])
+async def check_portal_session(code: str = Query(..., description="Active passcode to validate")):
+    """Check whether a session passcode is currently valid."""
+    from earnings_engine.data.passcodes import verify_passcode
+    result = verify_passcode(code, _settings)
+    return result
+
+
+@app.get("/api/v1/auth/codes", tags=["Auth"])
+async def get_all_passcodes():
+    """List all generated friend passcodes and route permissions."""
+    from earnings_engine.data.passcodes import list_passcodes
+    return {"passcodes": list_passcodes(_settings)}
+
+
+@app.post("/api/v1/auth/codes", tags=["Auth"])
+async def create_new_passcode(req: CreatePasscodeRequest):
+    """Generate a new passcode for a friend with custom route permissions."""
+    from earnings_engine.data.passcodes import create_passcode
+    created = create_passcode(
+        label=req.label,
+        allowed_routes=req.allowed_routes,
+        code=req.code,
+        max_uses=req.max_uses,
+        expires_at=req.expires_at,
+        settings=_settings,
+    )
+    return created
+
+
+@app.delete("/api/v1/auth/codes/{code}", tags=["Auth"])
+async def remove_passcode(code: str):
+    """Revoke and delete a friend passcode."""
+    from earnings_engine.data.passcodes import delete_passcode
+    success = delete_passcode(code, _settings)
+    return {"success": success, "code": code}
+
+
+@app.get("/api-info", tags=["Root"])
+async def api_info():
+    """API info and directory of endpoints."""
     return {
         "service": "Earnings Engine API",
         "version": "1.0.0",
         "docs": "/docs",
-        "ui": "/ui",
-        "endpoints": {
-            "health": "/health",
-            "price_history": "/api/v1/price-history/{ticker}",
-            "earnings_history": "/api/v1/earnings-history/{ticker}",
-            "market_cap": "/api/v1/market-cap/{ticker}",
-            "market_context": "/api/v1/market-context/{ticker}",
-            "upcoming_earnings": "/api/v1/upcoming-earnings",
-            "universe": "/api/v1/universe/{market}",
-            "universe_files": "/api/v1/universe/files",
-            "universe_add": "/api/v1/universe/add",
-            "universe_remove": "/api/v1/universe/remove",
-            "universe_create": "/api/v1/universe/create",
-            "all_market_caps": "/api/v1/market-caps",
-            "kronos_predictions": "/api/v1/dashboard/kronos",
-            "kronos_run": "/api/v1/dashboard/kronos/run",
-            "kronos_latest": "/api/v1/dashboard/kronos/latest",
-            "kronos_audit": "/api/v1/dashboard/kronos/audit",
-        }
+        "portal": "/portal",
+        "dashboard": "/dashboard",
+        "credit_card": "/credit-card",
     }
 
 
@@ -619,13 +710,7 @@ async def serve_ui():
 
 @app.get("/dashboard", tags=["UI"], response_class=HTMLResponse)
 async def serve_dashboard():
-    """Serve the interactive dashboard page.
-
-    Serves the dashboard template at /dashboard so it runs from the same
-    origin as the API server. This allows the embedded JavaScript to call
-    the API endpoints (market-context, price-history, earnings-history, etc.)
-    without CORS or origin issues.
-    """
+    """Serve the interactive dashboard page."""
     try:
         from jinja2 import Environment, FileSystemLoader
         env = Environment(

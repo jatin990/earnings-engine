@@ -515,6 +515,10 @@
                 setInterval(() => {
                     this.updateTopRateLimitPill();
                 }, 30000);
+
+                const friendName = localStorage.getItem('ee_friend_name') || 'Master Admin';
+                const userBadge = document.getElementById('topUserBadge');
+                if (userBadge) userBadge.textContent = friendName;
                 
                 const initialTab = this.getInitialTab();
                 this.switchTab(initialTab, true, true);
@@ -7023,7 +7027,7 @@
             app._customizer.activeSubTab = subTab;
             
             // Toggle nav buttons
-            ['tabs', 'themes', 'env', 'ratelimits', 'audit'].forEach(t => {
+            ['tabs', 'themes', 'env', 'ratelimits', 'keys', 'audit'].forEach(t => {
                 const navBtn = document.getElementById('ccNav' + t.charAt(0).toUpperCase() + t.slice(1));
                 const sec = document.getElementById('ccSection' + t.charAt(0).toUpperCase() + t.slice(1));
                 if (navBtn) navBtn.classList.toggle('active', t === subTab);
@@ -7038,6 +7042,8 @@
                 app.loadEnvVars();
             } else if (subTab === 'ratelimits') {
                 app.loadRateLimits();
+            } else if (subTab === 'keys') {
+                app.loadPasscodesInCustomizer();
             } else if (subTab === 'audit') {
                 app.loadAccessAudit();
             }
@@ -7196,6 +7202,103 @@
                 pillEl.style.borderColor = 'rgba(99, 102, 241, 0.35)';
                 pillEl.style.background = 'rgba(99, 102, 241, 0.12)';
             }
+        };
+
+        app.loadPasscodesInCustomizer = async function() {
+            const tbody = document.getElementById('ccPasscodesTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1.5rem;"><span class="loading-spinner"></span> Loading friend passcodes...</td></tr>';
+
+            try {
+                const res = await fetch('/api/v1/auth/codes');
+                const data = await res.json();
+                const list = data.passcodes || [];
+
+                if (!list.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1.5rem;">No passcodes found. Click Generate to create one.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = list.map(item => `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                        <td style="padding: 0.65rem 0.8rem; font-family: monospace; font-weight: 700; color: #a78bfa;">${item.code}</td>
+                        <td style="padding: 0.65rem 0.8rem; font-weight: 600; color: var(--light);">${item.label}</td>
+                        <td style="padding: 0.65rem 0.8rem;">
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
+                                ${item.allowed_routes.map(r => `<span style="background: rgba(255,255,255,0.06); padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-size: 0.72rem; color: #93c5fd;">${r}</span>`).join('')}
+                            </div>
+                        </td>
+                        <td style="padding: 0.65rem 0.8rem; text-align: center; font-family: monospace; color: var(--muted);">${item.use_count}</td>
+                        <td style="padding: 0.65rem 0.8rem; text-align: right; white-space: nowrap;">
+                            <button onclick="app.copyPasscodeLink('${item.code}')" class="btn btn-sm" style="background: rgba(56,189,248,0.15); color: #38bdf8; padding: 0.2rem 0.5rem; margin-right: 0.3rem;" title="Copy direct portal invite link">🔗 Link</button>
+                            <button onclick="app.deletePasscodeInCustomizer('${item.code}')" class="btn btn-sm btn-danger" style="padding: 0.2rem 0.5rem;" title="Delete Passcode">🗑️</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--red);padding:1.5rem;">Failed loading passcodes: ${e.message}</td></tr>`;
+            }
+        };
+
+        app.showAddPasscodeModal = function() {
+            document.getElementById('ccNewPassLabel').value = '';
+            document.getElementById('ccNewPassCode').value = '';
+            document.getElementById('ccRouteDash').checked = true;
+            document.getElementById('ccRouteCards').checked = true;
+            document.getElementById('ccRoutePlay').checked = true;
+            document.getElementById('ccRouteAdmin').checked = false;
+            document.getElementById('addPasscodeModal').style.display = 'flex';
+        };
+
+        app.submitCreatePasscodeInCustomizer = async function() {
+            const label = (document.getElementById('ccNewPassLabel')?.value || '').trim();
+            const code = (document.getElementById('ccNewPassCode')?.value || '').trim();
+            if (!label) {
+                alert('Please enter a friend name or label.');
+                return;
+            }
+
+            const routes = [];
+            if (document.getElementById('ccRouteDash')?.checked) routes.push('dashboard');
+            if (document.getElementById('ccRouteCards')?.checked) routes.push('credit_card');
+            if (document.getElementById('ccRoutePlay')?.checked) routes.push('playground');
+            if (document.getElementById('ccRouteAdmin')?.checked) routes.push('admin');
+
+            if (!routes.length) {
+                alert('Please select at least one route.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/v1/auth/codes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ label, code: code || null, allowed_routes: routes })
+                });
+                if (!res.ok) throw new Error('Failed to generate passcode');
+
+                document.getElementById('addPasscodeModal').style.display = 'none';
+                app.loadPasscodesInCustomizer();
+            } catch (e) {
+                alert(`Error creating passcode: ${e.message}`);
+            }
+        };
+
+        app.deletePasscodeInCustomizer = async function(code) {
+            if (!confirm(`Are you sure you want to revoke and delete passcode ${code}?`)) return;
+            try {
+                const res = await fetch(`/api/v1/auth/codes/${encodeURIComponent(code)}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed to delete passcode');
+                app.loadPasscodesInCustomizer();
+            } catch (e) {
+                alert(e.message);
+            }
+        };
+
+        app.copyPasscodeLink = function(code) {
+            const link = `${window.location.origin}/portal?code=${code}`;
+            navigator.clipboard.writeText(link);
+            alert(`Copied direct portal invite link for ${code}:\n${link}`);
         };
 
         app.toggleEncryptedAuditView = function() {

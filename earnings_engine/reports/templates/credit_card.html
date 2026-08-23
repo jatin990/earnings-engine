@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credit Card & Wealth Hub // Nexus</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #07090e;
+            --card-bg: rgba(14, 20, 33, 0.75);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --accent: #6366f1;
+            --cyan: #38bdf8;
+            --emerald: #10b981;
+            --gold: #f59e0b;
+            --light: #f8fafc;
+            --muted: #94a3b8;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.2), transparent 50%),
+                radial-gradient(circle at 90% 100%, rgba(56, 189, 248, 0.15), transparent 50%);
+            color: var(--light);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .brand-title {
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: -0.03em;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--card-border);
+            border-radius: 1.25rem;
+        }
+
+        /* 3D Luxury Credit Card Mockup */
+        .credit-card-3d {
+            width: 100%;
+            max-width: 420px;
+            height: 250px;
+            border-radius: 1.25rem;
+            background: linear-gradient(135deg, #181c2b 0%, #0d101d 50%, #1f1b3c 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 35px rgba(99, 102, 241, 0.25);
+            padding: 1.6rem;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
+        }
+
+        .credit-card-3d:hover {
+            transform: translateY(-6px) rotateX(4deg) rotateY(-4deg);
+            box-shadow: 0 35px 65px -15px rgba(0, 0, 0, 0.9), 0 0 45px rgba(99, 102, 241, 0.4);
+        }
+
+        .credit-card-3d::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .emv-chip {
+            width: 44px;
+            height: 34px;
+            background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+            border-radius: 6px;
+            position: relative;
+            border: 1px solid rgba(0,0,0,0.3);
+        }
+
+        .emv-chip::after {
+            content: "";
+            position: absolute;
+            inset: 6px;
+            border: 1px solid rgba(0,0,0,0.25);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-6 lg:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        
+        <!-- Navigation Header -->
+        <header class="glass-card p-4 sm:p-5 mb-8 flex flex-wrap items-center justify-between gap-4 border border-white/10">
+            <div class="flex items-center gap-3">
+                <a href="/portal" class="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold hover:scale-105 transition" title="Return to Portal">
+                    🧭
+                </a>
+                <div>
+                    <h1 class="brand-title text-xl font-extrabold text-white tracking-tight">NEXUS // CREDIT & WEALTH HUB</h1>
+                    <span class="text-xs text-slate-400">Card Multiplier & Cashflow Optimization Engine</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <a href="/dashboard" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 transition flex items-center gap-1.5">
+                    <span>📈</span>
+                    <span>Trading Terminal</span>
+                </a>
+                <a href="/portal" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition">
+                    🧭 Switch App / Portal
+                </a>
+            </div>
+        </header>
+
+        <!-- Main Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- Left Column: Card Mockup & Overview (5 Cols) -->
+            <div class="lg:col-span-5 flex flex-col gap-6">
+                
+                <!-- 3D Luxury Card Mockup -->
+                <div class="credit-card-3d mx-auto">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-[10px] font-bold tracking-widest text-indigo-400 uppercase">Nexus Black Edition</span>
+                            <h3 class="brand-title text-lg font-extrabold text-white tracking-wider">OBSIDIAN INFINITE</h3>
+                        </div>
+                        <span class="text-xl">📡</span>
+                    </div>
+
+                    <div class="flex items-center gap-4 my-2">
+                        <div class="emv-chip"></div>
+                        <span class="text-xs text-amber-300/80 font-mono tracking-widest">NFC ENABLED</span>
+                    </div>
+
+                    <div>
+                        <div class="mono text-lg tracking-[0.2em] text-slate-100 font-semibold mb-2">
+                            •••• •••• •••• 8842
+                        </div>
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <span class="text-[9px] text-slate-400 block uppercase">Card Holder</span>
+                                <span class="text-xs font-bold text-slate-200 tracking-wider uppercase" id="cardHolderName">VIP Member</span>
+                            </div>
+                            <div>
+                                <span class="text-[9px] text-slate-400 block uppercase">Expires</span>
+                                <span class="text-xs font-mono text-slate-200">12/30</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="brand-title font-black italic text-lg text-slate-100">VISA</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Limit & Spend Meters -->
+                <div class="glass-card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="brand-title text-sm font-bold text-slate-200">Credit Line & Utilization</h4>
+                        <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">14.2% Utilized (Optimal)</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1.5">
+                                <span class="text-slate-400">Current Balance:</span>
+                                <span class="font-mono font-bold text-slate-100">₹71,240.00</span>
+                            </div>
+                            <div class="flex justify-between text-xs mb-2">
+                                <span class="text-slate-400">Available Limit:</span>
+                                <span class="font-mono font-bold text-emerald-400">₹4,28,760.00</span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                                <div class="h-full bg-gradient-to-r from-emerald-500 to-indigo-500 rounded-full" style="width: 14.2%;"></div>
+                            </div>
+                            <span class="text-[10px] text-slate-500 mt-1 block">Total Limit: ₹5,00,000.00 · Auto-revolving</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Perks & Lounge Tracker -->
+                <div class="glass-card p-6">
+                    <h4 class="brand-title text-sm font-bold text-slate-200 mb-3">Tier Perks & Airport Lounges</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-white/5 p-3 rounded-xl border border-white/5">
+                            <span class="text-[11px] text-slate-400 block">Domestic Lounges</span>
+                            <span class="text-lg font-bold text-indigo-300 font-mono">6 / 8 Left</span>
+                        </div>
+                        <div class="bg-white/5 p-3 rounded-xl border border-white/5">
+                            <span class="text-[11px] text-slate-400 block">Golf Access</span>
+                            <span class="text-lg font-bold text-cyan-300 font-mono">4 Compl.</span>
+                        </div>
+                        <div class="bg-white/5 p-3 rounded-xl border border-white/5">
+                            <span class="text-[11px] text-slate-400 block">Forex Markup</span>
+                            <span class="text-lg font-bold text-emerald-300 font-mono">0.0% Zero</span>
+                        </div>
+                        <div class="bg-white/5 p-3 rounded-xl border border-white/5">
+                            <span class="text-[11px] text-slate-400 block">Annual Fee Waiver</span>
+                            <span class="text-lg font-bold text-amber-300 font-mono">Unlocked</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Reward Radar & Maximizer Engine (7 Cols) -->
+            <div class="lg:col-span-7 flex flex-col gap-6">
+                
+                <!-- Category Multiplier Radar -->
+                <div class="glass-card p-6 sm:p-7">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">Cashback & Reward Maximizer</span>
+                            <h3 class="brand-title text-xl font-bold text-white mt-0.5">Active Multiplier Matrix</h3>
+                        </div>
+                        <span class="text-xs bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 px-3 py-1 rounded-full font-bold">
+                            ✨ Active 10x Boost
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-indigo-500/40 transition">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-bold text-slate-200">✈️ Flights & Hotels</span>
+                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">10x Points</span>
+                            </div>
+                            <span class="text-xs text-slate-400">Direct bookings & luxury partner portals</span>
+                        </div>
+
+                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-emerald-500/40 transition">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-bold text-slate-200">🍽️ Dining & Nightlife</span>
+                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">5x Points</span>
+                            </div>
+                            <span class="text-xs text-slate-400">Fine dining, delivery apps & international restaurants</span>
+                        </div>
+
+                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-cyan-500/40 transition">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-bold text-slate-200">⛽ Fuel & Charging</span>
+                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300">3x + Surcharge Waved</span>
+                            </div>
+                            <span class="text-xs text-slate-400">All major fuel bunks & EV fast chargers</span>
+                        </div>
+
+                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-purple-500/40 transition">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-bold text-slate-200">🛍️ General Spends</span>
+                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">2x Base</span>
+                            </div>
+                            <span class="text-xs text-slate-400">All other retail, groceries, tech subscriptions</span>
+                        </div>
+                    </div>
+
+                    <!-- Calculator Simulator -->
+                    <div class="p-5 rounded-xl bg-black/40 border border-white/10">
+                        <h4 class="brand-title text-sm font-bold text-slate-100 mb-3">🧮 Interactive Spends & Yield Simulator</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label class="block text-[11px] text-slate-400 mb-1">Monthly Travel Spend</label>
+                                <input type="number" id="spendTravel" value="25000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-400 mb-1">Monthly Dining Spend</label>
+                                <input type="number" id="spendDining" value="15000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-400 mb-1">Monthly Other Spends</label>
+                                <input type="number" id="spendOther" value="40000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-between pt-3 border-t border-white/10 gap-3">
+                            <div>
+                                <span class="text-xs text-slate-400 block">Estimated Annual Value</span>
+                                <span class="text-xl font-extrabold text-emerald-400 font-mono" id="annualRewardsVal">₹62,400 / yr</span>
+                            </div>
+                            <div>
+                                <span class="text-xs text-slate-400 block">Total Reward Points</span>
+                                <span class="text-xl font-extrabold text-indigo-300 font-mono" id="annualPointsVal">1,24,800 pts</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Transactions & Smart Tagging -->
+                <div class="glass-card p-6">
+                    <h4 class="brand-title text-sm font-bold text-slate-200 mb-4">💳 Recent Transactions & Yield Tagging</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="border-b border-white/10 text-slate-400 uppercase text-[10px]">
+                                    <th class="pb-2">Merchant</th>
+                                    <th class="pb-2">Category</th>
+                                    <th class="pb-2">Date</th>
+                                    <th class="pb-2 text-right">Amount</th>
+                                    <th class="pb-2 text-right">Points Earned</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                <tr>
+                                    <td class="py-2.5 font-semibold text-slate-200">Singapore Airlines</td>
+                                    <td class="py-2.5 text-indigo-300">✈️ Flights (10x)</td>
+                                    <td class="py-2.5 text-slate-400">22 Aug 2026</td>
+                                    <td class="py-2.5 text-right font-mono text-slate-100">₹42,500</td>
+                                    <td class="py-2.5 text-right font-mono font-bold text-emerald-400">+4,250 pts</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2.5 font-semibold text-slate-200">The Bombay Canteen</td>
+                                    <td class="py-2.5 text-emerald-300">🍽️ Dining (5x)</td>
+                                    <td class="py-2.5 text-slate-400">21 Aug 2026</td>
+                                    <td class="py-2.5 text-right font-mono text-slate-100">₹6,800</td>
+                                    <td class="py-2.5 text-right font-mono font-bold text-emerald-400">+340 pts</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2.5 font-semibold text-slate-200">Apple Store India</td>
+                                    <td class="py-2.5 text-purple-300">🛍️ Retail (2x)</td>
+                                    <td class="py-2.5 text-slate-400">19 Aug 2026</td>
+                                    <td class="py-2.5 text-right font-mono text-slate-100">₹21,900</td>
+                                    <td class="py-2.5 text-right font-mono font-bold text-emerald-400">+438 pts</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        function recalcRewards() {
+            const travel = parseFloat(document.getElementById('spendTravel')?.value || 0);
+            const dining = parseFloat(document.getElementById('spendDining')?.value || 0);
+            const other = parseFloat(document.getElementById('spendOther')?.value || 0);
+
+            // Monthly points: (Travel * 10/100) + (Dining * 5/100) + (Other * 2/100)
+            const monthlyPts = (travel * 0.10) + (dining * 0.05) + (other * 0.02);
+            const annualPts = monthlyPts * 12;
+            const annualVal = annualPts * 0.5; // 1 pt = ₹0.50 redemption
+
+            document.getElementById('annualPointsVal').textContent = Math.round(annualPts).toLocaleString('en-IN') + ' pts';
+            document.getElementById('annualRewardsVal').textContent = '₹' + Math.round(annualVal).toLocaleString('en-IN') + ' / yr';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const friend = localStorage.getItem('ee_friend_name');
+            if (friend) {
+                const el = document.getElementById('cardHolderName');
+                if (el) el.textContent = friend;
+            }
+            recalcRewards();
+        });
+    </script>
+</body>
+</html>

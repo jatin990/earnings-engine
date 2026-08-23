@@ -353,6 +353,22 @@ def _migration_007_consolidate_earnings_and_freshness(conn: Any) -> None:
             pass
 
 
+def _migration_008_passcodes(conn: Any) -> None:
+    """Passcodes table for role-based friend portal & routing gate."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS passcodes (
+            code TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            allowed_routes TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT,
+            max_uses INTEGER,
+            use_count INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1
+        )
+    """)
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -362,6 +378,7 @@ MIGRATIONS: list[Migration] = [
     Migration(5, "005_unified_tickers", _migration_005_unified_tickers),
     Migration(6, "006_drop_legacy_ticker_tables", _migration_006_drop_legacy_ticker_tables),
     Migration(7, "007_consolidate_earnings_and_freshness", _migration_007_consolidate_earnings_and_freshness),
+    Migration(8, "008_passcodes", _migration_008_passcodes),
 ]
 
 

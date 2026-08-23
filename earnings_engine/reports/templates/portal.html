@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Gateway // Earnings Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg: #07090e;
+            --card-bg: rgba(14, 20, 33, 0.75);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.35);
+            --cyan: #38bdf8;
+            --green: #10b981;
+            --purple: #a855f7;
+            --amber: #f59e0b;
+            --red: #ef4444;
+            --light: #f8fafc;
+            --muted: #94a3b8;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(circle at 50% -20%, rgba(99, 102, 241, 0.25), transparent 60%),
+                radial-gradient(circle at 0% 100%, rgba(56, 189, 248, 0.12), transparent 50%),
+                radial-gradient(circle at 100% 50%, rgba(168, 85, 247, 0.12), transparent 50%);
+            color: var(--light);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Subtle cyber grid lines */
+        body::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .portal-wrapper {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 1180px;
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--card-border);
+            border-radius: 1.25rem;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px -10px var(--accent-glow);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .brand-title {
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: -0.03em;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .input-box {
+            background: rgba(8, 12, 22, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--light);
+            transition: all 0.2s ease;
+        }
+
+        .input-box:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2), 0 0 20px rgba(56, 189, 248, 0.15);
+        }
+
+        .btn-glow {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .btn-glow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 28px rgba(99, 102, 241, 0.6);
+            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+        }
+
+        .btn-glow:active {
+            transform: translateY(0);
+        }
+
+        .app-card {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .app-card.authorized {
+            cursor: pointer;
+        }
+
+        .app-card.authorized:hover {
+            transform: translateY(-4px);
+            border-color: rgba(99, 102, 241, 0.5);
+            background: rgba(20, 30, 55, 0.75);
+            box-shadow: 0 15px 35px -10px rgba(99, 102, 241, 0.3);
+        }
+
+        .app-card.restricted {
+            opacity: 0.55;
+            filter: grayscale(0.4);
+            cursor: not-allowed;
+        }
+
+        .chip-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            color: var(--muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chip-btn:hover {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: rgba(99, 102, 241, 0.4);
+            color: #c7d2fe;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+
+        .shake {
+            animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+        }
+
+        .pulsing-indicator {
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="portal-wrapper">
+
+        <!-- Top Header Controls (Hidden until authenticated) -->
+        <header id="portalHeader" class="w-full flex justify-between items-center mb-8 pb-4 border-b border-white/10" style="display: none;">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold text-lg">
+                    ⚡
+                </div>
+                <div>
+                    <h2 class="brand-title text-lg font-bold text-slate-100 tracking-tight">EARNINGS ENGINE // NEXUS</h2>
+                    <span class="text-xs text-slate-400">Authenticated App Deck</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 bg-white/5 border border-white/10 px-3.5 py-1.5 rounded-full text-xs">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span class="text-slate-300 font-medium" id="userLabelBadge">Master Admin</span>
+                </div>
+                <button onclick="portal.lockSession()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500/25 transition">
+                    🔒 Lock / Switch Key
+                </button>
+            </div>
+        </header>
+
+        <!-- ================= PHASE 1: PASSCODE GATE ================= -->
+        <div id="gateSection" class="w-full max-w-md my-auto">
+            <div class="glass-card p-8 sm:p-10 text-center">
+                
+                <!-- Icon badge -->
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-3xl mb-6 shadow-lg shadow-indigo-500/10">
+                    🔐
+                </div>
+
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-xs font-bold uppercase tracking-wider mb-3">
+                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 pulsing-indicator"></span>
+                    Access Restricted
+                </div>
+
+                <h1 class="brand-title text-2xl sm:text-3xl font-extrabold text-slate-50 mb-2">
+                    NEXUS GATEWAY
+                </h1>
+                <p class="text-slate-400 text-xs sm:text-sm mb-6 leading-relaxed">
+                    Enter your personal access passcode to unlock your authorized tools & dashboard deck.
+                </p>
+
+                <!-- Passcode Input Form -->
+                <form id="passcodeForm" onsubmit="portal.handleVerify(event)" class="space-y-4">
+                    <div class="relative">
+                        <input 
+                            type="password" 
+                            id="passcodeInput" 
+                            class="input-box mono w-full px-4 py-3.5 rounded-xl text-center text-lg font-bold tracking-widest uppercase placeholder:text-slate-600 placeholder:tracking-normal placeholder:font-normal placeholder:text-sm"
+                            placeholder="e.g. NEXUS-MASTER" 
+                            autocomplete="off"
+                            required
+                        >
+                        <button 
+                            type="button" 
+                            onclick="portal.toggleShowPasscode()"
+                            class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-sm focus:outline-none"
+                            title="Show/Hide"
+                        >
+                            👁️
+                        </button>
+                    </div>
+
+                    <!-- Error Alert -->
+                    <div id="errorAlert" class="hidden p-3 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-medium text-left flex items-center gap-2">
+                        <span>⚠️</span>
+                        <span id="errorMessage">Invalid passcode.</span>
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        id="btnUnlock"
+                        class="btn-glow w-full py-3.5 px-6 rounded-xl font-bold text-sm tracking-wide uppercase text-white flex items-center justify-center gap-2"
+                    >
+                        <span>Unlock Nexus Deck</span>
+                        <span class="text-lg">→</span>
+                    </button>
+                </form>
+
+                <!-- Quick Test Passcodes -->
+                <div class="mt-8 pt-6 border-t border-white/5 text-left">
+                    <span class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2.5">
+                        Quick Demo Passcodes:
+                    </span>
+                    <div class="flex flex-wrap gap-2">
+                        <button class="chip-btn mono font-semibold" onclick="portal.fillCode('NEXUS-MASTER')">⚡ NEXUS-MASTER (All)</button>
+                        <button class="chip-btn mono font-semibold" onclick="portal.fillCode('TRADER-VIP')">📈 TRADER-VIP (Terminal)</button>
+                        <button class="chip-btn mono font-semibold" onclick="portal.fillCode('CARDS-ACCESS')">💳 CARDS-ACCESS (Hub)</button>
+                        <button class="chip-btn mono font-semibold" onclick="portal.fillCode('ALL-ACCESS')">🚀 ALL-ACCESS (Friend)</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ================= PHASE 2: APP LAUNCHER DECK ================= -->
+        <div id="deckSection" class="w-full max-w-5xl" style="display: none;">
+            
+            <div class="text-center mb-8">
+                <span class="text-xs font-bold tracking-widest uppercase text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-3 py-1 rounded-full">
+                    🚀 Authorized Applications
+                </span>
+                <h1 class="brand-title text-3xl sm:text-4xl font-extrabold text-white mt-3 mb-2">
+                    Command & Trading Hub
+                </h1>
+                <p class="text-slate-400 text-sm max-w-xl mx-auto">
+                    Select an application from your authorized deck below. Access permissions are dynamically routed by your access key.
+                </p>
+            </div>
+
+            <!-- Apps Grid -->
+            <div id="appsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- ================= ADMIN CODE GENERATOR (Visible for Admin codes) ================= -->
+            <div id="adminKeyManagerCard" class="glass-card p-6 sm:p-8 mt-6" style="display: none;">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-6 border-b border-white/10">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl">🔑</span>
+                            <h3 class="brand-title text-lg font-bold text-white">Friend Passcode Generator & Access Control</h3>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">Generate new access codes for friends and define what routes they can see.</p>
+                    </div>
+                    <button onclick="portal.toggleGeneratorForm()" class="px-4 py-2 rounded-lg text-xs font-bold bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/30 transition">
+                        ➕ Generate New Passcode
+                    </button>
+                </div>
+
+                <!-- Generate Form Modal/Drawer -->
+                <div id="generatorDrawer" class="bg-black/30 border border-white/10 rounded-xl p-5 mb-6" style="display: none;">
+                    <h4 class="text-sm font-bold text-slate-200 mb-3">Create Friend Passcode</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Friend Name / Label</label>
+                            <input type="text" id="newCodeLabel" placeholder="e.g. Alex Trader, Rohan Cards" class="input-box w-full px-3 py-2 rounded-lg text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Custom Passcode (Optional - auto-generated if blank)</label>
+                            <input type="text" id="newCodeCustom" placeholder="e.g. ALEX-VIP" class="input-box mono w-full px-3 py-2 rounded-lg text-xs uppercase">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-xs text-slate-400 mb-2 font-semibold">Allowed Application Routes:</label>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-white/5 p-2.5 rounded-lg border border-white/5 hover:border-indigo-500/40">
+                                <input type="checkbox" id="route_dashboard" checked class="rounded border-slate-700 text-indigo-600 focus:ring-0">
+                                <span>📈 Dashboard</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-white/5 p-2.5 rounded-lg border border-white/5 hover:border-indigo-500/40">
+                                <input type="checkbox" id="route_credit_card" checked class="rounded border-slate-700 text-indigo-600 focus:ring-0">
+                                <span>💳 Credit Card</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-xs text-xs text-slate-300 cursor-pointer bg-white/5 p-2.5 rounded-lg border border-white/5 hover:border-indigo-500/40">
+                                <input type="checkbox" id="route_playground" checked class="rounded border-slate-700 text-indigo-600 focus:ring-0">
+                                <span>🧪 Playground</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-white/5 p-2.5 rounded-lg border border-white/5 hover:border-indigo-500/40">
+                                <input type="checkbox" id="route_admin" class="rounded border-slate-700 text-indigo-600 focus:ring-0">
+                                <span>🔑 Admin</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <button onclick="portal.toggleGeneratorForm()" class="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white">Cancel</button>
+                        <button onclick="portal.submitCreatePasscode()" class="btn-glow px-4 py-1.5 rounded-lg text-xs font-bold text-white">Save & Generate Key</button>
+                    </div>
+                </div>
+
+                <!-- Existing Codes Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="border-b border-white/10 text-slate-400 uppercase tracking-wider text-[10px]">
+                                <th class="pb-2">Passcode</th>
+                                <th class="pb-2">Friend / Label</th>
+                                <th class="pb-2">Allowed Routes</th>
+                                <th class="pb-2 text-center">Uses</th>
+                                <th class="pb-2 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="passcodesTableBody" class="divide-y divide-white/5">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        const portal = {
+            session: null,
+
+            init() {
+                // Check query string for ?code=
+                const urlParams = new URLSearchParams(window.location.search);
+                const queryCode = urlParams.get('code');
+
+                const savedCode = queryCode || localStorage.getItem('ee_passcode');
+                if (savedCode) {
+                    this.verifyCode(savedCode, true);
+                }
+            },
+
+            fillCode(code) {
+                const el = document.getElementById('passcodeInput');
+                if (el) {
+                    el.value = code;
+                    el.focus();
+                }
+            },
+
+            toggleShowPasscode() {
+                const el = document.getElementById('passcodeInput');
+                if (!el) return;
+                el.type = el.type === 'password' ? 'text' : 'password';
+            },
+
+            async handleVerify(e) {
+                e.preventDefault();
+                const code = (document.getElementById('passcodeInput')?.value || '').trim();
+                if (!code) return;
+                await this.verifyCode(code, false);
+            },
+
+            async verifyCode(code, silent = false) {
+                const btn = document.getElementById('btnUnlock');
+                const errBox = document.getElementById('errorAlert');
+                const errMsg = document.getElementById('errorMessage');
+                const card = document.getElementById('gateSection');
+
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="inline-block animate-spin mr-2">⟳</span> Authenticating...';
+                }
+                if (errBox) errBox.classList.add('hidden');
+
+                try {
+                    const res = await fetch('/api/v1/auth/verify-code', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code })
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok) {
+                        throw new Error(data.detail || 'Authentication failed');
+                    }
+
+                    // Save session
+                    this.session = data;
+                    localStorage.setItem('ee_passcode', data.code);
+                    localStorage.setItem('ee_friend_name', data.label);
+                    localStorage.setItem('ee_allowed_routes', JSON.stringify(data.allowed_routes));
+
+                    this.renderDeck(data);
+                } catch (err) {
+                    if (!silent) {
+                        if (errBox && errMsg) {
+                            errMsg.textContent = err.message || 'Invalid passcode.';
+                            errBox.classList.remove('hidden');
+                        }
+                        if (card) {
+                            card.classList.add('shake');
+                            setTimeout(() => card.classList.remove('shake'), 500);
+                        }
+                    }
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<span>Unlock Nexus Deck</span><span class="text-lg">→</span>';
+                    }
+                }
+            },
+
+            renderDeck(data) {
+                document.getElementById('gateSection').style.display = 'none';
+                document.getElementById('deckSection').style.display = 'block';
+                document.getElementById('portalHeader').style.display = 'flex';
+                document.getElementById('userLabelBadge').textContent = `${data.label} (${data.code})`;
+
+                const grid = document.getElementById('appsGrid');
+                if (!grid) return;
+
+                const apps = data.authorized_apps || [];
+                let html = '';
+
+                apps.forEach(app => {
+                    if (app.id === 'admin' && !data.is_admin) return;
+
+                    const isAuth = app.has_access;
+                    const actionBadge = isAuth 
+                        ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-xs">🟢 Authorized</span>'
+                        : '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-bold text-xs">🔒 Restricted</span>';
+
+                    const onclick = isAuth ? `onclick="portal.launchApp('${app.path}')"` : '';
+
+                    html += `
+                        <div class="app-card ${isAuth ? 'authorized' : 'restricted'}" ${onclick}>
+                            <div>
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-2xl">
+                                        ${app.icon}
+                                    </div>
+                                    ${actionBadge}
+                                </div>
+                                <h3 class="brand-title text-xl font-bold text-white mb-1.5">${app.name}</h3>
+                                <p class="text-xs text-slate-400 leading-relaxed mb-6">${app.description}</p>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-4 border-t border-white/5 mt-auto">
+                                <span class="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">${app.badge}</span>
+                                <span class="text-xs font-bold ${isAuth ? 'text-indigo-300' : 'text-slate-500'} flex items-center gap-1">
+                                    ${isAuth ? 'Launch App →' : 'Upgrade Required'}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                grid.innerHTML = html;
+
+                // If user is Admin, show and load Key Manager
+                const adminCard = document.getElementById('adminKeyManagerCard');
+                if (data.is_admin) {
+                    adminCard.style.display = 'block';
+                    this.loadPasscodesList();
+                } else {
+                    adminCard.style.display = 'none';
+                }
+            },
+
+            launchApp(path) {
+                window.location.href = path;
+            },
+
+            lockSession() {
+                localStorage.removeItem('ee_passcode');
+                localStorage.removeItem('ee_friend_name');
+                localStorage.removeItem('ee_allowed_routes');
+                this.session = null;
+                document.getElementById('gateSection').style.display = 'block';
+                document.getElementById('deckSection').style.display = 'none';
+                document.getElementById('portalHeader').style.display = 'none';
+                const el = document.getElementById('passcodeInput');
+                if (el) { el.value = ''; el.focus(); }
+            },
+
+            toggleGeneratorForm() {
+                const drawer = document.getElementById('generatorDrawer');
+                if (!drawer) return;
+                drawer.style.display = drawer.style.display === 'none' ? 'block' : 'none';
+            },
+
+            async loadPasscodesList() {
+                const tbody = document.getElementById('passcodesTableBody');
+                if (!tbody) return;
+
+                try {
+                    const res = await fetch('/api/v1/auth/codes');
+                    const data = await res.json();
+                    const list = data.passcodes || [];
+
+                    tbody.innerHTML = list.map(item => `
+                        <tr class="hover:bg-white/[0.02] transition">
+                            <td class="py-2.5 mono font-bold text-indigo-300">${item.code}</td>
+                            <td class="py-2.5 font-medium text-slate-200">${item.label}</td>
+                            <td class="py-2.5">
+                                <div class="flex flex-wrap gap-1">
+                                    ${item.allowed_routes.map(r => `<span class="bg-white/5 px-1.5 py-0.5 rounded text-[10px] text-slate-300">${r}</span>`).join('')}
+                                </div>
+                            </td>
+                            <td class="py-2.5 text-center font-mono text-slate-400">${item.use_count}</td>
+                            <td class="py-2.5 text-right">
+                                <button onclick="portal.copyPasscodeLink('${item.code}')" class="text-cyan-400 hover:text-cyan-300 mr-2 font-medium" title="Copy Invite Link">🔗 Link</button>
+                                <button onclick="portal.deletePasscode('${item.code}')" class="text-rose-400 hover:text-rose-300 font-medium" title="Delete Passcode">🗑️</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                } catch (e) {
+                    console.error('Error loading passcodes:', e);
+                }
+            },
+
+            async submitCreatePasscode() {
+                const label = (document.getElementById('newCodeLabel')?.value || '').trim();
+                const code = (document.getElementById('newCodeCustom')?.value || '').trim();
+                if (!label) {
+                    alert('Please enter a friend name or label.');
+                    return;
+                }
+
+                const routes = [];
+                if (document.getElementById('route_dashboard')?.checked) routes.push('dashboard');
+                if (document.getElementById('route_credit_card')?.checked) routes.push('credit_card');
+                if (document.getElementById('route_playground')?.checked) routes.push('playground');
+                if (document.getElementById('route_admin')?.checked) routes.push('admin');
+
+                if (!routes.length) {
+                    alert('Please select at least one authorized route.');
+                    return;
+                }
+
+                try {
+                    const res = await fetch('/api/v1/auth/codes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ label, code: code || null, allowed_routes: routes })
+                    });
+                    if (!res.ok) throw new Error('Failed creating passcode');
+                    
+                    document.getElementById('newCodeLabel').value = '';
+                    document.getElementById('newCodeCustom').value = '';
+                    this.toggleGeneratorForm();
+                    this.loadPasscodesList();
+                } catch (e) {
+                    alert(e.message);
+                }
+            },
+
+            copyPasscodeLink(code) {
+                const link = `${window.location.origin}/portal?code=${code}`;
+                navigator.clipboard.writeText(link);
+                alert(`Copied direct invite link for ${code}:\n${link}`);
+            },
+
+            async deletePasscode(code) {
+                if (!confirm(`Are you sure you want to delete passcode ${code}?`)) return;
+                try {
+                    await fetch(`/api/v1/auth/codes/${encodeURIComponent(code)}`, { method: 'DELETE' });
+                    this.loadPasscodesList();
+                } catch (e) {
+                    alert(e.message);
+                }
+            }
+        };
+
+        window.portal = portal;
+        document.addEventListener('DOMContentLoaded', () => portal.init());
+    </script>
+</body>
+</html>

@@ -25,6 +25,7 @@
             <button id="ccNavThemes" onclick="app.switchCustomizerTab('themes')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🎨 Themes & Colors</button>
             <button id="ccNavEnv" onclick="app.switchCustomizerTab('env')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🔑 Environment Variables</button>
             <button id="ccNavRateLimits" onclick="app.switchCustomizerTab('ratelimits')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">⚡ Rate Limits & Quotas</button>
+            <button id="ccNavKeys" onclick="app.switchCustomizerTab('keys')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🔐 Friend Passcodes</button>
             {% if has_diagnostics_key or has_tracker_key %}
             <button id="ccNavAudit" onclick="app.switchCustomizerTab('audit')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🖥️ System Diagnostics & Telemetry</button>
             {% endif %}
@@ -270,6 +271,31 @@
                             <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:1.5rem;">Loading access records...</td></tr>
                         </tbody>
                     </table>
+            <!-- ================= SUB-TAB 5: FRIEND PASSCODES ================= -->
+            <div id="ccSectionKeys" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Friend Passcodes & Route Permissions</h3>
+                        <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--muted);">Generate and manage private access keys and application permissions for friends.</p>
+                    </div>
+                    <button onclick="app.showAddPasscodeModal()" class="btn btn-sm btn-primary">➕ Generate New Passcode</button>
+                </div>
+
+                <div style="overflow-x: auto; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.5rem; background: rgba(0,0,0,0.2); max-height: 400px; overflow-y: auto;">
+                    <table class="results-table" style="width: 100%; font-size: 0.8rem;">
+                        <thead>
+                            <tr>
+                                <th>Passcode</th>
+                                <th>Friend / Label</th>
+                                <th>Allowed Routes</th>
+                                <th style="text-align: center;">Uses</th>
+                                <th style="text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ccPasscodesTableBody">
+                            <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1.5rem;">Loading passcodes...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
             {% endif %}
@@ -285,23 +311,44 @@
     </div>
 </div>
 
-<!-- ================= ADD / EDIT ENV VAR DIALOG ================= -->
-<div id="editEnvModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000000; align-items: center; justify-content: center; padding: 1rem;">
-    <div style="background: #0f172a; border: 1px solid #3b82f6; border-radius: 0.75rem; width: 100%; max-width: 480px; padding: 1.5rem; color: var(--light); box-shadow: 0 20px 50px rgba(0,0,0,0.9);">
-        <h3 id="editEnvTitle" style="margin: 0 0 1rem 0; font-size: 1.1rem; font-weight: 700;">Edit Environment Variable</h3>
-        <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+<!-- ================= ADD / GENERATE PASSCODE DIALOG ================= -->
+<div id="addPasscodeModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 1000000; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #0e1626; border: 1px solid rgba(99,102,241,0.5); border-radius: 0.85rem; width: 100%; max-width: 520px; padding: 1.6rem; color: var(--light); box-shadow: 0 25px 60px rgba(0,0,0,0.95);">
+        <h3 style="margin: 0 0 1rem 0; font-size: 1.15rem; font-weight: 700; color: #f8fafc;">➕ Generate Friend Passcode</h3>
+        <div style="display: flex; flex-direction: column; gap: 0.9rem;">
             <div>
-                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Variable Name (KEY)</label>
-                <input type="text" id="editEnvKey" placeholder="e.g. OPENROUTER_API_KEY" style="width: 100%; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 0.4rem; color: var(--light); font-family: monospace; font-size: 0.88rem;">
+                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Friend Name / Label</label>
+                <input type="text" id="ccNewPassLabel" placeholder="e.g. Alex, Trader VIP" style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 0.4rem; color: var(--light); font-size: 0.88rem;">
             </div>
             <div>
-                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Variable Value</label>
-                <textarea id="editEnvVal" rows="3" placeholder="Enter value..." style="width: 100%; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 0.4rem; color: var(--light); font-family: monospace; font-size: 0.88rem; resize: vertical;"></textarea>
+                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Custom Code (Optional)</label>
+                <input type="text" id="ccNewPassCode" placeholder="e.g. ALEX-VIP (Auto-generated if empty)" style="width: 100%; padding: 0.55rem 0.75rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); border-radius: 0.4rem; color: var(--light); font-family: monospace; font-size: 0.88rem; text-transform: uppercase;">
+            </div>
+            <div>
+                <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.4rem; font-weight: 600;">Authorized Applications / Routes:</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <label style="display: flex; items: center; gap: 0.4rem; font-size: 0.78rem; background: rgba(255,255,255,0.03); padding: 0.45rem 0.6rem; border-radius: 0.4rem; border: 1px solid rgba(255,255,255,0.08); cursor: pointer;">
+                        <input type="checkbox" id="ccRouteDash" checked>
+                        <span>📈 Terminal Dashboard</span>
+                    </label>
+                    <label style="display: flex; items: center; gap: 0.4rem; font-size: 0.78rem; background: rgba(255,255,255,0.03); padding: 0.45rem 0.6rem; border-radius: 0.4rem; border: 1px solid rgba(255,255,255,0.08); cursor: pointer;">
+                        <input type="checkbox" id="ccRouteCards" checked>
+                        <span>💳 Credit Card Hub</span>
+                    </label>
+                    <label style="display: flex; items: center; gap: 0.4rem; font-size: 0.78rem; background: rgba(255,255,255,0.03); padding: 0.45rem 0.6rem; border-radius: 0.4rem; border: 1px solid rgba(255,255,255,0.08); cursor: pointer;">
+                        <input type="checkbox" id="ccRoutePlay" checked>
+                        <span>🧪 NSE Playground</span>
+                    </label>
+                    <label style="display: flex; items: center; gap: 0.4rem; font-size: 0.78rem; background: rgba(255,255,255,0.03); padding: 0.45rem 0.6rem; border-radius: 0.4rem; border: 1px solid rgba(255,255,255,0.08); cursor: pointer;">
+                        <input type="checkbox" id="ccRouteAdmin">
+                        <span>🔑 Key Generator (Admin)</span>
+                    </label>
+                </div>
             </div>
         </div>
-        <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
-            <button onclick="document.getElementById('editEnvModal').style.display='none'" class="btn btn-sm" style="background: rgba(255,255,255,0.1); color: var(--light);">Cancel</button>
-            <button id="btnSaveEnv" onclick="app.submitSaveEnvVar()" class="btn btn-sm btn-primary">Save to .env</button>
+        <div style="margin-top: 1.4rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+            <button onclick="document.getElementById('addPasscodeModal').style.display='none'" class="btn btn-sm" style="background: rgba(255,255,255,0.1); color: var(--light);">Cancel</button>
+            <button onclick="app.submitCreatePasscodeInCustomizer()" class="btn btn-sm btn-primary">Generate & Save</button>
         </div>
     </div>
 </div>

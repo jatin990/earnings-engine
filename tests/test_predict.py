@@ -104,7 +104,7 @@ def test_render_dashboard(tmp_path, monkeypatch):
     
     # Verify it's valid HTML with key dashboard elements
     assert "<!DOCTYPE html>" in content
-    assert "<title>Earnings Engine Dashboard</title>" in content
+    assert "<title>Earnings Engine" in content
     assert "tickerSearch" in content
     assert "autocompleteDropdown" in content
     

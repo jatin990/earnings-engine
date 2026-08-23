@@ -28,7 +28,7 @@ def test_migrations_apply_all_in_order(test_settings):
         rows = conn.execute("SELECT version, name FROM schema_migrations ORDER BY version").fetchall()
         assert len(rows) == len(MIGRATIONS)
         assert rows[0][1] == "001_core_schema"
-        assert rows[-1][1] == "007_consolidate_earnings_and_freshness"
+        assert rows[-1][1] == MIGRATIONS[-1].name
 
         # Verify tables exist
         table_rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
@@ -38,6 +38,7 @@ def test_migrations_apply_all_in_order(test_settings):
         assert "price_history" in tables
         assert "swing_ranges" in tables
         assert "ticker_audit_log" in tables
+        assert "passcodes" in tables
         # Verify legacy tables are dropped
         assert "ticker_names" not in tables
         assert "ticker_market_cap" not in tables
