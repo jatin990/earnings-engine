@@ -107,9 +107,29 @@ async def log_and_cancel_api_requests(request: Request, call_next):
         response = await call_next(request)
         duration_ms = (time.perf_counter() - start_time) * 1000
 
-        # Skip logging high-frequency static asset hits to avoid log spam
-        if not (path.startswith("/static") or path.startswith("/ui")):
+        # Skip logging high-frequency polling/heartbeat/static hits to avoid log spam
+        silent_paths = {
+            "/api/v1/config/ratelimits",
+            "/api/v1/earnings/freshness",
+            "/api/v1/watchlist/names",
+            "/api/v1/config/ui-preferences",
+            "/favicon.ico",
+            "/health",
+            "/ping",
+        }
+        is_silent = path in silent_paths or path.startswith(("/static", "/ui", "/docs", "/openapi.json"))
+
+        if not is_silent:
             logger.info(
+                "API [%s] %s%s -> %d (%.1fms)",
+                request.method,
+                path,
+                filters_repr,
+                response.status_code,
+                duration_ms,
+            )
+        else:
+            logger.debug(
                 "API [%s] %s%s -> %d (%.1fms)",
                 request.method,
                 path,
@@ -121,13 +141,14 @@ async def log_and_cancel_api_requests(request: Request, call_next):
     except (asyncio.CancelledError, Exception) as exc:
         duration_ms = (time.perf_counter() - start_time) * 1000
         if isinstance(exc, asyncio.CancelledError) or (token and token.is_cancelled):
-            logger.info(
-                "API [%s] %s%s -> CANCELLED by client (%.1fms)",
-                request.method,
-                path,
-                filters_repr,
-                duration_ms,
-            )
+            if not is_silent:
+                logger.info(
+                    "API [%s] %s%s -> CANCELLED by client (%.1fms)",
+                    request.method,
+                    path,
+                    filters_repr,
+                    duration_ms,
+                )
             if token:
                 token.cancel("Request handler cancelled due to client disconnect")
             return Response(status_code=499, content="Client Closed Request")
