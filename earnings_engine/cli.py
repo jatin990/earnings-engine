@@ -1359,8 +1359,131 @@ def options_chain_cmd(symbol: str) -> None:
     click.echo()
 
 
+# ---------------------------------------------------------------------------
+# Multi-Model AI Consensus CLI Group
+# ---------------------------------------------------------------------------
+
+@cli.group("consensus")
+def consensus_group() -> None:
+    """Multi-Model AI Consensus Predictions, Settlement Tracking & Post-Mortem Diagnostics."""
+    pass
+
+
+@consensus_group.command("predict")
+@click.option("--ticker", "-t", required=True, help="Stock ticker (e.g. RELIANCE.NS, INFY.NS, AAPL).")
+@click.option("--timeframe", "-d", default=14, type=int, show_default=True, help="Evaluation window in days.")
+@click.option("--models", "-m", default=None, help="Comma-separated model IDs (optional).")
+def consensus_predict_cmd(ticker: str, timeframe: int, models: str | None) -> None:
+    """Run multi-model AI consensus prediction for a stock."""
+    from datetime import datetime, timedelta
+    from earnings_engine.consensus import context_builder, model_runner, aggregator, storage
+
+    t = ticker.strip().upper()
+    click.echo(f"\n[CONSENSUS] Gathering context for {t} ({timeframe}D timeframe)...")
+    settings = Settings()
+    ctx = context_builder.build_context(t, timeframe_days=timeframe, settings=settings)
+    as_of_price = ctx.get("price_action", {}).get("current_price") or 0.0
+
+    if as_of_price <= 0:
+        try:
+            import yfinance as yf
+            as_of_price = float(yf.Ticker(t).fast_info.last_price or 0.0)
+        except Exception:
+            pass
+
+    click.echo(f"[CONSENSUS] Current Price: ₹{as_of_price:.2f}")
+
+    model_list = [m.strip() for m in models.split(",") if m.strip()] if models else None
+    click.echo(f"[CONSENSUS] Dispatching to open-source models via OpenRouter...")
+    model_outputs = model_runner.run_consensus_models(context=ctx, models=model_list)
+
+    consensus = aggregator.aggregate_predictions(
+        model_results=model_outputs,
+        ticker=t,
+        as_of_price=as_of_price,
+        timeframe_days=timeframe,
+    )
+
+    eval_date = (datetime.now() + timedelta(days=timeframe)).strftime("%Y-%m-%d")
+    pred_id = storage.save_prediction(consensus, evaluation_date=eval_date, settings=settings)
+
+    dir_color = "green" if consensus["consensus_direction"] == "BULLISH" else ("red" if consensus["consensus_direction"] == "BEARISH" else "yellow")
+    click.echo("\n" + "=" * 70)
+    click.echo(f"AI CONSENSUS RESULT: {t} (ID: {pred_id})")
+    click.echo("=" * 70)
+    click.secho(f"  Direction:          {consensus['consensus_direction']}", fg=dir_color, bold=True)
+    click.echo(f"  Consensus Strength: {consensus['consensus_strength']:.1f}%")
+    click.echo(f"  Agreement Ratio:    {consensus['agreement_ratio']:.0%} ({consensus['valid_count']}/{consensus['model_count']} models)")
+    click.echo(f"  Expected Return:    {consensus['consensus_return_pct']:+.2f}%")
+    click.echo(f"  Target Price:       ₹{consensus['consensus_target_price']:.2f}")
+    if consensus.get("consensus_support"):
+        click.echo(f"  Consensus Support:  ₹{consensus['consensus_support']:.2f}")
+    if consensus.get("consensus_resistance"):
+        click.echo(f"  Consensus Resist:   ₹{consensus['consensus_resistance']:.2f}")
+    click.echo(f"  Evaluation Date:    {eval_date}")
+    click.echo(f"\n  Synthesized Thesis:\n  {consensus.get('synthesized_thesis')}")
+    click.echo("\n  Individual Model Breakdown:")
+    for m in consensus.get("models_breakdown", []):
+        m_name = m.get("model_name", "Unknown")
+        if "error" in m:
+            click.echo(f"    - {m_name:<16}: [ERROR] {m.get('error')}")
+        else:
+            m_dir = m.get("direction", "NEUTRAL")
+            m_conf = m.get("confidence_pct", 0)
+            m_ret = m.get("target_return_pct", 0.0)
+            click.echo(f"    - {m_name:<16}: {m_dir:<8} (Conf: {m_conf}%, Ret: {m_ret:+.1f}%)")
+    click.echo()
+
+
+@consensus_group.command("settle")
+@click.option("--date", "-d", default=None, help="Evaluation as-of date (YYYY-MM-DD). Defaults to today.")
+def consensus_settle_cmd(date: str | None) -> None:
+    """Run settlement worker to grade pending consensus predictions and trigger post-mortems."""
+    from earnings_engine.consensus import settlement
+
+    click.echo("\n[SETTLEMENT] Checking mature consensus predictions...")
+    res = settlement.settle_pending_predictions(as_of_date=date)
+    click.echo(f"  Total Due:    {res['total_due']}")
+    click.echo(f"  Settled:      {res['settled_count']}")
+    click.secho(f"  Success:      {res['success_count']}", fg="green")
+    click.secho(f"  Partial:      {res['partial_count']}", fg="yellow")
+    click.secho(f"  Failure:      {res['failure_count']}", fg="red")
+    click.echo(f"  Invalidated:  {res['invalidated_count']}")
+    click.echo()
+
+
+@consensus_group.command("stats")
+def consensus_stats_cmd() -> None:
+    """Display consensus performance metrics, win rates, and model accuracy breakdown."""
+    from earnings_engine.consensus import storage
+
+    stats = storage.get_accuracy_stats()
+    click.echo("\n" + "=" * 70)
+    click.echo("AI CONSENSUS ACCURACY & PERFORMANCE AUDIT")
+    click.echo("=" * 70)
+    click.echo(f"  Total Predictions:  {stats['total_predictions']}")
+    click.echo(f"  Pending:            {stats['pending']}")
+    click.echo(f"  Settled:            {stats['settled']}")
+    click.secho(f"  Win Rate:           {stats['win_rate']:.1f}%", fg="green" if stats['win_rate'] >= 50 else "yellow", bold=True)
+    click.echo(f"  Direction Accuracy: {stats['direction_accuracy']:.1f}%")
+    if stats.get("avg_strength_wins"):
+        click.echo(f"  Avg Strength (Wins):{stats['avg_strength_wins']:.1f}%")
+    if stats.get("avg_strength_losses"):
+        click.echo(f"  Avg Strength (Loss):{stats['avg_strength_losses']:.1f}%")
+
+    click.echo("\n  Per-Model Accuracy:")
+    for ms in stats.get("model_stats", []):
+        click.echo(f"    - {ms['model_name']:<18}: {ms['accuracy']:.1f}% ({ms['correct']}/{ms['predictions']})")
+
+    click.echo("\n  Top Failure Categories:")
+    for fc in stats.get("top_failure_categories", []):
+        click.echo(f"    - {fc['category']:<28}: {fc['count']} occurrences")
+    click.echo()
+
+
 if __name__ == "__main__":
     cli()
+
 
 
 

@@ -2041,5 +2041,167 @@ async def options_pcr_endpoint(symbol: str):
         raise HTTPException(status_code=500, detail=f"Error fetching PCR: {str(e)}")
 
 
+# ---------------------------------------------------------------------------
+# Multi-Model AI Consensus Prediction & Settlement Endpoints
+# ---------------------------------------------------------------------------
+
+
+class ConsensusPredictRequest(BaseModel):
+    ticker: str | None = None
+    tickers: list[str] | None = None
+    timeframe_days: int = Field(default=14, ge=1, le=90)
+    models: list[str] | None = None
+
+
+class ConsensusSettleRequest(BaseModel):
+    as_of_date: str | None = None
+
+
+@app.post("/api/v1/consensus/predict", tags=["AI Consensus Engine"])
+async def consensus_predict_endpoint(req: ConsensusPredictRequest):
+    """Run multi-model consensus prediction for one or more tickers."""
+    from datetime import datetime, timedelta
+    from earnings_engine.consensus import context_builder, model_runner, aggregator, storage
+
+    target_tickers: list[str] = []
+    if req.ticker:
+        target_tickers.append(req.ticker.strip().upper())
+    if req.tickers:
+        for t in req.tickers:
+            if t and t.strip().upper() not in target_tickers:
+                target_tickers.append(t.strip().upper())
+
+    if not target_tickers:
+        raise HTTPException(status_code=400, detail="Must provide at least one ticker symbol.")
+
+    results: list[dict[str, Any]] = []
+    for ticker in target_tickers:
+        try:
+            # 1. Build rich context
+            ctx = context_builder.build_context(ticker, timeframe_days=req.timeframe_days, settings=_settings)
+            as_of_price = ctx.get("price_action", {}).get("current_price") or 0.0
+
+            # Fallback price lookup if missing from context
+            if as_of_price <= 0:
+                try:
+                    import yfinance as yf
+                    info = yf.Ticker(ticker).fast_info
+                    as_of_price = float(info.last_price or 0.0)
+                except Exception:
+                    pass
+
+            # 2. Run multi-model parallel inference
+            model_outputs = model_runner.run_consensus_models(
+                context=ctx,
+                models=req.models,
+            )
+
+            # 3. Aggregate consensus
+            consensus = aggregator.aggregate_predictions(
+                model_results=model_outputs,
+                ticker=ticker,
+                as_of_price=as_of_price,
+                timeframe_days=req.timeframe_days,
+            )
+
+            # 4. Save to database
+            eval_date = (datetime.now() + timedelta(days=req.timeframe_days)).strftime("%Y-%m-%d")
+            pred_id = storage.save_prediction(consensus, evaluation_date=eval_date, settings=_settings)
+            consensus["id"] = pred_id
+            consensus["evaluation_date"] = eval_date
+            results.append(consensus)
+
+        except Exception as e:
+            logger.error("[CONSENSUS-API] Error predicting for %s: %s", ticker, e)
+            results.append({"ticker": ticker, "error": str(e)})
+
+    return {
+        "success": True,
+        "count": len(results),
+        "predictions": results,
+    }
+
+
+@app.get("/api/v1/consensus/latest", tags=["AI Consensus Engine"])
+async def consensus_latest_endpoint(
+    ticker: str | None = Query(default=None),
+    direction: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+):
+    """Retrieve latest consensus predictions with optional filtering."""
+    from earnings_engine.consensus import storage
+    try:
+        preds = storage.get_predictions(
+            settings=_settings,
+            ticker=ticker,
+            direction=direction,
+            status=status,
+            limit=limit,
+        )
+        return {"success": True, "count": len(preds), "predictions": preds}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error querying consensus predictions: {str(e)}")
+
+
+@app.get("/api/v1/consensus/audit", tags=["AI Consensus Engine"])
+async def consensus_audit_endpoint(
+    ticker: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+):
+    """Historical audit of consensus predictions including settlement outcomes and failure analyses."""
+    from earnings_engine.consensus import storage
+    try:
+        preds = storage.get_predictions(
+            settings=_settings,
+            ticker=ticker,
+            status=status,
+            limit=limit,
+        )
+        return {"success": True, "count": len(preds), "audit_records": preds}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching consensus audit records: {str(e)}")
+
+
+@app.get("/api/v1/consensus/accuracy-stats", tags=["AI Consensus Engine"])
+async def consensus_accuracy_stats_endpoint():
+    """Retrieve aggregate performance and win-rate statistics across all consensus predictions."""
+    from earnings_engine.consensus import storage
+    try:
+        stats = storage.get_accuracy_stats(settings=_settings)
+        return {"success": True, **stats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching consensus accuracy stats: {str(e)}")
+
+
+@app.post("/api/v1/consensus/settle", tags=["AI Consensus Engine"])
+async def consensus_settle_endpoint(req: ConsensusSettleRequest | None = None):
+    """Trigger settlement evaluation for all mature consensus predictions."""
+    from earnings_engine.consensus import settlement
+    try:
+        as_of = req.as_of_date if req else None
+        summary = settlement.settle_pending_predictions(settings=_settings, as_of_date=as_of)
+        return {"success": True, **summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running consensus settlement: {str(e)}")
+
+
+@app.get("/api/v1/consensus/{prediction_id}", tags=["AI Consensus Engine"])
+async def consensus_detail_endpoint(prediction_id: int):
+    """Get full details of a specific consensus prediction, including all model votes and post-mortems."""
+    from earnings_engine.consensus import storage
+    try:
+        pred = storage.get_prediction_by_id(prediction_id, settings=_settings)
+        if not pred:
+            raise HTTPException(status_code=404, detail=f"Prediction with ID {prediction_id} not found.")
+        return {"success": True, "prediction": pred}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching prediction details: {str(e)}")
+
+
+
 
 
