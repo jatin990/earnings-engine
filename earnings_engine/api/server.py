@@ -27,6 +27,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
+from earnings_engine.data.migrations import apply_migrations
 from earnings_engine.logging_utils import get_logger, log_startup_diagnostics
 
 logger = get_logger("earnings_engine.api.server")
@@ -34,7 +35,13 @@ logger = get_logger("earnings_engine.api.server")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Run environment, config and provider module diagnostics on API startup."""
+    """Run migrations and startup diagnostics on API startup."""
+    try:
+        applied = apply_migrations(_settings)
+        if applied:
+            logger.info("Database migrations applied on startup: %s", ", ".join(applied))
+    except Exception as e:
+        logger.warning("Startup database migration check failed: %s", e)
     log_startup_diagnostics(logger)
     yield
 

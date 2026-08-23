@@ -59,10 +59,26 @@ def _store(ticker: str, industry: str | None, sector: str | None, settings: Sett
     """Store (or refresh) the industry classification for a ticker."""
     now = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
     with _connect(settings) as connection:
+        # Upsert into unified tickers master table
         connection.execute(
-            "INSERT OR REPLACE INTO ticker_industry (ticker, industry, sector, fetched_at) VALUES (?, ?, ?, ?)",
+            """
+            INSERT INTO tickers (ticker, industry, sector, last_updated)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(ticker) DO UPDATE SET
+                industry = excluded.industry,
+                sector = excluded.sector,
+                last_updated = excluded.last_updated
+            """,
             (ticker, industry, sector, now),
         )
+        # Also maintain legacy ticker_industry for backward compatibility
+        try:
+            connection.execute(
+                "INSERT OR REPLACE INTO ticker_industry (ticker, industry, sector, fetched_at) VALUES (?, ?, ?, ?)",
+                (ticker, industry, sector, now),
+            )
+        except Exception:
+            pass
         connection.commit()
 
 
@@ -81,9 +97,17 @@ def load_industry(ticker: str, settings: Settings) -> str | None:
     """Load the industry for a single ticker from SQLite cache (no fetch)."""
     with _connect(settings) as connection:
         row = connection.execute(
-            "SELECT industry, sector FROM ticker_industry WHERE ticker = ?",
+            "SELECT industry, sector FROM tickers WHERE ticker = ?",
             (ticker,),
         ).fetchone()
+        if not row or (not row[0] and not row[1]):
+            try:
+                row = connection.execute(
+                    "SELECT industry, sector FROM ticker_industry WHERE ticker = ?",
+                    (ticker,),
+                ).fetchone()
+            except Exception:
+                row = None
     if not row:
         return None
     return row[0] or row[1]
@@ -99,10 +123,18 @@ def load_industry_map(tickers: list[str], settings: Settings) -> dict[str, str]:
     placeholders = ",".join("?" for _ in tickers)
     with _connect(settings) as connection:
         rows = connection.execute(
-            f"SELECT ticker, industry, sector FROM ticker_industry WHERE ticker IN ({placeholders})",
+            f"SELECT ticker, industry, sector FROM tickers WHERE ticker IN ({placeholders})",
             tickers,
         ).fetchall()
-    return {row[0]: (row[1] or row[2]) for row in rows}
+        if not rows:
+            try:
+                rows = connection.execute(
+                    f"SELECT ticker, industry, sector FROM ticker_industry WHERE ticker IN ({placeholders})",
+                    tickers,
+                ).fetchall()
+            except Exception:
+                rows = []
+    return {row[0]: (row[1] or row[2]) for row in rows if (row[1] or row[2])}
 
 
 def ingest_industries(tickers: list[str], settings: Settings, force: bool = False) -> dict[str, int]:

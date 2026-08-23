@@ -281,24 +281,55 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
         conn = get_db_connection(settings)
         placeholders = ", ".join(["?"] * len(tickers))
         
-        # 1. Names
-        name_rows = conn.execute(f"SELECT ticker, name FROM ticker_names WHERE ticker IN ({placeholders})", tickers).fetchall()
-        names_map = {r[0]: r[1] for r in name_rows}
+        # 1. Unified Ticker Master (Names, Market Caps, Metrics in 1 query)
+        import json
+        try:
+            ticker_master_rows = conn.execute(
+                f"SELECT ticker, name, market_cap, metrics FROM tickers WHERE ticker IN ({placeholders})",
+                tickers,
+            ).fetchall()
+            for r in ticker_master_rows:
+                sym = r[0]
+                if r[1]:
+                    names_map[sym] = r[1]
+                if r[2] is not None and not force:
+                    all_market_caps[sym] = float(r[2])
+                if r[3] and not force:
+                    try:
+                        metrics_map[sym] = json.loads(r[3]) if isinstance(r[3], str) else r[3]
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
-        # 1b. Market Caps (targeted)
-        if not force:
-            mcap_rows = conn.execute(f"SELECT ticker, market_cap FROM ticker_market_cap WHERE ticker IN ({placeholders})", tickers).fetchall()
-            all_market_caps = {r[0]: float(r[1]) for r in mcap_rows if r[1] is not None}
-        
-        # 2. Metrics
-        if not force:
-            m_rows = conn.execute(f"SELECT ticker, metrics FROM ticker_metrics WHERE ticker IN ({placeholders})", tickers).fetchall()
-            import json
-            for r in m_rows:
-                try:
-                    metrics_map[r[0]] = json.loads(r[1]) if isinstance(r[1], str) else r[1]
-                except Exception:
-                    pass
+        # Fallback to legacy tables if any missing
+        if len(names_map) < len(tickers):
+            try:
+                name_rows = conn.execute(f"SELECT ticker, name FROM ticker_names WHERE ticker IN ({placeholders})", tickers).fetchall()
+                for r in name_rows:
+                    if r[0] not in names_map and r[1]:
+                        names_map[r[0]] = r[1]
+            except Exception:
+                pass
+        if not force and len(all_market_caps) < len(tickers):
+            try:
+                mcap_rows = conn.execute(f"SELECT ticker, market_cap FROM ticker_market_cap WHERE ticker IN ({placeholders})", tickers).fetchall()
+                for r in mcap_rows:
+                    if r[0] not in all_market_caps and r[1] is not None:
+                        all_market_caps[r[0]] = float(r[1])
+            except Exception:
+                pass
+        if not force and len(metrics_map) < len(tickers):
+            try:
+                m_rows = conn.execute(f"SELECT ticker, metrics FROM ticker_metrics WHERE ticker IN ({placeholders})", tickers).fetchall()
+                for r in m_rows:
+                    if r[0] not in metrics_map and r[1]:
+                        try:
+                            metrics_map[r[0]] = json.loads(r[1]) if isinstance(r[1], str) else r[1]
+                        except Exception:
+                            pass
+            except Exception:
+                pass
                     
         # 3. Earnings History (last 2 years)
         cutoff_e_date = (pd.Timestamp.now() - pd.Timedelta(days=730)).strftime("%Y-%m-%d")

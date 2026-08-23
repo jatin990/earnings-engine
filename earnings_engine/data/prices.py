@@ -334,10 +334,26 @@ def store_price_metrics(ticker: str, settings: Settings, metrics: dict[str, Any]
     as_of_date_value = as_of_date or pd.Timestamp.now().strftime("%Y-%m-%d")
     payload = json.dumps(metrics, sort_keys=True, default=str)
     with _connect(settings) as connection:
+        # Upsert into unified tickers master table
         connection.execute(
-            "INSERT OR REPLACE INTO ticker_metrics (ticker, as_of_date, metrics) VALUES (?, ?, ?)",
-            (ticker, as_of_date_value, payload),
+            """
+            INSERT INTO tickers (ticker, metrics, metrics_as_of_date, last_updated)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(ticker) DO UPDATE SET
+                metrics = excluded.metrics,
+                metrics_as_of_date = excluded.metrics_as_of_date,
+                last_updated = excluded.last_updated
+            """,
+            (ticker, payload, as_of_date_value, as_of_date_value),
         )
+        # Also maintain legacy ticker_metrics for backward compatibility
+        try:
+            connection.execute(
+                "INSERT OR REPLACE INTO ticker_metrics (ticker, as_of_date, metrics) VALUES (?, ?, ?)",
+                (ticker, as_of_date_value, payload),
+            )
+        except Exception:
+            pass
         connection.commit()
 
 
@@ -350,15 +366,35 @@ def store_price_metrics_bulk(
     if not metrics_by_ticker:
         return
     as_of_date_value = as_of_date or pd.Timestamp.now().strftime("%Y-%m-%d")
-    rows = [
+    master_rows = [
+        (ticker, json.dumps(m, sort_keys=True, default=str), as_of_date_value, as_of_date_value)
+        for ticker, m in metrics_by_ticker.items()
+    ]
+    legacy_rows = [
         (ticker, as_of_date_value, json.dumps(m, sort_keys=True, default=str))
         for ticker, m in metrics_by_ticker.items()
     ]
     with _connect(settings) as connection:
+        # 1. Bulk upsert into unified tickers master table
         connection.executemany(
-            "INSERT OR REPLACE INTO ticker_metrics (ticker, as_of_date, metrics) VALUES (?, ?, ?)",
-            rows,
+            """
+            INSERT INTO tickers (ticker, metrics, metrics_as_of_date, last_updated)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(ticker) DO UPDATE SET
+                metrics = excluded.metrics,
+                metrics_as_of_date = excluded.metrics_as_of_date,
+                last_updated = excluded.last_updated
+            """,
+            master_rows,
         )
+        # 2. Maintain legacy table
+        try:
+            connection.executemany(
+                "INSERT OR REPLACE INTO ticker_metrics (ticker, as_of_date, metrics) VALUES (?, ?, ?)",
+                legacy_rows,
+            )
+        except Exception:
+            pass
         connection.commit()
 
 
@@ -367,13 +403,21 @@ def load_price_metrics(ticker: str, settings: Settings, as_of_date: str | None =
     as_of_date_value = as_of_date or pd.Timestamp.now().strftime("%Y-%m-%d")
     with _connect(settings) as connection:
         row = connection.execute(
-            "SELECT metrics FROM ticker_metrics WHERE ticker = ? AND as_of_date = ?",
+            "SELECT metrics FROM tickers WHERE ticker = ? AND metrics_as_of_date = ?",
             (ticker, as_of_date_value),
         ).fetchone()
+        if not row or not row[0]:
+            try:
+                row = connection.execute(
+                    "SELECT metrics FROM ticker_metrics WHERE ticker = ? AND as_of_date = ?",
+                    (ticker, as_of_date_value),
+                ).fetchone()
+            except Exception:
+                row = None
 
-    if not row:
+    if not row or not row[0]:
         return None
-    return json.loads(row[0])
+    return json.loads(row[0]) if isinstance(row[0], str) else row[0]
 
 
 def _fetch_prices_for_ticker(args: tuple[str, Settings, bool]) -> tuple[str, int]:

@@ -211,7 +211,12 @@ def _resolve_tickers(market: str | None, ticker: tuple[str, ...], universe_file:
 @click.pass_context
 def cli(ctx) -> None:
     """Earnings prediction engine."""
+    from earnings_engine.data.migrations import apply_migrations
     from earnings_engine.logging_utils import log_startup_diagnostics
+    try:
+        apply_migrations(Settings())
+    except Exception:
+        pass
     log_startup_diagnostics(_get_cli_logger())
     _cleanup_previous_artifacts(PROJECT_ROOT)
     if ctx.invoked_subcommand is None:

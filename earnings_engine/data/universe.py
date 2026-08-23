@@ -57,37 +57,9 @@ def _connect(settings: Settings | None = None) -> Any:
     if settings is None:
         settings = Settings()
     settings.ensure_dirs()
+    from earnings_engine.data.migrations import apply_migrations
+    apply_migrations(settings)
     conn = get_db_connection(settings)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS universes (
-            universe_name TEXT NOT NULL,
-            ticker TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            PRIMARY KEY (universe_name, ticker)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS universe_freshness (
-            universe_name TEXT NOT NULL,
-            fetched_at TEXT NOT NULL,
-            PRIMARY KEY (universe_name)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ticker_market_cap (
-            ticker TEXT NOT NULL,
-            market_cap REAL,
-            fetched_at TEXT NOT NULL,
-            PRIMARY KEY (ticker)
-        )
-        """
-    )
-    conn.commit()
 
     # Seed IN and US if universes table has no rows
     count = conn.execute("SELECT count(*) FROM universes").fetchone()[0]
@@ -151,10 +123,18 @@ def is_market_cap_fresh(ticker: str, settings: Settings | None = None) -> bool:
     """Check if market cap data is fresh in SQLite for the given ticker."""
     with _connect(settings) as connection:
         row = connection.execute(
-            "SELECT fetched_at FROM ticker_market_cap WHERE ticker = ?",
+            "SELECT market_cap_updated_at FROM tickers WHERE ticker = ?",
             (ticker,),
         ).fetchone()
-    if not row:
+        if not row or not row[0]:
+            try:
+                row = connection.execute(
+                    "SELECT fetched_at FROM ticker_market_cap WHERE ticker = ?",
+                    (ticker,),
+                ).fetchone()
+            except Exception:
+                row = None
+    if not row or not row[0]:
         return False
     fetched_at = pd.Timestamp(row[0])
     age_days = (pd.Timestamp.now() - fetched_at).total_seconds() / 86400
@@ -165,10 +145,26 @@ def store_market_cap(ticker: str, market_cap: float | None, settings: Settings |
     """Store market cap for a ticker in SQLite."""
     now = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
     with _connect(settings) as connection:
+        # Upsert into unified tickers master table
         connection.execute(
-            "INSERT OR REPLACE INTO ticker_market_cap (ticker, market_cap, fetched_at) VALUES (?, ?, ?)",
-            (ticker, market_cap, now),
+            """
+            INSERT INTO tickers (ticker, market_cap, market_cap_updated_at, last_updated)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(ticker) DO UPDATE SET
+                market_cap = excluded.market_cap,
+                market_cap_updated_at = excluded.market_cap_updated_at,
+                last_updated = excluded.last_updated
+            """,
+            (ticker, market_cap, now, now),
         )
+        # Also maintain legacy ticker_market_cap for backward compatibility
+        try:
+            connection.execute(
+                "INSERT OR REPLACE INTO ticker_market_cap (ticker, market_cap, fetched_at) VALUES (?, ?, ?)",
+                (ticker, market_cap, now),
+            )
+        except Exception:
+            pass
         connection.commit()
 
 
@@ -176,19 +172,35 @@ def load_market_cap(ticker: str, settings: Settings | None = None) -> float | No
     """Load market cap for a ticker from SQLite cache."""
     with _connect(settings) as connection:
         row = connection.execute(
-            "SELECT market_cap FROM ticker_market_cap WHERE ticker = ?",
+            "SELECT market_cap FROM tickers WHERE ticker = ?",
             (ticker,),
         ).fetchone()
-    return row[0] if row else None
+        if row and row[0] is not None:
+            return float(row[0])
+        try:
+            legacy_row = connection.execute(
+                "SELECT market_cap FROM ticker_market_cap WHERE ticker = ?",
+                (ticker,),
+            ).fetchone()
+            return float(legacy_row[0]) if legacy_row and legacy_row[0] is not None else None
+        except Exception:
+            return None
 
 
 def load_all_market_caps(settings: Settings | None = None) -> dict[str, float]:
     """Load all market caps from SQLite cache. Returns {ticker: market_cap}."""
     with _connect(settings) as connection:
         rows = connection.execute(
-            "SELECT ticker, market_cap FROM ticker_market_cap"
+            "SELECT ticker, market_cap FROM tickers WHERE market_cap IS NOT NULL"
         ).fetchall()
-    return {row[0]: row[1] for row in rows if row[1] is not None}
+        if not rows:
+            try:
+                rows = connection.execute(
+                    "SELECT ticker, market_cap FROM ticker_market_cap WHERE market_cap IS NOT NULL"
+                ).fetchall()
+            except Exception:
+                rows = []
+    return {row[0]: float(row[1]) for row in rows if row[1] is not None}
 
 
 # ---------------------------------------------------------------------------
