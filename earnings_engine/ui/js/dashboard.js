@@ -799,7 +799,7 @@
 
             switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'results').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'results';
 
                 // Abort any pending fetch requests when switching tabs

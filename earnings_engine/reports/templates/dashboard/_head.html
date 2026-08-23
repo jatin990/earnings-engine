@@ -58,7 +58,22 @@
         ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(168, 85, 247, 0.6); }
 
-        .container { max-width: 100%; width: 100%; margin: 0 auto; padding: 0 0.25rem; }
+        .container {
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 0.25rem !important;
+        }
+
+        .tab-content {
+            display: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        .tab-content.active {
+            display: block !important;
+        }
         
         .brand-title {
             font-family: var(--font-heading);
