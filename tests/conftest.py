@@ -1,0 +1,43 @@
+"""Global test configuration and speed optimizations for pytest."""
+import os
+import sqlite3
+import pytest
+
+from earnings_engine.config import Settings
+from earnings_engine.data.migrations import apply_migrations
+
+
+@pytest.fixture(autouse=True)
+def force_local_sqlite_in_tests(monkeypatch, tmp_path):
+    """Force local isolated SQLite and disable Turso Cloud WAN calls during test execution.
+    
+    This ensures tests run locally at in-memory speeds (< 1 second) rather than making
+    remote WAN network round-trips over HTTPS to cloud databases.
+    """
+    monkeypatch.setenv("TURSO_DATABASE_URL", "")
+    monkeypatch.setenv("TURSO_AUTH_TOKEN", "")
+
+
+from unittest.mock import MagicMock
+import pandas as pd
+import yfinance as yf
+from earnings_engine.data.providers import provider_manager
+
+
+@pytest.fixture(autouse=True)
+def mock_external_network_in_tests(monkeypatch):
+    """Prevent tests from making real network calls to Yahoo Finance or NSE."""
+    dummy_ticker = MagicMock()
+    dummy_ticker.fast_info = {"market_cap": 1000000.0, "last_price": 100.0, "year_high": 120.0, "year_low": 80.0}
+    dummy_ticker.info = {"industry": "Software", "sector": "Technology"}
+    dummy_ticker.calendar = None
+    dummy_ticker.earnings_dates = None
+    dummy_ticker.get_earnings_dates = MagicMock(return_value=pd.DataFrame())
+    dummy_ticker.history = MagicMock(return_value=pd.DataFrame())
+    monkeypatch.setattr(yf, "Ticker", lambda *args, **kwargs: dummy_ticker)
+
+    # Mock DataManager network calls
+    dummy_mgr = MagicMock()
+    dummy_mgr.fetch_ohlcv = MagicMock(return_value=pd.DataFrame())
+    dummy_mgr.fetch_earnings_dates = MagicMock(return_value=pd.DataFrame())
+    monkeypatch.setattr(provider_manager, "get_data_manager", lambda *args, **kwargs: dummy_mgr)
