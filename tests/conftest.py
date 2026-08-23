@@ -41,3 +41,23 @@ def mock_external_network_in_tests(monkeypatch):
     dummy_mgr.fetch_ohlcv = MagicMock(return_value=pd.DataFrame())
     dummy_mgr.fetch_earnings_dates = MagicMock(return_value=pd.DataFrame())
     monkeypatch.setattr(provider_manager, "get_data_manager", lambda *args, **kwargs: dummy_mgr)
+
+
+from earnings_engine.config import Settings
+
+
+@pytest.fixture
+def temp_settings(tmp_path):
+    """Provide isolated Settings object pointing to a temporary test directory."""
+    s = Settings(
+        data_dirs={
+            "prices": tmp_path / "prices",
+            "earnings": tmp_path / "earnings",
+            "reports": tmp_path / "reports",
+            "logs": tmp_path / "logs",
+            "cache": tmp_path / "cache",
+        }
+    )
+    s.ensure_dirs()
+    return s
+

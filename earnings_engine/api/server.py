@@ -873,6 +873,49 @@ async def ticker_audit_log(
         raise HTTPException(status_code=500, detail=f"Error retrieving audit history: {str(e)}")
 
 
+# ---------------------------------------------------------------------------
+# Control Center: Environment Variables & UI Customizer Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/config/env", tags=["Control Center"])
+async def get_environment_config():
+    """Retrieve environment configuration for the control center."""
+    from earnings_engine.api.config_api import get_env_config
+    return get_env_config()
+
+
+@app.post("/api/v1/config/env", tags=["Control Center"])
+async def update_environment_var(request: Request):
+    """Create or update an environment variable (Local development only)."""
+    from earnings_engine.api.config_api import EnvVarPayload, save_env_var
+    body = await request.json()
+    payload = EnvVarPayload(**body)
+    return save_env_var(payload)
+
+
+@app.delete("/api/v1/config/env/{key}", tags=["Control Center"])
+async def delete_environment_var(key: str):
+    """Delete an environment variable from local .env."""
+    from earnings_engine.api.config_api import delete_env_var
+    return delete_env_var(key)
+
+
+@app.get("/api/v1/config/ui-preferences", tags=["Control Center"])
+async def get_dashboard_ui_preferences():
+    """Get persisted dashboard UI preferences (tab visibility, theme, custom colors)."""
+    from earnings_engine.api.config_api import get_ui_preferences
+    return get_ui_preferences(settings=_settings)
+
+
+@app.post("/api/v1/config/ui-preferences", tags=["Control Center"])
+async def save_dashboard_ui_preferences(request: Request):
+    """Save dashboard UI preferences."""
+    from earnings_engine.api.config_api import UIPreferencesPayload, save_ui_preferences
+    body = await request.json()
+    payload = UIPreferencesPayload(**body)
+    return save_ui_preferences(payload, settings=_settings)
+
+
 @app.get("/api/v1/swing-range/history", tags=["Swing"])
 @app.get("/api/v1/dashboard/swing-range/history", tags=["Swing"])
 async def swing_range_history(

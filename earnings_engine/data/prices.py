@@ -31,40 +31,9 @@ def _empty_frame() -> pd.DataFrame:
 
 def _connect(settings: Settings) -> sqlite3.Connection | Any:
     settings.ensure_dirs()
+    from earnings_engine.data.migrations import apply_migrations
+    apply_migrations(settings)
     connection = get_db_connection(settings)
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS price_history (
-            ticker TEXT NOT NULL,
-            date TEXT NOT NULL,
-            open REAL,
-            high REAL,
-            low REAL,
-            close REAL,
-            volume REAL,
-            PRIMARY KEY (ticker, date)
-        )
-        """
-    )
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ticker_metrics (
-            ticker TEXT NOT NULL,
-            as_of_date TEXT NOT NULL,
-            metrics TEXT NOT NULL,
-            PRIMARY KEY (ticker, as_of_date)
-        )
-        """
-    )
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS price_fetch_log (
-            ticker     TEXT PRIMARY KEY,
-            fetched_at TEXT NOT NULL
-        )
-        """
-    )
-    connection.commit()
     return connection
 
 

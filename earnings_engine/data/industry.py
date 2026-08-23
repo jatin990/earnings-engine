@@ -23,21 +23,11 @@ INDUSTRY_MAX_AGE_DAYS = 30
 
 
 def _connect(settings: Settings) -> Any:
-    """Connect to the shared database and create the industry table if missing."""
+    """Connect to the shared database and ensure all schema tables exist."""
     settings.ensure_dirs()
+    from earnings_engine.data.migrations import apply_migrations
+    apply_migrations(settings)
     connection = get_db_connection(settings)
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ticker_industry (
-            ticker TEXT NOT NULL,
-            industry TEXT,
-            sector TEXT,
-            fetched_at TEXT NOT NULL,
-            PRIMARY KEY (ticker)
-        )
-        """
-    )
-    connection.commit()
     return connection
 
 

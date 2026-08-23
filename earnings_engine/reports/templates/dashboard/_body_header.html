@@ -14,7 +14,8 @@
                 <select id="globalWatchlist" onchange="app.onGlobalWatchlistChange(this.value)" style="min-width: 230px; padding: 0.45rem 0.8rem; border: 1px solid rgba(59,130,246,0.5); border-radius: 0.45rem; background: #1e293b; color: #f8fafc; font-size: 0.88rem; font-weight: 600; cursor: pointer; outline: none;" title="Active universe or watchlist across all dashboard tabs">
                     <option value="">🌐 All Stocks (Global)</option>
                 </select>
-                <button onclick="app.switchTab('watchlist')" class="btn btn-sm" style="padding: 0.35rem 0.65rem; background: rgba(59,130,246,0.2); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4); border-radius: 0.4rem; font-size: 0.78rem;" title="Manage custom watchlists">⚙ Manage</button>
+                <button onclick="app.switchTab('watchlist')" class="btn btn-sm" style="padding: 0.35rem 0.65rem; background: rgba(59,130,246,0.2); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4); border-radius: 0.4rem; font-size: 0.78rem;" title="Manage custom watchlists">⭐ Watchlists</button>
+                <button onclick="app.openCustomizerModal()" class="btn btn-sm" style="padding: 0.35rem 0.75rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: #fff; border: none; border-radius: 0.4rem; font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 8px rgba(139,92,246,0.3); cursor: pointer;" title="Customize visible tabs, color themes, and environment variables">⚙️ Control Center</button>
             </div>
         </header>
 

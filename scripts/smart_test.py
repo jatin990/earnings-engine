@@ -16,6 +16,7 @@ MODULE_TEST_MAP = {
     "server": ["tests/test_recalculate_audit.py", "tests/test_swing_ranges.py"],
     "prices": ["tests/test_recalculate_audit.py", "tests/test_swing_ranges.py"],
     "earnings": ["tests/test_recalculate_audit.py"],
+    "config": ["tests/test_config_api.py"],
 }
 
 

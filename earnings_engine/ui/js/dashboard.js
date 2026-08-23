@@ -503,6 +503,7 @@
             },
 
             async init() {
+                this.initCustomizer();
                 this._bindWatchlistSelectionPersistence();
                 this._restoreBdControls();
                 this._restorePatternsControls();
@@ -6503,6 +6504,481 @@
         app.closePopups = window.closePopups;
         app.runRowPrediction = app.runRowPrediction;
 
+        // =========================================================================
+        // ⚙️ DASHBOARD CONTROL CENTER, THEMES & LOCAL .ENV MANAGER
+        // =========================================================================
+
+        const DASHBOARD_TABS_SCHEMA = [
+            { key: 'results', label: 'Results', icon: '📊', desc: 'Corporate earnings report & financial results' },
+            { key: 'monthfilter', label: 'Month Filter', icon: '🗓️', desc: 'Calendar timeline & upcoming announcements' },
+            { key: 'scanner', label: 'Scanner', icon: '🔍', desc: 'Categorical breakout & earnings filter scanner' },
+            { key: 'catalysts', label: 'Catalysts', icon: '📰', desc: 'Corporate filings, order wins, and news catalyst feed' },
+            { key: 'gainers', label: 'Gainers & Patterns', icon: '🚀', desc: 'Top post-earnings movers and candle patterns' },
+            { key: 'swing', label: 'Swing Setups', icon: '🔄', desc: 'High/low swing ranges and cycle timing oscillations' },
+            { key: 'kronos', label: 'Kronos AI', icon: '🤖', desc: 'Multimodal AI deep learning 14-day price trajectory' },
+            { key: 'consensus', label: 'AI Consensus', icon: '🧠', desc: 'Multi-model LLM ensemble forecasting & reasoning' },
+            { key: 'playground', label: 'Playground', icon: '🧪', desc: 'Interactive prompt engineering & live backtesting sandbox' },
+            { key: 'coverage', label: 'Data Coverage', icon: '📊', desc: 'Dataset health, cache freshness, and ticker coverage' },
+            { key: 'industries', label: 'Industries', icon: '🏭', desc: 'Sector breakdown and industry performance moves' },
+            { key: 'patterns', label: 'Patterns', icon: '📊', desc: 'Automated technical chart pattern recognition' },
+            { key: 'buydip', label: 'Buy the Dip', icon: '🛒', desc: 'Oversold mean-reversion quality dip finder' },
+            { key: 'backtest', label: 'Backtest', icon: '📈', desc: 'Strategy backtest evaluation and historical performance' },
+            { key: 'watchlist', label: 'Watchlists', icon: '⭐', desc: 'Custom watchlists and universe portfolio management' },
+        ];
+
+        const THEME_PRESETS = {
+            obsidian: {
+                '--bg': '#0f172a',
+                '--card': 'rgba(30,41,59,0.7)',
+                '--accent': '#3b82f6',
+                '--green': '#10b981',
+                '--red': '#ef4444',
+                '--light': '#f8fafc',
+                '--muted': '#94a3b8'
+            },
+            sapphire: {
+                '--bg': '#030712',
+                '--card': 'rgba(17,24,39,0.85)',
+                '--accent': '#06b6d4',
+                '--green': '#10b981',
+                '--red': '#f43f5e',
+                '--light': '#f9fafb',
+                '--muted': '#9ca3af'
+            },
+            cyberpunk: {
+                '--bg': '#18181b',
+                '--card': 'rgba(39,39,42,0.85)',
+                '--accent': '#10b981',
+                '--green': '#22c55e',
+                '--red': '#f43f5e',
+                '--light': '#fafafa',
+                '--muted': '#a1a1aa'
+            },
+            amethyst: {
+                '--bg': '#1e102d',
+                '--card': 'rgba(46,16,68,0.75)',
+                '--accent': '#a855f7',
+                '--green': '#34d399',
+                '--red': '#fb7185',
+                '--light': '#fdf4ff',
+                '--muted': '#d8b4fe'
+            }
+        };
+
+        app._customizer = {
+            activeSubTab: 'tabs',
+            tabVisibility: {},
+            activeTheme: 'obsidian',
+            customColors: {},
+            envData: null,
+            envSearchQuery: '',
+            envCategory: 'ALL'
+        };
+
+        app.initCustomizer = function() {
+            // Restore tab visibility from localStorage
+            try {
+                const savedTabs = localStorage.getItem('ee_tab_visibility');
+                if (savedTabs) {
+                    app._customizer.tabVisibility = JSON.parse(savedTabs);
+                }
+            } catch (e) {}
+
+            // Restore theme & custom colors
+            try {
+                const savedTheme = localStorage.getItem('ee_active_theme') || 'obsidian';
+                const savedColors = localStorage.getItem('ee_custom_colors');
+                if (savedColors) {
+                    app._customizer.customColors = JSON.parse(savedColors);
+                }
+                app.applyPresetTheme(savedTheme, false);
+                if (app._customizer.customColors) {
+                    Object.entries(app._customizer.customColors).forEach(([varName, val]) => {
+                        document.documentElement.style.setProperty(varName, val);
+                    });
+                }
+            } catch (e) {}
+
+            // Apply tab visibility to DOM
+            app.applyAllTabVisibilities();
+
+            // Background sync with backend UI preferences
+            fetch('/api/v1/config/ui-preferences')
+                .then(r => r.ok ? r.json() : null)
+                .then(prefs => {
+                    if (prefs && prefs.tab_visibility && Object.keys(prefs.tab_visibility).length) {
+                        app._customizer.tabVisibility = Object.assign({}, prefs.tab_visibility, app._customizer.tabVisibility);
+                        app.applyAllTabVisibilities();
+                    }
+                })
+                .catch(() => {});
+        };
+
+        app.openCustomizerModal = function() {
+            const modal = document.getElementById('controlCenterModal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            app.switchCustomizerTab(app._customizer.activeSubTab || 'tabs');
+        };
+
+        app.closeCustomizerModal = function() {
+            const modal = document.getElementById('controlCenterModal');
+            if (modal) modal.style.display = 'none';
+            document.body.style.overflow = '';
+        };
+
+        app.switchCustomizerTab = function(subTab) {
+            app._customizer.activeSubTab = subTab;
+            
+            // Toggle nav buttons
+            ['tabs', 'themes', 'env'].forEach(t => {
+                const navBtn = document.getElementById('ccNav' + t.charAt(0).toUpperCase() + t.slice(1));
+                const sec = document.getElementById('ccSection' + t.charAt(0).toUpperCase() + t.slice(1));
+                if (navBtn) navBtn.classList.toggle('active', t === subTab);
+                if (sec) sec.style.display = (t === subTab) ? 'block' : 'none';
+            });
+
+            if (subTab === 'tabs') {
+                app.renderCustomizerTabsGrid();
+            } else if (subTab === 'themes') {
+                app.syncThemePickers();
+            } else if (subTab === 'env') {
+                app.loadEnvVars();
+            }
+        };
+
+        app.renderCustomizerTabsGrid = function() {
+            const container = document.getElementById('ccTabsGrid');
+            if (!container) return;
+
+            let html = '';
+            DASHBOARD_TABS_SCHEMA.forEach(tab => {
+                const isVisible = app._customizer.tabVisibility[tab.key] !== false; // Default true
+                html += `
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid ${isVisible ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.08)'}; border-radius: 0.65rem; padding: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; transition: all 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 0.6rem; min-width: 0;">
+                            <span style="font-size: 1.25rem;">${tab.icon}</span>
+                            <div style="min-width: 0;">
+                                <strong style="display: block; font-size: 0.88rem; color: ${isVisible ? 'var(--light)' : 'var(--muted)'};">${tab.label}</strong>
+                                <span style="display: block; font-size: 0.72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${tab.desc}</span>
+                            </div>
+                        </div>
+                        <label style="position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; cursor: pointer;">
+                            <input type="checkbox" onchange="app.toggleTabVisibility('${tab.key}', this.checked)" ${isVisible ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
+                            <span style="position: absolute; cursor: pointer; inset: 0; background-color: ${isVisible ? '#3b82f6' : '#475569'}; border-radius: 24px; transition: .3s; display: block;">
+                                <span style="position: absolute; content: ''; height: 18px; width: 18px; left: ${isVisible ? '23px' : '3px'}; bottom: 3px; background-color: white; border-radius: 50%; transition: .3s; display: block;"></span>
+                            </span>
+                        </label>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        };
+
+        app.toggleTabVisibility = function(tabKey, isVisible) {
+            app._customizer.tabVisibility[tabKey] = isVisible;
+            try {
+                localStorage.setItem('ee_tab_visibility', JSON.stringify(app._customizer.tabVisibility));
+            } catch (e) {}
+
+            app.applyAllTabVisibilities();
+            app.renderCustomizerTabsGrid();
+            app.saveUIPreferencesToBackend();
+        };
+
+        app.setAllTabsVisibility = function(showAll) {
+            DASHBOARD_TABS_SCHEMA.forEach(tab => {
+                app._customizer.tabVisibility[tab.key] = showAll;
+            });
+            try {
+                localStorage.setItem('ee_tab_visibility', JSON.stringify(app._customizer.tabVisibility));
+            } catch (e) {}
+
+            app.applyAllTabVisibilities();
+            app.renderCustomizerTabsGrid();
+            app.saveUIPreferencesToBackend();
+        };
+
+        app.applyAllTabVisibilities = function() {
+            DASHBOARD_TABS_SCHEMA.forEach(tab => {
+                const isVisible = app._customizer.tabVisibility[tab.key] !== false;
+                
+                // Toggle tab button in navbar
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    const onclick = btn.getAttribute('onclick') || '';
+                    if (onclick.includes("'" + tab.key + "'") || onclick.includes('"' + tab.key + '"')) {
+                        btn.style.display = isVisible ? 'inline-block' : 'none';
+                    }
+                });
+
+                // Toggle tab content section
+                const content = document.getElementById('tab-' + tab.key);
+                if (content && !isVisible) {
+                    content.classList.remove('active');
+                }
+            });
+
+            // If active tab is now hidden, switch to the first visible tab
+            const activeTab = localStorage.getItem('dashboard_active_tab') || 'results';
+            if (app._customizer.tabVisibility[activeTab] === false) {
+                const firstVisible = DASHBOARD_TABS_SCHEMA.find(t => app._customizer.tabVisibility[t.key] !== false);
+                if (firstVisible) {
+                    app.switchTab(firstVisible.key);
+                }
+            }
+        };
+
+        app.applyPresetTheme = function(themeName, persist = true) {
+            const palette = THEME_PRESETS[themeName] || THEME_PRESETS.obsidian;
+            app._customizer.activeTheme = themeName;
+            app._customizer.customColors = Object.assign({}, palette);
+
+            Object.entries(palette).forEach(([varName, val]) => {
+                document.documentElement.style.setProperty(varName, val);
+            });
+
+            if (persist) {
+                try {
+                    localStorage.setItem('ee_active_theme', themeName);
+                    localStorage.setItem('ee_custom_colors', JSON.stringify(app._customizer.customColors));
+                } catch (e) {}
+                app.saveUIPreferencesToBackend();
+            }
+            app.syncThemePickers();
+        };
+
+        app.onCustomColorInput = function(cssVar, hexValue) {
+            document.documentElement.style.setProperty(cssVar, hexValue);
+            app._customizer.customColors[cssVar] = hexValue;
+
+            const valSpanId = 'val' + cssVar.replace('--', '').charAt(0).toUpperCase() + cssVar.replace('--', '').slice(1);
+            const valSpan = document.getElementById(valSpanId);
+            if (valSpan) valSpan.textContent = hexValue;
+
+            try {
+                localStorage.setItem('ee_custom_colors', JSON.stringify(app._customizer.customColors));
+            } catch (e) {}
+            app.saveUIPreferencesToBackend();
+        };
+
+        app.resetDefaultColors = function() {
+            app.applyPresetTheme('obsidian', true);
+        };
+
+        app.syncThemePickers = function() {
+            const computed = getComputedStyle(document.documentElement);
+            const vars = ['--bg', '--card', '--accent', '--green', '--red', '--light'];
+            vars.forEach(v => {
+                const rawVal = computed.getPropertyValue(v).trim();
+                const key = v.replace('--', '').charAt(0).toUpperCase() + v.replace('--', '').slice(1);
+                const picker = document.getElementById('picker' + key);
+                const valSpan = document.getElementById('val' + key);
+                if (valSpan) valSpan.textContent = rawVal;
+                if (picker && rawVal.startsWith('#') && rawVal.length === 7) {
+                    picker.value = rawVal;
+                }
+            });
+        };
+
+        app.saveUIPreferencesToBackend = function() {
+            fetch('/api/v1/config/ui-preferences', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tab_visibility: app._customizer.tabVisibility,
+                    theme: app._customizer.activeTheme || 'obsidian',
+                    custom_colors: app._customizer.customColors || {}
+                })
+            }).catch(() => {});
+        };
+
+        // ================= ENVIRONMENT VARIABLES CONTROLLER =================
+
+        app.loadEnvVars = function() {
+            const tbody = document.getElementById('ccEnvTableBody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--muted);"><span class="loading-spinner"></span> Loading environment variables...</td></tr>';
+            }
+
+            fetch('/api/v1/config/env')
+                .then(r => r.json())
+                .then(data => {
+                    app._customizer.envData = data;
+                    
+                    // Update environment status badge
+                    const badge = document.getElementById('ccEnvBadge');
+                    const warning = document.getElementById('ccEnvWarning');
+                    const addBtn = document.getElementById('btnAddNewEnv');
+                    
+                    if (data.is_local) {
+                        if (badge) {
+                            badge.textContent = '🟢 Local Mode';
+                            badge.style.background = 'rgba(16, 185, 129, 0.15)';
+                            badge.style.color = '#34d399';
+                            badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                        }
+                        if (warning) warning.style.display = 'none';
+                        if (addBtn) addBtn.style.display = 'flex';
+                    } else {
+                        if (badge) {
+                            badge.textContent = '🔒 Cloud Mode (Read-Only)';
+                            badge.style.background = 'rgba(239, 68, 68, 0.15)';
+                            badge.style.color = '#f87171';
+                            badge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                        }
+                        if (warning) warning.style.display = 'block';
+                        if (addBtn) addBtn.style.display = 'none';
+                    }
+
+                    app.renderEnvTable();
+                })
+                .catch(err => {
+                    if (tbody) {
+                        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--red);">Failed to load environment variables: ${err.message}</td></tr>`;
+                    }
+                });
+        };
+
+        app.filterEnvVars = function() {
+            app._customizer.envSearchQuery = (document.getElementById('ccEnvSearch')?.value || '').toLowerCase().trim();
+            app._customizer.envCategory = document.getElementById('ccEnvCategoryFilter')?.value || 'ALL';
+            app.renderEnvTable();
+        };
+
+        app.renderEnvTable = function() {
+            const tbody = document.getElementById('ccEnvTableBody');
+            if (!tbody || !app._customizer.envData) return;
+
+            const isLocal = app._customizer.envData.is_local;
+            let list = app._customizer.envData.env_vars || [];
+
+            if (app._customizer.envCategory !== 'ALL') {
+                list = list.filter(item => item.category === app._customizer.envCategory);
+            }
+
+            if (app._customizer.envSearchQuery) {
+                list = list.filter(item => item.key.toLowerCase().includes(app._customizer.envSearchQuery));
+            }
+
+            if (!list.length) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--muted);">No matching environment variables found.</td></tr>';
+                return;
+            }
+
+            let html = '';
+            list.forEach(item => {
+                const masked = item.masked_value || item.value || '';
+                const rawVal = item.value || '';
+                const encodedVal = encodeURIComponent(rawVal);
+                const safeKey = item.key.replace(/[^a-zA-Z0-9_]/g, '_');
+
+                html += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.06); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                        <td style="padding: 0.65rem 0.85rem; font-family: monospace; font-weight: 600; color: #93c5fd;">${item.key}</td>
+                        <td style="padding: 0.65rem 0.85rem;">
+                            <span style="background: rgba(255,255,255,0.06); padding: 0.15rem 0.5rem; border-radius: 0.3rem; font-size: 0.72rem; color: var(--muted);">${item.category}</span>
+                        </td>
+                        <td style="padding: 0.65rem 0.85rem; font-family: monospace; font-size: 0.8rem;">
+                            <span id="envVal_${safeKey}" data-masked="${masked}" data-raw="${encodedVal}" data-revealed="false">${masked}</span>
+                            ${item.is_secret ? `<button onclick="app.toggleRevealEnv('${safeKey}')" style="background: none; border: none; color: #60a5fa; cursor: pointer; margin-left: 0.4rem; font-size: 0.75rem;" title="Reveal/Hide">👁️</button>` : ''}
+                        </td>
+                        <td style="padding: 0.65rem 0.85rem; text-align: right; white-space: nowrap;">
+                            ${isLocal ? `
+                                <button onclick="app.showEditEnvModal('${item.key}', decodeURIComponent('${encodedVal}'))" class="btn btn-sm" style="background: rgba(59,130,246,0.15); color: #60a5fa; padding: 0.25rem 0.5rem; margin-right: 0.3rem;">✏️ Edit</button>
+                                <button onclick="app.deleteEnvVar('${item.key}')" class="btn btn-sm" style="background: rgba(239,68,68,0.15); color: #f87171; padding: 0.25rem 0.5rem;">🗑️</button>
+                            ` : `
+                                <span style="font-size: 0.72rem; color: var(--muted);">Read-Only</span>
+                            `}
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        };
+
+        app.toggleRevealEnv = function(safeKey) {
+            const span = document.getElementById('envVal_' + safeKey);
+            if (!span) return;
+            const isRevealed = span.getAttribute('data-revealed') === 'true';
+            if (isRevealed) {
+                span.textContent = span.getAttribute('data-masked');
+                span.setAttribute('data-revealed', 'false');
+            } else {
+                span.textContent = decodeURIComponent(span.getAttribute('data-raw'));
+                span.setAttribute('data-revealed', 'true');
+            }
+        };
+
+        app.showAddEnvModal = function() {
+            document.getElementById('editEnvTitle').textContent = '➕ Add Environment Variable';
+            document.getElementById('editEnvKey').value = '';
+            document.getElementById('editEnvKey').disabled = false;
+            document.getElementById('editEnvVal').value = '';
+            document.getElementById('editEnvModal').style.display = 'flex';
+        };
+
+        app.showEditEnvModal = function(key, value) {
+            document.getElementById('editEnvTitle').textContent = `✏️ Edit ${key}`;
+            document.getElementById('editEnvKey').value = key;
+            document.getElementById('editEnvKey').disabled = true; // Key name locked when editing
+            document.getElementById('editEnvVal').value = value;
+            document.getElementById('editEnvModal').style.display = 'flex';
+        };
+
+        app.submitSaveEnvVar = function() {
+            const key = document.getElementById('editEnvKey').value.trim();
+            const value = document.getElementById('editEnvVal').value.trim();
+            if (!key) {
+                alert('Please enter a valid environment variable name.');
+                return;
+            }
+
+            const btn = document.getElementById('btnSaveEnv');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            fetch('/api/v1/config/env', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, value })
+            })
+            .then(r => {
+                if (!r.ok) return r.json().then(d => { throw new Error(d.detail || 'Save failed'); });
+                return r.json();
+            })
+            .then(() => {
+                document.getElementById('editEnvModal').style.display = 'none';
+                app.loadEnvVars();
+            })
+            .catch(err => {
+                alert(`Error saving environment variable: ${err.message}`);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = 'Save to .env';
+            });
+        };
+
+        app.deleteEnvVar = function(key) {
+            if (!confirm(`Are you sure you want to remove ${key} from your .env configuration?`)) return;
+
+            fetch(`/api/v1/config/env/${encodeURIComponent(key)}`, {
+                method: 'DELETE'
+            })
+            .then(r => {
+                if (!r.ok) return r.json().then(d => { throw new Error(d.detail || 'Delete failed'); });
+                return r.json();
+            })
+            .then(() => {
+                app.loadEnvVars();
+            })
+            .catch(err => {
+                alert(`Error deleting environment variable: ${err.message}`);
+            });
+        };
+
         // Initialize & export to window
         window.app = app;
         app.init();
+
