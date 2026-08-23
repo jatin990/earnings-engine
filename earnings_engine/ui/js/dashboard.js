@@ -487,7 +487,7 @@
                 // 3. Check LocalStorage
                 const storedTab = localStorage.getItem('dashboard_active_tab');
 
-                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 
                 if (hash && validTabs.includes(hash.toLowerCase())) return hash.toLowerCase();
                 if (queryTab && validTabs.includes(queryTab.toLowerCase())) return queryTab.toLowerCase();
@@ -685,6 +685,7 @@
                 if (name === 'patterns') this.loadPatterns();
                 if (name === 'buydip') this.loadRecentResults();
                 if (name === 'kronos') this.maybeShowKronosPrompt();
+                if (name === 'consensus') this.loadConsensusTab();
                 if (name === 'playground') {
                     if (!this.pg._initialized) {
                         this.pg.init();
@@ -5884,6 +5885,326 @@
                     '<thead><tr>' +
                     '<th>Ticker</th><th>Entry</th><th>Entry ₹</th><th>Exit</th><th>Exit ₹</th><th>PnL %</th><th>PnL ₹</th><th>Hold</th><th>Reason</th>' +
                     '</tr></thead><tbody>' + rows + '</tbody></table>';
+            },
+
+            // =========================================================================
+            // 🧠 Multi-Model AI Consensus Engine & Post-Mortems Tab
+            // =========================================================================
+            consensusPredictions: [],
+
+            async loadConsensusTab() {
+                const grid = document.getElementById('consensusListGrid');
+                if (grid) {
+                    grid.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading AI consensus predictions...</div>';
+                }
+
+                try {
+                    // Fetch latest predictions and accuracy stats in parallel
+                    const [predsRes, statsRes] = await Promise.all([
+                        fetch('/api/v1/consensus/latest?limit=100'),
+                        fetch('/api/v1/consensus/accuracy-stats')
+                    ]);
+
+                    const predsData = await predsRes.json();
+                    const statsData = await statsRes.json();
+
+                    this.consensusPredictions = predsData.predictions || [];
+
+                    // Render KPI stats
+                    this.renderConsensusKpis(statsData);
+
+                    // Render Prediction list
+                    this.filterConsensus();
+                } catch (e) {
+                    console.error('Error loading Consensus Tab:', e);
+                    if (grid) {
+                        grid.innerHTML = '<div class="card" style="padding:1.5rem;color:#f87171;text-align:center;">Failed to load consensus predictions: ' + (e.message || e) + '</div>';
+                    }
+                }
+            },
+
+            renderConsensusKpis(stats) {
+                const totalEl = document.getElementById('consensusStatTotal');
+                const winRateEl = document.getElementById('consensusStatWinRate');
+                const dirAccEl = document.getElementById('consensusStatDirAcc');
+                const pendingEl = document.getElementById('consensusStatPending');
+                const topFailEl = document.getElementById('consensusStatTopFail');
+
+                if (totalEl) totalEl.textContent = stats.total_predictions || 0;
+                if (winRateEl) {
+                    const wr = stats.win_rate != null ? stats.win_rate.toFixed(1) + '%' : '0.0%';
+                    winRateEl.textContent = wr;
+                    winRateEl.style.color = (stats.win_rate >= 50) ? '#10b981' : '#f59e0b';
+                }
+                if (dirAccEl) {
+                    const da = stats.direction_accuracy != null ? stats.direction_accuracy.toFixed(1) + '%' : '0.0%';
+                    dirAccEl.textContent = da;
+                }
+                if (pendingEl) pendingEl.textContent = stats.pending || 0;
+                if (topFailEl) {
+                    const topF = stats.top_failure_categories && stats.top_failure_categories.length ? stats.top_failure_categories[0].category : 'None';
+                    topFailEl.textContent = topF.replace(/_/g, ' ');
+                }
+            },
+
+            filterConsensus() {
+                const search = (document.getElementById('consensusSearchFilter')?.value || '').trim().toUpperCase();
+                const dirFilter = document.getElementById('consensusDirectionFilter')?.value || 'ALL';
+                const statusFilter = document.getElementById('consensusStatusFilter')?.value || 'ALL';
+
+                let filtered = this.consensusPredictions || [];
+
+                if (search) {
+                    filtered = filtered.filter(p => (p.ticker || '').toUpperCase().includes(search));
+                }
+                if (dirFilter !== 'ALL') {
+                    filtered = filtered.filter(p => (p.consensus_direction || '').toUpperCase() === dirFilter);
+                }
+                if (statusFilter !== 'ALL') {
+                    filtered = filtered.filter(p => (p.settlement_status || '').toUpperCase() === statusFilter);
+                }
+
+                const badge = document.getElementById('consensusCountBadge');
+                if (badge) badge.textContent = filtered.length + ' predictions';
+
+                this.renderConsensusList(filtered);
+            },
+
+            renderConsensusList(items) {
+                const grid = document.getElementById('consensusListGrid');
+                if (!grid) return;
+
+                if (!items || !items.length) {
+                    grid.innerHTML = '<div class="card" style="padding:2rem;text-align:center;color:var(--muted);margin:0;">No consensus predictions match the selected filters. Click <strong>⚡ Run Consensus</strong> above to generate one.</div>';
+                    return;
+                }
+
+                grid.innerHTML = items.map(p => {
+                    const dir = (p.consensus_direction || 'NEUTRAL').toUpperCase();
+                    const dirBg = dir === 'BULLISH' ? 'rgba(16,185,129,0.15)' : dir === 'BEARISH' ? 'rgba(239,68,68,0.15)' : 'rgba(251,191,36,0.15)';
+                    const dirColor = dir === 'BULLISH' ? '#34d399' : dir === 'BEARISH' ? '#f87171' : '#fbbf24';
+                    const dirIcon = dir === 'BULLISH' ? '🟢 BULLISH' : dir === 'BEARISH' ? '🔴 BEARISH' : '🟡 NEUTRAL';
+
+                    const status = (p.settlement_status || 'PENDING').toUpperCase();
+                    const statusBg = status === 'SUCCESS' ? '#10b981' : status === 'PARTIAL' ? '#f59e0b' : status === 'FAILURE' ? '#ef4444' : '#64748b';
+                    const statusIcon = status === 'SUCCESS' ? '✅ SUCCESS' : status === 'PARTIAL' ? '🟡 PARTIAL' : status === 'FAILURE' ? '❌ FAILED' : '⏳ PENDING';
+
+                    const strength = p.consensus_strength || 0;
+                    const agreeRatio = p.agreement_ratio ? (p.agreement_ratio * 100).toFixed(0) + '%' : '—';
+                    const retPct = p.consensus_return_pct != null ? (p.consensus_return_pct >= 0 ? '+' : '') + p.consensus_return_pct.toFixed(2) + '%' : '—';
+                    const actualRet = p.actual_return_pct != null ? (p.actual_return_pct >= 0 ? '+' : '') + p.actual_return_pct.toFixed(2) + '%' : '—';
+                    const actualRetColor = p.actual_return_pct != null ? (p.actual_return_pct >= 0 ? '#34d399' : '#f87171') : 'var(--muted)';
+
+                    // Model Pills
+                    let modelPills = '';
+                    if (p.models_breakdown && p.models_breakdown.length) {
+                        modelPills = p.models_breakdown.map(m => {
+                            const mDir = (m.direction || 'ERR').toUpperCase();
+                            const mCol = mDir === 'BULLISH' ? '#34d399' : mDir === 'BEARISH' ? '#f87171' : '#94a3b8';
+                            return '<span style="font-size:0.72rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);padding:0.15rem 0.45rem;border-radius:0.3rem;color:' + mCol + ';">' + (m.model_name || m.model_id) + ': ' + mDir + '</span>';
+                        }).join(' ');
+                    }
+
+                    // Post-Mortem banner if failed
+                    let postMortemSnippet = '';
+                    if (status === 'FAILURE' || status === 'PARTIAL') {
+                        const failCat = p.failure_category ? p.failure_category.replace(/_/g, ' ') : 'Unclassified';
+                        const failSummary = p.failure_reason_summary || 'Price action diverged from model consensus.';
+                        postMortemSnippet = '<div style="margin-top:0.6rem;padding:0.5rem 0.75rem;background:rgba(239,68,68,0.08);border-left:3px solid #ef4444;border-radius:0.3rem;font-size:0.78rem;color:#fca5a5;">' +
+                            '<strong>🔍 Post-Mortem (' + failCat + '):</strong> ' + failSummary +
+                            '</div>';
+                    }
+
+                    return '<div class="card" style="margin:0;padding:1rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.6rem;transition:all 0.2s;">' +
+                        '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;">' +
+                            '<div>' +
+                                '<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">' +
+                                    '<strong style="font-size:1.15rem;color:var(--light);">' + p.ticker + '</strong>' +
+                                    '<span style="font-size:0.75rem;font-weight:700;background:' + dirBg + ';color:' + dirColor + ';padding:0.2rem 0.55rem;border-radius:0.35rem;border:1px solid ' + dirColor + '44;">' + dirIcon + '</span>' +
+                                    '<span style="font-size:0.72rem;font-weight:700;background:' + statusBg + '22;color:' + statusBg + ';padding:0.18rem 0.5rem;border-radius:0.35rem;border:1px solid ' + statusBg + '66;">' + statusIcon + '</span>' +
+                                '</div>' +
+                                '<div style="font-size:0.78rem;color:var(--muted);display:flex;gap:0.8rem;flex-wrap:wrap;">' +
+                                    '<span>Entry: <strong>₹' + (p.as_of_price || 0).toFixed(2) + '</strong></span>' +
+                                    '<span>Target: <strong style="color:#60a5fa;">₹' + (p.consensus_target_price || 0).toFixed(2) + ' (' + retPct + ')</strong></span>' +
+                                    '<span>Exit: <strong style="color:' + actualRetColor + ';">' + (p.actual_exit_price ? '₹' + p.actual_exit_price.toFixed(2) + ' (' + actualRet + ')' : 'Pending') + '</strong></span>' +
+                                    '<span>Due: ' + (p.evaluation_date || '—') + '</span>' +
+                                '</div>' +
+                            '</div>' +
+                            '<div style="display:flex;align-items:center;gap:0.6rem;">' +
+                                '<div style="text-align:right;">' +
+                                    '<div style="font-size:0.75rem;color:var(--muted);">Consensus Strength</div>' +
+                                    '<div style="font-size:0.95rem;font-weight:700;color:' + dirColor + ';">' + strength.toFixed(0) + '% <span style="font-size:0.75rem;color:var(--muted);">(' + agreeRatio + ' agree)</span></div>' +
+                                '</div>' +
+                                '<button onclick="app.openConsensusDetailModal(' + p.id + ')" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);padding:0.4rem 0.75rem;border-radius:0.4rem;font-weight:600;">🔍 View Audit</button>' +
+                            '</div>' +
+                        '</div>' +
+                        (modelPills ? '<div style="margin-top:0.6rem;display:flex;gap:0.4rem;flex-wrap:wrap;">' + modelPills + '</div>' : '') +
+                        postMortemSnippet +
+                    '</div>';
+                }).join('');
+            },
+
+            async runConsensusPrediction() {
+                const tickerInput = document.getElementById('consensusTickerInput');
+                const tfSelect = document.getElementById('consensusTimeframeSelect');
+                const runBtn = document.getElementById('consensusRunBtn');
+
+                const ticker = (tickerInput?.value || '').trim().toUpperCase();
+                if (!ticker) {
+                    alert('Please enter a stock ticker symbol (e.g. RELIANCE.NS, TCS.NS, AAPL).');
+                    return;
+                }
+
+                const timeframe = parseInt(tfSelect?.value || '14', 10);
+                if (runBtn) {
+                    runBtn.disabled = true;
+                    runBtn.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Querying Models...';
+                }
+
+                try {
+                    const res = await fetch('/api/v1/consensus/predict', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ticker: ticker, timeframe_days: timeframe })
+                    });
+                    const data = await res.json();
+                    if (!data.success || !data.predictions || !data.predictions.length) {
+                        alert('Prediction error: ' + (data.detail || data.error || 'Failed to generate consensus.'));
+                        return;
+                    }
+                    const pred = data.predictions[0];
+                    if (pred.error) {
+                        alert('Model error for ' + ticker + ': ' + pred.error);
+                        return;
+                    }
+
+                    // Reload consensus list
+                    await this.loadConsensusTab();
+
+                    // Automatically open modal for newly created prediction
+                    if (pred.id) {
+                        this.openConsensusDetailModal(pred.id);
+                    }
+                } catch (e) {
+                    console.error('Error running consensus prediction:', e);
+                    alert('Error running consensus: ' + (e.message || e));
+                } finally {
+                    if (runBtn) {
+                        runBtn.disabled = false;
+                        runBtn.innerHTML = '⚡ Run Consensus';
+                    }
+                }
+            },
+
+            async settleConsensusPredictions() {
+                const settleBtn = document.getElementById('consensusSettleBtn');
+                if (settleBtn) {
+                    settleBtn.disabled = true;
+                    settleBtn.innerHTML = '🔄 Settling...';
+                }
+                try {
+                    const res = await fetch('/api/v1/consensus/settle', { method: 'POST' });
+                    const data = await res.json();
+                    alert('Settlement Complete!\n- Total Due: ' + (data.total_due || 0) + '\n- Settled: ' + (data.settled_count || 0) + '\n- Successes: ' + (data.success_count || 0) + '\n- Failures: ' + (data.failure_count || 0));
+                    await this.loadConsensusTab();
+                } catch (e) {
+                    console.error('Error settling consensus predictions:', e);
+                    alert('Settlement error: ' + (e.message || e));
+                } finally {
+                    if (settleBtn) {
+                        settleBtn.disabled = false;
+                        settleBtn.innerHTML = '🔄 Settle Due Trades';
+                    }
+                }
+            },
+
+            async openConsensusDetailModal(predId) {
+                const modal = document.getElementById('consensusDetailModal');
+                const body = document.getElementById('consensusModalBody');
+                if (!modal || !body) return;
+
+                modal.style.display = 'flex';
+                body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading audit details...</div>';
+
+                try {
+                    const res = await fetch('/api/v1/consensus/' + predId);
+                    const data = await res.json();
+                    if (!data.success || !data.prediction) {
+                        body.innerHTML = '<div style="color:#f87171;padding:1.5rem;">Prediction record not found.</div>';
+                        return;
+                    }
+                    const p = data.prediction;
+                    const dir = (p.consensus_direction || 'NEUTRAL').toUpperCase();
+                    const dirColor = dir === 'BULLISH' ? '#34d399' : dir === 'BEARISH' ? '#f87171' : '#fbbf24';
+                    const status = (p.settlement_status || 'PENDING').toUpperCase();
+                    const statusBg = status === 'SUCCESS' ? '#10b981' : status === 'PARTIAL' ? '#f59e0b' : status === 'FAILURE' ? '#ef4444' : '#64748b';
+
+                    // Build Models Breakdown Matrix
+                    let modelsGrid = '';
+                    if (p.models_breakdown && p.models_breakdown.length) {
+                        modelsGrid = p.models_breakdown.map(m => {
+                            const mDir = (m.direction || 'ERR').toUpperCase();
+                            const mColor = mDir === 'BULLISH' ? '#34d399' : mDir === 'BEARISH' ? '#f87171' : '#94a3b8';
+                            const drivers = m.key_drivers ? m.key_drivers.map(d => '<li style="margin-bottom:0.25rem;">' + d + '</li>').join('') : '<li>No specific drivers</li>';
+                            return '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:0.5rem;padding:0.85rem;">' +
+                                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">' +
+                                    '<strong style="color:var(--light);font-size:0.9rem;">' + (m.model_name || m.model_id) + '</strong>' +
+                                    '<span style="font-size:0.75rem;font-weight:700;color:' + mColor + ';background:' + mColor + '22;padding:0.15rem 0.45rem;border-radius:0.3rem;">' + mDir + ' (' + (m.confidence_pct || 0) + '%)</span>' +
+                                '</div>' +
+                                '<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.4rem;">' +
+                                    'Target Return: <strong style="color:#60a5fa;">' + (m.target_return_pct ? (m.target_return_pct >= 0 ? '+' : '') + m.target_return_pct + '%' : '—') + '</strong> | Target ₹: ' + (m.target_price || '—') +
+                                '</div>' +
+                                '<div style="font-size:0.75rem;color:#cbd5e1;margin-bottom:0.4rem;"><strong>Key Drivers:</strong><ul style="padding-left:1.2rem;margin:0.2rem 0 0 0;">' + drivers + '</ul></div>' +
+                                (m.primary_risk ? '<div style="font-size:0.75rem;color:#fca5a5;"><strong>Primary Risk:</strong> ' + m.primary_risk + '</div>' : '') +
+                            '</div>';
+                        }).join('');
+                    }
+
+                    // Build Post-Mortem Failure Analysis Section
+                    let postMortemSection = '';
+                    if (status === 'FAILURE' || status === 'PARTIAL' || p.failure_post_mortem) {
+                        const cat = p.failure_category ? p.failure_category.replace(/_/g, ' ') : 'Unclassified';
+                        postMortemSection = '<div style="margin-top:1.25rem;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.3);border-radius:0.6rem;padding:1rem;">' +
+                            '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">' +
+                                '<h4 style="margin:0;color:#f87171;font-size:0.95rem;">🔍 AI Post-Mortem Failure Attribution</h4>' +
+                                '<span style="font-size:0.72rem;font-weight:700;background:rgba(239,68,68,0.2);color:#fca5a5;padding:0.15rem 0.5rem;border-radius:0.3rem;">' + cat + '</span>' +
+                            '</div>' +
+                            '<div style="font-size:0.82rem;color:#e2e8f0;line-height:1.5;margin-bottom:0.6rem;">' +
+                                '<strong>Summary:</strong> ' + (p.failure_reason_summary || 'Adverse market movement opposite to consensus expectation.') +
+                            '</div>' +
+                            (p.failure_post_mortem ? '<div style="font-size:0.8rem;color:#cbd5e1;line-height:1.5;background:rgba(0,0,0,0.25);padding:0.75rem;border-radius:0.4rem;">' + p.failure_post_mortem.replace(/\n/g, '<br>') + '</div>' : '') +
+                        '</div>';
+                    }
+
+                    body.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0.75rem;margin-bottom:1rem;">' +
+                        '<div>' +
+                            '<h3 style="margin:0;font-size:1.3rem;color:var(--light);">' + p.ticker + ' — Consensus Prediction Audit</h3>' +
+                            '<div style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">Created: ' + p.created_at + ' | Evaluation Window: ' + p.evaluation_date + '</div>' +
+                        '</div>' +
+                        '<span style="font-size:0.85rem;font-weight:700;background:' + statusBg + ';color:white;padding:0.3rem 0.8rem;border-radius:0.4rem;">' + status + '</span>' +
+                    '</div>' +
+                    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.6rem;margin-bottom:1rem;">' +
+                        '<div class="card" style="margin:0;padding:0.6rem;text-align:center;"><span style="font-size:0.7rem;color:var(--muted);">Direction</span><strong style="display:block;font-size:1.1rem;color:' + dirColor + ';">' + dir + '</strong></div>' +
+                        '<div class="card" style="margin:0;padding:0.6rem;text-align:center;"><span style="font-size:0.7rem;color:var(--muted);">Strength</span><strong style="display:block;font-size:1.1rem;color:' + dirColor + ';">' + (p.consensus_strength || 0).toFixed(0) + '%</strong></div>' +
+                        '<div class="card" style="margin:0;padding:0.6rem;text-align:center;"><span style="font-size:0.7rem;color:var(--muted);">Entry Price</span><strong style="display:block;font-size:1.1rem;color:var(--light);">₹' + (p.as_of_price || 0).toFixed(2) + '</strong></div>' +
+                        '<div class="card" style="margin:0;padding:0.6rem;text-align:center;"><span style="font-size:0.7rem;color:var(--muted);">Target Price</span><strong style="display:block;font-size:1.1rem;color:#60a5fa;">₹' + (p.consensus_target_price || 0).toFixed(2) + '</strong></div>' +
+                        '<div class="card" style="margin:0;padding:0.6rem;text-align:center;"><span style="font-size:0.7rem;color:var(--muted);">Actual Return</span><strong style="display:block;font-size:1.1rem;color:' + (p.actual_return_pct != null ? (p.actual_return_pct >= 0 ? '#34d399' : '#f87171') : 'var(--muted)') + ';">' + (p.actual_return_pct != null ? (p.actual_return_pct >= 0 ? '+' : '') + p.actual_return_pct.toFixed(2) + '%' : 'Pending') + '</strong></div>' +
+                    '</div>' +
+                    '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.85rem;margin-bottom:1rem;font-size:0.85rem;color:#e2e8f0;line-height:1.5;">' +
+                        '<strong>📜 Synthesized Consensus Thesis:</strong> ' + (p.synthesized_thesis || 'No thesis generated.') +
+                    '</div>' +
+                    '<h4 style="margin:1rem 0 0.5rem 0;color:var(--light);font-size:0.95rem;">🤖 Individual Model Predictions</h4>' +
+                    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:0.75rem;">' + modelsGrid + '</div>' +
+                    postMortemSection;
+                } catch (e) {
+                    console.error('Error opening consensus modal:', e);
+                    body.innerHTML = '<div style="color:#f87171;padding:1.5rem;">Error loading prediction details: ' + (e.message || e) + '</div>';
+                }
+            },
+
+            closeConsensusModal() {
+                const modal = document.getElementById('consensusDetailModal');
+                if (modal) modal.style.display = 'none';
             },
 
         };

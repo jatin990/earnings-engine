@@ -1,0 +1,102 @@
+        <!-- ================= MULTI-MODEL AI CONSENSUS TAB ================= -->
+        <div id="tab-consensus" class="tab-content">
+            <!-- Top Summary KPI Cards -->
+            <div id="consensusKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+                <div class="card" style="padding: 0.75rem; text-align: center; margin: 0;">
+                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block;">Total Predictions</span>
+                    <strong id="consensusStatTotal" style="font-size: 1.35rem; color: var(--light);">0</strong>
+                </div>
+                <div class="card" style="padding: 0.75rem; text-align: center; margin: 0;">
+                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block;">🏆 Win Rate (Settled)</span>
+                    <strong id="consensusStatWinRate" style="font-size: 1.35rem; color: #10b981;">0.0%</strong>
+                </div>
+                <div class="card" style="padding: 0.75rem; text-align: center; margin: 0;">
+                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block;">🎯 Directional Accuracy</span>
+                    <strong id="consensusStatDirAcc" style="font-size: 1.35rem; color: #38bdf8;">0.0%</strong>
+                </div>
+                <div class="card" style="padding: 0.75rem; text-align: center; margin: 0;">
+                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block;">⏳ Pending Settlement</span>
+                    <strong id="consensusStatPending" style="font-size: 1.35rem; color: #fbbf24;">0</strong>
+                </div>
+                <div class="card" style="padding: 0.75rem; text-align: center; margin: 0;">
+                    <span style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; display: block;">⚠️ Top Failure Cause</span>
+                    <strong id="consensusStatTopFail" style="font-size: 0.95rem; color: #f87171; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;">—</strong>
+                </div>
+            </div>
+
+            <!-- Action & Predict Section -->
+            <section class="card" style="margin-bottom: 1rem; padding: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.2rem; background: linear-gradient(to right, #a855f7, #60a5fa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                            🧠 Multi-Model AI Consensus Engine
+                        </h3>
+                        <p style="margin: 0.2rem 0 0 0; font-size: 0.8rem; color: var(--muted);">
+                            Parallel ensemble forecasting across DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B & Mistral-Large with automated post-mortem diagnostics.
+                        </p>
+                    </div>
+
+                    <!-- Predict Controls -->
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <input type="text" id="consensusTickerInput" placeholder="Ticker (e.g. RELIANCE.NS)" style="padding: 0.45rem 0.75rem; font-size: 0.85rem; background: rgba(255,255,255,0.05); color: var(--light); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.45rem; min-width: 170px; text-transform: uppercase;">
+                        <select id="consensusTimeframeSelect" style="padding: 0.45rem 0.6rem; font-size: 0.85rem; background: #1e293b; color: var(--light); border: 1px solid rgba(255,255,255,0.2); border-radius: 0.45rem;">
+                            <option value="7">7 Days (Swing)</option>
+                            <option value="14" selected>14 Days (Standard)</option>
+                            <option value="30">30 Days (Monthly)</option>
+                        </select>
+                        <button onclick="app.runConsensusPrediction()" id="consensusRunBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #9333ea, #3b82f6); border: none; font-weight: 600;">
+                            ⚡ Run Consensus
+                        </button>
+                        <button onclick="app.settleConsensusPredictions()" id="consensusSettleBtn" class="btn btn-secondary" style="background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.4); font-size: 0.82rem;">
+                            🔄 Settle Due Trades
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Filter & Predictions Feed Section -->
+            <section class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.6rem;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <h4 style="margin: 0; font-size: 1rem; color: var(--light);">📜 Consensus Predictions & Post-Mortem Audit</h4>
+                        <span id="consensusCountBadge" class="signal-badge" style="font-size:0.72rem;background:rgba(168,85,247,0.2);color:#c084fc;">0 records</span>
+                    </div>
+
+                    <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="consensusSearchFilter" oninput="app.filterConsensus()" placeholder="🔍 Filter by ticker..." style="padding:0.35rem 0.6rem;font-size:0.82rem;background:rgba(255,255,255,0.05);color:var(--light);border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;min-width:140px;">
+                        <select id="consensusDirectionFilter" onchange="app.filterConsensus()" style="padding:0.35rem 0.5rem;font-size:0.82rem;background:#1e293b;color:var(--light);border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;">
+                            <option value="ALL">All Directions</option>
+                            <option value="BULLISH">🟢 Bullish</option>
+                            <option value="BEARISH">🔴 Bearish</option>
+                            <option value="NEUTRAL">🟡 Neutral</option>
+                        </select>
+                        <select id="consensusStatusFilter" onchange="app.filterConsensus()" style="padding:0.35rem 0.5rem;font-size:0.82rem;background:#1e293b;color:var(--light);border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;">
+                            <option value="ALL">All Statuses</option>
+                            <option value="PENDING">⏳ Pending</option>
+                            <option value="SUCCESS">✅ Success</option>
+                            <option value="PARTIAL">🟡 Partial</option>
+                            <option value="FAILURE">❌ Failure (Post-Mortems)</option>
+                        </select>
+                        <button onclick="app.loadConsensusTab()" class="btn btn-sm" style="background:rgba(255,255,255,0.08);color:var(--light);border:1px solid rgba(255,255,255,0.15);">🔄 Refresh</button>
+                    </div>
+                </div>
+
+                <!-- Predictions Grid Container -->
+                <div id="consensusListGrid" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div style="text-align: center; color: var(--muted); padding: 2rem;">Loading consensus predictions...</div>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= CONSENSUS DETAIL / POST-MORTEM MODAL ================= -->
+        <div id="consensusDetailModal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); justify-content: center; align-items: center; padding: 1rem;">
+            <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.75rem; width: 100%; max-width: 850px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.5); padding: 1.5rem; position: relative;">
+                <!-- Close button -->
+                <button onclick="app.closeConsensusModal()" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer;">✕</button>
+
+                <!-- Modal Content Hook -->
+                <div id="consensusModalBody">
+                    <div style="text-align: center; padding: 2rem; color: var(--muted);">Loading details...</div>
+                </div>
+            </div>
+        </div>
