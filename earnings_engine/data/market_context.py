@@ -17,6 +17,8 @@ logger = get_logger("earnings_engine.data.market_context")
 
 _ORIGINAL_FETCH_PRICES = prices_mod.fetch_prices
 _ORIGINAL_LOAD_PRICES = prices_mod.load_prices
+_ORIGINAL_LOAD_EARNINGS = load_earnings
+_ORIGINAL_LOAD_PRICE_METRICS = prices_mod.load_price_metrics
 
 
 def _score_surprise(surprise: float) -> int:
@@ -147,13 +149,13 @@ def detect_swing_range(closes: pd.Series) -> dict[str, Any]:
 
     # 1. 20-day Current Channel
     recent_20 = clean_closes.tail(20)
-    lower = float(recent_20.min())
-    upper = float(recent_20.max())
+    lower = round(float(recent_20.min()), 2)
+    upper = round(float(recent_20.max()), 2)
 
     # 2. 3-Month (65 trading days) Channel
     recent_65 = clean_closes.tail(65)
-    three_month_lower = float(recent_65.min())
-    three_month_upper = float(recent_65.max())
+    three_month_lower = round(float(recent_65.min()), 2)
+    three_month_upper = round(float(recent_65.max()), 2)
 
     # 3. Monthly Breakdown Ranges (last 3 months)
     monthly_ranges: list[dict[str, Any]] = []
@@ -167,8 +169,8 @@ def detect_swing_range(closes: pd.Series) -> dict[str, Any]:
 
     for label, seg in segments:
         if not seg.empty:
-            s_low = float(seg.min())
-            s_high = float(seg.max())
+            s_low = round(float(seg.min()), 2)
+            s_high = round(float(seg.max()), 2)
             first_date_str, _ = parse_dt(seg.index[0])
             last_date_str, _ = parse_dt(seg.index[-1])
             spread = ((s_high - s_low) / s_low * 100) if s_low > 0 else 0.0
@@ -365,7 +367,11 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             eps_reported = None
             surprise_pct = None
 
-            cached_metrics = metrics_map.get(ticker)
+            if load_price_metrics is not _ORIGINAL_LOAD_PRICE_METRICS:
+                cached_metrics = None if force else load_price_metrics(ticker, settings)
+            else:
+                cached_metrics = None if force else (metrics_map.get(ticker) or load_price_metrics(ticker, settings))
+
             if cached_metrics is not None:
                 current_price = cached_metrics.get("current_price")
                 week_high = cached_metrics.get("week_high")
@@ -379,16 +385,24 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 if market_cap is None:
                     market_cap = cached_metrics.get("market_cap")
 
-            # Load prices from preloaded cache
-            prices = prices_map.get(ticker)
-            if prices is None or prices.empty:
-                if force:
-                    try:
-                        prices = fetch_prices(ticker, settings, force=True)
-                    except Exception:
-                        prices = pd.DataFrame(columns=["close"])
-                else:
-                    prices = pd.DataFrame(columns=["close"])
+            # Load prices from preloaded cache or fallback to load_prices/fetch_prices
+            if fetch_prices is not _ORIGINAL_FETCH_PRICES:
+                prices = fetch_prices(ticker, settings, force=False)
+            elif load_prices is not _ORIGINAL_LOAD_PRICES:
+                prices = load_prices(ticker, settings)
+                if prices is None or prices.empty:
+                    prices = fetch_prices(ticker, settings, force=False)
+            else:
+                prices = prices_map.get(ticker)
+                if prices is None or prices.empty:
+                    prices = load_prices(ticker, settings)
+                    if (prices is None or prices.empty) and force:
+                        try:
+                            prices = fetch_prices(ticker, settings, force=True)
+                        except Exception:
+                            prices = pd.DataFrame(columns=["close"])
+            if prices is None:
+                prices = pd.DataFrame(columns=["close"])
 
             # Compute current price and 52W high/low from prices cache if missing
             if not prices.empty and "close" in prices.columns:
@@ -466,7 +480,12 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                     # Auto-detect swing range
                     auto_rng = detect_swing_range(closes)
 
-            earnings = earnings_map.get(ticker)
+            if load_earnings is not _ORIGINAL_LOAD_EARNINGS:
+                earnings = load_earnings(ticker, settings)
+            else:
+                earnings = earnings_map.get(ticker)
+                if earnings is None or earnings.empty:
+                    earnings = load_earnings(ticker, settings)
             if earnings is None:
                 earnings = pd.DataFrame(columns=["earnings_date", "eps_estimate", "eps_reported", "surprise_pct"])
 

@@ -211,22 +211,12 @@ def get_endpoint_catalog() -> list[dict[str, Any]]:
 # Symbol search (autocomplete)
 # ---------------------------------------------------------------------------
 
+_SEARCH_UNIVERSE_CACHE: tuple[list[str], list[str]] | None = None
+_SEARCH_SEEDED: bool = False
+
+
 def search_symbols(q: str, limit: int = 20) -> list[dict[str, str]]:
-    """Search stocks by NAME or SYMBOL across NSE_ALL + US universes.
-
-    Returns ``[{symbol, name, market}]`` where market is "NSE" for ``.NS``
-    tickers and "US" otherwise.  Case-insensitive substring match on BOTH the
-    display name and the symbol, with name matches ranked first (so "search a
-    company by its name" is the primary experience).
-
-    The name index is backfilled lazily from nsetools (once per process) via
-    ``data.names``; US symbols fall back to the symbol-as-name and are enriched
-    from yfinance over time.  Robustness:
-    - If the cached NSE universe is stale and misses a symbol (e.g. ZOMATO.NS),
-      we refresh from nsetools live.
-    - If the query still matches nothing, we return the typed symbol itself as
-      a suggestion so the user can always select what they entered.
-    """
+    """Search stocks by NAME or SYMBOL across NSE_ALL + US universes with in-memory fast indexing."""
     from earnings_engine.data import names as names_mod
     from earnings_engine.data.universe import load_nse_all, load_universe
 
@@ -234,7 +224,8 @@ def search_symbols(q: str, limit: int = 20) -> list[dict[str, str]]:
     if not query:
         return []
 
-    def _collect() -> tuple[list[str], list[str]]:
+    global _SEARCH_UNIVERSE_CACHE, _SEARCH_SEEDED
+    if _SEARCH_UNIVERSE_CACHE is None:
         try:
             nse = load_nse_all()
         except Exception as e:
@@ -245,15 +236,16 @@ def search_symbols(q: str, limit: int = 20) -> list[dict[str, str]]:
         except Exception as e:
             logger.warning("search_symbols: us_top failed: %s", e)
             us = []
-        return nse, us
+        _SEARCH_UNIVERSE_CACHE = (nse, us)
 
-    nse, us = _collect()
+    nse, us = _SEARCH_UNIVERSE_CACHE
 
-    # Seed the name index for the universe (nsetools bulk call, cached in-process).
-    try:
-        names_mod.ensure_names([*nse, *us])
-    except Exception as e:
-        logger.warning("search_symbols: name index seeding failed: %s", e)
+    if not _SEARCH_SEEDED:
+        try:
+            names_mod.ensure_names([*nse, *us])
+            _SEARCH_SEEDED = True
+        except Exception as e:
+            logger.warning("search_symbols: name index seeding failed: %s", e)
 
     seen: set[str] = set()
     results: list[dict[str, str]] = []

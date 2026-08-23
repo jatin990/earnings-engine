@@ -17,7 +17,16 @@
                 <p class="timestamp" style="margin: 0 0 0.75rem 0;">Past results with the realized high/low move over the 7 trading days after each result date (vs the close before the result). Grouped by industry, best-to-worst.</p>
                 <div id="indSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;"></div>
                 <div id="indBestBanner"></div>
-                <div id="indGroups"></div>
+                <div id="indGroups">
+                    <div class="card" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.15);border-radius:0.75rem;margin:0;">
+                        <div style="font-size:2.2rem;margin-bottom:0.75rem;">🏭</div>
+                        <h4 style="margin:0 0 0.4rem 0;color:var(--light);font-size:1.1rem;">Industry Earnings Moves Ready</h4>
+                        <p style="max-width:520px;margin:0 auto 1.25rem auto;font-size:0.85rem;line-height:1.45;">
+                            Select your market and lookback above, then click <strong>Load Industry Moves</strong> on demand.
+                        </p>
+                        <button onclick="app.loadIndustryMoves()" class="btn btn-primary" style="padding:0.45rem 1.25rem;font-size:0.88rem;font-weight:600;">🔄 Load Industry Moves</button>
+                    </div>
+                </div>
                 <div id="indStatus" class="timestamp" style="margin-top: 0.5rem;"></div>
             </section>
         </div>

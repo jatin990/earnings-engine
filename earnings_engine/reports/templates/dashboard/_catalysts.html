@@ -54,6 +54,15 @@
                 </div>
 
                 <!-- Feed Grid / Container -->
-                <div id="catalystsFeedGrid" style="display: flex; flex-direction: column; gap: 0.75rem;"></div>
+                <div id="catalystsFeedGrid" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div class="card" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.15);border-radius:0.75rem;margin:0;">
+                        <div style="font-size:2.2rem;margin-bottom:0.75rem;">📰</div>
+                        <h4 style="margin:0 0 0.4rem 0;color:var(--light);font-size:1.1rem;">Catalysts Feed Ready</h4>
+                        <p style="max-width:520px;margin:0 auto 1.25rem auto;font-size:0.85rem;line-height:1.45;">
+                            Click <strong>Scan Feeds</strong> to aggregate breaking news, regulatory filings, and market-moving events on demand.
+                        </p>
+                        <button onclick="app.scanCatalystsNow()" class="btn btn-primary" style="padding:0.45rem 1.25rem;font-size:0.88rem;font-weight:600;">⚡ Scan Breaking Feeds</button>
+                    </div>
+                </div>
             </section>
         </div>

@@ -58,23 +58,27 @@ class YFinanceProvider(DataProvider):
 
         sym = self._normalize_symbol(ticker)
         try:
-            stock = yf.Ticker(sym)
-            kwargs: dict[str, Any] = {"interval": interval, "auto_adjust": False}
-            if start_date:
-                kwargs["start"] = start_date
-            if end_date:
-                kwargs["end"] = end_date
-            else:
-                kwargs["period"] = "max" if not start_date else None
+            df = yf.download(sym, start=start_date, end=end_date, progress=False, auto_adjust=False)
+            if df is None or df.empty:
+                stock = yf.Ticker(sym)
+                kwargs: dict[str, Any] = {"interval": interval, "auto_adjust": False}
+                if start_date:
+                    kwargs["start"] = start_date
+                if end_date:
+                    kwargs["end"] = end_date
+                df = stock.history(**{k: v for k, v in kwargs.items() if v is not None})
 
-            df = stock.history(**{k: v for k, v in kwargs.items() if v is not None})
-            if df.empty:
+            if df is None or df.empty:
                 return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
 
-            df.columns = df.columns.str.lower()
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = [col[0].lower() if isinstance(col, tuple) else str(col).lower() for col in df.columns]
+            else:
+                df.columns = df.columns.str.lower()
+
             cols = [c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]
             df = df[cols].copy()
-            df.index = df.index.astype(str).str[:10]
+            df.index = pd.to_datetime(df.index).astype(str).str[:10]
             df.index.name = "date"
             return df
         except Exception as e:

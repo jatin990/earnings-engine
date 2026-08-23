@@ -59,8 +59,9 @@ def test_run_swing_backtest_with_mock(monkeypatch):
     """Test full backtest cycle with simulated oscillating stock data."""
     dates = pd.date_range("2026-01-01", periods=60, freq="D")
     
-    # 20 bars flat around 100, then dip to 91 (buy zone), then rally to 110 (take profit)
-    prices = np.array([100.0] * 20 + [91.0, 92.0, 95.0, 105.0, 112.0] + [100.0] * 35)
+    # 20 bars oscillating between 90 and 110, then dip to 91 (buy zone), then rally to 112 (take profit)
+    base = [90.0, 110.0] * 10
+    prices = np.array(base + [91.0, 92.0, 95.0, 105.0, 112.0] + [100.0] * 35)
     highs = prices + 2.0
     lows = prices - 2.0
     volumes = [10000] * 60

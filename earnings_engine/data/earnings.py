@@ -87,6 +87,12 @@ def _connect(settings: Settings) -> Any:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_earnings_history_date
+            ON earnings_history (earnings_date)
+            """
+        )
 
     connection.execute(
         """

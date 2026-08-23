@@ -48,9 +48,15 @@
                 <!-- 📅 Month Breakdown Sub-Tabs -->
                 <div id="mfMonthTabs" style="display: flex; gap: 0.5rem; margin: 0.75rem 0 1rem 0; flex-wrap: wrap; align-items: center; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 0.6rem;"></div>
 
-                <div id="mfReportLegend" class="day-legend"></div>
                 <div id="mfReportSections">
-                    <div style="text-align:center; padding: 2rem; color: var(--muted);">Loading precalculated Month Filter data...</div>
+                    <div class="card" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.15);border-radius:0.75rem;margin:1rem 0;">
+                        <div style="font-size:2.2rem;margin-bottom:0.75rem;">🗓️</div>
+                        <h4 style="margin:0 0 0.4rem 0;color:var(--light);font-size:1.1rem;">Month Filter & Earnings Calendar</h4>
+                        <p style="max-width:520px;margin:0 auto 1.25rem auto;font-size:0.85rem;line-height:1.45;">
+                            Select your market filter above and click <strong>Load Calendar</strong> to view structured events categorized by Date, Market Cap & Industry on demand.
+                        </p>
+                        <button onclick="app.loadMonthFilterTab(true)" class="btn btn-primary" style="padding:0.45rem 1.25rem;font-size:0.88rem;font-weight:600;">▶ Load Earnings Calendar</button>
+                    </div>
                 </div>
                 <div id="mfReportStatus" class="timestamp" style="margin-top: 0.5rem;"></div>
             </section>

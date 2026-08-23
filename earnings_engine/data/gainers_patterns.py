@@ -144,15 +144,23 @@ def compute_stock_daily_telemetry(ticker: str, prices_df: pd.DataFrame) -> dict[
     if "date" in df.columns:
         df = df.sort_values("date")
     
+    def _safe_float(val: Any, default: float = 0.0) -> float:
+        if val is None or pd.isna(val):
+            return default
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return default
+
     last = df.iloc[-1]
     prev = df.iloc[-2]
 
-    prev_close = float(prev["close"]) if prev["close"] else 0.0
-    close = float(last["close"]) if last["close"] else 0.0
-    open_p = float(last["open"]) if last.get("open") is not None else close
-    high = float(last["high"]) if last.get("high") is not None else close
-    low = float(last["low"]) if last.get("low") is not None else close
-    vol = float(last["volume"]) if last.get("volume") is not None else 0.0
+    prev_close = _safe_float(prev.get("close") if hasattr(prev, "get") else prev["close"])
+    close = _safe_float(last.get("close") if hasattr(last, "get") else last["close"])
+    open_p = _safe_float(last.get("open") if hasattr(last, "get") else last["open"], default=close)
+    high = _safe_float(last.get("high") if hasattr(last, "get") else last["high"], default=close)
+    low = _safe_float(last.get("low") if hasattr(last, "get") else last["low"], default=close)
+    vol = _safe_float(last.get("volume") if hasattr(last, "get") else last["volume"], default=0.0)
 
     if prev_close <= 0 or close <= 0:
         return None
@@ -161,19 +169,22 @@ def compute_stock_daily_telemetry(ticker: str, prices_df: pd.DataFrame) -> dict[
 
     # 20-Day Average Volume
     vols_20 = df["volume"].tail(21).iloc[:-1]
-    avg_vol = float(vols_20.mean()) if not vols_20.empty and vols_20.mean() > 0 else 1.0
+    v_mean = vols_20.mean() if not vols_20.empty else None
+    avg_vol = float(v_mean) if v_mean is not None and pd.notna(v_mean) and float(v_mean) > 0 else 1.0
     vol_multiple = round(vol / max(avg_vol, 1.0), 1)
 
     # 52-Week High/Low
     closes_52w = df["close"].tail(252)
-    high_52w = float(closes_52w.max()) if not closes_52w.empty else high
-    low_52w = float(closes_52w.min()) if not closes_52w.empty else low
+    c_max_52w = closes_52w.max() if not closes_52w.empty else None
+    c_min_52w = closes_52w.min() if not closes_52w.empty else None
+    high_52w = float(c_max_52w) if c_max_52w is not None and pd.notna(c_max_52w) else high
+    low_52w = float(c_min_52w) if c_min_52w is not None and pd.notna(c_min_52w) else low
     is_52w = 1 if high >= high_52w * 0.99 else 0
-    dist_52w = round(((close - high_52w) / high_52w) * 100.0, 1)
+    dist_52w = round(((close - high_52w) / max(high_52w, 0.01)) * 100.0, 1)
 
     # 14-Day Consolidation Range width prior to today
     closes_14 = df["close"].tail(15).iloc[:-1]
-    if len(closes_14) >= 5:
+    if len(closes_14) >= 5 and pd.notna(closes_14.min()) and pd.notna(closes_14.max()):
         c_min = float(closes_14.min())
         c_max = float(closes_14.max())
         consolidation_range = round(((c_max - c_min) / max(c_min, 1.0)) * 100.0, 1)

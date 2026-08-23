@@ -34,3 +34,4 @@ secrets.env
 *.p12
 credentials.json
 client_secret*.json
+*.pdf

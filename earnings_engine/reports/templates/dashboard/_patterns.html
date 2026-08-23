@@ -41,7 +41,16 @@
                                 <th onclick="app.patStocksSort('comeback_50')" style="cursor:pointer">Comeback≥50%</th>
                                 <th onclick="app.patStocksSort('kept_dipping')" style="cursor:pointer">Kept Dipping</th>
                             </tr></thead>
-                            <tbody id="patStocksTable"></tbody>
+                            <tbody id="patStocksTable">
+                                <tr>
+                                    <td colspan="12" style="padding:2.5rem 1.5rem;text-align:center;color:var(--muted);">
+                                        <div style="font-size:2rem;margin-bottom:0.5rem;">📊</div>
+                                        <h4 style="margin:0 0 0.3rem 0;color:var(--light);">Patterns Scanner Ready</h4>
+                                        <p style="font-size:0.85rem;margin:0 0 1rem 0;">Select your market and date range above, then click <strong>Load Patterns</strong> on demand.</p>
+                                        <button onclick="app.loadPatterns()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Load Patterns</button>
+                                    </td>
+                                </tr>
+                            </tbody>
                         </table>
                     </div>
                 </div>

@@ -147,9 +147,11 @@
                             const r = this.ranges[u.name + ':' + t] || this.ranges['ALL:' + t];
                             const hasRange = r && r.lower_bound != null && r.upper_bound != null;
                             const isUser = r && r.source === 'user';
+                            const lowStr = hasRange && !isNaN(Number(r.lower_bound)) ? Number(r.lower_bound).toFixed(2) : (r ? r.lower_bound : '');
+                            const upStr = hasRange && !isNaN(Number(r.upper_bound)) ? Number(r.upper_bound).toFixed(2) : (r ? r.upper_bound : '');
                             const rangeBadge = hasRange
                                 ? '<span style="font-size:0.72rem;opacity:0.85;margin-left:0.25rem;color:' + (isUser ? '#c084fc' : '#60a5fa') + ';" title="' + (isUser ? 'Custom swing range' : 'Auto swing range') + '">' +
-                                  r.lower_bound + '–' + r.upper_bound + (r.cycles ? ' ⤫' + r.cycles : '') +
+                                  lowStr + '–' + upStr + (r.cycles ? ' ⤫' + r.cycles : '') +
                                   '</span>'
                                 : '';
                             return '<span style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(99,102,241,0.12);border:1px solid ' + (isUser ? 'rgba(139,92,246,0.45)' : 'rgba(99,102,241,0.25)') + ';padding:0.25rem 0.6rem;border-radius:9999px;font-size:0.78rem;" title="' + (this.names[t] || t) + '">' +
@@ -206,9 +208,11 @@
                             const r = this.ranges[name + ':' + t];
                             const hasRange = r && r.lower_bound != null && r.upper_bound != null;
                             const isUser = r && r.source === 'user';
+                            const lowStr = hasRange && !isNaN(Number(r.lower_bound)) ? Number(r.lower_bound).toFixed(2) : (r ? r.lower_bound : '');
+                            const upStr = hasRange && !isNaN(Number(r.upper_bound)) ? Number(r.upper_bound).toFixed(2) : (r ? r.upper_bound : '');
                             const rangeBadge = hasRange
                                 ? '<span style="font-size:0.72rem;opacity:0.85;margin-left:0.25rem;color:' + (isUser ? '#c084fc' : '#60a5fa') + ';" title="' + (isUser ? 'Custom swing range' : 'Auto swing range') + '">' +
-                                  r.lower_bound + '–' + r.upper_bound + (r.cycles ? ' ⤫' + r.cycles : '') +
+                                  lowStr + '–' + upStr + (r.cycles ? ' ⤫' + r.cycles : '') +
                                   '</span>'
                                 : '';
                             return '<span style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(59,130,246,0.15);border:1px solid ' + (isUser ? 'rgba(139,92,246,0.45)' : 'rgba(59,130,246,0.3)') + ';padding:0.3rem 0.65rem;border-radius:9999px;font-size:0.8rem;" title="' + (this.names[t] || t) + '">' +
@@ -676,6 +680,18 @@
                 this.refreshGainersTab();
             },
 
+            _tabLoadedAt: {},
+
+            _shouldReloadTab(name, ttlSec = 60) {
+                const now = Date.now();
+                const last = this._tabLoadedAt[name] || 0;
+                if (now - last > ttlSec * 1000) {
+                    this._tabLoadedAt[name] = now;
+                    return true;
+                }
+                return false;
+            },
+
             switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'results').toLowerCase().replace('#', '').replace('tab=', '');
                 const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
@@ -709,27 +725,42 @@
                     localStorage.setItem('dashboard_active_tab', name);
                 } catch (e) {}
 
-                if (name === 'watchlist') this.watchlistTab.load();
-                if (name === 'results' && !isInitialLoad) this.loadResultsReport();
-                if (name === 'monthfilter') this.loadMonthFilterTab();
-                if (name === 'scanner') this.loadScanner();
-                if (name === 'catalysts') this.loadCatalysts();
-                if (name === 'gainers') this.loadGainersTab();
-                if (name === 'swing') this.loadSwing();
-                if (name === 'coverage') this.loadDataCoverage();
-                if (name === 'industries') this.loadIndustryMoves();
-                if (name === 'patterns') this.loadPatterns();
-                if (name === 'buydip') this.loadRecentResults();
-                if (name === 'kronos') this.maybeShowKronosPrompt();
-                if (name === 'consensus') this.loadConsensusTab();
-                if (name === 'playground') {
-                    if (!this.pg._initialized) {
-                        this.pg.init();
-                        this.pg._initialized = true;
+                // Sync tab-specific watchlist/universe dropdown with global selection
+                const gWl = document.getElementById('globalWatchlist')?.value || localStorage.getItem('selectedGlobalWatchlist');
+                if (gWl) {
+                    const tabWlMap = {
+                        'results': 'resultsMarket',
+                        'monthfilter': 'mfMarket',
+                        'scanner': 'scannerWatchlistSelect',
+                        'gainers': 'gainersMarketSelect',
+                        'swing': 'swingMarket',
+                        'coverage': 'coverageMarket',
+                        'industries': 'indMarket',
+                        'patterns': 'patternsMarket',
+                        'buydip': 'bdMarket',
+                        'backtest': 'btWatchlist',
+                        'kronos': 'kronosWatchlist'
+                    };
+                    const targetSel = document.getElementById(tabWlMap[name]);
+                    if (targetSel && Array.from(targetSel.options).some(o => o.value === gWl)) {
+                        targetSel.value = gWl;
                     }
-                    this.loadPlaygroundNse();
                 }
-                if (name === 'backtest') this.initBacktestTab();
+
+                // Lazy-initialize client UI components on first visit without firing heavy backend scans
+                if (name === 'watchlist' && (!this.watchlistTab.customLists || !this.watchlistTab.customLists.length)) {
+                    this.watchlistTab.load();
+                }
+                if (name === 'kronos') {
+                    this.maybeShowKronosPrompt();
+                }
+                if (name === 'playground' && !this.pg._initialized) {
+                    this.pg.init();
+                    this.pg._initialized = true;
+                }
+                if (name === 'backtest') {
+                    this.initBacktestTab();
+                }
             },
 
             // =========================================================================

@@ -30,8 +30,16 @@
                 <p class="timestamp" style="margin: 0 0 0.75rem 0;">
                     <span id="bdMarketHours"></span> Scans earnings (default last 7 days; use the date range to validate the strategy historically). Watch for stocks that gapped <strong>down at the open</strong> after results, then <strong>recovered</strong> intraday / next day. Earnings-quality ("verdict") is opt-in via the button below.
                 </p>
-                <div id="bdSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin-bottom: 1rem;"></div>
-                <div id="bdDipRecovery"></div>
+                <div id="bdDipRecovery">
+                    <div class="card" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.15);border-radius:0.75rem;margin:1rem 0;">
+                        <div style="font-size:2.2rem;margin-bottom:0.75rem;">🛒</div>
+                        <h4 style="margin:0 0 0.4rem 0;color:var(--light);font-size:1.1rem;">Buy-the-Dip Scanner Ready</h4>
+                        <p style="max-width:520px;margin:0 auto 1.25rem auto;font-size:0.85rem;line-height:1.45;">
+                            Select your market and parameters above, then click <strong>Load Buy-the-Dip</strong> on demand.
+                        </p>
+                        <button onclick="app.loadRecentResults()" class="btn btn-primary" style="padding:0.45rem 1.25rem;font-size:0.88rem;font-weight:600;">🔄 Load Buy-the-Dip</button>
+                    </div>
+                </div>
                 <div id="bdCandidates"></div>
                 <div class="bd-section">
                     <button class="bd-section-header" onclick="app.toggleBdSection('today')">

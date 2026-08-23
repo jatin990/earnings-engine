@@ -66,7 +66,7 @@ def render_dashboard(html_path: Path | None = None) -> Path:
         js_content = js_path.read_text(encoding="utf-8")
         html = re.sub(
             r'<script src="/static/js/dashboard\.js[^"]*"></script>',
-            f"<script>\n{js_content}\n</script>",
+            lambda m: f"<script>\n{js_content}\n</script>",
             html,
         )
 

@@ -11,7 +11,10 @@ Provides aggregate data access for the interactive dashboard:
 from __future__ import annotations
 
 import sqlite3
+import threading
+import time
 from datetime import datetime
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +47,55 @@ logger = get_logger("earnings_engine.api.dashboard_api")
 UNIVERSES_DIR = Path(__file__).resolve().parent.parent / "data" / "universes"
 
 _REFRESH_STATUS: dict[str, dict[str, Any]] = {}
+_GLOBAL_CACHES: list[Any] = []
+
+
+def ttl_cache(seconds: int = 60):
+    """Thread-safe in-memory TTL response cache for read-heavy dashboard endpoints."""
+    def decorator(fn):
+        cache: dict[str, tuple[float, Any]] = {}
+        lock = threading.Lock()
+
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            # If force or force_sync or force_refresh is True, bypass cache and update
+            if kwargs.get("force") or kwargs.get("force_sync") or kwargs.get("force_refresh"):
+                val = fn(*args, **kwargs)
+                key = str((args, sorted(kwargs.items())))
+                with lock:
+                    cache[key] = (time.time(), val)
+                return val
+
+            key = str((args, sorted(kwargs.items())))
+            now = time.time()
+            with lock:
+                if key in cache:
+                    ts, val = cache[key]
+                    if now - ts < seconds:
+                        return val
+
+            val = fn(*args, **kwargs)
+            with lock:
+                cache[key] = (now, val)
+            return val
+
+        def clear():
+            with lock:
+                cache.clear()
+
+        wrapped.clear_cache = clear
+        _GLOBAL_CACHES.append(wrapped)
+        return wrapped
+    return decorator
+
+
+def clear_dashboard_caches() -> None:
+    """Clear all in-memory dashboard caches across all decorated endpoints."""
+    for c in _GLOBAL_CACHES:
+        try:
+            c.clear_cache()
+        except Exception:
+            pass
 
 
 def _settings() -> Settings:
@@ -330,6 +382,7 @@ def run_prediction_for_ticker(
         return {"success": False, "error": str(e)}
 
 
+@ttl_cache(seconds=60)
 def get_event_dataset_summary() -> dict[str, Any]:
     """Get summary stats from event_dataset table."""
     from earnings_engine.data.db import get_db_connection
@@ -531,20 +584,26 @@ def get_swing_range_api(watchlist: str = "ALL", ticker: str = "") -> dict[str, A
         rng = swing_ranges_mod.get_swing_range("ALL", ticker, settings)
 
     prices = prices_mod.load_prices(ticker, settings)
-    if prices.empty:
-        prices = prices_mod.fetch_prices(ticker, settings, force=False)
+    if prices.empty and not rng:
+        try:
+            prices = prices_mod.fetch_prices(ticker, settings, force=False)
+        except Exception:
+            prices = pd.DataFrame()
 
     current_price = None
     auto_rng = None
     if not prices.empty and "close" in prices.columns:
-        df_p = prices.copy()
-        if "date" in df_p.columns:
-            df_p["date"] = pd.to_datetime(df_p["date"], errors="coerce")
-            df_p = df_p.dropna(subset=["date"]).sort_values("date").set_index("date")
-        closes = pd.to_numeric(df_p["close"], errors="coerce").dropna()
-        if not closes.empty:
-            current_price = float(closes.iloc[-1])
-            auto_rng = detect_swing_range(closes)
+        try:
+            df_p = prices.copy()
+            if "date" in df_p.columns:
+                df_p["date"] = pd.to_datetime(df_p["date"], errors="coerce")
+                df_p = df_p.dropna(subset=["date"]).sort_values("date").set_index("date")
+            closes = pd.to_numeric(df_p["close"], errors="coerce").dropna()
+            if not closes.empty:
+                current_price = float(closes.iloc[-1])
+                auto_rng = detect_swing_range(closes)
+        except Exception as e:
+            logger.debug("Error computing auto swing range for %s: %s", ticker, e)
 
     if not rng and auto_rng:
         if auto_rng.get("lower") is not None and auto_rng.get("upper") is not None:
@@ -609,21 +668,28 @@ def clear_swing_range_api(watchlist: str = "ALL", ticker: str = "") -> dict[str,
     # Re-detect auto range if prices are available
     prices = prices_mod.load_prices(ticker, settings)
     if prices.empty:
-        prices = prices_mod.fetch_prices(ticker, settings, force=False)
+        try:
+            prices = prices_mod.fetch_prices(ticker, settings, force=False)
+        except Exception:
+            prices = pd.DataFrame()
     if not prices.empty and "close" in prices.columns:
-        closes = pd.to_numeric(prices["close"], errors="coerce").dropna()
-        auto_rng = detect_swing_range(closes)
-        if auto_rng.get("lower") is not None and auto_rng.get("upper") is not None:
-            swing_ranges_mod.record_auto_range(
-                wl_name,
-                ticker,
-                auto_rng["lower"],
-                auto_rng["upper"],
-                cycles=auto_rng.get("cycles"),
-                avg_days=auto_rng.get("avg_days"),
-                cycles_data=auto_rng.get("cycles_data"),
-                settings=settings,
-            )
+        try:
+            closes = pd.to_numeric(prices["close"], errors="coerce").dropna()
+            if not closes.empty:
+                auto_rng = detect_swing_range(closes)
+                if auto_rng and auto_rng.get("lower") is not None and auto_rng.get("upper") is not None:
+                    swing_ranges_mod.record_auto_range(
+                        wl_name,
+                        ticker,
+                        auto_rng["lower"],
+                        auto_rng["upper"],
+                        cycles=auto_rng.get("cycles"),
+                        avg_days=auto_rng.get("avg_days"),
+                        cycles_data=auto_rng.get("cycles_data"),
+                        settings=settings,
+                    )
+        except Exception as e:
+            logger.debug("Auto range detection error for %s: %s", ticker, e)
 
     return get_swing_range_api(watchlist=wl_name, ticker=ticker)
 
@@ -861,6 +927,7 @@ def get_all_watchlists_and_universes() -> dict[str, Any]:
     }
 
 
+@ttl_cache(seconds=60)
 def get_watchlist_names_summary() -> dict[str, Any]:
     """Fast, lightweight summary of watchlist names and universes for UI dropdowns (no ticker arrays)."""
     settings = _settings()
@@ -925,6 +992,7 @@ def get_universe_files() -> list[dict[str, Any]]:
 # Data coverage
 # ---------------------------------------------------------------------------
 
+@ttl_cache(seconds=60)
 def get_data_coverage(market: str | None = None, tickers: list[str] | None = None) -> dict[str, Any]:
     """Return per-ticker data coverage for the requested universe.
 
@@ -965,6 +1033,7 @@ def ingest_earnings_incremental_api(market: str | None = None, tickers: list[str
         return {"success": False, "error": str(e)}
 
 
+@ttl_cache(seconds=60)
 def get_industry_moves(market: str | None = None, lookback_days: int = 60) -> dict[str, Any]:
     """Return recent-earnings moves grouped by industry for the Industries tab.
 
@@ -1011,6 +1080,7 @@ def classify_industries_api(market: str | None = None, tickers: list[str] | None
         return {"success": False, "error": str(e)}
 
 
+@ttl_cache(seconds=60)
 def get_recent_results_api(
     market: str | None = None,
     correction_pct: float = 5.0,
@@ -1062,6 +1132,7 @@ def get_recent_results_verdict_api(
     return {"verdicts": verdicts, "total": len(verdicts)}
 
 
+@ttl_cache(seconds=60)
 def get_patterns_api(
     market: str | None = None,
     start_date: str | None = None,
@@ -1334,6 +1405,7 @@ def get_latest_ai_forecasts_api() -> list[dict[str, Any]]:
 # Short-Term Impact News & Catalyst Scanner APIs
 # =========================================================================
 
+@ttl_cache(seconds=45)
 def get_catalysts_api(
     watchlist: str | None = None,
     impact_level: str | None = None,
@@ -1370,6 +1442,7 @@ def get_catalysts_api(
     return items
 
 
+@ttl_cache(seconds=60)
 def get_catalyst_stats_api() -> dict[str, Any]:
     """Get high-impact catalyst KPI statistics."""
     from earnings_engine.data.catalysts_news import get_catalyst_summary_stats
@@ -1379,6 +1452,7 @@ def get_catalyst_stats_api() -> dict[str, Any]:
 
 def scan_catalysts_api(watchlist: str | None = None) -> dict[str, Any]:
     """Trigger real-time catalyst scan across watchlist/universe."""
+    clear_dashboard_caches()
     from earnings_engine.data.catalysts_news import scan_watchlist_catalysts
     settings = _settings()
     return scan_watchlist_catalysts(watchlist_name=watchlist, settings=settings)
@@ -1388,6 +1462,7 @@ def scan_catalysts_api(watchlist: str | None = None) -> dict[str, Any]:
 # Daily Top 10 Gainers, Driver Attribution & Pattern Discovery APIs
 # =========================================================================
 
+@ttl_cache(seconds=60)
 def get_daily_top_gainers_api(
     universe: str = "NSE_ALL",
     date: str | None = None,
@@ -1416,6 +1491,7 @@ def scan_upcoming_setups_api(universe: str = "NSE_TOP") -> list[dict[str, Any]]:
 # Active Multi-Category Stock Scanner APIs
 # =========================================================================
 
+@ttl_cache(seconds=45)
 def get_scanner_categories_api(universe: str = "NSE_TOP") -> list[dict[str, Any]]:
     """Get all scanner categories with live candidate counts."""
     from earnings_engine.data.category_scanner import get_categories_overview

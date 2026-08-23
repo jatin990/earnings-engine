@@ -199,7 +199,7 @@ def is_universe_fresh(name: str, max_age_days: int = NSE_ALL_MAX_AGE_DAYS, setti
     """Check if a dynamic universe is fresh in SQLite."""
     with _connect(settings) as connection:
         row = connection.execute(
-            "SELECT fetched_at FROM universe_freshness WHERE universe_name = ?",
+            "SELECT fetched_at FROM universe_freshness WHERE LOWER(universe_name) = LOWER(?)",
             (name,),
         ).fetchone()
     if not row:
@@ -212,18 +212,19 @@ def is_universe_fresh(name: str, max_age_days: int = NSE_ALL_MAX_AGE_DAYS, setti
 def store_universe(name: str, tickers: list[str], settings: Settings | None = None) -> None:
     """Store/replace an entire universe in SQLite."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    clean_name = name.strip()
     with _connect(settings) as connection:
-        connection.execute("DELETE FROM universes WHERE universe_name = ?", (name,))
+        connection.execute("DELETE FROM universes WHERE LOWER(universe_name) = LOWER(?)", (clean_name,))
         for t in tickers:
             t = t.strip().upper()
             if t:
                 connection.execute(
                     "INSERT OR REPLACE INTO universes (universe_name, ticker, updated_at) VALUES (?, ?, ?)",
-                    (name, t, now),
+                    (clean_name.lower(), t, now),
                 )
         connection.execute(
             "INSERT OR REPLACE INTO universe_freshness (universe_name, fetched_at) VALUES (?, ?)",
-            (name, now),
+            (clean_name.lower(), now),
         )
         connection.commit()
 

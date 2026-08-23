@@ -95,6 +95,8 @@ def set_user_range(
     """Manually set a swing range for a ticker (source='user')."""
     settings = settings or Settings()
     now = datetime.now().isoformat(timespec="seconds")
+    lower_val = round(float(lower), 2)
+    upper_val = round(float(upper), 2)
     with _connect(settings) as conn:
         conn.execute(
             """
@@ -102,7 +104,7 @@ def set_user_range(
             (watchlist, ticker, lower_bound, upper_bound, source, cycles, last_updated)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (watchlist, ticker, lower, upper, "user", cycles, now),
+            (watchlist, ticker, lower_val, upper_val, "user", cycles, now),
         )
         conn.commit()
 
@@ -110,8 +112,8 @@ def set_user_range(
         "success": True,
         "watchlist": watchlist,
         "ticker": ticker,
-        "lower_bound": lower,
-        "upper_bound": upper,
+        "lower_bound": lower_val,
+        "upper_bound": upper_val,
         "source": "user",
         "cycles": cycles,
         "last_updated": now,
@@ -131,6 +133,8 @@ def record_auto_range(
     """Record an auto-detected swing range. Only overwrites if source is already 'auto' or missing."""
     settings = settings or Settings()
     now = datetime.now().isoformat(timespec="seconds")
+    lower_val = round(float(lower), 2)
+    upper_val = round(float(upper), 2)
     with _connect(settings) as conn:
         # Check if a user override or existing record exists
         existing = conn.execute(
@@ -142,7 +146,7 @@ def record_auto_range(
             if existing[0] == "user":
                 return  # Don't overwrite user settings
             # If auto-range values haven't changed, skip redundant write
-            if existing[1] == lower and existing[2] == upper:
+            if existing[1] == lower_val and existing[2] == upper_val:
                 return
 
         conn.execute(
@@ -151,7 +155,7 @@ def record_auto_range(
             (watchlist, ticker, lower_bound, upper_bound, source, cycles, avg_cycle_days, last_updated)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (watchlist, ticker, lower, upper, "auto", cycles, avg_days, now),
+            (watchlist, ticker, lower_val, upper_val, "auto", cycles, avg_days, now),
         )
 
         if cycles_data:
