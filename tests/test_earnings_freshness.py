@@ -70,3 +70,27 @@ def test_refresh_watchlist_api_endpoints(temp_settings, clean_test_watchlist):
     assert resp_tickers.status_code == 200
     data_tickers = resp_tickers.json()
     assert data_tickers["total_tickers"] == 2
+
+    # 3. Query global universe freshness (watchlist=None or ALL)
+    resp_global = client.get("/api/v1/earnings/freshness")
+    assert resp_global.status_code == 200
+    data_global = resp_global.json()
+    assert data_global["total_tickers"] >= 2
+    assert data_global["cached_tickers"] >= 2
+    assert data_global["relative_time"] != "No tickers in universe"
+
+
+def test_recent_results_preset_window():
+    from earnings_engine.api.dashboard_api import get_results_report_components
+
+    # Test recent window (-4 days, +7 days)
+    res = get_results_report_components(days=7, past_days=4, market="ALL")
+    assert isinstance(res, dict)
+    assert "success" in res
+    assert "day_sections" in res
+    assert "popups" in res
+    if res["success"]:
+        assert "day_sections_list" in res
+        assert "months" in res
+
+

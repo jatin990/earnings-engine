@@ -1579,62 +1579,57 @@
                 return c != null ? (b.label + ' (' + c + ')') : b.label;
             },
 
+            getResultsPresetDetails(preset) {
+                if (preset === 'recent') {
+                    return { pastDays: 4, days: 7, label: 'Recent (-4D to +7D)' };
+                } else if (preset === 'pm60') {
+                    return { pastDays: 60, days: 60, label: '±2 Months' };
+                } else if (preset === 'pm30') {
+                    return { pastDays: 30, days: 30, label: '±1 Month' };
+                } else if (preset === 'next14') {
+                    return { pastDays: 0, days: 14, label: 'Upcoming 14 Days' };
+                } else if (preset === 'next30') {
+                    return { pastDays: 0, days: 30, label: 'Upcoming 30 Days' };
+                } else if (preset === 'next60') {
+                    return { pastDays: 0, days: 60, label: 'Upcoming 60 Days' };
+                } else if (preset === 'past60') {
+                    return { pastDays: 60, days: 0, label: 'Past 60 Days' };
+                } else {
+                    const past = parseInt(document.getElementById('resultsPastDays')?.value || '60', 10);
+                    const ahead = parseInt(document.getElementById('resultsDays')?.value || '60', 10);
+                    return { pastDays: past, days: ahead, label: `Custom (-${past}D to +${ahead}D)` };
+                }
+            },
+
             onResultsPresetChange(preset) {
                 const customSpan = document.getElementById('resultsCustomInputs');
                 const pastInput = document.getElementById('resultsPastDays');
                 const nextInput = document.getElementById('resultsDays');
-                if (!customSpan || !pastInput || !nextInput) return;
+                const centerTitle = document.getElementById('resultsCenterTitle');
+                const centerBtn = document.getElementById('resultsCenterLoadBtn');
 
-                if (preset === 'pm60') {
-                    customSpan.style.display = 'none';
-                    pastInput.value = 60;
-                    nextInput.value = 60;
-                } else if (preset === 'pm30') {
-                    customSpan.style.display = 'none';
-                    pastInput.value = 30;
-                    nextInput.value = 30;
-                } else if (preset === 'next14') {
-                    customSpan.style.display = 'none';
-                    pastInput.value = 0;
-                    nextInput.value = 14;
-                } else if (preset === 'next30') {
-                    customSpan.style.display = 'none';
-                    pastInput.value = 0;
-                    nextInput.value = 30;
-                } else if (preset === 'next60') {
-                    customSpan.style.display = 'none';
-                    pastInput.value = 0;
-                    nextInput.value = 60;
-                } else if (preset === 'past60') {
-                    customSpan.style.display = 'none';
-                    pastInput.value = 60;
-                    nextInput.value = 0;
-                } else if (preset === 'custom') {
-                    customSpan.style.display = 'inline-flex';
+                const details = this.getResultsPresetDetails(preset);
+                if (pastInput) pastInput.value = details.pastDays;
+                if (nextInput) nextInput.value = details.days;
+
+                if (customSpan) {
+                    customSpan.style.display = (preset === 'custom') ? 'inline-flex' : 'none';
+                }
+                if (centerTitle) {
+                    centerTitle.textContent = `Ready to Load Results (${details.label})`;
+                }
+                if (centerBtn) {
+                    centerBtn.innerHTML = `▶ Load Results Report (${details.label})`;
                 }
             },
 
             async loadResultsReport() {
                 const preset = document.getElementById('resultsRangePreset')?.value || 'pm60';
-                let pastDays = 60;
-                let days = 60;
-
-                if (preset === 'pm60') {
-                    pastDays = 60; days = 60;
-                } else if (preset === 'pm30') {
-                    pastDays = 30; days = 30;
-                } else if (preset === 'next14') {
-                    pastDays = 0; days = 14;
-                } else if (preset === 'next30') {
-                    pastDays = 0; days = 30;
-                } else if (preset === 'next60') {
-                    pastDays = 0; days = 60;
-                } else if (preset === 'past60') {
-                    pastDays = 60; days = 0;
-                } else {
-                    pastDays = parseInt(document.getElementById('resultsPastDays')?.value || '60', 10);
-                    days = parseInt(document.getElementById('resultsDays')?.value || '60', 10);
-                }
+                const details = this.getResultsPresetDetails(preset);
+                const pastDays = details.pastDays;
+                const days = details.days;
+                const windowName = details.label;
+                this.resultsActiveWindowName = windowName;
 
                 const market = document.getElementById('resultsMarket')?.value || '';
                 const query = '?days=' + days + '&past_days=' + pastDays + (market ? '&market=' + encodeURIComponent(market) : '');
@@ -1646,7 +1641,7 @@
                 
                 const statusEl = document.getElementById('resultsReportStatus');
                 const countBadge = document.getElementById('resultsCount');
-                if (statusEl) statusEl.textContent = 'Fetching corporate results across ±2 months...';
+                if (statusEl) statusEl.textContent = 'Fetching corporate results across ' + windowName + ' window...';
                 
                 try {
                     const res = await this.fetchWithAbort('results', API_BASE + '/api/v1/dashboard/results/report' + query);
@@ -1729,7 +1724,7 @@
                         countBadge.style.display = 'inline-block';
                         countBadge.textContent = this.resultsTotalStocks + ' results (' + totalDates + ' dates)';
                     }
-                    if (statusEl) statusEl.textContent = 'Report loaded: ' + this.resultsTotalStocks + ' corporate results across ' + totalDates + ' dates in ±2 months window (' + new Date().toLocaleTimeString() + ')';
+                    if (statusEl) statusEl.textContent = 'Report loaded: ' + this.resultsTotalStocks + ' corporate results across ' + totalDates + ' dates in ' + windowName + ' window (' + new Date().toLocaleTimeString() + ')';
                     
                     if (data.popups) {
                         const existing = document.getElementById('resultsReportPopups');
@@ -1780,11 +1775,12 @@
                 const allBtnStyle = allActive
                     ? 'background:var(--accent);color:#fff;font-weight:700;border:1px solid var(--accent);'
                     : 'background:rgba(255,255,255,0.06);color:var(--light);border:1px solid rgba(255,255,255,0.15);';
+                const allLabel = this.resultsActiveWindowName ? `🌐 All (${this.resultsActiveWindowName})` : '🌐 All Dates';
                 html += '<button type="button" onclick="app.filterResultsByMonth(\'ALL\')" class="btn btn-sm" style="' + allBtnStyle + 'padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.75rem;cursor:pointer;">' +
-                    '🌐 All (±2M) <span style="background:rgba(0,0,0,0.25);padding:0.1rem 0.35rem;border-radius:9999px;font-size:0.7rem;margin-left:0.2rem;">' + totalStocks + '</span>' +
+                    allLabel + ' <span style="background:rgba(0,0,0,0.25);padding:0.1rem 0.35rem;border-radius:9999px;font-size:0.7rem;margin-left:0.2rem;">' + totalStocks + '</span>' +
                     '</button>';
 
-                // 2. Individual month tabs (4 tabs for 4 months)
+                // 2. Individual month tabs (tabs for months in range)
                 this.resultsMonths.forEach((m, idx) => {
                     const isActive = (this.resultsActiveMonth === m.month_key);
                     const tag = m.is_current ? '⭐ ' : (m.is_past ? '◀ ' : '▶ ');
@@ -1835,7 +1831,7 @@
                 const countBadge = document.getElementById('resultsCount');
                 if (countBadge) {
                     const mObj = (this.resultsMonths || []).find(m => m.month_key === monthKey);
-                    const label = (monthKey === 'ALL') ? '±2 Months' : (mObj ? mObj.month_label : monthKey);
+                    const label = (monthKey === 'ALL') ? (this.resultsActiveWindowName || 'Selected Window') : (mObj ? mObj.month_label : monthKey);
                     countBadge.textContent = filteredStocks + ' results (' + filtered.length + ' dates in ' + label + ')';
                 }
             },

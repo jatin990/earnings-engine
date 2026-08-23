@@ -736,41 +736,100 @@ def get_watchlist_earnings_freshness(
 ) -> dict[str, Any]:
     """Calculate aggregated earnings freshness metrics for a watchlist or ticker list."""
     settings = settings or Settings()
-    if tickers is None:
-        if watchlist_name:
-            from earnings_engine.data.watchlists import get_watchlist
-            tickers = get_watchlist(watchlist_name, settings)
+
+    is_all_universe = not watchlist_name or watchlist_name.strip().upper() in ("ALL", "GLOBAL", "DEFAULT", "UNIVERSE")
+
+    if tickers is None and is_all_universe:
+        with _connect(settings) as connection:
+            row = connection.execute(
+                """
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(earnings_fetched_at) as fetched_count,
+                    MAX(earnings_fetched_at) as latest_fetch,
+                    MIN(earnings_fetched_at) as oldest_fetch
+                FROM tickers
+                """
+            ).fetchone()
+        
+        total_tickers = row[0] if row else 0
+        fetched_count = row[1] if row else 0
+        latest_fetch = row[2] if row else None
+        oldest_fetch = row[3] if row else None
+
+        # Fallback to earnings_history if tickers table count is 0
+        if total_tickers == 0:
+            with _connect(settings) as connection:
+                eh_row = connection.execute("SELECT COUNT(DISTINCT ticker), MAX(fetched_at), MIN(fetched_at) FROM earnings_history").fetchone()
+                if eh_row and eh_row[0]:
+                    total_tickers = eh_row[0]
+                    fetched_count = eh_row[0]
+                    latest_fetch = eh_row[1]
+                    oldest_fetch = eh_row[2]
+
+        if total_tickers == 0:
+            try:
+                from earnings_engine.data.universe import load_universe
+                u_tickers = load_universe(settings)
+                total_tickers = len(u_tickers)
+            except Exception:
+                total_tickers = 0
+    else:
+        if tickers is None:
+            if watchlist_name:
+                from earnings_engine.data.watchlists import get_watchlist
+                tickers = get_watchlist(watchlist_name, settings)
+            else:
+                tickers = []
+
+        if not tickers:
+            return {
+                "watchlist": watchlist_name or "ALL",
+                "total_tickers": 0,
+                "cached_tickers": 0,
+                "last_updated": None,
+                "relative_time": "No tickers in watchlist",
+                "status": "EMPTY",
+            }
+
+        total_tickers = len(tickers)
+        # Avoid exceeding SQLite 999 parameter limit if watchlist is huge
+        if len(tickers) <= 900:
+            placeholders = ", ".join(["?"] * len(tickers))
+            with _connect(settings) as connection:
+                row = connection.execute(
+                    f"""
+                    SELECT 
+                        COUNT(*) as total,
+                        COUNT(earnings_fetched_at) as fetched_count,
+                        MAX(earnings_fetched_at) as latest_fetch,
+                        MIN(earnings_fetched_at) as oldest_fetch
+                    FROM tickers
+                    WHERE ticker IN ({placeholders})
+                    """,
+                    tickers,
+                ).fetchone()
+            fetched_count = row[1] if row else 0
+            latest_fetch = row[2] if row else None
+            oldest_fetch = row[3] if row else None
         else:
-            tickers = []
-
-    if not tickers:
-        return {
-            "watchlist": watchlist_name or "ALL",
-            "total_tickers": 0,
-            "cached_tickers": 0,
-            "last_updated": None,
-            "relative_time": "No tickers in universe",
-            "status": "EMPTY",
-        }
-
-    placeholders = ", ".join(["?"] * len(tickers))
-    with _connect(settings) as connection:
-        row = connection.execute(
-            f"""
-            SELECT 
-                COUNT(*) as total,
-                COUNT(earnings_fetched_at) as fetched_count,
-                MAX(earnings_fetched_at) as latest_fetch,
-                MIN(earnings_fetched_at) as oldest_fetch
-            FROM tickers
-            WHERE ticker IN ({placeholders})
-            """,
-            tickers,
-        ).fetchone()
-
-    fetched_count = row[1] if row else 0
-    latest_fetch = row[2] if row else None
-    oldest_fetch = row[3] if row else None
+            fetched_count = 0
+            latest_fetch = None
+            oldest_fetch = None
+            for i in range(0, len(tickers), 500):
+                chunk = tickers[i:i+500]
+                placeholders = ", ".join(["?"] * len(chunk))
+                with _connect(settings) as connection:
+                    row = connection.execute(
+                        f"SELECT COUNT(earnings_fetched_at), MAX(earnings_fetched_at), MIN(earnings_fetched_at) FROM tickers WHERE ticker IN ({placeholders})",
+                        chunk,
+                    ).fetchone()
+                    if row:
+                        fetched_count += (row[0] or 0)
+                        if row[1] and (latest_fetch is None or row[1] > latest_fetch):
+                            latest_fetch = row[1]
+                        if row[2] and (oldest_fetch is None or row[2] < oldest_fetch):
+                            oldest_fetch = row[2]
 
     # Calculate human-readable relative time
     relative_time = "Never"
@@ -798,7 +857,7 @@ def get_watchlist_earnings_freshness(
 
     return {
         "watchlist": watchlist_name or "ALL",
-        "total_tickers": len(tickers),
+        "total_tickers": total_tickers,
         "cached_tickers": fetched_count,
         "last_updated": latest_fetch,
         "oldest_updated": oldest_fetch,
