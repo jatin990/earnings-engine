@@ -11,6 +11,7 @@
                     <button onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" style="background:#2563eb;">Load Setups</button>
                     <button onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-sm" style="background:rgba(139,92,246,0.3);color:#c084fc;border:1px solid #8b5cf6;font-weight:600;" title="Compute Kronos AI predictions for all stocks in the selected watchlist">🔮 Predict All (Kronos)</button>
                     <button onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-sm" style="background:rgba(59,130,246,0.25);color:#60a5fa;border:1px solid #3b82f6;font-weight:600;" title="Run Multi-Modal AI News, World Events & Volume Synthesis for all stocks">🧠 AI Thesis All</button>
+                    <button onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-sm" style="background:linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.25));color:#c084fc;border:1px solid #8b5cf6;font-weight:600;" title="Run 4-Model AI Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral) for all stocks in view">🤖 Consensus All</button>
                 </div>
             </div>
 
@@ -46,14 +47,15 @@
                                 <th onclick="app.sortSwing('thirty_day_return_pct')" style="cursor:pointer;">30D Return ⇅</th>
                                 <th onclick="app.sortSwing('prev_quarter_earnings_score')" style="cursor:pointer;">Quality ⇅</th>
                                 <th onclick="app.sortSwing('kronos_return')" style="cursor:pointer;">Kronos Trend ⇅</th>
-                                <th onclick="app.sortSwing('ai_sentiment')" style="cursor:pointer;">AI Synthesis (News + Vol) ⇅</th>
+                                <th onclick="app.sortSwing('ai_sentiment')" style="cursor:pointer;">AI Synthesis ⇅</th>
+                                <th onclick="app.sortSwing('consensus_strength')" style="cursor:pointer;" title="DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model AI Consensus">🤖 AI Consensus ⇅</th>
                                 <th onclick="app.sortSwing('earnings_date')" style="cursor:pointer;">Next Earnings ⇅</th>
                                 <th style="text-align:right;">Action</th>
                             </tr>
                         </thead>
                         <tbody id="swingTableBody">
                             <tr>
-                                <td colspan="13" style="text-align:center;padding:2rem;color:var(--muted);">
+                                <td colspan="14" style="text-align:center;padding:2rem;color:var(--muted);">
                                     Click <strong>"Load Setups"</strong> above to load swing trading opportunities.
                                 </td>
                             </tr>

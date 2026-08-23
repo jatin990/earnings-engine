@@ -50,10 +50,16 @@ def _seed_db(settings: Settings) -> None:
     )
     conn.execute(
         """
-        CREATE TABLE IF NOT EXISTS earnings_freshness (
-            ticker TEXT NOT NULL,
-            fetched_at TEXT NOT NULL,
-            PRIMARY KEY (ticker)
+        CREATE TABLE IF NOT EXISTS tickers (
+            ticker TEXT PRIMARY KEY,
+            company_name TEXT,
+            industry TEXT,
+            sector TEXT,
+            market_cap REAL,
+            current_price REAL,
+            earnings_fetched_at TEXT,
+            prices_fetched_at TEXT,
+            last_updated TEXT
         )
         """
     )
@@ -80,8 +86,8 @@ def _seed_db(settings: Settings) -> None:
         ("B.NS", "2026-02-12"),
     )
     conn.execute(
-        "INSERT INTO earnings_freshness (ticker, fetched_at) VALUES (?, ?)",
-        ("A.NS", "2026-07-30 10:00:00"),
+        "INSERT INTO tickers (ticker, earnings_fetched_at, prices_fetched_at) VALUES (?, ?, ?)",
+        ("A.NS", "2026-07-30 10:00:00", "2026-07-30 10:00:00"),
     )
     conn.commit()
     conn.close()

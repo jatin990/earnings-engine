@@ -4,6 +4,7 @@
             allTickers: [],
             resultsData: [],
             swingData: [],
+            consensusMap: {},
             sortKey: 'earnings_date',
             sortDir: 'asc',
 
@@ -509,6 +510,7 @@
                 this._restorePatternsControls();
                 this.populateWatchlistDropdowns();
                 this.loadOverview();
+                this.loadConsensusCache();
                 
                 const initialTab = this.getInitialTab();
                 this.switchTab(initialTab, true, true);
@@ -879,7 +881,7 @@
                 }
 
                 if (!filtered.length) {
-                    tbody.innerHTML = '<tr><td colspan="10" style="padding:1.5rem;text-align:center;color:var(--muted);">No candidates matching selected category in this universe. Click "⚡ Deep Sweep All Categories" to refresh feeds.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="11" style="padding:1.5rem;text-align:center;color:var(--muted);">No candidates matching selected category in this universe. Click "⚡ Deep Sweep All Categories" to refresh feeds.</td></tr>';
                     return;
                 }
 
@@ -912,6 +914,7 @@
                         '<td style="max-width:320px;">' +
                             '<div style="font-size:0.75rem;color:#cbd5e1;line-height:1.35;">' + (c.why_it_matches || c.catalyst_summary || '') + '</div>' +
                         '</td>' +
+                        '<td>' + this.renderConsensusBadge(c.ticker, 'ALL') + '</td>' +
                         '<td style="text-align:center;">' +
                             '<div style="display:flex;gap:0.3rem;justify-content:center;">' +
                                 '<button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="14D OHLCV Benchmark">📊 Benchmark</button>' +
@@ -1197,7 +1200,7 @@
                 if (!tbody) return;
                 const items = this.gainersData || [];
                 if (!items.length) {
-                    tbody.innerHTML = '<tr><td colspan="9" style="padding:1.5rem;text-align:center;color:var(--muted);">No top gainers found for selected universe.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="10" style="padding:1.5rem;text-align:center;color:var(--muted);">No top gainers found for selected universe.</td></tr>';
                     return;
                 }
 
@@ -1228,6 +1231,7 @@
                             '<div style="font-size:0.73rem;color:#cbd5e1;line-height:1.35;">' + (g.driver_explanation || '') + '</div>' +
                         '</td>' +
                         '<td><span style="background:rgba(139,92,246,0.15);color:#c084fc;padding:0.2rem 0.5rem;border-radius:0.3rem;font-size:0.72rem;font-weight:600;white-space:nowrap;">' + (g.pattern_name || 'Breakout') + '</span></td>' +
+                        '<td>' + this.renderConsensusBadge(g.ticker, 'ALL') + '</td>' +
                         '<td style="text-align:center;">' +
                             '<div style="display:flex;gap:0.3rem;justify-content:center;">' +
                                 '<button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + g.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="14D OHLCV Forecast Benchmark">📊 Benchmark</button>' +
@@ -1287,7 +1291,7 @@
                 const tbody = document.getElementById('upcomingSetupsTableBody');
                 if (!tbody) return;
                 const wl = localStorage.getItem('selectedGlobalWatchlist') || 'NSE_TOP';
-                tbody.innerHTML = '<tr><td colspan="8" style="padding:1.5rem;text-align:center;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Scanning watchlist for pre-breakout patterns...</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" style="padding:1.5rem;text-align:center;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Scanning watchlist for pre-breakout patterns...</td></tr>';
                 try {
                     const res = await fetch(API_BASE + '/api/v1/gainers/upcoming-setups?universe=' + encodeURIComponent(wl));
                     const data = await res.json();
@@ -1295,7 +1299,7 @@
                     this.renderUpcomingSetups();
                 } catch (e) {
                     console.error('Error scanning setups:', e);
-                    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="padding:1rem;text-align:center;color:var(--red);">Failed scanning watchlist setups.</td></tr>';
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="padding:1rem;text-align:center;color:var(--red);">Failed scanning watchlist setups.</td></tr>';
                 }
             },
 
@@ -1304,7 +1308,7 @@
                 if (!tbody) return;
                 const items = this.upcomingSetupsData || [];
                 if (!items.length) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="padding:1.5rem;text-align:center;color:var(--muted);">No stocks currently in tight pre-breakout coils in this universe. Try selecting another universe above.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" style="padding:1.5rem;text-align:center;color:var(--muted);">No stocks currently in tight pre-breakout coils in this universe. Try selecting another universe above.</td></tr>';
                     return;
                 }
 
@@ -1321,6 +1325,7 @@
                         '<td><strong style="color:#fbbf24;font-size:0.85rem;">' + currSym + Number(s.trigger_level).toFixed(2) + '</strong></td>' +
                         '<td><span style="color:#34d399;font-weight:700;">' + s.confidence_score + '%</span></td>' +
                         '<td style="max-width:320px;font-size:0.75rem;color:#cbd5e1;line-height:1.35;">' + s.why_it_matches + '</td>' +
+                        '<td>' + this.renderConsensusBadge(s.ticker, 'ALL') + '</td>' +
                         '<td style="text-align:center;">' +
                             '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + s.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(139,92,246,0.2);color:#c084fc;border:1px solid rgba(139,92,246,0.4);border-radius:0.3rem;" title="Run AI Prediction">🔮 Predict</button>' +
                         '</td>' +
@@ -2191,7 +2196,7 @@
                 });
 
                 if (!sorted.length) {
-                    tbody.innerHTML = '<tr><td colspan="10" style="padding:1rem;text-align:center;color:var(--muted)">No results</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="11" style="padding:1rem;text-align:center;color:var(--muted)">No results</td></tr>';
                     return;
                 }
                 tbody.innerHTML = sorted.map(r => {
@@ -2213,6 +2218,7 @@
                         '<td>' + (r.earnings_week_move_pct !== null ? r.earnings_week_move_pct.toFixed(2) + '%' : 'N/A') + '</td>' +
                         '<td>' + (r.prev_quarter_earnings_score !== null ? r.prev_quarter_earnings_score + '/9' : 'N/A') + '</td>' +
                         '<td class="' + trendCls + '">' + trend + '</td>' +
+                        '<td>' + this.renderConsensusBadge(r.ticker, this.currentMarket) + '</td>' +
                         '<td><span class="signal-badge ' + (mom > 3 ? 'price-positive' : mom < -3 ? 'price-negative' : '') + '">' + signal + '</span></td>' +
                         '</tr>';
                 }).join('');
@@ -2384,6 +2390,11 @@
                     } else if (this.swingSortKey === 'kronos_return') {
                         va = (a.kronos_prediction && a.kronos_prediction.return_pct != null) ? a.kronos_prediction.return_pct : -Infinity;
                         vb = (b.kronos_prediction && b.kronos_prediction.return_pct != null) ? b.kronos_prediction.return_pct : -Infinity;
+                    } else if (this.swingSortKey === 'consensus_strength') {
+                        const pA = this.consensusMap[(a.ticker || '').toUpperCase()] || {};
+                        const pB = this.consensusMap[(b.ticker || '').toUpperCase()] || {};
+                        va = pA.consensus_strength != null ? pA.consensus_strength : -Infinity;
+                        vb = pB.consensus_strength != null ? pB.consensus_strength : -Infinity;
                     } else if (this.swingSortKey === 'earnings_date') {
                         va = a.earnings_date ? new Date(a.earnings_date) : new Date(8640000000000000);
                         vb = b.earnings_date ? new Date(b.earnings_date) : new Date(8640000000000000);
@@ -2397,7 +2408,7 @@
                 });
 
                 if (!list.length) {
-                    if (tbody) tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--muted)">No stocks match the selected filter.</td></tr>';
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:2rem;color:var(--muted)">No stocks match the selected filter.</td></tr>';
                     if (widgetEl) widgetEl.innerHTML = '<div class="card" style="grid-column:1/-1;margin:0">No stocks match the selected filter.</div>';
                     return;
                 }
@@ -2506,6 +2517,9 @@
                             aiColHtml = '<button class="btn btn-sm" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)" style="padding:0.2rem 0.5rem;font-size:0.72rem;background:rgba(59,130,246,0.22);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);" title="Run AI News, World Events & Volume synthesis for ' + (r.ticker || '') + '">🧠 AI Thesis</button>';
                         }
 
+                        // AI Consensus Column
+                        const consensusColHtml = this.renderConsensusBadge(r.ticker, currentMarket);
+
                         // Row styling: Green row if in buy zone
                         const rowStyle = isBz
                             ? 'background:rgba(16,185,129,0.08);border-left:4px solid #10b981;'
@@ -2531,6 +2545,7 @@
                             '<td>' + (r.prev_quarter_earnings_score !== null ? r.prev_quarter_earnings_score + '/9' : '—') + '</td>' +
                             '<td>' + kronosColHtml + '</td>' +
                             '<td>' + aiColHtml + '</td>' +
+                            '<td>' + consensusColHtml + '</td>' +
                             '<td><span class="timestamp">' + (r.earnings_date || '—') + '</span></td>' +
                             '<td style="text-align:right;">' +
                                 '<div style="display:flex;justify-content:flex-end;gap:0.3rem;align-items:center;">' +
@@ -3322,6 +3337,163 @@
                         btn.disabled = false;
                         btn.innerHTML = origHtml;
                     }
+                }
+            },
+
+            // =========================================================================
+            // 🤖 AI Multi-Model Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral)
+            // =========================================================================
+            async loadConsensusCache() {
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/consensus/latest?limit=500');
+                    const data = await res.json();
+                    if (data && data.predictions) {
+                        data.predictions.forEach(p => {
+                            if (p.ticker) {
+                                this.consensusMap[p.ticker.toUpperCase()] = p;
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Failed to load consensus cache:', e);
+                }
+            },
+
+            renderConsensusBadge(ticker, market) {
+                if (!ticker) return '—';
+                const sym = String(ticker).trim().toUpperCase();
+                const pred = this.consensusMap[sym];
+                const safeMarket = (market || this.currentMarket || 'ALL').replace(/'/g, "\\'");
+                const safeSym = sym.replace(/'/g, "\\'");
+                const domId = 'consensus-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
+
+                if (pred && pred.consensus_direction) {
+                    const dir = (pred.consensus_direction || 'NEUTRAL').toUpperCase();
+                    const isBull = dir.includes('BULL');
+                    const isBear = dir.includes('BEAR');
+                    const color = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
+                    const bg = isBull ? 'rgba(16,185,129,0.18)' : isBear ? 'rgba(239,68,68,0.18)' : 'rgba(251,191,36,0.18)';
+                    const border = isBull ? 'rgba(16,185,129,0.35)' : isBear ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)';
+                    
+                    const retPct = pred.consensus_return_pct != null ? pred.consensus_return_pct : (pred.expected_move_pct != null ? pred.expected_move_pct : null);
+                    const retStr = retPct != null ? ((retPct > 0 ? '+' : '') + Number(retPct).toFixed(1) + '%') : '';
+                    const strength = pred.consensus_strength != null ? Math.round(pred.consensus_strength) + '%' : '';
+                    const agreeRatio = pred.agreement_ratio != null ? Math.round(pred.agreement_ratio * 100) : (pred.agreement_rate ? Math.round(pred.agreement_rate * 100) : null);
+                    const action = pred.consensus_recommended_action || (isBull ? 'BUY' : isBear ? 'SELL' : 'HOLD');
+                    
+                    const titleText = 'DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral: ' + dir + (retStr ? ' (' + retStr + ')' : '') +
+                        (agreeRatio ? ' · ' + agreeRatio + '% Agreement' : '') +
+                        (strength ? ' · ' + strength + ' Strength' : '') +
+                        (action ? ' · Stance: ' + action : '') +
+                        ' (Click to view full price action & 5-pillar targets)';
+
+                    return '<div id="' + domId + '" style="display:inline-flex;align-items:center;gap:0.35rem;">' +
+                        '<span class="signal-badge" style="background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';font-size:0.72rem;padding:0.18rem 0.5rem;font-weight:700;cursor:pointer;" onclick="event.stopPropagation(); app.openAiDetails(\'' + safeMarket + '\', \'' + safeSym + '\', event)" title="' + titleText.replace(/"/g, '&quot;') + '">' +
+                        '🤖 ' + dir + (retStr ? ' ' + retStr : '') +
+                        '</span>' +
+                        '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(99,102,241,0.18);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);border-radius:0.3rem;" title="Re-run 4-Model AI Consensus for ' + safeSym + '">⚡</button>' +
+                        '</div>';
+                } else {
+                    return '<div id="' + domId + '">' +
+                        '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.18rem 0.45rem;font-size:0.7rem;background:linear-gradient(135deg, rgba(99,102,241,0.18), rgba(168,85,247,0.18));color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:0.3rem;font-weight:600;" title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model consensus for ' + safeSym + '">⚡ AI Consensus</button>' +
+                        '</div>';
+                }
+            },
+
+            async runConsensusForTicker(ticker, btnEl) {
+                if (!ticker) return;
+                const sym = String(ticker).trim().toUpperCase();
+                const oldHtml = btnEl ? btnEl.innerHTML : '';
+                if (btnEl) {
+                    btnEl.disabled = true;
+                    btnEl.innerHTML = '<span class="loading-spinner" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#c084fc;animation:spin 0.8s linear infinite;"></span>';
+                }
+                
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/consensus/predict', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ticker: sym, timeframe_days: 14 })
+                    });
+                    const data = await res.json();
+                    if (data && data.results && data.results.length) {
+                        const pred = data.results[0];
+                        if (pred && !pred.error) {
+                            this.consensusMap[sym] = pred;
+                            
+                            // Update all cells matching this ticker across any open table
+                            const domId = 'consensus-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
+                            const cells = document.querySelectorAll('[id="' + domId + '"]');
+                            const newHtml = this.renderConsensusBadge(sym, this.currentMarket || 'ALL');
+                            cells.forEach(el => {
+                                el.outerHTML = newHtml;
+                            });
+                            
+                            if (typeof this.showToast === 'function') {
+                                this.showToast('✨ AI Consensus for ' + sym + ': ' + (pred.consensus_direction || 'DONE') + ' (' + (pred.consensus_strength || 80) + '% strength)');
+                            }
+                            return pred;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error running on-demand consensus for ' + sym + ':', e);
+                    if (typeof this.showToast === 'function') {
+                        this.showToast('Failed running consensus for ' + sym + ': ' + e.message, 'error');
+                    }
+                } finally {
+                    if (btnEl && btnEl.isConnected) {
+                        btnEl.disabled = false;
+                        btnEl.innerHTML = oldHtml;
+                    }
+                }
+            },
+
+            async predictAllConsensus(e) {
+                const btn = (e && e.target) ? e.target : document.getElementById('swingConsensusAllBtn');
+                const origHtml = btn ? btn.innerHTML : '🤖 Consensus All';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '⏳ Scanning stocks in view...';
+                }
+                
+                // Find all visible tickers on the active tables
+                const tickers = [];
+                const rows = document.querySelectorAll('#swingTableBody tr strong, #resultsTable tr strong, #topGainersTableBody tr strong, #upcomingSetupsTableBody tr strong, #scannerCandidatesTableBody tr strong, #patStocksTable tr strong');
+                rows.forEach(r => {
+                    const text = r.textContent.trim().toUpperCase();
+                    if (text && text !== '?' && text !== '—' && !tickers.includes(text) && text.length <= 15 && !text.includes('NO CANDIDATES') && !text.includes('NO RESULTS')) {
+                        tickers.push(text);
+                    }
+                });
+
+                if (!tickers.length) {
+                    if (typeof this.showToast === 'function') this.showToast('No stocks found in current view to predict.', 'info');
+                    else alert('No stocks found in current view to predict.');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }
+                    return;
+                }
+
+                let completed = 0;
+                const total = tickers.length;
+                for (const ticker of tickers) {
+                    if (btn) {
+                        btn.innerHTML = '🤖 Consensus ' + (completed + 1) + '/' + total + ' (' + ticker + ')...';
+                    }
+                    await this.runConsensusForTicker(ticker, null);
+                    completed++;
+                }
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+                if (typeof this.showToast === 'function') {
+                    this.showToast('✨ Completed AI Consensus for ' + total + ' stocks!');
+                } else {
+                    alert('✨ Completed AI Consensus for ' + total + ' stocks!');
                 }
             },
 
@@ -5692,7 +5864,7 @@
                 const tbody = document.getElementById('patStocksTable');
                 const rows = this._patTodayRows || [];
                 if (!rows.length) {
-                    tbody.innerHTML = '<tr><td colspan="11" style="padding:1rem;text-align:center;color:var(--muted)">No earnings today in the selected range.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="13" style="padding:1rem;text-align:center;color:var(--muted)">No earnings today in the selected range.</td></tr>';
                     return;
                 }
                 const sorted = [...rows].sort((a, b) => {
@@ -5720,6 +5892,7 @@
                     '<td>' + resultBadge(r.result_class) + '</td>' +
                     '<td class="' + cls(r.reaction_return_pct, true) + '">' + (r.reaction_return_pct !== null && r.reaction_return_pct !== undefined ? r.reaction_return_pct.toFixed(2) + '%' : '—') + '</td>' +
                     '<td>' + fmt(r.day_open) + '</td><td>' + fmt(r.day_high) + '</td><td>' + fmt(r.day_low) + '</td><td>' + fmt(r.day_close) + '</td>' +
+                    '<td>' + this.renderConsensusBadge(r.ticker, 'IN') + '</td>' +
                     '<td>' + badge(r.dipped) + '</td>' +
                     '<td>' + badge(r.comeback_50) + '</td>' +
                     '<td>' + badge(r.kept_dipping) + '</td>' +

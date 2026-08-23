@@ -96,6 +96,21 @@ def _connect(settings: Settings) -> Any:
 
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS tickers (
+            ticker TEXT PRIMARY KEY,
+            company_name TEXT,
+            industry TEXT,
+            sector TEXT,
+            market_cap REAL,
+            current_price REAL,
+            earnings_fetched_at TEXT,
+            prices_fetched_at TEXT,
+            last_updated TEXT
+        )
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS earnings_fetch_log (
             fetch_date TEXT NOT NULL PRIMARY KEY,
             fetched_at TEXT NOT NULL,

@@ -246,12 +246,27 @@ def test_get_recent_results_momentum_30d_with_long_series(settings):
 def _seed_industry(settings, rows):
     conn = sqlite3.connect(str(_db_path(settings)))
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS ticker_industry (ticker TEXT PRIMARY KEY, industry TEXT, sector TEXT, fetched_at TEXT)"
+        """
+        CREATE TABLE IF NOT EXISTS tickers (
+            ticker TEXT PRIMARY KEY,
+            company_name TEXT,
+            industry TEXT,
+            sector TEXT,
+            market_cap REAL,
+            current_price REAL,
+            earnings_fetched_at TEXT,
+            prices_fetched_at TEXT,
+            last_updated TEXT
+        )
+        """
     )
     for ticker, industry, sector in rows:
         conn.execute(
-            "INSERT OR REPLACE INTO ticker_industry (ticker, industry, sector, fetched_at) VALUES (?, ?, ?, ?)",
-            (ticker, industry, sector, "2026-05-01 00:00:00"),
+            """
+            INSERT INTO tickers (ticker, industry, sector) VALUES (?, ?, ?)
+            ON CONFLICT(ticker) DO UPDATE SET industry = excluded.industry, sector = excluded.sector
+            """,
+            (ticker, industry, sector),
         )
     conn.commit()
     conn.close()
@@ -266,7 +281,9 @@ def test_get_recent_results_includes_industry(settings):
     assert res["rows"][0]["industry"] == "Software—Infrastructure"
 
 
-def test_get_recent_results_industry_missing_is_none(settings):
+def test_get_recent_results_industry_missing_is_none(settings, monkeypatch):
+    from earnings_engine.data import industry as industry_mod
+    monkeypatch.setattr(industry_mod, "_fetch_for_ticker", lambda t: (t, None, None))
     closes = [99, 100, 110, 120, 118, 112, 110, 111, 112, 109]
     _seed(settings, [("NODATA.NS", "2026-05-14", closes)], _now())
     res = get_recent_results(["NODATA.NS"], settings, now=_now())
@@ -464,8 +481,28 @@ def test_prices_recent_enough_after_market_uses_cache(settings, monkeypatch):
             return cls(cls.fixed.year, cls.fixed.month, cls.fixed.day, cls.fixed.hour, cls.fixed.minute, cls.fixed.second)
 
     conn = prices_mod._connect(settings)
-    conn.execute("INSERT OR REPLACE INTO price_fetch_log (ticker, fetched_at) VALUES (?,?)",
-                 ("OLDAM2.NS", (_dt.datetime(2026, 5, 15, 17, 0) - _dt.timedelta(days=1)).isoformat()))
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tickers (
+            ticker TEXT PRIMARY KEY,
+            company_name TEXT,
+            industry TEXT,
+            sector TEXT,
+            market_cap REAL,
+            current_price REAL,
+            earnings_fetched_at TEXT,
+            prices_fetched_at TEXT,
+            last_updated TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO tickers (ticker, prices_fetched_at) VALUES (?, ?)
+        ON CONFLICT(ticker) DO UPDATE SET prices_fetched_at = excluded.prices_fetched_at
+        """,
+        ("OLDAM2.NS", (_dt.datetime(2026, 5, 15, 17, 0) - _dt.timedelta(days=1)).isoformat()),
+    )
     conn.commit()
     conn.close()
     monkeypatch.setattr(prices_mod, "datetime", _Fixed)
@@ -484,8 +521,28 @@ def test_prices_recent_enough_stale_during_trading_refetches(settings, monkeypat
             return cls(cls.fixed.year, cls.fixed.month, cls.fixed.day, cls.fixed.hour, cls.fixed.minute, cls.fixed.second)
 
     conn = prices_mod._connect(settings)
-    conn.execute("INSERT OR REPLACE INTO price_fetch_log (ticker, fetched_at) VALUES (?,?)",
-                 ("STALE2.NS", (_dt.datetime(2026, 5, 15, 12, 0) - _dt.timedelta(days=1)).isoformat()))
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tickers (
+            ticker TEXT PRIMARY KEY,
+            company_name TEXT,
+            industry TEXT,
+            sector TEXT,
+            market_cap REAL,
+            current_price REAL,
+            earnings_fetched_at TEXT,
+            prices_fetched_at TEXT,
+            last_updated TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO tickers (ticker, prices_fetched_at) VALUES (?, ?)
+        ON CONFLICT(ticker) DO UPDATE SET prices_fetched_at = excluded.prices_fetched_at
+        """,
+        ("STALE2.NS", (_dt.datetime(2026, 5, 15, 12, 0) - _dt.timedelta(days=1)).isoformat()),
+    )
     conn.commit()
     conn.close()
     monkeypatch.setattr(prices_mod, "datetime", _Fixed)

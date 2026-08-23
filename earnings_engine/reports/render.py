@@ -359,6 +359,7 @@ def _build_ledger_table(rows: list[str], day_class: str = "") -> str:
         "<th>30D Ret</th><th>Q1 Wk H/L</th><th>Q2 Wk H/L</th><th>Q3 Wk H/L</th>"
         "<th>52W H/L</th><th>Quality</th><th>3Q Avg</th><th>Resist</th><th>Support</th>"
         "<th>Kronos 14D</th><th>GBM</th>"
+        '<th style="text-align:center;">AI Consensus</th>'
         "<th>Actions</th>"
         "</tr></thead>"
         f"<tbody>{''.join(rows)}</tbody>"
@@ -522,6 +523,13 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
 
     day_classes = _assign_day_classes(enriched)
     day_legend = _build_day_legend(day_classes)
+
+    # Load latest consensus predictions for all tickers
+    try:
+        from earnings_engine.consensus import storage as consensus_storage
+        latest_consensus_preds = {p["ticker"]: p for p in consensus_storage.get_predictions(limit=1000)}
+    except Exception:
+        latest_consensus_preds = {}
 
     # Group rows by day, then by cap category
     day_groups: dict[str, dict[str, list]] = {}
@@ -807,6 +815,39 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
         }
         popup_html = _render_template("popup.html", **popup_values)
 
+        # AI Consensus Badge
+        pred = latest_consensus_preds.get(ticker)
+        if pred and pred.get("consensus_direction"):
+            dir_str = str(pred["consensus_direction"]).upper()
+            is_bull = "BULL" in dir_str
+            is_bear = "BEAR" in dir_str
+            dir_color = "#34d399" if is_bull else ("#f87171" if is_bear else "#fbbf24")
+            dir_bg = "rgba(16,185,129,0.18)" if is_bull else ("rgba(239,68,68,0.18)" if is_bear else "rgba(251,191,36,0.18)")
+            ret_val = pred.get("consensus_return_pct")
+            ret_disp = f" ({'+' if ret_val > 0 else ''}{ret_val:.1f}%)" if ret_val is not None else ""
+            clean_dom_id = "consensus-cell-" + re.sub(r"[^A-Za-z0-9]", "_", ticker)
+            consensus_badge = (
+                f'<div id="{clean_dom_id}" style="display:inline-flex;align-items:center;gap:0.35rem;">'
+                f'<span class="signal-badge" style="background:{dir_bg};color:{dir_color};border:1px solid {dir_color}55;font-size:0.72rem;padding:0.18rem 0.5rem;font-weight:700;cursor:pointer;" '
+                f'onclick="event.stopPropagation(); app.openAiDetails(\'ALL\', \'{ticker}\', event)" '
+                f'title="DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral: {dir_str}{ret_disp}">'
+                f'🤖 {dir_str}{ret_disp}'
+                f'</span>'
+                f'<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'{ticker}\', this)" '
+                f'style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(99,102,241,0.18);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);border-radius:0.3rem;" '
+                f'title="Re-run 4-Model AI Consensus for {ticker}">⚡</button>'
+                f'</div>'
+            )
+        else:
+            clean_dom_id = "consensus-cell-" + re.sub(r"[^A-Za-z0-9]", "_", ticker)
+            consensus_badge = (
+                f'<div id="{clean_dom_id}">'
+                f'<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'{ticker}\', this)" '
+                f'style="padding:0.18rem 0.45rem;font-size:0.7rem;background:linear-gradient(135deg, rgba(99,102,241,0.18), rgba(168,85,247,0.18));color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:0.35rem;cursor:pointer;font-weight:600;" '
+                f'title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model consensus for {ticker}">⚡ AI Consensus</button>'
+                f'</div>'
+            )
+
         row_values = {
             "ticker": ticker,
             "row_ticker_id": re.sub(r"[^a-zA-Z0-9]", "_", ticker),
@@ -827,6 +868,7 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             "current_support": current_support,
             "kronos_14d": kronos_14d,
             "gbm_prediction": gbm_prediction,
+            "consensus_badge": consensus_badge,
         }
         row_html = _render_template("result_row.html", **row_values)
 
