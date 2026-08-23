@@ -496,17 +496,14 @@
             },
 
             async init() {
-                this.loadSearchTickers();
                 await this.loadOverview();
                 this._bindWatchlistSelectionPersistence();
                 this._restoreBdControls();
                 this._restorePatternsControls();
-                this.watchlistTab.load();
                 this.populateWatchlistDropdowns();
                 
                 const initialTab = this.getInitialTab();
                 this.switchTab(initialTab, true);
-                this.pg.init();
 
                 window.addEventListener('hashchange', () => {
                     const tab = this.getInitialTab();
@@ -676,8 +673,6 @@
                     localStorage.setItem('dashboard_active_tab', name);
                 } catch (e) {}
 
-                // Keep every market/watchlist dropdown synced with the user's watchlists
-                if (this.populateWatchlistDropdowns) this.populateWatchlistDropdowns();
                 if (name === 'watchlist') this.watchlistTab.load();
                 if (name === 'results') this.loadResultsReport();
                 if (name === 'monthfilter') this.loadMonthFilterTab();
@@ -690,7 +685,13 @@
                 if (name === 'patterns') this.loadPatterns();
                 if (name === 'buydip') this.loadRecentResults();
                 if (name === 'kronos') this.maybeShowKronosPrompt();
-                if (name === 'playground') this.loadPlaygroundNse();
+                if (name === 'playground') {
+                    if (!this.pg._initialized) {
+                        this.pg.init();
+                        this.pg._initialized = true;
+                    }
+                    this.loadPlaygroundNse();
+                }
                 if (name === 'backtest') this.initBacktestTab();
             },
 
@@ -1395,34 +1396,6 @@
             _universeCounts: {},
             _countsLoaded: false,
 
-            async _refreshUniverseCounts(force = false) {
-                if (this._countsLoaded && !force && Object.keys(this._universeCounts).length > 0) {
-                    return;
-                }
-
-                const jobs = this._BUILTINS.map(async b => {
-                    let count = null;
-                    try {
-                        if (b.value === 'WATCHLIST') {
-                            const r = await fetch(API_BASE + '/api/v1/watchlist?name=my_watchlist');
-                            const d = await r.json();
-                            count = (d && d.tickers && d.tickers.length) || 0;
-                        } else if (b.value !== 'ALL') {
-                            const d = await this.getUniverse(b.value, force);
-                            count = d && d.count != null ? d.count : (d.tickers && d.tickers.length) || 0;
-                        }
-                    } catch (e) { count = null; }
-                    return { value: b.value, count };
-                });
-                const results = await Promise.all(jobs);
-                const counts = {};
-                results.forEach(r => { counts[r.value] = r.count; });
-                // "All Markets" = IN + US combined when both are known.
-                if (counts['IN'] != null && counts['US'] != null) counts['ALL'] = counts['IN'] + counts['US'];
-                this._universeCounts = counts;
-                this._countsLoaded = true;
-            },
-
             _builtinLabel(value) {
                 const b = this._BUILTINS.find(x => x.value === value);
                 if (!b) return value;
@@ -1430,35 +1403,34 @@
                 return c != null ? (b.label + ' (' + c + ')') : b.label;
             },
 
-                        WATCHLIST_DROPDOWN_IDS: ['resultsMarket', 'swingMarket', 'coverageMarket', 'indMarket', 'bdMarket', 'patternsMarket'],
+            WATCHLIST_DROPDOWN_IDS: ['resultsMarket', 'swingMarket', 'coverageMarket', 'indMarket', 'bdMarket', 'patternsMarket'],
             WATCHLIST_BUILTIN_NAMES: ['ALL', 'WATCHLIST', 'IN', 'US', 'NSE_LARGE_CAP', 'NSE_ALL'],
 
             async populateWatchlistDropdowns() {
-                // Rebuild every market filter (Results, Swing, Data Coverage, Industries,
-                // Buy the Dip, Patterns) so it lists ALL selectable universes — the
-                // built-in ones AND the user-created watchlists — each showing its stock
-                // count, then restores the last-selected value (or a per-tab default).
-                //
-                // The user watchlists are fetched FIRST (fast, SQLite) and rendered
-                // immediately, so the dropdowns are populated even if the live universe
-                // counts are slow/unavailable. Counts are refreshed in the background
-                // afterwards and the labels re-rendered on completion.
-                let lists = [];
                 try {
-                    const res = await fetch(API_BASE + '/api/v1/watchlist/list');
+                    const res = await fetch(API_BASE + '/api/v1/watchlist/all');
                     const data = await res.json();
-                    lists = (data.watchlists || []).filter(
+                    const watchlists = data.watchlists || [];
+                    const universes = data.universes || [];
+
+                    const counts = {};
+                    universes.forEach(u => {
+                        counts[u.name] = (u.tickers && u.tickers.length) || u.count || 0;
+                    });
+                    if (counts['IN'] != null && counts['US'] != null) {
+                        counts['ALL'] = counts['IN'] + counts['US'];
+                    }
+                    this._universeCounts = counts;
+                    this._countsLoaded = true;
+
+                    const customLists = watchlists.filter(
                         w => w && w.name && !this.WATCHLIST_BUILTIN_NAMES.includes(w.name)
                     );
+                    this._renderWatchlistDropdowns(customLists);
+                    if (this.populateKronosWatchlist) { this.populateKronosWatchlist(); }
                 } catch (e) {
-                    console.error('Error loading watchlists for dropdown:', e);
+                    console.error('Error loading watchlist dropdowns:', e);
                 }
-                this._renderWatchlistDropdowns(lists);
-                // Background: refresh counts and re-render labels (non-fatal if slow).
-                try { await this._refreshUniverseCounts(); } catch (e) { /* non-fatal */ }
-                this._renderWatchlistDropdowns(lists);
-                // Always keep the Kronos watchlist dropdown in sync too.
-                if (this.populateKronosWatchlist) { this.populateKronosWatchlist(); }
             },
 
             _renderWatchlistDropdowns(lists) {
@@ -5921,9 +5893,16 @@
         const dropdown = document.getElementById('autocompleteDropdown');
         let selectedIndex = -1;
 
-        searchInput.addEventListener('input', (e) => {
+        searchInput.addEventListener('focus', () => {
+            if (!app.allTickers.length) app.loadSearchTickers();
+        });
+
+        searchInput.addEventListener('input', async (e) => {
             const query = e.target.value.trim().toUpperCase();
             if (query.length < 1) { dropdown.style.display = 'none'; return; }
+            if (!app.allTickers.length) {
+                await app.loadSearchTickers();
+            }
             const matches = app.allTickers.filter(t => t.toUpperCase().includes(query)).slice(0, 20);
             if (matches.length) {
                 selectedIndex = -1;
