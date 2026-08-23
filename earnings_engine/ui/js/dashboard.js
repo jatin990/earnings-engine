@@ -7604,7 +7604,6 @@
                 tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;color:var(--red);padding:1.5rem;">Error loading telemetry: ${(e.message || e)}</td></tr>`;
             }
         };
-        };
 
         app.clearAccessAudit = async function() {
             if (!confirm('Are you sure you want to clear system telemetry records?')) return;
