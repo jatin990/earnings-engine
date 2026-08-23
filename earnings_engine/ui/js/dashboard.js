@@ -4559,8 +4559,10 @@
                     }
 
                     // Pre-fill input fields
-                    setEl('srModalLower', 'value', rng.lower_bound != null ? rng.lower_bound : (autoLower != null ? autoLower : ''));
-                    setEl('srModalUpper', 'value', rng.upper_bound != null ? rng.upper_bound : (autoUpper != null ? autoUpper : ''));
+                    const curLower = rng.lower_bound != null ? Number(rng.lower_bound) : (autoLower != null ? Number(autoLower) : null);
+                    const curUpper = rng.upper_bound != null ? Number(rng.upper_bound) : (autoUpper != null ? Number(autoUpper) : null);
+                    setEl('srModalLower', 'value', curLower != null ? curLower.toFixed(2) : '');
+                    setEl('srModalUpper', 'value', curUpper != null ? curUpper.toFixed(2) : '');
                     setEl('srModalCycles', 'value', rng.cycles != null ? rng.cycles : (autoCycles || ''));
                     setEl('srModalAvgDays', 'value', rng.avg_cycle_days != null ? (rng.avg_cycle_days.toFixed(1) + ' days') : (autoAvgDays > 0 ? (autoAvgDays.toFixed(1) + ' days') : '—'));
 
@@ -4614,16 +4616,17 @@
             fillFoundRange() {
                 if (this._detectedRange) {
                     if (this._detectedRange.lower != null) {
-                        document.getElementById('srModalLower').value = this._detectedRange.lower;
+                        document.getElementById('srModalLower').value = Number(this._detectedRange.lower).toFixed(2);
                     }
                     if (this._detectedRange.upper != null) {
-                        document.getElementById('srModalUpper').value = this._detectedRange.upper;
+                        document.getElementById('srModalUpper').value = Number(this._detectedRange.upper).toFixed(2);
                     }
                     if (this._detectedRange.cycles != null) {
                         document.getElementById('srModalCycles').value = this._detectedRange.cycles;
                     }
                     if (this._detectedRange.avg_days != null) {
-                        document.getElementById('srModalAvgDays').value = this._detectedRange.avg_days > 0 ? (this._detectedRange.avg_days.toFixed(1) + ' days') : '—';
+                        const avgEl = document.getElementById('srModalAvgDays');
+                        if (avgEl) avgEl.value = this._detectedRange.avg_days > 0 ? (Number(this._detectedRange.avg_days).toFixed(1) + ' days') : '—';
                     }
                 }
             },

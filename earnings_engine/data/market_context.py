@@ -228,8 +228,8 @@ def detect_swing_range(closes: pd.Series) -> dict[str, Any]:
                             "start": start_date_val,
                             "end": date_str,
                             "duration": float(duration_days),
-                            "lower": min_p if min_p is not None else lower,
-                            "upper": max_p if max_p is not None else upper,
+                            "lower": round(float(min_p), 2) if min_p is not None else lower,
+                            "upper": round(float(max_p), 2) if max_p is not None else upper,
                         })
                     state = "low"
                     start_date_val = date_str
