@@ -34,8 +34,14 @@ def _get_db_path(settings: Settings | None = None) -> Path:
     return _cache_path(s)
 
 
+_MULTIMODAL_DB_INITED = False
+
+
 def init_multimodal_db(settings: Settings | None = None) -> None:
-    """Initialize the table for AI multi-modal predictions."""
+    """Initialize the table for AI multi-modal predictions once per process."""
+    global _MULTIMODAL_DB_INITED
+    if _MULTIMODAL_DB_INITED:
+        return
     conn = get_db_connection(settings)
     with conn:
         conn.execute("""
@@ -58,6 +64,7 @@ def init_multimodal_db(settings: Settings | None = None) -> None:
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_news_ticker ON ai_news_predictions (ticker)")
         conn.commit()
+    _MULTIMODAL_DB_INITED = True
 
 
 def store_ai_prediction(ticker: str, payload: dict[str, Any], settings: Settings | None = None) -> None:

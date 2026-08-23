@@ -266,8 +266,9 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
     if not tickers:
         return df.copy()
 
+    t0_enrich = time.perf_counter()
     # Pre-fetch cached market caps, names, metrics, earnings, and prices in bulk
-    all_market_caps = load_all_market_caps(settings) if not force else {}
+    all_market_caps: dict[str, float] = {}
     names_map: dict[str, str] = {}
     metrics_map: dict[str, dict[str, Any]] = {}
     earnings_map: dict[str, pd.DataFrame] = {}
@@ -282,6 +283,11 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
         # 1. Names
         name_rows = conn.execute(f"SELECT ticker, name FROM ticker_names WHERE ticker IN ({placeholders})", tickers).fetchall()
         names_map = {r[0]: r[1] for r in name_rows}
+
+        # 1b. Market Caps (targeted)
+        if not force:
+            mcap_rows = conn.execute(f"SELECT ticker, market_cap FROM ticker_market_cap WHERE ticker IN ({placeholders})", tickers).fetchall()
+            all_market_caps = {r[0]: float(r[1]) for r in mcap_rows if r[1] is not None}
         
         # 2. Metrics
         if not force:
@@ -322,6 +328,8 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             prices_map[t] = f
     except Exception:
         pass
+
+    t1_bulk = time.perf_counter()
 
     rows: list[dict] = []
     for ticker in tickers:
@@ -762,4 +770,12 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
     # multiple times (e.g. from both yfinance and nse sources), the merge
     # doesn't create a cartesian product.
     context = context.drop_duplicates(subset=["ticker"], keep="first")
+    t2_loop = time.perf_counter()
+    logger.info(
+        "[ENRICH-PROFILER] Total: %.1fms | bulk_db_queries: %.1fms | loop_processing: %.1fms (%d tickers)",
+        (t2_loop - t0_enrich) * 1000,
+        (t1_bulk - t0_enrich) * 1000,
+        (t2_loop - t1_bulk) * 1000,
+        len(tickers),
+    )
     return df.merge(context, on="ticker", how="left")

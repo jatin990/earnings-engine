@@ -418,8 +418,10 @@ def get_event_dataset_summary() -> dict[str, Any]:
 @ttl_cache(seconds=60)
 def get_swing_setups(market: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
     """Get swing setups with support/resistance and momentum data."""
+    t_start = time.perf_counter()
     settings = _settings()
     tickers = _resolve_tickers(market)
+    t_resolve = time.perf_counter()
 
     # Pre-fetch upcoming earnings for the whole batch so each swing card can
     # show a real "Next Earnings" date (enrich_upcoming_results() alone does
@@ -438,6 +440,7 @@ def get_swing_setups(market: str | None = None, limit: int = 50) -> list[dict[st
                     )
     except Exception:
         upcoming_map = {}
+    t_upcoming = time.perf_counter()
 
     results = []
     wl_name = market or "ALL"
@@ -449,6 +452,7 @@ def get_swing_setups(market: str | None = None, limit: int = 50) -> list[dict[st
     except Exception as e:
         logger.warning("Failed batch enrich in get_swing_setups: %s", e)
         enriched_all = pd.DataFrame()
+    t_enrich = time.perf_counter()
 
     if enriched_all.empty:
         return results
@@ -464,6 +468,7 @@ def get_swing_setups(market: str | None = None, limit: int = 50) -> list[dict[st
     except Exception:
         stored_ranges_wl = {}
         stored_ranges_all = {}
+    t_ranges = time.perf_counter()
 
     missing_auto_ranges = []
 
@@ -559,12 +564,14 @@ def get_swing_setups(market: str | None = None, limit: int = 50) -> list[dict[st
             results.append(item)
         except Exception:
             continue
+    t_loop = time.perf_counter()
 
     if missing_auto_ranges:
         try:
             swing_ranges_mod.record_auto_ranges_bulk(wl_name, missing_auto_ranges, settings=settings)
         except Exception as e:
             logger.debug("Failed bulk recording auto swing ranges: %s", e)
+    t_bulk_save = time.perf_counter()
 
     # Enrich each swing setup with the latest multi-modal AI synthesis & news sentiment
     try:
@@ -576,8 +583,20 @@ def get_swing_setups(market: str | None = None, limit: int = 50) -> list[dict[st
                 r["ai_synthesis"] = all_ai_preds[sym]
     except Exception as e:
         logger.debug("Failed to attach AI synthesis to swing setups: %s", e)
+    t_ai = time.perf_counter()
 
     mark_refreshed("swing", rows=len(results))
+    logger.info(
+        "[SWING-PROFILER] Total: %.1fms | resolve: %.1fms | upcoming: %.1fms | enrich: %.1fms | ranges: %.1fms | loop: %.1fms | bulk_save: %.1fms | ai_synth: %.1fms",
+        (t_ai - t_start) * 1000,
+        (t_resolve - t_start) * 1000,
+        (t_upcoming - t_resolve) * 1000,
+        (t_enrich - t_upcoming) * 1000,
+        (t_ranges - t_enrich) * 1000,
+        (t_loop - t_ranges) * 1000,
+        (t_bulk_save - t_loop) * 1000,
+        (t_ai - t_bulk_save) * 1000,
+    )
     return results
 
 
