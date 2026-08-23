@@ -1,95 +1,56 @@
-<body>
-    <div class="container">
-        <!-- Top App Navigation & Controls Header -->
-        <header class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.15rem; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.75rem; position: relative; z-index: 1000; border-color: rgba(255,255,255,0.08); background: #07070b; box-shadow: 0 8px 30px rgba(0,0,0,0.9);">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <a href="/portal" class="btn" style="padding: 0.4rem 0.75rem; background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.3); color: #d8b4fe; border-radius: 0.5rem; transition: all 0.2s;" title="Switch App / Nexus Portal">
-                    <span>🧭</span>
-                    <span style="font-size: 0.74rem; font-weight: 700; letter-spacing: 0.02em;">Portal</span>
-                </a>
-                <a href="/credit-card" class="btn" style="padding: 0.4rem 0.75rem; background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.25); color: #7dd3fc; border-radius: 0.5rem; transition: all 0.2s;" title="Credit Card & Wealth Hub">
-                    <span>💳</span>
-                    <span style="font-size: 0.74rem; font-weight: 700; letter-spacing: 0.02em;">Cards</span>
-                </a>
-                <div>
-                    <h1 class="brand-title" style="margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em;">
-                        EARNINGS ENGINE // TERMINAL
-                    </h1>
-                    <div style="display: flex; align-items: center; gap: 0.4rem; margin-top: 0.15rem;">
-                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 8px #34d399;"></span>
-                        <span id="lastRefreshed" class="timestamp" style="font-size: 0.7rem; color: #71717a;">Loading status...</span>
-                    </div>
-                </div>
-            </div>
+<!-- ========================================================================= -->
+<!-- 🖤 VERCEL-STYLE STICKY TOPBAR HEADER -->
+<!-- ========================================================================= -->
+<header class="app-topbar">
+    
+    <!-- Left: Breadcrumb & Universe Selector -->
+    <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">
+        <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8125rem;">
+            <span style="color: #71717a;">engine</span>
+            <span style="color: #3f3f46;">/</span>
+            <span id="topbarBreadcrumbTab" style="color: #ededed; font-weight: 600; text-transform: capitalize;">Results</span>
+        </div>
 
-            <!-- Global Watchlist, Freshness Pill, Rate Limit Pill, User & Config -->
-            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                
-                <!-- Watchlist Selector -->
-                <div style="display: flex; align-items: center; gap: 0.4rem; background: #030305; padding: 0.3rem 0.65rem; border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.08);">
-                    <label for="globalWatchlist" style="font-size: 0.74rem; font-weight: 700; color: #c084fc; display: flex; align-items: center; gap: 0.3rem; white-space: nowrap;">
-                        <span>⭐ Universe:</span>
-                    </label>
-                    <select id="globalWatchlist" onchange="app.onGlobalWatchlistChange(this.value)" style="min-width: 190px; padding: 0.3rem 0.6rem; border: 1px solid rgba(255,255,255,0.12); border-radius: 0.4rem; background: #07070a; color: #f8fafc; font-size: 0.78rem; font-weight: 600; cursor: pointer; outline: none;" title="Active universe or watchlist across all dashboard tabs">
-                        <option value="">🌐 All Stocks (Global)</option>
-                    </select>
-                </div>
+        <!-- Global Watchlist / Universe Selector -->
+        <div style="display: flex; align-items: center; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 0.15rem 0.45rem;">
+            <label for="globalWatchlist" style="font-size: 0.72rem; color: #a1a1aa; margin-right: 0.3rem;">⭐</label>
+            <select id="globalWatchlist" onchange="app.onGlobalWatchlistChange(this.value)" style="background: transparent; border: none; color: #ededed; font-size: 0.75rem; font-weight: 500; cursor: pointer; outline: none; padding-right: 0.3rem;" title="Active universe or watchlist across all dashboard tabs">
+                <option value="">All Stocks (Global)</option>
+            </select>
+        </div>
+    </div>
 
-                <!-- Watchlist Earnings Freshness & On-Demand Refresh Pill -->
-                <div id="topEarningsFreshnessPill" style="display: flex; align-items: center; gap: 0.45rem; background: rgba(168,85,247,0.1); padding: 0.3rem 0.6rem; border-radius: 0.5rem; border: 1px solid rgba(168,85,247,0.25);" title="Last updated timestamp for active universe/watchlist earnings">
-                    <span style="font-size: 0.8rem;">📅</span>
-                    <div style="display: flex; flex-direction: column; line-height: 1.15;">
-                        <span id="topEarningsFreshnessLabel" style="font-size: 0.7rem; font-weight: 700; color: #34d399; font-family: var(--font-mono);">Earnings: Loading...</span>
-                        <span id="topEarningsFreshnessSub" style="font-size: 0.6rem; color: #a1a1aa;">Persistent Cache</span>
-                    </div>
-                    <button onclick="app.refreshCurrentWatchlistEarnings()" id="topRefreshEarningsBtn" class="btn-micro btn-micro-violet" style="padding: 0.18rem 0.4rem; font-size: 0.66rem;" title="Refresh earnings data for currently selected watchlist">
-                        🔄 Refresh
-                    </button>
-                </div>
+    <!-- Center: Global Stock Search with [/] shortcut -->
+    <div style="flex: 1; max-width: 420px; position: relative; margin: 0 0.5rem;">
+        <div style="position: relative; display: flex; align-items: center;">
+            <span style="position: absolute; left: 0.6rem; font-size: 0.75rem; color: #71717a;">🔍</span>
+            <input type="text" id="tickerSearch" placeholder="Search ticker (e.g., RELIANCE.NS, NVDA)..." style="width: 100%; padding: 0.32rem 1.8rem 0.32rem 1.8rem; background: #080808; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; color: #ededed; font-size: 0.76rem; font-family: var(--font-mono); outline: none; transition: border-color 0.15s ease;" autocomplete="off">
+            <span class="kbd-badge" style="position: absolute; right: 0.45rem;">/</span>
+        </div>
+        <div id="autocompleteDropdown" class="dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.9);"></div>
+    </div>
 
-                <!-- Rate Limits Pill -->
-                <div id="topRateLimitPill" onclick="app.openCustomizerModal('ratelimits')" style="display: flex; align-items: center; gap: 0.4rem; background: rgba(255,255,255,0.03); padding: 0.3rem 0.65rem; border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.08); cursor: pointer; transition: all 0.2s;" title="Click to view API rate limits & downstream quotas in Control Center">
-                    <span style="font-size: 0.85rem;">⚡</span>
-                    <div style="display: flex; flex-direction: column; line-height: 1.15;">
-                        <span id="topOpenRouterQuota" style="font-size: 0.7rem; font-weight: 700; color: #e2e8f0; font-family: var(--font-mono);">OpenRouter: 0/200</span>
-                        <span id="topRateLimitStatus" style="font-size: 0.6rem; color: #34d399; font-weight: 600;">🟢 Quotas Healthy</span>
-                    </div>
-                </div>
+    <!-- Right: Freshness Status, Rate Quota, Control Center -->
+    <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+        
+        <!-- Earnings Freshness Pill -->
+        <div id="topEarningsFreshnessPill" style="display: flex; align-items: center; gap: 0.35rem; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 0.2rem 0.5rem;" title="Last updated timestamp for active universe/watchlist earnings">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 6px #34d399;"></span>
+            <span id="topEarningsFreshnessLabel" style="font-size: 0.7rem; font-weight: 500; color: #34d399; font-family: var(--font-mono);">Earnings: Loading...</span>
+            <button onclick="app.refreshCurrentWatchlistEarnings()" id="topRefreshEarningsBtn" class="btn-micro" style="padding: 0.08rem 0.3rem; font-size: 0.62rem; margin-left: 0.2rem; background: rgba(255,255,255,0.06); color: #ededed;" title="Refresh earnings data">
+                🔄
+            </button>
+        </div>
 
-                <!-- User Profile & Key Pill -->
-                <div id="topUserPill" style="display: flex; align-items: center; gap: 0.35rem; background: rgba(16,185,129,0.08); padding: 0.3rem 0.65rem; border-radius: 0.5rem; border: 1px solid rgba(16,185,129,0.25);">
-                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 8px #34d399;"></span>
-                    <span id="topUserBadge" style="font-size: 0.72rem; font-weight: 700; color: #a7f3d0;">VIP Access</span>
-                </div>
+        <!-- OpenRouter API Quota Pill -->
+        <div id="topRateLimitPill" onclick="app.openCustomizerModal('ratelimits')" style="display: flex; align-items: center; gap: 0.35rem; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 0.22rem 0.5rem; cursor: pointer;" title="Click to view API rate limits & quotas in Control Center">
+            <span style="font-size: 0.72rem;">⚡</span>
+            <span id="topOpenRouterQuota" style="font-size: 0.7rem; font-weight: 600; color: #e2e8f0; font-family: var(--font-mono);">0/200</span>
+        </div>
 
-                <button onclick="app.openCustomizerModal()" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.74rem; font-weight: 700; display: flex; align-items: center; gap: 0.3rem; cursor: pointer;" title="Customize visible tabs, color themes, and environment variables">⚙️ Control Center</button>
-            </div>
-        </header>
-
-        <!-- Search Bar -->
-        <section class="card" style="padding: 0.65rem 0.85rem;">
-            <div class="search-wrap">
-                <input type="text" id="tickerSearch" placeholder="🔍 Search stock symbol (e.g., AAPL, RELIANCE.NS, NVDA)..." style="width: 100%; padding: 0.55rem 0.95rem; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.5rem; background: #030305; color: var(--light); font-size: 0.85rem; font-family: var(--font-mono); outline: none;" autocomplete="off">
-                <div id="autocompleteDropdown" class="dropdown"></div>
-            </div>
-        </section>
-
-        <!-- Navigation Tabs -->
-        <section class="card" style="padding: 0.65rem 0.85rem; display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center;">
-            <button id="tabBtn-results" data-tab="results" class="tab-btn active" onclick="app.switchTab('results')">📊 Results</button>
-            <button id="tabBtn-monthfilter" data-tab="monthfilter" class="tab-btn" onclick="app.switchTab('monthfilter')">🗓️ Month Filter</button>
-            <button id="tabBtn-scanner" data-tab="scanner" class="tab-btn" onclick="app.switchTab('scanner')">🔍 Scanner</button>
-            <button id="tabBtn-catalysts" data-tab="catalysts" class="tab-btn" onclick="app.switchTab('catalysts')">📰 Catalysts</button>
-            <button id="tabBtn-gainers" data-tab="gainers" class="tab-btn" onclick="app.switchTab('gainers')">🚀 Gainers & Patterns</button>
-            <button id="tabBtn-swing" data-tab="swing" class="tab-btn" onclick="app.switchTab('swing')">🔄 Swing</button>
-            <button id="tabBtn-kronos" data-tab="kronos" class="tab-btn" onclick="app.switchTab('kronos')">🤖 Kronos</button>
-            <button id="tabBtn-consensus" data-tab="consensus" class="tab-btn" onclick="app.switchTab('consensus')">🧠 AI Consensus</button>
-            <button id="tabBtn-playground" data-tab="playground" class="tab-btn" onclick="app.switchTab('playground')">🧪 Playground</button>
-            <button id="tabBtn-coverage" data-tab="coverage" class="tab-btn" onclick="app.switchTab('coverage')">📊 Data Coverage</button>
-            <button id="tabBtn-industries" data-tab="industries" class="tab-btn" onclick="app.switchTab('industries')">🏭 Industries</button>
-            <button id="tabBtn-patterns" data-tab="patterns" class="tab-btn" onclick="app.switchTab('patterns')">📊 Patterns</button>
-            <button id="tabBtn-buydip" data-tab="buydip" class="tab-btn" onclick="app.switchTab('buydip')">🛒 Buy the Dip</button>
-            <button id="tabBtn-backtest" data-tab="backtest" class="tab-btn" onclick="app.switchTab('backtest')">📈 Backtest</button>
-            <button id="tabBtn-watchlist" data-tab="watchlist" class="tab-btn" onclick="app.switchTab('watchlist')">⭐ Watchlist</button>
-            <button class="tab-btn" onclick="app.openCustomizerModal('tabs')" style="margin-left: auto; background: rgba(99,102,241,0.12); border: 1px dashed rgba(168,85,247,0.35); color: #c7d2fe; display: flex; align-items: center; gap: 0.3rem; font-size: 0.74rem; padding: 0.35rem 0.65rem;" title="Customize and toggle visible tabs on/off">⚙️ Customize Tabs</button>
-        </section>
+        <!-- Control Center Button -->
+        <button onclick="app.openCustomizerModal()" class="btn-micro" style="background: #ffffff; color: #000000; font-weight: 600; font-size: 0.72rem; padding: 0.25rem 0.55rem; border-radius: 5px; border: none; cursor: pointer;" title="Open Control Center">
+            Settings
+        </button>
+    </div>
+</header>

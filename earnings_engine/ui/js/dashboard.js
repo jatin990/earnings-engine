@@ -523,6 +523,7 @@
 
             async init() {
                 this.initCustomizer();
+                this.bindKeyboardShortcuts();
                 this._bindWatchlistSelectionPersistence();
                 this._restoreBdControls();
                 this._restorePatternsControls();
@@ -549,6 +550,51 @@
                 window.addEventListener('popstate', () => {
                     const tab = this.getInitialTab();
                     this.switchTab(tab, false, false);
+                });
+            },
+
+            bindKeyboardShortcuts() {
+                window.addEventListener('keydown', (e) => {
+                    const tag = (e.target.tagName || '').toLowerCase();
+                    const isInput = tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable;
+                    
+                    if (e.key === '/' && !isInput) {
+                        e.preventDefault();
+                        const searchEl = document.getElementById('tickerSearch');
+                        if (searchEl) {
+                            searchEl.focus();
+                            searchEl.select();
+                        }
+                    } else if ((e.key === 'f' || e.key === 'F') && !isInput && !e.ctrlKey && !e.metaKey) {
+                        e.preventDefault();
+                        const findEl = document.getElementById('sidebarFind');
+                        if (findEl) {
+                            findEl.focus();
+                            findEl.select();
+                        }
+                    } else if (e.key === 'Escape') {
+                        const modal = document.getElementById('controlCenterModal');
+                        if (modal && modal.style.display !== 'none') {
+                            app.closeCustomizerModal();
+                        }
+                        const autoEl = document.getElementById('autocompleteDropdown');
+                        if (autoEl) autoEl.style.display = 'none';
+                        if (document.activeElement) document.activeElement.blur();
+                    }
+                });
+            },
+
+            filterSidebarTabs(query) {
+                const q = (query || '').toLowerCase().trim();
+                document.querySelectorAll('.sidebar-group').forEach(grp => {
+                    let hasVisible = false;
+                    grp.querySelectorAll('.sidebar-nav-item').forEach(item => {
+                        const text = item.textContent.toLowerCase();
+                        const isMatch = !q || text.includes(q);
+                        item.style.display = isMatch ? 'flex' : 'none';
+                        if (isMatch) hasVisible = true;
+                    });
+                    grp.style.display = hasVisible ? 'flex' : 'none';
                 });
             },
 
@@ -811,12 +857,43 @@
                 const targetContent = document.getElementById('tab-' + name);
                 if (targetContent) targetContent.classList.add('active');
 
+                // Sync legacy top buttons if any
                 document.querySelectorAll('.tab-btn').forEach(el => {
                     const onclickAttr = el.getAttribute('onclick') || '';
                     if (onclickAttr.includes("'" + name + "'") || onclickAttr.includes('"' + name + '"') || el.textContent.toLowerCase().includes(name)) {
                         el.classList.add('active');
                     }
                 });
+
+                // Sync Vercel Sidebar Active Item
+                document.querySelectorAll('.sidebar-nav-item').forEach(el => {
+                    const tabKey = el.getAttribute('data-tab');
+                    const isActive = (tabKey === name);
+                    el.classList.toggle('active', isActive);
+                });
+
+                // Update Breadcrumb Tab Title
+                const bcEl = document.getElementById('topbarBreadcrumbTab');
+                if (bcEl) {
+                    const titles = {
+                        'results': 'Results Ledger',
+                        'monthfilter': 'Month Filter',
+                        'scanner': 'Scanner',
+                        'catalysts': 'Catalysts & News',
+                        'gainers': 'Gainers & Breakouts',
+                        'swing': 'Swing Ranges',
+                        'kronos': 'Kronos 14D Forecast',
+                        'consensus': '4-Model Consensus',
+                        'buydip': 'Buy the Dip',
+                        'playground': 'Quant Playground',
+                        'watchlist': 'Watchlist Hub',
+                        'backtest': 'Backtest Engine',
+                        'coverage': 'Data Coverage',
+                        'industries': 'Industries & Multiples',
+                        'patterns': 'Technical Patterns'
+                    };
+                    bcEl.textContent = titles[name] || name;
+                }
 
                 // Update URL hash without page reload
                 if (updateUrl && window.location.hash !== '#' + name) {
