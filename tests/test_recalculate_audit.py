@@ -60,8 +60,9 @@ def test_recalculate_ticker_metrics_flow(temp_settings):
         {"date": "2026-08-21", "open": 102.0, "high": 108.0, "low": 101.0, "close": 106.0, "volume": 1200},
     ])
 
-    with patch("earnings_engine.data.earnings.fetch_earnings", return_value=mock_earnings), \
-         patch("earnings_engine.data.prices.fetch_prices", return_value=mock_prices):
+    with patch("earnings_engine.api.recalculate_api.earnings_mod.fetch_earnings", return_value=mock_earnings), \
+         patch("earnings_engine.api.recalculate_api.prices_mod.fetch_prices", return_value=mock_prices), \
+         patch("earnings_engine.api.recalculate_api.enrich_upcoming_results", return_value=pd.DataFrame([{"ticker": "RECALC_TEST.NS", "current_price": 106.0, "earnings_date": "2026-08-28"}])):
         res = recalculate_ticker_metrics("RECALC_TEST.NS", settings=temp_settings)
 
     assert res["success"] is True

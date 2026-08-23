@@ -6763,7 +6763,7 @@
             app._customizer.activeSubTab = subTab;
             
             // Toggle nav buttons
-            ['tabs', 'themes', 'env'].forEach(t => {
+            ['tabs', 'themes', 'env', 'audit'].forEach(t => {
                 const navBtn = document.getElementById('ccNav' + t.charAt(0).toUpperCase() + t.slice(1));
                 const sec = document.getElementById('ccSection' + t.charAt(0).toUpperCase() + t.slice(1));
                 if (navBtn) navBtn.classList.toggle('active', t === subTab);
@@ -6776,6 +6776,95 @@
                 app.syncThemePickers();
             } else if (subTab === 'env') {
                 app.loadEnvVars();
+            } else if (subTab === 'audit') {
+                app.loadAccessAudit();
+            }
+        };
+
+        app.toggleEncryptedAuditView = function() {
+            app._customizer.showRawJson = !app._customizer.showRawJson;
+            const btn = document.getElementById('ccToggleEncryptedBtn');
+            if (btn) {
+                btn.innerHTML = app._customizer.showRawJson ? '📊 View Table View' : '📄 View Raw Decrypted JSON';
+                btn.style.background = app._customizer.showRawJson ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255,255,255,0.08)';
+                btn.style.color = app._customizer.showRawJson ? '#60a5fa' : 'var(--light)';
+            }
+            app.loadAccessAudit();
+        };
+
+        app.loadAccessAudit = async function() {
+            const tableWrapper = document.getElementById('ccAuditTableWrapper');
+            const tbody = document.getElementById('ccAuditTableBody');
+            if (!tbody || !tableWrapper) return;
+
+            const isRaw = app._customizer.showRawJson === true;
+            
+            // Adjust table header according to view mode
+            const thead = tableWrapper.querySelector('thead');
+            if (thead) {
+                thead.innerHTML = isRaw
+                    ? '<tr><th style="width: 60px;">ID</th><th style="width: 170px;">Timestamp</th><th>Decrypted JSON Payload</th></tr>'
+                    : '<tr><th>Timestamp</th><th>IP Address</th><th>Machine / Hostname</th><th>Location & Coordinates</th><th>ISP / Org</th><th>Device & OS</th><th>Route</th></tr>';
+            }
+
+            tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--muted);padding:1.5rem;"><span class="loading-spinner"></span> Loading access records...</td></tr>`;
+
+            try {
+                const res = await fetch('/api/v1/admin/access-tracker?limit=100');
+                const data = await res.json();
+                const records = data.records || [];
+
+                if (!records.length) {
+                    tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--muted);padding:1.5rem;">No access records captured yet.</td></tr>`;
+                    return;
+                }
+
+                if (isRaw) {
+                    tbody.innerHTML = records.map(r => {
+                        const jsonStr = JSON.stringify(r.raw_decrypted || {}, null, 2);
+                        return `
+                            <tr>
+                                <td style="font-family:monospace;color:var(--muted);font-weight:700;">#${r.id}</td>
+                                <td style="font-family:monospace;white-space:nowrap;color:var(--muted);font-size:0.75rem;">${r.timestamp || '—'}</td>
+                                <td>
+                                    <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                                        <pre style="margin:0;max-height:180px;overflow-y:auto;background:rgba(0,0,0,0.6);padding:0.6rem 0.8rem;border-radius:0.4rem;font-family:monospace;font-size:0.75rem;color:#38bdf8;word-break:break-all;white-space:pre-wrap;border:1px solid rgba(56,189,248,0.25);">${jsonStr}</pre>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                } else {
+                    tbody.innerHTML = records.map(r => {
+                        const loc = [r.city, r.region, r.country].filter(x => x && x !== 'Unknown' && x !== '—').join(', ') || 'Unknown Location';
+                        const coordsHtml = (r.lat && r.lon)
+                            ? `<div style="margin-top:0.2rem;"><a href="https://maps.google.com/?q=${r.lat},${r.lon}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;font-size:0.72rem;text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;">🌐 ${r.coordinates} ↗</a></div>`
+                            : '';
+                        return `
+                            <tr>
+                                <td style="font-family:monospace;white-space:nowrap;color:var(--muted);">${r.timestamp || '—'}</td>
+                                <td><strong style="color:#60a5fa;font-family:monospace;">${r.ip_address || '—'}</strong></td>
+                                <td><span style="color:#a78bfa;font-weight:600;">${r.machine_name || '—'}</span></td>
+                                <td><div><span>📍 ${loc}</span>${coordsHtml}</div></td>
+                                <td><span style="color:var(--muted);">${r.isp || '—'}</span></td>
+                                <td><span style="font-size:0.75rem;">${r.device_info || r.user_agent || '—'}</span></td>
+                                <td><span class="signal-badge" style="font-size:0.68rem;background:rgba(59,130,246,0.15);color:#93c5fd;">${r.endpoint || '/'}</span></td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--red);padding:1.5rem;">Error loading access records: ${(e.message || e)}</td></tr>`;
+            }
+        };
+
+        app.clearAccessAudit = async function() {
+            if (!confirm('Are you sure you want to clear all tracked access and login records?')) return;
+            try {
+                await fetch('/api/v1/admin/access-tracker', { method: 'DELETE' });
+                app.loadAccessAudit();
+            } catch (e) {
+                alert('Error clearing records: ' + e.message);
             }
         };
 

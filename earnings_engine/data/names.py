@@ -45,13 +45,6 @@ def get_name(ticker: str, settings: Settings | None = None) -> str | None:
         row = conn.execute(
             "SELECT name FROM tickers WHERE ticker = ?", (ticker.strip().upper(),)
         ).fetchone()
-        if not row or not row[0]:
-            try:
-                row = conn.execute(
-                    "SELECT name FROM ticker_names WHERE ticker = ?", (ticker.strip().upper(),)
-                ).fetchone()
-            except Exception:
-                row = None
     return row[0] if row else None
 
 
@@ -61,7 +54,7 @@ def store_name(
     source: str = "yfinance",
     settings: Settings | None = None,
 ) -> str | None:
-    """Persist a display name for a ticker."""
+    """Persist a display name for a ticker in unified tickers master table."""
     settings = settings or Settings()
     ticker = ticker.strip().upper()
     name = (name or "").strip()
@@ -70,7 +63,6 @@ def store_name(
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         with _connect(settings) as conn:
-            # 1. Upsert into unified tickers master table
             conn.execute(
                 """
                 INSERT INTO tickers (ticker, name, last_updated)
@@ -81,14 +73,6 @@ def store_name(
                 """,
                 (ticker, name, now_str),
             )
-            # 2. Maintain legacy table for backward compatibility
-            try:
-                conn.execute(
-                    "INSERT OR IGNORE INTO ticker_names (ticker, name, source, updated_at) VALUES (?, ?, ?, ?)",
-                    (ticker, name, source, now_str),
-                )
-            except Exception:
-                pass
             conn.commit()
     except Exception as e:  # never break downstream enrichment on a name write
         logger.warning("store_name failed ticker=%s: %s", ticker, e)
@@ -121,8 +105,6 @@ def ensure_names(
         try:
             with _connect(settings) as conn:
                 rows = conn.execute("SELECT ticker FROM tickers WHERE name IS NOT NULL").fetchall()
-                if not rows:
-                    rows = conn.execute("SELECT ticker FROM ticker_names").fetchall()
             known = {r[0] for r in rows}
             missing = [t for t in tickers if t not in known]
         except Exception:
@@ -174,11 +156,6 @@ def search(q: str, limit: int = 20, settings: Settings | None = None) -> list[di
     rows: list[tuple[str, str]] = []
     with _connect(settings) as conn:
         rows = conn.execute("SELECT ticker, name FROM tickers WHERE name IS NOT NULL").fetchall()
-        if not rows:
-            try:
-                rows = conn.execute("SELECT ticker, name FROM ticker_names").fetchall()
-            except Exception:
-                rows = []
 
     name_hits: list[str] = []
     symbol_hits: list[str] = []

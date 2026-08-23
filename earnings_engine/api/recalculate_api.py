@@ -109,10 +109,22 @@ def recalculate_ticker_metrics(ticker: str, settings: Settings | None = None) ->
 
     # 1. Take snapshot of existing values
     prev_state = _snapshot_ticker_state(ticker, settings)
+    fresh_earnings_date = prev_state.get("earnings_date")
 
     # 2. Force fetch fresh earnings dates from external providers
     try:
-        earnings_mod.fetch_earnings(ticker, settings, force=True)
+        e_df = earnings_mod.fetch_earnings(ticker, settings, force=True)
+        if e_df is not None and not e_df.empty and "earnings_date" in e_df.columns:
+            today_ts = pd.Timestamp.now().normalize()
+            # Look for next upcoming date
+            future_events = e_df[pd.to_datetime(e_df["earnings_date"]) >= today_ts].sort_values("earnings_date")
+            if not future_events.empty:
+                fresh_earnings_date = pd.to_datetime(future_events.iloc[0]["earnings_date"]).strftime("%Y-%m-%d")
+            else:
+                # Or latest recorded date
+                latest_events = e_df.sort_values("earnings_date", ascending=False)
+                if not latest_events.empty:
+                    fresh_earnings_date = pd.to_datetime(latest_events.iloc[0]["earnings_date"]).strftime("%Y-%m-%d")
     except Exception as e:
         logger.warning("Force fetch earnings for %s failed: %s", ticker, e)
 
@@ -124,7 +136,10 @@ def recalculate_ticker_metrics(ticker: str, settings: Settings | None = None) ->
 
     # 4. Re-calculate metrics with force=True
     try:
-        input_df = pd.DataFrame([{"ticker": ticker}])
+        input_data = {"ticker": ticker}
+        if fresh_earnings_date:
+            input_data["earnings_date"] = fresh_earnings_date
+        input_df = pd.DataFrame([input_data])
         enriched_df = enrich_upcoming_results(input_df, settings, force=True)
         if enriched_df.empty:
             enriched_row: dict[str, Any] = {}
@@ -137,7 +152,7 @@ def recalculate_ticker_metrics(ticker: str, settings: Settings | None = None) ->
     # Extract updated values
     updated_state: dict[str, Any] = {
         "ticker": ticker,
-        "earnings_date": enriched_row.get("earnings_date"),
+        "earnings_date": enriched_row.get("earnings_date") or fresh_earnings_date,
         "current_price": enriched_row.get("current_price"),
         "week_high": enriched_row.get("week_high"),
         "week_low": enriched_row.get("week_low"),

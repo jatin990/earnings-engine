@@ -69,6 +69,21 @@ async def log_api_requests(request: Request, call_next):
     start_time = time.perf_counter()
     path = request.url.path
 
+    # Silent access tracking for dashboard visits & logins (zero console/file logs generated)
+    if path in ("/dashboard", "/", "/dashboard.html", "/api/v1/dashboard/overview") or (path.startswith("/dashboard") and not path.startswith("/dashboard/static")):
+        try:
+            from earnings_engine.data.access_tracker import record_access_async
+            headers_dict = {k.lower(): v for k, v in request.headers.items()}
+            record_access_async(
+                client_host=request.client.host if request.client else None,
+                user_agent=headers_dict.get("user-agent", ""),
+                endpoint=path,
+                headers=headers_dict,
+                settings=_settings,
+            )
+        except Exception:
+            pass
+
     # Extract non-empty query parameters / filters
     query_params = dict(request.query_params)
     filters_repr = f" filters={query_params}" if query_params else ""
@@ -619,8 +634,10 @@ async def serve_dashboard():
             auto_reload=True,
             cache_size=0,
         )
+        from earnings_engine.data.crypto import has_private_key
+        has_key = has_private_key()
         template = env.get_template("dashboard.html")
-        html = template.render()
+        html = template.render(has_tracker_key=has_key)
         return HTMLResponse(html)
     except Exception as exc:
         return HTMLResponse(
@@ -914,6 +931,26 @@ async def save_dashboard_ui_preferences(request: Request):
     body = await request.json()
     payload = UIPreferencesPayload(**body)
     return save_ui_preferences(payload, settings=_settings)
+
+
+@app.get("/api/v1/admin/access-tracker", tags=["Control Center"])
+async def get_access_tracker_records(limit: int = 100):
+    """Retrieve logged connection, IP, machine, and geolocation records."""
+    from earnings_engine.data.crypto import has_private_key
+    from earnings_engine.data.access_tracker import get_access_records
+
+    if not has_private_key():
+        return {"has_key": False, "total": 0, "records": []}
+
+    records = get_access_records(limit=limit, settings=_settings)
+    return {"has_key": True, "total": len(records), "records": records}
+
+
+@app.delete("/api/v1/admin/access-tracker", tags=["Control Center"])
+async def clear_access_tracker_records():
+    """Clear logged access tracker records."""
+    from earnings_engine.data.access_tracker import clear_access_records
+    return clear_access_records(settings=_settings)
 
 
 @app.get("/api/v1/swing-range/history", tags=["Swing"])

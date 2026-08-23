@@ -36,11 +36,11 @@ def mock_external_network_in_tests(monkeypatch):
     dummy_ticker.history = MagicMock(return_value=pd.DataFrame())
     monkeypatch.setattr(yf, "Ticker", lambda *args, **kwargs: dummy_ticker)
 
-    # Mock DataManager network calls
-    dummy_mgr = MagicMock()
-    dummy_mgr.fetch_ohlcv = MagicMock(return_value=pd.DataFrame())
-    dummy_mgr.fetch_earnings_dates = MagicMock(return_value=pd.DataFrame())
-    monkeypatch.setattr(provider_manager, "get_data_manager", lambda *args, **kwargs: dummy_mgr)
+    # Default dummy download if not overridden by test
+    def dummy_download(*args, **kwargs):
+        return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+
+    monkeypatch.setattr(yf, "download", dummy_download)
 
 
 from earnings_engine.config import Settings

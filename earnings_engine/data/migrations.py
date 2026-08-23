@@ -260,6 +260,23 @@ def _migration_005_unified_tickers(conn: Any) -> None:
         pass
 
 
+def _migration_006_drop_legacy_ticker_tables(conn: Any) -> None:
+    """Drop legacy ticker tables consolidated into unified tickers master table."""
+    legacy_tables = [
+        "ticker_names",
+        "market_caps",
+        "ticker_market_cap",
+        "ticker_metrics",
+        "ticker_industries",
+        "ticker_industry",
+    ]
+    for tbl in legacy_tables:
+        try:
+            conn.execute(f"DROP TABLE IF EXISTS {tbl}")
+        except Exception:
+            pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -267,6 +284,7 @@ MIGRATIONS: list[Migration] = [
     Migration(3, "003_multimodal_ai", _migration_003_multimodal_ai),
     Migration(4, "004_ticker_audit", _migration_004_ticker_audit),
     Migration(5, "005_unified_tickers", _migration_005_unified_tickers),
+    Migration(6, "006_drop_legacy_ticker_tables", _migration_006_drop_legacy_ticker_tables),
 ]
 
 

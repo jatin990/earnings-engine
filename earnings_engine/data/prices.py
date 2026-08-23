@@ -77,8 +77,8 @@ def _mark_fetched(ticker: str, settings: Settings) -> None:
     """Record the moment this ticker's prices were last written to the cache."""
     with _connect(settings) as connection:
         connection.execute(
-            "INSERT OR REPLACE INTO price_fetch_log (ticker, fetched_at) VALUES (?, ?)",
-            (ticker, datetime.now().isoformat(timespec="seconds")),
+            "INSERT OR REPLACE INTO price_fetch_log (ticker, fetched_at, status) VALUES (?, ?, ?)",
+            (ticker, datetime.now().isoformat(timespec="seconds"), "SUCCESS"),
         )
         connection.commit()
 

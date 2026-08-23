@@ -302,34 +302,6 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
         except Exception:
             pass
 
-        # Fallback to legacy tables if any missing
-        if len(names_map) < len(tickers):
-            try:
-                name_rows = conn.execute(f"SELECT ticker, name FROM ticker_names WHERE ticker IN ({placeholders})", tickers).fetchall()
-                for r in name_rows:
-                    if r[0] not in names_map and r[1]:
-                        names_map[r[0]] = r[1]
-            except Exception:
-                pass
-        if not force and len(all_market_caps) < len(tickers):
-            try:
-                mcap_rows = conn.execute(f"SELECT ticker, market_cap FROM ticker_market_cap WHERE ticker IN ({placeholders})", tickers).fetchall()
-                for r in mcap_rows:
-                    if r[0] not in all_market_caps and r[1] is not None:
-                        all_market_caps[r[0]] = float(r[1])
-            except Exception:
-                pass
-        if not force and len(metrics_map) < len(tickers):
-            try:
-                m_rows = conn.execute(f"SELECT ticker, metrics FROM ticker_metrics WHERE ticker IN ({placeholders})", tickers).fetchall()
-                for r in m_rows:
-                    if r[0] not in metrics_map and r[1]:
-                        try:
-                            metrics_map[r[0]] = json.loads(r[1]) if isinstance(r[1], str) else r[1]
-                        except Exception:
-                            pass
-            except Exception:
-                pass
                     
         # 3. Earnings History (last 2 years)
         cutoff_e_date = (pd.Timestamp.now() - pd.Timedelta(days=730)).strftime("%Y-%m-%d")

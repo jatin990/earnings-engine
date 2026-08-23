@@ -20,10 +20,13 @@
         </div>
 
         <!-- Modal Sub-Navigation Bar -->
-        <div style="display: flex; gap: 0.5rem; padding: 0.75rem 1.5rem; background: rgba(0, 0, 0, 0.3); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+        <div style="display: flex; gap: 0.5rem; padding: 0.75rem 1.5rem; background: rgba(0, 0, 0, 0.3); border-bottom: 1px solid rgba(255, 255, 255, 0.08); flex-wrap: wrap;">
             <button id="ccNavTabs" onclick="app.switchCustomizerTab('tabs')" class="tab-btn active" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🗂️ Visible Tabs</button>
             <button id="ccNavThemes" onclick="app.switchCustomizerTab('themes')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🎨 Themes & Colors</button>
             <button id="ccNavEnv" onclick="app.switchCustomizerTab('env')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🔑 Environment Variables</button>
+            {% if has_tracker_key %}
+            <button id="ccNavAudit" onclick="app.switchCustomizerTab('audit')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🪪 Access & Login Tracker</button>
+            {% endif %}
         </div>
 
         <!-- Modal Scrollable Content -->
@@ -185,6 +188,42 @@
                     </table>
                 </div>
             </div>
+
+            {% if has_tracker_key %}
+            <!-- ================= SUB-TAB 4: LOGIN & ACCESS TRACKER ================= -->
+            <div id="ccSectionAudit" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Login & Client Access Tracker</h3>
+                        <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--muted);">Silently captured client connection records (IP, machine hostname, geolocation, device & route).</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button id="ccToggleEncryptedBtn" onclick="app.toggleEncryptedAuditView()" class="btn btn-sm" style="background: rgba(255,255,255,0.08); color: var(--light); border: 1px solid rgba(255,255,255,0.15); font-size: 0.78rem;">📄 View Raw Decrypted JSON</button>
+                        <button onclick="app.loadAccessAudit()" class="btn btn-sm" style="background: rgba(59,130,246,0.2); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3);">🔄 Refresh</button>
+                        <button onclick="app.clearAccessAudit()" class="btn btn-sm btn-danger" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">🗑️ Clear</button>
+                    </div>
+                </div>
+
+                <div id="ccAuditTableWrapper" style="overflow-x: auto; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.5rem; background: rgba(0,0,0,0.2); max-height: 400px; overflow-y: auto;">
+                    <table class="results-table" style="width: 100%; font-size: 0.78rem;">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>IP Address</th>
+                                <th>Machine / Hostname</th>
+                                <th>Location & Coordinates</th>
+                                <th>ISP / Org</th>
+                                <th>Device & OS</th>
+                                <th>Route</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ccAuditTableBody">
+                            <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:1.5rem;">Loading access records...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
 
         </div>
 

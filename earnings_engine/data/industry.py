@@ -35,10 +35,10 @@ def _is_fresh(ticker: str, settings: Settings) -> bool:
     """Check if industry classification is fresh in SQLite for the given ticker."""
     with _connect(settings) as connection:
         row = connection.execute(
-            "SELECT fetched_at FROM ticker_industry WHERE ticker = ?",
+            "SELECT last_updated FROM tickers WHERE ticker = ? AND industry IS NOT NULL",
             (ticker,),
         ).fetchone()
-    if not row:
+    if not row or not row[0]:
         return False
     fetched_at = pd.Timestamp(row[0])
     age_days = (pd.Timestamp.now() - fetched_at).total_seconds() / 86400
@@ -61,14 +61,6 @@ def _store(ticker: str, industry: str | None, sector: str | None, settings: Sett
             """,
             (ticker, industry, sector, now),
         )
-        # Also maintain legacy ticker_industry for backward compatibility
-        try:
-            connection.execute(
-                "INSERT OR REPLACE INTO ticker_industry (ticker, industry, sector, fetched_at) VALUES (?, ?, ?, ?)",
-                (ticker, industry, sector, now),
-            )
-        except Exception:
-            pass
         connection.commit()
 
 
@@ -84,21 +76,13 @@ def _fetch_for_ticker(ticker: str) -> tuple[str, str | None, str | None]:
 
 
 def load_industry(ticker: str, settings: Settings) -> str | None:
-    """Load the industry for a single ticker from SQLite cache (no fetch)."""
+    """Load the cached industry for a single ticker (None if not in SQLite)."""
     with _connect(settings) as connection:
         row = connection.execute(
             "SELECT industry, sector FROM tickers WHERE ticker = ?",
             (ticker,),
         ).fetchone()
-        if not row or (not row[0] and not row[1]):
-            try:
-                row = connection.execute(
-                    "SELECT industry, sector FROM ticker_industry WHERE ticker = ?",
-                    (ticker,),
-                ).fetchone()
-            except Exception:
-                row = None
-    if not row:
+    if not row or not (row[0] or row[1]):
         return None
     return row[0] or row[1]
 
