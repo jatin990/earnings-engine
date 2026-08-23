@@ -530,6 +530,7 @@
                 this.loadOverview();
                 this.loadConsensusCache();
                 this.updateTopRateLimitPill();
+                this.updateWatchlistFreshnessPill(localStorage.getItem('selectedGlobalWatchlist') || '');
                 setInterval(() => {
                     this.updateTopRateLimitPill();
                 }, 30000);
@@ -665,6 +666,9 @@
                 localStorage.setItem('selectedGlobalWatchlist', val);
                 localStorage.setItem('selectedWatchlist_kronos', val);
                 
+                // Update top navbar freshness pill for selected universe
+                this.updateWatchlistFreshnessPill(val);
+
                 // Sync Kronos, Backtest, Scanner, and Gainers selectors
                 const targets = ['kronosWatchlist', 'btWatchlist', 'scannerWatchlistSelect', 'gainersMarketSelect'];
                 targets.forEach(id => {
@@ -691,6 +695,78 @@
                     this.loadCatalysts();
                 } else if (activeTab.includes('Gainers')) {
                     this.refreshGainersTab();
+                }
+            },
+
+            async updateWatchlistFreshnessPill(watchlistName) {
+                const label = document.getElementById('topEarningsFreshnessLabel');
+                const sub = document.getElementById('topEarningsFreshnessSub');
+                if (!label) return;
+
+                try {
+                    const url = API_BASE + '/api/v1/earnings/freshness' + (watchlistName ? '?watchlist=' + encodeURIComponent(watchlistName) : '');
+                    const res = await fetch(url);
+                    const data = await res.json();
+
+                    if (data.success) {
+                        const rel = data.relative_time || 'Persistent Cache';
+                        label.textContent = `Earnings: ${rel}`;
+                        if (data.status === 'FRESH') {
+                            label.style.color = '#34d399';
+                        } else if (data.status === 'WARM') {
+                            label.style.color = '#38bdf8';
+                        } else {
+                            label.style.color = '#f87171';
+                        }
+
+                        if (sub) {
+                            if (data.last_updated) {
+                                sub.textContent = `Updated: ${data.last_updated.substring(0, 16)}`;
+                            } else {
+                                sub.textContent = `${data.cached_tickers || 0}/${data.total_tickers || 0} cached`;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.debug('Error updating freshness pill:', e);
+                }
+            },
+
+            async refreshCurrentWatchlistEarnings() {
+                const wl = document.getElementById('globalWatchlist')?.value || '';
+                const btn = document.getElementById('topRefreshEarningsBtn');
+
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="inline-block animate-spin mr-1">⟳</span> Refreshing...';
+                }
+
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/earnings/refresh-watchlist', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ watchlist: wl || null })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.detail || 'Failed refreshing watchlist earnings');
+
+                    alert(`✅ Refreshed earnings data for ${data.refreshed_count} tickers in ${data.watchlist}!`);
+                    await this.updateWatchlistFreshnessPill(wl);
+
+                    // If on results or swing tab, reload view
+                    const activeTab = this.getInitialTab();
+                    if (activeTab === 'results') {
+                        this.loadResultsReport();
+                    } else if (activeTab === 'swing') {
+                        this.loadSwing();
+                    }
+                } catch (err) {
+                    alert('Error refreshing watchlist earnings: ' + err.message);
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '🔄 Refresh';
+                    }
                 }
             },
 

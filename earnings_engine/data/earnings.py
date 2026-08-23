@@ -728,3 +728,131 @@ def set_cached_month_filter(settings: Settings, cache_key: str, payload: dict[st
         )
         connection.commit()
 
+
+def get_watchlist_earnings_freshness(
+    watchlist_name: str | None = None,
+    tickers: list[str] | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Calculate aggregated earnings freshness metrics for a watchlist or ticker list."""
+    settings = settings or Settings()
+    if tickers is None:
+        if watchlist_name:
+            from earnings_engine.data.watchlists import get_watchlist
+            tickers = get_watchlist(watchlist_name, settings)
+        else:
+            tickers = []
+
+    if not tickers:
+        return {
+            "watchlist": watchlist_name or "ALL",
+            "total_tickers": 0,
+            "cached_tickers": 0,
+            "last_updated": None,
+            "relative_time": "No tickers in universe",
+            "status": "EMPTY",
+        }
+
+    placeholders = ", ".join(["?"] * len(tickers))
+    with _connect(settings) as connection:
+        row = connection.execute(
+            f"""
+            SELECT 
+                COUNT(*) as total,
+                COUNT(earnings_fetched_at) as fetched_count,
+                MAX(earnings_fetched_at) as latest_fetch,
+                MIN(earnings_fetched_at) as oldest_fetch
+            FROM tickers
+            WHERE ticker IN ({placeholders})
+            """,
+            tickers,
+        ).fetchone()
+
+    fetched_count = row[1] if row else 0
+    latest_fetch = row[2] if row else None
+    oldest_fetch = row[3] if row else None
+
+    # Calculate human-readable relative time
+    relative_time = "Never"
+    status = "STALE"
+    if latest_fetch:
+        try:
+            ts = pd.Timestamp(latest_fetch)
+            delta = pd.Timestamp.now() - ts
+            hours = delta.total_seconds() / 3600.0
+            if hours < 1:
+                relative_time = "Just now"
+                status = "FRESH"
+            elif hours < 24:
+                relative_time = f"{int(hours)}h ago"
+                status = "FRESH"
+            elif hours < 48:
+                relative_time = "1 day ago"
+                status = "WARM"
+            else:
+                days = int(hours / 24)
+                relative_time = f"{days} days ago"
+                status = "WARM" if days <= 7 else "STALE"
+        except Exception:
+            relative_time = str(latest_fetch)
+
+    return {
+        "watchlist": watchlist_name or "ALL",
+        "total_tickers": len(tickers),
+        "cached_tickers": fetched_count,
+        "last_updated": latest_fetch,
+        "oldest_updated": oldest_fetch,
+        "relative_time": relative_time,
+        "status": status,
+    }
+
+
+def refresh_watchlist_earnings(
+    watchlist_name: str | None = None,
+    tickers: list[str] | None = None,
+    settings: Settings | None = None,
+    max_workers: int = 6,
+) -> dict[str, Any]:
+    """Force-refresh earnings data for all tickers in a specific watchlist in parallel."""
+    import concurrent.futures
+    settings = settings or Settings()
+
+    if tickers is None:
+        if watchlist_name:
+            from earnings_engine.data.watchlists import get_watchlist
+            tickers = get_watchlist(watchlist_name, settings)
+        else:
+            tickers = []
+
+    if not tickers:
+        return {"success": False, "error": "No tickers in selected watchlist", "refreshed_count": 0}
+
+    refreshed = []
+    errors = []
+
+    def _fetch_single(t: str):
+        try:
+            fetch_earnings(t, settings, force=True)
+            return t, True, None
+        except Exception as err:
+            return t, False, str(err)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_fetch_single, t): t for t in tickers}
+        for future in concurrent.futures.as_completed(futures):
+            sym, ok, err_msg = future.result()
+            if ok:
+                refreshed.append(sym)
+            else:
+                errors.append({"ticker": sym, "error": err_msg})
+
+    freshness = get_watchlist_earnings_freshness(watchlist_name, tickers, settings)
+    return {
+        "success": True,
+        "watchlist": watchlist_name or "CUSTOM",
+        "total_tickers": len(tickers),
+        "refreshed_count": len(refreshed),
+        "error_count": len(errors),
+        "freshness": freshness,
+    }
+

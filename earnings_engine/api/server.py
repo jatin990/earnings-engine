@@ -281,7 +281,7 @@ async def get_price_history(
     - **force_refresh**: If true, fetch fresh data from yfinance instead of cache
     """
     try:
-        df = prices_mod.fetch_prices(ticker, _settings, force=force_refresh)
+        df = await asyncio.to_thread(prices_mod.fetch_prices, ticker, _settings, force=force_refresh)
         
         if df.empty:
             return []
@@ -319,10 +319,43 @@ async def get_earnings_history(
     - **force_refresh**: If true, fetch fresh data from yfinance instead of cache
     """
     try:
-        df = earnings_mod.fetch_earnings(ticker, _settings, force=force_refresh)
+        df = await asyncio.to_thread(earnings_mod.fetch_earnings, ticker, _settings, force=force_refresh)
         return _df_to_earnings_list(df)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching earnings history: {str(e)}")
+
+
+class RefreshWatchlistEarningsRequest(BaseModel):
+    watchlist: str | None = None
+    tickers: list[str] | None = None
+
+
+@app.get("/api/v1/earnings/freshness", tags=["Earnings"])
+async def get_earnings_freshness_endpoint(
+    watchlist: str | None = Query(None, description="Watchlist name or universe"),
+    tickers: str | None = Query(None, description="Comma-separated list of tickers"),
+):
+    """Retrieve earnings data freshness and last-updated timestamp for a watchlist."""
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()] if tickers else None
+    freshness = await asyncio.to_thread(
+        earnings_mod.get_watchlist_earnings_freshness,
+        watchlist_name=watchlist,
+        tickers=ticker_list,
+        settings=_settings,
+    )
+    return {"success": True, **freshness}
+
+
+@app.post("/api/v1/earnings/refresh-watchlist", tags=["Earnings"])
+async def refresh_watchlist_earnings_endpoint(req: RefreshWatchlistEarningsRequest):
+    """Trigger parallel background refresh of earnings data for all tickers in a selected watchlist."""
+    res = await asyncio.to_thread(
+        earnings_mod.refresh_watchlist_earnings,
+        watchlist_name=req.watchlist,
+        tickers=req.tickers,
+        settings=_settings,
+    )
+    return res
 
 
 @app.get("/api/v1/market-cap/{ticker}", response_model=MarketCapResponse, tags=["Market Data"])
@@ -1185,10 +1218,14 @@ async def dashboard_results_report(
     start_date: str | None = Query(None, description="Explicit start date YYYY-MM-DD"),
 ):
     try:
-        import importlib
         import earnings_engine.api.dashboard_api as _dash_api
-        importlib.reload(_dash_api)
-        return _dash_api.get_results_report_components(days=days, market=market, past_days=past_days, start_date=start_date)
+        return await asyncio.to_thread(
+            _dash_api.get_results_report_components,
+            days=days,
+            market=market,
+            past_days=past_days,
+            start_date=start_date,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching results report: {str(e)}")
 
@@ -1202,11 +1239,13 @@ async def dashboard_month_filter(
 ):
     """Get precalculated Month Filter report components with present-day delta sync."""
     try:
-        import importlib
         import earnings_engine.api.dashboard_api as _dash_api
-        importlib.reload(_dash_api)
-        return _dash_api.get_month_filter_report_components(
-            days=days, market=market, past_days=past_days, force_sync=force_sync
+        return await asyncio.to_thread(
+            _dash_api.get_month_filter_report_components,
+            days=days,
+            market=market,
+            past_days=past_days,
+            force_sync=force_sync,
         )
     except Exception as e:
         logger.exception("Error in dashboard_month_filter: %s", e)
@@ -1219,11 +1258,13 @@ async def dashboard_month_filter_sync(
 ):
     """Force present-day delta fetch and refresh precalculated Month Filter report."""
     try:
-        import importlib
         import earnings_engine.api.dashboard_api as _dash_api
-        importlib.reload(_dash_api)
-        return _dash_api.get_month_filter_report_components(
-            days=60, market=market, past_days=60, force_sync=True
+        return await asyncio.to_thread(
+            _dash_api.get_month_filter_report_components,
+            days=60,
+            market=market,
+            past_days=60,
+            force_sync=True,
         )
     except Exception as e:
         logger.exception("Error in dashboard_month_filter_sync: %s", e)
@@ -1237,7 +1278,7 @@ async def dashboard_swing(
 ):
     """Get swing trading setups (support/resistance, momentum, signals) for the Swing tab."""
     try:
-        return get_swing_setups(market=market, limit=limit)
+        return await asyncio.to_thread(get_swing_setups, market=market, limit=limit)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching swing setups: {str(e)}")
 

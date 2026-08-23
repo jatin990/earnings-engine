@@ -21,7 +21,7 @@
                 </div>
             </div>
 
-            <!-- Global Watchlist, Rate Limit Pill, User & Config -->
+            <!-- Global Watchlist, Freshness Pill, Rate Limit Pill, User & Config -->
             <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
                 
                 <!-- Watchlist Selector -->
@@ -32,6 +32,18 @@
                     <select id="globalWatchlist" onchange="app.onGlobalWatchlistChange(this.value)" style="min-width: 210px; padding: 0.4rem 0.7rem; border: 1px solid rgba(99,102,241,0.4); border-radius: 0.5rem; background: #0e1626; color: #f8fafc; font-size: 0.82rem; font-weight: 600; cursor: pointer; outline: none;" title="Active universe or watchlist across all dashboard tabs">
                         <option value="">🌐 All Stocks (Global)</option>
                     </select>
+                </div>
+
+                <!-- Watchlist Earnings Freshness & On-Demand Refresh Pill -->
+                <div id="topEarningsFreshnessPill" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(56,189,248,0.1); padding: 0.35rem 0.65rem; border-radius: 0.65rem; border: 1px solid rgba(56,189,248,0.3);" title="Last updated timestamp for active universe/watchlist earnings">
+                    <span style="font-size: 0.85rem;">📅</span>
+                    <div style="display: flex; flex-direction: column; line-height: 1.15;">
+                        <span id="topEarningsFreshnessLabel" style="font-size: 0.72rem; font-weight: 700; color: #38bdf8; font-family: 'JetBrains Mono', monospace;">Earnings: Loading...</span>
+                        <span id="topEarningsFreshnessSub" style="font-size: 0.62rem; color: #94a3b8;">Persistent Cache</span>
+                    </div>
+                    <button onclick="app.refreshCurrentWatchlistEarnings()" id="topRefreshEarningsBtn" class="btn btn-sm" style="padding: 0.2rem 0.45rem; background: rgba(56,189,248,0.2); hover:bg-sky-500/30; border: 1px solid rgba(56,189,248,0.4); color: #e0f2fe; font-size: 0.7rem; font-weight: 700; border-radius: 0.45rem;" title="Refresh earnings data for currently selected watchlist">
+                        🔄 Refresh
+                    </button>
                 </div>
 
                 <!-- Rate Limits Pill -->
