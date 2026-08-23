@@ -18,7 +18,7 @@ from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.passcodes")
 
-# Canonical Application / Route definitions
+# Canonical Application / Route definitions & API prefixes mapping
 AVAILABLE_ROUTES: dict[str, dict[str, Any]] = {
     "dashboard": {
         "id": "dashboard",
@@ -27,6 +27,31 @@ AVAILABLE_ROUTES: dict[str, dict[str, Any]] = {
         "description": "Full AI Consensus, swing oscillator, multi-model predictions, category scanner & corporate ledger.",
         "path": "/dashboard",
         "badge": "AI Trading Terminal",
+        "api_prefixes": [
+            "/api/v1/dashboard",
+            "/api/v1/results",
+            "/api/v1/swing",
+            "/api/v1/kronos",
+            "/api/v1/consensus",
+            "/api/v1/scanner",
+            "/api/v1/catalysts",
+            "/api/v1/gainers",
+            "/api/v1/patterns",
+            "/api/v1/industries",
+            "/api/v1/buydip",
+            "/api/v1/backtest",
+            "/api/v1/watchlist",
+            "/api/v1/stocks",
+            "/api/v1/tickers",
+            "/api/v1/history",
+            "/api/v1/overview",
+            "/api/v1/audit",
+            "/api/v1/recalculate",
+            "/api/v1/market-status",
+            "/api/v1/config/ratelimits",
+            "/api/v1/ratelimits",
+            "/api/v1/config/ui-preferences",
+        ],
     },
     "credit_card": {
         "id": "credit_card",
@@ -35,6 +60,11 @@ AVAILABLE_ROUTES: dict[str, dict[str, Any]] = {
         "description": "Luxury obsidian card tracker, reward maximizer radar, cashback analytics & perks dial.",
         "path": "/credit-card",
         "badge": "Financial Deck",
+        "api_prefixes": [
+            "/api/v1/cards",
+            "/api/v1/net-worth",
+            "/api/v1/trips",
+        ],
     },
     "playground": {
         "id": "playground",
@@ -43,6 +73,10 @@ AVAILABLE_ROUTES: dict[str, dict[str, Any]] = {
         "description": "Interactive NSE Bhavcopy, calendar queries, and model feature playground.",
         "path": "/dashboard#tab-playground",
         "badge": "Data Lab",
+        "api_prefixes": [
+            "/api/v1/playground",
+            "/api/v1/bhavcopy",
+        ],
     },
     "admin": {
         "id": "admin",
@@ -51,6 +85,12 @@ AVAILABLE_ROUTES: dict[str, dict[str, Any]] = {
         "description": "Generate, customize, and revoke access codes and route permissions for friends.",
         "path": "/portal#admin",
         "badge": "Admin Deck",
+        "api_prefixes": [
+            "/api/v1/system/telemetry",
+            "/api/v1/friends",
+            "/api/v1/config/env",
+            "/api/v1/passcodes",
+        ],
     },
 }
 

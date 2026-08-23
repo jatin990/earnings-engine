@@ -190,11 +190,11 @@ def _resolve_session(request: Request) -> dict[str, Any] | None:
         session = verify_session_token(token)
         if session:
             return session
+        token = None  # Reset token so invalid/expired cookie doesn't shadow passcode headers!
 
     # 4. Check for direct passcode / invite code in headers or query parameters
     passcode = (
-        token
-        or request.headers.get("X-Passcode")
+        request.headers.get("X-Passcode")
         or request.headers.get("X-Nexus-Passcode")
         or request.headers.get("X-Nexus-Code")
         or request.query_params.get("passcode")
@@ -207,7 +207,7 @@ def _resolve_session(request: Request) -> dict[str, Any] | None:
         if res.get("valid"):
             is_admin = res.get("is_admin") or res.get("role") == "owner"
             scopes = res.get("scopes") or (
-                ["dashboard", "can_view_cards", "can_view_trips", "can_view_net_worth", "admin", "credit_card"]
+                ["dashboard", "can_view_cards", "can_view_trips", "can_view_net_worth", "admin", "credit_card", "playground"]
                 if is_admin
                 else res.get("allowed_routes", ["dashboard"])
             )
@@ -220,13 +220,69 @@ def _resolve_session(request: Request) -> dict[str, Any] | None:
                 "allowed_routes": res.get("allowed_routes", []),
                 "passcode": passcode,
             }
+        # Explicit invalid passcode provided -> reject immediately
+        return None
 
     return None
 
 
+def is_route_authorized(path: str, session: dict[str, Any]) -> bool:
+    """Check if the authenticated user has scope/route authorization for the requested path."""
+    from earnings_engine.data.passcodes import AVAILABLE_ROUTES
+
+    role = session.get("role", "friend")
+    scopes = set(session.get("scopes", []) + session.get("allowed_routes", []))
+
+    # 1. Master owner or admin scope has unrestricted access to all endpoints
+    if role == "owner" or "admin" in scopes or "*" in scopes:
+        return True
+
+    # 2. General config & utility APIs accessible to all authenticated sessions
+    if path in (
+        "/api/v1/config/ratelimits",
+        "/api/v1/ratelimits",
+        "/api/v1/config/ui-preferences",
+        "/api/v1/watchlist",
+        "/api/v1/health",
+        "/api/v1/auth/me",
+    ):
+        return True
+
+    # 3. Granular Wealth & Lifestyle scope mappings
+    if path.startswith("/api/v1/trips"):
+        return bool("can_view_trips" in scopes or "trips" in scopes or "credit_card" in scopes)
+    if path.startswith("/api/v1/net-worth"):
+        return bool("can_view_net_worth" in scopes or "net_worth" in scopes or "credit_card" in scopes)
+    if path.startswith("/api/v1/cards"):
+        return bool("can_view_cards" in scopes or "credit_card" in scopes)
+
+    # 4. Check section api_prefixes from AVAILABLE_ROUTES
+    for route_id, route_def in AVAILABLE_ROUTES.items():
+        prefixes = route_def.get("api_prefixes", [])
+        if any(path.startswith(prefix) for prefix in prefixes):
+            has_perm = (
+                route_id in scopes
+                or (route_id == "dashboard" and "dashboard" in scopes)
+                or (route_id == "credit_card" and ("credit_card" in scopes or "can_view_cards" in scopes))
+            )
+            return bool(has_perm)
+
+    # 5. HTML views
+    if path in ("/dashboard", "/dashboard.html"):
+        return "dashboard" in scopes
+    if path == "/credit-card":
+        return bool("credit_card" in scopes or "can_view_cards" in scopes)
+
+    # Default allow authenticated users for unclassified non-admin routes
+    if not (path.startswith("/api/v1/system/telemetry") or path.startswith("/api/v1/friends") or path.startswith("/api/v1/config/env")):
+        return True
+
+    return False
+
+
 @app.middleware("http")
 async def enforce_auth_middleware(request: Request, call_next):
-    """Enforce authentication on all protected HTML views and API endpoints."""
+    """Enforce authentication and route RBAC on all protected HTML views and API endpoints."""
     path = request.url.path
 
     # Allow public static assets and gateway routes
@@ -236,6 +292,18 @@ async def enforce_auth_middleware(request: Request, call_next):
     session = _resolve_session(request)
     if session:
         request.state.session = session
+
+        # Verify RBAC route permission
+        if not is_route_authorized(path, session):
+            if path in ("/dashboard", "/credit-card", "/dashboard.html") or not path.startswith("/api/"):
+                return RedirectResponse(url=f"/portal?unauthorized=true&redirect={path}", status_code=302)
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "detail": f"Access forbidden: Your active passcode/tier does not grant permission for '{path}'."
+                },
+            )
+
         response = await call_next(request)
         # If authenticated via query parameter ?code=... and no cookie is present, issue cookie
         if "nexus_session" not in request.cookies and session.get("passcode"):
