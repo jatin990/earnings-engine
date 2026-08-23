@@ -198,12 +198,19 @@ class TursoConnection:
                 }
             ]
         }
-        resp = self.session.post(self.endpoint, json=payload, headers=self.headers, timeout=30)
+        try:
+            resp = self.session.post(self.endpoint, json=payload, headers=self.headers, timeout=30)
+        except Exception as e:
+            logger.error("[TURSO-NETWORK-ERROR] Failed to reach remote database at %s: %s (SQL: %.100s)", self.endpoint, e, sql)
+            raise sqlite3.OperationalError(f"Turso Network Error: {e}") from e
+
         if resp.status_code != 200:
+            logger.error("[TURSO-HTTP-ERROR] Remote DB returned HTTP %d for %s: %s (SQL: %.100s)", resp.status_code, self.endpoint, resp.text, sql)
             raise sqlite3.OperationalError(f"Turso HTTP {resp.status_code}: {resp.text}")
 
         data = resp.json()
         if "error" in data:
+            logger.error("[TURSO-ERROR] Remote DB error on %s: %s (SQL: %.100s)", self.endpoint, data["error"], sql)
             raise sqlite3.OperationalError(f"Turso Error: {data['error']}")
 
         results = data.get("results", [])
@@ -215,6 +222,7 @@ class TursoConnection:
             err_msg = str(res.get("error", {}).get("message", res))
             if "UNIQUE constraint" in err_msg or "constraint failed" in err_msg.lower():
                 raise sqlite3.IntegrityError(err_msg)
+            logger.error("[TURSO-QUERY-ERROR] Remote statement execution failed: %s (SQL: %.100s)", err_msg, sql)
             raise sqlite3.OperationalError(f"Turso Query Error: {err_msg}")
 
         stmt_res = res.get("response", {}).get("result", {})
@@ -253,13 +261,22 @@ class TursoConnection:
                 for params in chunk
             ]
             payload = {"requests": requests_list}
-            resp = self.session.post(self.endpoint, json=payload, headers=self.headers, timeout=60)
+            try:
+                resp = self.session.post(self.endpoint, json=payload, headers=self.headers, timeout=60)
+            except Exception as e:
+                logger.error("[TURSO-NETWORK-ERROR] Failed to reach remote database during executemany at %s: %s (SQL: %.100s)", self.endpoint, e, sql)
+                raise sqlite3.OperationalError(f"Turso Network Error: {e}") from e
+
             if resp.status_code != 200:
+                logger.error("[TURSO-HTTP-ERROR] Remote DB returned HTTP %d in executemany for %s: %s (SQL: %.100s)", resp.status_code, self.endpoint, resp.text, sql)
                 raise sqlite3.OperationalError(f"Turso HTTP {resp.status_code}: {resp.text}")
+
             data = resp.json()
             for res in data.get("results", []):
                 if res.get("type") == "error":
-                    raise sqlite3.OperationalError(f"Turso Executemany Error: {res.get('error', {}).get('message', res)}")
+                    err_msg = str(res.get("error", {}).get("message", res))
+                    logger.error("[TURSO-EXEC-ERROR] Executemany batch statement error: %s (SQL: %.100s)", err_msg, sql)
+                    raise sqlite3.OperationalError(f"Turso Executemany Error: {err_msg}")
                 total_affected += res.get("response", {}).get("result", {}).get("affected_row_count", 0)
 
         return TursoCursor([], rowcount=total_affected)
@@ -298,6 +315,17 @@ def is_turso_enabled() -> bool:
     return bool(url and token)
 
 
+def is_server_environment() -> bool:
+    """Return True if running in a serverless, cloud, or production deployment."""
+    return bool(
+        os.getenv("VERCEL") == "1"
+        or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+        or os.getenv("K_SERVICE")
+        or os.getenv("ENV", "").lower() in ("production", "prod", "staging")
+        or os.getenv("ENVIRONMENT", "").lower() in ("production", "prod", "staging")
+    )
+
+
 def get_db_connection(settings: Settings | None = None) -> sqlite3.Connection | TursoConnection:
     """Return a database connection (Turso Cloud if configured, otherwise local SQLite).
 
@@ -314,6 +342,22 @@ def get_db_connection(settings: Settings | None = None) -> sqlite3.Connection | 
 
     if url and token:
         return TursoConnection(url, token)
+
+    # If in a server environment without Turso credentials, log a high-visibility warning
+    if is_server_environment():
+        logger.error(
+            "[DB-SERVER-WARNING] Running on server (VERCEL=%s, ENV=%s) but TURSO_DATABASE_URL / TURSO_AUTH_TOKEN is missing! "
+            "Falling back to local SQLite at %s (WARNING: data is ephemeral and will not persist across serverless invocations!)",
+            os.getenv("VERCEL"),
+            os.getenv("ENV") or os.getenv("ENVIRONMENT"),
+            _cache_path(s),
+        )
+        if os.getenv("TURSO_STRICT", "0").lower() in ("1", "true"):
+            raise sqlite3.OperationalError(
+                "Strict server mode enabled (TURSO_STRICT=1): Remote Turso credentials required on server deployments."
+            )
+    else:
+        logger.debug("[DB-LOCAL] Using local SQLite database at %s", _cache_path(s))
 
     s.ensure_dirs()
     return sqlite3.connect(str(_cache_path(s)))
