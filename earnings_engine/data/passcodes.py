@@ -162,26 +162,68 @@ def verify_passcode(code: str, settings: Settings | None = None) -> dict[str, An
             # Also check if it matches an active invite_code
             try:
                 inv_row = conn.execute(
-                    "SELECT code, label, scopes, max_uses, use_count, is_active FROM invite_codes WHERE UPPER(code) = ?",
+                    """
+                    SELECT code, label, scopes, max_uses, uses_count, expires_at, is_active
+                    FROM invite_codes
+                    WHERE UPPER(code) = ?
+                    """,
                     (clean_code,),
                 ).fetchone()
-                if inv_row and inv_row[5]:
-                    inv_scopes = json.loads(inv_row[2]) if inv_row[2] else ["can_view_trips"]
+                if inv_row:
+                    inv_code, inv_label, scopes_json, max_uses, uses_count, expires_at, is_active = inv_row
+                    if not is_active:
+                        return {"valid": False, "error": "This invite code has been deactivated by the admin."}
+
+                    if max_uses is not None and uses_count >= max_uses:
+                        return {"valid": False, "error": "This invite code has reached its maximum allowed uses."}
+
+                    if expires_at:
+                        try:
+                            exp_dt = datetime.fromisoformat(expires_at)
+                            if exp_dt.tzinfo is None:
+                                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                            if exp_dt < datetime.now(timezone.utc):
+                                return {"valid": False, "error": "This invite code has expired."}
+                        except Exception:
+                            pass
+
+                    # Increment uses count
+                    conn.execute("UPDATE invite_codes SET uses_count = uses_count + 1 WHERE code = ?", (inv_code,))
+                    conn.commit()
+
+                    try:
+                        inv_scopes = json.loads(scopes_json) if scopes_json else ["can_view_trips"]
+                    except Exception:
+                        inv_scopes = ["can_view_trips"]
+
+                    allowed_routes = []
+                    if "dashboard" in inv_scopes:
+                        allowed_routes.append("dashboard")
+                    if "can_view_cards" in inv_scopes:
+                        allowed_routes.append("credit_card")
+                    if "can_view_trips" in inv_scopes:
+                        allowed_routes.append("trips")
+                    if "can_view_net_worth" in inv_scopes:
+                        allowed_routes.append("net_worth")
+
                     return {
                         "valid": True,
-                        "code": inv_row[0],
-                        "label": inv_row[1] or "Friend Access",
+                        "code": inv_code,
+                        "label": inv_label or "Friend Access",
                         "role": "friend",
                         "is_admin": False,
-                        "allowed_routes": ["dashboard"] if "dashboard" in inv_scopes else ["credit_card"],
+                        "allowed_routes": allowed_routes,
                         "scopes": inv_scopes,
                         "authorized_apps": [
-                            {**r_info, "has_access": (r_id == "dashboard" and "dashboard" in inv_scopes) or (r_id == "credit_card" and "can_view_cards" in inv_scopes)}
+                            {
+                                **r_info,
+                                "has_access": (r_id in allowed_routes) or (r_id == "credit_card" and "can_view_cards" in inv_scopes) or (r_id == "dashboard" and "dashboard" in inv_scopes)
+                            }
                             for r_id, r_info in AVAILABLE_ROUTES.items()
                         ],
                     }
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Error verifying invite code %s: %s", clean_code, e)
             return {"valid": False, "error": "Invalid access code. Please check your passcode."}
 
         p_code, label, allowed_json, created_at, expires_at, max_uses, use_count, is_active = row

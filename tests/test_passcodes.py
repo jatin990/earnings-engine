@@ -110,3 +110,32 @@ def test_passcode_api_endpoints():
     cards_resp = client.get("/credit-card")
     assert cards_resp.status_code == 200
     assert "OBSIDIAN INFINITE" in cards_resp.text
+
+
+def test_verify_scoped_invite_code():
+    from earnings_engine.data.auth import create_scoped_invite
+    client = TestClient(app)
+
+    invite = create_scoped_invite(
+        label="Test Friend Guest",
+        scopes=["can_view_cards", "dashboard"],
+        max_uses=2,
+    )
+    inv_code = invite["code"]
+
+    # Verify directly via verify_passcode
+    verified = verify_passcode(inv_code)
+    assert verified["valid"] is True
+    assert verified["role"] == "friend"
+    assert verified["label"] == "Test Friend Guest"
+    assert "credit_card" in verified["allowed_routes"]
+    assert "dashboard" in verified["allowed_routes"]
+
+    # Verify via API endpoint
+    resp = client.post("/api/v1/auth/verify-code", json={"code": inv_code})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["valid"] is True
+    assert "session_token" in data
+    assert resp.cookies.get("nexus_session") is not None
+

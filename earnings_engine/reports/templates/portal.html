@@ -438,20 +438,13 @@
             pendingOtpData: null,
 
             async init() {
-                // Check if invite code was passed in URL query
+                // Check if invite/passcode was passed in URL query (e.g. /join?code=... or /portal?code=...)
                 const urlParams = new URLSearchParams(window.location.search);
-                const codeParam = urlParams.get('code') || urlParams.get('invite');
-                const joinParam = urlParams.get('join');
+                const codeParam = urlParams.get('code') || urlParams.get('invite') || urlParams.get('passcode');
 
-                if (joinParam || window.location.pathname === '/join') {
-                    this.switchGateMode('email_otp');
-                    if (codeParam) {
-                        const el = document.getElementById('inviteCodeInput');
-                        if (el) el.value = codeParam;
-                    }
-                } else if (codeParam) {
+                if (codeParam) {
                     this.fillCode(codeParam);
-                    await this.verifyCode(codeParam, true);
+                    await this.verifyCode(codeParam, false);
                     return;
                 }
 
@@ -465,36 +458,12 @@
                 }
             },
 
-            switchGateMode(mode) {
-                const passBtn = document.getElementById('tabBtnPasscode');
-                const emailBtn = document.getElementById('tabBtnEmailOtp');
-                const passForm = document.getElementById('passcodeForm');
-                const emailForm = document.getElementById('emailOtpForm');
-
-                if (mode === 'passcode') {
-                    passBtn.classList.add('active');
-                    emailBtn.classList.remove('active');
-                    passForm.style.display = 'block';
-                    emailForm.style.display = 'none';
-                } else {
-                    emailBtn.classList.add('active');
-                    passBtn.classList.remove('active');
-                    emailForm.style.display = 'block';
-                    passForm.style.display = 'none';
-                }
-            },
-
             fillCode(code) {
                 const el = document.getElementById('passcodeInput');
                 if (el) {
                     el.value = code;
                     el.focus();
                 }
-            },
-
-            toggleEmailOtpView() {
-                const el = document.getElementById('emailOtpCollapsible');
-                if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
             },
 
             toggleShowPasscode() {
