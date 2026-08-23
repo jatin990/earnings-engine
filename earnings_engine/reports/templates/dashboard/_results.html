@@ -1,18 +1,26 @@
 {% import 'dashboard/_components.html' as comps %}
-        <div id="tab-results" class="tab-content active">
-            <div id="resultsDatasetSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;"></div>
-            <div id="resultsWidgets" class="widget-grid"></div>
-            <section class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.65rem;">
+        <div id="tab-results" class="tab-content active" style="width: 100%; max-width: 100%;">
+            
+            <!-- ⚡ Top High-Density Metric Cards Grid -->
+            <div id="resultsDatasetSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;"></div>
+            <div id="resultsWidgets" class="widget-grid" style="margin-bottom: 0.75rem;"></div>
+
+            <!-- 📊 Main Results Terminal Section -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+                
+                <!-- Header & Action Controls Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.2rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.5rem; background: linear-gradient(135deg, #c084fc 0%, #a855f7 50%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                            <span>📊 Corporate Results & Earnings Announcements</span>
-                            <span id="resultsCount" class="signal-badge" style="font-size:0.75rem;display:none;background:rgba(168,85,247,0.2);color:#d8b4fe;border:1px solid rgba(168,85,247,0.3);"></span>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
+                            <span>📊 Corporate Results Ledger</span>
+                            <span id="resultsCount" class="signal-badge" style="font-size:0.68rem;display:none;background:rgba(168,85,247,0.15);color:#d8b4fe;border:1px solid rgba(168,85,247,0.3);padding:0.12rem 0.45rem;"></span>
                         </h3>
-                        <p class="timestamp" style="margin:0.2rem 0 0 0;font-size:0.8rem;color:var(--muted);">Explore earnings announcements across Indian & US markets with pre-event momentum and past quarterly beats.</p>
+                        <p class="timestamp" style="margin:0.15rem 0 0 0;font-size:0.72rem;color:var(--text-muted);">Real-time corporate earnings calendar, historical beat rates, pre-event momentum, and 4-model AI consensus predictions.</p>
                     </div>
-                    <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap;">
-                        <select id="resultsRangePreset" onchange="app.onResultsPresetChange(this.value)" style="padding: 0.45rem 0.7rem; border: 1px solid rgba(168,85,247,0.3); border-radius: 0.5rem; background: #0c0717; color: var(--light); font-size: 0.82rem; font-weight: 600;">
+
+                    <!-- Right Controls -->
+                    <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                        <select id="resultsRangePreset" onchange="app.onResultsPresetChange(this.value)" style="padding: 0.32rem 0.55rem; border: 1px solid rgba(255,255,255,0.12); border-radius: 0.4rem; background: #0a0a10; color: #f8fafc; font-size: 0.74rem; font-weight: 600;">
                             <option value="recent">⚡ Recent (-4D to +7D)</option>
                             <option value="pm60" selected>⚡ ±2 Months (Past 60D & Next 60D)</option>
                             <option value="pm30">📅 ±1 Month (Past 30D & Next 30D)</option>
@@ -22,36 +30,64 @@
                             <option value="past60">🕒 Past 60 Days Only</option>
                             <option value="custom">⚙️ Custom Range</option>
                         </select>
-                        <span id="resultsCustomInputs" style="display: none; align-items: center; gap: 0.3rem;">
-                            <input type="number" id="resultsPastDays" value="60" min="0" max="180" style="width: 65px; padding: 0.35rem 0.4rem; border: 1px solid rgba(168,85,247,0.3); border-radius: 0.4rem; background: rgba(12,7,23,0.7); color: var(--light); font-size: 0.8rem;" title="Days in past (lookback)">
-                            <span style="font-size:0.75rem;color:var(--muted);">Past D / Next D</span>
-                            <input type="number" id="resultsDays" value="60" min="1" max="180" style="width: 65px; padding: 0.35rem 0.4rem; border: 1px solid rgba(168,85,247,0.3); border-radius: 0.4rem; background: rgba(12,7,23,0.7); color: var(--light); font-size: 0.8rem;" title="Days ahead (lookahead)">
+                        <span id="resultsCustomInputs" style="display: none; align-items: center; gap: 0.25rem;">
+                            <input type="number" id="resultsPastDays" value="60" min="0" max="180" style="width: 55px; padding: 0.25rem 0.35rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.35rem; background: #0a0a10; color: #f8fafc; font-size: 0.72rem;" title="Days in past (lookback)">
+                            <span style="font-size:0.68rem;color:var(--text-muted);">/</span>
+                            <input type="number" id="resultsDays" value="60" min="1" max="180" style="width: 55px; padding: 0.25rem 0.35rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 0.35rem; background: #0a0a10; color: #f8fafc; font-size: 0.72rem;" title="Days ahead (lookahead)">
                         </span>
                         {{ comps.market_dropdown('resultsMarket', 'ALL', '') }}
-                        <button onclick="app.loadResultsReport()" id="resultsLoadBtn" class="btn btn-primary btn-sm" style="font-weight:700;box-shadow:0 4px 16px rgba(147,51,234,0.4);">▶ Load Report</button>
-                        <button onclick="app.cancelReportLoad('results')" id="resultsCancelBtn" class="btn btn-sm btn-danger" style="display:none;font-weight:700;background:#dc2626;border-color:#ef4444;" title="Cancel pending load request">⏹ Cancel</button>
-                        <button onclick="app.showMoreResultsDays()" id="resultsMoreDaysBtn" class="btn btn-sm" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.35);display:none;font-weight:700;">📅 Show Next Date</button>
-                        <button onclick="app.summarizeResults()" class="btn btn-sm" style="background:rgba(168,85,247,0.18);color:#d8b4fe;border:1px solid rgba(168,85,247,0.35);font-weight:700;">✨ LLM Summary</button>
-                        <button onclick="app.refreshResults()" class="btn btn-sm" style="background:rgba(168,85,247,0.12);color:#e9d5ff;border:1px solid rgba(168,85,247,0.25);font-weight:700;">🔄 Sync Feed</button>
+                        <button onclick="app.loadResultsReport()" id="resultsLoadBtn" class="btn btn-primary btn-sm" style="font-weight:700;font-size:0.74rem;padding:0.32rem 0.75rem;">▶ Load Report</button>
+                        <button onclick="app.cancelReportLoad('results')" id="resultsCancelBtn" class="btn btn-sm btn-danger" style="display:none;font-weight:700;font-size:0.74rem;" title="Cancel pending load request">⏹ Cancel</button>
+                        <button onclick="app.showMoreResultsDays()" id="resultsMoreDaysBtn" class="btn btn-sm" style="background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);display:none;font-weight:700;font-size:0.72rem;">📅 Next Date</button>
+                        <button onclick="app.summarizeResults()" class="btn btn-sm" style="background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.3);font-weight:700;font-size:0.72rem;">✨ LLM Summary</button>
+                        <button onclick="app.refreshResults()" class="btn btn-sm" style="background:rgba(255,255,255,0.06);color:#e2e8f0;border:1px solid rgba(255,255,255,0.15);font-weight:600;font-size:0.72rem;">🔄 Sync Feed</button>
+                    </div>
+                </div>
+
+                <!-- 🛠️ Next-Gen Interactive Table Operations Toolbar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.45rem;">
+                    
+                    <!-- Search Input -->
+                    <div style="display: flex; align-items: center; gap: 0.4rem; flex: 1; min-width: 240px; max-width: 420px;">
+                        <span style="font-size: 0.76rem; color: #71717a;">🔍</span>
+                        <input type="text" id="resultsLiveSearch" oninput="app.filterResultsTable(this.value)" placeholder="Instant filter by symbol, company, industry, or signal..." style="width: 100%; padding: 0.25rem 0.5rem; background: #030305; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.35rem; color: #ffffff; font-size: 0.74rem; font-family: var(--font-mono); outline: none;">
+                    </div>
+
+                    <!-- Toolbar Operations: Density, Columns, Export -->
+                    <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.72rem;">
+                        <span id="resultsFilterMatchCount" style="color: #38bdf8; font-family: var(--font-mono); font-weight: 700; font-size: 0.7rem;"></span>
+                        
+                        <!-- Density Toggle -->
+                        <div style="display: flex; align-items: center; background: #030305; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.35rem; padding: 1px;">
+                            <button type="button" onclick="app.setResultsTableDensity('compact')" id="densityBtnCompact" class="btn-micro" style="background:rgba(255,255,255,0.12);color:#ffffff;font-size:0.65rem;" title="Compact Data View">Dense</button>
+                            <button type="button" onclick="app.setResultsTableDensity('standard')" id="densityBtnStandard" class="btn-micro" style="background:transparent;color:#71717a;font-size:0.65rem;" title="Standard Data View">Comfort</button>
+                        </div>
+
+                        <!-- Export Tools -->
+                        <button type="button" onclick="app.exportResultsToCsv()" class="btn-micro btn-micro-neutral" title="Export visible results to CSV spreadsheet">⤓ CSV</button>
+                        <button type="button" onclick="app.exportResultsToJson()" class="btn-micro btn-micro-neutral" title="Export visible results to JSON">⤓ JSON</button>
                     </div>
                 </div>
 
                 <!-- 📅 Month Breakdown Sub-Tabs -->
-                <div id="resultsMonthTabs" style="display: none; gap: 0.5rem; margin: 0.75rem 0 1rem 0; flex-wrap: wrap; align-items: center; padding: 0.5rem 0.75rem; background: rgba(18,10,32,0.5); border: 1px solid rgba(168,85,247,0.15); border-radius: 0.75rem;"></div>
+                <div id="resultsMonthTabs" style="display: none; gap: 0.35rem; margin: 0.4rem 0 0.65rem 0; flex-wrap: wrap; align-items: center; padding: 0.35rem 0.55rem; background: #09090f; border: 1px solid rgba(255,255,255,0.06); border-radius: 0.5rem;"></div>
 
                 <div id="resultsReportLegend" class="day-legend"></div>
+                
+                <!-- Results Report Table Container -->
                 <div id="resultsReportSections">
-                    <div class="card" style="text-align:center;padding:2.75rem 1.5rem;color:var(--muted);background:rgba(18,10,32,0.5);border:1px dashed rgba(168,85,247,0.3);border-radius:1rem;margin:1rem 0;">
-                        <div style="font-size:2.4rem;margin-bottom:0.75rem;">📅</div>
-                        <h4 id="resultsCenterTitle" style="margin:0 0 0.4rem 0;color:var(--light);font-size:1.15rem;font-family:'Space Grotesk',sans-serif;">Ready to Load Results Report</h4>
-                        <p style="max-width:520px;margin:0 auto 1.25rem auto;font-size:0.85rem;line-height:1.55;color:var(--text-muted);">
-                            Results are served instantaneously from the persistent local cache. Select your desired timeframe and click <strong>Load Report</strong> below to analyze reported quarterly numbers and upcoming earnings catalysts.
+                    <div class="card" style="text-align:center;padding:2.2rem 1.2rem;color:var(--text-muted);background:#08080d;border:1px dashed rgba(255,255,255,0.12);border-radius:0.75rem;margin:0.5rem 0;">
+                        <div style="font-size:2rem;margin-bottom:0.5rem;">📅</div>
+                        <h4 id="resultsCenterTitle" style="margin:0 0 0.35rem 0;color:var(--light);font-size:1.05rem;font-family:'Space Grotesk',sans-serif;">Corporate Earnings Ready to Load</h4>
+                        <p style="max-width:480px;margin:0 auto 1rem auto;font-size:0.78rem;line-height:1.5;color:var(--text-muted);">
+                            Results are served instantaneously from the local cache. Click <strong>Load Report</strong> to view upcoming earnings catalysts and previous quarter performance.
                         </p>
-                        <button onclick="app.loadResultsReport()" id="resultsCenterLoadBtn" class="btn btn-primary" style="padding:0.55rem 1.4rem;font-size:0.88rem;font-weight:700;box-shadow:0 4px 20px rgba(147,51,234,0.5);">▶ Load Results Report</button>
+                        <button onclick="app.loadResultsReport()" id="resultsCenterLoadBtn" class="btn btn-primary btn-sm" style="padding:0.45rem 1.2rem;font-size:0.8rem;font-weight:700;">▶ Load Results Report</button>
                     </div>
                 </div>
-                <div id="resultsReportStatus" class="timestamp" style="margin-top: 0.5rem;"></div>
+                <div id="resultsReportStatus" class="timestamp" style="margin-top: 0.4rem; font-size: 0.72rem;"></div>
             </section>
         </div>
 
         <!-- ================= SWING TAB ================= -->
+

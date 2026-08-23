@@ -1,1 +1,36 @@
-<tr class="{day_class}" id="row_{row_ticker_id}"><td class="stock-cell"><a class="stock-link" onclick="openPopup('{ticker}')">{company_name}<br><span class="ticker-sub">{ticker}</span></a></td><td class="cell-earnings-date">{earnings_date}</td><td class="cell-market-cap">{market_cap}</td><td class="cell-current-price">{current_price}</td><td class="cell-thirty-day-return">{thirty_day_return}</td><td class="cell-q1-week-hl">{q1_week_hl}</td><td class="cell-q2-week-hl">{q2_week_hl}</td><td class="cell-q3-week-hl">{q3_week_hl}</td><td class="cell-pct-52w-hl">{pct_from_52w_high_low}</td><td class="cell-quality-scores">{quality_scores}</td><td class="cell-prev-3q-score">{prev_3q_score}</td><td class="cell-next-resistance">{next_resistance}</td><td class="cell-current-support">{current_support}</td><td>{kronos_14d}</td><td>{gbm_prediction}</td><td class="cell-ai-consensus" style="text-align:center;">{consensus_badge}</td><td class="cell-actions" style="white-space:nowrap;"><div style="display:flex;gap:0.35rem;align-items:center;"><button type="button" class="btn btn-sm" onclick="app.recalculateRow('{ticker}', this)" title="Refresh live earnings date, prices, and recalculate metrics" style="padding:0.2rem 0.5rem;font-size:0.75rem;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.35);border-radius:0.35rem;cursor:pointer;font-weight:600;">🔄 Recalc</button><button type="button" class="btn btn-sm" onclick="app.showTickerAuditModal('{ticker}')" title="View recalculation audit history" style="padding:0.2rem 0.45rem;font-size:0.75rem;background:rgba(255,255,255,0.06);color:var(--muted);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;cursor:pointer;">📜</button></div></td></tr>
+<tr class="{day_class}" id="row_{row_ticker_id}" data-ticker="{ticker}">
+  <td class="stock-cell">
+    <div class="stock-cell-wrap">
+      <span class="stock-ticker-main" onclick="app.toggleRowDrawer('{row_ticker_id}', '{ticker}')" title="Click to view full stock breakdown">
+        <span class="drawer-arrow" id="arrow_{row_ticker_id}" style="font-size:0.62rem;color:#a855f7;transition:transform 0.15s;">▶</span>
+        {ticker}
+      </span>
+      <span class="stock-company-sub" title="{company_name}">{company_name}</span>
+    </div>
+  </td>
+  <td class="cell-earnings-date mono" style="color:#e2e8f0;font-size:0.74rem;">{earnings_date}</td>
+  <td class="cell-market-cap mono" style="color:#cbd5e1;font-size:0.74rem;">{market_cap}</td>
+  <td class="cell-current-price mono" style="color:#ffffff;font-weight:700;font-size:0.75rem;">{current_price}</td>
+  <td class="cell-thirty-day-return mono" style="font-size:0.74rem;">{thirty_day_return}</td>
+  <td class="cell-q1-week-hl mono" style="font-size:0.72rem;line-height:1.2;">{q1_week_hl}</td>
+  <td class="cell-q2-week-hl mono" style="font-size:0.72rem;line-height:1.2;">{q2_week_hl}</td>
+  <td class="cell-q3-week-hl mono" style="font-size:0.72rem;line-height:1.2;">{q3_week_hl}</td>
+  <td class="cell-pct-52w-hl mono" style="font-size:0.72rem;">{pct_from_52w_high_low}</td>
+  <td class="cell-quality-scores mono" style="color:#94a3b8;font-size:0.72rem;">{quality_scores}</td>
+  <td class="cell-prev-3q-score mono" style="font-weight:700;font-size:0.74rem;">{prev_3q_score}</td>
+  <td class="cell-next-resistance mono" style="color:#f87171;font-size:0.72rem;">{next_resistance}</td>
+  <td class="cell-current-support mono" style="color:#34d399;font-size:0.72rem;">{current_support}</td>
+  <td class="cell-kronos mono" style="font-size:0.72rem;">{kronos_14d}</td>
+  <td class="cell-gbm mono" style="font-size:0.72rem;">{gbm_prediction}</td>
+  <td class="cell-ai-consensus" style="text-align:center;">{consensus_badge}</td>
+  <td class="cell-actions" style="white-space:nowrap;">
+    <div style="display:flex;gap:0.25rem;align-items:center;">
+      <button type="button" class="btn-micro btn-micro-primary" onclick="app.recalculateRow('{ticker}', this)" title="Refresh live prices & recalculate metrics">🔄 Recalc</button>
+      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.showTickerAuditModal('{ticker}')" title="Audit Log">📜</button>
+      <button type="button" class="btn-micro btn-micro-violet" onclick="app.toggleRowDrawer('{row_ticker_id}', '{ticker}')" title="Expand Details Drawer">🔍</button>
+    </div>
+  </td>
+</tr>
+<tr id="drawer_{row_ticker_id}" class="row-drawer-tr" style="display:none;">
+  <td colspan="17" id="drawer_body_{row_ticker_id}" style="padding:0;border-bottom:1px solid rgba(168,85,247,0.3);"></td>
+</tr>

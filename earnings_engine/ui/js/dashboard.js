@@ -1855,6 +1855,7 @@
                         btn.style.display = 'none';
                     }
                 }
+                this.updateResultsSummaryCards();
             },
 
             showMoreResultsDays() {
@@ -1862,6 +1863,320 @@
                     this.resultsShowDays = Math.min(this.resultsShowDays + 5, (this.resultsDaySections || []).length);
                     this.renderResultsDays();
                 }
+            },
+
+            updateResultsSummaryCards() {
+                const summaryEl = document.getElementById('resultsDatasetSummary');
+                if (!summaryEl) return;
+
+                const tableRows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr)');
+                if (!tableRows.length) {
+                    summaryEl.innerHTML = '';
+                    return;
+                }
+
+                let totalStocks = 0;
+                let sum30D = 0;
+                let count30D = 0;
+                let positiveMovesCount = 0;
+                let totalBeatEvalCount = 0;
+                let bullConsensusCount = 0;
+                let bearConsensusCount = 0;
+                let imminentCount = 0;
+
+                const today = new Date();
+                const next48h = new Date(today.getTime() + 48 * 3600 * 1000);
+                const todayStr = today.toISOString().slice(0, 10);
+                const next48hStr = next48h.toISOString().slice(0, 10);
+
+                tableRows.forEach(row => {
+                    totalStocks++;
+                    const dateCell = row.querySelector('.cell-earnings-date');
+                    if (dateCell) {
+                        const dateText = dateCell.textContent.trim().slice(0, 10);
+                        if (dateText >= todayStr && dateText <= next48hStr) {
+                            imminentCount++;
+                        }
+                    }
+
+                    const retCell = row.querySelector('.cell-thirty-day-return');
+                    if (retCell) {
+                        const retText = retCell.textContent.replace('%', '').replace('+', '').trim();
+                        const val = parseFloat(retText);
+                        if (!isNaN(val)) {
+                            sum30D += val;
+                            count30D++;
+                        }
+                    }
+
+                    const qScoreCell = row.querySelector('.cell-prev-3q-score');
+                    if (qScoreCell) {
+                        const sText = qScoreCell.textContent.replace('/9', '').trim();
+                        const sVal = parseFloat(sText);
+                        if (!isNaN(sVal)) {
+                            totalBeatEvalCount++;
+                            if (sVal >= 5) positiveMovesCount++;
+                        }
+                    }
+
+                    const aiCell = row.querySelector('.cell-ai-consensus');
+                    if (aiCell) {
+                        const text = aiCell.textContent.toUpperCase();
+                        if (text.includes('BULL')) bullConsensusCount++;
+                        else if (text.includes('BEAR')) bearConsensusCount++;
+                    }
+                });
+
+                const avg30D = count30D ? (sum30D / count30D).toFixed(1) : '0.0';
+                const avg30DCls = parseFloat(avg30D) >= 0 ? 'color:#34d399;' : 'color:#f87171;';
+                const beatPct = totalBeatEvalCount ? Math.round((positiveMovesCount / totalBeatEvalCount) * 100) : 0;
+                const winWindow = this.resultsActiveWindowName || '±60D';
+
+                summaryEl.innerHTML = `
+                    <div class="metric">
+                        <span>Total Tracked</span>
+                        <strong style="color:#ffffff;">${totalStocks} <span style="font-size:0.7rem;color:#a855f7;font-weight:600;">(${winWindow})</span></strong>
+                    </div>
+                    <div class="metric">
+                        <span>Avg 30D Momentum</span>
+                        <strong style="${avg30DCls}">${parseFloat(avg30D) > 0 ? '+' : ''}${avg30D}%</strong>
+                    </div>
+                    <div class="metric">
+                        <span>Quality Beat Rate</span>
+                        <strong style="color:#38bdf8;">${beatPct}% <span style="font-size:0.7rem;color:#71717a;font-weight:400;">(${positiveMovesCount}/${totalBeatEvalCount})</span></strong>
+                    </div>
+                    <div class="metric">
+                        <span>AI Consensus</span>
+                        <strong style="color:#c084fc;font-size:0.85rem;"><span style="color:#34d399;">${bullConsensusCount} 🐂</span> / <span style="color:#f87171;">${bearConsensusCount} 🐻</span></strong>
+                    </div>
+                    <div class="metric">
+                        <span>Imminent (48h)</span>
+                        <strong style="color:#fbbf24;">${imminentCount} <span style="font-size:0.7rem;color:#a1a1aa;font-weight:400;">catalysts</span></strong>
+                    </div>
+                `;
+            },
+
+            filterResultsTable(query) {
+                const q = (query || '').toLowerCase().trim();
+                const rows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr)');
+                const matchEl = document.getElementById('resultsFilterMatchCount');
+                let matchCount = 0;
+                let totalCount = rows.length;
+
+                rows.forEach(row => {
+                    const rowId = row.id;
+                    const drawerId = rowId ? rowId.replace('row_', 'drawer_') : null;
+                    const drawerRow = drawerId ? document.getElementById(drawerId) : null;
+
+                    if (!q) {
+                        row.style.display = '';
+                        matchCount++;
+                        return;
+                    }
+
+                    const text = row.textContent.toLowerCase();
+                    const isMatch = text.includes(q);
+                    row.style.display = isMatch ? '' : 'none';
+                    if (!isMatch && drawerRow) {
+                        drawerRow.style.display = 'none';
+                    }
+                    if (isMatch) matchCount++;
+                });
+
+                // Also hide empty cap/industry sections
+                document.querySelectorAll('#resultsReportSections .industry-subgroup, #resultsReportSections .cap-section').forEach(sec => {
+                    const visibleTrs = sec.querySelectorAll('tbody tr:not(.row-drawer-tr):not([style*="display: none"])');
+                    sec.style.display = visibleTrs.length ? '' : 'none';
+                });
+
+                if (matchEl) {
+                    matchEl.textContent = q ? `Showing ${matchCount}/${totalCount}` : '';
+                }
+            },
+
+            sortResultsTable(th, colIndex, type) {
+                const table = th.closest('table');
+                if (!table) return;
+                const tbody = table.querySelector('tbody');
+                if (!tbody) return;
+
+                const isAsc = th.classList.contains('sort-asc');
+                const isDesc = th.classList.contains('sort-desc');
+                const newDirection = isAsc ? 'desc' : 'asc';
+
+                // Reset all th headers in this table
+                table.querySelectorAll('th').forEach(h => {
+                    h.classList.remove('sort-asc', 'sort-desc');
+                });
+                th.classList.add(newDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+
+                // Get row pairs (main row + drawer row)
+                const rows = Array.from(tbody.querySelectorAll('tr:not(.row-drawer-tr)'));
+                const rowPairs = rows.map(row => {
+                    const drawerId = row.id ? row.id.replace('row_', 'drawer_') : null;
+                    const drawerRow = drawerId ? document.getElementById(drawerId) : null;
+                    return { row, drawerRow };
+                });
+
+                rowPairs.sort((a, b) => {
+                    const cellA = a.row.children[colIndex];
+                    const cellB = b.row.children[colIndex];
+                    if (!cellA || !cellB) return 0;
+
+                    let valA = cellA.textContent.trim();
+                    let valB = cellB.textContent.trim();
+
+                    if (type === 'num') {
+                        const numA = parseFloat(valA.replace(/[^0-9.-]/g, '')) || 0;
+                        const numB = parseFloat(valB.replace(/[^0-9.-]/g, '')) || 0;
+                        return newDirection === 'asc' ? numA - numB : numB - numA;
+                    } else if (type === 'date') {
+                        const dateA = valA.slice(0, 10);
+                        const dateB = valB.slice(0, 10);
+                        return newDirection === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+                    } else {
+                        return newDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                    }
+                });
+
+                rowPairs.forEach(pair => {
+                    tbody.appendChild(pair.row);
+                    if (pair.drawerRow) tbody.appendChild(pair.drawerRow);
+                });
+            },
+
+            toggleRowDrawer(rowTickerId, ticker) {
+                const drawerTr = document.getElementById('drawer_' + rowTickerId);
+                const arrow = document.getElementById('arrow_' + rowTickerId);
+                const mainRow = document.getElementById('row_' + rowTickerId);
+                if (!drawerTr) return;
+
+                const isHidden = drawerTr.style.display === 'none' || !drawerTr.style.display;
+                if (isHidden) {
+                    drawerTr.style.display = 'table-row';
+                    if (arrow) arrow.style.transform = 'rotate(90deg)';
+                    if (mainRow) mainRow.classList.add('row-expanded');
+
+                    const bodyTd = document.getElementById('drawer_body_' + rowTickerId);
+                    if (bodyTd && !bodyTd.hasAttribute('data-populated')) {
+                        bodyTd.setAttribute('data-populated', 'true');
+                        
+                        // Extract content from corresponding popup modal if present
+                        const popupEl = document.getElementById('popup_' + rowTickerId);
+                        let sectionsHtml = '';
+                        if (popupEl) {
+                            sectionsHtml = popupEl.querySelector('.popup-sections')?.innerHTML || popupEl.querySelector('.popup-body')?.innerHTML || '';
+                        }
+                        
+                        if (!sectionsHtml) {
+                            sectionsHtml = `
+                                <div class="drawer-card">
+                                    <h5>📊 Stock Intelligence for ${ticker}</h5>
+                                    <div style="font-size:0.75rem;color:#a1a1aa;line-height:1.5;">
+                                        Comprehensive earnings history, implied volatility breakdown, and 4-model AI consensus predictions.
+                                    </div>
+                                    <div style="margin-top:0.5rem;display:flex;gap:0.4rem;align-items:center;">
+                                        <button type="button" class="btn-micro btn-micro-violet" onclick="app.openAiDetails('ALL', '${ticker}', event)">🤖 4-Model AI Breakdown</button>
+                                        <button type="button" class="btn-micro btn-micro-primary" onclick="app.showOhlcvBenchmarkModal('${ticker}')">📈 TradingView Chart</button>
+                                        <button type="button" class="btn-micro btn-micro-neutral" onclick="app.showTickerAuditModal('${ticker}')">📜 Formula Audit</button>
+                                    </div>
+                                </div>
+                            `;
+                        }
+
+                        bodyTd.innerHTML = `
+                            <div class="drawer-content">
+                                ${sectionsHtml}
+                            </div>
+                        `;
+                    }
+                } else {
+                    drawerTr.style.display = 'none';
+                    if (arrow) arrow.style.transform = 'rotate(0deg)';
+                    if (mainRow) mainRow.classList.remove('row-expanded');
+                }
+            },
+
+            setResultsTableDensity(mode) {
+                const tables = document.querySelectorAll('#resultsReportSections table.results-table');
+                const btnCompact = document.getElementById('densityBtnCompact');
+                const btnStd = document.getElementById('densityBtnStandard');
+
+                if (mode === 'compact') {
+                    tables.forEach(t => {
+                        t.style.fontSize = '0.72rem';
+                        t.querySelectorAll('th, td').forEach(c => c.style.padding = '0.32rem 0.48rem');
+                    });
+                    if (btnCompact) { btnCompact.style.background = 'rgba(255,255,255,0.12)'; btnCompact.style.color = '#ffffff'; }
+                    if (btnStd) { btnStd.style.background = 'transparent'; btnStd.style.color = '#71717a'; }
+                } else {
+                    tables.forEach(t => {
+                        t.style.fontSize = '0.78rem';
+                        t.querySelectorAll('th, td').forEach(c => c.style.padding = '0.5rem 0.75rem');
+                    });
+                    if (btnCompact) { btnCompact.style.background = 'transparent'; btnCompact.style.color = '#71717a'; }
+                    if (btnStd) { btnStd.style.background = 'rgba(255,255,255,0.12)'; btnStd.style.color = '#ffffff'; }
+                }
+            },
+
+            exportResultsToCsv() {
+                const rows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr):not([style*="display: none"])');
+                if (!rows.length) {
+                    alert('No visible rows to export.');
+                    return;
+                }
+
+                const headers = ['Ticker', 'Result Date', 'Market Cap', 'Price', '30D Return', 'Q1 Wk H/L', 'Q2 Wk H/L', 'Q3 Wk H/L', '52W H/L', 'Quality Scores', '3Q Avg', 'Resistance', 'Support', 'Consensus'];
+                const csvData = [headers.join(',')];
+
+                rows.forEach(r => {
+                    const cols = Array.from(r.querySelectorAll('td')).map(td => {
+                        let text = td.textContent.replace(/\s+/g, ' ').trim().replace(/"/g, '""');
+                        return `"${text}"`;
+                    });
+                    if (cols.length >= 13) {
+                        csvData.push(cols.slice(0, 14).join(','));
+                    }
+                });
+
+                const blob = new Blob([csvData.join('\n')], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `corporate_results_${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            },
+
+            exportResultsToJson() {
+                const rows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr):not([style*="display: none"])');
+                if (!rows.length) {
+                    alert('No visible rows to export.');
+                    return;
+                }
+
+                const results = [];
+                rows.forEach(r => {
+                    const ticker = r.querySelector('.stock-ticker-main')?.textContent.replace(/[^A-Za-z0-9._-]/g, '') || '';
+                    const company = r.querySelector('.stock-company-sub')?.textContent.trim() || '';
+                    const date = r.querySelector('.cell-earnings-date')?.textContent.trim() || '';
+                    const mcap = r.querySelector('.cell-market-cap')?.textContent.trim() || '';
+                    const price = r.querySelector('.cell-current-price')?.textContent.trim() || '';
+                    const ret30d = r.querySelector('.cell-thirty-day-return')?.textContent.trim() || '';
+                    const consensus = r.querySelector('.cell-ai-consensus')?.textContent.trim() || '';
+
+                    results.push({ ticker, company, date, mcap, price, ret30d, consensus });
+                });
+
+                const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `corporate_results_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             },
 
             // =========================================================================

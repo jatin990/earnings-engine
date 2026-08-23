@@ -1,81 +1,81 @@
 <body>
     <div class="container">
         <!-- Top App Navigation & Controls Header -->
-        <header class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 1.15rem 1.4rem; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem; position: relative; z-index: 1000; border-color: rgba(168,85,247,0.25); background: rgba(10, 4, 24, 0.82); box-shadow: 0 12px 35px rgba(0,0,0,0.85), 0 0 25px rgba(147, 51, 234, 0.15);">
-            <div style="display: flex; align-items: center; gap: 0.85rem;">
-                <a href="/portal" class="btn" style="padding: 0.5rem 0.85rem; background: rgba(168,85,247,0.16); border: 1px solid rgba(168,85,247,0.4); color: #d8b4fe; border-radius: 0.65rem; transition: all 0.2s;" title="Switch App / Nexus Portal">
+        <header class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.15rem; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.75rem; position: relative; z-index: 1000; border-color: rgba(255,255,255,0.08); background: #07070b; box-shadow: 0 8px 30px rgba(0,0,0,0.9);">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <a href="/portal" class="btn" style="padding: 0.4rem 0.75rem; background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.3); color: #d8b4fe; border-radius: 0.5rem; transition: all 0.2s;" title="Switch App / Nexus Portal">
                     <span>🧭</span>
-                    <span style="font-size: 0.78rem; font-weight: 700; letter-spacing: 0.02em;">Portal Hub</span>
+                    <span style="font-size: 0.74rem; font-weight: 700; letter-spacing: 0.02em;">Portal</span>
                 </a>
-                <a href="/credit-card" class="btn" style="padding: 0.5rem 0.85rem; background: rgba(56,189,248,0.14); border: 1px solid rgba(56,189,248,0.35); color: #7dd3fc; border-radius: 0.65rem; transition: all 0.2s;" title="Credit Card & Wealth Hub">
+                <a href="/credit-card" class="btn" style="padding: 0.4rem 0.75rem; background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.25); color: #7dd3fc; border-radius: 0.5rem; transition: all 0.2s;" title="Credit Card & Wealth Hub">
                     <span>💳</span>
-                    <span style="font-size: 0.78rem; font-weight: 700; letter-spacing: 0.02em;">Cards</span>
+                    <span style="font-size: 0.74rem; font-weight: 700; letter-spacing: 0.02em;">Cards</span>
                 </a>
                 <div>
-                    <h1 class="brand-title" style="margin: 0; font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em;">
+                    <h1 class="brand-title" style="margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em;">
                         EARNINGS ENGINE // TERMINAL
                     </h1>
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.2rem;">
+                    <div style="display: flex; align-items: center; gap: 0.4rem; margin-top: 0.15rem;">
                         <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 8px #34d399;"></span>
-                        <span id="lastRefreshed" class="timestamp" style="font-size: 0.74rem;">Loading status...</span>
+                        <span id="lastRefreshed" class="timestamp" style="font-size: 0.7rem; color: #71717a;">Loading status...</span>
                     </div>
                 </div>
             </div>
 
             <!-- Global Watchlist, Freshness Pill, Rate Limit Pill, User & Config -->
-            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                 
                 <!-- Watchlist Selector -->
-                <div style="display: flex; align-items: center; gap: 0.5rem; background: rgba(8,3,18,0.85); padding: 0.4rem 0.75rem; border-radius: 0.65rem; border: 1px solid rgba(168,85,247,0.3);">
-                    <label for="globalWatchlist" style="font-size: 0.78rem; font-weight: 700; color: #c084fc; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap;">
+                <div style="display: flex; align-items: center; gap: 0.4rem; background: #030305; padding: 0.3rem 0.65rem; border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.08);">
+                    <label for="globalWatchlist" style="font-size: 0.74rem; font-weight: 700; color: #c084fc; display: flex; align-items: center; gap: 0.3rem; white-space: nowrap;">
                         <span>⭐ Universe:</span>
                     </label>
-                    <select id="globalWatchlist" onchange="app.onGlobalWatchlistChange(this.value)" style="min-width: 210px; padding: 0.4rem 0.7rem; border: 1px solid rgba(168,85,247,0.4); border-radius: 0.5rem; background: #080312; color: #f8fafc; font-size: 0.82rem; font-weight: 600; cursor: pointer; outline: none;" title="Active universe or watchlist across all dashboard tabs">
+                    <select id="globalWatchlist" onchange="app.onGlobalWatchlistChange(this.value)" style="min-width: 190px; padding: 0.3rem 0.6rem; border: 1px solid rgba(255,255,255,0.12); border-radius: 0.4rem; background: #07070a; color: #f8fafc; font-size: 0.78rem; font-weight: 600; cursor: pointer; outline: none;" title="Active universe or watchlist across all dashboard tabs">
                         <option value="">🌐 All Stocks (Global)</option>
                     </select>
                 </div>
 
                 <!-- Watchlist Earnings Freshness & On-Demand Refresh Pill -->
-                <div id="topEarningsFreshnessPill" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(168,85,247,0.14); padding: 0.35rem 0.65rem; border-radius: 0.65rem; border: 1px solid rgba(168,85,247,0.38); box-shadow: 0 0 14px rgba(168,85,247,0.15);" title="Last updated timestamp for active universe/watchlist earnings">
-                    <span style="font-size: 0.85rem;">📅</span>
+                <div id="topEarningsFreshnessPill" style="display: flex; align-items: center; gap: 0.45rem; background: rgba(168,85,247,0.1); padding: 0.3rem 0.6rem; border-radius: 0.5rem; border: 1px solid rgba(168,85,247,0.25);" title="Last updated timestamp for active universe/watchlist earnings">
+                    <span style="font-size: 0.8rem;">📅</span>
                     <div style="display: flex; flex-direction: column; line-height: 1.15;">
-                        <span id="topEarningsFreshnessLabel" style="font-size: 0.72rem; font-weight: 700; color: #34d399; font-family: 'JetBrains Mono', monospace;">Earnings: Loading...</span>
-                        <span id="topEarningsFreshnessSub" style="font-size: 0.62rem; color: #d8b4fe;">Persistent Cache</span>
+                        <span id="topEarningsFreshnessLabel" style="font-size: 0.7rem; font-weight: 700; color: #34d399; font-family: var(--font-mono);">Earnings: Loading...</span>
+                        <span id="topEarningsFreshnessSub" style="font-size: 0.6rem; color: #a1a1aa;">Persistent Cache</span>
                     </div>
-                    <button onclick="app.refreshCurrentWatchlistEarnings()" id="topRefreshEarningsBtn" class="btn btn-sm" style="padding: 0.2rem 0.45rem; background: rgba(168,85,247,0.3); border: 1px solid rgba(168,85,247,0.5); color: #ffffff; font-size: 0.7rem; font-weight: 700; border-radius: 0.45rem;" title="Refresh earnings data for currently selected watchlist">
+                    <button onclick="app.refreshCurrentWatchlistEarnings()" id="topRefreshEarningsBtn" class="btn-micro btn-micro-violet" style="padding: 0.18rem 0.4rem; font-size: 0.66rem;" title="Refresh earnings data for currently selected watchlist">
                         🔄 Refresh
                     </button>
                 </div>
 
                 <!-- Rate Limits Pill -->
-                <div id="topRateLimitPill" onclick="app.openCustomizerModal('ratelimits')" style="display: flex; align-items: center; gap: 0.45rem; background: rgba(147,51,234,0.15); padding: 0.4rem 0.75rem; border-radius: 0.65rem; border: 1px solid rgba(168,85,247,0.38); cursor: pointer; transition: all 0.2s;" title="Click to view API rate limits & downstream quotas in Control Center">
-                    <span style="font-size: 0.95rem;">⚡</span>
+                <div id="topRateLimitPill" onclick="app.openCustomizerModal('ratelimits')" style="display: flex; align-items: center; gap: 0.4rem; background: rgba(255,255,255,0.03); padding: 0.3rem 0.65rem; border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.08); cursor: pointer; transition: all 0.2s;" title="Click to view API rate limits & downstream quotas in Control Center">
+                    <span style="font-size: 0.85rem;">⚡</span>
                     <div style="display: flex; flex-direction: column; line-height: 1.15;">
-                        <span id="topOpenRouterQuota" style="font-size: 0.74rem; font-weight: 700; color: #e9d5ff; font-family: 'JetBrains Mono', monospace;">OpenRouter: 0/200 reqs</span>
-                        <span id="topRateLimitStatus" style="font-size: 0.64rem; color: #34d399; font-weight: 600;">🟢 Quotas Healthy</span>
+                        <span id="topOpenRouterQuota" style="font-size: 0.7rem; font-weight: 700; color: #e2e8f0; font-family: var(--font-mono);">OpenRouter: 0/200</span>
+                        <span id="topRateLimitStatus" style="font-size: 0.6rem; color: #34d399; font-weight: 600;">🟢 Quotas Healthy</span>
                     </div>
                 </div>
 
                 <!-- User Profile & Key Pill -->
-                <div id="topUserPill" style="display: flex; align-items: center; gap: 0.4rem; background: rgba(16,185,129,0.12); padding: 0.4rem 0.75rem; border-radius: 0.65rem; border: 1px solid rgba(16,185,129,0.35); box-shadow: 0 0 10px rgba(16,185,129,0.15);">
-                    <span style="width: 7px; height: 7px; border-radius: 50%; background: #34d399; box-shadow: 0 0 8px #34d399;"></span>
-                    <span id="topUserBadge" style="font-size: 0.76rem; font-weight: 700; color: #a7f3d0;">VIP Access</span>
+                <div id="topUserPill" style="display: flex; align-items: center; gap: 0.35rem; background: rgba(16,185,129,0.08); padding: 0.3rem 0.65rem; border-radius: 0.5rem; border: 1px solid rgba(16,185,129,0.25);">
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 8px #34d399;"></span>
+                    <span id="topUserBadge" style="font-size: 0.72rem; font-weight: 700; color: #a7f3d0;">VIP Access</span>
                 </div>
 
-                <button onclick="app.openCustomizerModal()" class="btn btn-primary" style="padding: 0.5rem 0.9rem; font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; gap: 0.35rem; cursor: pointer;" title="Customize visible tabs, color themes, and environment variables">⚙️ Control Center</button>
+                <button onclick="app.openCustomizerModal()" class="btn btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.74rem; font-weight: 700; display: flex; align-items: center; gap: 0.3rem; cursor: pointer;" title="Customize visible tabs, color themes, and environment variables">⚙️ Control Center</button>
             </div>
         </header>
 
         <!-- Search Bar -->
-        <section class="card" style="padding: 0.85rem 1rem;">
+        <section class="card" style="padding: 0.65rem 0.85rem;">
             <div class="search-wrap">
-                <input type="text" id="tickerSearch" placeholder="🔍 Search stock symbol (e.g., AAPL, RELIANCE.NS, NVDA)..." style="width: 100%; padding: 0.75rem 1.1rem; border: 1px solid rgba(168,85,247,0.3); border-radius: 0.65rem; background: rgba(8,3,18,0.8); color: var(--light); font-size: 0.95rem; font-family: 'JetBrains Mono', monospace;" autocomplete="off">
+                <input type="text" id="tickerSearch" placeholder="🔍 Search stock symbol (e.g., AAPL, RELIANCE.NS, NVDA)..." style="width: 100%; padding: 0.55rem 0.95rem; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.5rem; background: #030305; color: var(--light); font-size: 0.85rem; font-family: var(--font-mono); outline: none;" autocomplete="off">
                 <div id="autocompleteDropdown" class="dropdown"></div>
             </div>
         </section>
 
         <!-- Navigation Tabs -->
-        <section class="card" style="padding: 0.85rem; display: flex; gap: 0.45rem; flex-wrap: wrap; align-items: center;">
+        <section class="card" style="padding: 0.65rem 0.85rem; display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center;">
             <button id="tabBtn-results" data-tab="results" class="tab-btn active" onclick="app.switchTab('results')">📊 Results</button>
             <button id="tabBtn-monthfilter" data-tab="monthfilter" class="tab-btn" onclick="app.switchTab('monthfilter')">🗓️ Month Filter</button>
             <button id="tabBtn-scanner" data-tab="scanner" class="tab-btn" onclick="app.switchTab('scanner')">🔍 Scanner</button>
@@ -91,5 +91,5 @@
             <button id="tabBtn-buydip" data-tab="buydip" class="tab-btn" onclick="app.switchTab('buydip')">🛒 Buy the Dip</button>
             <button id="tabBtn-backtest" data-tab="backtest" class="tab-btn" onclick="app.switchTab('backtest')">📈 Backtest</button>
             <button id="tabBtn-watchlist" data-tab="watchlist" class="tab-btn" onclick="app.switchTab('watchlist')">⭐ Watchlist</button>
-            <button class="tab-btn" onclick="app.openCustomizerModal('tabs')" style="margin-left: auto; background: rgba(99,102,241,0.15); border: 1px dashed rgba(168,85,247,0.45); color: #c7d2fe; display: flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; padding: 0.45rem 0.8rem;" title="Customize and toggle visible tabs on/off">⚙️ Customize Tabs</button>
+            <button class="tab-btn" onclick="app.openCustomizerModal('tabs')" style="margin-left: auto; background: rgba(99,102,241,0.12); border: 1px dashed rgba(168,85,247,0.35); color: #c7d2fe; display: flex; align-items: center; gap: 0.3rem; font-size: 0.74rem; padding: 0.35rem 0.65rem;" title="Customize and toggle visible tabs on/off">⚙️ Customize Tabs</button>
         </section>

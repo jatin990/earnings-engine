@@ -229,9 +229,9 @@ def _fmt_prediction(value: object, kind: str = "kronos",
             label = "🤖" if kind == "kronos" else "📈"
             return (
                 f'<span class="pred-cell">'
-                f'<button class="btn btn-sm pred-run-btn" data-ticker="{ticker}" '
+                f'<button type="button" class="btn-micro btn-micro-neutral pred-run-btn" data-ticker="{ticker}" '
                 f'data-engine="{engine}" '
-                f'onclick="app.runRowPrediction(\'{ticker}\',\'{engine}\',this)">'
+                f'onclick="app.runRowPrediction(\'{ticker}\',\'{engine}\',this)" title="Run {engine.upper()} on-demand">'
                 f'{label} Run</button></span>'
             )
         return '<span class="pred-muted">—</span>'
@@ -261,82 +261,93 @@ def _build_card_sections(row: pd.Series, fmt: dict[str, str]) -> str:
     """
     sections: list[str] = []
 
-    # 📊 Stock & Price Info
-    stock_metrics = []
-    for label, key in [
-        ("Market Cap", "market_cap"),
-        ("Current Price", "current_price"),
-        ("52W High/Low", "pct_from_52w_high_low"),
-        ("30D Return", "thirty_day_return"),
-        ("EPS Estimate", "eps_estimate"),
-        ("EPS Reported", "eps_reported"),
-        ("Surprise", "surprise_pct"),
-    ]:
-        val = fmt.get(key, "—")
-        if val != "—":
-            stock_metrics.append(f'<div class="metric"><span>{label}</span><strong>{val}</strong></div>')
-    if stock_metrics:
+    # 1. Market Cap, Price, 52W Range, 30D Return
+    cap_price = []
+    if fmt["market_cap"] != "—":
+        cap_price.append(f'<div class="metric"><span>Market Cap</span><strong>{fmt["market_cap"]}</strong></div>')
+    if fmt["current_price"] != "—":
+        cap_price.append(f'<div class="metric"><span>Price</span><strong>{fmt["current_price"]}</strong></div>')
+    if fmt["pct_from_52w_high_low"] != "—":
+        cap_price.append(f'<div class="metric"><span>52W H/L</span><strong>{fmt["pct_from_52w_high_low"]}</strong></div>')
+    if fmt["thirty_day_return"] != "—":
+        cap_price.append(f'<div class="metric"><span>30D Return</span><strong>{fmt["thirty_day_return"]}</strong></div>')
+    if cap_price:
         sections.append(
-            '<div class="card-title" style="margin-top: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: #60a5fa;">📊 Stock & Price Info</div>'
-            f'<div class="metrics-grid">{"".join(stock_metrics)}</div>'
+            '<div class="card-section">'
+            '<div class="card-title">📊 Valuation & Price Action</div>'
+            '<div class="metrics-grid">' + "".join(cap_price) + '</div>'
+            '</div>'
         )
 
-    # 📈 Quarterly Metrics
-    q_metrics = []
-    for label, key in [
-        ("Q1 Week H/L", "q1_week_hl"),
-        ("Q2 Week H/L", "q2_week_hl"),
-        ("Q3 Week H/L", "q3_week_hl"),
-        ("Earnings Week Move", "earnings_week_move"),
-    ]:
-        val = fmt.get(key, "—")
-        if val != "—":
-            q_metrics.append(f'<div class="metric"><span>{label}</span><strong>{val}</strong></div>')
-    if q_metrics:
+    # 2. EPS Surprise
+    eps_items = []
+    if fmt["eps_estimate"] != "—":
+        eps_items.append(f'<div class="metric"><span>EPS Est</span><strong>{fmt["eps_estimate"]}</strong></div>')
+    if fmt["eps_reported"] != "—":
+        eps_items.append(f'<div class="metric"><span>EPS Act</span><strong>{fmt["eps_reported"]}</strong></div>')
+    if fmt["surprise_pct"] != "—":
+        eps_items.append(f'<div class="metric"><span>Surprise</span><strong>{fmt["surprise_pct"]}</strong></div>')
+    if eps_items:
         sections.append(
-            '<div class="card-title" style="margin-top: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: #60a5fa;">📈 Quarterly Metrics (Result Week ±4 Days)</div>'
-            f'<div class="metrics-grid">{"".join(q_metrics)}</div>'
+            '<div class="card-section">'
+            '<div class="card-title">🎯 Earnings Surprise</div>'
+            '<div class="metrics-grid">' + "".join(eps_items) + '</div>'
+            '</div>'
         )
 
-    # ⭐ Quality Scores
-    quality_metrics = []
-    for label, key in [
-        ("Q1 Quality", "q1_score"),
-        ("Q2 Quality", "q2_score"),
-        ("Q3 Quality", "q3_score"),
-        ("3Q Average", "prev_3q_score"),
-    ]:
-        val = fmt.get(key, "—")
-        if val != "—":
-            quality_metrics.append(f'<div class="metric"><span>{label}</span><strong>{val}</strong></div>')
-    if quality_metrics:
+    # 3. Post-Earnings Drift (Q1, Q2, Q3 + 1W move)
+    drift_items = []
+    if fmt["q1_week_hl"] != "—":
+        drift_items.append(f'<div class="metric"><span>Q1 Move</span><strong>{fmt["q1_week_hl"]}</strong></div>')
+    if fmt["q2_week_hl"] != "—":
+        drift_items.append(f'<div class="metric"><span>Q2 Move</span><strong>{fmt["q2_week_hl"]}</strong></div>')
+    if fmt["q3_week_hl"] != "—":
+        drift_items.append(f'<div class="metric"><span>Q3 Move</span><strong>{fmt["q3_week_hl"]}</strong></div>')
+    if fmt["earnings_week_move"] != "—":
+        drift_items.append(f'<div class="metric"><span>1W Move</span><strong>{fmt["earnings_week_move"]}</strong></div>')
+    if drift_items:
         sections.append(
-            '<div class="card-title" style="margin-top: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: #60a5fa;">⭐ Quality Scores</div>'
-            f'<div class="metrics-grid">{"".join(quality_metrics)}</div>'
+            '<div class="card-section">'
+            '<div class="card-title">📈 Post-Earnings Drift (Week of Event)</div>'
+            '<div class="metrics-grid">' + "".join(drift_items) + '</div>'
+            '</div>'
         )
 
-    # 🎯 Setup & Risk/Reward
-    setup_metrics = []
-    for label, key in [
-        ("Setup Signal", "setup_signal"),
-        ("Momentum Bias", "momentum_bias"),
-        ("Reward Potential", "reward_potential"),
-        ("Risk Buffer", "risk_buffer"),
-        ("Next Resistance", "next_resistance"),
-        ("Current Support", "current_support"),
-    ]:
-        val = fmt.get(key, "—")
-        if val != "—":
-            setup_metrics.append(f'<div class="metric"><span>{label}</span><strong>{val}</strong></div>')
-    if setup_metrics:
+    # 4. Quality Scores
+    score_items = []
+    if fmt["q1_score"] != "—":
+        score_items.append(f'<div class="metric"><span>Q1</span><strong>{fmt["q1_score"]}</strong></div>')
+    if fmt["q2_score"] != "—":
+        score_items.append(f'<div class="metric"><span>Q2</span><strong>{fmt["q2_score"]}</strong></div>')
+    if fmt["q3_score"] != "—":
+        score_items.append(f'<div class="metric"><span>Q3</span><strong>{fmt["q3_score"]}</strong></div>')
+    if fmt["prev_3q_score"] != "—":
+        score_items.append(f'<div class="metric"><span>3Q Avg</span><strong>{fmt["prev_3q_score"]}</strong></div>')
+    if score_items:
         sections.append(
-            '<div class="card-title" style="margin-top: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: #60a5fa;">🎯 Setup & Risk/Reward</div>'
-            f'<div class="metrics-grid">{"".join(setup_metrics)}</div>'
+            '<div class="card-section">'
+            '<div class="card-title">⭐ Earnings Quality Score (Surprise Factor)</div>'
+            '<div class="metrics-grid">' + "".join(score_items) + '</div>'
+            '</div>'
         )
 
-    # 💡 Analysis (commentary)
+    # 5. Technical Levels
+    tech_items = []
+    if fmt["next_resistance"] != "—":
+        tech_items.append(f'<div class="metric"><span>Resistance</span><strong style="color:var(--red);">{fmt["next_resistance"]}</strong></div>')
+    if fmt["current_support"] != "—":
+        tech_items.append(f'<div class="metric"><span>Support</span><strong style="color:var(--green);">{fmt["current_support"]}</strong></div>')
+    if tech_items:
+        sections.append(
+            '<div class="card-section">'
+            '<div class="card-title">🎯 Swing Support & Resistance</div>'
+            '<div class="metrics-grid">' + "".join(tech_items) + '</div>'
+            '</div>'
+        )
+
+    # 6. Analysis / Commentary
     take = fmt.get("take", "")
-    if take and take != "—":
+    if take:
         sections.append(
             '<div class="commentary" style="margin-top: 0.75rem; padding-top: 0.75rem;">'
             '<div class="card-title" style="margin-bottom: 0.4rem; font-size: 0.85rem;">💡 Analysis</div>'
@@ -348,25 +359,34 @@ def _build_card_sections(row: pd.Series, fmt: dict[str, str]) -> str:
 
 
 def _build_ledger_table(rows: list[str], day_class: str = "") -> str:
-    """Build a compact ledger table HTML from pre-rendered row strings."""
+    """Build a compact next-gen interactive operations table HTML."""
     if not rows:
         return ""
     return (
         '<div class="table-wrapper">'
         '<table class="results-table">'
         "<thead><tr>"
-        "<th>Stock</th><th>Result Date</th><th>Mkt Cap</th><th>Price</th>"
-        "<th>30D Ret</th><th>Q1 Wk H/L</th><th>Q2 Wk H/L</th><th>Q3 Wk H/L</th>"
-        "<th>52W H/L</th><th>Quality</th><th>3Q Avg</th><th>Resist</th><th>Support</th>"
-        "<th>Kronos 14D</th><th>GBM</th>"
-        '<th style="text-align:center;">AI Consensus</th>'
-        "<th>Actions</th>"
+        '<th onclick="app.sortResultsTable(this, 0, \'text\')" title="Sort by Stock Symbol">Stock</th>'
+        '<th onclick="app.sortResultsTable(this, 1, \'date\')" title="Sort by Announcement Date">Result Date</th>'
+        '<th onclick="app.sortResultsTable(this, 2, \'num\')" title="Sort by Market Cap">Mkt Cap</th>'
+        '<th onclick="app.sortResultsTable(this, 3, \'num\')" title="Sort by Current Price">Price</th>'
+        '<th onclick="app.sortResultsTable(this, 4, \'num\')" title="Sort by 30-Day Pre-Event Momentum">30D Ret</th>'
+        '<th onclick="app.sortResultsTable(this, 5, \'text\')" title="Q1 Week Move">Q1 Wk H/L</th>'
+        '<th onclick="app.sortResultsTable(this, 6, \'text\')" title="Q2 Week Move">Q2 Wk H/L</th>'
+        '<th onclick="app.sortResultsTable(this, 7, \'text\')" title="Q3 Week Move">Q3 Wk H/L</th>'
+        '<th onclick="app.sortResultsTable(this, 8, \'text\')" title="52-Week High/Low Distance">52W H/L</th>'
+        '<th onclick="app.sortResultsTable(this, 9, \'text\')" title="Quality Scores">Quality</th>'
+        '<th onclick="app.sortResultsTable(this, 10, \'num\')" title="Previous 3Q Average Score">3Q Avg</th>'
+        '<th onclick="app.sortResultsTable(this, 11, \'num\')" title="Next Overhead Resistance">Resist</th>'
+        '<th onclick="app.sortResultsTable(this, 12, \'num\')" title="Current Base Support">Support</th>'
+        '<th onclick="app.sortResultsTable(this, 13, \'text\')" title="Kronos 14-Day AI Forecast">Kronos 14D</th>'
+        '<th onclick="app.sortResultsTable(this, 14, \'text\')" title="GBM Earnings Direction Classifier">GBM</th>'
+        '<th onclick="app.sortResultsTable(this, 15, \'text\')" style="text-align:center;" title="4-Model AI Consensus Forecast">AI Consensus</th>'
+        '<th style="text-align:center;">Actions</th>'
         "</tr></thead>"
         f"<tbody>{''.join(rows)}</tbody>"
         "</table></div>"
     )
-
-
 
 
 
@@ -822,19 +842,18 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             is_bull = "BULL" in dir_str
             is_bear = "BEAR" in dir_str
             dir_color = "#34d399" if is_bull else ("#f87171" if is_bear else "#fbbf24")
-            dir_bg = "rgba(16,185,129,0.18)" if is_bull else ("rgba(239,68,68,0.18)" if is_bear else "rgba(251,191,36,0.18)")
+            dir_bg = "rgba(16,185,129,0.12)" if is_bull else ("rgba(239,68,68,0.12)" if is_bear else "rgba(251,191,36,0.12)")
             ret_val = pred.get("consensus_return_pct")
             ret_disp = f" ({'+' if ret_val > 0 else ''}{ret_val:.1f}%)" if ret_val is not None else ""
             clean_dom_id = "consensus-cell-" + re.sub(r"[^A-Za-z0-9]", "_", ticker)
             consensus_badge = (
-                f'<div id="{clean_dom_id}" style="display:inline-flex;align-items:center;gap:0.35rem;">'
-                f'<span class="signal-badge" style="background:{dir_bg};color:{dir_color};border:1px solid {dir_color}55;font-size:0.72rem;padding:0.18rem 0.5rem;font-weight:700;cursor:pointer;" '
+                f'<div id="{clean_dom_id}" style="display:inline-flex;align-items:center;gap:0.25rem;">'
+                f'<span class="signal-badge" style="background:{dir_bg};color:{dir_color};border:1px solid {dir_color}44;font-size:0.68rem;padding:0.12rem 0.45rem;font-weight:700;cursor:pointer;line-height:1.2;" '
                 f'onclick="event.stopPropagation(); app.openAiDetails(\'ALL\', \'{ticker}\', event)" '
                 f'title="DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral: {dir_str}{ret_disp}">'
                 f'🤖 {dir_str}{ret_disp}'
                 f'</span>'
-                f'<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'{ticker}\', this)" '
-                f'style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(99,102,241,0.18);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);border-radius:0.3rem;" '
+                f'<button type="button" class="btn-micro btn-micro-violet" onclick="event.stopPropagation(); app.runConsensusForTicker(\'{ticker}\', this)" '
                 f'title="Re-run 4-Model AI Consensus for {ticker}">⚡</button>'
                 f'</div>'
             )
@@ -842,9 +861,8 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             clean_dom_id = "consensus-cell-" + re.sub(r"[^A-Za-z0-9]", "_", ticker)
             consensus_badge = (
                 f'<div id="{clean_dom_id}">'
-                f'<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'{ticker}\', this)" '
-                f'style="padding:0.18rem 0.45rem;font-size:0.7rem;background:linear-gradient(135deg, rgba(99,102,241,0.18), rgba(168,85,247,0.18));color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:0.35rem;cursor:pointer;font-weight:600;" '
-                f'title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model consensus for {ticker}">⚡ AI Consensus</button>'
+                f'<button type="button" class="btn-micro btn-micro-violet" onclick="event.stopPropagation(); app.runConsensusForTicker(\'{ticker}\', this)" '
+                f'title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral consensus for {ticker}">⚡ AI Consensus</button>'
                 f'</div>'
             )
 
