@@ -426,23 +426,37 @@
             fetchWithAbort(taskName, url, options = {}) {
                 if (this.activeFetchControllers[taskName]) {
                     try {
-                        this.activeFetchControllers[taskName].abort('Superseded by new request');
+                        const prev = this.activeFetchControllers[taskName];
+                        if (prev.controller) prev.controller.abort('Superseded by new request');
+                        if (prev.reqId) {
+                            fetch('/api/v1/tasks/' + encodeURIComponent(prev.reqId) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
+                        }
                     } catch (e) {}
                 }
                 const controller = new AbortController();
-                this.activeFetchControllers[taskName] = controller;
-                return fetch(url, { ...options, signal: controller.signal })
+                const reqId = 'req_' + taskName + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+                const opts = { ...options, signal: controller.signal };
+                opts.headers = { ...(opts.headers || {}), 'X-Request-ID': reqId };
+
+                this.activeFetchControllers[taskName] = { controller, reqId };
+
+                return fetch(url, opts)
                     .finally(() => {
-                        if (this.activeFetchControllers[taskName] === controller) {
+                        const current = this.activeFetchControllers[taskName];
+                        if (current && current.controller === controller) {
                             delete this.activeFetchControllers[taskName];
                         }
                     });
             },
 
             cancelReportLoad(taskName) {
-                if (this.activeFetchControllers[taskName]) {
+                const entry = this.activeFetchControllers[taskName];
+                if (entry) {
                     try {
-                        this.activeFetchControllers[taskName].abort('User cancelled');
+                        if (entry.controller) entry.controller.abort('User cancelled');
+                        if (entry.reqId) {
+                            fetch('/api/v1/tasks/' + encodeURIComponent(entry.reqId) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
+                        }
                     } catch (e) {}
                     delete this.activeFetchControllers[taskName];
                 }
@@ -452,8 +466,12 @@
             cancelAllPendingRequests(reason = 'Tab switched') {
                 Object.keys(this.activeFetchControllers || {}).forEach(taskName => {
                     try {
-                        if (this.activeFetchControllers[taskName]) {
-                            this.activeFetchControllers[taskName].abort(reason);
+                        const entry = this.activeFetchControllers[taskName];
+                        if (entry) {
+                            if (entry.controller) entry.controller.abort(reason);
+                            if (entry.reqId) {
+                                fetch('/api/v1/tasks/' + encodeURIComponent(entry.reqId) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
+                            }
                         }
                     } catch (e) {}
                     this.resetTaskLoadingUI(taskName, '⚠️ Loading cancelled (' + reason + ').');

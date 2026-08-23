@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import date, datetime
+import json
 from typing import Any
 
 import pandas as pd
@@ -65,10 +67,21 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def log_api_requests(request: Request, call_next):
-    """Log concise API call details including input query filters, status code, and latency."""
+async def log_and_cancel_api_requests(request: Request, call_next):
+    """Log API details and register cancellation token for client request tracking."""
     start_time = time.perf_counter()
     path = request.url.path
+    req_id = request.headers.get("x-request-id") or request.query_params.get("request_id")
+
+    if not req_id and path.startswith("/api/"):
+        req_id = f"req_{int(time.time()*1000)}_{id(request)}"
+
+    from earnings_engine.api.cancellation import cancellation_manager
+    token = cancellation_manager.register(req_id) if req_id else None
+
+    # Attach token to request state
+    request.state.cancellation_token = token
+    request.state.request_id = req_id
 
     # Asynchronous request telemetry & diagnostics
     if path in ("/dashboard", "/", "/dashboard.html", "/api/v1/dashboard/overview") or (path.startswith("/dashboard") and not path.startswith("/dashboard/static")):
@@ -89,21 +102,38 @@ async def log_api_requests(request: Request, call_next):
     query_params = dict(request.query_params)
     filters_repr = f" filters={query_params}" if query_params else ""
 
-    response = await call_next(request)
-    duration_ms = (time.perf_counter() - start_time) * 1000
+    try:
+        response = await call_next(request)
+        duration_ms = (time.perf_counter() - start_time) * 1000
 
-    # Skip logging high-frequency static asset hits to avoid log spam
-    if not (path.startswith("/static") or path.startswith("/ui")):
-        logger.info(
-            "API [%s] %s%s -> %d (%.1fms)",
-            request.method,
-            path,
-            filters_repr,
-            response.status_code,
-            duration_ms,
-        )
-
-    return response
+        # Skip logging high-frequency static asset hits to avoid log spam
+        if not (path.startswith("/static") or path.startswith("/ui")):
+            logger.info(
+                "API [%s] %s%s -> %d (%.1fms)",
+                request.method,
+                path,
+                filters_repr,
+                response.status_code,
+                duration_ms,
+            )
+        return response
+    except (asyncio.CancelledError, Exception) as exc:
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        if isinstance(exc, asyncio.CancelledError) or (token and token.is_cancelled):
+            logger.info(
+                "API [%s] %s%s -> CANCELLED by client (%.1fms)",
+                request.method,
+                path,
+                filters_repr,
+                duration_ms,
+            )
+            if token:
+                token.cancel("Request handler cancelled due to client disconnect")
+            return Response(status_code=499, content="Client Closed Request")
+        raise exc
+    finally:
+        if req_id:
+            cancellation_manager.unregister(req_id)
 
 # Global settings instance
 _settings = Settings()
@@ -577,6 +607,41 @@ async def create_universe(request: dict):
 ui_dir = Path(__file__).resolve().parent.parent / "ui"
 if ui_dir.exists():
     app.mount("/static", StaticFiles(directory=ui_dir), name="static")
+
+
+# ---------------------------------------------------------------------------
+# Task Cancellation Endpoints
+# ---------------------------------------------------------------------------
+
+class CancelTaskRequest(BaseModel):
+    request_id: str
+    reason: str | None = "Explicit client cancellation"
+
+
+@app.post("/api/v1/tasks/{task_id}/cancel", tags=["Task Cancellation"])
+async def cancel_task_by_id(task_id: str):
+    """Cancel an active backend calculation, data fetch, or batch job by request/task ID."""
+    from earnings_engine.api.cancellation import cancellation_manager
+    cancelled = cancellation_manager.cancel(task_id, reason="Explicit client cancel API call")
+    return {
+        "success": True,
+        "task_id": task_id,
+        "cancelled": cancelled,
+        "message": f"Task {task_id} cancellation signal dispatched." if cancelled else f"Task {task_id} was not active or already finished.",
+    }
+
+
+@app.post("/api/v1/tasks/cancel", tags=["Task Cancellation"])
+async def cancel_task_generic(req: CancelTaskRequest):
+    """Cancel an active backend calculation, data fetch, or batch job."""
+    from earnings_engine.api.cancellation import cancellation_manager
+    cancelled = cancellation_manager.cancel(req.request_id, reason=req.reason or "Explicit client cancel API call")
+    return {
+        "success": True,
+        "request_id": req.request_id,
+        "cancelled": cancelled,
+        "message": f"Request {req.request_id} cancellation signal dispatched." if cancelled else f"Request {req.request_id} was not active or already finished.",
+    }
 
 
 # ---------------------------------------------------------------------------
