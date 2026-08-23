@@ -2987,6 +2987,134 @@
                     articlesHtml;
             },
 
+            async runModalConsensus() {
+                const ticker = document.getElementById('srModalTicker')?.value;
+                const btn = document.getElementById('srModalConsensusRunBtn');
+                if (!ticker) return;
+
+                const origHtml = btn ? btn.innerHTML : '⚡ Run AI Consensus';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading-spinner"></span> Synthesizing Models...';
+                }
+
+                try {
+                    const res = await fetch('/api/v1/consensus/predict', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tickers: [ticker] })
+                    });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.detail || 'Consensus generation failed');
+                    }
+                    await this._renderModalConsensus(ticker);
+                } catch (e) {
+                    alert('Error running AI Consensus: ' + e.message);
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }
+                }
+            },
+
+            async _renderModalConsensus(ticker) {
+                const badge = document.getElementById('srModalConsensusBadge');
+                const content = document.getElementById('srModalConsensusContent');
+                if (!content) return;
+
+                if (!ticker) {
+                    if (badge) badge.style.display = 'none';
+                    content.innerHTML = '<p class="timestamp" style="margin:0;font-size:0.8rem;">No ticker specified for consensus.</p>';
+                    return;
+                }
+
+                try {
+                    content.innerHTML = '<div style="display:flex;align-items:center;gap:0.5rem;color:var(--muted);font-size:0.82rem;"><span class="loading-spinner"></span> Checking multi-model consensus status for ' + ticker + '...</div>';
+                    
+                    const res = await fetch('/api/v1/consensus/latest?ticker=' + encodeURIComponent(ticker) + '&limit=1');
+                    const data = await res.json();
+                    const pred = (data.predictions && data.predictions.length) ? data.predictions[0] : null;
+
+                    if (!pred || !pred.consensus_direction) {
+                        if (badge) badge.style.display = 'none';
+                        content.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:0.5rem;padding:0.75rem;">' +
+                            '<div>' +
+                            '<strong style="display:block;font-size:0.85rem;color:var(--light);">No Multi-Model Consensus on Record</strong>' +
+                            '<span style="font-size:0.78rem;color:var(--muted);">Trigger an ensemble run to gather calibrated votes from DeepSeek-R1, Claude 3.5 Sonnet, Llama-3.3, and Gemini Flash.</span>' +
+                            '</div>' +
+                            '<button class="btn btn-sm" onclick="app.runModalConsensus()" style="background:linear-gradient(135deg, #6366f1, #a855f7);color:#fff;border:none;font-size:0.78rem;font-weight:700;padding:0.4rem 0.85rem;border-radius:0.4rem;box-shadow:0 2px 8px rgba(99,102,241,0.3);">⚡ Run Consensus Now</button>' +
+                            '</div>';
+                        return;
+                    }
+
+                    // Render Consensus Details
+                    const dir = pred.consensus_direction || 'NEUTRAL';
+                    const isBull = dir.includes('BULL');
+                    const isBear = dir.includes('BEAR');
+                    const dirColor = isBull ? '#34d399' : isBear ? '#ef4444' : '#fbbf24';
+                    const dirBg = isBull ? 'rgba(16,185,129,0.2)' : isBear ? 'rgba(239,68,68,0.2)' : 'rgba(251,191,36,0.2)';
+                    
+                    const confPct = pred.confidence_score ? Math.round(pred.confidence_score * 100) : 80;
+                    const agreePct = pred.agreement_rate ? Math.round(pred.agreement_rate * 100) : 75;
+                    const expRet = pred.expected_move_pct != null ? (pred.expected_move_pct > 0 ? '+' : '') + Number(pred.expected_move_pct).toFixed(1) + '%' : '—';
+                    const horizon = pred.time_horizon_days ? (pred.time_horizon_days + ' Days') : '14 Days';
+
+                    if (badge) {
+                        badge.style.display = 'inline-block';
+                        badge.style.background = dirBg;
+                        badge.style.color = dirColor;
+                        badge.textContent = dir + ' (' + expRet + ' · ' + agreePct + '% Agreement · ' + confPct + '% Conf)';
+                    }
+
+                    // Parse individual model votes if available
+                    let votesHtml = '';
+                    if (pred.model_outputs || pred.model_votes) {
+                        const votes = typeof pred.model_outputs === 'object' ? pred.model_outputs : (typeof pred.model_votes === 'object' ? pred.model_votes : {});
+                        const modelCards = Object.entries(votes).map(([modelKey, mData]) => {
+                            const mDir = (typeof mData === 'object' ? mData.direction : mData) || 'NEUTRAL';
+                            const mReason = typeof mData === 'object' ? (mData.reasoning || mData.thesis || '') : '';
+                            const mBull = String(mDir).toUpperCase().includes('BULL');
+                            const mBear = String(mDir).toUpperCase().includes('BEAR');
+                            const mColor = mBull ? '#34d399' : mBear ? '#f87171' : '#fbbf24';
+
+                            const cleanModelName = modelKey.replace(/_/g, ' ').replace(/-/g, ' ').toUpperCase();
+
+                            return '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.6rem 0.75rem;">' +
+                                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">' +
+                                '<strong style="font-size:0.78rem;color:#93c5fd;">🤖 ' + cleanModelName + '</strong>' +
+                                '<span class="signal-badge" style="font-size:0.65rem;background:rgba(255,255,255,0.06);color:' + mColor + ';font-weight:700;">' + mDir + '</span>' +
+                                '</div>' +
+                                (mReason ? '<p style="margin:0.2rem 0 0 0;font-size:0.72rem;color:var(--muted);line-height:1.35;">' + mReason.slice(0, 140) + (mReason.length > 140 ? '...' : '') + '</p>' : '') +
+                                '</div>';
+                        }).join('');
+
+                        if (modelCards) {
+                            votesHtml = '<div style="margin-top:0.6rem;"><strong style="font-size:0.8rem;color:var(--light);display:block;margin-bottom:0.35rem;">🗳️ Individual Model Votes & Signals:</strong>' +
+                                '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:0.5rem;">' + modelCards + '</div></div>';
+                        }
+                    }
+
+                    // Render main KPI grid + Synthesis Thesis
+                    content.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.4rem;margin:0.5rem 0;">' +
+                        '<div class="metric"><span>Consensus Direction</span><strong style="color:' + dirColor + ';">' + dir + ' (' + expRet + ')</strong></div>' +
+                        '<div class="metric"><span>Model Agreement</span><strong>' + agreePct + '% (' + (pred.agreement_count || '3/4') + ' Models)</strong></div>' +
+                        '<div class="metric"><span>Confidence Rating</span><strong>' + confPct + '% Calibrated</strong></div>' +
+                        '<div class="metric"><span>Forecast Horizon</span><strong>' + horizon + '</strong></div>' +
+                        '</div>' +
+                        (pred.synthesis_reasoning || pred.synthesis_summary ? ('<div style="background:linear-gradient(135deg, rgba(99,102,241,0.08), rgba(168,85,247,0.08));border:1px solid rgba(99,102,241,0.3);border-radius:0.5rem;padding:0.65rem 0.85rem;margin-top:0.5rem;">' +
+                        '<strong style="color:#a5b4fc;font-size:0.82rem;display:flex;align-items:center;gap:0.35rem;margin-bottom:0.25rem;">✨ Ensemble Synthesis Thesis:</strong>' +
+                        '<p style="margin:0;font-size:0.82rem;line-height:1.5;color:var(--light);">' + (pred.synthesis_reasoning || pred.synthesis_summary) + '</p>' +
+                        '</div>') : '') +
+                        votesHtml;
+
+                } catch (err) {
+                    console.error('Error rendering modal consensus:', err);
+                    if (content) content.innerHTML = '<p class="timestamp" style="margin:0;font-size:0.8rem;color:var(--red);">Failed to load consensus data: ' + err.message + '</p>';
+                }
+            },
+
             async openAiDetails(market, ticker, e) {
                 if (e) e.stopPropagation();
                 market = market || this.currentSwingMarket || 'ALL';
@@ -4472,6 +4600,9 @@
 
                     const modalAi = (currentItem && currentItem.ai_synthesis) || data.ai_synthesis;
                     if (this._renderModalAi) this._renderModalAi(modalAi, ticker);
+
+                    // Render Multi-Model AI Consensus
+                    if (this._renderModalConsensus) this._renderModalConsensus(ticker);
                 } catch (e) {
                     console.error('Error opening swing range modal:', e);
                     setEl('srModalStatus', 'textContent', 'Error loading swing range details.');

@@ -1,26 +1,26 @@
-    <!-- Swing Range Edit & Cycle Timing Modal -->
-    <div id="swingRangeModal" onclick="if(event.target === this) app.closeSwingRangeModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);z-index:2000;padding:1.5rem;overflow-y:auto;">
-        <div class="card" style="max-width:640px;margin:3vh auto;position:relative;background:#1e293b;border:1px solid rgba(255,255,255,0.15);box-shadow:0 25px 60px rgba(0,0,0,0.5);">
-            <button onclick="app.closeSwingRangeModal()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--light);font-size:1.5rem;cursor:pointer;" title="Close">&times;</button>
+    <!-- Stock Analysis, AI Prediction & Swing Intelligence Modal -->
+    <div id="swingRangeModal" onclick="if(event.target === this) app.closeSwingRangeModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.82);backdrop-filter:blur(6px);z-index:2000;padding:1.5rem;overflow-y:auto;">
+        <div class="card" style="max-width:1080px;width:95%;margin:3vh auto;position:relative;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:1rem;box-shadow:0 25px 60px rgba(0,0,0,0.7);padding:1.5rem;">
+            <button onclick="app.closeSwingRangeModal()" style="position:absolute;top:1.25rem;right:1.25rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:var(--light);width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;" title="Close">✕</button>
             <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
-                <h3 style="margin:0;">🔄 Swing Range & Trading Band</h3>
+                <h3 style="margin:0;font-size:1.3rem;font-weight:700;background:linear-gradient(to right, #60a5fa, #c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">🎯 Stock Intelligence & Multi-Model Prediction</h3>
                 <span id="srModalSourceBadge" class="signal-badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;">Auto</span>
             </div>
-            <p id="srModalSubtitle" class="timestamp" style="margin-bottom:0.75rem;font-size:0.85rem;"></p>
+            <p id="srModalSubtitle" class="timestamp" style="margin-bottom:0.85rem;font-size:0.85rem;"></p>
 
             <!-- Current Price & Found Range Summary Box -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.75rem;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:0.75rem;margin-bottom:1rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.6rem;padding:0.85rem;">
                 <div>
                     <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;font-weight:600;margin-bottom:0.2rem;">Current Market Price</div>
-                    <div id="srModalCurrentPrice" style="font-size:1.25rem;font-weight:700;color:var(--light);">₹—</div>
+                    <div id="srModalCurrentPrice" style="font-size:1.35rem;font-weight:700;color:var(--light);">₹—</div>
                 </div>
                 <div>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
                         <span style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;font-weight:600;">Found Trading Range (20D)</span>
-                        <button type="button" onclick="app.fillFoundRange()" class="btn btn-sm" style="padding:0.1rem 0.35rem;font-size:0.68rem;background:rgba(59,130,246,0.2);color:#60a5fa;" title="Copy detected bounds to custom inputs">⚡ Use Detected</button>
+                        <button type="button" onclick="app.fillFoundRange()" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.7rem;background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:0.3rem;" title="Copy detected bounds to custom inputs">⚡ Use Detected</button>
                     </div>
-                    <div id="srModalFoundRange" style="font-size:0.95rem;font-weight:600;color:#94a3b8;">₹— – ₹—</div>
-                    <div id="srModalFoundMeta" class="timestamp" style="font-size:0.72rem;"></div>
+                    <div id="srModalFoundRange" style="font-size:1.05rem;font-weight:600;color:#94a3b8;">₹— – ₹—</div>
+                    <div id="srModalFoundMeta" class="timestamp" style="font-size:0.75rem;"></div>
                 </div>
             </div>
 
@@ -77,17 +77,31 @@
                 <div id="srModalHistoryContent"></div>
             </div>
 
+            <!-- ================= AI MULTI-MODEL CONSENSUS SECTION ================= -->
+            <div id="srModalConsensusSection" style="margin-top:0.75rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:0.75rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.4rem;">
+                    <h4 style="margin:0;font-size:0.92rem;display:flex;align-items:center;gap:0.4rem;">
+                        <span>🧠 AI Multi-Model Consensus (DeepSeek + Claude + Llama + Gemini)</span>
+                        <span id="srModalConsensusBadge" class="signal-badge" style="font-size:0.7rem;display:none;"></span>
+                    </h4>
+                    <button type="button" id="srModalConsensusRunBtn" onclick="app.runModalConsensus()" class="btn btn-sm" style="background:linear-gradient(135deg, #6366f1, #a855f7);color:#fff;border:none;font-size:0.75rem;font-weight:700;display:flex;align-items:center;gap:0.3rem;box-shadow:0 2px 8px rgba(99,102,241,0.3);">⚡ Run AI Consensus</button>
+                </div>
+                <div id="srModalConsensusContent">
+                    <p class="timestamp" style="margin:0;font-size:0.8rem;">Click "Run AI Consensus" to trigger ensemble reasoning across DeepSeek-R1, Llama-3.3-70B, Claude, and Gemini.</p>
+                </div>
+            </div>
+
             <!-- AI Multi-Modal & News Synthesis Section -->
             <div id="srModalAiSection" style="margin-top:0.75rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:0.75rem;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
                     <h4 style="margin:0;font-size:0.9rem;display:flex;align-items:center;gap:0.4rem;">
-                        <span>🧠 AI Multi-Modal Synthesis (News + Volume + Range)</span>
+                        <span>📰 Live News Synthesis & Volume Accumulation</span>
                         <span id="srModalAiSignalBadge" class="signal-badge" style="font-size:0.7rem;display:none;"></span>
                     </h4>
-                    <button type="button" id="srModalAiRunBtn" onclick="app.runModalAiForecast()" class="btn btn-sm" style="background:rgba(59,130,246,0.25);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);font-size:0.75rem;">⚡ Run AI Synthesis</button>
+                    <button type="button" id="srModalAiRunBtn" onclick="app.runModalAiForecast()" class="btn btn-sm" style="background:rgba(59,130,246,0.25);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);font-size:0.75rem;">⚡ Run News Synthesis</button>
                 </div>
                 <div id="srModalAiContent">
-                    <p class="timestamp" style="margin:0;font-size:0.8rem;">Click "Run AI Synthesis" to evaluate recent news headlines, world events, and volume accumulation.</p>
+                    <p class="timestamp" style="margin:0;font-size:0.8rem;">Click "Run News Synthesis" to evaluate recent news headlines, world events, and volume accumulation.</p>
                 </div>
             </div>
 
@@ -95,7 +109,7 @@
             <div id="srModalKronosSection" style="margin-top:0.75rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:0.75rem;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
                     <h4 style="margin:0;font-size:0.9rem;display:flex;align-items:center;gap:0.4rem;">
-                        <span>🔮 Kronos AI 14-Day Prediction</span>
+                        <span>🔮 Kronos AI 14-Day Deep Learning Trajectory</span>
                         <span id="srModalKronosBadge" class="signal-badge" style="font-size:0.7rem;display:none;"></span>
                     </h4>
                     <button type="button" id="srModalKronosRunBtn" onclick="app.runModalKronos()" class="btn btn-sm" style="background:rgba(139,92,246,0.25);color:#c084fc;border:1px solid rgba(139,92,246,0.4);font-size:0.75rem;">⚡ Run Kronos AI</button>
