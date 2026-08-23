@@ -237,6 +237,11 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
 
     mgr = get_data_manager(settings)
     raw = mgr.fetch_ohlcv(ticker=fetch_symbol, start_date=start)
+    try:
+        from earnings_engine.rate_limits import record_request
+        record_request("yfinance")
+    except Exception:
+        pass
 
     if raw is None or raw.empty:
         _mark_fetched(ticker, settings)

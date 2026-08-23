@@ -1,0 +1,309 @@
+"""Downstream API Rate Limit & Quota Tracking Engine.
+
+Tracks API consumption, rate limit criteria, free-tier quotas, and response headers
+across all downstreams (OpenRouter, Yahoo Finance, NSE, Gemini, etc.) across multiple timeframes.
+"""
+from __future__ import annotations
+
+import collections
+import os
+import threading
+import time
+from datetime import datetime, timezone
+from typing import Any
+
+import requests
+
+from earnings_engine.config import Settings
+from earnings_engine.logging_utils import get_logger
+
+logger = get_logger("earnings_engine.rate_limits")
+
+# Downstream default criteria definition (Free tier and standard limits)
+DOWNSTREAM_CRITERIA: dict[str, dict[str, Any]] = {
+    "openrouter": {
+        "service_name": "OpenRouter AI (Consensus & LLMs)",
+        "icon": "🤖",
+        "description": "Multi-model reasoning via DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large.",
+        "free_tier_limits": {
+            "1m": 20,      # 20 requests per minute
+            "1h": 100,     # 100 requests per hour
+            "24h": 200,    # 200 requests per day (Free tier cap)
+        },
+        "default_limits": {
+            "1m": 60,
+            "1h": 500,
+            "24h": 2000,
+        },
+        "unit": "requests",
+        "docs_url": "https://openrouter.ai/docs/limits",
+    },
+    "yfinance": {
+        "service_name": "Yahoo Finance (Market & Price Data)",
+        "icon": "📈",
+        "description": "Historical OHLCV prices, dividends, splits, and quarterly earnings data.",
+        "free_tier_limits": {
+            "1m": 30,      # 30 requests per minute
+            "1h": 500,     # 500 requests per hour
+            "24h": 2000,   # 2000 requests per day
+        },
+        "default_limits": {
+            "1m": 60,
+            "1h": 1000,
+            "24h": 5000,
+        },
+        "unit": "requests",
+        "docs_url": "https://pypi.org/project/yfinance/",
+    },
+    "nse": {
+        "service_name": "NSE / BSE India (Corporate Feeds)",
+        "icon": "🏛️",
+        "description": "National Stock Exchange Bhavcopy, corporate announcements, and circuit filters.",
+        "free_tier_limits": {
+            "1m": 15,
+            "1h": 150,
+            "24h": 600,
+        },
+        "default_limits": {
+            "1m": 30,
+            "1h": 300,
+            "24h": 1200,
+        },
+        "unit": "requests",
+        "docs_url": "https://www.nseindia.com",
+    },
+    "gemini": {
+        "service_name": "Google Gemini (Multimodal & News)",
+        "icon": "✨",
+        "description": "Multimodal news synthesis and volume catalyst analysis.",
+        "free_tier_limits": {
+            "1m": 15,      # 15 RPM
+            "1h": 300,     # 300 RPH
+            "24h": 1500,   # 1500 RPD
+        },
+        "default_limits": {
+            "1m": 60,
+            "1h": 1000,
+            "24h": 10000,
+        },
+        "unit": "requests",
+        "docs_url": "https://ai.google.dev/pricing",
+    },
+}
+
+
+class RateLimitTracker:
+    """Thread-safe in-memory sliding window request tracker and OpenRouter quota cache."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        # Deque of timestamps per downstream
+        self._request_timestamps: dict[str, collections.deque[float]] = {
+            k: collections.deque(maxlen=10000) for k in DOWNSTREAM_CRITERIA
+        }
+        # Last known HTTP response headers from OpenRouter
+        self._openrouter_headers: dict[str, Any] = {
+            "limit": None,
+            "remaining": None,
+            "reset": None,
+            "last_updated": None,
+        }
+        # Cached OpenRouter key metadata from /api/v1/auth/key
+        self._openrouter_key_cache: dict[str, Any] = {}
+        self._openrouter_key_last_fetched: float = 0.0
+
+    def record_request(self, service: str, status_code: int = 200) -> None:
+        """Record an outbound request timestamp for the given downstream service."""
+        now = time.time()
+        service_key = service.lower().strip()
+        with self._lock:
+            if service_key not in self._request_timestamps:
+                self._request_timestamps[service_key] = collections.deque(maxlen=10000)
+            self._request_timestamps[service_key].append(now)
+
+    def update_openrouter_headers(self, headers: dict[str, Any]) -> None:
+        """Store x-ratelimit-* headers from OpenRouter API responses."""
+        with self._lock:
+            limit_val = headers.get("x-ratelimit-limit") or headers.get("X-RateLimit-Limit")
+            rem_val = headers.get("x-ratelimit-remaining") or headers.get("X-RateLimit-Remaining")
+            reset_val = headers.get("x-ratelimit-reset") or headers.get("X-RateLimit-Reset")
+
+            if limit_val is not None:
+                try:
+                    self._openrouter_headers["limit"] = int(limit_val)
+                except (ValueError, TypeError):
+                    pass
+            if rem_val is not None:
+                try:
+                    self._openrouter_headers["remaining"] = int(rem_val)
+                except (ValueError, TypeError):
+                    pass
+            if reset_val is not None:
+                try:
+                    self._openrouter_headers["reset"] = float(reset_val)
+                except (ValueError, TypeError):
+                    pass
+            self._openrouter_headers["last_updated"] = time.time()
+
+    def _fetch_openrouter_key_info(self, api_key: str) -> dict[str, Any]:
+        """Query https://openrouter.ai/api/v1/auth/key for real-time key usage and limits."""
+        now = time.time()
+        # Cache key info for 60 seconds to avoid hitting OpenRouter auth endpoint excessively
+        if self._openrouter_key_cache and (now - self._openrouter_key_last_fetched < 60):
+            return self._openrouter_key_cache
+
+        try:
+            resp = requests.get(
+                "https://openrouter.ai/api/v1/auth/key",
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                data = resp.json().get("data", {})
+                self._openrouter_key_cache = data
+                self._openrouter_key_last_fetched = now
+                return data
+            else:
+                logger.debug("OpenRouter auth/key check returned status %s", resp.status_code)
+        except Exception as e:
+            logger.debug("Failed checking OpenRouter key info: %s", e)
+
+        return self._openrouter_key_cache
+
+    def get_downstream_summary(self, settings: Settings | None = None) -> dict[str, Any]:
+        """Compute the allowed vs used metrics across 1m, 1h, and 24h timeframes for all downstreams."""
+        now = time.time()
+        openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+        is_openrouter_configured = bool(openrouter_key)
+
+        openrouter_key_info: dict[str, Any] = {}
+        is_free_tier = True
+        if is_openrouter_configured:
+            openrouter_key_info = self._fetch_openrouter_key_info(openrouter_key)
+            if "is_free_tier" in openrouter_key_info:
+                is_free_tier = bool(openrouter_key_info.get("is_free_tier"))
+            elif openrouter_key_info.get("limit") is not None and openrouter_key_info.get("limit") > 0:
+                is_free_tier = False
+
+        summary: dict[str, Any] = {}
+
+        with self._lock:
+            for key, meta in DOWNSTREAM_CRITERIA.items():
+                timestamps = list(self._request_timestamps.get(key, []))
+
+                # Count requests in sliding windows
+                count_1m = sum(1 for t in timestamps if now - t <= 60)
+                count_1h = sum(1 for t in timestamps if now - t <= 3600)
+                count_24h = sum(1 for t in timestamps if now - t <= 86400)
+
+                # Determine limits (Free tier vs Standard)
+                tier_limits = meta["free_tier_limits"] if (key == "openrouter" and is_free_tier) else meta["default_limits"]
+
+                allowed_1m = tier_limits.get("1m", 20)
+                allowed_1h = tier_limits.get("1h", 100)
+                allowed_24h = tier_limits.get("24h", 200)
+
+                # Utilization percentages
+                util_1m = min(100.0, round((count_1m / max(1, allowed_1m)) * 100.0, 1))
+                util_1h = min(100.0, round((count_1h / max(1, allowed_1h)) * 100.0, 1))
+                util_24h = min(100.0, round((count_24h / max(1, allowed_24h)) * 100.0, 1))
+
+                # Determine status
+                max_util = max(util_1m, util_1h, util_24h)
+                if max_util >= 90.0:
+                    status = "throttled"
+                    status_badge = "🔴 High / Near Limit"
+                elif max_util >= 70.0:
+                    status = "warning"
+                    status_badge = "🟡 Moderate"
+                else:
+                    status = "normal"
+                    status_badge = "🟢 Healthy"
+
+                service_summary = {
+                    "key": key,
+                    "service_name": meta["service_name"],
+                    "icon": meta["icon"],
+                    "description": meta["description"],
+                    "unit": meta["unit"],
+                    "docs_url": meta["docs_url"],
+                    "is_configured": is_openrouter_configured if key == "openrouter" else True,
+                    "is_free_tier": is_free_tier if key == "openrouter" else True,
+                    "status": status,
+                    "status_badge": status_badge,
+                    "max_utilization_pct": max_util,
+                    "timeframes": {
+                        "1m": {
+                            "label": "1 Minute",
+                            "current": count_1m,
+                            "allowed": allowed_1m,
+                            "remaining": max(0, allowed_1m - count_1m),
+                            "utilization_pct": util_1m,
+                        },
+                        "1h": {
+                            "label": "1 Hour",
+                            "current": count_1h,
+                            "allowed": allowed_1h,
+                            "remaining": max(0, allowed_1h - count_1h),
+                            "utilization_pct": util_1h,
+                        },
+                        "24h": {
+                            "label": "24 Hours (Daily)",
+                            "current": count_24h,
+                            "allowed": allowed_24h,
+                            "remaining": max(0, allowed_24h - count_24h),
+                            "utilization_pct": util_24h,
+                        },
+                    },
+                }
+
+                # Extra OpenRouter details
+                if key == "openrouter":
+                    service_summary["openrouter_key_info"] = {
+                        "label": openrouter_key_info.get("label", "Default API Key"),
+                        "usage": openrouter_key_info.get("usage", 0.0),
+                        "limit": openrouter_key_info.get("limit"),
+                        "is_free_tier": is_free_tier,
+                        "rate_limit": openrouter_key_info.get("rate_limit", {}),
+                    }
+                    service_summary["openrouter_live_headers"] = {
+                        "limit": self._openrouter_headers.get("limit"),
+                        "remaining": self._openrouter_headers.get("remaining"),
+                        "reset": self._openrouter_headers.get("reset"),
+                        "last_updated": self._openrouter_headers.get("last_updated"),
+                    }
+
+                summary[key] = service_summary
+
+        return {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "downstreams": summary,
+            "openrouter_counter": {
+                "current_24h": summary.get("openrouter", {}).get("timeframes", {}).get("24h", {}).get("current", 0),
+                "allowed_24h": summary.get("openrouter", {}).get("timeframes", {}).get("24h", {}).get("allowed", 200),
+                "remaining_24h": summary.get("openrouter", {}).get("timeframes", {}).get("24h", {}).get("remaining", 200),
+                "utilization_pct": summary.get("openrouter", {}).get("timeframes", {}).get("24h", {}).get("utilization_pct", 0.0),
+                "is_free_tier": is_free_tier,
+                "is_configured": is_openrouter_configured,
+                "status": summary.get("openrouter", {}).get("status", "normal"),
+            },
+        }
+
+
+# Global singleton instance
+tracker = RateLimitTracker()
+
+
+def record_request(service: str, status_code: int = 200) -> None:
+    """Convenience helper to record request metrics."""
+    tracker.record_request(service, status_code)
+
+
+def update_openrouter_headers(headers: dict[str, Any]) -> None:
+    """Convenience helper to store OpenRouter HTTP headers."""
+    tracker.update_openrouter_headers(headers)
+
+
+def get_ratelimits_summary(settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve the unified rate limit & quota payload."""
+    return tracker.get_downstream_summary(settings)

@@ -110,6 +110,13 @@ def diagnose_failure(
             timeout=60,
         )
 
+        try:
+            from earnings_engine.rate_limits import record_request, update_openrouter_headers
+            record_request("openrouter", resp.status_code)
+            update_openrouter_headers(dict(resp.headers))
+        except Exception:
+            pass
+
         if resp.status_code == 200:
             content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
             parsed = _parse_post_mortem_json(content)

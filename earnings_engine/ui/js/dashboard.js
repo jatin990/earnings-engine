@@ -511,6 +511,10 @@
                 this.populateWatchlistDropdowns();
                 this.loadOverview();
                 this.loadConsensusCache();
+                this.updateTopRateLimitPill();
+                setInterval(() => {
+                    this.updateTopRateLimitPill();
+                }, 30000);
                 
                 const initialTab = this.getInitialTab();
                 this.switchTab(initialTab, true, true);
@@ -7019,7 +7023,7 @@
             app._customizer.activeSubTab = subTab;
             
             // Toggle nav buttons
-            ['tabs', 'themes', 'env', 'audit'].forEach(t => {
+            ['tabs', 'themes', 'env', 'ratelimits', 'audit'].forEach(t => {
                 const navBtn = document.getElementById('ccNav' + t.charAt(0).toUpperCase() + t.slice(1));
                 const sec = document.getElementById('ccSection' + t.charAt(0).toUpperCase() + t.slice(1));
                 if (navBtn) navBtn.classList.toggle('active', t === subTab);
@@ -7032,8 +7036,165 @@
                 app.syncThemePickers();
             } else if (subTab === 'env') {
                 app.loadEnvVars();
+            } else if (subTab === 'ratelimits') {
+                app.loadRateLimits();
             } else if (subTab === 'audit') {
                 app.loadAccessAudit();
+            }
+        };
+
+        app.loadRateLimits = async function() {
+            const grid = document.getElementById('ccRateLimitsGrid');
+            if (grid) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--muted); padding: 2rem;"><span class="loading-spinner"></span> Loading downstream rate limits and quotas...</div>';
+            }
+
+            try {
+                const res = await fetch('/api/v1/config/ratelimits');
+                const data = await res.json();
+                const downstreams = data.downstreams || {};
+                const opCounter = data.openrouter_counter || {};
+
+                // Update Top Header Pill
+                app.updateTopRateLimitPill(opCounter);
+
+                // Update Control Center OpenRouter Banner
+                const bannerCount = document.getElementById('ccOpenRouter24hCount');
+                const bannerRem = document.getElementById('ccOpenRouter24hRem');
+                const tierBadge = document.getElementById('ccOpenRouterTierBadge');
+
+                if (bannerCount) bannerCount.textContent = `${opCounter.current_24h || 0} / ${opCounter.allowed_24h || 200}`;
+                if (bannerRem) {
+                    bannerRem.textContent = `${opCounter.remaining_24h || 0} reqs`;
+                    bannerRem.style.color = (opCounter.remaining_24h <= 20) ? '#f87171' : ((opCounter.remaining_24h <= 60) ? '#fbbf24' : '#34d399');
+                }
+                if (tierBadge) {
+                    tierBadge.textContent = opCounter.is_free_tier ? 'Free Tier Active' : 'Paid / Standard Tier';
+                    tierBadge.style.background = opCounter.is_free_tier ? 'rgba(16,185,129,0.2)' : 'rgba(59,130,246,0.2)';
+                    tierBadge.style.color = opCounter.is_free_tier ? '#34d399' : '#60a5fa';
+                }
+
+                if (!grid) return;
+
+                let html = '';
+                Object.values(downstreams).forEach(ds => {
+                    const statusBg = ds.status === 'throttled' ? 'rgba(239,68,68,0.2)' : (ds.status === 'warning' ? 'rgba(251,191,36,0.2)' : 'rgba(16,185,129,0.2)');
+                    const statusColor = ds.status === 'throttled' ? '#f87171' : (ds.status === 'warning' ? '#fbbf24' : '#34d399');
+                    const statusBorder = ds.status === 'throttled' ? 'rgba(239,68,68,0.4)' : (ds.status === 'warning' ? 'rgba(251,191,36,0.4)' : 'rgba(16,185,129,0.4)');
+
+                    const tfHtml = Object.entries(ds.timeframes || {}).map(([tfKey, tf]) => {
+                        const barColor = tf.utilization_pct >= 90 ? '#ef4444' : (tf.utilization_pct >= 70 ? '#fbbf24' : '#3b82f6');
+                        return `
+                            <div style="background: rgba(0,0,0,0.25); padding: 0.65rem 0.8rem; border-radius: 0.45rem; border: 1px solid rgba(255,255,255,0.06);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; font-size: 0.78rem;">
+                                    <span style="color: #cbd5e1; font-weight: 600;">⏱️ ${tf.label}</span>
+                                    <span style="font-family: monospace; font-weight: 700; color: ${barColor};">
+                                        ${tf.current} / ${tf.allowed} ${ds.unit} (${tf.utilization_pct}%)
+                                    </span>
+                                </div>
+                                <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; margin-bottom: 0.3rem;">
+                                    <div style="width: ${Math.min(100, tf.utilization_pct)}%; height: 100%; background: ${barColor}; border-radius: 3px; transition: width 0.3s ease;"></div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted);">
+                                    <span>Remaining: <strong style="color: #f8fafc;">${tf.remaining}</strong></span>
+                                    <span>Cap: ${tf.allowed} ${ds.unit}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    // Extra metadata rows for OpenRouter
+                    let extraMetaHtml = '';
+                    if (ds.key === 'openrouter' && ds.openrouter_key_info) {
+                        const ki = ds.openrouter_key_info;
+                        extraMetaHtml = `
+                            <div style="background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2); border-radius: 0.45rem; padding: 0.5rem 0.75rem; margin-top: 0.75rem; font-size: 0.75rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem;">
+                                <span>🔑 Key Label: <strong style="color: #c084fc;">${ki.label || 'Default'}</strong></span>
+                                <span>Usage: <strong style="color: #38bdf8;">$${Number(ki.usage || 0).toFixed(4)}</strong></span>
+                                ${ki.limit ? `<span>Credit Cap: <strong>$${ki.limit}</strong></span>` : ''}
+                            </div>
+                        `;
+                    }
+
+                    html += `
+                        <div class="card" style="margin: 0; padding: 1.15rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; gap: 0.5rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <span style="font-size: 1.4rem;">${ds.icon}</span>
+                                        <div>
+                                            <h4 style="margin: 0; font-size: 0.95rem; color: #f8fafc;">${ds.service_name}</h4>
+                                            <span style="font-size: 0.72rem; color: var(--muted);">${ds.description}</span>
+                                        </div>
+                                    </div>
+                                    <span class="signal-badge" style="background: ${statusBg}; color: ${statusColor}; border: 1px solid ${statusBorder}; font-size: 0.72rem; padding: 0.2rem 0.55rem; white-space: nowrap;">
+                                        ${ds.status_badge}
+                                    </span>
+                                </div>
+
+                                <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.85rem;">
+                                    ${tfHtml}
+                                </div>
+
+                                ${extraMetaHtml}
+                            </div>
+
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 0.75rem; margin-top: 0.85rem; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.72rem; color: var(--muted);">
+                                <span>Max Utilization: <strong style="color: ${statusColor}; font-size: 0.82rem;">${ds.max_utilization_pct}%</strong></span>
+                                <a href="${ds.docs_url}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; text-decoration: none;">Docs & Criteria ↗</a>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                grid.innerHTML = html;
+            } catch (e) {
+                console.error('Error loading rate limits:', e);
+                if (grid) {
+                    grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--red); padding: 2rem;">Failed loading rate limits: ${e.message}</div>`;
+                }
+            }
+        };
+
+        app.updateTopRateLimitPill = async function(cachedCounter) {
+            const quotaEl = document.getElementById('topOpenRouterQuota');
+            const statusEl = document.getElementById('topRateLimitStatus');
+            const pillEl = document.getElementById('topRateLimitPill');
+            if (!quotaEl || !statusEl || !pillEl) return;
+
+            let counter = cachedCounter;
+            if (!counter) {
+                try {
+                    const res = await fetch('/api/v1/config/ratelimits');
+                    const data = await res.json();
+                    counter = data.openrouter_counter || {};
+                } catch (e) {
+                    return;
+                }
+            }
+
+            const cur = counter.current_24h || 0;
+            const allowed = counter.allowed_24h || 200;
+            const rem = counter.remaining_24h != null ? counter.remaining_24h : (allowed - cur);
+            const util = counter.utilization_pct || 0;
+
+            quotaEl.textContent = `OpenRouter: ${cur}/${allowed} reqs`;
+
+            if (util >= 90 || rem <= 20) {
+                statusEl.textContent = `🔴 ${rem} left · High`;
+                statusEl.style.color = '#f87171';
+                pillEl.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                pillEl.style.background = 'rgba(239, 68, 68, 0.15)';
+            } else if (util >= 70 || rem <= 60) {
+                statusEl.textContent = `🟡 ${rem} left · Warning`;
+                statusEl.style.color = '#fbbf24';
+                pillEl.style.borderColor = 'rgba(251, 191, 36, 0.5)';
+                pillEl.style.background = 'rgba(251, 191, 36, 0.15)';
+            } else {
+                statusEl.textContent = `🟢 ${rem} left · Healthy`;
+                statusEl.style.color = '#34d399';
+                pillEl.style.borderColor = 'rgba(99, 102, 241, 0.35)';
+                pillEl.style.background = 'rgba(99, 102, 241, 0.12)';
             }
         };
 

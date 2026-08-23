@@ -15,6 +15,14 @@
                     <option value="">🌐 All Stocks (Global)</option>
                 </select>
                 <button onclick="app.switchTab('watchlist')" class="btn btn-sm" style="padding: 0.35rem 0.65rem; background: rgba(59,130,246,0.2); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4); border-radius: 0.4rem; font-size: 0.78rem;" title="Manage custom watchlists">⭐ Watchlists</button>
+                <!-- Live Rate Limits & OpenRouter Quota Indicator Pill -->
+                <div id="topRateLimitPill" onclick="app.openCustomizerModal('ratelimits')" style="display: flex; align-items: center; gap: 0.45rem; background: rgba(99,102,241,0.12); padding: 0.35rem 0.75rem; border-radius: 0.45rem; border: 1px solid rgba(99,102,241,0.35); cursor: pointer; transition: all 0.2s;" title="Click to view API rate limits & downstream quotas in Control Center">
+                    <span style="font-size: 0.9rem;">⚡</span>
+                    <div style="display: flex; flex-direction: column; line-height: 1.15;">
+                        <span id="topOpenRouterQuota" style="font-size: 0.75rem; font-weight: 700; color: #c084fc;">OpenRouter: 0/200 reqs</span>
+                        <span id="topRateLimitStatus" style="font-size: 0.65rem; color: #34d399; font-weight: 600;">🟢 Quotas Healthy</span>
+                    </div>
+                </div>
                 <button onclick="app.openCustomizerModal()" class="btn btn-sm" style="padding: 0.35rem 0.75rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: #fff; border: none; border-radius: 0.4rem; font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 8px rgba(139,92,246,0.3); cursor: pointer;" title="Customize visible tabs, color themes, and environment variables">⚙️ Control Center</button>
             </div>
         </header>

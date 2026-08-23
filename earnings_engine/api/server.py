@@ -933,6 +933,14 @@ async def save_dashboard_ui_preferences(request: Request):
     return save_ui_preferences(payload, settings=_settings)
 
 
+@app.get("/api/v1/config/ratelimits", tags=["Control Center"])
+@app.get("/api/v1/ratelimits", tags=["Control Center"])
+async def get_downstream_ratelimits():
+    """Retrieve rate limit criteria, quotas, and current utilization for all downstreams."""
+    from earnings_engine.rate_limits import get_ratelimits_summary
+    return get_ratelimits_summary(settings=_settings)
+
+
 @app.get("/api/v1/system/telemetry", tags=["Control Center"])
 async def get_system_telemetry_records(limit: int = 100):
     """Retrieve system diagnostic and telemetry entries."""

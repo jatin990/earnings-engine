@@ -24,6 +24,7 @@
             <button id="ccNavTabs" onclick="app.switchCustomizerTab('tabs')" class="tab-btn active" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🗂️ Visible Tabs</button>
             <button id="ccNavThemes" onclick="app.switchCustomizerTab('themes')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🎨 Themes & Colors</button>
             <button id="ccNavEnv" onclick="app.switchCustomizerTab('env')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🔑 Environment Variables</button>
+            <button id="ccNavRateLimits" onclick="app.switchCustomizerTab('ratelimits')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">⚡ Rate Limits & Quotas</button>
             {% if has_diagnostics_key or has_tracker_key %}
             <button id="ccNavAudit" onclick="app.switchCustomizerTab('audit')" class="tab-btn" style="padding: 0.45rem 1rem; font-size: 0.85rem;">🖥️ System Diagnostics & Telemetry</button>
             {% endif %}
@@ -186,6 +187,54 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- ================= SUB-TAB 4: API RATE LIMITS & QUOTAS ================= -->
+            <div id="ccSectionRateLimits" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+                            <span>⚡ API Quotas & Downstream Rate Limits</span>
+                        </h3>
+                        <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--muted);">Live consumption tracking, allowed vs current request quotas, and rate limit criteria across all downstream services.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button onclick="app.loadRateLimits()" class="btn btn-sm" style="background: rgba(99,102,241,0.2); color: #c084fc; border: 1px solid rgba(99,102,241,0.4); display: flex; align-items: center; gap: 0.3rem;">
+                            <span>🔄 Refresh Quotas</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- OpenRouter Free Tier Highlight Banner -->
+                <div id="ccOpenRouterBanner" style="background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.12)); border: 1px solid rgba(168,85,247,0.35); border-radius: 0.75rem; padding: 1rem 1.25rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.85rem;">
+                        <span style="font-size: 2rem;">🤖</span>
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem;">
+                                <strong style="font-size: 0.98rem; color: #f8fafc;">OpenRouter Multi-Model Reasoning</strong>
+                                <span id="ccOpenRouterTierBadge" class="signal-badge" style="background: rgba(16,185,129,0.2); color: #34d399; font-size: 0.72rem; padding: 0.15rem 0.5rem;">Free Tier Active</span>
+                            </div>
+                            <p style="margin: 0; font-size: 0.8rem; color: #cbd5e1;">Free tier rate limit criteria: <strong>20 req/min</strong> · <strong>200 req/day</strong> · 4 concurrent models per consensus forecast</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 1.5rem; align-items: center;">
+                        <div style="text-align: right;">
+                            <div style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; font-weight: 700;">24h Requests</div>
+                            <div id="ccOpenRouter24hCount" style="font-size: 1.25rem; font-weight: 800; color: #c084fc;">0 / 200</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 0.72rem; color: var(--muted); text-transform: uppercase; font-weight: 700;">Daily Remaining</div>
+                            <div id="ccOpenRouter24hRem" style="font-size: 1.25rem; font-weight: 800; color: #34d399;">200 reqs</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Downstream Rate Limits Grid -->
+                <div id="ccRateLimitsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 1rem;">
+                    <div style="grid-column: 1/-1; text-align: center; color: var(--muted); padding: 2rem;">
+                        <span class="loading-spinner"></span> Loading downstream rate limits and quotas...
+                    </div>
                 </div>
             </div>
 

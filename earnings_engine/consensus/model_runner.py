@@ -114,6 +114,13 @@ def _query_single_model(
             timeout=timeout,
         )
 
+        try:
+            from earnings_engine.rate_limits import record_request, update_openrouter_headers
+            record_request("openrouter", resp.status_code)
+            update_openrouter_headers(dict(resp.headers))
+        except Exception:
+            pass
+
         elapsed_ms = (time.perf_counter() - start) * 1000
         logger.info("[CONSENSUS] %s responded in %.0fms (HTTP %d)", display_name, elapsed_ms, resp.status_code)
 
