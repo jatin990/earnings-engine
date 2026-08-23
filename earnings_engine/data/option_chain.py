@@ -41,19 +41,25 @@ def analyze_option_chain(
       - highest_put_oi_strike: Major support strike
     """
     clean_symbol = symbol.upper().replace(".NS", "")
+    logger.info("[OPTION-CHAIN] Analyzing Option Chain derivatives data for symbol=%s (spot=%s)...", clean_symbol, spot_price)
     mgr = get_data_manager(settings)
     raw_chain = mgr.fetch_option_chain(clean_symbol)
 
     records = raw_chain.get("data", [])
     if not records:
+        logger.info("[OPTION-CHAIN] Real-time Option Chain records empty for %s; computing baseline derivatives metrics", clean_symbol)
         # Generate synthetic calculation if spot price is provided (or fetch quote)
         if spot_price is None:
             q = mgr.fetch_quote(clean_symbol)
             spot_price = q.get("price") or 100.0
 
-        return _compute_baseline_option_metrics(clean_symbol, spot_price)
+        res = _compute_baseline_option_metrics(clean_symbol, spot_price)
+        logger.info("[OPTION-CHAIN] [Baseline] %s -> Sentiment: %s, PCR: %s, Max Pain: %s", clean_symbol, res.get("sentiment"), res.get("pcr_oi"), res.get("max_pain_strike"))
+        return res
 
-    return _calculate_option_metrics_from_records(clean_symbol, records, spot_price)
+    res = _calculate_option_metrics_from_records(clean_symbol, records, spot_price)
+    logger.info("[OPTION-CHAIN] [NSE-Live] %s (%d strikes) -> Sentiment: %s, PCR(OI): %s, Max Pain: ₹%s", clean_symbol, len(records), res.get("sentiment"), res.get("pcr_oi"), res.get("max_pain_strike"))
+    return res
 
 
 def _calculate_option_metrics_from_records(

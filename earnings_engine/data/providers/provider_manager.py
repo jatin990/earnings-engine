@@ -49,23 +49,34 @@ class DataProviderManager:
         if preferred_provider and preferred_provider in self._providers:
             prov = self._providers[preferred_provider]
             if prov.is_available:
+                logger.info("[PROVIDER-ROUTE] Querying preferred provider '%s' for ticker=%s...", preferred_provider, ticker)
                 df = prov.fetch_ohlcv(ticker, start_date, end_date, interval)
                 if not df.empty:
+                    logger.info("[PROVIDER-SUCCESS] Fetched %d rows from '%s' for %s", len(df), preferred_provider, ticker)
                     return df
 
         # 2. For Indian equities: try NSE Direct first
         if mkt == "IN":
             nse_prov = self._providers["nse_direct"]
             if nse_prov.is_available:
+                logger.info("[PROVIDER-ROUTE] [NSE-Direct] Querying official NSE archives (nselib / jugaad-data) for %s...", ticker)
                 df = nse_prov.fetch_ohlcv(ticker, start_date, end_date, interval)
                 if not df.empty:
+                    logger.info("[PROVIDER-SUCCESS] [NSE-Direct] Retrieved %d bars for %s", len(df), ticker)
                     return df
+                else:
+                    logger.info("[PROVIDER-FALLBACK] [NSE-Direct] returned empty for %s; falling back to yfinance", ticker)
 
         # 3. Fallback to yfinance
         yf_prov = self._providers["yfinance"]
         if yf_prov.is_available:
-            return yf_prov.fetch_ohlcv(ticker, start_date, end_date, interval)
+            logger.info("[PROVIDER-ROUTE] [yfinance] Querying Yahoo Finance for %s (%s to %s)...", ticker, start_date, end_date or "now")
+            df = yf_prov.fetch_ohlcv(ticker, start_date, end_date, interval)
+            if not df.empty:
+                logger.info("[PROVIDER-SUCCESS] [yfinance] Retrieved %d bars for %s", len(df), ticker)
+            return df
 
+        logger.warning("[PROVIDER-ERROR] No available provider succeeded for ticker=%s", ticker)
         return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
 
     def fetch_quote(self, ticker: str) -> dict[str, Any]:
@@ -74,25 +85,32 @@ class DataProviderManager:
         if mkt == "IN":
             nse_prov = self._providers["nse_direct"]
             if nse_prov.is_available:
+                logger.info("[PROVIDER-QUOTE] [NSE-Direct] Fetching real-time quote for %s...", ticker)
                 res = nse_prov.fetch_quote(ticker)
                 if res.get("price") is not None:
                     return res
+                logger.info("[PROVIDER-QUOTE] [NSE-Direct] Quote empty for %s, falling back to yfinance", ticker)
 
         yf_prov = self._providers["yfinance"]
+        logger.info("[PROVIDER-QUOTE] [yfinance] Fetching quote for %s...", ticker)
         return yf_prov.fetch_quote(ticker)
 
     def fetch_bhavcopy(self, date_str: str) -> pd.DataFrame:
         """Fetch bulk daily bhavcopy for all NSE equities."""
         nse_prov = self._providers["nse_direct"]
         if nse_prov.is_available:
+            logger.info("[PROVIDER-BHAVCOPY] [NSE-Direct] Fetching bulk daily bhavcopy for %s...", date_str)
             return nse_prov.fetch_bhavcopy(date_str)
+        logger.warning("[PROVIDER-BHAVCOPY] NSE Direct provider not available for bhavcopy on %s", date_str)
         return pd.DataFrame(columns=["ticker", "open", "high", "low", "close", "volume"])
 
     def fetch_option_chain(self, symbol: str) -> dict[str, Any]:
         """Fetch Option Chain data for an NSE symbol or index."""
         nse_prov = self._providers["nse_direct"]
         if nse_prov.is_available:
+            logger.info("[PROVIDER-OPTIONS] [NSE-Direct] Querying live Option Chain for %s...", symbol)
             return nse_prov.fetch_option_chain(symbol)
+        logger.warning("[PROVIDER-OPTIONS] NSE Direct provider (nselib / jugaad-data) unavailable for Option Chain on %s", symbol)
         return {"symbol": symbol, "records_count": 0, "data": []}
 
     def fetch_index_data(self, index_name: str, start_date: str, end_date: str | None = None) -> pd.DataFrame:

@@ -249,6 +249,8 @@ def fetch_ticker_catalysts(ticker: str, limit: int = 8, settings: Settings | Non
     ticker = ticker.strip().upper()
     name = get_name(ticker, settings) or ticker
 
+    logger.info("[CATALYSTS] Fetching real-time news & catalyst feeds for ticker=%s (%s)...", ticker, name)
+
     articles: list[dict[str, Any]] = []
     seen_titles: set[str] = set()
 
@@ -259,6 +261,8 @@ def fetch_ticker_catalysts(ticker: str, limit: int = 8, settings: Settings | Non
     if len(raw_items) < limit:
         market = "IN" if ticker.endswith(".NS") or ticker.endswith(".BO") else "US"
         raw_items += fetch_google_news_rss(ticker, market=market)
+
+    logger.info("[CATALYSTS] Retrieved %d raw news headlines for %s across Yahoo/Google RSS feeds", len(raw_items), ticker)
 
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -322,6 +326,8 @@ def fetch_ticker_catalysts(ticker: str, limit: int = 8, settings: Settings | Non
                 logger.debug("Failed saving catalyst record: %s", e)
 
         conn.commit()
+
+    logger.info("[CATALYSTS] Successfully processed and scored %d unique catalyst items for %s", len(articles), ticker)
 
     # Sort by newest published date descending, then impact score
     articles.sort(key=lambda a: (a.get("published_at", ""), a.get("impact_score", 0)), reverse=True)

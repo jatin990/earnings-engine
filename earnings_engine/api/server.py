@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Any
 
@@ -26,14 +27,23 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
-from earnings_engine.logging_utils import get_logger
+from earnings_engine.logging_utils import get_logger, log_startup_diagnostics
 
 logger = get_logger("earnings_engine.api.server")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Run environment, config and provider module diagnostics on API startup."""
+    log_startup_diagnostics(logger)
+    yield
+
 
 app = FastAPI(
     title="Earnings Engine API",
     description="REST API for accessing earnings predictions and market data",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Enable CORS for Postman and browser access

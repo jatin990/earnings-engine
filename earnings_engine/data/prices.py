@@ -239,6 +239,7 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
     after the market closes, are reused without re-downloading.
     """
     if not force and _is_fresh(ticker, settings) and prices_recent_enough(ticker, settings):
+        logger.info("[DATA-CACHE] [prices] Reusing cached price history for ticker=%s (within TTL)", ticker)
         return load_prices(ticker, settings)
 
     # Resolve alias if ticker is known to be renamed/rebranded
@@ -253,20 +254,21 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
         overlap = pd.Timedelta(days=5)
         start = (last_cached - overlap).strftime("%Y-%m-%d")
         logger.info(
-            "downloading price delta ticker=%s from=%s (last cached %s)",
-            fetch_symbol, start, last_cached.date(),
+            "[DATA-FETCH] [yfinance] Downloading price delta for ticker=%s (%s) from=%s (last cached: %s)",
+            ticker, fetch_symbol, start, last_cached.date(),
         )
     else:
-        logger.info("downloading full prices ticker=%s from=%s", fetch_symbol, start)
+        logger.info("[DATA-FETCH] [yfinance] Downloading full historical prices for ticker=%s (%s) from=%s", ticker, fetch_symbol, start)
 
     try:
         raw = yf.download(fetch_symbol, start=start, auto_adjust=True, progress=False, threads=False)
     except Exception as exc:
-        logger.warning("failed to download prices for ticker=%s (%s): %s", ticker, fetch_symbol, exc)
+        logger.warning("[DATA-FETCH] [yfinance] Failed to download prices for ticker=%s (%s): %s", ticker, fetch_symbol, exc)
         raw = None
 
     if raw is None or raw.empty:
         _mark_fetched(ticker, settings)
+        logger.warning("[DATA-FETCH] [yfinance] No new data returned for %s; loading from cache", ticker)
         return load_prices(ticker, settings) if _is_fresh(ticker, settings) else _empty_frame()
 
     df = raw.copy()
@@ -289,7 +291,7 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
             df[col] = pd.NA
 
     df = df[COLUMNS].copy()
-    logger.info("price data normalized ticker=%s rows=%s", ticker, len(df))
+    logger.info("[DATA-FETCH] [yfinance] Successfully fetched and normalized %d rows for ticker=%s", len(df), ticker)
     for col in COLUMNS:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["volume"] = df["volume"].astype("Int64")
