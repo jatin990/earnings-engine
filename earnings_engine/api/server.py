@@ -832,12 +832,34 @@ async def serve_credit_card():
 # --- Passcode Auth & Key Management ---
 
 @app.post("/api/v1/auth/verify-code", tags=["Auth"])
-async def verify_portal_code(req: VerifyCodeRequest):
+async def verify_portal_code(req: VerifyCodeRequest, response: Response):
     """Verify input passcode and return authorized applications and permissions."""
     from earnings_engine.data.passcodes import verify_passcode
+    from earnings_engine.data.auth import create_session_token
     result = verify_passcode(req.code, _settings)
     if not result.get("valid"):
         raise HTTPException(status_code=401, detail=result.get("error", "Invalid access passcode."))
+    
+    is_owner = result.get("role") == "owner" or result.get("is_admin")
+    scopes = result.get("scopes") or (
+        ["can_view_trips", "can_view_cards", "can_view_net_worth", "admin", "dashboard", "credit_card"]
+        if is_owner else ["can_view_trips"]
+    )
+    token = create_session_token(
+        user_id=1 if is_owner else 2,
+        role="owner" if is_owner else "friend",
+        email="owner@nexus.local" if is_owner else "friend@nexus.local",
+        name=result.get("label", "Nexus User"),
+        scopes=scopes,
+    )
+    result["session_token"] = token
+    response.set_cookie(
+        key="nexus_session",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=14 * 86400,
+    )
     return result
 
 

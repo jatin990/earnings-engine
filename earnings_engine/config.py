@@ -78,6 +78,10 @@ class Settings:
     kronos_device: str = field(
         default_factory=lambda: os.getenv("EARNINGS_ENGINE_KRONOS_DEVICE", "").strip()
     )
+    # Master owner passcode for unified portal login and admin access.
+    owner_passcode: str = field(
+        default_factory=lambda: os.getenv("OWNER_PASSCODE") or os.getenv("NEXUS_MASTER_PASSCODE") or "NEXUS-MASTER"
+    )
 
     def resolve_device(self, preferred: str | None = None) -> str:
         """Resolve the model inference device for Kronos."""

@@ -201,17 +201,7 @@
             </div>
 
             <h2 class="brand-title text-2xl font-extrabold text-white mb-1">Nexus Command Hub</h2>
-            <p class="text-xs text-slate-400 mb-6">Enter your private access code or join via Email OTP verification.</p>
-
-            <!-- Mode Switcher Tabs -->
-            <div class="flex p-1 bg-black/40 rounded-xl border border-white/10 mb-6">
-                <button id="tabBtnPasscode" onclick="portal.switchGateMode('passcode')" class="tab-switch-btn active flex-1 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 border border-transparent">
-                    🔑 Passcode / Owner
-                </button>
-                <button id="tabBtnEmailOtp" onclick="portal.switchGateMode('email_otp')" class="tab-switch-btn flex-1 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 border border-transparent">
-                    ✉️ Friend Join & OTP
-                </button>
-            </div>
+            <p class="text-xs text-slate-400 mb-6">Enter your personal access passcode to unlock your personalized command deck.</p>
 
             <!-- Error Banner -->
             <div id="errorAlert" class="hidden mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium flex items-center gap-2 text-left">
@@ -219,13 +209,13 @@
                 <span id="errorMessage">Invalid access credentials.</span>
             </div>
 
-            <!-- MODE A: PASSCODE FORM -->
+            <!-- UNIFIED PASSCODE FORM -->
             <form id="passcodeForm" onsubmit="portal.handleVerify(event)" class="space-y-4">
                 <div class="relative">
                     <input 
                         type="password" 
                         id="passcodeInput" 
-                        placeholder="ENTER ACCESS KEY..." 
+                        placeholder="ENTER ACCESS CODE..." 
                         autocomplete="off"
                         class="input-box w-full px-4 py-3.5 rounded-xl mono text-center font-bold tracking-widest text-sm text-indigo-200 placeholder:text-slate-600 uppercase"
                     >
@@ -235,16 +225,38 @@
                 </div>
 
                 <button type="submit" id="btnUnlock" class="glow-btn w-full py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm font-bold">
-                    <span>Unlock Nexus Deck</span>
+                    <span>Unlock Command Deck</span>
                     <span class="text-lg">→</span>
                 </button>
 
+                <!-- Optional Email OTP Collapsible Toggle -->
+                <div class="pt-2">
+                    <button type="button" onclick="portal.toggleEmailOtpView()" class="text-[11px] font-semibold text-slate-400 hover:text-indigo-300 transition">
+                        ✉️ Have an Email Invite Code? Click here to verify via OTP
+                    </button>
+                </div>
+
+                <!-- Collapsible Email OTP Drawer -->
+                <div id="emailOtpCollapsible" class="pt-3 border-t border-white/5 space-y-2.5 text-left" style="display: none;">
+                    <span class="text-[11px] font-semibold text-slate-400 block">Enter your registered email for one-time code:</span>
+                    <input 
+                        type="email" 
+                        id="friendEmailInput" 
+                        placeholder="your.email@example.com" 
+                        class="input-box w-full px-3 py-2 rounded-lg text-xs text-white placeholder:text-slate-600"
+                    >
+                    <button type="button" onclick="portal.handleRequestOtp(event)" id="btnRequestOtp" class="w-full py-2.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 transition">
+                        <span>Send Email OTP</span>
+                        <span>✉️</span>
+                    </button>
+                </div>
+
                 <!-- Quick Test Passcode Chips -->
                 <div class="pt-4 border-t border-white/5">
-                    <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-2">Preset Demo Codes:</span>
+                    <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-2">Preset Quick Codes:</span>
                     <div class="flex flex-wrap gap-1.5 justify-center">
                         <button type="button" onclick="portal.fillCode('NEXUS-MASTER')" class="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] mono text-indigo-300 font-semibold transition">
-                            NEXUS-MASTER
+                            NEXUS-MASTER (Owner)
                         </button>
                         <button type="button" onclick="portal.fillCode('VIP-ALL-ACCESS')" class="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] mono text-cyan-300 font-semibold transition">
                             VIP-ALL-ACCESS
@@ -252,37 +264,10 @@
                         <button type="button" onclick="portal.fillCode('TRIP-EXPLORER')" class="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] mono text-amber-300 font-semibold transition">
                             TRIP-EXPLORER
                         </button>
-                        <button type="button" onclick="portal.fillCode('CARDS-REWARDS')" class="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] mono text-emerald-300 font-semibold transition">
-                            CARDS-REWARDS
-                        </button>
                     </div>
                 </div>
             </form>
-
-            <!-- MODE B: EMAIL + OTP FORM -->
-            <form id="emailOtpForm" onsubmit="portal.handleRequestOtp(event)" class="space-y-4" style="display: none;">
-                <div>
-                    <input 
-                        type="text" 
-                        id="inviteCodeInput" 
-                        placeholder="INVITE CODE (e.g. VIP-ALL-ACCESS)" 
-                        autocomplete="off"
-                        class="input-box w-full px-4 py-3 rounded-xl mono text-center font-bold tracking-widest text-xs text-indigo-200 placeholder:text-slate-600 uppercase mb-2"
-                    >
-                    <input 
-                        type="email" 
-                        id="friendEmailInput" 
-                        placeholder="Enter your email address..." 
-                        required
-                        class="input-box w-full px-4 py-3 rounded-xl text-center text-xs text-white placeholder:text-slate-600"
-                    >
-                </div>
-
-                <button type="submit" id="btnRequestOtp" class="glow-btn w-full py-3.5 rounded-xl flex items-center justify-center gap-2 text-xs font-bold">
-                    <span>Send Verification Code (OTP)</span>
-                    <span class="text-sm">✉️</span>
-                </button>
-            </form>
+        </div>
         </div>
 
 
@@ -507,6 +492,11 @@
                 }
             },
 
+            toggleEmailOtpView() {
+                const el = document.getElementById('emailOtpCollapsible');
+                if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+            },
+
             toggleShowPasscode() {
                 const el = document.getElementById('passcodeInput');
                 if (!el) return;
@@ -533,21 +523,11 @@
                 if (errBox) errBox.classList.add('hidden');
 
                 try {
-                    // Try owner login first if master
-                    let res;
-                    if (code === 'NEXUS-MASTER') {
-                        res = await fetch('/api/v1/auth/owner-login', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ passcode: code })
-                        });
-                    } else {
-                        res = await fetch('/api/v1/auth/verify-code', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ code })
-                        });
-                    }
+                    const res = await fetch('/api/v1/auth/verify-code', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code })
+                    });
 
                     const data = await res.json();
                     if (!res.ok) {
@@ -574,20 +554,23 @@
                 } finally {
                     if (btn) {
                         btn.disabled = false;
-                        btn.innerHTML = '<span>Unlock Nexus Deck</span><span class="text-lg">→</span>';
+                        btn.innerHTML = '<span>Unlock Command Deck</span><span class="text-lg">→</span>';
                     }
                 }
             },
 
             async handleRequestOtp(e) {
-                e.preventDefault();
-                const code = (document.getElementById('inviteCodeInput')?.value || '').trim();
+                if (e && e.preventDefault) e.preventDefault();
+                const code = (document.getElementById('passcodeInput')?.value || '').trim() || 'VIP-ALL-ACCESS';
                 const email = (document.getElementById('friendEmailInput')?.value || '').trim();
                 const btn = document.getElementById('btnRequestOtp');
                 const errBox = document.getElementById('errorAlert');
                 const errMsg = document.getElementById('errorMessage');
 
-                if (!code || !email) return;
+                if (!email) {
+                    alert('Please enter your email address to receive an OTP.');
+                    return;
+                }
 
                 if (btn) {
                     btn.disabled = true;
