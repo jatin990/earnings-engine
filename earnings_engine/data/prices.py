@@ -341,6 +341,27 @@ def store_price_metrics(ticker: str, settings: Settings, metrics: dict[str, Any]
         connection.commit()
 
 
+def store_price_metrics_bulk(
+    metrics_by_ticker: dict[str, dict[str, Any]],
+    settings: Settings,
+    as_of_date: str | None = None,
+) -> None:
+    """Persist derived metrics for multiple tickers in a single atomic batch transaction."""
+    if not metrics_by_ticker:
+        return
+    as_of_date_value = as_of_date or pd.Timestamp.now().strftime("%Y-%m-%d")
+    rows = [
+        (ticker, as_of_date_value, json.dumps(m, sort_keys=True, default=str))
+        for ticker, m in metrics_by_ticker.items()
+    ]
+    with _connect(settings) as connection:
+        connection.executemany(
+            "INSERT OR REPLACE INTO ticker_metrics (ticker, as_of_date, metrics) VALUES (?, ?, ?)",
+            rows,
+        )
+        connection.commit()
+
+
 def load_price_metrics(ticker: str, settings: Settings, as_of_date: str | None = None) -> dict[str, Any] | None:
     """Load previously persisted metrics for a ticker and day if they exist."""
     as_of_date_value = as_of_date or pd.Timestamp.now().strftime("%Y-%m-%d")

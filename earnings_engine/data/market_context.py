@@ -327,12 +327,20 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             f = pd.DataFrame(r_list, columns=["date", "open", "high", "low", "close", "volume"]).set_index("date")
             f.index = pd.to_datetime(f.index)
             prices_map[t] = f
+
+        # 5. Stored Swing Ranges
+        sr_rows = conn.execute(
+            f"SELECT ticker, lower_bound, upper_bound, source FROM swing_ranges WHERE ticker IN ({placeholders})",
+            tickers,
+        ).fetchall()
+        sr_map = {r[0]: {"lower_bound": r[1], "upper_bound": r[2], "source": r[3]} for r in sr_rows}
     except Exception:
-        pass
+        sr_map = {}
 
     t1_bulk = time.perf_counter()
 
     rows: list[dict] = []
+    metrics_to_store: dict[str, dict[str, Any]] = {}
     for ticker in tickers:
         try:
             company_name = names_map.get(ticker) or ticker.replace(".NS", "")
@@ -657,9 +665,9 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "last_week_low_date": last_week_low_date.strftime("%Y-%m-%d") if last_week_low_date is not None else None,
                 "next_resistance": next_resistance,
                 "current_support": current_support,
-                "swing_range": get_swing_range("ALL", ticker, settings),
+                "swing_range": sr_map.get(ticker),
             }
-            store_price_metrics(ticker, settings, metrics_payload)
+            metrics_to_store[ticker] = metrics_payload
 
             rows.append({
                 "ticker": ticker,
@@ -765,6 +773,13 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "surprise_pct": None,
             })
             continue
+
+    if metrics_to_store:
+        try:
+            from earnings_engine.data.prices import store_price_metrics_bulk
+            store_price_metrics_bulk(metrics_to_store, settings)
+        except Exception as e:
+            logger.debug("Failed bulk storing price metrics: %s", e)
 
     context = pd.DataFrame(rows)
     # Deduplicate context by ticker so that if the input df has the same ticker
