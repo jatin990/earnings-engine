@@ -11,7 +11,7 @@ from typing import Any
 import pandas as pd
 
 from earnings_engine.config import Settings
-from earnings_engine.data.prices import _cache_path as _prices_cache_path
+from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path as _prices_cache_path
 
 UNIVERSE_DIR = Path(__file__).resolve().parent / "universes"
 NSE_ALL_MAX_AGE_DAYS = 40
@@ -52,12 +52,12 @@ def _db_path(settings: Settings | None = None) -> Path:
     return _prices_cache_path(settings)
 
 
-def _connect(settings: Settings | None = None) -> sqlite3.Connection:
-    """Connect to SQLite database and ensure universe tables and initial seeds exist."""
+def _connect(settings: Settings | None = None) -> Any:
+    """Connect to database and ensure universe tables and initial seeds exist."""
     if settings is None:
         settings = Settings()
     settings.ensure_dirs()
-    conn = sqlite3.connect(_db_path(settings))
+    conn = get_db_connection(settings)
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS universes (

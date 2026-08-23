@@ -12,40 +12,31 @@ import sqlite3
 from typing import Any
 
 from earnings_engine.config import Settings
-from earnings_engine.data.prices import _cache_path
+from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path
 
 
 def get_data_coverage(tickers: list[str], settings: Settings | None = None) -> dict[str, Any]:
-    """Return per-ticker data coverage for the requested ticker list.
-
-    Runs a single SQL query with LEFT JOINs across ``price_history``,
-    ``earnings_history`` and ``earnings_freshness`` grouped by ticker, then
-    filters to the requested tickers.
-
-    The result contains:
-
-    - ``total``: number of requested tickers
-    - ``with_prices``: how many of those have price rows
-    - ``with_earnings``: how many of those have earnings rows
-    - ``rows``: one entry per ticker with:
-        - ``ticker``
-        - ``price_start`` / ``price_end`` / ``price_rows``
-        - ``earnings_start`` / ``earnings_end`` / ``earnings_rows`` (across all sources)
-        - ``has_prices`` / ``has_earnings``
-        - ``listing_date`` (price_history MIN(date), used as a listing-date proxy)
-        - ``earnings_fresh`` (from earnings_freshness)
-    """
+    """Return per-ticker data coverage for the requested ticker list."""
     settings = settings or Settings()
-    db_path = _cache_path(settings)
     total = len(tickers)
 
-    if not db_path.exists() or not tickers:
+    if not tickers:
         return {
-            "total": total,
+            "total": 0,
             "with_prices": 0,
             "with_earnings": 0,
             "rows": [],
         }
+
+    if not is_turso_enabled():
+        db_path = _cache_path(settings)
+        if not db_path.exists():
+            return {
+                "total": total,
+                "with_prices": 0,
+                "with_earnings": 0,
+                "rows": [],
+            }
 
     placeholders = ",".join("?" for _ in tickers)
 
@@ -81,12 +72,12 @@ def get_data_coverage(tickers: list[str], settings: Settings | None = None) -> d
     WHERE p.ticker IS NOT NULL
     """
 
-    conn = sqlite3.connect(str(db_path))
+    conn = get_db_connection(settings)
     try:
         cur = conn.cursor()
         cur.execute(query, tickers + tickers)
         rows = cur.fetchall()
-    except sqlite3.Error:
+    except Exception:
         return {
             "total": total,
             "with_prices": 0,

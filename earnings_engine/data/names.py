@@ -23,7 +23,7 @@ from datetime import datetime
 from typing import Any
 
 from earnings_engine.config import Settings, market_of
-from earnings_engine.data.prices import _cache_path
+from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path
 
 logger = logging.getLogger("earnings_engine.data.names")
 
@@ -31,9 +31,9 @@ logger = logging.getLogger("earnings_engine.data.names")
 _seeded: bool = False
 
 
-def _connect(settings: Settings) -> sqlite3.Connection:
+def _connect(settings: Settings) -> Any:
     settings.ensure_dirs()
-    conn = sqlite3.connect(str(_cache_path(settings)))
+    conn = get_db_connection(settings)
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS ticker_names (

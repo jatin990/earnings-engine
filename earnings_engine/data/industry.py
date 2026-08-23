@@ -14,7 +14,7 @@ import pandas as pd
 import yfinance as yf
 
 from earnings_engine.config import Settings
-from earnings_engine.data.prices import _cache_path
+from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.industry")
@@ -22,10 +22,10 @@ logger = get_logger("earnings_engine.data.industry")
 INDUSTRY_MAX_AGE_DAYS = 30
 
 
-def _connect(settings: Settings) -> sqlite3.Connection:
-    """Connect to the shared SQLite database and create the industry table if missing."""
+def _connect(settings: Settings) -> Any:
+    """Connect to the shared database and create the industry table if missing."""
     settings.ensure_dirs()
-    connection = sqlite3.connect(str(_cache_path(settings)))
+    connection = get_db_connection(settings)
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS ticker_industry (

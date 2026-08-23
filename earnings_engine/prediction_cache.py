@@ -14,16 +14,16 @@ from pathlib import Path
 from typing import Any
 
 from earnings_engine.config import Settings
-from earnings_engine.data.prices import _cache_path
+from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.prediction_cache")
 
 
-def _connect(settings: Settings | None = None) -> sqlite3.Connection:
+def _connect(settings: Settings | None = None) -> Any:
     s = settings or Settings()
     s.ensure_dirs()
-    conn = sqlite3.connect(_cache_path(s))
+    conn = get_db_connection(s)
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS daily_prediction_cache (

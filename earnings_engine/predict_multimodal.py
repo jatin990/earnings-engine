@@ -19,8 +19,9 @@ import numpy as np
 import pandas as pd
 
 from earnings_engine.config import Settings
+from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path
 from earnings_engine.data.news_sentiment import get_ticker_news_and_sentiment
-from earnings_engine.data.prices import _cache_path, load_prices
+from earnings_engine.data.prices import load_prices
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +35,9 @@ def _get_db_path(settings: Settings | None = None) -> Path:
 
 
 def init_multimodal_db(settings: Settings | None = None) -> None:
-    """Initialize the SQLite table for AI multi-modal predictions."""
-    db_path = _get_db_path(settings)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(str(db_path)) as conn:
+    """Initialize the table for AI multi-modal predictions."""
+    conn = get_db_connection(settings)
+    with conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS ai_news_predictions (
                 ticker TEXT NOT NULL,
@@ -71,7 +71,8 @@ def store_ai_prediction(ticker: str, payload: dict[str, Any], settings: Settings
     risks_json = json.dumps(payload.get("risk_factors", []))
     payload_json = json.dumps(payload)
 
-    with sqlite3.connect(str(db_path)) as conn:
+    conn = get_db_connection(settings)
+    with conn:
         conn.execute("""
             INSERT OR REPLACE INTO ai_news_predictions (
                 ticker, run_at, current_price, ai_signal, sentiment_score,
@@ -97,12 +98,12 @@ def store_ai_prediction(ticker: str, payload: dict[str, Any], settings: Settings
 
 
 def get_latest_ai_prediction(ticker: str, settings: Settings | None = None) -> dict[str, Any] | None:
-    """Fetch the latest AI multi-modal forecast for a ticker from SQLite."""
+    """Fetch the latest AI multi-modal forecast for a ticker from database."""
     init_multimodal_db(settings)
-    db_path = _get_db_path(settings)
     ticker = ticker.strip().upper()
 
-    with sqlite3.connect(str(db_path)) as conn:
+    conn = get_db_connection(settings)
+    with conn:
         row = conn.execute("""
             SELECT payload, run_at FROM ai_news_predictions
             WHERE ticker = ? ORDER BY run_at DESC LIMIT 1
@@ -122,9 +123,9 @@ def get_latest_ai_prediction(ticker: str, settings: Settings | None = None) -> d
 def get_latest_ai_predictions_all(settings: Settings | None = None) -> list[dict[str, Any]]:
     """Fetch the most recent AI multi-modal prediction for each ticker."""
     init_multimodal_db(settings)
-    db_path = _get_db_path(settings)
 
-    with sqlite3.connect(str(db_path)) as conn:
+    conn = get_db_connection(settings)
+    with conn:
         rows = conn.execute("""
             SELECT a.payload, a.run_at FROM ai_news_predictions a
             INNER JOIN (

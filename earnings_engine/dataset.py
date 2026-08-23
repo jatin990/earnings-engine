@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
 from earnings_engine.config import CACHE_DIR, Settings, market_of
+from earnings_engine.data.db import get_db_connection, _cache_path as _prices_cache_path
 from earnings_engine.data.earnings import load_earnings
-from earnings_engine.data.prices import _cache_path as _prices_cache_path, load_prices
+from earnings_engine.data.prices import load_prices
 from earnings_engine.features.earnings_features import EARNINGS_FEATURES, compute_earnings_features
 from earnings_engine.features.price_features import PRICE_FEATURES, compute_price_features
 from earnings_engine.labels import compute_reaction
@@ -40,8 +42,8 @@ def _db_path(settings: Settings | None = None) -> Path:
     return _prices_cache_path(settings)
 
 
-def _connect(settings: Settings | None = None) -> sqlite3.Connection:
-    """Connect to the shared SQLite database and create the dataset table if missing."""
+def _connect(settings: Settings | None = None) -> Any:
+    """Connect to the shared database and create the dataset table if missing."""
     if settings is None:
         from earnings_engine.config import Settings as S
         settings = S()

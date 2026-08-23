@@ -27,7 +27,7 @@ from typing import Any
 import pandas as pd
 
 from earnings_engine.config import Settings
-from earnings_engine.data.prices import _cache_path as _prices_cache_path
+from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path as _prices_cache_path
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.predictions")
@@ -38,10 +38,10 @@ def _db_path(settings: Settings) -> Path:
     return _prices_cache_path(settings)
 
 
-def _connect(settings: Settings) -> sqlite3.Connection:
-    """Connect to the shared SQLite database, creating the table if missing."""
+def _connect(settings: Settings) -> Any:
+    """Connect to the shared database, creating the table if missing."""
     settings.ensure_dirs()
-    connection = sqlite3.connect(_db_path(settings))
+    connection = get_db_connection(settings)
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS kronos_predictions (

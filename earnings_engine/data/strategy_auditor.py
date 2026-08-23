@@ -27,7 +27,7 @@ from typing import Any
 import pandas as pd
 
 from earnings_engine.config import Settings, market_of
-from earnings_engine.data.prices import _cache_path as _prices_cache_path
+from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path as _prices_cache_path
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.strategy_auditor")
@@ -48,15 +48,16 @@ DEFAULT_HOLDING_DAYS: dict[str, int] = {
 # SQLite helpers (mirrors predictions.py patterns).
 # ---------------------------------------------------------------------------
 
+
 def _db_path(settings: Settings) -> Path:
     """Use the same SQLite database as prices / earnings."""
     return _prices_cache_path(settings)
 
 
-def _connect(settings: Settings) -> sqlite3.Connection:
+def _connect(settings: Settings) -> Any:
     """Connect & create audit tables if missing."""
     settings.ensure_dirs()
-    conn = sqlite3.connect(str(_db_path(settings)), timeout=20.0)
+    conn = get_db_connection(settings)
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS strategy_predictions (

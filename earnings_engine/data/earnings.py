@@ -9,8 +9,8 @@ import pandas as pd
 import yfinance as yf
 
 from earnings_engine.config import Settings
+from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path as _prices_cache_path
 from earnings_engine.data.nse_api import fetch_event_calendar
-from earnings_engine.data.prices import _cache_path as _prices_cache_path
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.earnings")
@@ -23,10 +23,10 @@ def _db_path(settings: Settings) -> Path:
     return _prices_cache_path(settings)
 
 
-def _connect(settings: Settings) -> sqlite3.Connection:
-    """Connect to the shared SQLite database and create the earnings table if missing."""
+def _connect(settings: Settings) -> Any:
+    """Connect to the shared database and create the earnings table if missing."""
     settings.ensure_dirs()
-    connection = sqlite3.connect(_db_path(settings))
+    connection = get_db_connection(settings)
 
     # Check if the old schema (PK = ticker+earnings_date, no source in PK) exists.
     needs_migration = False

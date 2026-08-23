@@ -11,14 +11,18 @@ from datetime import datetime
 from typing import Any
 
 from earnings_engine.config import Settings
-from earnings_engine.data.prices import _cache_path
+from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path
 
 
-def _connect(settings: Settings) -> sqlite3.Connection:
+def _connect(settings: Settings) -> Any:
     settings.ensure_dirs()
-    conn = sqlite3.connect(str(_cache_path(settings)), timeout=20.0)
-    conn.execute("PRAGMA journal_mode = WAL;")
-    conn.execute("PRAGMA busy_timeout = 10000;")
+    conn = get_db_connection(settings)
+    if not is_turso_enabled():
+        try:
+            conn.execute("PRAGMA journal_mode = WAL;")
+            conn.execute("PRAGMA busy_timeout = 10000;")
+        except Exception:
+            pass
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS swing_ranges (

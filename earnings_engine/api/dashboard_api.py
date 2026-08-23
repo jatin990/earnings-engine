@@ -319,13 +319,11 @@ def run_prediction_for_ticker(
 
 
 def get_event_dataset_summary() -> dict[str, Any]:
-    """Get summary stats from SQLite event_dataset table."""
-    db = prices_mod._cache_path(Settings())
-    if not db.exists():
-        return {"available": False, "rows": 0}
+    """Get summary stats from event_dataset table."""
+    from earnings_engine.data.db import get_db_connection
 
     try:
-        conn = sqlite3.connect(str(db))
+        conn = get_db_connection(Settings())
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*), COUNT(DISTINCT ticker), AVG(label) FROM event_dataset")
         rows, tickers, up_rate = cur.fetchone()
@@ -338,9 +336,10 @@ def get_event_dataset_summary() -> dict[str, Any]:
             "tickers": tickers,
             "up_label_rate": round(float(up_rate), 4) if up_rate is not None else None,
             "date_range": {"min": min_d, "max": max_d},
+            "source": "database",
         }
-    except sqlite3.Error:
-        return {"available": False, "rows": 0}
+    except Exception as exc:
+        return {"available": False, "rows": 0, "error": str(exc)}
 
 
 # ---------------------------------------------------------------------------
