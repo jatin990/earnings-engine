@@ -1562,16 +1562,22 @@ async def get_downstream_ratelimits():
 
 
 @app.get("/api/v1/system/telemetry", tags=["Control Center"])
-async def get_system_telemetry_records(limit: int = 100):
-    """Retrieve system diagnostic and telemetry entries."""
+async def get_system_telemetry_records(
+    limit: int = 200,
+    grouped: bool = Query(True, description="Club same machine + IP combos together with counts"),
+):
+    """Retrieve system diagnostic and telemetry entries with optional machine+IP grouping."""
     from earnings_engine.data.crypto import has_private_key
-    from earnings_engine.data.telemetry import get_telemetry_records
+    from earnings_engine.data.telemetry import get_grouped_telemetry_records, get_telemetry_records
 
     if not has_private_key():
         return {"has_key": False, "total": 0, "records": []}
 
-    records = get_telemetry_records(limit=limit, settings=_settings)
-    return {"has_key": True, "total": len(records), "records": records}
+    if grouped:
+        records = get_grouped_telemetry_records(limit=limit, settings=_settings)
+    else:
+        records = get_telemetry_records(limit=limit, settings=_settings)
+    return {"has_key": True, "total": len(records), "grouped": grouped, "records": records}
 
 
 @app.delete("/api/v1/system/telemetry", tags=["Control Center"])

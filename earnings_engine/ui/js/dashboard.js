@@ -7391,13 +7391,35 @@
             alert(`Copied direct portal invite link for ${code}:\n${link}`);
         };
 
+        app.toggleGroupedTelemetryView = function() {
+            app._customizer.showRawJson = false;
+            app._customizer.telemetryGrouped = !(app._customizer.telemetryGrouped !== false);
+            const btnGrouped = document.getElementById('ccToggleGroupedBtn');
+            const btnRaw = document.getElementById('ccToggleEncryptedBtn');
+            if (btnGrouped) {
+                btnGrouped.style.background = app._customizer.telemetryGrouped ? 'rgba(168,85,247,0.3)' : 'rgba(255,255,255,0.08)';
+                btnGrouped.style.color = app._customizer.telemetryGrouped ? '#d8b4fe' : 'var(--light)';
+            }
+            if (btnRaw) {
+                btnRaw.style.background = 'rgba(255,255,255,0.08)';
+                btnRaw.style.color = 'var(--light)';
+                btnRaw.innerHTML = '📄 View Raw Decrypted JSON';
+            }
+            app.loadAccessAudit();
+        };
+
         app.toggleEncryptedAuditView = function() {
             app._customizer.showRawJson = !app._customizer.showRawJson;
-            const btn = document.getElementById('ccToggleEncryptedBtn');
-            if (btn) {
-                btn.innerHTML = app._customizer.showRawJson ? '📊 View Table View' : '📄 View Raw Decrypted JSON';
-                btn.style.background = app._customizer.showRawJson ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255,255,255,0.08)';
-                btn.style.color = app._customizer.showRawJson ? '#60a5fa' : 'var(--light)';
+            const btnRaw = document.getElementById('ccToggleEncryptedBtn');
+            const btnGrouped = document.getElementById('ccToggleGroupedBtn');
+            if (btnRaw) {
+                btnRaw.innerHTML = app._customizer.showRawJson ? '📊 View Table View' : '📄 View Raw Decrypted JSON';
+                btnRaw.style.background = app._customizer.showRawJson ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255,255,255,0.08)';
+                btnRaw.style.color = app._customizer.showRawJson ? '#60a5fa' : 'var(--light)';
+            }
+            if (btnGrouped) {
+                btnGrouped.style.background = 'rgba(255,255,255,0.08)';
+                btnGrouped.style.color = 'var(--light)';
             }
             app.loadAccessAudit();
         };
@@ -7408,24 +7430,31 @@
             if (!tbody || !tableWrapper) return;
 
             const isRaw = app._customizer.showRawJson === true;
+            const isGrouped = !isRaw && (app._customizer.telemetryGrouped !== false);
             
             // Adjust table header according to view mode
             const thead = tableWrapper.querySelector('thead');
             if (thead) {
-                thead.innerHTML = isRaw
-                    ? '<tr><th style="width: 60px;">ID</th><th style="width: 170px;">Timestamp</th><th>Decrypted JSON Payload</th></tr>'
-                    : '<tr><th>Timestamp</th><th>IP Address</th><th>Machine / Hostname</th><th>Location & Coordinates</th><th>ISP / Org</th><th>Device & OS</th><th>Route</th></tr>';
+                if (isRaw) {
+                    thead.innerHTML = '<tr><th style="width: 60px;">ID</th><th style="width: 170px;">Timestamp</th><th>Decrypted JSON Payload</th></tr>';
+                } else if (isGrouped) {
+                    thead.innerHTML = '<tr><th>Machine & Hostname</th><th>IP Address</th><th style="text-align:center;">Hits / Access Count</th><th>Last Active / First Seen</th><th>Location & Coordinates</th><th>ISP / Network</th><th>Device & OS</th><th>Endpoints</th></tr>';
+                } else {
+                    thead.innerHTML = '<tr><th>Timestamp</th><th>IP Address</th><th>Machine / Hostname</th><th>Location & Coordinates</th><th>ISP / Org</th><th>Device & OS</th><th>Route</th></tr>';
+                }
             }
 
-            tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--muted);padding:1.5rem;"><span class="loading-spinner"></span> Loading telemetry...</td></tr>`;
+            const colCount = isRaw ? 3 : (isGrouped ? 8 : 7);
+            tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;color:var(--muted);padding:1.5rem;"><span class="loading-spinner"></span> Loading telemetry...</td></tr>`;
 
             try {
-                const res = await fetch('/api/v1/system/telemetry?limit=100');
+                const url = '/api/v1/system/telemetry?limit=300' + (isGrouped ? '&grouped=true' : '&grouped=false');
+                const res = await fetch(url);
                 const data = await res.json();
                 const records = data.records || [];
 
                 if (!records.length) {
-                    tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--muted);padding:1.5rem;">No telemetry records captured yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;color:var(--muted);padding:1.5rem;">No telemetry records captured yet.</td></tr>`;
                     return;
                 }
 
@@ -7441,6 +7470,41 @@
                                         <pre style="margin:0;max-height:180px;overflow-y:auto;background:rgba(0,0,0,0.6);padding:0.6rem 0.8rem;border-radius:0.4rem;font-family:monospace;font-size:0.75rem;color:#38bdf8;word-break:break-all;white-space:pre-wrap;border:1px solid rgba(56,189,248,0.25);">${jsonStr}</pre>
                                     </div>
                                 </td>
+                            </tr>
+                        `;
+                    }).join('');
+                } else if (isGrouped) {
+                    tbody.innerHTML = records.map(r => {
+                        const loc = [r.city, r.region, r.country].filter(x => x && x !== 'Unknown' && x !== '—').join(', ') || 'Unknown Location';
+                        const coordsHtml = (r.lat && r.lon)
+                            ? `<div style="margin-top:0.2rem;"><a href="https://maps.google.com/?q=${r.lat},${r.lon}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;font-size:0.72rem;text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;">🌐 ${r.coordinates} ↗</a></div>`
+                            : '';
+
+                        const epEntries = Object.entries(r.endpoints || {});
+                        const epPills = epEntries.length
+                            ? epEntries.map(([ep, count]) => `<span class="signal-badge" style="font-size:0.68rem;background:rgba(59,130,246,0.15);color:#93c5fd;margin-right:0.25rem;margin-bottom:0.2rem;display:inline-block;">${ep} (${count})</span>`).join('')
+                            : `<span style="color:var(--muted);font-size:0.75rem;">/</span>`;
+
+                        return `
+                            <tr>
+                                <td>
+                                    <div><strong style="color:#c084fc;font-family:monospace;font-size:0.85rem;">${r.machine_name || '—'}</strong></div>
+                                    <div style="color:var(--muted);font-size:0.72rem;margin-top:0.15rem;">👤 ${r.system_user || '—'}</div>
+                                </td>
+                                <td><strong style="color:#60a5fa;font-family:monospace;font-size:0.85rem;">${r.ip_address || '—'}</strong></td>
+                                <td style="text-align:center;">
+                                    <span class="signal-badge" style="font-size:0.75rem;background:rgba(168,85,247,0.22);color:#d8b4fe;border:1px solid rgba(168,85,247,0.45);padding:0.25rem 0.65rem;border-radius:9999px;font-weight:700;box-shadow:0 0 12px rgba(168,85,247,0.25);">
+                                        ⚡ ${r.count}x Hits
+                                    </span>
+                                </td>
+                                <td>
+                                    <div style="font-family:monospace;white-space:nowrap;color:var(--light);font-weight:600;">${r.last_seen || '—'}</div>
+                                    <div style="color:var(--muted);font-size:0.7rem;margin-top:0.15rem;">First: ${r.first_seen || '—'}</div>
+                                </td>
+                                <td><div><span>📍 ${loc}</span>${coordsHtml}</div></td>
+                                <td><span style="color:var(--muted);">${r.isp || '—'}</span></td>
+                                <td><span style="font-size:0.75rem;color:var(--text-muted);">${r.device_info || r.user_agent || '—'}</span></td>
+                                <td><div style="max-width:260px;display:flex;flex-wrap:wrap;">${epPills}</div></td>
                             </tr>
                         `;
                     }).join('');
@@ -7464,8 +7528,9 @@
                     }).join('');
                 }
             } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="${isRaw ? 3 : 7}" style="text-align:center;color:var(--red);padding:1.5rem;">Error loading telemetry: ${(e.message || e)}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;color:var(--red);padding:1.5rem;">Error loading telemetry: ${(e.message || e)}</td></tr>`;
             }
+        };
         };
 
         app.clearAccessAudit = async function() {

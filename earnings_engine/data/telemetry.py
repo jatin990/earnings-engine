@@ -56,6 +56,12 @@ def _resolve_machine_name(ip: str, headers: dict[str, str]) -> str:
         except Exception:
             return "local-machine"
 
+    if ip.startswith("192.168.") or ip.startswith("10.") or ip.startswith("172.16."):
+        sec_platform = headers.get("sec-ch-ua-platform", "").strip("\"'")
+        if sec_platform:
+            return f"{sec_platform}-client"
+        return "local-lan-client"
+
     try:
         host, _, _ = socket.gethostbyaddr(ip)
         if host and host != ip:
@@ -292,6 +298,69 @@ def get_telemetry_records(limit: int = 100, settings: Settings | None = None) ->
             "raw_encrypted": raw_payload,
         })
     return records
+
+
+def get_grouped_telemetry_records(limit: int = 500, settings: Settings | None = None) -> list[dict[str, Any]]:
+    """Retrieve telemetry entries aggregated and clubbed by unique (machine_name, ip_address) combinations."""
+    raw_records = get_telemetry_records(limit=limit, settings=settings)
+    grouped_map: dict[str, dict[str, Any]] = {}
+
+    for r in raw_records:
+        machine = (r.get("machine_name") or "—").strip()
+        ip = (r.get("ip_address") or "—").strip()
+        group_key = f"{machine}@@{ip}"
+
+        if group_key not in grouped_map:
+            grouped_map[group_key] = {
+                "id": r["id"],
+                "machine_name": machine,
+                "ip_address": ip,
+                "system_user": r.get("system_user", "—"),
+                "country": r.get("country", "—"),
+                "region": r.get("region", "—"),
+                "city": r.get("city", "—"),
+                "isp": r.get("isp", "—"),
+                "lat": r.get("lat"),
+                "lon": r.get("lon"),
+                "coordinates": r.get("coordinates", "—"),
+                "user_agent": r.get("user_agent", "—"),
+                "device_info": r.get("device_info", "—"),
+                "count": 0,
+                "first_seen": r.get("timestamp"),
+                "last_seen": r.get("timestamp"),
+                "endpoints": {},
+                "sample_ids": [],
+            }
+
+        entry = grouped_map[group_key]
+        entry["count"] += 1
+        entry["sample_ids"].append(r["id"])
+
+        curr_ts = r.get("timestamp") or ""
+        if curr_ts:
+            if not entry["last_seen"] or curr_ts > entry["last_seen"]:
+                entry["last_seen"] = curr_ts
+                if r.get("city") and r.get("city") != "—":
+                    entry["city"] = r["city"]
+                    entry["region"] = r.get("region", "—")
+                    entry["country"] = r.get("country", "—")
+                    entry["lat"] = r.get("lat")
+                    entry["lon"] = r.get("lon")
+                    entry["coordinates"] = r.get("coordinates", "—")
+                    entry["isp"] = r.get("isp", "—")
+                if r.get("system_user") and r.get("system_user") != "—":
+                    entry["system_user"] = r["system_user"]
+                if r.get("device_info") and r.get("device_info") != "—":
+                    entry["device_info"] = r["device_info"]
+            if not entry["first_seen"] or curr_ts < entry["first_seen"]:
+                entry["first_seen"] = curr_ts
+
+        ep = r.get("endpoint") or "/"
+        entry["endpoints"][ep] = entry["endpoints"].get(ep, 0) + 1
+
+    results = list(grouped_map.values())
+    results.sort(key=lambda x: (x.get("last_seen") or ""), reverse=True)
+    return results
 
 
 def clear_telemetry_records(settings: Settings | None = None) -> dict[str, Any]:

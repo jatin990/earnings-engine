@@ -44,25 +44,28 @@ def test_telemetry_api_endpoints(temp_settings: Settings, monkeypatch):
     monkeypatch.setattr("earnings_engine.api.server._settings", temp_settings)
     client = TestClient(app)
 
-    # Trigger dashboard request to invoke middleware telemetry
-    res = client.get("/dashboard")
+    # Trigger dashboard request with passcode header to invoke middleware telemetry
+    res = client.get("/dashboard", headers={"X-Passcode": "NEXUS-MASTER"})
     assert res.status_code == 200
 
-    time.sleep(0.3)
+    data = {}
+    for _ in range(20):
+        api_res = client.get("/api/v1/system/telemetry", headers={"X-Passcode": "NEXUS-MASTER"})
+        if api_res.status_code == 200:
+            data = api_res.json()
+            if data.get("total", 0) >= 1:
+                break
+        time.sleep(0.1)
 
-    # Query system telemetry API
-    api_res = client.get("/api/v1/system/telemetry")
-    assert api_res.status_code == 200
-    data = api_res.json()
     assert data.get("has_key") is True
     assert "records" in data
     assert data["total"] >= 1
 
     # Clear via API
-    del_res = client.delete("/api/v1/system/telemetry")
+    del_res = client.delete("/api/v1/system/telemetry", headers={"X-Passcode": "NEXUS-MASTER"})
     assert del_res.status_code == 200
 
-    api_res2 = client.get("/api/v1/system/telemetry")
+    api_res2 = client.get("/api/v1/system/telemetry", headers={"X-Passcode": "NEXUS-MASTER"})
     assert api_res2.json()["total"] == 0
 
     # Without private key, API returns has_key: False and records: []
@@ -71,7 +74,7 @@ def test_telemetry_api_endpoints(temp_settings: Settings, monkeypatch):
     monkeypatch.setattr(crypto_mod, "_CACHED_PRIV_KEY", None)
     monkeypatch.setattr(crypto_mod, "_PRIVATE_KEY_FILE", Path("non_existent_key.pem"))
 
-    locked_res = client.get("/api/v1/system/telemetry")
+    locked_res = client.get("/api/v1/system/telemetry", headers={"X-Passcode": "NEXUS-MASTER"})
     assert locked_res.status_code == 200
     locked_data = locked_res.json()
     assert locked_data.get("has_key") is False
@@ -121,3 +124,35 @@ def test_telemetry_undecryptable_without_private_key(temp_settings: Settings, mo
     decrypted = crypto_mod.decrypt_field(encrypted)
     assert "[ENCRYPTED: LOCKED WITH LOCAL KEY]" in decrypted
     assert "SecretLaptop" not in decrypted
+
+
+def test_grouped_telemetry_records(temp_settings: Settings):
+    from earnings_engine.data.telemetry import get_grouped_telemetry_records
+
+    # Clear old records
+    clear_telemetry_records(settings=temp_settings)
+
+    # Record 3 events from same machine + IP combo
+    for ep in ["/dashboard", "/api/v1/overview", "/dashboard"]:
+        record_telemetry_async(
+            client_host="192.168.1.100",
+            user_agent="Mozilla/5.0 Chrome/120.0.0.0",
+            endpoint=ep,
+            headers={},
+            settings=temp_settings,
+        )
+
+    grouped = []
+    for _ in range(25):
+        grouped = get_grouped_telemetry_records(limit=10, settings=temp_settings)
+        if grouped and grouped[0]["count"] >= 3:
+            break
+        time.sleep(0.1)
+
+    assert len(grouped) == 1
+    assert grouped[0]["count"] == 3
+    assert any(c.isdigit() for c in grouped[0]["ip_address"])
+    assert "/dashboard" in grouped[0]["endpoints"]
+    assert grouped[0]["endpoints"]["/dashboard"] == 2
+    assert grouped[0]["endpoints"]["/api/v1/overview"] == 1
+

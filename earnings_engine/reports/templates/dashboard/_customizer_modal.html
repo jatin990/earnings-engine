@@ -245,10 +245,11 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
                     <div>
                         <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700;">System Diagnostics & Telemetry</h3>
-                        <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--muted);">Diagnostic connection metadata, network routing, and client runtime telemetry.</p>
+                        <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--muted);">Clubbed machine + IP diagnostics and secure client runtime telemetry.</p>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                        <button id="ccToggleEncryptedBtn" onclick="app.toggleEncryptedAuditView()" class="btn btn-sm" style="background: rgba(255,255,255,0.08); color: var(--light); border: 1px solid rgba(255,255,255,0.15); font-size: 0.78rem;">📄 View Raw Decrypted JSON</button>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <button id="ccToggleGroupedBtn" onclick="app.toggleGroupedTelemetryView()" class="btn btn-sm" style="background: rgba(168,85,247,0.22); color: #d8b4fe; border: 1px solid rgba(168,85,247,0.4); font-size: 0.78rem; font-weight: 700;">⚡ Grouped (Machine+IP)</button>
+                        <button id="ccToggleEncryptedBtn" onclick="app.toggleEncryptedAuditView()" class="btn btn-sm" style="background: rgba(255,255,255,0.08); color: var(--light); border: 1px solid rgba(255,255,255,0.15); font-size: 0.78rem;">📄 Raw Decrypted JSON</button>
                         <button onclick="app.loadAccessAudit()" class="btn btn-sm" style="background: rgba(59,130,246,0.2); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3);">🔄 Refresh</button>
                         <button onclick="app.clearAccessAudit()" class="btn btn-sm btn-danger" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">🗑️ Clear</button>
                     </div>
@@ -258,19 +259,22 @@
                     <table class="results-table" style="width: 100%; font-size: 0.78rem;">
                         <thead>
                             <tr>
-                                <th>Timestamp</th>
+                                <th>Machine & Hostname</th>
                                 <th>IP Address</th>
-                                <th>Machine & System User</th>
+                                <th style="text-align: center;">Hits / Count</th>
+                                <th>Last Active / First Seen</th>
                                 <th>Location & Coordinates</th>
                                 <th>ISP / Org</th>
                                 <th>Device & OS</th>
-                                <th>Route</th>
+                                <th>Endpoints</th>
                             </tr>
                         </thead>
                         <tbody id="ccAuditTableBody">
-                            <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:1.5rem;">Loading access records...</td></tr>
+                            <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:1.5rem;">Loading access records...</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
             <!-- ================= SUB-TAB 5: FRIEND PASSCODES ================= -->
             <div id="ccSectionKeys" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
