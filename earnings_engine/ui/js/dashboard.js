@@ -7013,40 +7013,40 @@
 
         const THEME_PRESETS = {
             obsidian: {
-                '--bg': '#05030a',
-                '--card': 'rgba(18,10,32,0.78)',
+                '--bg': '#020006',
+                '--card': 'rgba(10,4,24,0.75)',
                 '--accent': '#9333ea',
                 '--green': '#10b981',
-                '--red': '#ef4444',
+                '--red': '#f43f5e',
                 '--light': '#f8fafc',
-                '--muted': '#a78bfa'
+                '--muted': '#c084fc'
             },
             sapphire: {
-                '--bg': '#030712',
-                '--card': 'rgba(17,24,39,0.85)',
+                '--bg': '#010510',
+                '--card': 'rgba(8,16,36,0.85)',
                 '--accent': '#06b6d4',
                 '--green': '#10b981',
                 '--red': '#f43f5e',
                 '--light': '#f9fafb',
-                '--muted': '#9ca3af'
+                '--muted': '#38bdf8'
             },
             cyberpunk: {
-                '--bg': '#18181b',
-                '--card': 'rgba(39,39,42,0.85)',
+                '--bg': '#030a08',
+                '--card': 'rgba(8,24,18,0.85)',
                 '--accent': '#10b981',
                 '--green': '#22c55e',
                 '--red': '#f43f5e',
                 '--light': '#fafafa',
-                '--muted': '#a1a1aa'
+                '--muted': '#34d399'
             },
             amethyst: {
-                '--bg': '#1e102d',
-                '--card': 'rgba(46,16,68,0.75)',
-                '--accent': '#a855f7',
+                '--bg': '#080112',
+                '--card': 'rgba(22,6,42,0.8)',
+                '--accent': '#c084fc',
                 '--green': '#34d399',
                 '--red': '#fb7185',
                 '--light': '#fdf4ff',
-                '--muted': '#d8b4fe'
+                '--muted': '#e9d5ff'
             }
         };
 

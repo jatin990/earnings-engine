@@ -10,18 +10,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
-            --bg: #07090e;
-            --card-bg: rgba(14, 20, 33, 0.85);
-            --card-border: rgba(255, 255, 255, 0.08);
-            --accent: #6366f1;
-            --accent-glow: rgba(99, 102, 241, 0.35);
+            --bg: #020006;
+            --card-bg: rgba(10, 4, 24, 0.82);
+            --card-border: rgba(168, 85, 247, 0.22);
+            --accent: #9333ea;
+            --accent-glow: rgba(168, 85, 247, 0.45);
             --cyan: #38bdf8;
             --green: #10b981;
-            --purple: #a855f7;
-            --amber: #f59e0b;
-            --red: #ef4444;
+            --purple: #c084fc;
+            --amber: #fbbf24;
+            --red: #f43f5e;
             --light: #f8fafc;
-            --muted: #94a3b8;
+            --muted: #d8b4fe;
         }
 
         * { box-sizing: border-box; }
@@ -32,9 +32,9 @@
             min-height: 100vh;
             background-color: var(--bg);
             background-image: 
-                radial-gradient(circle at 50% -20%, rgba(99, 102, 241, 0.25), transparent 60%),
-                radial-gradient(circle at 0% 100%, rgba(56, 189, 248, 0.12), transparent 50%),
-                radial-gradient(circle at 100% 50%, rgba(168, 85, 247, 0.12), transparent 50%);
+                radial-gradient(circle at 50% -20%, rgba(168, 85, 247, 0.22), transparent 60%),
+                radial-gradient(circle at 0% 100%, rgba(56, 189, 248, 0.1), transparent 50%),
+                radial-gradient(circle at 100% 50%, rgba(147, 51, 234, 0.15), transparent 50%);
             color: var(--light);
             font-family: 'Plus Jakarta Sans', sans-serif;
             display: flex;
@@ -50,8 +50,8 @@
             content: "";
             position: absolute;
             inset: 0;
-            background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-image: linear-gradient(rgba(168, 85, 247, 0.04) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(168, 85, 247, 0.04) 1px, transparent 1px);
             background-size: 40px 40px;
             pointer-events: none;
             z-index: 0;
@@ -70,17 +70,25 @@
 
         .glass-card {
             background: var(--card-bg);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
+            backdrop-filter: blur(28px) saturate(190%);
+            -webkit-backdrop-filter: blur(28px) saturate(190%);
             border: 1px solid var(--card-border);
             border-radius: 1.25rem;
-            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px -10px var(--accent-glow);
+            box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 45px -10px var(--accent-glow);
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .glass-card:hover {
+            border-color: rgba(192, 132, 252, 0.65);
+            box-shadow: 0 35px 80px -15px rgba(0, 0, 0, 0.95), 0 0 50px rgba(168, 85, 247, 0.35);
         }
 
         .brand-title {
             font-family: 'Space Grotesk', sans-serif;
             letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #ffffff 0%, #e9d5ff 45%, #c084fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .mono {
@@ -88,44 +96,44 @@
         }
 
         .input-box {
-            background: rgba(8, 12, 22, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(6, 2, 16, 0.88);
+            border: 1px solid rgba(168, 85, 247, 0.28);
             color: var(--light);
-            transition: all 0.2s ease;
+            transition: all 0.22s ease;
         }
 
         .input-box:focus {
             outline: none;
-            border-color: var(--cyan);
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2), 0 0 20px rgba(56, 189, 248, 0.15);
+            border-color: #c084fc;
+            box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.3), 0 0 25px rgba(168, 85, 247, 0.25);
         }
 
         .glow-btn {
-            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
             color: #ffffff;
             font-weight: 700;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+            border: 1px solid rgba(233, 213, 255, 0.3);
+            box-shadow: 0 4px 22px rgba(147, 51, 234, 0.5);
             transition: all 0.2s ease;
         }
 
         .glow-btn:hover {
-            transform: translateY(-1.5px);
-            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.6);
-            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(147, 51, 234, 0.75), 0 0 16px rgba(192, 132, 252, 0.5);
+            background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
         }
 
         .app-card {
-            background: rgba(14, 20, 33, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 1rem;
-            padding: 1.5rem;
+            background: rgba(10, 4, 24, 0.75);
+            border: 1px solid rgba(168, 85, 247, 0.2);
+            border-radius: 1.15rem;
+            padding: 1.6rem;
             position: relative;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            min-height: 220px;
+            min-height: 230px;
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
@@ -134,10 +142,10 @@
         }
 
         .app-card.authorized:hover {
-            transform: translateY(-4px);
-            border-color: rgba(99, 102, 241, 0.4);
-            box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.6), 0 0 25px -5px rgba(99, 102, 241, 0.25);
-            background: rgba(18, 26, 43, 0.85);
+            transform: translateY(-5px);
+            border-color: rgba(192, 132, 252, 0.8);
+            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.9), 0 0 35px rgba(168, 85, 247, 0.45);
+            background: rgba(18, 8, 38, 0.92);
         }
 
         .app-card.restricted {
@@ -159,9 +167,10 @@
         }
 
         .tab-switch-btn.active {
-            background: rgba(99, 102, 241, 0.25);
+            background: rgba(168, 85, 247, 0.28);
             color: #ffffff;
-            border-color: rgba(99, 102, 241, 0.5);
+            border-color: rgba(192, 132, 252, 0.6);
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
         }
     </style>
 </head>
