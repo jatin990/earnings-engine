@@ -274,8 +274,19 @@ def verify_passcode(code: str, settings: Settings | None = None) -> dict[str, An
         if max_uses is not None and use_count >= max_uses:
             return {"valid": False, "error": "This passcode has reached its maximum allowed uses."}
 
+        if expires_at:
+            try:
+                exp_dt = datetime.fromisoformat(expires_at)
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                if exp_dt < datetime.now(timezone.utc):
+                    return {"valid": False, "error": "This passcode has expired."}
+            except Exception:
+                pass
+
         # Increment use count
         conn.execute("UPDATE passcodes SET use_count = use_count + 1 WHERE code = ?", (p_code,))
+        conn.commit()
 
         try:
             allowed_routes = json.loads(allowed_json)
@@ -300,6 +311,8 @@ def verify_passcode(code: str, settings: Settings | None = None) -> dict[str, An
             "allowed_routes": allowed_routes,
             "is_admin": is_admin,
             "use_count": use_count + 1,
+            "max_uses": max_uses,
+            "expires_at": expires_at,
             "authorized_apps": authorized_apps,
         }
 
@@ -344,10 +357,13 @@ def create_passcode(
     allowed_routes: list[str],
     code: str | None = None,
     max_uses: int | None = None,
+    expires_in_days: float | int | None = None,
+    expires_in_hours: float | int | None = None,
     expires_at: str | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    """Generate a new customized passcode for a friend or associate."""
+    """Generate a new customized passcode with configurable usage limits and timeframe."""
+    from datetime import timedelta
     settings = settings or Settings()
     init_passcodes(settings)
 
@@ -359,7 +375,21 @@ def create_passcode(
     else:
         code = code.strip().upper()
 
-    now_str = datetime.now(timezone.utc).isoformat()
+    now_dt = datetime.now(timezone.utc)
+    now_str = now_dt.isoformat(timespec="seconds")
+
+    # Calculate expiration timestamp
+    exp_str = None
+    if expires_at:
+        exp_str = expires_at
+    elif expires_in_hours is not None and expires_in_hours > 0:
+        exp_str = (now_dt + timedelta(hours=expires_in_hours)).isoformat(timespec="seconds")
+    elif expires_in_days is not None and expires_in_days > 0:
+        exp_str = (now_dt + timedelta(days=expires_in_days)).isoformat(timespec="seconds")
+
+    # Normalize max_uses
+    actual_max_uses = max_uses if (max_uses is not None and max_uses > 0) else None
+
     conn = get_db_connection(settings)
 
     with conn:
@@ -372,6 +402,7 @@ def create_passcode(
                 allowed_routes = excluded.allowed_routes,
                 max_uses = excluded.max_uses,
                 expires_at = excluded.expires_at,
+                use_count = 0,
                 is_active = 1
             """,
             (
@@ -379,18 +410,19 @@ def create_passcode(
                 label.strip(),
                 json.dumps(allowed_routes),
                 now_str,
-                expires_at,
-                max_uses,
+                exp_str,
+                actual_max_uses,
             ),
         )
+        conn.commit()
 
-    logger.info("Created passcode %s for friend '%s' with routes %s", code, label, allowed_routes)
+    logger.info("Created passcode %s for friend '%s' with routes %s (max_uses=%s, expires_at=%s)", code, label, allowed_routes, actual_max_uses, exp_str)
     return {
         "code": code,
         "label": label,
         "allowed_routes": allowed_routes,
-        "created_at": now_str,
-        "max_uses": max_uses,
+        "max_uses": actual_max_uses,
+        "expires_at": exp_str,
         "use_count": 0,
         "is_active": True,
     }

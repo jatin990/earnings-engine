@@ -7349,30 +7349,54 @@
                     return;
                 }
 
-                tbody.innerHTML = list.map(item => `
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                        <td style="padding: 0.65rem 0.8rem; font-family: monospace; font-weight: 700; color: #a78bfa;">${item.code}</td>
-                        <td style="padding: 0.65rem 0.8rem; font-weight: 600; color: var(--light);">${item.label}</td>
-                        <td style="padding: 0.65rem 0.8rem;">
-                            <div style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
-                                ${item.allowed_routes.map(r => `<span style="background: rgba(255,255,255,0.06); padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-size: 0.72rem; color: #93c5fd;">${r}</span>`).join('')}
-                            </div>
-                        </td>
-                        <td style="padding: 0.65rem 0.8rem; text-align: center; font-family: monospace; color: var(--muted);">${item.use_count}</td>
-                        <td style="padding: 0.65rem 0.8rem; text-align: right; white-space: nowrap;">
-                            <button onclick="app.copyPasscodeLink('${item.code}')" class="btn btn-sm" style="background: rgba(56,189,248,0.15); color: #38bdf8; padding: 0.2rem 0.5rem; margin-right: 0.3rem;" title="Copy direct portal invite link">🔗 Link</button>
-                            <button onclick="app.deletePasscodeInCustomizer('${item.code}')" class="btn btn-sm btn-danger" style="padding: 0.2rem 0.5rem;" title="Delete Passcode">🗑️</button>
-                        </td>
-                    </tr>
-                `).join('');
+                tbody.innerHTML = list.map(item => {
+                    const maxStr = item.max_uses ? `${item.use_count} / ${item.max_uses}` : `${item.use_count} / ♾️`;
+                    let expDisplay = '<span style="color: #34d399; font-family: monospace; font-size: 0.75rem;">♾️ Permanent</span>';
+                    if (item.expires_at) {
+                        const expDate = new Date(item.expires_at);
+                        const now = new Date();
+                        const diffMs = expDate - now;
+                        if (diffMs <= 0) {
+                            expDisplay = '<span style="color: #f87171; font-weight: 700; font-family: monospace; font-size: 0.75rem;">⚠️ Expired</span>';
+                        } else {
+                            const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+                            if (diffHours < 24) {
+                                expDisplay = `<span style="color: #fde047; font-family: monospace; font-size: 0.75rem;">⏳ ${diffHours}h left</span>`;
+                            } else {
+                                const diffDays = Math.round(diffHours / 24);
+                                expDisplay = `<span style="color: #c084fc; font-family: monospace; font-size: 0.75rem;">⏳ ${diffDays}d left</span>`;
+                            }
+                        }
+                    }
+
+                    return `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                            <td style="padding: 0.65rem 0.8rem; font-family: monospace; font-weight: 700; color: #a78bfa;">${item.code}</td>
+                            <td style="padding: 0.65rem 0.8rem; font-weight: 600; color: var(--light);">${item.label}</td>
+                            <td style="padding: 0.65rem 0.8rem;">
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
+                                    ${item.allowed_routes.map(r => `<span style="background: rgba(255,255,255,0.06); padding: 0.15rem 0.45rem; border-radius: 0.3rem; font-size: 0.72rem; color: #93c5fd;">${r}</span>`).join('')}
+                                </div>
+                            </td>
+                            <td style="padding: 0.65rem 0.8rem; text-align: center; font-family: monospace; color: var(--muted);">${maxStr}</td>
+                            <td style="padding: 0.65rem 0.8rem; text-align: center;">${expDisplay}</td>
+                            <td style="padding: 0.65rem 0.8rem; text-align: right; white-space: nowrap;">
+                                <button onclick="app.copyPasscodeLink('${item.code}')" class="btn btn-sm" style="background: rgba(56,189,248,0.15); color: #38bdf8; padding: 0.2rem 0.5rem; margin-right: 0.3rem;" title="Copy direct portal invite link">🔗 Link</button>
+                                <button onclick="app.deletePasscodeInCustomizer('${item.code}')" class="btn btn-sm btn-danger" style="padding: 0.2rem 0.5rem;" title="Delete Passcode">🗑️</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--red);padding:1.5rem;">Failed loading passcodes: ${e.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--red);padding:1.5rem;">Failed loading passcodes: ${e.message}</td></tr>`;
             }
         };
 
         app.showAddPasscodeModal = function() {
             document.getElementById('ccNewPassLabel').value = '';
             document.getElementById('ccNewPassCode').value = '';
+            if (document.getElementById('ccNewPassMaxUses')) document.getElementById('ccNewPassMaxUses').value = '0';
+            if (document.getElementById('ccNewPassExpiry')) document.getElementById('ccNewPassExpiry').value = '30';
             document.getElementById('ccRouteDash').checked = true;
             document.getElementById('ccRouteCards').checked = true;
             document.getElementById('ccRoutePlay').checked = true;
@@ -7383,6 +7407,9 @@
         app.submitCreatePasscodeInCustomizer = async function() {
             const label = (document.getElementById('ccNewPassLabel')?.value || '').trim();
             const code = (document.getElementById('ccNewPassCode')?.value || '').trim();
+            const maxUsesVal = parseInt(document.getElementById('ccNewPassMaxUses')?.value || '0', 10);
+            const expiryVal = parseFloat(document.getElementById('ccNewPassExpiry')?.value || '30');
+
             if (!label) {
                 alert('Please enter a friend name or label.');
                 return;
@@ -7403,7 +7430,13 @@
                 const res = await fetch('/api/v1/auth/codes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ label, code: code || null, allowed_routes: routes })
+                    body: JSON.stringify({
+                        label,
+                        code: code || null,
+                        allowed_routes: routes,
+                        max_uses: maxUsesVal > 0 ? maxUsesVal : null,
+                        expires_in_days: expiryVal > 0 ? expiryVal : null,
+                    })
                 });
                 if (!res.ok) throw new Error('Failed to generate passcode');
 

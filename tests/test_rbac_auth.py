@@ -226,3 +226,96 @@ def test_rbac_scope_guards_on_protected_endpoints():
     assert client.get("/api/v1/trips", headers={"Authorization": f"Bearer {owner_token}"}).status_code == 200
     assert client.get("/api/v1/cards", headers={"Authorization": f"Bearer {owner_token}"}).status_code == 200
     assert client.get("/api/v1/net-worth", headers={"Authorization": f"Bearer {owner_token}"}).status_code == 200
+
+
+def test_configurable_timeframe_and_multi_use_invites():
+    from datetime import datetime, timezone, timedelta
+
+    # 1. Multi-use invite (5 uses)
+    multi_inv = create_scoped_invite(
+        label="Team Pass (5 Uses)",
+        scopes=["can_view_trips"],
+        max_uses=5,
+        expires_in_days=30,
+        custom_code="TEAM-PASS-5X",
+    )
+    assert multi_inv["max_uses"] == 5
+    assert multi_inv["expires_at"] is not None
+
+    # Should allow 5 users to request and verify OTP
+    for i in range(5):
+        req = request_otp_for_invite("TEAM-PASS-5X", f"user_{i}@team.com")
+        assert req["success"] is True
+        ver = verify_otp_for_invite("TEAM-PASS-5X", f"user_{i}@team.com", req["dev_otp"])
+        assert ver["success"] is True
+
+    # 6th request should fail as max_uses (5) is reached
+    fail_res = request_otp_for_invite("TEAM-PASS-5X", "user_6@team.com")
+    assert fail_res["success"] is False
+    assert "maximum allowed uses" in fail_res["error"]
+
+    # 2. Unlimited multi-use invite (max_uses=None / 0)
+    unlim_inv = create_scoped_invite(
+        label="Public Community Pass",
+        scopes=["can_view_trips"],
+        max_uses=None,
+        expires_in_days=None,
+        custom_code="COMMUNITY-UNLIMITED",
+    )
+    assert unlim_inv["max_uses"] is None
+    assert unlim_inv["expires_at"] is None
+
+    # Requests succeed without decrement cap
+    assert request_otp_for_invite("COMMUNITY-UNLIMITED", "comm1@test.com")["success"] is True
+    assert request_otp_for_invite("COMMUNITY-UNLIMITED", "comm2@test.com")["success"] is True
+
+    # 3. Expired invite code
+    past_iso = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(timespec="seconds")
+    expired_inv = create_scoped_invite(
+        label="Expired Pass",
+        scopes=["can_view_trips"],
+        expires_at=past_iso,
+        custom_code="EXPIRED-CODE-00",
+    )
+    exp_res = request_otp_for_invite("EXPIRED-CODE-00", "any@test.com")
+    assert exp_res["success"] is False
+    assert "expired" in exp_res["error"].lower()
+
+
+def test_invites_api_endpoints():
+    client = TestClient(app)
+    owner_token = create_session_token(
+        user_id="usr_owner_001",
+        role="owner",
+        email="owner@test.com",
+        name="Owner",
+        scopes=[],
+    )
+
+    # 1. Create invite via API with custom timeframe and max_uses
+    post_res = client.post(
+        "/api/v1/invites",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={
+            "label": "API Test Invite",
+            "scopes": ["can_view_trips", "can_view_cards"],
+            "max_uses": 10,
+            "expires_in_days": 14,
+            "code": "API-TEST-INV-10",
+        },
+    )
+    assert post_res.status_code == 200
+    inv = post_res.json()
+    assert inv["code"] == "API-TEST-INV-10"
+    assert inv["max_uses"] == 10
+    assert inv["expires_at"] is not None
+
+    # 2. List invites via API
+    get_res = client.get(
+        "/api/v1/invites",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert get_res.status_code == 200
+    invites_list = get_res.json()["invites"]
+    assert any(i["code"] == "API-TEST-INV-10" for i in invites_list)
+

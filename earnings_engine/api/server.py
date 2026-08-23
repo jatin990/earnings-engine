@@ -901,6 +901,8 @@ class CreatePasscodeRequest(BaseModel):
     allowed_routes: list[str] = ["dashboard"]
     code: str | None = None
     max_uses: int | None = None
+    expires_in_days: float | None = None
+    expires_in_hours: float | None = None
     expires_at: str | None = None
 
 
@@ -924,8 +926,10 @@ class CreateInviteRequest(BaseModel):
     label: str
     scopes: list[str] = ["can_view_trips"]
     allowed_email: str | None = None
-    max_uses: int = 1
-    expires_in_days: int | None = 7
+    max_uses: int | None = 1
+    expires_in_days: float | None = 7
+    expires_in_hours: float | None = None
+    expires_at: str | None = None
     code: str | None = None
 
 
@@ -1061,13 +1065,15 @@ async def get_all_passcodes():
 
 @app.post("/api/v1/auth/codes", tags=["Auth"])
 async def create_new_passcode(req: CreatePasscodeRequest):
-    """Generate a new passcode for a friend with custom route permissions."""
+    """Generate a new passcode for a friend with custom route permissions, limits and timeframe."""
     from earnings_engine.data.passcodes import create_passcode
     created = create_passcode(
         label=req.label,
         allowed_routes=req.allowed_routes,
         code=req.code,
         max_uses=req.max_uses,
+        expires_in_days=req.expires_in_days,
+        expires_in_hours=req.expires_in_hours,
         expires_at=req.expires_at,
         settings=_settings,
     )
@@ -1186,9 +1192,42 @@ async def revoke_friend_endpoint(user_id: str, request: Request):
     return {"success": success, "user_id": user_id}
 
 
+@app.get("/api/v1/invites", tags=["Friend Management"])
+async def list_invites_endpoint(request: Request):
+    """Owner-only list of all created invite codes with limits and expiration timeframes."""
+    session = _get_current_session(request)
+    if session.get("role") != "owner" and "admin" not in session.get("scopes", []):
+        raise HTTPException(status_code=403, detail="Owner privileges required.")
+    conn = get_db_connection(_settings)
+    with conn:
+        rows = conn.execute("""
+            SELECT code, label, allowed_email, scopes, max_uses, uses_count, expires_at, is_active, created_at
+            FROM invite_codes
+            ORDER BY created_at DESC
+        """).fetchall()
+    invites = []
+    for r in rows:
+        try:
+            scopes = json.loads(r[3]) if r[3] else []
+        except Exception:
+            scopes = []
+        invites.append({
+            "code": r[0],
+            "label": r[1],
+            "allowed_email": r[2],
+            "scopes": scopes,
+            "max_uses": r[4],
+            "uses_count": r[5],
+            "expires_at": r[6],
+            "is_active": bool(r[7]),
+            "created_at": r[8],
+        })
+    return {"invites": invites}
+
+
 @app.post("/api/v1/invites", tags=["Friend Management"])
 async def create_invite_endpoint(req: CreateInviteRequest, request: Request):
-    """Create a new scoped invite code."""
+    """Create a new scoped invite code with configurable usage limits and validity timeframe."""
     session = _get_current_session(request)
     if session.get("role") != "owner" and "admin" not in session.get("scopes", []):
         raise HTTPException(status_code=403, detail="Owner privileges required.")
@@ -1199,6 +1238,8 @@ async def create_invite_endpoint(req: CreateInviteRequest, request: Request):
         allowed_email=req.allowed_email,
         max_uses=req.max_uses,
         expires_in_days=req.expires_in_days,
+        expires_in_hours=req.expires_in_hours,
+        expires_at=req.expires_at,
         custom_code=req.code,
         created_by=session.get("sub", "usr_owner_001"),
         settings=_settings,

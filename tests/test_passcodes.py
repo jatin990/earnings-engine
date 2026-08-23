@@ -139,3 +139,44 @@ def test_verify_scoped_invite_code():
     assert "session_token" in data
     assert resp.cookies.get("nexus_session") is not None
 
+
+def test_passcode_expiration_and_max_uses():
+    from datetime import datetime, timezone, timedelta
+
+    # 1. Passcode with max_uses=2
+    created = create_passcode(
+        label="Dual Use Pass",
+        allowed_routes=["dashboard"],
+        code="DUAL-PASS-2X",
+        max_uses=2,
+        expires_in_days=7,
+    )
+    assert created["max_uses"] == 2
+    assert created["expires_at"] is not None
+
+    # First use -> valid
+    v1 = verify_passcode("DUAL-PASS-2X")
+    assert v1["valid"] is True
+
+    # Second use -> valid
+    v2 = verify_passcode("DUAL-PASS-2X")
+    assert v2["valid"] is True
+
+    # Third use -> max uses reached
+    v3 = verify_passcode("DUAL-PASS-2X")
+    assert v3["valid"] is False
+    assert "maximum allowed uses" in v3["error"]
+
+    # 2. Expired passcode
+    past_iso = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(timespec="seconds")
+    create_passcode(
+        label="Expired Pass",
+        allowed_routes=["dashboard"],
+        code="EXPIRED-PASS-01",
+        expires_at=past_iso,
+    )
+    v_exp = verify_passcode("EXPIRED-PASS-01")
+    assert v_exp["valid"] is False
+    assert "expired" in v_exp["error"].lower()
+
+
