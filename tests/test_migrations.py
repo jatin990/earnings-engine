@@ -74,3 +74,11 @@ def test_migration_005_migrates_legacy_data(test_settings):
         assert row[2] == "Technology"
         assert row[3] == 750000.0
         assert "25.5" in str(row[4])
+
+    # Test names module integration with tickers table
+    from earnings_engine.data.names import get_name, store_name, search
+    assert get_name("INFY.NS", test_settings) == "Infosys Limited"
+    store_name("TCS.NS", "Tata Consultancy Services", settings=test_settings)
+    assert get_name("TCS.NS", test_settings) == "Tata Consultancy Services"
+    search_res = search("Tata", settings=test_settings)
+    assert any(r["symbol"] == "TCS.NS" for r in search_res)
