@@ -370,7 +370,7 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             if load_price_metrics is not _ORIGINAL_LOAD_PRICE_METRICS:
                 cached_metrics = None if force else load_price_metrics(ticker, settings)
             else:
-                cached_metrics = None if force else (metrics_map.get(ticker) or load_price_metrics(ticker, settings))
+                cached_metrics = None if force else metrics_map.get(ticker)
 
             if cached_metrics is not None:
                 current_price = cached_metrics.get("current_price")
@@ -394,13 +394,11 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                     prices = fetch_prices(ticker, settings, force=False)
             else:
                 prices = prices_map.get(ticker)
-                if prices is None or prices.empty:
-                    prices = load_prices(ticker, settings)
-                    if (prices is None or prices.empty) and force:
-                        try:
-                            prices = fetch_prices(ticker, settings, force=True)
-                        except Exception:
-                            prices = pd.DataFrame(columns=["close"])
+                if (prices is None or prices.empty) and force:
+                    try:
+                        prices = fetch_prices(ticker, settings, force=True)
+                    except Exception:
+                        prices = pd.DataFrame(columns=["close"])
             if prices is None:
                 prices = pd.DataFrame(columns=["close"])
 
@@ -484,8 +482,6 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 earnings = load_earnings(ticker, settings)
             else:
                 earnings = earnings_map.get(ticker)
-                if earnings is None or earnings.empty:
-                    earnings = load_earnings(ticker, settings)
             if earnings is None:
                 earnings = pd.DataFrame(columns=["earnings_date", "eps_estimate", "eps_reported", "surprise_pct"])
 
