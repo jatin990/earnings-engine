@@ -7011,10 +7011,43 @@
             { key: 'watchlist', label: 'Watchlists', icon: '⭐', desc: 'Custom watchlists and universe portfolio management' },
         ];
 
+        const FONT_PRESETS = {
+            geist: {
+                label: 'Geist & Geist Mono (Modern Minimalist)',
+                sans: "'Geist', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                mono: "'Geist Mono', 'JetBrains Mono', monospace",
+                heading: "'Geist', 'Space Grotesk', sans-serif"
+            },
+            inter: {
+                label: 'Inter & JetBrains Mono (Precision Fintech)',
+                sans: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+                mono: "'JetBrains Mono', monospace",
+                heading: "'Inter', sans-serif"
+            },
+            outfit: {
+                label: 'Outfit & Geist Mono (Futuristic Luxury)',
+                sans: "'Outfit', 'Inter', sans-serif",
+                mono: "'Geist Mono', 'JetBrains Mono', monospace",
+                heading: "'Outfit', sans-serif"
+            },
+            space: {
+                label: 'Space Grotesk & JetBrains Mono (Cyber Tech)',
+                sans: "'Space Grotesk', 'Inter', sans-serif",
+                mono: "'JetBrains Mono', monospace",
+                heading: "'Space Grotesk', sans-serif"
+            },
+            jakarta: {
+                label: 'Plus Jakarta Sans & JetBrains Mono (Executive Glass)',
+                sans: "'Plus Jakarta Sans', sans-serif",
+                mono: "'JetBrains Mono', monospace",
+                heading: "'Space Grotesk', 'Plus Jakarta Sans', sans-serif"
+            }
+        };
+
         const THEME_PRESETS = {
             obsidian: {
-                '--bg': '#020006',
-                '--card': 'rgba(10,4,24,0.75)',
+                '--bg': '#000000',
+                '--card': 'rgba(8,4,18,0.82)',
                 '--accent': '#9333ea',
                 '--green': '#10b981',
                 '--red': '#f43f5e',
@@ -7054,6 +7087,7 @@
             activeSubTab: 'tabs',
             tabVisibility: {},
             activeTheme: 'obsidian',
+            activeFont: 'geist',
             customColors: {},
             envData: null,
             envSearchQuery: '',
@@ -7067,6 +7101,12 @@
                 if (savedTabs) {
                     app._customizer.tabVisibility = JSON.parse(savedTabs);
                 }
+            } catch (e) {}
+
+            // Restore font preset
+            try {
+                const savedFont = localStorage.getItem('ee_active_font') || 'geist';
+                app.applyFontPreset(savedFont, false);
             } catch (e) {}
 
             // Restore theme & custom colors
@@ -7662,12 +7702,40 @@
             app.saveUIPreferencesToBackend();
         };
 
+        app.applyFontPreset = function(fontKey, persist = true) {
+            const preset = FONT_PRESETS[fontKey] || FONT_PRESETS.geist;
+            app._customizer.activeFont = fontKey;
+            document.documentElement.style.setProperty('--font-sans', preset.sans);
+            document.documentElement.style.setProperty('--font-mono', preset.mono);
+            document.documentElement.style.setProperty('--font-heading', preset.heading);
+            
+            const fontSelect = document.getElementById('pickerFontPreset');
+            if (fontSelect) fontSelect.value = fontKey;
+
+            const sample = document.getElementById('fontSamplePreview');
+            if (sample) {
+                sample.style.fontFamily = preset.sans;
+            }
+
+            if (persist) {
+                try {
+                    localStorage.setItem('ee_active_font', fontKey);
+                } catch (e) {}
+                app.saveUIPreferencesToBackend();
+            }
+        };
+
         app.resetDefaultColors = function() {
             app.applyPresetTheme('obsidian', true);
+            app.applyFontPreset('geist', true);
         };
 
         app.syncThemePickers = function() {
             const computed = getComputedStyle(document.documentElement);
+            const fontSelect = document.getElementById('pickerFontPreset');
+            if (fontSelect && app._customizer.activeFont) {
+                fontSelect.value = app._customizer.activeFont;
+            }
             const vars = ['--bg', '--card', '--accent', '--green', '--red', '--light'];
             vars.forEach(v => {
                 const rawVal = computed.getPropertyValue(v).trim();

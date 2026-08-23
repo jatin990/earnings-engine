@@ -93,52 +93,72 @@
                     </div>
                 </div>
 
-                <div style="background: rgba(18, 10, 32, 0.6); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 0.85rem; padding: 1.25rem;">
+                <!-- Typography & Font Family Switcher -->
+                <div style="background: rgba(10, 4, 24, 0.7); border: 1px solid rgba(168, 85, 247, 0.22); border-radius: 0.85rem; padding: 1.25rem; margin-bottom: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <div>
+                            <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; font-family: var(--font-heading); color: #f8fafc;">🔤 Terminal Typography & Font</h4>
+                            <p style="margin: 0.15rem 0 0 0; font-size: 0.78rem; color: var(--muted);">Switch between modern minimalist, high-legibility fintech, or cyber monospace fonts.</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap;">
+                        <select id="pickerFontPreset" onchange="app.applyFontPreset(this.value)" style="min-width: 280px; padding: 0.5rem 0.85rem; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 0.55rem; background: #000000; color: #f8fafc; font-size: 0.85rem; font-weight: 600; cursor: pointer; outline: none;">
+                            <option value="geist">✦ Geist & Geist Mono (Modern Minimalist Terminal)</option>
+                            <option value="inter">✦ Inter & JetBrains Mono (Precision Fintech)</option>
+                            <option value="outfit">✦ Outfit & Geist Mono (Futuristic Luxury)</option>
+                            <option value="space">✦ Space Grotesk & JetBrains Mono (Cyber Tech)</option>
+                            <option value="jakarta">✦ Plus Jakarta Sans & JetBrains Mono (Executive Glass)</option>
+                        </select>
+                        <span id="fontSamplePreview" style="font-size: 0.82rem; color: #d8b4fe; font-family: var(--font-sans); background: rgba(168, 85, 247, 0.12); padding: 0.4rem 0.75rem; border-radius: 0.5rem; border: 1px solid rgba(168, 85, 247, 0.25);">The quick brown fox jumps over the lazy dog 1234567890</span>
+                    </div>
+                </div>
+
+                <div style="background: rgba(10, 4, 24, 0.7); border: 1px solid rgba(168, 85, 247, 0.22); border-radius: 0.85rem; padding: 1.25rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">Custom Design Tokens</h4>
-                        <button onclick="app.resetDefaultColors()" class="btn btn-sm" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #e9d5ff; font-weight: 700;">↺ Reset Defaults</button>
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; font-family: var(--font-heading);">Custom Design Tokens</h4>
+                        <button onclick="app.resetDefaultColors()" class="btn btn-sm" style="background: rgba(168, 85, 247, 0.18); border: 1px solid rgba(168, 85, 247, 0.35); color: #e9d5ff; font-weight: 700;">↺ Reset Defaults</button>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
                         <div>
                             <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Primary Background</label>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="color" id="pickerBg" oninput="app.onCustomColorInput('--bg', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 0.4rem; cursor: pointer; background: transparent;">
-                                <span id="valBg" style="font-family: monospace; font-size: 0.85rem;">#05030a</span>
+                                <span id="valBg" style="font-family: var(--font-mono); font-size: 0.85rem;">#000000</span>
                             </div>
                         </div>
                         <div>
                             <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Card / Surface</label>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="color" id="pickerCard" oninput="app.onCustomColorInput('--card', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 0.4rem; cursor: pointer; background: transparent;">
-                                <span id="valCard" style="font-family: monospace; font-size: 0.85rem;">#120a20</span>
+                                <span id="valCard" style="font-family: var(--font-mono); font-size: 0.85rem;">#080412</span>
                             </div>
                         </div>
                         <div>
                             <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Brand / Accent Color</label>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="color" id="pickerAccent" oninput="app.onCustomColorInput('--accent', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 0.4rem; cursor: pointer; background: transparent;">
-                                <span id="valAccent" style="font-family: monospace; font-size: 0.85rem;">#9333ea</span>
+                                <span id="valAccent" style="font-family: var(--font-mono); font-size: 0.85rem;">#9333ea</span>
                             </div>
                         </div>
                         <div>
                             <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Bullish / Gain Color</label>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="color" id="pickerGreen" oninput="app.onCustomColorInput('--green', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 0.4rem; cursor: pointer; background: transparent;">
-                                <span id="valGreen" style="font-family: monospace; font-size: 0.85rem;">#10b981</span>
+                                <span id="valGreen" style="font-family: var(--font-mono); font-size: 0.85rem;">#10b981</span>
                             </div>
                         </div>
                         <div>
                             <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Bearish / Drop Color</label>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="color" id="pickerRed" oninput="app.onCustomColorInput('--red', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 0.4rem; cursor: pointer; background: transparent;">
-                                <span id="valRed" style="font-family: monospace; font-size: 0.85rem;">#ef4444</span>
+                                <span id="valRed" style="font-family: var(--font-mono); font-size: 0.85rem;">#f43f5e</span>
                             </div>
                         </div>
                         <div>
                             <label style="display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem;">Text Color</label>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="color" id="pickerLight" oninput="app.onCustomColorInput('--light', this.value)" style="width: 36px; height: 36px; border: none; border-radius: 0.4rem; cursor: pointer; background: transparent;">
-                                <span id="valLight" style="font-family: monospace; font-size: 0.85rem;">#f8fafc</span>
+                                <span id="valLight" style="font-family: var(--font-mono); font-size: 0.85rem;">#f8fafc</span>
                             </div>
                         </div>
                     </div>
