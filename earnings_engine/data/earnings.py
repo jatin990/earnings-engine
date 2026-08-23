@@ -729,6 +729,38 @@ def set_cached_month_filter(settings: Settings, cache_key: str, payload: dict[st
         connection.commit()
 
 
+def resolve_tickers_for_watchlist_or_universe(
+    name: str | None,
+    settings: Settings | None = None,
+) -> list[str]:
+    """Resolve a watchlist name or universe identifier to a list of tickers."""
+    settings = settings or Settings()
+    if not name or name.strip().upper() in ("ALL", "GLOBAL", "DEFAULT", "UNIVERSE", ""):
+        return []
+
+    clean_name = name.strip()
+
+    # 1. Check custom watchlists in SQLite
+    try:
+        from earnings_engine.data.watchlists import get_watchlist
+        wl_tickers = get_watchlist(clean_name, settings)
+        if wl_tickers:
+            return wl_tickers
+    except Exception:
+        pass
+
+    # 2. Check standard universes (e.g. NSE_ALL, NSE_TOP, NSE_LARGE_CAP, US_TOP, IN, US)
+    try:
+        from earnings_engine.data.universe import load_universe
+        u_tickers = load_universe(clean_name, settings)
+        if u_tickers:
+            return u_tickers
+    except Exception:
+        pass
+
+    return []
+
+
 def get_watchlist_earnings_freshness(
     watchlist_name: str | None = None,
     tickers: list[str] | None = None,
@@ -737,9 +769,12 @@ def get_watchlist_earnings_freshness(
     """Calculate aggregated earnings freshness metrics for a watchlist or ticker list."""
     settings = settings or Settings()
 
-    is_all_universe = not watchlist_name or watchlist_name.strip().upper() in ("ALL", "GLOBAL", "DEFAULT", "UNIVERSE")
+    is_all_universe = not watchlist_name or watchlist_name.strip().upper() in ("ALL", "GLOBAL", "DEFAULT", "UNIVERSE", "")
 
-    if tickers is None and is_all_universe:
+    if tickers is None and not is_all_universe:
+        tickers = resolve_tickers_for_watchlist_or_universe(watchlist_name, settings)
+
+    if tickers is None or (not tickers and is_all_universe):
         with _connect(settings) as connection:
             row = connection.execute(
                 """
@@ -770,18 +805,11 @@ def get_watchlist_earnings_freshness(
         if total_tickers == 0:
             try:
                 from earnings_engine.data.universe import load_universe
-                u_tickers = load_universe(settings)
+                u_tickers = load_universe("NSE_ALL", settings) or load_universe("IN", settings)
                 total_tickers = len(u_tickers)
             except Exception:
                 total_tickers = 0
     else:
-        if tickers is None:
-            if watchlist_name:
-                from earnings_engine.data.watchlists import get_watchlist
-                tickers = get_watchlist(watchlist_name, settings)
-            else:
-                tickers = []
-
         if not tickers:
             return {
                 "watchlist": watchlist_name or "ALL",
@@ -878,10 +906,13 @@ def refresh_watchlist_earnings(
 
     if tickers is None:
         if watchlist_name:
-            from earnings_engine.data.watchlists import get_watchlist
-            tickers = get_watchlist(watchlist_name, settings)
+            tickers = resolve_tickers_for_watchlist_or_universe(watchlist_name, settings)
         else:
-            tickers = []
+            try:
+                from earnings_engine.data.universe import load_universe
+                tickers = load_universe("NSE_TOP", settings) or load_universe("IN", settings)
+            except Exception:
+                tickers = []
 
     if not tickers:
         return {"success": False, "error": "No tickers in selected watchlist", "refreshed_count": 0}

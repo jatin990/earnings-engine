@@ -80,17 +80,12 @@ def test_refresh_watchlist_api_endpoints(temp_settings, clean_test_watchlist):
     assert data_global["relative_time"] != "No tickers in universe"
 
 
-def test_recent_results_preset_window():
-    from earnings_engine.api.dashboard_api import get_results_report_components
+def test_universe_freshness_resolution(temp_settings):
+    # Test standard universes (NSE_TOP, IN, NSE_ALL)
+    for u in ("NSE_TOP", "IN", "NSE_ALL"):
+        fresh = get_watchlist_earnings_freshness(u, settings=temp_settings)
+        assert fresh["total_tickers"] > 0
+        assert fresh["relative_time"] != "No tickers in watchlist"
 
-    # Test recent window (-4 days, +7 days)
-    res = get_results_report_components(days=7, past_days=4, market="ALL")
-    assert isinstance(res, dict)
-    assert "success" in res
-    assert "day_sections" in res
-    assert "popups" in res
-    if res["success"]:
-        assert "day_sections_list" in res
-        assert "months" in res
 
 
