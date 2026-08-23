@@ -260,15 +260,14 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
     else:
         logger.info("[DATA-FETCH] [yfinance] Downloading full historical prices for ticker=%s (%s) from=%s", ticker, fetch_symbol, start)
 
-    try:
-        raw = yf.download(fetch_symbol, start=start, auto_adjust=True, progress=False, threads=False)
-    except Exception as exc:
-        logger.warning("[DATA-FETCH] [yfinance] Failed to download prices for ticker=%s (%s): %s", ticker, fetch_symbol, exc)
-        raw = None
+    from earnings_engine.data.providers.provider_manager import get_data_manager
+
+    mgr = get_data_manager(settings)
+    raw = mgr.fetch_ohlcv(ticker=fetch_symbol, start_date=start)
 
     if raw is None or raw.empty:
         _mark_fetched(ticker, settings)
-        logger.warning("[DATA-FETCH] [yfinance] No new data returned for %s; loading from cache", ticker)
+        logger.warning("[DATA-FETCH] No price data returned for %s; loading from cache", ticker)
         return load_prices(ticker, settings) if _is_fresh(ticker, settings) else _empty_frame()
 
     df = raw.copy()
@@ -291,7 +290,7 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
             df[col] = pd.NA
 
     df = df[COLUMNS].copy()
-    logger.info("[DATA-FETCH] [yfinance] Successfully fetched and normalized %d rows for ticker=%s", len(df), ticker)
+    logger.info("[DATA-FETCH] Successfully normalized %d price rows for ticker=%s", len(df), ticker)
     for col in COLUMNS:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["volume"] = df["volume"].astype("Int64")
