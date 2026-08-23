@@ -458,6 +458,11 @@ def _fetch_market_cap_for_ticker(ticker: str) -> tuple[str, float | None]:
         return (ticker, cached)
 
     try:
+        try:
+            from earnings_engine.rate_limits import record_request
+            record_request("yfinance")
+        except Exception:
+            pass
         info = yf.Ticker(ticker).fast_info or {}
         market_cap = info.get("market_cap")
         if market_cap is None:

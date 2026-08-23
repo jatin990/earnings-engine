@@ -55,6 +55,11 @@ class YFinanceProvider(DataProvider):
         interval: str = "1d",
     ) -> pd.DataFrame:
         import yfinance as yf
+        try:
+            from earnings_engine.rate_limits import record_request
+            record_request("yfinance")
+        except Exception:
+            pass
 
         sym = self._normalize_symbol(ticker)
         try:
@@ -87,6 +92,11 @@ class YFinanceProvider(DataProvider):
 
     def fetch_quote(self, ticker: str) -> dict[str, Any]:
         import yfinance as yf
+        try:
+            from earnings_engine.rate_limits import record_request
+            record_request("yfinance")
+        except Exception:
+            pass
 
         sym = self._normalize_symbol(ticker)
         try:

@@ -229,6 +229,11 @@ def fetch_earnings(ticker: str, settings: Settings, force: bool = False) -> pd.D
     settings.ensure_dirs()
     try:
         logger.info("downloading earnings ticker=%s", ticker)
+        try:
+            from earnings_engine.rate_limits import record_request
+            record_request("yfinance")
+        except Exception:
+            pass
         raw = yf.Ticker(ticker).get_earnings_dates(limit=60)
     except Exception:
         raw = None

@@ -57,6 +57,7 @@ class NSEDirectProvider(DataProvider):
         try:
             import nselib
             from nselib import capital_market
+            from earnings_engine.rate_limits import record_request
 
             # Convert YYYY-MM-DD to DD-MM-YYYY required by nselib
             from_dt = datetime.strptime(start_date[:10], "%Y-%m-%d").strftime("%d-%m-%Y")
@@ -67,6 +68,7 @@ class NSEDirectProvider(DataProvider):
                 from_date=from_dt,
                 to_date=to_dt,
             )
+            record_request("nse")
 
             if raw_df is not None and not raw_df.empty:
                 df = raw_df.copy()
@@ -95,10 +97,12 @@ class NSEDirectProvider(DataProvider):
         # 2. Try jugaad-data
         try:
             from jugaad_data.nse import stock_df
+            from earnings_engine.rate_limits import record_request
             from_d = datetime.strptime(start_date[:10], "%Y-%m-%d").date()
             to_d = datetime.strptime(end_str[:10], "%Y-%m-%d").date()
 
             raw_df = stock_df(symbol=clean_symbol, from_date=from_d, to_date=to_d, series="EQ")
+            record_request("jugaad_data")
             if raw_df is not None and not raw_df.empty:
                 df = raw_df.copy()
                 df.columns = df.columns.str.strip().str.lower()
@@ -166,10 +170,15 @@ class NSEDirectProvider(DataProvider):
             from nselib import capital_market
 
             d_fmt = datetime.strptime(date_str[:10], "%Y-%m-%d").strftime("%d-%m-%Y")
-            bhav = capital_market.bhav_copy_equities(d_fmt)
+            df = capital_market.bhav_copy_equities(d_fmt)
+            try:
+                from earnings_engine.rate_limits import record_request
+                record_request("nse")
+            except Exception:
+                pass
 
-            if bhav is not None and not bhav.empty:
-                df = bhav.copy()
+            if df is not None and not df.empty:
+                df = df.copy()
                 df.columns = df.columns.str.strip().str.upper()
 
                 # Filter EQ series
@@ -195,6 +204,11 @@ class NSEDirectProvider(DataProvider):
             d = datetime.strptime(date_str[:10], "%Y-%m-%d").date()
             from jugaad_data.nse.history import bhavcopy_raw
             raw_csv = bhavcopy_raw(d)
+            try:
+                from earnings_engine.rate_limits import record_request
+                record_request("jugaad_data")
+            except Exception:
+                pass
             if raw_csv:
                 import io
                 df = pd.read_csv(io.StringIO(raw_csv))
@@ -227,6 +241,11 @@ class NSEDirectProvider(DataProvider):
             try:
                 from nselib import derivatives
                 oc = derivatives.nse_live_option_chain(clean_symbol)
+                try:
+                    from earnings_engine.rate_limits import record_request
+                    record_request("nse")
+                except Exception:
+                    pass
                 if oc is not None and not oc.empty:
                     return {
                         "symbol": clean_symbol,
@@ -257,6 +276,11 @@ class NSEDirectProvider(DataProvider):
             to_d = datetime.strptime(end_str[:10], "%Y-%m-%d").date()
 
             raw_df = index_df(symbol=idx_clean, from_date=from_d, to_date=to_d)
+            try:
+                from earnings_engine.rate_limits import record_request
+                record_request("jugaad_data")
+            except Exception:
+                pass
             if raw_df is not None and not raw_df.empty:
                 df = raw_df.copy()
                 df.columns = df.columns.str.strip().str.lower()

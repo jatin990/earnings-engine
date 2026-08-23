@@ -24,6 +24,8 @@ def test_rate_limit_tracker_sliding_windows():
     assert "openrouter" in summary["downstreams"]
     assert "yfinance" in summary["downstreams"]
     assert "nse" in summary["downstreams"]
+    assert "jugaad_data" in summary["downstreams"]
+    assert "bse" in summary["downstreams"]
     assert "gemini" in summary["downstreams"]
 
     op = summary["downstreams"]["openrouter"]
@@ -37,6 +39,10 @@ def test_rate_limit_tracker_sliding_windows():
     yf = summary["downstreams"]["yfinance"]
     assert yf["timeframes"]["1m"]["current"] == 1
     assert yf["timeframes"]["24h"]["allowed"] == 5000
+
+    jg = summary["downstreams"]["jugaad_data"]
+    assert jg["service_name"] == "Jugaad Data (NSE Bhavcopy & F&O)"
+    assert jg["timeframes"]["24h"]["allowed"] == 1500
 
 
 def test_openrouter_headers_updating():
@@ -64,6 +70,8 @@ def test_ratelimits_api_endpoint():
     assert "openrouter" in data["downstreams"]
     assert "yfinance" in data["downstreams"]
     assert "nse" in data["downstreams"]
+    assert "jugaad_data" in data["downstreams"]
+    assert "bse" in data["downstreams"]
     assert "gemini" in data["downstreams"]
 
     # Check top counter format

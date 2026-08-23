@@ -41,7 +41,7 @@ DOWNSTREAM_CRITERIA: dict[str, dict[str, Any]] = {
     "yfinance": {
         "service_name": "Yahoo Finance (Market & Price Data)",
         "icon": "📈",
-        "description": "Historical OHLCV prices, dividends, splits, and quarterly earnings data.",
+        "description": "Historical OHLCV prices, fast_info market caps, dividends, splits, and quarterly earnings data.",
         "free_tier_limits": {
             "1m": 30,      # 30 requests per minute
             "1h": 500,     # 500 requests per hour
@@ -56,9 +56,43 @@ DOWNSTREAM_CRITERIA: dict[str, dict[str, Any]] = {
         "docs_url": "https://pypi.org/project/yfinance/",
     },
     "nse": {
-        "service_name": "NSE / BSE India (Corporate Feeds)",
+        "service_name": "NSE India (Direct Archives & nselib)",
         "icon": "🏛️",
-        "description": "National Stock Exchange Bhavcopy, corporate announcements, and circuit filters.",
+        "description": "National Stock Exchange official corporate calendar, event feeds, shareholding patterns, and index data.",
+        "free_tier_limits": {
+            "1m": 15,      # 15 RPM
+            "1h": 150,     # 150 RPH
+            "24h": 600,    # 600 RPD
+        },
+        "default_limits": {
+            "1m": 30,
+            "1h": 300,
+            "24h": 1200,
+        },
+        "unit": "requests",
+        "docs_url": "https://www.nseindia.com",
+    },
+    "jugaad_data": {
+        "service_name": "Jugaad Data (NSE Bhavcopy & F&O)",
+        "icon": "📦",
+        "description": "Historical Indian equity Bhavcopy, F&O derivatives archives, and stock index series.",
+        "free_tier_limits": {
+            "1m": 20,      # 20 requests per minute (Rate throttled to prevent NSE CDN cooldowns)
+            "1h": 200,     # 200 requests per hour
+            "24h": 800,    # 800 requests per day
+        },
+        "default_limits": {
+            "1m": 40,
+            "1h": 400,
+            "24h": 1500,
+        },
+        "unit": "requests",
+        "docs_url": "https://jugaad-data.readthedocs.io/",
+    },
+    "bse": {
+        "service_name": "BSE India (Corporate Actions & Filings)",
+        "icon": "🏢",
+        "description": "Bombay Stock Exchange corporate announcements, financial results, and insider trade disclosures.",
         "free_tier_limits": {
             "1m": 15,
             "1h": 150,
@@ -70,12 +104,12 @@ DOWNSTREAM_CRITERIA: dict[str, dict[str, Any]] = {
             "24h": 1200,
         },
         "unit": "requests",
-        "docs_url": "https://www.nseindia.com",
+        "docs_url": "https://www.bseindia.com",
     },
     "gemini": {
         "service_name": "Google Gemini (Multimodal & News)",
         "icon": "✨",
-        "description": "Multimodal news synthesis and volume catalyst analysis.",
+        "description": "Multimodal financial news parsing, volume catalysts, and sentiment impact scoring.",
         "free_tier_limits": {
             "1m": 15,      # 15 RPM
             "1h": 300,     # 300 RPH
