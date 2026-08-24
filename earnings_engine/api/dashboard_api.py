@@ -1306,12 +1306,8 @@ def get_recent_results_verdict_api(
     if not tickers:
         return {"verdicts": {}, "total": 0}
     events = recent_results_mod.load_recent_results(tickers, settings, start_date=start_date, end_date=end_date)
-    price_map: dict[str, Any] = {}
-    for t in sorted({t for t, _ in events}):
-        try:
-            price_map[t] = prices_mod.fetch_prices(t, settings)
-        except Exception:
-            price_map[t] = pd.DataFrame()
+    unique_tickers = sorted({t for t, _ in events})
+    price_map: dict[str, Any] = prices_mod.load_prices_batch(unique_tickers, settings)
     verdicts = recent_results_mod.compute_earnings_verdicts(events, price_map, settings)
     return {"verdicts": verdicts, "total": len(verdicts)}
 

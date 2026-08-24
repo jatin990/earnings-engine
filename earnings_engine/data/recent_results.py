@@ -137,15 +137,9 @@ def get_recent_results(
         now = datetime.now()
     events = load_recent_results(tickers, settings, now=now, start_date=start_date, end_date=end_date)
 
-    # Load prices once per unique ticker.  ``fetch_prices`` falls back to
-    # yfinance / NSE when a ticker has no (or stale) cached price rows, so
-    # stocks missing from the SQLite cache still get real OHLC data.
-    price_map: dict[str, pd.DataFrame] = {}
-    for ticker in sorted({t for t, _ in events}):
-        try:
-            price_map[ticker] = prices_mod.fetch_prices(ticker, settings)
-        except Exception:
-            price_map[ticker] = pd.DataFrame()
+    # Bulk load cached price history in a single batched database query
+    unique_tickers = sorted({t for t, _ in events})
+    price_map: dict[str, pd.DataFrame] = prices_mod.load_prices_batch(unique_tickers, settings)
 
     rows: list[dict[str, Any]] = []
     industry_map = get_industry_map([t for t, _ in events], settings)
@@ -322,13 +316,8 @@ def compute_patterns(
     if now is None:
         now = datetime.now()
     events = load_recent_results(tickers, settings, now=now, start_date=start_date, end_date=end_date)
-
-    price_map: dict[str, pd.DataFrame] = {}
-    for t in sorted({t for t, _ in events}):
-        try:
-            price_map[t] = prices_mod.fetch_prices(t, settings)
-        except Exception:
-            price_map[t] = pd.DataFrame()
+    unique_tickers = sorted({t for t, _ in events})
+    price_map: dict[str, pd.DataFrame] = prices_mod.load_prices_batch(unique_tickers, settings)
     industry_map = get_industry_map([t for t, _ in events], settings)
 
     def _series(prices, col) -> pd.Series:

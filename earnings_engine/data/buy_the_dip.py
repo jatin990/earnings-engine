@@ -25,13 +25,7 @@ def get_previous_trading_session(settings=None):
     return today - timedelta(days=1)
 
 def _load_prices_for_tickers(tickers, settings):
-    out = {}
-    for t in tickers:
-        try:
-            out[t] = prices_mod.fetch_prices(t, settings)
-        except Exception:
-            out[t] = pd.DataFrame()
-    return out
+    return prices_mod.load_prices_batch(tickers, settings)
 
 def _latest_price_row(prices):
     if prices is None or prices.empty or 'close' not in prices.columns:

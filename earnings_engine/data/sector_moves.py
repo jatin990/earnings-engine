@@ -63,13 +63,9 @@ def get_recent_earnings_moves(tickers: list[str], settings: Settings, lookback_d
     events = _load_recent_earnings(tickers, settings, lookback_days=lookback_days)
     rows: list[dict[str, Any]] = []
 
-    # Load prices once per unique ticker (cached SQLite).
-    price_map: dict[str, pd.DataFrame] = {}
-    for ticker in sorted({t for t, _ in events}):
-        try:
-            price_map[ticker] = prices_mod.load_prices(ticker, settings)
-        except Exception:
-            price_map[ticker] = pd.DataFrame()
+    # Batch load prices once for all unique tickers
+    unique_tickers = sorted({t for t, _ in events})
+    price_map: dict[str, pd.DataFrame] = prices_mod.load_prices_batch(unique_tickers, settings)
 
     for ticker, edate in events:
         prices = price_map.get(ticker)

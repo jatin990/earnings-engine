@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -21,6 +23,43 @@ from earnings_engine.logging_utils import get_logger
 logger = get_logger("earnings_engine.data.prices")
 
 COLUMNS = ["open", "high", "low", "close", "volume"]
+
+_PRICE_DF_MEMORY_CACHE: dict[str, tuple[float, pd.DataFrame]] = {}
+_PRICE_CACHE_LOCK = threading.Lock()
+_PRICE_CACHE_TTL_SECONDS = 120.0
+
+
+def get_cached_price_df(ticker: str) -> pd.DataFrame | None:
+    """Retrieve in-memory cached price history DataFrame if within TTL."""
+    sym = ticker.strip().upper()
+    now = time.monotonic()
+    with _PRICE_CACHE_LOCK:
+        item = _PRICE_DF_MEMORY_CACHE.get(sym)
+        if item:
+            ts, df = item
+            if now - ts <= _PRICE_CACHE_TTL_SECONDS:
+                return df
+            del _PRICE_DF_MEMORY_CACHE[sym]
+    return None
+
+
+def set_cached_price_df(ticker: str, df: pd.DataFrame) -> None:
+    """Store in-memory cached price history DataFrame with current timestamp."""
+    if df is None:
+        return
+    sym = ticker.strip().upper()
+    now = time.monotonic()
+    with _PRICE_CACHE_LOCK:
+        _PRICE_DF_MEMORY_CACHE[sym] = (now, df)
+
+
+def clear_price_df_cache(ticker: str | None = None) -> None:
+    """Invalidate in-memory price history cache for a specific ticker or globally."""
+    with _PRICE_CACHE_LOCK:
+        if ticker:
+            _PRICE_DF_MEMORY_CACHE.pop(ticker.strip().upper(), None)
+        else:
+            _PRICE_DF_MEMORY_CACHE.clear()
 
 
 def _empty_frame() -> pd.DataFrame:
@@ -211,27 +250,32 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
     yfinance hits during live scans: prices fetched within the TTL, or any time
     after the market closes, are reused without re-downloading.
     """
-    if not force and _is_fresh(ticker, settings) and prices_recent_enough(ticker, settings):
-        logger.info("[DATA-CACHE] [prices] Reusing cached price history for ticker=%s (within TTL)", ticker)
-        return load_prices(ticker, settings)
+    sym = ticker.strip().upper()
+    if not force:
+        cached_df = load_prices(sym, settings)
+        if not cached_df.empty and prices_recent_enough(sym, settings):
+            logger.debug("[DATA-CACHE] [prices] Reusing cached price history for ticker=%s (within TTL)", sym)
+            return cached_df
+
+    clear_price_df_cache(sym)
 
     # Resolve alias if ticker is known to be renamed/rebranded
-    fetch_symbol = KNOWN_TICKER_ALIASES.get(ticker.upper(), ticker)
+    fetch_symbol = KNOWN_TICKER_ALIASES.get(sym, sym)
 
-    # Delta fetch: only download the dates we're missing.  A 5-day overlap
+    # Delta fetch: only download the dates we're missing. A 5-day overlap
     # buffer means a prior day's interrupted/partial write is corrected by the
     # fresh yfinance data (yfinance returns enough rows for the overlap).
     start = settings.history_start
-    last_cached = _last_cached_date(ticker, settings)
+    last_cached = _last_cached_date(sym, settings)
     if last_cached is not None:
         overlap = pd.Timedelta(days=5)
         start = (last_cached - overlap).strftime("%Y-%m-%d")
         logger.info(
             "[DATA-FETCH] [yfinance] Downloading price delta for ticker=%s (%s) from=%s (last cached: %s)",
-            ticker, fetch_symbol, start, last_cached.date(),
+            sym, fetch_symbol, start, last_cached.date(),
         )
     else:
-        logger.info("[DATA-FETCH] [yfinance] Downloading full historical prices for ticker=%s (%s) from=%s", ticker, fetch_symbol, start)
+        logger.info("[DATA-FETCH] [yfinance] Downloading full historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
 
     from earnings_engine.data.providers.provider_manager import get_data_manager
 
@@ -244,9 +288,9 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
         pass
 
     if raw is None or raw.empty:
-        _mark_fetched(ticker, settings)
-        logger.warning("[DATA-FETCH] No price data returned for %s; loading from cache", ticker)
-        return load_prices(ticker, settings) if _is_fresh(ticker, settings) else _empty_frame()
+        _mark_fetched(sym, settings)
+        logger.warning("[DATA-FETCH] No price data returned for %s; loading from cache", sym)
+        return load_prices(sym, settings) if _is_fresh(sym, settings) else _empty_frame()
 
     df = raw.copy()
     if isinstance(df.columns, pd.MultiIndex):
@@ -268,7 +312,7 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
             df[col] = pd.NA
 
     df = df[COLUMNS].copy()
-    logger.info("[DATA-FETCH] Successfully normalized %d price rows for ticker=%s", len(df), ticker)
+    logger.info("[DATA-FETCH] Successfully normalized %d price rows for ticker=%s", len(df), sym)
     for col in COLUMNS:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["volume"] = df["volume"].astype("Int64")
@@ -279,32 +323,78 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
 
     if last_cached is not None:
         # Merge delta into existing history — do NOT wipe the cache.
-        _merge_prices(ticker, settings, df)
-        return load_prices(ticker, settings)
+        _merge_prices(sym, settings, df)
+        clear_price_df_cache(sym)
+        return load_prices(sym, settings)
 
-    _write_prices(ticker, settings, df)
+    _write_prices(sym, settings, df)
+    set_cached_price_df(sym, df)
     return df
 
 
-def load_prices(ticker: str, settings: Settings) -> pd.DataFrame:
-    """Load prices from SQLite if present."""
+def load_prices_batch(tickers: list[str], settings: Settings) -> dict[str, pd.DataFrame]:
+    """Load price DataFrames for multiple tickers in a single batched database query with in-memory caching."""
+    if not tickers:
+        return {}
+
+    cleaned = [t.strip().upper() for t in tickers if t and t.strip()]
+    unique_tickers = list(dict.fromkeys(cleaned))
+    result: dict[str, pd.DataFrame] = {}
+    missing: list[str] = []
+
+    for t in unique_tickers:
+        cached = get_cached_price_df(t)
+        if cached is not None:
+            result[t] = cached
+        else:
+            missing.append(t)
+
+    if not missing:
+        return result
+
+    CHUNK_SIZE = 200
     with _connect(settings) as connection:
-        rows = connection.execute(
-            "SELECT date, open, high, low, close, volume FROM price_history WHERE ticker = ? ORDER BY date",
-            (ticker,),
-        ).fetchall()
+        for i in range(0, len(missing), CHUNK_SIZE):
+            chunk = missing[i : i + CHUNK_SIZE]
+            placeholders = ",".join("?" for _ in chunk)
+            rows = connection.execute(
+                f"SELECT ticker, date, open, high, low, close, volume FROM price_history WHERE ticker IN ({placeholders}) ORDER BY ticker, date ASC",
+                chunk,
+            ).fetchall()
 
-    if not rows:
+            grouped: dict[str, list[Any]] = {sym: [] for sym in chunk}
+            for r in rows:
+                grouped[r[0]].append((r[1], r[2], r[3], r[4], r[5], r[6]))
+
+            for sym, row_list in grouped.items():
+                if not row_list:
+                    empty_df = _empty_frame()
+                    result[sym] = empty_df
+                    set_cached_price_df(sym, empty_df)
+                else:
+                    frame = pd.DataFrame(row_list, columns=["date", *COLUMNS])
+                    frame["date"] = pd.to_datetime(frame["date"])
+                    frame = frame.set_index("date")
+                    for col in COLUMNS:
+                        frame[col] = pd.to_numeric(frame[col], errors="coerce")
+                    frame = frame.astype({"volume": "Int64"}, errors="ignore")
+                    frame.index.name = "date"
+                    result[sym] = frame
+                    set_cached_price_df(sym, frame)
+
+    return result
+
+
+def load_prices(ticker: str, settings: Settings) -> pd.DataFrame:
+    """Load prices from in-memory cache or SQLite if present."""
+    if not ticker:
         return _empty_frame()
-
-    frame = pd.DataFrame(rows, columns=["date", *COLUMNS])
-    frame["date"] = pd.to_datetime(frame["date"])
-    frame = frame.set_index("date")
-    for col in COLUMNS:
-        frame[col] = pd.to_numeric(frame[col], errors="coerce")
-    frame = frame.astype({"volume": "Int64"}, errors="ignore")
-    frame.index.name = "date"
-    return frame
+    sym = ticker.strip().upper()
+    cached = get_cached_price_df(sym)
+    if cached is not None:
+        return cached
+    res = load_prices_batch([sym], settings)
+    return res.get(sym, _empty_frame())
 
 
 def store_price_metrics(ticker: str, settings: Settings, metrics: dict[str, Any], as_of_date: str | None = None) -> None:

@@ -94,21 +94,35 @@ def load_industry_map(tickers: list[str], settings: Settings) -> dict[str, str]:
     """
     if not tickers:
         return {}
-    placeholders = ",".join("?" for _ in tickers)
+
+    cleaned = [t.strip().upper() for t in tickers if t and t.strip()]
+    unique_tickers = list(dict.fromkeys(cleaned))
+
+    result: dict[str, str] = {}
+    CHUNK_SIZE = 200
     with _connect(settings) as connection:
-        rows = connection.execute(
-            f"SELECT ticker, industry, sector FROM tickers WHERE ticker IN ({placeholders})",
-            tickers,
-        ).fetchall()
-        if not rows:
-            try:
-                rows = connection.execute(
-                    f"SELECT ticker, industry, sector FROM ticker_industry WHERE ticker IN ({placeholders})",
-                    tickers,
-                ).fetchall()
-            except Exception:
-                rows = []
-    return {row[0]: (row[1] or row[2]) for row in rows if (row[1] or row[2])}
+        for i in range(0, len(unique_tickers), CHUNK_SIZE):
+            chunk = unique_tickers[i : i + CHUNK_SIZE]
+            placeholders = ",".join("?" for _ in chunk)
+            rows = connection.execute(
+                f"SELECT ticker, industry, sector FROM tickers WHERE ticker IN ({placeholders})",
+                chunk,
+            ).fetchall()
+            if not rows:
+                try:
+                    rows = connection.execute(
+                        f"SELECT ticker, industry, sector FROM ticker_industry WHERE ticker IN ({placeholders})",
+                        chunk,
+                    ).fetchall()
+                except Exception:
+                    rows = []
+
+            for r in rows:
+                ind = r[1] or r[2]
+                if ind:
+                    result[r[0].strip().upper()] = ind
+
+    return result
 
 
 def ingest_industries(tickers: list[str], settings: Settings, force: bool = False) -> dict[str, int]:
