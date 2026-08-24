@@ -174,3 +174,34 @@ def test_industries_api_endpoint(settings, monkeypatch):
         assert "industry" in g
         assert "rows" in g
 
+
+def test_week_high_low_around_ignores_today_if_window_already_completed():
+    ed = pd.Timestamp("2026-07-09")
+    today = pd.Timestamp.today().normalize()
+    
+    dates = pd.bdate_range(start="2026-07-01", end=today)
+    closes = pd.Series(100.0, index=dates, name="close")
+    closes.loc[pd.Timestamp("2026-07-08")] = 100.0
+    closes.loc[pd.Timestamp("2026-07-10")] = 105.0
+    closes.loc[pd.Timestamp("2026-07-14")] = 110.0
+    closes.loc[pd.Timestamp("2026-07-15")] = 95.0
+    closes.loc[today] = 120.0
+    
+    prices = closes.to_frame()
+    prices["high"] = closes
+    prices["low"] = closes
+    
+    res = _week_high_low_around(prices, ed, current_price=200.0, day_high=200.0)
+    assert res is not None
+    high_pct, low_pct, week_high, week_low, high_date, low_date = res
+    
+    assert week_high == 110.0
+    assert high_date == pd.Timestamp("2026-07-14")
+    
+    ed_recent = today - pd.Timedelta(days=2)
+    res_recent = _week_high_low_around(prices, ed_recent, current_price=200.0, day_high=200.0)
+    assert res_recent is not None
+    _, _, recent_week_high, _, recent_high_date, _ = res_recent
+    assert recent_week_high == 200.0
+    assert recent_high_date == today
+

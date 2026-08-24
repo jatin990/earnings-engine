@@ -194,7 +194,8 @@ def _week_high_low_around(
         window_lows = lows[lows.index >= ed].iloc[:days].copy()
 
     today = pd.Timestamp.today().normalize()
-    if current_price is not None and float(current_price) > 0 and today >= ed:
+    closed_days_after = highs[(highs.index > ed) & (highs.index < today)]
+    if current_price is not None and float(current_price) > 0 and today >= ed and (len(closed_days_after) < days or today in window_highs.index):
         curr_p = float(current_price)
         hi_p = float(day_high) if day_high is not None and float(day_high) > 0 else curr_p
         lo_p = float(day_low) if day_low is not None and float(day_low) > 0 else curr_p
