@@ -264,9 +264,10 @@ def run_breakout_scan(settings: Settings) -> list[dict[str, Any]]:
     Pulls prices from the local SQLite cache only — no live network calls.
     Quality scores are loaded from stored price_metrics where available.
     """
+    from concurrent.futures import ThreadPoolExecutor
     from earnings_engine.data import prices as prices_mod
     from earnings_engine.data.watchlists import all_watchlists, get_watchlist
-    from earnings_engine.data.prices import load_prices, load_price_metrics
+    from earnings_engine.data.prices import load_prices, load_price_metrics, _connect
 
     _cache["status"] = "running"
     _cache["error"] = None
@@ -275,19 +276,39 @@ def run_breakout_scan(settings: Settings) -> list[dict[str, Any]]:
     # Collect all unique tickers across every watchlist
     tickers: set[str] = set()
     try:
-        for wl in all_watchlists(settings):
-            wl_tickers = get_watchlist(wl, settings)
-            tickers.update(wl_tickers)
+        wls = all_watchlists(settings)
+        for wl in wls:
+            if isinstance(wl, dict):
+                tickers.update(wl.get("tickers", []))
+            elif isinstance(wl, str):
+                wl_tickers = get_watchlist(wl, settings)
+                if wl_tickers:
+                    tickers.update(wl_tickers)
     except Exception as e:
         logger.warning("[BREAKOUT] Could not load watchlists: %s", e)
 
-    # Also pull from universe if available
+    # Pull top tickers from universe
     try:
         from earnings_engine.data.universe import load_universe
-        uni = load_universe("NSE_LARGE_CAP", settings)
-        tickers.update(uni)
-    except Exception:
-        pass
+        for u in ("NSE_TOP", "IN"):
+            uni = load_universe(u, settings)
+            if uni:
+                tickers.update(uni)
+        # Also grab top large cap tickers (capped to prevent scanning thousands)
+        large_caps = load_universe("NSE_LARGE_CAP", settings)
+        if large_caps:
+            tickers.update(large_caps[:100])
+    except Exception as e:
+        logger.debug("[BREAKOUT] Universe load fallback: %s", e)
+
+    # If still small, pull active tickers from price_history
+    if len(tickers) < 50:
+        try:
+            with _connect(settings) as conn:
+                rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 100").fetchall()
+                tickers.update([r[0] for r in rows if r[0]])
+        except Exception:
+            pass
 
     if not tickers:
         logger.info("[BREAKOUT] No tickers found to scan.")
@@ -298,14 +319,13 @@ def run_breakout_scan(settings: Settings) -> list[dict[str, Any]]:
         _cache["last_scan_duration_s"] = round(time.perf_counter() - t0, 2)
         return []
 
-    candidates: list[dict[str, Any]] = []
-    scanned = 0
+    ticker_list = sorted(tickers)
 
-    for ticker in sorted(tickers):
+    def _score_single(ticker: str) -> dict[str, Any] | None:
         try:
             prices_df = load_prices(ticker, settings)
             if prices_df is None or prices_df.empty:
-                continue
+                return None
 
             # Load quality scores from stored metrics
             metrics = load_price_metrics(ticker, settings) or {}
@@ -321,18 +341,21 @@ def run_breakout_scan(settings: Settings) -> list[dict[str, Any]]:
                     quality_scores.append(None)
 
             result = score_breakout(ticker, prices_df, quality_scores)
-            scanned += 1
-
             if result and result["composite_score"] >= BREAKOUT_MIN_SCORE:
                 # Enrich with company name from metrics if available
                 result["company_name"] = metrics.get("company_name") or ticker
                 result["market_cap_cr"] = metrics.get("market_cap_cr") or metrics.get("market_cap")
                 result["industry"] = metrics.get("industry") or metrics.get("sector") or "—"
-                candidates.append(result)
-
+                return result
         except Exception as e:
             logger.debug("[BREAKOUT] Error scoring %s: %s", ticker, e)
-            continue
+        return None
+
+    # Run scoring concurrently using thread pool (I/O & DB queries)
+    candidates: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        scored = list(executor.map(_score_single, ticker_list))
+        candidates = [c for c in scored if c is not None]
 
     # Sort by composite score descending
     candidates.sort(key=lambda x: x["composite_score"], reverse=True)
@@ -343,14 +366,14 @@ def run_breakout_scan(settings: Settings) -> list[dict[str, Any]]:
         "candidates": candidates,
         "last_scan_at": datetime.now(timezone.utc).isoformat(),
         "last_scan_duration_s": elapsed,
-        "tickers_scanned": scanned,
+        "tickers_scanned": len(ticker_list),
         "status": "done",
         "error": None,
     })
 
     logger.info(
         "[BREAKOUT] Scan complete: %d tickers scanned, %d candidates in %.1fs",
-        scanned, len(candidates), elapsed,
+        len(ticker_list), len(candidates), elapsed,
     )
     return candidates
 
