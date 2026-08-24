@@ -1789,8 +1789,9 @@
                         this.resultsTotalStocks = this.resultsMonths.reduce((acc, m) => acc + m.stocks_count, 0);
                     }
                     
-                    // Render Month breakdown tabs (e.g. 4 tabs for 4 months)
+                    // Render Month breakdown tabs and top 3 month cards
                     this.renderResultsMonthTabs();
+                    this.updateResultsMonthSummaryCards();
 
                     // Show first 10 dates by default (or all if fewer)
                     this.resultsShowDays = Math.min(10, (this.resultsDaySections || []).length || 1);
@@ -1911,6 +1912,62 @@
                     const label = (monthKey === 'ALL') ? (this.resultsActiveWindowName || 'Selected Window') : (mObj ? mObj.month_label : monthKey);
                     countBadge.textContent = filteredStocks + ' results (' + filtered.length + ' dates in ' + label + ')';
                 }
+            },
+
+            updateResultsMonthSummaryCards() {
+                const now = new Date();
+                const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const thisMonthDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+                const lastMonthKey = lastMonthDate.toISOString().slice(0, 7);
+                const thisMonthKey = thisMonthDate.toISOString().slice(0, 7);
+                const nextMonthKey = nextMonthDate.toISOString().slice(0, 7);
+
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const lastMonthName = monthNames[lastMonthDate.getMonth()] + ' ' + lastMonthDate.getFullYear();
+                const thisMonthName = monthNames[thisMonthDate.getMonth()] + ' ' + thisMonthDate.getFullYear();
+                const nextMonthName = monthNames[nextMonthDate.getMonth()] + ' ' + nextMonthDate.getFullYear();
+
+                let lastCount = 0;
+                let thisCount = 0;
+                let nextCount = 0;
+
+                if (this.resultsMonths && this.resultsMonths.length) {
+                    this.resultsMonths.forEach(m => {
+                        if (m.month_key === lastMonthKey) lastCount = m.stocks_count;
+                        else if (m.month_key === thisMonthKey) thisCount = m.stocks_count;
+                        else if (m.month_key === nextMonthKey) nextCount = m.stocks_count;
+                    });
+                } else if (this.resultsDaySectionsMeta && this.resultsDaySectionsMeta.length) {
+                    this.resultsDaySectionsMeta.forEach(d => {
+                        const count = d.stocks_count || 1;
+                        if (d.month_key === lastMonthKey || (d.date && d.date.startsWith(lastMonthKey))) lastCount += count;
+                        else if (d.month_key === thisMonthKey || (d.date && d.date.startsWith(thisMonthKey))) thisCount += count;
+                        else if (d.month_key === nextMonthKey || (d.date && d.date.startsWith(nextMonthKey))) nextCount += count;
+                    });
+                }
+
+                const lastLabelEl = document.getElementById('resultsCardLastMonthLabel');
+                const lastCountEl = document.getElementById('resultsCardLastMonthCount');
+                const lastSubEl = document.getElementById('resultsCardLastMonthSubtitle');
+                if (lastLabelEl) lastLabelEl.textContent = lastMonthName;
+                if (lastCountEl) lastCountEl.textContent = lastCount > 0 ? (lastCount.toLocaleString() + ' Results') : '0 Results';
+                if (lastSubEl) lastSubEl.textContent = lastCount > 0 ? 'Reported prints in ' + monthNames[lastMonthDate.getMonth()] : 'No prints in loaded range';
+
+                const thisLabelEl = document.getElementById('resultsCardThisMonthLabel');
+                const thisCountEl = document.getElementById('resultsCardThisMonthCount');
+                const thisSubEl = document.getElementById('resultsCardThisMonthSubtitle');
+                if (thisLabelEl) thisLabelEl.textContent = thisMonthName;
+                if (thisCountEl) thisCountEl.textContent = thisCount > 0 ? (thisCount.toLocaleString() + ' Results') : '0 Results';
+                if (thisSubEl) thisSubEl.textContent = thisCount > 0 ? 'Active prints in ' + monthNames[thisMonthDate.getMonth()] : 'No prints in loaded range';
+
+                const nextLabelEl = document.getElementById('resultsCardNextMonthLabel');
+                const nextCountEl = document.getElementById('resultsCardNextMonthCount');
+                const nextSubEl = document.getElementById('resultsCardNextMonthSubtitle');
+                if (nextLabelEl) nextLabelEl.textContent = nextMonthName;
+                if (nextCountEl) nextCountEl.textContent = nextCount > 0 ? (nextCount.toLocaleString() + ' Results') : '0 Results';
+                if (nextSubEl) nextSubEl.textContent = nextCount > 0 ? 'Scheduled prints in ' + monthNames[nextMonthDate.getMonth()] : 'Pipeline in ' + monthNames[nextMonthDate.getMonth()];
             },
 
             renderResultsDays() {

@@ -14,3 +14,6 @@ scikit-learn>=1.4
 click>=8.0
 python-dotenv>=1.0
 nsetools>=2.0
+cryptography>=42.0.0
+libsql-experimental>=0.0.34
+
