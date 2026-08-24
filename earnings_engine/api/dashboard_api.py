@@ -720,7 +720,7 @@ def clear_swing_range_api(watchlist: str = "ALL", ticker: str = "") -> dict[str,
         except Exception as e:
             logger.debug("Auto range detection error for %s: %s", ticker, e)
 
-    return get_swing_range_api(watchlist=wl_name, ticker=ticker)
+    return {"success": True, "range": None, "message": f"Swing range cleared for {ticker}"}
 
 
 def get_swing_cycle_history_api(watchlist: str = "ALL", ticker: str = "") -> list[dict[str, Any]]:

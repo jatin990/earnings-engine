@@ -928,6 +928,8 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
                 f'<span class="q-score-badge" style="cursor:help;border-bottom:1px dotted rgba(56,189,248,0.6);" title="{html.escape(str(q2_ai_note).strip()) if (q2_ai_note and not pd.isna(q2_ai_note) and str(q2_ai_note).strip()) else f"Q2 Quality Score: {q2_score}"}">{q2_score}</span> | '
                 f'<span class="q-score-badge" style="cursor:help;border-bottom:1px dotted rgba(56,189,248,0.6);" title="{html.escape(str(q3_ai_note).strip()) if (q3_ai_note and not pd.isna(q3_ai_note) and str(q3_ai_note).strip()) else f"Q3 Quality Score: {q3_score}"}">{q3_score}</span>'
             ),
+            # Plain-text version used as data-quality attribute for JS sorting and test assertions
+            "quality_scores_plain": f"{q1_score} | {q2_score} | {q3_score}",
             "prev_3q_score": prev_3q_score,
             "next_resistance": next_resistance,
             "current_support": current_support,
