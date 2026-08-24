@@ -1134,16 +1134,18 @@
             // =========================================================================
             catalystsData: [],
 
-            async loadCatalysts() {
+            async loadCatalysts(watchlist) {
                 const feedGrid = document.getElementById('catalystsFeedGrid');
                 if (!feedGrid) return;
-                const wl = localStorage.getItem('selectedGlobalWatchlist') || '';
+                const wlSelect = document.getElementById('catWatchlistSelect');
+                const wl = watchlist || (wlSelect ? wlSelect.value : (localStorage.getItem('selectedGlobalWatchlist') || 'GLOBAL'));
+                const wlParam = (wl && wl !== 'GLOBAL') ? '?watchlist=' + encodeURIComponent(wl) : '';
                 feedGrid.innerHTML = '<div class="card" style="padding:1.5rem;text-align:center;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading short-term market moving catalysts' + (wl ? ' for "' + wl + '"' : '') + '...</div>';
                 
                 try {
                     // Fetch stats and items in parallel
                     const [itemsRes, statsRes] = await Promise.all([
-                        fetch(API_BASE + '/api/v1/news/catalysts' + (wl ? '?watchlist=' + encodeURIComponent(wl) : '')),
+                        fetch(API_BASE + '/api/v1/news/catalysts' + wlParam),
                         fetch(API_BASE + '/api/v1/news/catalyst-stats')
                     ]);
                     const itemsData = await itemsRes.json();
@@ -1156,6 +1158,10 @@
                     console.error('Error loading catalysts:', e);
                     if (feedGrid) feedGrid.innerHTML = '<div class="card" style="padding:1rem;color:var(--red);">Failed loading catalysts feed. Click "⚡ Scan Feeds" to refresh.</div>';
                 }
+            },
+
+            onCatWatchlistChange(val) {
+                this.loadCatalysts(val);
             },
 
             renderCatalystsStats(stats) {
@@ -1296,19 +1302,20 @@
 
             async scanCatalystsNow() {
                 const btn = document.getElementById('catScanBtn');
+                const wlSelect = document.getElementById('catWatchlistSelect');
+                const wl = wlSelect ? wlSelect.value : (localStorage.getItem('selectedGlobalWatchlist') || 'GLOBAL');
                 if (btn) {
                     btn.disabled = true;
                     btn.innerHTML = '⏳ Scanning Feeds...';
                 }
                 try {
-                    const wl = localStorage.getItem('selectedGlobalWatchlist') || '';
                     const res = await fetch(API_BASE + '/api/v1/news/scan', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({watchlist: wl})
+                        body: JSON.stringify({watchlist: wl, limit_per_stock: 3})
                     });
                     const data = await res.json();
-                    await this.loadCatalysts();
+                    await this.loadCatalysts(wl);
                 } catch (e) {
                     console.error('Error scanning catalysts:', e);
                 } finally {
@@ -1358,11 +1365,16 @@
                 }
             },
 
-            async loadDailyTopGainers() {
+            onGainersMarketChange(val) {
+                this.loadDailyTopGainers(val);
+            },
+
+            async loadDailyTopGainers(market) {
                 const tbody = document.getElementById('topGainersTableBody');
                 if (!tbody) return;
-                const wl = localStorage.getItem('selectedGlobalWatchlist') || 'NSE_ALL';
-                tbody.innerHTML = '<tr><td colspan="9" style="padding:1.5rem;text-align:center;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Analyzing daily top gainers & drivers...</td></tr>';
+                const mktSelect = document.getElementById('gainersMarketSelect');
+                const wl = market || (mktSelect ? mktSelect.value : (localStorage.getItem('selectedGlobalWatchlist') || 'NSE_TOP'));
+                tbody.innerHTML = '<tr><td colspan="10" style="padding:1.5rem;text-align:center;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Analyzing daily top gainers & drivers for ' + wl + '...</td></tr>';
                 try {
                     const res = await fetch(API_BASE + '/api/v1/gainers/daily?universe=' + encodeURIComponent(wl) + '&top_n=10');
                     const data = await res.json();
@@ -1370,7 +1382,7 @@
                     this.renderGainersLeaderboard();
                 } catch (e) {
                     console.error('Error loading top gainers:', e);
-                    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="padding:1rem;text-align:center;color:var(--red);">Failed loading daily top gainers.</td></tr>';
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="padding:1rem;text-align:center;color:var(--red);">Failed loading daily top gainers.</td></tr>';
                 }
             },
 

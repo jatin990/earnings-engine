@@ -49,6 +49,14 @@
                             <option value="Litigation, Risk & Probes">⚠️ Litigation & Risk</option>
                             <option value="Corporate Action & Dividends">🎁 Dividends & Corporate</option>
                         </select>
+                        <select id="catWatchlistSelect" onchange="app.onCatWatchlistChange(this.value)" style="padding:0.35rem 0.55rem;font-size:0.82rem;background:#0f172a;color:#f8fafc;border:1px solid rgba(56,189,248,0.4);border-radius:0.4rem;font-weight:600;" title="Select Watchlist / Universe to scan">
+                            <option value="GLOBAL" selected>⭐ Active Watchlist</option>
+                            <option value="NIFTY_50">🇮🇳 NIFTY 50</option>
+                            <option value="NSE_LARGE_CAP">🇮🇳 NSE Large Cap</option>
+                            <option value="NSE_ALL">🇮🇳 All NSE Equities</option>
+                            <option value="US_TOP">🇺🇸 US Mega-Caps</option>
+                            <option value="US">🇺🇸 All US Equities</option>
+                        </select>
                         <button onclick="app.scanCatalystsNow()" id="catScanBtn" class="btn btn-primary btn-sm"><span>⚡</span> Scan Feeds</button>
                     </div>
                 </div>
