@@ -514,22 +514,7 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                         if prev_c > 0:
                             week_change = ((current_price - prev_c) / prev_c) * 100
 
-            # Only query fast_info over network when force=True
-            if force and (market_cap is None or current_price is None):
-                try:
-                    info = yf.Ticker(ticker).fast_info or {}
-                    if market_cap is None:
-                        market_cap = info.get("market_cap")
-                    if current_price is None:
-                        current_price = info.get("last_price")
-                    if week_high is None:
-                        week_high = info.get("year_high")
-                    if week_low is None:
-                        week_low = info.get("year_low")
-                except Exception:
-                    pass
-
-            # Collect market cap in batch for bulk storage when force-fetching
+            # Collect market cap in batch for bulk storage when available
             if market_cap is not None and force:
                 market_caps_to_store[ticker] = float(market_cap)
             if not prices.empty and "close" in prices.columns:
