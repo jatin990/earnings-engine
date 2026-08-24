@@ -6,25 +6,31 @@
     <title>Credit Card & Wealth Hub // Nexus</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
-            --font-sans: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
-            --font-heading: 'Geist', 'Space Grotesk', sans-serif;
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-heading: 'Outfit', 'Plus Jakarta Sans', sans-serif;
 
-            --bg: #030712;
-            --card-bg: rgba(15, 23, 42, 0.85);
-            --card-border: rgba(59, 130, 246, 0.22);
-            --accent: #3b82f6;
-            --cyan: #38bdf8;
-            --emerald: #10b981;
-            --gold: #fbbf24;
-            --blue: #60a5fa;
-            --light: #f8fafc;
-            --muted: #94a3b8;
+            --bg-base: #f8fafc;
+            --card-surface: #ffffff;
+            --border-soft: #e2e8f0;
+            --border-highlight: #cbd5e1;
+            
+            --primary: #4f46e5;
+            --primary-light: #e0e7ff;
+            --emerald: #059669;
+            --emerald-light: #d1fae5;
+            --amber: #d97706;
+            --amber-light: #fef3c7;
+            --rose: #e11d48;
+            --rose-light: #ffe4e6;
+            --sky: #0284c7;
+            --sky-light: #e0f2fe;
+            --purple: #7c3aed;
+            --purple-light: #ede9fe;
         }
 
         * { box-sizing: border-box; }
@@ -33,86 +39,107 @@
             margin: 0;
             padding: 0;
             min-height: 100vh;
-            background-color: var(--bg);
+            background-color: var(--bg-base);
             background-image: 
-                radial-gradient(circle at 10% 0%, rgba(59, 130, 246, 0.18), transparent 50%),
-                radial-gradient(circle at 90% 100%, rgba(56, 189, 248, 0.1), transparent 50%),
-                radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.08), transparent 60%);
-            color: var(--light);
+                radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.09), transparent 40%),
+                radial-gradient(circle at 90% 15%, rgba(236, 72, 153, 0.07), transparent 45%),
+                radial-gradient(circle at 50% 100%, rgba(16, 185, 129, 0.08), transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(14, 165, 233, 0.07), transparent 45%);
+            color: #1e293b;
             font-family: var(--font-sans);
             overflow-x: hidden;
         }
 
-        .brand-title {
+        .heading-title {
             font-family: var(--font-heading);
-            letter-spacing: -0.03em;
-            background: linear-gradient(135deg, #ffffff 0%, #bae6fd 45%, #60a5fa 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.025em;
         }
 
         .mono {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
         }
 
-        .glass-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(24px) saturate(190%);
-            -webkit-backdrop-filter: blur(24px) saturate(190%);
-            border: 1px solid var(--card-border);
+        .soft-card {
+            background: var(--card-surface);
+            border: 1px solid var(--border-soft);
             border-radius: 1.25rem;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 25px rgba(59, 130, 246, 0.15);
-            transition: all 0.25s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 10px 25px -5px rgba(0, 0, 0, 0.04);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .glass-card:hover {
-            border-color: rgba(96, 165, 250, 0.65);
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 35px rgba(59, 130, 246, 0.3);
+        .soft-card:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 15px 35px -5px rgba(99, 102, 241, 0.08), 0 0 0 1px rgba(199, 210, 254, 0.6);
             transform: translateY(-2px);
         }
 
-        /* 3D Luxury Credit Card Mockup */
+        /* 3D Luxury Credit Card Display */
         .credit-card-3d {
             width: 100%;
-            max-width: 420px;
-            height: 250px;
-            border-radius: 1.25rem;
-            background: linear-gradient(135deg, #0b1329 0%, #030712 50%, #0f1f44 100%);
-            border: 1px solid rgba(59, 130, 246, 0.35);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 35px rgba(59, 130, 246, 0.35);
-            padding: 1.6rem;
+            max-width: 440px;
+            height: 260px;
+            border-radius: 1.35rem;
+            padding: 1.65rem;
             position: relative;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.35), 0 0 30px rgba(99, 102, 241, 0.2);
             transition: transform 0.4s ease, box-shadow 0.4s ease;
+            color: #ffffff;
+            user-select: none;
         }
 
         .credit-card-3d:hover {
-            transform: translateY(-6px) rotateX(4deg) rotateY(-4deg);
-            box-shadow: 0 35px 65px -15px rgba(0, 0, 0, 0.95), 0 0 50px rgba(96, 165, 250, 0.5);
-            border-color: rgba(191, 219, 254, 0.6);
+            transform: translateY(-6px) rotateX(4deg) rotateY(-3deg);
+            box-shadow: 0 28px 55px -12px rgba(15, 23, 42, 0.45), 0 0 40px rgba(99, 102, 241, 0.35);
+        }
+
+        .theme-obsidian {
+            background: linear-gradient(135deg, #18181b 0%, #09090b 50%, #27272a 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .theme-emerald-gold {
+            background: linear-gradient(135deg, #064e3b 0%, #022c22 55%, #065f46 100%);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+        .theme-platinum-frost {
+            background: linear-gradient(135deg, #334155 0%, #1e293b 50%, #475569 100%);
+            border: 1px solid rgba(203, 213, 225, 0.4);
+        }
+        .theme-burgundy-rose {
+            background: linear-gradient(135deg, #881337 0%, #4c0519 50%, #9f1239 100%);
+            border: 1px solid rgba(244, 63, 94, 0.4);
+        }
+        .theme-sapphire-indigo {
+            background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 50%, #312e81 100%);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+        }
+        .theme-sunset-coral {
+            background: linear-gradient(135deg, #7c2d12 0%, #431407 50%, #9a3412 100%);
+            border: 1px solid rgba(249, 115, 22, 0.4);
         }
 
         .credit-card-3d::before {
             content: "";
             position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+            top: -60%;
+            left: -60%;
+            width: 220%;
+            height: 220%;
+            background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 65%);
             pointer-events: none;
         }
 
         .emv-chip {
-            width: 44px;
-            height: 34px;
+            width: 46px;
+            height: 35px;
             background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
             border-radius: 6px;
             position: relative;
-            border: 1px solid rgba(0,0,0,0.3);
+            border: 1px solid rgba(0,0,0,0.25);
+            box-shadow: inset 0 1px 2px rgba(255,255,255,0.4);
         }
 
         .emv-chip::after {
@@ -122,244 +149,283 @@
             border: 1px solid rgba(0,0,0,0.25);
             border-radius: 3px;
         }
+
+        /* Animated Pulse for Pending OTP */
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(217, 119, 6, 0); }
+        }
+        .otp-pulse {
+            animation: pulseGlow 2s infinite;
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
 <body class="p-4 sm:p-6 lg:p-8">
 
-    <div class="max-w-7xl mx-auto">
+    <div class="max-w-7xl mx-auto space-y-7">
         
-        <!-- Navigation Header -->
-        <header class="glass-card p-4 sm:p-5 mb-8 flex flex-wrap items-center justify-between gap-4 border border-white/10">
-            <div class="flex items-center gap-3">
-                <a href="/portal" class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-300 font-bold hover:scale-105 transition" title="Return to Portal">
-                    🧭
+        <!-- Navigation & Header Bar -->
+        <header class="soft-card p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border-slate-200/80">
+            <div class="flex items-center gap-3.5">
+                <a href="/portal" class="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-200/80 flex items-center justify-center text-indigo-600 text-lg font-bold shadow-sm hover:scale-105 hover:bg-indigo-100 transition" title="Return to Nexus Portal">
+                    💳
                 </a>
                 <div>
-                    <h1 class="brand-title text-xl font-extrabold text-white tracking-tight">NEXUS // CREDIT & WEALTH HUB</h1>
-                    <span class="text-xs text-slate-400">Card Multiplier & Cashflow Optimization Engine</span>
+                    <div class="flex items-center gap-2">
+                        <h1 class="heading-title text-xl font-extrabold text-slate-900 tracking-tight">NEXUS // CREDIT & WEALTH HUB</h1>
+                        <span id="roleBadge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            👑 Vault Owner
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">High-Yield Reward Maximizer, Lounge Manager & Friend OTP Shared Access</p>
                 </div>
             </div>
 
-            <div class="flex items-center gap-3">
-                <a href="/dashboard" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 transition flex items-center gap-1.5">
+            <div class="flex items-center gap-2.5">
+                <button id="addCardBtn" onclick="openAddCardModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-200 flex items-center gap-1.5 transition">
+                    <span>➕</span>
+                    <span>Add Credit Card</span>
+                </button>
+                <a href="/dashboard" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 transition flex items-center gap-1.5">
                     <span>📈</span>
                     <span>Trading Terminal</span>
                 </a>
-                <a href="/portal" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition">
-                    🧭 Switch App / Portal
+                <a href="/portal" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition shadow-sm">
+                    🧭 Switch App
                 </a>
             </div>
         </header>
 
-        <!-- Main Grid Layout -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Notification Toast Container -->
+        <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-            <!-- Left Column: Card Mockup & Overview (5 Cols) -->
+        <!-- Main Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-7">
+
+            <!-- Left Column: 3D Card Visualizer & Quick Stats (5 Cols) -->
             <div class="lg:col-span-5 flex flex-col gap-6">
                 
-                <!-- 3D Luxury Card Mockup -->
-                <div class="credit-card-3d mx-auto">
-                    <div class="flex justify-between items-start">
+                <!-- 3D Interactive Card Showcase -->
+                <div class="soft-card p-6 flex flex-col items-center bg-gradient-to-b from-white to-slate-50/50">
+                    <div class="w-full flex justify-between items-center mb-4">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Active Card Preview</span>
+                        <div class="flex items-center gap-1.5" id="cardDotsContainer"></div>
+                    </div>
+
+                    <div id="card3dVisual" class="credit-card-3d theme-obsidian">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span id="visualCardIssuer" class="text-[10px] font-bold tracking-widest text-indigo-300 uppercase block">HDFC BANK</span>
+                                <h3 id="visualCardName" class="heading-title text-lg font-extrabold text-white tracking-wide">OBSIDIAN INFINITE</h3>
+                            </div>
+                            <span class="text-xl">📡</span>
+                        </div>
+
+                        <div class="flex items-center gap-4 my-2">
+                            <div class="emv-chip"></div>
+                            <span id="visualNetworkTag" class="text-xs text-amber-300 font-mono tracking-widest font-bold">VISA INFINITE</span>
+                        </div>
+
                         <div>
-                            <span class="text-[10px] font-bold tracking-widest text-blue-400 uppercase">Nexus Black Edition</span>
-                            <h3 class="brand-title text-lg font-extrabold text-white tracking-wider">OBSIDIAN INFINITE</h3>
+                            <div class="mono text-lg tracking-[0.25em] text-slate-100 font-semibold mb-2" id="visualCardNumber">
+                                •••• •••• •••• 8842
+                            </div>
+                            <div class="flex justify-between items-end">
+                                <div>
+                                    <span class="text-[9px] text-slate-300 block uppercase font-medium">Card Holder</span>
+                                    <span class="text-xs font-bold text-white tracking-wider uppercase" id="visualCardHolder">JATIN</span>
+                                </div>
+                                <div>
+                                    <span class="text-[9px] text-slate-300 block uppercase font-medium">Expires</span>
+                                    <span class="text-xs font-mono text-slate-100 font-bold">12/30</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="heading-title font-black italic text-lg text-white" id="visualNetworkLogo">VISA</span>
+                                </div>
+                            </div>
                         </div>
-                        <span class="text-xl">📡</span>
                     </div>
 
-                    <div class="flex items-center gap-4 my-2">
-                        <div class="emv-chip"></div>
-                        <span class="text-xs text-amber-300/80 font-mono tracking-widest">NFC ENABLED</span>
-                    </div>
-
-                    <div>
-                        <div class="mono text-lg tracking-[0.2em] text-slate-100 font-semibold mb-2">
-                            •••• •••• •••• 8842
-                        </div>
-                        <div class="flex justify-between items-end">
-                            <div>
-                                <span class="text-[9px] text-slate-400 block uppercase">Card Holder</span>
-                                <span class="text-xs font-bold text-slate-200 tracking-wider uppercase" id="cardHolderName">VIP Member</span>
-                            </div>
-                            <div>
-                                <span class="text-[9px] text-slate-400 block uppercase">Expires</span>
-                                <span class="text-xs font-mono text-slate-200">12/30</span>
-                            </div>
-                            <div class="text-right">
-                                <span class="brand-title font-black italic text-lg text-slate-100">VISA</span>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Card Selector Thumbnails -->
+                    <div class="w-full flex items-center gap-2 overflow-x-auto pt-5 pb-1" id="cardThumbnails"></div>
                 </div>
 
-                <!-- Live Limit & Spend Meters -->
-                <div class="glass-card p-6">
+                <!-- Limits & Live Utilization -->
+                <div class="soft-card p-6">
                     <div class="flex justify-between items-center mb-4">
-                        <h4 class="brand-title text-sm font-bold text-slate-200">Credit Line & Utilization</h4>
-                        <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">14.2% Utilized (Optimal)</span>
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Credit Portfolio</span>
+                            <h4 class="heading-title text-sm font-bold text-slate-800">Total Credit Line & Utilization</h4>
+                        </div>
+                        <span id="utilizationBadge" class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                            14.2% Optimal
+                        </span>
                     </div>
 
-                    <div class="space-y-4">
-                        <div>
-                            <div class="flex justify-between text-xs mb-1.5">
-                                <span class="text-slate-400">Current Balance:</span>
-                                <span class="font-mono font-bold text-slate-100">₹71,240.00</span>
-                            </div>
-                            <div class="flex justify-between text-xs mb-2">
-                                <span class="text-slate-400">Available Limit:</span>
-                                <span class="font-mono font-bold text-emerald-400">₹4,28,760.00</span>
-                            </div>
-                            <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full" style="width: 14.2%;"></div>
-                            </div>
-                            <span class="text-[10px] text-slate-500 mt-1 block">Total Limit: ₹5,00,000.00 · Auto-revolving</span>
+                    <div class="space-y-3">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Total Credit Available:</span>
+                            <span class="font-mono font-bold text-emerald-600 text-sm" id="statAvailableLimit">₹27,95,000</span>
                         </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-500 font-medium">Total Spending Cap:</span>
+                            <span class="font-mono font-bold text-slate-800" id="statTotalLimit">₹31,50,000</span>
+                        </div>
+                        <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                            <div id="utilizationProgressBar" class="h-full bg-gradient-to-r from-emerald-500 to-indigo-500 rounded-full transition-all duration-500" style="width: 14.2%;"></div>
+                        </div>
+                        <span class="text-[11px] text-slate-400 block pt-1">Auto-revolving billing cycle resets on 15th of each month.</span>
                     </div>
                 </div>
 
-                <!-- Perks & Lounge Tracker -->
-                <div class="glass-card p-6">
-                    <h4 class="brand-title text-sm font-bold text-slate-200 mb-3">Tier Perks & Airport Lounges</h4>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="bg-white/5 p-3 rounded-xl border border-white/5">
-                            <span class="text-[11px] text-slate-400 block">Domestic Lounges</span>
-                            <span class="text-lg font-bold text-blue-300 font-mono">6 / 8 Left</span>
+                <!-- Tier Perks & Lounge Tracker -->
+                <div class="soft-card p-6">
+                    <h4 class="heading-title text-sm font-bold text-slate-800 mb-3.5">Tier Benefits & Luxury Quotas</h4>
+                    <div class="grid grid-cols-2 gap-3" id="perksOverviewGrid">
+                        <div class="bg-indigo-50/60 p-3.5 rounded-xl border border-indigo-100">
+                            <span class="text-[11px] font-semibold text-indigo-700 block">Airport Lounges</span>
+                            <span class="text-base font-bold text-slate-800 font-mono">Unlimited Intl</span>
+                            <span class="text-[10px] text-slate-500 block mt-0.5">Priority Pass + Guest</span>
                         </div>
-                        <div class="bg-white/5 p-3 rounded-xl border border-white/5">
-                            <span class="text-[11px] text-slate-400 block">Golf Access</span>
-                            <span class="text-lg font-bold text-cyan-300 font-mono">4 Compl.</span>
+                        <div class="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-100">
+                            <span class="text-[11px] font-semibold text-emerald-700 block">Forex Markup</span>
+                            <span class="text-base font-bold text-slate-800 font-mono">0.0% - 2.0%</span>
+                            <span class="text-[10px] text-slate-500 block mt-0.5">Zero surcharge overseas</span>
                         </div>
-                        <div class="bg-white/5 p-3 rounded-xl border border-white/5">
-                            <span class="text-[11px] text-slate-400 block">Forex Markup</span>
-                            <span class="text-lg font-bold text-emerald-300 font-mono">0.0% Zero</span>
+                        <div class="bg-amber-50/60 p-3.5 rounded-xl border border-amber-100">
+                            <span class="text-[11px] font-semibold text-amber-700 block">Golf Access</span>
+                            <span class="text-base font-bold text-slate-800 font-mono">4 Compl. / Qtr</span>
+                            <span class="text-[10px] text-slate-500 block mt-0.5">All PGA partner clubs</span>
                         </div>
-                        <div class="bg-white/5 p-3 rounded-xl border border-white/5">
-                            <span class="text-[11px] text-slate-400 block">Annual Fee Waiver</span>
-                            <span class="text-lg font-bold text-amber-300 font-mono">Unlocked</span>
+                        <div class="bg-purple-50/60 p-3.5 rounded-xl border border-purple-100">
+                            <span class="text-[11px] font-semibold text-purple-700 block">Reward Rate</span>
+                            <span class="text-base font-bold text-slate-800 font-mono">Up to 33.3%</span>
+                            <span class="text-[10px] text-slate-500 block mt-0.5">10x Multiplier portals</span>
                         </div>
                     </div>
                 </div>
 
             </div>
 
-            <!-- Right Column: Reward Radar & Maximizer Engine (7 Cols) -->
+            <!-- Right Column: Shared Cards Grid, OTP Requests Hub & Calculator (7 Cols) -->
             <div class="lg:col-span-7 flex flex-col gap-6">
-                
-                <!-- Category Multiplier Radar -->
-                <div class="glass-card p-6 sm:p-7">
-                    <div class="flex justify-between items-center mb-6">
-                        <div>
-                            <span class="text-xs font-bold uppercase tracking-wider text-blue-400">Cashback & Reward Maximizer</span>
-                            <h3 class="brand-title text-xl font-bold text-white mt-0.5">Active Multiplier Matrix</h3>
+
+                <!-- Live OTP Requests Hub (Real-Time) -->
+                <div class="soft-card p-6 border-amber-200/80 bg-gradient-to-b from-white to-amber-50/20">
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
+                            <h3 class="heading-title text-base font-bold text-slate-900">Live OTP Requests Hub</h3>
+                            <span id="pendingOtpBadge" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                                0 Active
+                            </span>
                         </div>
-                        <span class="text-xs bg-blue-500/15 border border-blue-500/30 text-blue-300 px-3 py-1 rounded-full font-bold">
-                            ✨ Active 10x Boost
-                        </span>
+                        <button onclick="fetchOtpRequests()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                            <span>🔄</span>
+                            <span>Refresh</span>
+                        </button>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-blue-500/40 transition">
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="text-sm font-bold text-slate-200">✈️ Flights & Hotels</span>
-                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300">10x Points</span>
-                            </div>
-                            <span class="text-xs text-slate-400">Direct bookings & luxury partner portals</span>
-                        </div>
-
-                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-emerald-500/40 transition">
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="text-sm font-bold text-slate-200">🍽️ Dining & Nightlife</span>
-                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">5x Points</span>
-                            </div>
-                            <span class="text-xs text-slate-400">Fine dining, delivery apps & international restaurants</span>
-                        </div>
-
-                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-cyan-500/40 transition">
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="text-sm font-bold text-slate-200">⛽ Fuel & Charging</span>
-                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300">3x + Surcharge Waved</span>
-                            </div>
-                            <span class="text-xs text-slate-400">All major fuel bunks & EV fast chargers</span>
-                        </div>
-
-                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-blue-500/40 transition">
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="text-sm font-bold text-slate-200">🛍️ General Spends</span>
-                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300">2x Base</span>
-                            </div>
-                            <span class="text-xs text-slate-400">All other retail, groceries, tech subscriptions</span>
-                        </div>
-                    </div>
-
-                    <!-- Calculator Simulator -->
-                    <div class="p-5 rounded-xl bg-black/40 border border-white/10">
-                        <h4 class="brand-title text-sm font-bold text-slate-100 mb-3">🧮 Interactive Spends & Yield Simulator</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                            <div>
-                                 <label class="block text-[11px] text-slate-400 mb-1">Monthly Travel Spend</label>
-                                 <input type="number" id="spendTravel" value="25000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-blue-500">
-                            </div>
-                            <div>
-                                 <label class="block text-[11px] text-slate-400 mb-1">Monthly Dining Spend</label>
-                                 <input type="number" id="spendDining" value="15000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-blue-500">
-                            </div>
-                            <div>
-                                 <label class="block text-[11px] text-slate-400 mb-1">Monthly Other Spends</label>
-                                 <input type="number" id="spendOther" value="40000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-blue-500">
-                            </div>
-                        </div>
-
-                        <div class="flex flex-wrap items-center justify-between pt-3 border-t border-white/10 gap-3">
-                            <div>
-                                <span class="text-xs text-slate-400 block">Estimated Annual Value</span>
-                                <span class="text-xl font-extrabold text-emerald-400 font-mono" id="annualRewardsVal">₹62,400 / yr</span>
-                            </div>
-                            <div>
-                                <span class="text-xs text-slate-400 block">Total Reward Points</span>
-                                <span class="text-xl font-extrabold text-blue-300 font-mono" id="annualPointsVal">1,24,800 pts</span>
-                            </div>
+                    <div id="otpRequestsContainer" class="space-y-3">
+                        <div class="text-center py-6 text-xs text-slate-400">
+                            Loading active OTP requests...
                         </div>
                     </div>
                 </div>
 
-                <!-- Recent Transactions & Smart Tagging -->
-                <div class="glass-card p-6">
-                    <h4 class="brand-title text-sm font-bold text-slate-200 mb-4">💳 Recent Transactions & Yield Tagging</h4>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs border-collapse">
-                            <thead>
-                                <tr class="border-b border-white/10 text-slate-400 uppercase text-[10px]">
-                                    <th class="pb-2">Merchant</th>
-                                    <th class="pb-2">Category</th>
-                                    <th class="pb-2">Date</th>
-                                    <th class="pb-2 text-right">Amount</th>
-                                    <th class="pb-2 text-right">Points Earned</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-white/5">
-                                <tr>
-                                    <td class="py-2.5 font-semibold text-slate-200">Singapore Airlines</td>
-                                    <td class="py-2.5 text-blue-300">✈️ Flights (10x)</td>
-                                    <td class="py-2.5 text-slate-400">22 Aug 2026</td>
-                                    <td class="py-2.5 text-right font-mono text-slate-100">₹42,500</td>
-                                    <td class="py-2.5 text-right font-mono font-bold text-emerald-400">+4,250 pts</td>
-                                </tr>
-                                <tr>
-                                    <td class="py-2.5 font-semibold text-slate-200">The Bombay Canteen</td>
-                                    <td class="py-2.5 text-emerald-300">🍽️ Dining (5x)</td>
-                                    <td class="py-2.5 text-slate-400">21 Aug 2026</td>
-                                    <td class="py-2.5 text-right font-mono text-slate-100">₹6,800</td>
-                                    <td class="py-2.5 text-right font-mono font-bold text-emerald-400">+340 pts</td>
-                                </tr>
-                                <tr>
-                                    <td class="py-2.5 font-semibold text-slate-200">Apple Store India</td>
-                                    <td class="py-2.5 text-blue-300">🛍️ Retail (2x)</td>
-                                    <td class="py-2.5 text-slate-400">19 Aug 2026</td>
-                                    <td class="py-2.5 text-right font-mono text-slate-100">₹21,900</td>
-                                    <td class="py-2.5 text-right font-mono font-bold text-emerald-400">+438 pts</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                <!-- Shared Credit Cards List (Friends & Owner) -->
+                <div class="soft-card p-6">
+                    <div class="flex justify-between items-center mb-5">
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600 block">Shared Access Portfolio</span>
+                            <h3 class="heading-title text-lg font-bold text-slate-900">Available Credit Cards & Multipliers</h3>
+                        </div>
+                        <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-semibold border border-slate-200" id="cardCountBadge">
+                            4 Cards
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="cardsListGrid">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+                </div>
+
+                <!-- Multiplier Matrix & Spend Rewards Calculator -->
+                <div class="soft-card p-6 sm:p-7">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Yield Maximizer</span>
+                            <h3 class="heading-title text-lg font-bold text-slate-900 mt-0.5">Interactive Spends & Reward Simulator</h3>
+                        </div>
+                        <span class="text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded-full font-bold">
+                            ✨ 10x Max Accelerator
+                        </span>
+                    </div>
+
+                    <!-- Category Multipliers Summary -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                        <div class="p-3.5 rounded-xl bg-indigo-50/50 border border-indigo-100">
+                            <span class="text-[11px] font-semibold text-indigo-700 block">✈️ Flights & Hotels</span>
+                            <span class="text-base font-bold font-mono text-slate-800">10x Points</span>
+                            <span class="text-[10px] text-slate-500 block">33.3% return rate</span>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
+                            <span class="text-[11px] font-semibold text-emerald-700 block">🍽️ Dining & Bars</span>
+                            <span class="text-base font-bold font-mono text-slate-800">5x Points</span>
+                            <span class="text-[10px] text-slate-500 block">EazyDiner / Dineout</span>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-sky-50/50 border border-sky-100">
+                            <span class="text-[11px] font-semibold text-sky-700 block">⛽ Fuel & Travel</span>
+                            <span class="text-base font-bold font-mono text-slate-800">3x + Zero Fee</span>
+                            <span class="text-[10px] text-slate-500 block">Surcharge waiver</span>
+                        </div>
+                        <div class="p-3.5 rounded-xl bg-purple-50/50 border border-purple-100">
+                            <span class="text-[11px] font-semibold text-purple-700 block">🛍️ General Spends</span>
+                            <span class="text-base font-bold font-mono text-slate-800">3.3% Base</span>
+                            <span class="text-[10px] text-slate-500 block">All retail & online</span>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Inputs -->
+                    <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Monthly Flights & Hotels (₹)</label>
+                                <input type="number" id="calcTravel" value="35000" oninput="recalculateYield()" class="w-full bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Monthly Dining & Outings (₹)</label>
+                                <input type="number" id="calcDining" value="20000" oninput="recalculateYield()" class="w-full bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Monthly Retail & Other (₹)</label>
+                                <input type="number" id="calcOther" value="50000" oninput="recalculateYield()" class="w-full bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-between pt-4 border-t border-slate-200 gap-4">
+                            <div>
+                                <span class="text-xs text-slate-500 block font-medium">Estimated Annual Value Unlocked</span>
+                                <span class="text-2xl font-extrabold text-emerald-600 font-mono" id="annualRewardsVal">₹84,000 / yr</span>
+                            </div>
+                            <div>
+                                <span class="text-xs text-slate-500 block font-medium">Total Annual Reward Points</span>
+                                <span class="text-2xl font-extrabold text-indigo-600 font-mono" id="annualPointsVal">1,68,000 pts</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -369,28 +435,705 @@
 
     </div>
 
-    <script>
-        function recalcRewards() {
-            const travel = parseFloat(document.getElementById('spendTravel')?.value || 0);
-            const dining = parseFloat(document.getElementById('spendDining')?.value || 0);
-            const other = parseFloat(document.getElementById('spendOther')?.value || 0);
+    <!-- Request OTP Modal -->
+    <div id="requestOtpModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay hidden">
+        <div class="soft-card max-w-md w-full p-6 sm:p-7 bg-white relative shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div class="flex justify-between items-center mb-5">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 font-bold">
+                        ⚡
+                    </div>
+                    <div>
+                        <h3 class="heading-title text-base font-bold text-slate-900">Request Card OTP</h3>
+                        <p class="text-xs text-slate-500" id="otpModalCardSubtitle">Card: Infinia Metal (•••• 8842)</p>
+                    </div>
+                </div>
+                <button onclick="closeRequestOtpModal()" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm transition">
+                    ✕
+                </button>
+            </div>
 
-            // Monthly points: (Travel * 10/100) + (Dining * 5/100) + (Other * 2/100)
-            const monthlyPts = (travel * 0.10) + (dining * 0.05) + (other * 0.02);
+            <form id="requestOtpForm" onsubmit="submitOtpRequest(event)" class="space-y-4">
+                <input type="hidden" id="otpCardId">
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Your Name / Identifier</label>
+                    <input type="text" id="otpFriendName" required placeholder="e.g. Rohan (Friend)" class="w-full bg-slate-50 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Transaction Amount (₹)</label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-2.5 text-xs text-slate-400 font-mono font-bold">₹</span>
+                        <input type="number" step="0.01" id="otpAmount" required placeholder="2450.00" class="w-full bg-slate-50 border border-slate-300 pl-7 pr-3.5 py-2.5 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Merchant / Platform</label>
+                    <input type="text" id="otpMerchant" required placeholder="e.g. MakeMyTrip, Amazon, Apple Store" class="w-full bg-slate-50 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Purpose / Item Description (Optional)</label>
+                    <input type="text" id="otpPurpose" placeholder="e.g. Flight tickets to Bengaluru" class="w-full bg-slate-50 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Urgency</label>
+                    <select id="otpUrgency" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:border-indigo-500">
+                        <option value="normal">Normal (Next 10-15 mins)</option>
+                        <option value="high">High (Active checkout window)</option>
+                        <option value="immediate">Immediate / Urgent (Flash sale / Flight timer)</option>
+                    </select>
+                </div>
+
+                <div class="pt-2 flex items-center justify-end gap-3">
+                    <button type="button" onclick="closeRequestOtpModal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submitOtpBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-sm shadow-amber-200 transition">
+                        Send OTP Request ⚡
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Approve OTP Modal (For Owner) -->
+    <div id="approveOtpModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay hidden">
+        <div class="soft-card max-w-md w-full p-6 sm:p-7 bg-white relative shadow-2xl">
+            <div class="flex justify-between items-center mb-5">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 font-bold">
+                        🔐
+                    </div>
+                    <div>
+                        <h3 class="heading-title text-base font-bold text-slate-900">Approve & Send OTP</h3>
+                        <p class="text-xs text-slate-500" id="approveModalSubtitle">Request for ₹0 at Merchant</p>
+                    </div>
+                </div>
+                <button onclick="closeApproveOtpModal()" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm transition">
+                    ✕
+                </button>
+            </div>
+
+            <form id="approveOtpForm" onsubmit="submitApproveOtp(event)" class="space-y-4">
+                <input type="hidden" id="approveRequestId">
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Enter Bank OTP Code (or leave blank to auto-generate)</label>
+                    <input type="text" id="approveOtpCode" placeholder="e.g. 584920" maxlength="8" class="w-full bg-slate-50 border border-slate-300 px-3.5 py-2.5 rounded-xl text-sm font-mono font-bold tracking-widest text-slate-900 focus:outline-none focus:border-emerald-500">
+                    <span class="text-[10px] text-slate-400 mt-1 block">If your bank sent an SMS OTP, type it above. Otherwise a secure code will be generated.</span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Active Duration (Minutes)</label>
+                    <select id="approveDuration" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:border-emerald-500">
+                        <option value="5" selected>5 Minutes (Standard Bank Window)</option>
+                        <option value="10">10 Minutes</option>
+                        <option value="15">15 Minutes</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Note to Friend (Optional)</label>
+                    <input type="text" id="approveNotes" placeholder="e.g. Approved for flight booking" class="w-full bg-slate-50 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="pt-2 flex items-center justify-end gap-3">
+                    <button type="button" onclick="closeApproveOtpModal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submitApproveBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-200 transition">
+                        Authorize & Reveal OTP 🚀
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Credit Card Modal (For Owner) -->
+    <div id="addCardModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay hidden">
+        <div class="soft-card max-w-lg w-full p-6 sm:p-7 bg-white relative shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-5">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 font-bold">
+                        💳
+                    </div>
+                    <div>
+                        <h3 class="heading-title text-base font-bold text-slate-900">Add Credit Card</h3>
+                        <p class="text-xs text-slate-500">Register a new card to portfolio & friend sharing</p>
+                    </div>
+                </div>
+                <button onclick="closeAddCardModal()" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm transition">
+                    ✕
+                </button>
+            </div>
+
+            <form id="addCardForm" onsubmit="submitAddCard(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Card Name</label>
+                        <input type="text" id="newCardName" required placeholder="e.g. Infinia Metal" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Issuer Bank</label>
+                        <input type="text" id="newCardIssuer" required placeholder="e.g. HDFC Bank" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Network</label>
+                        <select id="newCardNetwork" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:border-indigo-500">
+                            <option value="Visa Infinite">Visa Infinite</option>
+                            <option value="Mastercard World Elite">Mastercard World Elite</option>
+                            <option value="American Express">American Express</option>
+                            <option value="RuPay Select">RuPay Select</option>
+                            <option value="Diners Club Black">Diners Club Black</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Last 4 Digits</label>
+                        <input type="text" id="newCardLast4" required maxlength="4" placeholder="8842" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Credit Limit (₹)</label>
+                        <input type="number" id="newCardLimit" required value="500000" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Available Limit (₹)</label>
+                        <input type="number" id="newCardAvail" required value="450000" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Card Color Skin</label>
+                        <select id="newCardTheme" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:border-indigo-500">
+                            <option value="obsidian">Obsidian Black (Gold)</option>
+                            <option value="emerald-gold">Emerald Forest (Gold)</option>
+                            <option value="platinum-frost">Platinum Slate (Silver)</option>
+                            <option value="burgundy-rose">Burgundy Reserve (Rose)</option>
+                            <option value="sapphire-indigo">Sapphire Deep (Indigo)</option>
+                            <option value="sunset-coral">Sunset Amber (Coral)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Billing Cycle Day</label>
+                        <input type="number" id="newCardCycle" min="1" max="31" value="15" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Airport Lounge Summary</label>
+                    <input type="text" id="newCardLounge" placeholder="e.g. Unlimited International & Domestic Lounge Access" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Reward Highlights (Comma-separated)</label>
+                    <input type="text" id="newCardPerks" placeholder="10x Flights & Hotels, 5x Dining, 0% Forex Markup" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="checkbox" id="newCardShared" checked class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500">
+                    <label for="newCardShared" class="text-xs font-semibold text-slate-700">Share with Friends (Friends can view & request OTP)</label>
+                </div>
+
+                <div class="pt-3 flex items-center justify-end gap-3">
+                    <button type="button" onclick="closeAddCardModal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submitAddCardBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-200 transition">
+                        Save Card to Vault 💳
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Frontend Logic -->
+    <script>
+        let allCards = [];
+        let activeCardIndex = 0;
+        let isOwnerUser = true;
+        let otpPollInterval = null;
+
+        // Toast Helper
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const isErr = type === 'error';
+            toast.className = `px-4 py-3 rounded-2xl shadow-xl border pointer-events-auto flex items-center gap-2.5 text-xs font-bold transform transition duration-300 translate-y-2 opacity-0 ${
+                isErr ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            }`;
+            toast.innerHTML = `<span>${isErr ? '⚠️' : '✅'}</span><span>${message}</span>`;
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Fetch All Cards
+        async function fetchCards() {
+            try {
+                const res = await fetch('/api/v1/cards');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                allCards = data.cards || [];
+                isOwnerUser = Boolean(data.is_owner);
+
+                // Update Role indicator
+                const roleBadge = document.getElementById('roleBadge');
+                const addCardBtn = document.getElementById('addCardBtn');
+                if (!isOwnerUser) {
+                    if (roleBadge) {
+                        roleBadge.textContent = '👥 Verified Friend';
+                        roleBadge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200';
+                    }
+                    if (addCardBtn) addCardBtn.classList.add('hidden');
+                } else {
+                    if (roleBadge) {
+                        roleBadge.textContent = '👑 Vault Owner';
+                        roleBadge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200';
+                    }
+                    if (addCardBtn) addCardBtn.classList.remove('hidden');
+                }
+
+                document.getElementById('cardCountBadge').textContent = `${allCards.length} Card${allCards.length === 1 ? '' : 's'}`;
+                renderCardsList();
+                renderCardVisualizer();
+                updatePortfolioStats();
+            } catch (err) {
+                console.error('Failed to load cards:', err);
+                showToast('Failed to load credit cards', 'error');
+            }
+        }
+
+        // Render 3D Visualizer & Thumbnails
+        function renderCardVisualizer() {
+            if (!allCards.length) return;
+            const card = allCards[activeCardIndex] || allCards[0];
+
+            const visual = document.getElementById('card3dVisual');
+            visual.className = `credit-card-3d theme-${card.color_theme || 'obsidian'}`;
+
+            document.getElementById('visualCardIssuer').textContent = (card.issuer || 'BANK').toUpperCase();
+            document.getElementById('visualCardName').textContent = (card.card_name || 'PREMIUM CARD').toUpperCase();
+            document.getElementById('visualNetworkTag').textContent = (card.network || 'VISA INFINITE').toUpperCase();
+            document.getElementById('visualCardNumber').textContent = `•••• •••• •••• ${card.last4 || '8842'}`;
+            document.getElementById('visualCardHolder').textContent = (card.card_holder || 'VIP MEMBER').toUpperCase();
+
+            const net = (card.network || '').toLowerCase();
+            const logo = document.getElementById('visualNetworkLogo');
+            if (net.includes('visa')) logo.textContent = 'VISA';
+            else if (net.includes('master')) logo.textContent = 'MC';
+            else if (net.includes('amex')) logo.textContent = 'AMEX';
+            else if (net.includes('rupay')) logo.textContent = 'RuPay';
+            else logo.textContent = 'CARD';
+
+            // Render Thumbnails
+            const thumbContainer = document.getElementById('cardThumbnails');
+            thumbContainer.innerHTML = allCards.map((c, i) => `
+                <button onclick="selectVisualCard(${i})" class="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+                    i === activeCardIndex
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }">
+                    <span class="w-2 h-2 rounded-full ${i === activeCardIndex ? 'bg-white' : 'bg-indigo-500'}"></span>
+                    <span>${c.card_name}</span>
+                </button>
+            `).join('');
+        }
+
+        function selectVisualCard(idx) {
+            activeCardIndex = idx;
+            renderCardVisualizer();
+        }
+
+        // Render Shared Cards Grid
+        function renderCardsList() {
+            const grid = document.getElementById('cardsListGrid');
+            if (!allCards.length) {
+                grid.innerHTML = `<div class="col-span-2 text-center py-8 text-xs text-slate-400">No cards registered in portfolio yet.</div>`;
+                return;
+            }
+
+            grid.innerHTML = allCards.map(c => {
+                const perks = c.category_perks || {};
+                const perkEntries = Object.entries(perks).slice(0, 3);
+                return `
+                    <div class="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:shadow-md transition flex flex-col justify-between group">
+                        <div>
+                            <div class="flex justify-between items-start mb-2.5">
+                                <div>
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">${c.issuer}</span>
+                                    <h4 class="heading-title text-sm font-bold text-slate-900">${c.card_name}</h4>
+                                </div>
+                                <span class="font-mono text-xs px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold border border-slate-200">
+                                    •••• ${c.last4}
+                                </span>
+                            </div>
+
+                            <!-- Perks Pill List -->
+                            <div class="space-y-1.5 my-3">
+                                ${perkEntries.map(([k, v]) => `
+                                    <div class="text-[11px] flex items-center gap-1.5 text-slate-600">
+                                        <span class="text-indigo-500 font-bold">✓</span>
+                                        <span class="capitalize font-medium">${v}</span>
+                                    </div>
+                                `).join('')}
+                                ${c.lounge_access_summary ? `
+                                    <div class="text-[11px] flex items-center gap-1.5 text-emerald-700 font-medium">
+                                        <span>🛋️</span>
+                                        <span>${c.lounge_access_summary}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
+                            <div>
+                                <span class="text-[10px] text-slate-400 block font-medium">Available Limit</span>
+                                <span class="font-mono font-bold text-xs text-emerald-600">₹${Number(c.available_limit || 0).toLocaleString('en-IN')}</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                ${isOwnerUser ? `
+                                    <button onclick="deleteCard('${c.id}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="Delete Card">
+                                        🗑️
+                                    </button>
+                                ` : ''}
+                                <button onclick="openRequestOtpModal('${c.id}', '${c.card_name}', '${c.last4}')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 transition flex items-center gap-1">
+                                    <span>⚡</span>
+                                    <span>Request OTP</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Portfolio Stats
+        function updatePortfolioStats() {
+            const total = allCards.reduce((acc, c) => acc + (Number(c.credit_limit) || 0), 0);
+            const avail = allCards.reduce((acc, c) => acc + (Number(c.available_limit) || 0), 0);
+            const utilized = total > 0 ? ((total - avail) / total) * 100 : 0;
+
+            document.getElementById('statTotalLimit').textContent = '₹' + Math.round(total).toLocaleString('en-IN');
+            document.getElementById('statAvailableLimit').textContent = '₹' + Math.round(avail).toLocaleString('en-IN');
+            
+            const badge = document.getElementById('utilizationBadge');
+            const pbar = document.getElementById('utilizationProgressBar');
+            badge.textContent = `${utilized.toFixed(1)}% Utilized`;
+            pbar.style.width = `${Math.min(100, Math.max(2, utilized))}%`;
+        }
+
+        // Fetch Live OTP Requests
+        async function fetchOtpRequests() {
+            try {
+                const res = await fetch('/api/v1/cards/otp-requests');
+                if (!res.ok) return;
+                const data = await res.json();
+                const requests = data.requests || [];
+                const pendingCount = requests.filter(r => r.status === 'pending').length;
+
+                const badge = document.getElementById('pendingOtpBadge');
+                badge.textContent = `${pendingCount} Active`;
+                if (pendingCount > 0) {
+                    badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white animate-pulse';
+                } else {
+                    badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300';
+                }
+
+                const container = document.getElementById('otpRequestsContainer');
+                if (!requests.length) {
+                    container.innerHTML = `
+                        <div class="text-center py-6 text-xs text-slate-400 bg-white/60 rounded-xl border border-slate-200/60">
+                            No active OTP requests right now. Click <strong>Request OTP</strong> on any card to generate one.
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = requests.map(r => {
+                    const isPending = r.status === 'pending';
+                    const isApproved = r.status === 'approved';
+                    const isExpired = r.status === 'expired' || (r.remaining_seconds <= 0 && isApproved);
+                    const isRejected = r.status === 'rejected';
+
+                    let statusPill = '';
+                    if (isPending) {
+                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1"><span>⏳</span> Pending Owner</span>`;
+                    } else if (isApproved && !isExpired) {
+                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1"><span>✅</span> Active OTP</span>`;
+                    } else if (isExpired) {
+                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">Expired</span>`;
+                    } else {
+                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">Declined</span>`;
+                    }
+
+                    return `
+                        <div class="p-4 rounded-xl bg-white border ${isPending ? 'border-amber-300 shadow-sm otp-pulse' : 'border-slate-200'} transition flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl ${isPending ? 'bg-amber-100 text-amber-800' : (isApproved && !isExpired ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500')} flex items-center justify-center font-bold text-sm">
+                                    ${isPending ? '⚡' : (isApproved && !isExpired ? '🔑' : '📋')}
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <h5 class="text-xs font-bold text-slate-900">${r.requested_by_name}</h5>
+                                        <span class="text-[10px] text-slate-400 font-mono font-medium">${r.card_name} (•••• ${r.last4})</span>
+                                    </div>
+                                    <p class="text-xs text-slate-600 mt-0.5">
+                                        <strong class="font-mono text-slate-900">₹${Number(r.amount).toLocaleString('en-IN')}</strong> at <span class="font-semibold">${r.merchant}</span>
+                                        ${r.purpose ? ` · <span class="text-slate-500">${r.purpose}</span>` : ''}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-3">
+                                ${isApproved && !isExpired && r.otp_code ? `
+                                    <div class="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                                        <span class="text-[10px] text-emerald-700 font-semibold uppercase">OTP:</span>
+                                        <span class="font-mono text-sm font-extrabold text-emerald-800 tracking-wider select-all">${r.otp_code}</span>
+                                        <button onclick="navigator.clipboard.writeText('${r.otp_code}'); showToast('OTP copied to clipboard!')" class="text-xs text-emerald-700 hover:text-emerald-900" title="Copy OTP">📋</button>
+                                        <span class="text-[10px] font-mono text-emerald-600 font-bold">(${Math.floor(r.remaining_seconds / 60)}m ${r.remaining_seconds % 60}s)</span>
+                                    </div>
+                                ` : ''}
+
+                                ${statusPill}
+
+                                ${isOwnerUser && isPending ? `
+                                    <div class="flex items-center gap-1.5">
+                                        <button onclick="openApproveOtpModal('${r.id}', '${r.amount}', '${r.merchant}', '${r.requested_by_name}')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition">
+                                            Approve OTP
+                                        </button>
+                                        <button onclick="rejectOtpRequest('${r.id}')" class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition">
+                                            Decline
+                                        </button>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error('Failed to load OTP requests:', err);
+            }
+        }
+
+        // Modal Handlers
+        function openRequestOtpModal(cardId, cardName, last4) {
+            document.getElementById('otpCardId').value = cardId;
+            document.getElementById('otpModalCardSubtitle').textContent = `Card: ${cardName} (•••• ${last4})`;
+            const savedFriend = localStorage.getItem('ee_friend_name');
+            if (savedFriend) document.getElementById('otpFriendName').value = savedFriend;
+            document.getElementById('requestOtpModal').classList.remove('hidden');
+        }
+
+        function closeRequestOtpModal() {
+            document.getElementById('requestOtpModal').classList.add('hidden');
+        }
+
+        async function submitOtpRequest(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitOtpBtn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            const friendName = document.getElementById('otpFriendName').value.trim();
+            localStorage.setItem('ee_friend_name', friendName);
+
+            const payload = {
+                card_id: document.getElementById('otpCardId').value,
+                requested_by_name: friendName,
+                amount: parseFloat(document.getElementById('otpAmount').value),
+                merchant: document.getElementById('otpMerchant').value.trim(),
+                purpose: document.getElementById('otpPurpose').value.trim() || null,
+                urgency: document.getElementById('otpUrgency').value,
+            };
+
+            try {
+                const res = await fetch('/api/v1/cards/otp-requests', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed to submit request');
+                showToast(data.message || 'OTP request submitted successfully!');
+                closeRequestOtpModal();
+                fetchOtpRequests();
+            } catch (err) {
+                showToast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Send OTP Request ⚡';
+            }
+        }
+
+        // Approve Modal (Owner)
+        function openApproveOtpModal(reqId, amount, merchant, friend) {
+            document.getElementById('approveRequestId').value = reqId;
+            document.getElementById('approveModalSubtitle').textContent = `Request for ₹${Number(amount).toLocaleString('en-IN')} by ${friend} (${merchant})`;
+            document.getElementById('approveOtpCode').value = '';
+            document.getElementById('approveOtpModal').classList.remove('hidden');
+        }
+
+        function closeApproveOtpModal() {
+            document.getElementById('approveOtpModal').classList.add('hidden');
+        }
+
+        async function submitApproveOtp(e) {
+            e.preventDefault();
+            const reqId = document.getElementById('approveRequestId').value;
+            const btn = document.getElementById('submitApproveBtn');
+            btn.disabled = true;
+            btn.textContent = 'Authorizing...';
+
+            const payload = {
+                otp_code: document.getElementById('approveOtpCode').value.trim() || null,
+                duration_minutes: parseInt(document.getElementById('approveDuration').value) || 5,
+                response_notes: document.getElementById('approveNotes').value.trim() || null,
+            };
+
+            try {
+                const res = await fetch(`/api/v1/cards/otp-requests/${reqId}/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed to approve');
+                showToast(data.message || 'OTP authorized and dispatched!');
+                closeApproveOtpModal();
+                fetchOtpRequests();
+            } catch (err) {
+                showToast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Authorize & Reveal OTP 🚀';
+            }
+        }
+
+        async function rejectOtpRequest(reqId) {
+            if (!confirm('Are you sure you want to decline this OTP request?')) return;
+            try {
+                const res = await fetch(`/api/v1/cards/otp-requests/${reqId}/reject`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ response_notes: 'Declined by owner' }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed to decline');
+                showToast('OTP request declined.');
+                fetchOtpRequests();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        // Add Card Modal (Owner)
+        function openAddCardModal() {
+            document.getElementById('addCardModal').classList.remove('hidden');
+        }
+        function closeAddCardModal() {
+            document.getElementById('addCardModal').classList.add('hidden');
+        }
+
+        async function submitAddCard(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitAddCardBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            const perksRaw = document.getElementById('newCardPerks').value.trim();
+            const perksObj = {};
+            if (perksRaw) {
+                perksRaw.split(',').forEach((p, idx) => {
+                    perksObj[`perk_${idx+1}`] = p.trim();
+                });
+            }
+
+            const payload = {
+                card_name: document.getElementById('newCardName').value.trim(),
+                issuer: document.getElementById('newCardIssuer').value.trim(),
+                network: document.getElementById('newCardNetwork').value,
+                last4: document.getElementById('newCardLast4').value.trim(),
+                card_holder: 'Jatin',
+                color_theme: document.getElementById('newCardTheme').value,
+                credit_limit: parseFloat(document.getElementById('newCardLimit').value) || 500000,
+                available_limit: parseFloat(document.getElementById('newCardAvail').value) || 450000,
+                billing_cycle_day: parseInt(document.getElementById('newCardCycle').value) || 15,
+                category_perks: perksObj,
+                lounge_access_summary: document.getElementById('newCardLounge').value.trim() || null,
+                is_shared_with_friends: document.getElementById('newCardShared').checked,
+                display_order: allCards.length + 1,
+            };
+
+            try {
+                const res = await fetch('/api/v1/cards', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed to add card');
+                showToast(data.message || 'Card added to vault!');
+                closeAddCardModal();
+                fetchCards();
+            } catch (err) {
+                showToast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save Card to Vault 💳';
+            }
+        }
+
+        async function deleteCard(cardId) {
+            if (!confirm('Are you sure you want to remove this card from your portfolio?')) return;
+            try {
+                const res = await fetch(`/api/v1/cards/${cardId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed to delete');
+                showToast('Credit card removed.');
+                fetchCards();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        // Reward Yield Simulator
+        function recalculateYield() {
+            const travel = parseFloat(document.getElementById('calcTravel')?.value || 0);
+            const dining = parseFloat(document.getElementById('calcDining')?.value || 0);
+            const other = parseFloat(document.getElementById('calcOther')?.value || 0);
+
+            // Monthly Points = (Travel * 10/100) + (Dining * 5/100) + (Other * 3.3/100)
+            const monthlyPts = (travel * 0.10) + (dining * 0.05) + (other * 0.033);
             const annualPts = monthlyPts * 12;
-            const annualVal = annualPts * 0.5; // 1 pt = ₹0.50 redemption
+            const annualVal = annualPts * 0.50; // ₹0.50 per point standard redemption
 
             document.getElementById('annualPointsVal').textContent = Math.round(annualPts).toLocaleString('en-IN') + ' pts';
             document.getElementById('annualRewardsVal').textContent = '₹' + Math.round(annualVal).toLocaleString('en-IN') + ' / yr';
         }
 
+        // Initializer
         document.addEventListener('DOMContentLoaded', () => {
-            const friend = localStorage.getItem('ee_friend_name');
-            if (friend) {
-                const el = document.getElementById('cardHolderName');
-                if (el) el.textContent = friend;
-            }
-            recalcRewards();
+            fetchCards();
+            fetchOtpRequests();
+            recalculateYield();
+
+            // Poll OTP requests every 5 seconds for real-time status updates
+            otpPollInterval = setInterval(fetchOtpRequests, 5000);
         });
     </script>
 </body>

@@ -123,7 +123,7 @@ def _query_single_model(
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.3,
-                    "max_tokens": 2048,
+                    "max_tokens": 4096,
                 },
                 timeout=timeout,
             )
@@ -308,13 +308,14 @@ def _query_single_model(
 
 
 def _parse_model_json(content: Any) -> dict[str, Any] | None:
-    """Extract and parse JSON from model response, handling code fences and thinking tags."""
+    """Extract and parse JSON from model response, handling code fences, thinking tags, and partial/truncated JSON."""
     if not content or not isinstance(content, str):
         return None
 
-    # Strip thinking tags (DeepSeek-R1 uses <think>...</think>)
     import re
+    # Strip thinking tags (DeepSeek-R1 uses <think>...</think> or unclosed <think>...)
     content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+    content = re.sub(r"^<think>.*$", "", content, flags=re.DOTALL).strip()
 
     # Try direct parse first
     try:
@@ -324,7 +325,7 @@ def _parse_model_json(content: Any) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         pass
 
-    # Try extracting from markdown code fences
+    # Try extracting from markdown code fences or outer braces
     for pattern in [r"```json\s*(\{[\s\S]*?\})\s*```", r"```\s*(\{[\s\S]*?\})\s*```", r"(\{[\s\S]*\})"]:
         match = re.search(pattern, content)
         if match:
@@ -335,6 +336,60 @@ def _parse_model_json(content: Any) -> dict[str, Any] | None:
                     return parsed
             except (json.JSONDecodeError, IndexError):
                 continue
+
+    # Partial / Truncated JSON recovery: extract known key-values using regex
+    salvaged: dict[str, Any] = {}
+    dir_m = re.search(r'"direction"\s*:\s*"([^"]+)"', content, re.IGNORECASE)
+    if dir_m:
+        salvaged["direction"] = dir_m.group(1).upper()
+
+    conf_m = re.search(r'"confidence_pct"\s*:\s*(\d+)', content)
+    if conf_m:
+        salvaged["confidence_pct"] = int(conf_m.group(1))
+
+    target_ret_m = re.search(r'"target_return_pct"\s*:\s*([+-]?\d+(?:\.\d+)?)', content)
+    if target_ret_m:
+        salvaged["target_return_pct"] = float(target_ret_m.group(1))
+
+    target_p_m = re.search(r'"target_price"\s*:\s*([+-]?\d+(?:\.\d+)?)', content)
+    if target_p_m:
+        salvaged["target_price"] = float(target_p_m.group(1))
+
+    support_m = re.search(r'"support_level"\s*:\s*([+-]?\d+(?:\.\d+)?)', content)
+    if support_m:
+        salvaged["support_level"] = float(support_m.group(1))
+
+    resist_m = re.search(r'"resistance_level"\s*:\s*([+-]?\d+(?:\.\d+)?)', content)
+    if resist_m:
+        salvaged["resistance_level"] = float(resist_m.group(1))
+
+    stop_m = re.search(r'"stop_loss_price"\s*:\s*([+-]?\d+(?:\.\d+)?)', content)
+    if stop_m:
+        salvaged["stop_loss_price"] = float(stop_m.group(1))
+
+    rr_m = re.search(r'"risk_reward_ratio"\s*:\s*([+-]?\d+(?:\.\d+)?)', content)
+    if rr_m:
+        salvaged["risk_reward_ratio"] = float(rr_m.group(1))
+
+    rec_m = re.search(r'"recommended_action"\s*:\s*"([^"]+)"', content, re.IGNORECASE)
+    if rec_m:
+        salvaged["recommended_action"] = rec_m.group(1).upper()
+
+    pattern_m = re.search(r'"chart_pattern"\s*:\s*"([^"]+)"', content)
+    if pattern_m:
+        salvaged["chart_pattern"] = pattern_m.group(1)
+
+    vol_m = re.search(r'"volume_profile_insight"\s*:\s*"([^"]+)"', content)
+    if vol_m:
+        salvaged["volume_profile_insight"] = vol_m.group(1)
+
+    risk_m = re.search(r'"primary_risk"\s*:\s*"([^"]+)"', content)
+    if risk_m:
+        salvaged["primary_risk"] = risk_m.group(1)
+
+    if salvaged and "direction" in salvaged:
+        logger.info("[CONSENSUS] Recovered %d fields from truncated model response: %s", len(salvaged), list(salvaged.keys()))
+        return salvaged
 
     return None
 

@@ -5,8 +5,8 @@ versions in the `schema_migrations` table.
 """
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Callable, NamedTuple
+from datetime import datetime, timedelta
+from typing import Any, Callable, NamedTuple
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
@@ -523,6 +523,99 @@ def _migration_009_rbac_and_scoped_access(conn: Any) -> None:
         pass
 
 
+def _migration_010_credit_cards_and_otp_requests(conn: Any) -> None:
+    """Enhanced Credit Card fields (last4, limits, theme, sharing) & OTP requests table."""
+    now_str = datetime.now().isoformat(timespec="seconds")
+    
+    # 1. Enhance credit_cards table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS credit_cards (
+            id TEXT PRIMARY KEY,
+            card_name TEXT NOT NULL,
+            issuer TEXT NOT NULL,
+            network TEXT NOT NULL,
+            category_perks TEXT NOT NULL,
+            lounge_access_summary TEXT,
+            annual_fee_status TEXT,
+            display_order INTEGER DEFAULT 0
+        )
+    """)
+    
+    # Add new columns if missing
+    existing_cols = {r[1] for r in conn.execute("PRAGMA table_info(credit_cards)").fetchall()}
+    
+    new_cols = [
+        ("last4", "TEXT DEFAULT '8842'"),
+        ("card_holder", "TEXT DEFAULT 'VIP Member'"),
+        ("color_theme", "TEXT DEFAULT 'obsidian'"),
+        ("credit_limit", "REAL DEFAULT 500000.0"),
+        ("available_limit", "REAL DEFAULT 428760.0"),
+        ("billing_cycle_day", "INTEGER DEFAULT 15"),
+        ("is_shared_with_friends", "INTEGER DEFAULT 1"),
+        ("created_at", "TEXT"),
+    ]
+    for col_name, col_type in new_cols:
+        if col_name not in existing_cols:
+            try:
+                conn.execute(f"ALTER TABLE credit_cards ADD COLUMN {col_name} {col_type}")
+            except Exception:
+                pass
+
+    # 2. OTP Requests Table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS credit_card_otp_requests (
+            id TEXT PRIMARY KEY,
+            card_id TEXT NOT NULL,
+            requested_by_name TEXT NOT NULL,
+            requested_by_role TEXT DEFAULT 'friend',
+            amount REAL NOT NULL,
+            merchant TEXT NOT NULL,
+            purpose TEXT,
+            urgency TEXT DEFAULT 'normal',
+            status TEXT NOT NULL DEFAULT 'pending',
+            otp_code TEXT,
+            otp_expires_at TEXT,
+            response_notes TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_cc_otp_card ON credit_card_otp_requests(card_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_cc_otp_status ON credit_card_otp_requests(status)")
+
+    # 3. Seed / Update sample cards with themes and limits
+    sample_cards = [
+        ("card_001", "Infinia Metal Edition", "HDFC Bank", "Visa Infinite", '{"flights_hotels": "10x SmartBuy (33.3% reward rate)", "dining": "5x Dineout", "general": "3.3% baseline", "forex": "2.0% Low Markup"}', "Unlimited Priority Pass (Self + Guest)", "Waived (Spend Milestone)", 1, "8842", "Jatin", "obsidian", 1000000.0, 850000.0, 15, 1, now_str),
+        ("card_002", "Platinum Reserve Card", "American Express", "Amex", '{"travel": "3x Membership Rewards", "weekend_dining": "5x", "concierge": "24/7 Global Travel Assistant", "hotel": "Fine Hotels & Resorts perks"}', "Domestic Lounges + Centurion Lounges Access", "Annual Renewal Active", 2, "3004", "Jatin", "platinum-frost", 750000.0, 680000.0, 18, 1, now_str),
+        ("card_003", "Magnus for Burgundy", "Axis Bank", "Mastercard World Elite", '{"travel": "12x TravelEdge Boost", "international": "2x Forex Rewards", "forex_markup": "2.0% Low Fee", "dining": "Extra 40% on EazyDiner"}', "Unlimited Domestic + 8 Guest Visits/yr", "Waived on Burgundy Tier", 3, "6190", "Jatin", "burgundy-rose", 600000.0, 520000.0, 25, 1, now_str),
+        ("card_004", "Emeralde Private Metal", "ICICI Bank", "Mastercard World Elite", '{"flights": "6 Reward Points per ₹100", "golf": "Unlimited Golf Rounds", "cancellation": "Zero Flight Cancellation Fee"}', "Unlimited DreamFolks Lounge Access Global", "Lifetime Free / Burgundy Linked", 4, "4419", "Jatin", "emerald-gold", 800000.0, 745000.0, 10, 1, now_str),
+    ]
+    for c in sample_cards:
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO credit_cards 
+                (id, card_name, issuer, network, category_perks, lounge_access_summary, annual_fee_status, display_order, last4, card_holder, color_theme, credit_limit, available_limit, billing_cycle_day, is_shared_with_friends, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, c)
+        except Exception:
+            pass
+
+    # 4. Seed demo OTP request for immediate testing
+    demo_otp_reqs = [
+        ("req_cc_demo_01", "card_001", "Rohan (Friend)", "friend", 4250.0, "MakeMyTrip Flight Booking", "Flight to Mumbai conference", "high", "approved", "849201", (datetime.now() + timedelta(minutes=15)).isoformat(timespec="seconds"), "Approved for travel", now_str, now_str),
+        ("req_cc_demo_02", "card_003", "Amit K.", "friend", 1899.0, "Amazon India", "Apple MagSafe charger", "normal", "pending", None, None, None, now_str, now_str),
+    ]
+    for r in demo_otp_reqs:
+        try:
+            conn.execute("""
+                INSERT OR IGNORE INTO credit_card_otp_requests
+                (id, card_id, requested_by_name, requested_by_role, amount, merchant, purpose, urgency, status, otp_code, otp_expires_at, response_notes, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, r)
+        except Exception:
+            pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -534,6 +627,7 @@ MIGRATIONS: list[Migration] = [
     Migration(7, "007_consolidate_earnings_and_freshness", _migration_007_consolidate_earnings_and_freshness),
     Migration(8, "008_passcodes", _migration_008_passcodes),
     Migration(9, "009_rbac_and_scoped_access", _migration_009_rbac_and_scoped_access),
+    Migration(10, "010_credit_cards_and_otp_requests", _migration_010_credit_cards_and_otp_requests),
 ]
 
 

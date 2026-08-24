@@ -247,3 +247,10 @@ def test_parse_model_json():
     parsed_md = _parse_model_json(md_resp)
     assert parsed_md is not None
     assert parsed_md["direction"] == "BEARISH"
+
+    # Truncated response recovery (e.g. DeepSeek-R1 token limit cutoff)
+    truncated_resp = "<think>Calculating risk reward...</think>{\n  \"direction\": \"NEUTRAL\",\n  \"confidence_pct\": 60,\n  \"target_return_pct\":"
+    parsed_trunc = _parse_model_json(truncated_resp)
+    assert parsed_trunc is not None
+    assert parsed_trunc["direction"] == "NEUTRAL"
+    assert parsed_trunc["confidence_pct"] == 60
