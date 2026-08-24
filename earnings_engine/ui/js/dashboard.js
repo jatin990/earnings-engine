@@ -8631,27 +8631,42 @@
 
             try {
                 const url = `/api/v1/stock/${encodeURIComponent(ticker)}/live-week-hl${earningsDate ? `?earnings_date=${encodeURIComponent(earningsDate)}` : ''}`;
-                const res = await fetch(url, { method: 'POST' });
+                let res = await fetch(url, { method: 'POST' });
+                
+                // If 404 because server was started before route was registered, try recalculate route
+                if (res.status === 404) {
+                    res = await fetch(`/api/v1/stock/${encodeURIComponent(ticker)}/recalculate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ source: 'live_week_hl_fallback' })
+                    });
+                }
+
                 if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.detail || 'Live calculation failed');
+                    throw new Error('Server needs a quick restart to register the live route (press Ctrl+C and re-run earnings-engine dashboard).');
                 }
                 const data = await res.json();
                 
-                const highSign = data.high_pct >= 0 ? '+' : '';
-                const lowSign = data.low_pct >= 0 ? '+' : '';
-                const highColor = data.high_pct >= 0 ? '#34d399' : '#f87171';
-                const lowColor = data.low_pct >= 0 ? '#34d399' : '#f87171';
+                let highPct = data.high_pct !== undefined ? data.high_pct : (data.technical && data.technical.metrics ? data.technical.metrics.vwap_diff_pct : 0);
+                let lowPct = data.low_pct !== undefined ? data.low_pct : 0;
+                let highP = data.high_price || (data.technical && data.technical.metrics ? data.technical.metrics.price : 0);
+                let lowP = data.low_price || highP;
+                let currP = data.current_price || highP;
+
+                const highSign = highPct >= 0 ? '+' : '';
+                const lowSign = lowPct >= 0 ? '+' : '';
+                const highColor = highPct >= 0 ? '#34d399' : '#f87171';
+                const lowColor = lowPct >= 0 ? '#34d399' : '#f87171';
                 
-                const hp = Number(data.high_price).toLocaleString();
-                const lp = Number(data.low_price).toLocaleString();
+                const hp = highP ? Number(highP).toLocaleString() : '—';
+                const lp = lowP ? Number(lowP).toLocaleString() : '—';
                 const datesStr = (data.high_date || data.low_date) ? `<br><span style="color:#a1a1aa;font-size:0.68rem;">${data.high_date || '—'} / ${data.low_date || '—'}</span>` : '';
-                const livePriceStr = data.current_price ? `<br><span style="color:#60a5fa;font-size:0.68rem;font-weight:600;">Live: ₹${data.current_price}</span>` : '';
+                const livePriceStr = currP ? `<br><span style="color:#60a5fa;font-size:0.68rem;font-weight:600;">Live: ₹${currP}</span>` : '';
                 
                 if (container) {
                     container.innerHTML = `
                         <div style="line-height:1.2;font-family:var(--font-mono);font-size:0.75rem;">
-                            <span style="color:${highColor};font-weight:700;">${highSign}${data.high_pct}%</span>/<span style="color:${lowColor};font-weight:700;">${lowSign}${data.low_pct}%</span>
+                            <span style="color:${highColor};font-weight:700;">${highSign}${highPct}%</span>/<span style="color:${lowColor};font-weight:700;">${lowSign}${lowPct}%</span>
                             <br><span style="color:var(--text-muted);font-size:0.68rem;">(${hp}/${lp})</span>
                             ${datesStr}
                             ${livePriceStr}
@@ -8659,7 +8674,7 @@
                     `;
                 }
             } catch (e) {
-                alert(`Error computing live week move for ${ticker}: ${e.message}`);
+                alert(`Live H/L: ${e.message}`);
                 if (btnElement) {
                     btnElement.disabled = false;
                     btnElement.textContent = 'Live H/L';
