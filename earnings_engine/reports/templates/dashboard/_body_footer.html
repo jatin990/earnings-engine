@@ -274,73 +274,101 @@
     </div>
 
     <!-- ======================================================== -->
-    <!-- 🧠 CATALYST AI CONSENSUS INTEL MODAL -->
+    <!-- 🧠 CATALYST AI CONSENSUS INTEL MODAL (FULL TRADE SETUP) -->
     <!-- ======================================================== -->
     <div id="catalystConsensusModal" onclick="if(event.target === this) app.closeCatalystConsensusModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);backdrop-filter:blur(8px);z-index:2800;padding:1.5rem;overflow-y:auto;">
-        <div class="card card-glow-blue" style="max-width:880px;width:95%;margin:4vh auto;position:relative;background:#060609;border:1px solid rgba(59,130,246,0.35);border-radius:14px;box-shadow:0 30px 90px rgba(0,0,0,0.95);padding:1.5rem;">
+        <div class="card card-glow-blue" style="max-width:960px;width:96%;margin:3vh auto;position:relative;background:#060609;border:1px solid rgba(59,130,246,0.35);border-radius:14px;box-shadow:0 30px 90px rgba(0,0,0,0.95);padding:1.5rem;">
             <button onclick="app.closeCatalystConsensusModal()" class="btn-icon" style="position:absolute;top:1.15rem;right:1.15rem;" title="Close">✕</button>
             
-            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
-                <span style="font-size:1.4rem;">🧠</span>
-                <h3 style="margin:0;font-size:1.25rem;font-family:'Space Grotesk',sans-serif;color:#ffffff;">Catalyst AI Consensus Intelligence</h3>
-                <span id="catConsensusTimeframeBadge" class="signal-badge" style="background:rgba(99,102,241,0.2);color:#93c5fd;font-size:0.68rem;">14-Day Horizon</span>
+            <!-- Modal Header & Hero Setup Bar -->
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.4rem;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="font-size:1.4rem;">🧠</span>
+                    <h3 style="margin:0;font-size:1.25rem;font-family:'Space Grotesk',sans-serif;color:#ffffff;">Catalyst AI Consensus Trade Setup</h3>
+                    <span id="catConsensusTimeframeBadge" class="signal-badge" style="background:rgba(99,102,241,0.2);color:#93c5fd;font-size:0.68rem;">14-Day Horizon</span>
+                </div>
             </div>
-            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.85rem;flex-wrap:wrap;">
-                <span id="catConsensusTicker" style="font-size:1.2rem;font-weight:800;font-family:var(--font-mono);color:#60a5fa;">TICKER</span>
-                <span id="catConsensusPrice" class="timestamp" style="font-size:0.9rem;font-weight:600;color:#f8fafc;">₹—</span>
-                <span id="catConsensusDirectionBadge" class="signal-badge" style="font-size:0.75rem;font-weight:700;">NEUTRAL</span>
+            
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);padding:0.6rem 0.85rem;border-radius:8px;">
+                <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+                    <span id="catConsensusTicker" style="font-size:1.25rem;font-weight:800;font-family:var(--font-mono);color:#60a5fa;">TICKER</span>
+                    <span id="catConsensusPrice" class="timestamp" style="font-size:0.95rem;font-weight:700;color:#f8fafc;">₹—</span>
+                    <span id="catConsensusDirectionBadge" class="signal-badge" style="font-size:0.75rem;font-weight:700;">POLLING MODELS...</span>
+                </div>
+                <div>
+                    <span id="catConsensusWorthEnteringBadge" class="signal-badge" style="font-size:0.8rem;font-weight:800;background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.25rem 0.65rem;">WORTH ENTERING: CALCULATING...</span>
+                </div>
             </div>
 
-            <!-- 4 Key Catalyst Consensus KPI Metric Cards -->
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:0.65rem;margin-bottom:1rem;">
+            <!-- 6 Key Catalyst Consensus Trade Setup KPI Cards -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(145px, 1fr));gap:0.65rem;margin-bottom:1rem;">
                 <div class="card card-glow-emerald" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(16,185,129,0.3);">
                     <div style="font-size:0.68rem;color:#34d399;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">🎯 Target Price</div>
                     <div id="catConsensusTarget" style="font-size:1.35rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">₹—</div>
                     <div id="catConsensusExpectedMove" style="font-size:0.72rem;color:#34d399;font-weight:600;margin-top:0.2rem;">—</div>
                 </div>
 
-                <div class="card card-glow-amber" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(245,158,11,0.3);">
-                    <div style="font-size:0.68rem;color:#f87171;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">🛑 Resistance / Exit</div>
-                    <div id="catConsensusResistance" style="font-size:1.35rem;font-weight:800;color:#fca5a5;font-family:var(--font-mono);">₹—</div>
-                    <div style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">Profit target zone</div>
-                </div>
-
-                <div class="card card-glow-blue" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(59,130,246,0.3);">
-                    <div style="font-size:0.68rem;color:#60a5fa;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">🛡️ Support / Buy Zone</div>
-                    <div id="catConsensusSupport" style="font-size:1.35rem;font-weight:800;color:#93c5fd;font-family:var(--font-mono);">₹—</div>
-                    <div style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">Optimal entry floor</div>
+                <div class="card card-glow-amber" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(239,68,68,0.3);">
+                    <div style="font-size:0.68rem;color:#f87171;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">🛑 Stop Loss (SL)</div>
+                    <div id="catConsensusStopLoss" style="font-size:1.35rem;font-weight:800;color:#fca5a5;font-family:var(--font-mono);">₹—</div>
+                    <div id="catConsensusSlRisk" style="font-size:0.72rem;color:#f87171;font-weight:600;margin-top:0.2rem;">—</div>
                 </div>
 
                 <div class="card card-glow-purple" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(168,85,247,0.3);">
-                    <div style="font-size:0.68rem;color:#c084fc;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">⚡ Consensus Agreement</div>
-                    <div id="catConsensusStrength" style="font-size:1.35rem;font-weight:800;color:#e9d5ff;font-family:var(--font-mono);">0%</div>
+                    <div style="font-size:0.68rem;color:#c084fc;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">⚖️ Risk / Reward</div>
+                    <div id="catConsensusRiskReward" style="font-size:1.35rem;font-weight:800;color:#e9d5ff;font-family:var(--font-mono);">—</div>
+                    <div style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">Target vs Invalidation</div>
+                </div>
+
+                <div class="card card-glow-blue" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(59,130,246,0.3);">
+                    <div style="font-size:0.68rem;color:#60a5fa;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">🛡️ Entry / Buy Zone</div>
+                    <div id="catConsensusBuyZone" style="font-size:1.15rem;font-weight:800;color:#93c5fd;font-family:var(--font-mono);">₹—</div>
+                    <div style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">Optimal entry floor</div>
+                </div>
+
+                <div class="card" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(245,158,11,0.3);">
+                    <div style="font-size:0.68rem;color:#fbbf24;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">🛑 Resistance / Exit</div>
+                    <div id="catConsensusResistance" style="font-size:1.35rem;font-weight:800;color:#fde68a;font-family:var(--font-mono);">₹—</div>
+                    <div style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">Profit target zone</div>
+                </div>
+
+                <div class="card" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(99,102,241,0.3);">
+                    <div style="font-size:0.68rem;color:#a5b4fc;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">⚡ AI Agreement</div>
+                    <div id="catConsensusStrength" style="font-size:1.35rem;font-weight:800;color:#e0e7ff;font-family:var(--font-mono);">0%</div>
                     <div id="catConsensusModelCount" style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">4 Models Polled</div>
                 </div>
             </div>
 
-            <!-- Synthesized Thesis Box -->
+            <!-- Synthesized Thesis & Technical Insights Box -->
             <div style="background:#0a0a10;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.85rem;margin-bottom:1rem;">
                 <div style="font-size:0.75rem;font-weight:700;color:#c7d2fe;margin-bottom:0.35rem;display:flex;align-items:center;gap:0.35rem;">
                     <span>🧠</span> Synthesized Multi-Model Catalyst Thesis:
                 </div>
-                <p id="catConsensusThesis" style="margin:0;font-size:0.82rem;line-height:1.55;color:#e2e8f0;"></p>
+                <p id="catConsensusThesis" style="margin:0 0 0.6rem 0;font-size:0.82rem;line-height:1.55;color:#e2e8f0;"></p>
+                
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:0.5rem;background:rgba(0,0,0,0.3);padding:0.5rem 0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);font-size:0.74rem;">
+                    <div><span style="color:#a1a1aa;">📊 Chart Pattern: </span><strong id="catConsensusPattern" style="color:#67e8f9;">—</strong></div>
+                    <div><span style="color:#a1a1aa;">📦 Volume Profile: </span><strong id="catConsensusVolume" style="color:#a78bfa;">—</strong></div>
+                    <div style="grid-column:1/-1;"><span style="color:#a1a1aa;">⚠️ Primary Risk: </span><strong id="catConsensusRisk" style="color:#fca5a5;">—</strong></div>
+                </div>
             </div>
 
             <!-- Individual Model Breakdown -->
             <div style="margin-bottom:1.25rem;">
                 <div style="font-size:0.74rem;font-weight:700;color:#a1a1aa;margin-bottom:0.45rem;text-transform:uppercase;">
-                    Individual Model Votes & Predictions
+                    Individual Model Votes & Detailed Trade Setups
                 </div>
                 <div class="table-wrapper">
                     <table class="results-table" style="width:100%;">
                         <thead>
                             <tr>
                                 <th>AI Model</th>
-                                <th>Direction</th>
+                                <th>Direction & Action</th>
                                 <th>Confidence</th>
+                                <th>Entry / Buy Floor</th>
                                 <th>Target Price</th>
-                                <th>Support / Buy</th>
-                                <th>Resistance</th>
+                                <th>Stop Loss (SL)</th>
+                                <th>R:R Ratio</th>
                             </tr>
                         </thead>
                         <tbody id="catConsensusModelsBody">
@@ -362,4 +390,4 @@
         </div>
     </div>
 
-    <script src="/static/js/dashboard.js?v=20260824_v16_watchlist_ohlcv"></script>
+    <script src="/static/js/dashboard.js?v=20260824_v17_consensus_setup"></script>

@@ -24,8 +24,16 @@ DEFAULT_MODELS = [
     "deepseek/deepseek-r1",
     "meta-llama/llama-3.3-70b-instruct",
     "qwen/qwen-2.5-72b-instruct",
-    "mistralai/mistral-large",
+    "mistralai/mistral-large-2411",
 ]
+
+# Fallback models when primary model encounters 429 upstream rate limit
+MODEL_FALLBACKS: dict[str, str] = {
+    "mistralai/mistral-large": "mistralai/mistral-large-2411",
+    "mistralai/mistral-large-2411": "google/gemini-2.0-flash-001",
+    "qwen/qwen-2.5-72b-instruct": "meta-llama/llama-3.3-70b-instruct",
+    "deepseek/deepseek-r1": "deepseek/deepseek-chat",
+}
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -65,6 +73,7 @@ MODEL_DISPLAY_NAMES: dict[str, str] = {
     "mistralai/mistral-large": "Mistral-Large",
     "mistralai/mistral-large-2411": "Mistral-Large",
     "mistralai/mistral-large-2407": "Mistral-Large",
+    "google/gemini-2.0-flash-001": "Gemini-2.0-Flash",
 }
 
 
@@ -84,84 +93,203 @@ def _query_single_model(
     prompt: str,
     api_key: str,
     timeout: int = 60,
+    max_retries: int = 2,
 ) -> dict[str, Any]:
-    """Send a prediction request to a single model via OpenRouter.
+    """Send a prediction request to a single model via OpenRouter with rate limit retry & fallback.
 
     Returns a dict with model_name, the parsed prediction fields,
     or an error entry if the call fails.
     """
     display_name = MODEL_DISPLAY_NAMES.get(model_id, model_id.split("/")[-1])
-    start = time.perf_counter()
+    current_model = model_id
 
-    try:
-        resp = requests.post(
-            OPENROUTER_API_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://earnings-engine.local",
-                "X-Title": "Earnings Engine Consensus",
-            },
-            json={
-                "model": model_id,
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.3,
-                "max_tokens": 2048,
-            },
-            timeout=timeout,
-        )
-
+    for attempt in range(max_retries + 1):
+        start = time.perf_counter()
         try:
-            from earnings_engine.rate_limits import record_request, update_openrouter_headers
-            record_request("openrouter", resp.status_code)
-            update_openrouter_headers(dict(resp.headers))
-        except Exception:
-            pass
+            resp = requests.post(
+                OPENROUTER_API_URL,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://earnings-engine.local",
+                    "X-Title": "Earnings Engine Consensus",
+                },
+                json={
+                    "model": current_model,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.3,
+                    "max_tokens": 2048,
+                },
+                timeout=timeout,
+            )
 
-        elapsed_ms = (time.perf_counter() - start) * 1000
-        logger.info("[CONSENSUS] %s responded in %.0fms (HTTP %d)", display_name, elapsed_ms, resp.status_code)
+            try:
+                from earnings_engine.rate_limits import record_request, update_openrouter_headers
+                record_request("openrouter", resp.status_code)
+                update_openrouter_headers(dict(resp.headers))
+            except Exception:
+                pass
 
-        if resp.status_code != 200:
-            logger.warning("[CONSENSUS] %s HTTP error %d: %s", display_name, resp.status_code, resp.text[:200])
-            return {"model_name": display_name, "model_id": model_id, "error": f"HTTP {resp.status_code}", "raw": resp.text[:200]}
+            elapsed_ms = (time.perf_counter() - start) * 1000
 
-        data = resp.json()
-        choice = (data.get("choices") or [{}])[0]
-        msg = choice.get("message") or {}
-        content = msg.get("content") or ""
-        reasoning = msg.get("reasoning") or ""
+            # If rate limited (429) or temporary server overload (502, 503), retry with backoff or fallback
+            if resp.status_code in (429, 502, 503):
+                logger.warning(
+                    "[CONSENSUS] %s returned HTTP %d (attempt %d/%d): %.150s",
+                    display_name, resp.status_code, attempt + 1, max_retries + 1, resp.text
+                )
+                if attempt < max_retries:
+                    sleep_sec = 1.5 * (attempt + 1)
+                    time.sleep(sleep_sec)
+                    continue
+                elif current_model in MODEL_FALLBACKS:
+                    fallback_id = MODEL_FALLBACKS[current_model]
+                    logger.info("[CONSENSUS] %s rate-limited. Failing over to fallback: %s", display_name, fallback_id)
+                    current_model = fallback_id
+                    display_name = f"{display_name} (via {MODEL_DISPLAY_NAMES.get(fallback_id, fallback_id.split('/')[-1])})"
+                    time.sleep(1.0)
+                    continue
 
-        # For reasoning models where content might be null/empty, check reasoning or alternative fields
-        if not content and reasoning:
-            content = reasoning
+            if resp.status_code != 200:
+                logger.warning("[CONSENSUS] %s HTTP error %d: %s", display_name, resp.status_code, resp.text[:200])
+                return {
+                    "model_name": display_name,
+                    "model_id": current_model,
+                    "error": f"HTTP {resp.status_code}",
+                    "direction": "NEUTRAL",
+                    "confidence_pct": 50,
+                    "target_price": None,
+                    "support_level": None,
+                    "resistance_level": None,
+                    "stop_loss_price": None,
+                    "risk_reward_ratio": None,
+                    "recommended_action": "HOLD / WAIT",
+                    "raw": resp.text[:200],
+                }
 
-        # Parse the JSON response — handle markdown code fences and reasoning tags
-        prediction = _parse_model_json(content)
-        if prediction is None:
-            raw_preview = (content if isinstance(content, str) else str(content)) or ""
-            logger.warning("[CONSENSUS] %s returned unparseable response: %.200s", display_name, raw_preview)
-            return {"model_name": display_name, "model_id": model_id, "error": "Unparseable JSON", "raw_response": raw_preview[:500]}
+            data = resp.json()
+            choice = (data.get("choices") or [{}])[0]
+            msg = choice.get("message") or {}
+            content = msg.get("content") or ""
+            reasoning = msg.get("reasoning") or ""
 
-        prediction["model_name"] = display_name
-        prediction["model_id"] = model_id
-        prediction["latency_ms"] = round(elapsed_ms)
+            # For reasoning models where content might be in reasoning tag
+            if not content and reasoning:
+                content = reasoning
 
-        # Usage stats if available
-        usage = data.get("usage", {})
-        if usage:
-            prediction["tokens_used"] = usage.get("total_tokens", 0)
+            # Parse the JSON response
+            prediction = _parse_model_json(content)
+            if prediction is None:
+                raw_preview = (content if isinstance(content, str) else str(content)) or ""
+                logger.warning("[CONSENSUS] %s returned unparseable response: %.200s", display_name, raw_preview)
+                return {
+                    "model_name": display_name,
+                    "model_id": current_model,
+                    "error": "Unparseable JSON",
+                    "direction": "NEUTRAL",
+                    "confidence_pct": 50,
+                    "target_price": None,
+                    "support_level": None,
+                    "resistance_level": None,
+                    "stop_loss_price": None,
+                    "risk_reward_ratio": None,
+                    "recommended_action": "HOLD / WAIT",
+                    "raw_response": raw_preview[:500],
+                }
 
-        return prediction
+            # Field normalization
+            direction = str(prediction.get("direction", "NEUTRAL")).upper()
+            if direction not in ("BULLISH", "BEARISH", "NEUTRAL"):
+                direction = "NEUTRAL"
 
-    except requests.Timeout:
-        logger.warning("[CONSENSUS] %s timed out after %ds", display_name, timeout)
-        return {"model_name": display_name, "model_id": model_id, "error": f"Timeout after {timeout}s"}
-    except Exception as e:
-        logger.error("[CONSENSUS] %s unexpected error: %s", display_name, e)
-        return {"model_name": display_name, "model_id": model_id, "error": str(e)}
+            conf_pct = int(prediction.get("confidence_pct", 75))
+            target_p = float(prediction.get("target_price", 0.0)) if prediction.get("target_price") else None
+            support_p = float(prediction.get("support_level", 0.0)) if prediction.get("support_level") else None
+            resist_p = float(prediction.get("resistance_level", 0.0)) if prediction.get("resistance_level") else None
+            sl_p = float(prediction.get("stop_loss_price", 0.0)) if prediction.get("stop_loss_price") else None
+            rr = float(prediction.get("risk_reward_ratio", 0.0)) if prediction.get("risk_reward_ratio") else None
+
+            # Fallback calculations if SL or RR missing
+            if target_p and support_p and not sl_p and direction == "BULLISH":
+                sl_p = round(support_p * 0.98, 2)
+            if not rr and target_p and sl_p and support_p and (target_p - support_p) > 0 and (support_p - sl_p) > 0:
+                rr = round((target_p - support_p) / (support_p - sl_p), 1)
+
+            rec_action = str(prediction.get("recommended_action") or ("STRONG BUY" if direction == "BULLISH" and conf_pct >= 80 else ("ACCUMULATE ON DIPS" if direction == "BULLISH" else ("AVOID / CAUTION" if direction == "BEARISH" else "HOLD / WAIT")))).upper()
+
+            return {
+                "model_name": display_name,
+                "model_id": current_model,
+                "direction": direction,
+                "confidence_pct": conf_pct,
+                "target_price": target_p,
+                "target_return_pct": float(prediction.get("target_return_pct", 0.0)) if prediction.get("target_return_pct") is not None else None,
+                "support_level": support_p,
+                "resistance_level": resist_p,
+                "stop_loss_price": sl_p,
+                "risk_reward_ratio": rr,
+                "recommended_action": rec_action,
+                "chart_pattern": str(prediction.get("chart_pattern") or "Consolidation / Channel"),
+                "volume_profile_insight": str(prediction.get("volume_profile_insight") or "Normal volume baseline"),
+                "key_drivers": prediction.get("key_drivers") or [],
+                "primary_risk": str(prediction.get("primary_risk") or "General market volatility"),
+                "latency_ms": round(elapsed_ms),
+                "tokens_used": data.get("usage", {}).get("total_tokens", 0),
+            }
+
+        except requests.Timeout:
+            if attempt < max_retries:
+                time.sleep(1.0)
+                continue
+            logger.warning("[CONSENSUS] %s timed out after %ds", display_name, timeout)
+            return {
+                "model_name": display_name,
+                "model_id": current_model,
+                "error": f"Timeout after {timeout}s",
+                "direction": "NEUTRAL",
+                "confidence_pct": 50,
+                "target_price": None,
+                "support_level": None,
+                "resistance_level": None,
+                "stop_loss_price": None,
+                "risk_reward_ratio": None,
+                "recommended_action": "HOLD / WAIT",
+            }
+        except Exception as e:
+            if attempt < max_retries:
+                time.sleep(1.0)
+                continue
+            logger.error("[CONSENSUS] %s unexpected error: %s", display_name, e)
+            return {
+                "model_name": display_name,
+                "model_id": current_model,
+                "error": str(e),
+                "direction": "NEUTRAL",
+                "confidence_pct": 50,
+                "target_price": None,
+                "support_level": None,
+                "resistance_level": None,
+                "stop_loss_price": None,
+                "risk_reward_ratio": None,
+                "recommended_action": "HOLD / WAIT",
+            }
+
+    return {
+        "model_name": display_name,
+        "model_id": current_model,
+        "error": "Max retries exceeded",
+        "direction": "NEUTRAL",
+        "confidence_pct": 50,
+        "target_price": None,
+        "support_level": None,
+        "resistance_level": None,
+        "stop_loss_price": None,
+        "risk_reward_ratio": None,
+        "recommended_action": "HOLD / WAIT",
+    }
 
 
 def _parse_model_json(content: Any) -> dict[str, Any] | None:

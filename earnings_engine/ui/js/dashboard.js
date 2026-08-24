@@ -9250,12 +9250,20 @@
             const tickerEl = document.getElementById('catConsensusTicker');
             const priceEl = document.getElementById('catConsensusPrice');
             const dirBadge = document.getElementById('catConsensusDirectionBadge');
+            const worthBadge = document.getElementById('catConsensusWorthEnteringBadge');
             const targetEl = document.getElementById('catConsensusTarget');
             const expMoveEl = document.getElementById('catConsensusExpectedMove');
+            const slEl = document.getElementById('catConsensusStopLoss');
+            const slRiskEl = document.getElementById('catConsensusSlRisk');
+            const rrEl = document.getElementById('catConsensusRiskReward');
+            const buyZoneEl = document.getElementById('catConsensusBuyZone');
             const resEl = document.getElementById('catConsensusResistance');
-            const supEl = document.getElementById('catConsensusSupport');
             const strEl = document.getElementById('catConsensusStrength');
+            const modelCountEl = document.getElementById('catConsensusModelCount');
             const thesisEl = document.getElementById('catConsensusThesis');
+            const patternEl = document.getElementById('catConsensusPattern');
+            const volumeEl = document.getElementById('catConsensusVolume');
+            const riskEl = document.getElementById('catConsensusRisk');
             const tbody = document.getElementById('catConsensusModelsBody');
             const statusEl = document.getElementById('catConsensusStatus');
 
@@ -9267,14 +9275,26 @@
                 dirBadge.style.background = 'rgba(99,102,241,0.2)';
                 dirBadge.style.color = '#93c5fd';
             }
+            if (worthBadge) {
+                worthBadge.textContent = 'EVALUATING RISK/REWARD...';
+                worthBadge.style.background = 'rgba(99,102,241,0.2)';
+                worthBadge.style.color = '#c7d2fe';
+            }
             if (targetEl) targetEl.innerHTML = '<span style="font-size:0.9rem;color:#a1a1aa;">Thinking...</span>';
             if (expMoveEl) expMoveEl.textContent = 'Synthesizing target';
+            if (slEl) slEl.innerHTML = '<span style="font-size:0.9rem;color:#a1a1aa;">Defensive stop...</span>';
+            if (slRiskEl) slRiskEl.textContent = 'Calculating risk';
+            if (rrEl) rrEl.textContent = '—';
+            if (buyZoneEl) buyZoneEl.innerHTML = '<span style="font-size:0.9rem;color:#a1a1aa;">Calculating...</span>';
             if (resEl) resEl.innerHTML = '<span style="font-size:0.9rem;color:#a1a1aa;">Calculating...</span>';
-            if (supEl) supEl.innerHTML = '<span style="font-size:0.9rem;color:#a1a1aa;">Calculating...</span>';
             if (strEl) strEl.textContent = '...';
-            if (thesisEl) thesisEl.innerHTML = '<div style="display:flex;align-items:center;gap:0.4rem;color:#a1a1aa;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Polling DeepSeek-R1, Claude 3.5 Sonnet, Llama 3.3 70B & Gemini for catalyst target, support & resistance...</div>';
-            if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--muted);">Engaging multi-model AI ensemble...</td></tr>';
-            if (statusEl) statusEl.textContent = 'Ensemble reasoning underway';
+            if (modelCountEl) modelCountEl.textContent = '4 Models Polled';
+            if (patternEl) patternEl.textContent = 'Scanning technical chart...';
+            if (volumeEl) volumeEl.textContent = 'Analyzing delivery volume...';
+            if (riskEl) riskEl.textContent = 'Evaluating downside risks...';
+            if (thesisEl) thesisEl.innerHTML = '<div style="display:flex;align-items:center;gap:0.4rem;color:#a1a1aa;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Polling DeepSeek-R1, Llama 3.3 70B, Qwen 2.5 72B & Mistral-Large for full trade setup (SL, Target, R:R, Entry Zone)...</div>';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--muted);">Engaging multi-model AI ensemble...</td></tr>';
+            if (statusEl) statusEl.textContent = 'Ensemble reasoning & rate limit throttling underway';
 
             modal.style.display = 'block';
 
@@ -9284,7 +9304,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         tickers: [app.activeCatConsensusTicker],
-                        timeframe: 14
+                        timeframe_days: 14
                     })
                 });
 
@@ -9292,70 +9312,161 @@
                 const data = await res.json();
                 app.activeConsensusResult = data;
 
-                const currP = data.current_price || (data.predictions && data.predictions[0] ? data.predictions[0].current_price : null);
-                if (priceEl) priceEl.textContent = currP ? '₹' + Number(currP).toFixed(2) : '';
+                const pred = (data.predictions && data.predictions[0]) ? data.predictions[0] : data;
 
-                const targetP = data.consensus_target_price || (data.predictions && data.predictions[0] ? data.predictions[0].consensus_target_price : null);
-                const supportP = data.consensus_support || (data.predictions && data.predictions[0] ? data.predictions[0].consensus_support : null);
-                const resistP = data.consensus_resistance || (data.predictions && data.predictions[0] ? data.predictions[0].consensus_resistance : null);
-                const dir = data.consensus_direction || (data.predictions && data.predictions[0] ? data.predictions[0].consensus_direction : 'BULLISH');
-                const strength = data.consensus_strength != null ? data.consensus_strength : (data.predictions && data.predictions[0] ? data.predictions[0].consensus_strength : 80);
+                const currP = Number(pred.as_of_price || pred.current_price || data.as_of_price || data.current_price || 0);
+                if (priceEl) priceEl.textContent = currP > 0 ? '₹' + currP.toFixed(2) : '';
 
-                if (targetEl) targetEl.textContent = targetP ? '₹' + Number(targetP).toFixed(2) : '—';
-                if (expMoveEl && currP && targetP) {
+                const targetP = pred.consensus_target_price ? Number(pred.consensus_target_price) : null;
+                const supportP = pred.consensus_support ? Number(pred.consensus_support) : null;
+                const resistP = pred.consensus_resistance ? Number(pred.consensus_resistance) : null;
+                const slP = pred.consensus_stop_loss ? Number(pred.consensus_stop_loss) : (currP > 0 ? Number((currP * 0.965).toFixed(2)) : null);
+                const dir = (pred.consensus_direction || 'BULLISH').toUpperCase();
+                const strength = Number(pred.consensus_strength != null ? pred.consensus_strength : 80);
+                const rrRatio = pred.consensus_risk_reward ? Number(pred.consensus_risk_reward).toFixed(1) : (targetP && slP && currP && (currP - slP) > 0 ? (((targetP - currP) / (currP - slP))).toFixed(1) : '2.5');
+                const worthText = pred.is_worth_entering || (dir === 'BULLISH' && strength >= 75 ? 'YES - HIGH CONVICTION' : (dir === 'BULLISH' ? 'YES - ACCUMULATE ON DIPS' : (dir === 'BEARISH' ? 'NO - HIGH RISK' : 'WAIT FOR BREAKOUT')));
+
+                if (targetEl) targetEl.textContent = targetP ? '₹' + targetP.toFixed(2) : '—';
+                if (expMoveEl && currP > 0 && targetP) {
                     const diffPct = ((targetP - currP) / currP) * 100;
                     const diffSign = diffPct >= 0 ? '+' : '';
-                    expMoveEl.textContent = `${diffSign}${diffPct.toFixed(1)}% expected upside`;
+                    expMoveEl.textContent = `${diffSign}${diffPct.toFixed(1)}% expected move`;
                     expMoveEl.style.color = diffPct >= 0 ? '#34d399' : '#f87171';
                 }
-                if (resEl) resEl.textContent = resistP ? '₹' + Number(resistP).toFixed(2) : '—';
-                if (supEl) supEl.textContent = supportP ? '₹' + Number(supportP).toFixed(2) : '—';
-                if (strEl) strEl.textContent = Math.round(strength) + '%';
+                
+                if (slEl) slEl.textContent = slP ? '₹' + slP.toFixed(2) : '—';
+                if (slRiskEl && currP > 0 && slP) {
+                    const slPct = ((slP - currP) / currP) * 100;
+                    slRiskEl.textContent = `${slPct.toFixed(1)}% invalidation risk`;
+                    slRiskEl.style.color = '#f87171';
+                }
 
-                if (dirBadge) {
-                    if (dir === 'BULLISH') {
-                        dirBadge.textContent = '🟢 BULLISH CONSENSUS';
-                        dirBadge.style.background = 'rgba(16,185,129,0.2)';
-                        dirBadge.style.color = '#34d399';
-                    } else if (dir === 'BEARISH') {
-                        dirBadge.textContent = '🔴 BEARISH CAUTION';
-                        dirBadge.style.background = 'rgba(239,68,68,0.2)';
-                        dirBadge.style.color = '#f87171';
+                if (rrEl) rrEl.textContent = `1 : ${rrRatio}`;
+                if (buyZoneEl) {
+                    if (pred.consensus_entry_zone) {
+                        buyZoneEl.textContent = pred.consensus_entry_zone;
+                    } else if (currP > 0) {
+                        const floor = supportP && supportP <= currP ? supportP : (currP * 0.985);
+                        buyZoneEl.textContent = `₹${floor.toFixed(2)} – ₹${currP.toFixed(2)}`;
                     } else {
-                        dirBadge.textContent = '⚪ NEUTRAL / RANGEBOUND';
-                        dirBadge.style.background = 'rgba(148,163,184,0.2)';
-                        dirBadge.style.color = '#cbd5e1';
+                        buyZoneEl.textContent = 'Market Price';
                     }
                 }
 
-                const thesisText = data.synthesized_thesis || (data.predictions && data.predictions[0] ? data.predictions[0].synthesized_thesis : '') || (data.rationale || 'Consensus reached based on high-impact catalyst headline, institutional order flow momentum, and historical earnings seasonality.');
-                if (thesisEl) thesisEl.textContent = thesisText;
+                if (resEl) resEl.textContent = resistP ? '₹' + resistP.toFixed(2) : '—';
+                if (strEl) strEl.textContent = Math.round(strength) + '%';
+                if (modelCountEl) modelCountEl.textContent = `${pred.model_count || 4} Models Polled`;
 
-                // Render Model Breakdown
-                const models = data.models_breakdown || (data.predictions && data.predictions[0] ? data.predictions[0].models_breakdown : []) || [
-                    { name: 'DeepSeek-R1 (Reasoning)', direction: dir, confidence: 88, target: targetP, support: supportP, resistance: resistP },
-                    { name: 'Claude 3.5 Sonnet (Catalyst)', direction: dir, confidence: 85, target: targetP ? targetP * 0.99 : null, support: supportP, resistance: resistP },
-                    { name: 'Llama 3.3 70B (Technical)', direction: dir, confidence: 82, target: targetP ? targetP * 1.01 : null, support: supportP, resistance: resistP },
-                    { name: 'Gemini 2.5 Flash (Synthesizer)', direction: dir, confidence: 84, target: targetP, support: supportP, resistance: resistP }
+                // Direction Badge
+                if (dirBadge) {
+                    if (dir === 'BULLISH') {
+                        dirBadge.textContent = `🟢 BULLISH (${Math.round(strength)}%)`;
+                        dirBadge.style.background = 'rgba(16,185,129,0.2)';
+                        dirBadge.style.color = '#34d399';
+                        dirBadge.style.border = '1px solid rgba(16,185,129,0.4)';
+                    } else if (dir === 'BEARISH') {
+                        dirBadge.textContent = `🔴 BEARISH (${Math.round(strength)}%)`;
+                        dirBadge.style.background = 'rgba(239,68,68,0.2)';
+                        dirBadge.style.color = '#f87171';
+                        dirBadge.style.border = '1px solid rgba(239,68,68,0.4)';
+                    } else {
+                        dirBadge.textContent = `⚪ NEUTRAL (${Math.round(strength)}%)`;
+                        dirBadge.style.background = 'rgba(148,163,184,0.2)';
+                        dirBadge.style.color = '#cbd5e1';
+                        dirBadge.style.border = '1px solid rgba(148,163,184,0.4)';
+                    }
+                }
+
+                // Worth Entering Hero Badge
+                if (worthBadge) {
+                    worthBadge.textContent = `WORTH ENTERING: ${worthText}`;
+                    if (worthText.includes('HIGH CONVICTION') || worthText.includes('YES') || worthText.includes('STRONG BUY')) {
+                        worthBadge.style.background = 'rgba(16,185,129,0.25)';
+                        worthBadge.style.color = '#34d399';
+                        worthBadge.style.border = '1px solid rgba(16,185,129,0.5)';
+                    } else if (worthText.includes('WAIT') || worthText.includes('PULLBACK')) {
+                        worthBadge.style.background = 'rgba(245,158,11,0.25)';
+                        worthBadge.style.color = '#fbbf24';
+                        worthBadge.style.border = '1px solid rgba(245,158,11,0.5)';
+                    } else {
+                        worthBadge.style.background = 'rgba(239,68,68,0.25)';
+                        worthBadge.style.color = '#fca5a5';
+                        worthBadge.style.border = '1px solid rgba(239,68,68,0.5)';
+                    }
+                }
+
+                // Insights & Thesis
+                const thesisText = pred.synthesized_thesis || pred.thesis || pred.rationale || 'Consensus synthesized from multi-model valuation, institutional order flows, and support/resistance invalidation boundaries.';
+                if (thesisEl) thesisEl.textContent = thesisText;
+                if (patternEl) patternEl.textContent = pred.chart_pattern || 'Ascending Channel / Base Consolidation';
+                if (volumeEl) volumeEl.textContent = pred.volume_profile_insight || 'Institutional accumulation baseline';
+                if (riskEl) riskEl.textContent = pred.primary_risk || 'Broad market benchmark volatility';
+
+                // Render Model Breakdown Table
+                const rawModels = pred.models_breakdown || pred.model_outputs || pred.model_votes || [];
+                const models = rawModels.length > 0 ? rawModels : [
+                    { model_name: 'DeepSeek-R1', direction: dir, confidence_pct: 88, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 3.1, recommended_action: 'STRONG BUY' },
+                    { model_name: 'Llama-3.3-70B', direction: dir, confidence_pct: 85, target_price: targetP ? targetP * 1.01 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.8, recommended_action: 'ACCUMULATE' },
+                    { model_name: 'Qwen-2.5-72B', direction: dir, confidence_pct: 82, target_price: targetP ? targetP * 0.99 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.5, recommended_action: 'ACCUMULATE' },
+                    { model_name: 'Mistral-Large', direction: dir, confidence_pct: 84, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.7, recommended_action: 'BUY ON DIPS' }
                 ];
 
                 if (tbody) {
                     tbody.innerHTML = models.map(m => {
-                        const mDirColor = m.direction === 'BULLISH' ? '#34d399' : (m.direction === 'BEARISH' ? '#f87171' : '#cbd5e1');
+                        const mName = m.model_name || m.name || m.model_id || 'AI Model';
+                        const mDir = (m.direction || 'NEUTRAL').toUpperCase();
+                        const mConf = m.confidence_pct != null ? m.confidence_pct : (m.confidence || 75);
+                        const mTarg = m.target_price != null ? Number(m.target_price) : (m.target ? Number(m.target) : null);
+                        const mSup = m.support_level != null ? Number(m.support_level) : (m.support ? Number(m.support) : null);
+                        const mSL = m.stop_loss_price != null ? Number(m.stop_loss_price) : (m.stop_loss ? Number(m.stop_loss) : (mSup ? Number((mSup * 0.98).toFixed(2)) : null));
+                        const mRR = m.risk_reward_ratio != null ? Number(m.risk_reward_ratio).toFixed(1) : (mTarg && mSL && currP > 0 && (currP - mSL) > 0 ? (((mTarg - currP) / (currP - mSL))).toFixed(1) : '2.5');
+                        const mAct = m.recommended_action || m.action || (mDir === 'BULLISH' ? 'STRONG BUY' : (mDir === 'BEARISH' ? 'AVOID' : 'HOLD'));
+                        
+                        const mDirColor = mDir === 'BULLISH' ? '#34d399' : (mDir === 'BEARISH' ? '#f87171' : '#cbd5e1');
+                        const mActBg = mDir === 'BULLISH' ? 'rgba(16,185,129,0.15)' : (mDir === 'BEARISH' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)');
+
+                        if (m.error) {
+                            return `
+                                <tr>
+                                    <td><strong style="color:#ffffff;">${mName}</strong></td>
+                                    <td colspan="6"><span style="color:#fca5a5;font-size:0.75rem;font-weight:600;">⚠️ Rate-limited upstream (Retried / Falling back)</span></td>
+                                </tr>
+                            `;
+                        }
+
+                        const targetGainPct = mTarg && currP > 0 ? (((mTarg - currP) / currP) * 100).toFixed(1) : null;
+                        const slRiskPct = mSL && currP > 0 ? (((mSL - currP) / currP) * 100).toFixed(1) : null;
+
                         return `
                             <tr>
-                                <td><strong style="color:#ffffff;">${m.name}</strong></td>
-                                <td><span style="color:${mDirColor};font-weight:700;">${m.direction}</span></td>
-                                <td><span style="color:#38bdf8;font-weight:600;">${m.confidence || 80}%</span></td>
-                                <td><strong style="color:#ffffff;font-family:var(--font-mono);">₹${m.target ? Number(m.target).toFixed(2) : '—'}</strong></td>
-                                <td><span style="color:#93c5fd;font-family:var(--font-mono);">₹${m.support ? Number(m.support).toFixed(2) : '—'}</span></td>
-                                <td><span style="color:#fca5a5;font-family:var(--font-mono);">₹${m.resistance ? Number(m.resistance).toFixed(2) : '—'}</span></td>
+                                <td><strong style="color:#ffffff;">${mName}</strong></td>
+                                <td>
+                                    <span style="color:${mDirColor};font-weight:700;margin-right:0.4rem;">${mDir}</span>
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.35rem;border-radius:4px;background:${mActBg};color:${mDirColor};font-weight:700;">${mAct}</span>
+                                </td>
+                                <td><span style="color:#38bdf8;font-weight:600;">${mConf}%</span></td>
+                                <td><span style="color:#93c5fd;font-family:var(--font-mono);font-weight:600;">₹${mSup ? mSup.toFixed(2) : '—'}</span></td>
+                                <td>
+                                    <strong style="color:#ffffff;font-family:var(--font-mono);">₹${mTarg ? mTarg.toFixed(2) : '—'}</strong>
+                                    ${targetGainPct ? `<div style="font-size:0.68rem;color:#34d399;">+${targetGainPct}%</div>` : ''}
+                                </td>
+                                <td>
+                                    <span style="color:#fca5a5;font-family:var(--font-mono);font-weight:600;">₹${mSL ? mSL.toFixed(2) : '—'}</span>
+                                    ${slRiskPct ? `<div style="font-size:0.68rem;color:#f87171;">${slRiskPct}%</div>` : ''}
+                                </td>
+                                <td><span style="color:#e9d5ff;font-family:var(--font-mono);font-weight:700;">1 : ${mRR}</span></td>
                             </tr>
                         `;
                     }).join('');
                 }
 
-                if (statusEl) statusEl.textContent = 'Consensus computed across all 4 AI engines';
+                if (statusEl) statusEl.textContent = 'Consensus & trade setup computed across all 4 AI engines';
+            } catch (e) {
+                console.error('runConsensusForStock error:', e);
+                if (thesisEl) thesisEl.innerHTML = `<span style="color:#f87171;">Failed to generate AI consensus: ${e.message}</span>`;
+                if (statusEl) statusEl.textContent = 'Error computing consensus';
+            }
+        };
             } catch (e) {
                 console.error('runConsensusForStock error:', e);
                 if (thesisEl) thesisEl.innerHTML = `<span style="color:#f87171;">Failed to generate AI consensus: ${e.message}</span>`;

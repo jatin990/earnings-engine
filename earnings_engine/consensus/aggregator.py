@@ -148,7 +148,23 @@ def aggregate_predictions(
     consensus_stop_loss = weighted_stop_loss / stop_weight if stop_weight > 0 else None
     consensus_rr = (sum(rr_ratios) / len(rr_ratios)) if rr_ratios else None
 
-    # Determine recommended action
+    # Calculate Stop Loss % from current price
+    if consensus_stop_loss and as_of_price > 0:
+        consensus_sl_pct = round(((consensus_stop_loss - as_of_price) / as_of_price) * 100, 2)
+    elif as_of_price > 0:
+        consensus_sl_pct = -3.5
+        consensus_stop_loss = round(as_of_price * 0.965, 2)
+    else:
+        consensus_sl_pct = None
+
+    # Determine Entry Zone
+    if as_of_price > 0:
+        sup_floor = consensus_support if consensus_support and consensus_support <= as_of_price else (as_of_price * 0.985)
+        consensus_entry_zone = f"₹{sup_floor:.2f} – ₹{as_of_price:.2f}"
+    else:
+        consensus_entry_zone = "Market Price"
+
+    # Determine recommended action & conviction
     if actions:
         from collections import Counter
         consensus_action = Counter(actions).most_common(1)[0][0]
@@ -158,6 +174,29 @@ def aggregate_predictions(
         consensus_action = "AVOID / TAKE PROFITS"
     else:
         consensus_action = "HOLD / WAIT FOR BREAKOUT"
+
+    # Is it worth entering?
+    if consensus_direction == "BULLISH":
+        if consensus_strength >= 75 and (consensus_rr is None or consensus_rr >= 2.0) and consensus_return_pct >= 2.5:
+            is_worth_entering = "YES - HIGH CONVICTION"
+        elif consensus_strength >= 60:
+            is_worth_entering = "YES - ACCUMULATE ON DIPS"
+        else:
+            is_worth_entering = "WAIT FOR PULLBACK"
+    elif consensus_direction == "BEARISH":
+        is_worth_entering = "NO - HIGH DOWNSIDE RISK"
+    else:
+        is_worth_entering = "NEUTRAL - WAIT FOR BREAKOUT"
+
+    # Extract common pattern and volume profile
+    patterns = [p.get("chart_pattern") for p in valid if p.get("chart_pattern") and p.get("chart_pattern") != "Consolidation / Channel"]
+    common_pattern = patterns[0] if patterns else (valid[0].get("chart_pattern") if valid else "Channel Consolidation")
+    
+    vol_insights = [p.get("volume_profile_insight") for p in valid if p.get("volume_profile_insight") and p.get("volume_profile_insight") != "Normal volume baseline"]
+    common_vol = vol_insights[0] if vol_insights else (valid[0].get("volume_profile_insight") if valid else "Normal institutional baseline")
+
+    risks = [p.get("primary_risk") for p in valid if p.get("primary_risk")]
+    common_risk = risks[0] if risks else "General market sentiment volatility"
 
     # --- Synthesized Thesis ---
     thesis = _synthesize_thesis(valid, errored, consensus_direction, consensus_strength, agreement_ratio)
@@ -172,8 +211,14 @@ def aggregate_predictions(
         "consensus_support": round(consensus_support, 2) if consensus_support else None,
         "consensus_resistance": round(consensus_resistance, 2) if consensus_resistance else None,
         "consensus_stop_loss": round(consensus_stop_loss, 2) if consensus_stop_loss else None,
-        "consensus_risk_reward": round(consensus_rr, 1) if consensus_rr else None,
+        "consensus_stop_loss_pct": consensus_sl_pct,
+        "consensus_risk_reward": round(consensus_rr, 1) if consensus_rr else 2.5,
+        "consensus_entry_zone": consensus_entry_zone,
         "consensus_recommended_action": consensus_action,
+        "is_worth_entering": is_worth_entering,
+        "chart_pattern": common_pattern,
+        "volume_profile_insight": common_vol,
+        "primary_risk": common_risk,
         "model_count": len(model_results),
         "agreement_ratio": round(agreement_ratio, 2),
         "models_breakdown": model_results,
