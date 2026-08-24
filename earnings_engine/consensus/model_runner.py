@@ -106,6 +106,7 @@ def _query_single_model(
 
     for attempt in range(max_retries + 1):
         start = time.perf_counter()
+        logger.info("[CONSENSUS] Querying %s (%s, attempt %d/%d)...", display_name, current_model, attempt + 1, max_retries + 1)
         try:
             resp = requests.post(
                 OPENROUTER_API_URL,
@@ -139,8 +140,8 @@ def _query_single_model(
             # If rate limited (429), temporary server overload (502, 503), or model endpoint not found (404)
             if resp.status_code in (404, 429, 502, 503):
                 logger.warning(
-                    "[CONSENSUS] %s returned HTTP %d (attempt %d/%d): %.150s",
-                    display_name, resp.status_code, attempt + 1, max_retries + 1, resp.text
+                    "[CONSENSUS] %s returned HTTP %d (attempt %d/%d in %.2fs): %.150s",
+                    display_name, resp.status_code, attempt + 1, max_retries + 1, elapsed_ms / 1000.0, resp.text
                 )
                 if resp.status_code == 404:
                     if current_model in MODEL_FALLBACKS:
@@ -162,7 +163,7 @@ def _query_single_model(
                     continue
 
             if resp.status_code != 200:
-                logger.warning("[CONSENSUS] %s HTTP error %d: %s", display_name, resp.status_code, resp.text[:200])
+                logger.warning("[CONSENSUS] %s HTTP error %d (in %.2fs): %s", display_name, resp.status_code, elapsed_ms / 1000.0, resp.text[:200])
                 return {
                     "model_name": display_name,
                     "model_id": current_model,
@@ -179,6 +180,9 @@ def _query_single_model(
                 }
 
             data = resp.json()
+            total_tokens = data.get("usage", {}).get("total_tokens", 0)
+            logger.info("[CONSENSUS] %s responded in %.2fs (HTTP 200, tokens=%d)", display_name, elapsed_ms / 1000.0, total_tokens)
+
             choice = (data.get("choices") or [{}])[0]
             msg = choice.get("message") or {}
             content = msg.get("content") or ""
@@ -192,7 +196,7 @@ def _query_single_model(
             prediction = _parse_model_json(content)
             if prediction is None:
                 raw_preview = (content if isinstance(content, str) else str(content)) or ""
-                logger.warning("[CONSENSUS] %s returned unparseable response: %.200s", display_name, raw_preview)
+                logger.warning("[CONSENSUS] %s returned unparseable response (%.2fs): %.200s", display_name, elapsed_ms / 1000.0, raw_preview)
                 return {
                     "model_name": display_name,
                     "model_id": current_model,
@@ -228,6 +232,9 @@ def _query_single_model(
 
             rec_action = str(prediction.get("recommended_action") or ("STRONG BUY" if direction == "BULLISH" and conf_pct >= 80 else ("ACCUMULATE ON DIPS" if direction == "BULLISH" else ("AVOID / CAUTION" if direction == "BEARISH" else "HOLD / WAIT")))).upper()
 
+            logger.info("[CONSENSUS] %s parsed: direction=%s, conf=%d%%, target=%s, action=%s (latency=%.2fs)",
+                        display_name, direction, conf_pct, target_p, rec_action, elapsed_ms / 1000.0)
+
             return {
                 "model_name": display_name,
                 "model_id": current_model,
@@ -245,7 +252,7 @@ def _query_single_model(
                 "key_drivers": prediction.get("key_drivers") or [],
                 "primary_risk": str(prediction.get("primary_risk") or "General market volatility"),
                 "latency_ms": round(elapsed_ms),
-                "tokens_used": data.get("usage", {}).get("total_tokens", 0),
+                "tokens_used": total_tokens,
             }
 
         except requests.Timeout:
@@ -356,7 +363,9 @@ def run_consensus_models(
     # Add the prediction ask to the prompt
     full_prompt = f"{prompt}\n\n---\n**Task:** Predict the price direction of {ticker} over the next {timeframe} trading days. Respond with ONLY a JSON object."
 
-    logger.info("[CONSENSUS] Dispatching %s to %d models...", ticker, len(models))
+    t_start = time.perf_counter()
+    model_names_str = ", ".join(MODEL_DISPLAY_NAMES.get(m, m.split('/')[-1]) for m in models)
+    logger.info("[CONSENSUS] Dispatching %s to %d models (%s)...", ticker, len(models), model_names_str)
 
     results: list[dict[str, Any]] = []
 
@@ -367,16 +376,20 @@ def run_consensus_models(
         }
         for future in as_completed(futures):
             model_id = futures[future]
+            display_name = MODEL_DISPLAY_NAMES.get(model_id, model_id.split('/')[-1])
             try:
                 result = future.result()
                 result["timeframe_days"] = timeframe
                 results.append(result)
+                dir_or_err = result.get("direction") if "error" not in result else f"ERROR({result.get('error')})"
+                logger.info("[CONSENSUS] [%d/%d completed] %s -> %s (latency: %.2fs)",
+                            len(results), len(models), result["model_name"], dir_or_err, result.get("latency_ms", 0) / 1000.0)
             except Exception as e:
-                display_name = MODEL_DISPLAY_NAMES.get(model_id, model_id)
                 logger.error("[CONSENSUS] %s future error: %s", display_name, e)
                 results.append({"model_name": display_name, "model_id": model_id, "error": str(e)})
 
+    total_elapsed = time.perf_counter() - t_start
     successful = sum(1 for r in results if "error" not in r)
-    logger.info("[CONSENSUS] %s: %d/%d models responded successfully", ticker, successful, len(models))
+    logger.info("[CONSENSUS] %s: %d/%d models responded successfully in %.2fs. Proceeding to aggregation.", ticker, successful, len(models), total_elapsed)
 
     return results

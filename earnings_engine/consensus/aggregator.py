@@ -201,6 +201,11 @@ def aggregate_predictions(
     # --- Synthesized Thesis ---
     thesis = _synthesize_thesis(valid, errored, consensus_direction, consensus_strength, agreement_ratio)
 
+    logger.info(
+        "[CONSENSUS-AGGREGATOR] %s consensus: %s (strength=%.1f%%, agreement=%.0f%%, target=%.2f, action=%s, valid=%d/%d)",
+        ticker, consensus_direction, consensus_strength, agreement_ratio * 100, consensus_target_price, consensus_action, len(valid), len(model_results)
+    )
+
     return {
         "ticker": ticker,
         "as_of_price": round(as_of_price, 2),

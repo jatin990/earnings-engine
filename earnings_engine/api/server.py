@@ -3244,6 +3244,7 @@ async def consensus_predict_endpoint(req: ConsensusPredictRequest):
                         continue
 
             # 1. Build rich context
+            logger.info("[CONSENSUS-API] Building quantitative context for %s (%dd window)...", ticker, req.timeframe_days)
             ctx = context_builder.build_context(ticker, timeframe_days=req.timeframe_days, settings=_settings)
             as_of_price = ctx.get("price_action", {}).get("current_price") or 0.0
 
@@ -3276,6 +3277,8 @@ async def consensus_predict_endpoint(req: ConsensusPredictRequest):
             consensus["id"] = pred_id
             consensus["evaluation_date"] = eval_date
             results.append(consensus)
+            logger.info("[CONSENSUS-API] Completed & saved consensus forecast #%s for %s: %s (Target: %.2f)",
+                        pred_id, ticker, consensus.get("consensus_direction"), consensus.get("consensus_target_price", as_of_price))
 
         except Exception as e:
             logger.error("[CONSENSUS-API] Error predicting for %s: %s", ticker, e)
