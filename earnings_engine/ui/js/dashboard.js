@@ -1157,7 +1157,7 @@
 
             switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'results').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'results';
 
                 // Abort any pending fetch requests when switching tabs
@@ -1193,6 +1193,7 @@
                         'scanner': 'Scanner',
                         'catalysts': 'Catalysts & News',
                         'gainers': 'Gainers & Breakouts',
+                        'breakout': '⚡ Breakout Radar',
                         'swing': 'Swing Ranges',
                         'kronos': 'Kronos 14D Forecast',
                         'consensus': '4-Model Consensus',
@@ -1257,6 +1258,27 @@
                 }
                 if (name === 'backtest') {
                     this.initBacktestTab();
+                }
+                if (name === 'breakout') {
+                    // Lazy-load on first visit; start auto-polling while active
+                    if (!this._breakoutLoaded) {
+                        this._breakoutLoaded = true;
+                        this.loadBreakoutRadar();
+                    }
+                    // Start 5-minute auto-poll (cleared when leaving the tab)
+                    this._breakoutPollTimer = setInterval(() => {
+                        if (document.getElementById('tab-breakout')?.classList.contains('active')) {
+                            this.loadBreakoutRadar();
+                        } else {
+                            clearInterval(this._breakoutPollTimer);
+                        }
+                    }, 5 * 60 * 1000);
+                } else {
+                    // Clear poll when leaving the breakout tab
+                    if (this._breakoutPollTimer) {
+                        clearInterval(this._breakoutPollTimer);
+                        this._breakoutPollTimer = null;
+                    }
                 }
             },
 
@@ -9957,6 +9979,174 @@
                 console.error('applyConsensusToSwingRange error:', e);
                 alert('Error saving swing range.');
             }
+        };
+
+
+        // =========================================================================
+        // ⚡ BREAKOUT RADAR MODULE
+        // =========================================================================
+        app._breakoutLoaded = false;
+        app._breakoutPollTimer = null;
+        app._breakoutData = [];
+        app._breakoutSortKey = 'composite_score';
+        app._breakoutSortAsc = false;
+
+        app.loadBreakoutRadar = async function() {
+            const badge = document.getElementById('breakoutScanningBadge');
+            const lastScanEl = document.getElementById('breakoutLastScanTime');
+            const tbody = document.getElementById('breakoutTableBody');
+            if (badge) badge.style.display = 'inline-block';
+
+            const sortBy = document.getElementById('breakoutSortBy')?.value || 'composite_score';
+            const minScore = document.getElementById('breakoutMinScore')?.value || 35;
+
+            try {
+                const params = new URLSearchParams({ sort_by: sortBy, min_score: minScore, limit: 100 });
+                const res = await fetch(API_BASE + '/api/v1/breakout-radar?' + params.toString());
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+
+                app._breakoutData = data.candidates || [];
+                const status = data.scan_status || {};
+                const total = app._breakoutData.length;
+                const topCandidate = total > 0 ? app._breakoutData[0] : null;
+                const avgScore = total > 0
+                    ? (app._breakoutData.reduce((s, c) => s + (c.composite_score || 0), 0) / total).toFixed(1)
+                    : '\u2014';
+
+                const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+                setEl('breakoutStatTotal', total);
+                setEl('breakoutStatTopScore', topCandidate ? topCandidate.composite_score : '\u2014');
+                setEl('breakoutStatTopTicker', topCandidate ? (topCandidate.ticker || '\u2014') : '\u2014');
+                setEl('breakoutStatAvg', avgScore);
+                setEl('breakoutStatScanned', status.tickers_scanned || '\u2014');
+                setEl('breakoutStatDuration', status.last_scan_duration_s != null ? status.last_scan_duration_s : '\u2014');
+                setEl('breakoutIntervalDisplay', status.scan_interval_min || 30);
+
+                if (lastScanEl && status.last_scan_at) {
+                    try {
+                        const d = new Date(status.last_scan_at);
+                        lastScanEl.textContent = 'Last scan: ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                    } catch { lastScanEl.textContent = 'Last scan: ' + status.last_scan_at; }
+                } else if (lastScanEl) {
+                    lastScanEl.textContent = status.status === 'running' ? 'Scanning now\u2026' : 'Waiting for first scan\u2026';
+                }
+
+                app.renderBreakoutTable(app._breakoutData);
+            } catch (err) {
+                console.error('[BREAKOUT] Load error:', err);
+                if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#ef4444;font-size:0.8rem;">\u26a1 Failed to load breakout data. Is the server running?</td></tr>';
+            } finally {
+                if (badge) badge.style.display = 'none';
+            }
+        };
+
+        app.renderBreakoutTable = function(candidates) {
+            const tbody = document.getElementById('breakoutTableBody');
+            if (!tbody) return;
+
+            if (!candidates || candidates.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="padding:2.5rem;text-align:center;color:#334155;font-size:0.82rem;">\u26a1 No candidates above the minimum score threshold.<br><span style="font-size:0.72rem;color:#1e293b;">Lower the Min Score or wait for the next scan cycle.</span></td></tr>';
+                return;
+            }
+
+            const scoreBar = (val, max, color) => {
+                const pct = max > 0 ? Math.round((val / max) * 100) : 0;
+                return `<div style="display:flex;align-items:center;gap:0.3rem;"><span style="font-family:var(--font-mono);color:${color};font-weight:600;min-width:2rem;text-align:right;">${val}</span><div style="flex:1;height:4px;background:rgba(255,255,255,0.07);border-radius:2px;min-width:40px;"><div style="width:${pct}%;height:100%;background:${color};border-radius:2px;transition:width 0.3s;"></div></div></div>`;
+            };
+
+            const momentumColor = s => ({ 'Strong': '#34d399', 'Moderate': '#60a5fa', 'Weak': '#fbbf24', 'None': '#475569' }[s] || '#475569');
+
+            const rows = candidates.map((c) => {
+                const score = c.composite_score || 0;
+                const scoreColor = score >= 75 ? '#fde68a' : score >= 55 ? '#34d399' : '#60a5fa';
+                const scoreBg = score >= 75 ? 'rgba(234,179,8,0.15)' : score >= 55 ? 'rgba(16,185,129,0.12)' : 'rgba(59,130,246,0.1)';
+
+                const pctHighStr = c.pct_from_high != null
+                    ? `<span style="color:${c.pct_from_high >= 0 ? '#34d399' : '#f87171'};">${c.pct_from_high >= 0 ? '+' : ''}${c.pct_from_high.toFixed(1)}%</span>`
+                    : '<span style="color:#334155;">\u2014</span>';
+
+                const volRatioStr = c.volume_ratio != null
+                    ? `<span style="color:${c.volume_ratio >= 1.5 ? '#34d399' : '#94a3b8'};">${c.volume_ratio.toFixed(2)}x</span>`
+                    : '<span style="color:#334155;">\u2014</span>';
+
+                const atrStr = c.atr_pct != null
+                    ? `<span style="color:${c.atr_pct < 1.0 ? '#fbbf24' : '#64748b'};">${c.atr_pct.toFixed(2)}%</span>`
+                    : '<span style="color:#334155;">\u2014</span>';
+
+                const momSignal = c.momentum_signal || 'None';
+                const momBg = { 'Strong': 'rgba(16,185,129,0.15)', 'Moderate': 'rgba(59,130,246,0.12)', 'Weak': 'rgba(234,179,8,0.12)', 'None': 'rgba(71,85,105,0.12)' }[momSignal] || 'rgba(71,85,105,0.12)';
+
+                const ticker = c.ticker || '\u2014';
+                const company = (c.company_name || ticker).substring(0, 22);
+                const industry = (c.industry || '\u2014').substring(0, 18);
+                const price = c.current_price != null ? `\u20b9${Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
+
+                return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);" data-ticker="${ticker}">
+                    <td style="padding:0.55rem 0.75rem;">
+                        <div style="display:flex;flex-direction:column;gap:0.05rem;">
+                            <span style="font-weight:700;color:#f1f5f9;font-family:var(--font-mono);font-size:0.78rem;cursor:pointer;" onclick="app.switchTab('results');" title="View ${ticker} in Results">${ticker}</span>
+                            <span style="font-size:0.65rem;color:#475569;" title="${c.company_name || ticker}">${company}</span>
+                            <span style="font-size:0.6rem;color:#334155;">${industry}</span>
+                        </div>
+                    </td>
+                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);color:#e2e8f0;font-size:0.75rem;white-space:nowrap;">${price}</td>
+                    <td style="padding:0.55rem 0.75rem;text-align:right;">${pctHighStr}</td>
+                    <td style="padding:0.55rem 0.75rem;text-align:right;">${volRatioStr}</td>
+                    <td style="padding:0.55rem 0.75rem;text-align:right;">${atrStr}</td>
+                    <td style="padding:0.55rem 0.75rem;text-align:center;">
+                        <span style="background:${momBg};color:${momentumColor(momSignal)};font-size:0.65rem;font-weight:700;padding:0.12rem 0.4rem;border-radius:4px;">${momSignal}</span>
+                    </td>
+                    <td style="padding:0.55rem 0.75rem;">${scoreBar(c.fundamental_score || 0, 20, '#a78bfa')}</td>
+                    <td style="padding:0.55rem 0.75rem;text-align:right;">
+                        <span style="background:${scoreBg};color:${scoreColor};font-size:0.82rem;font-weight:800;font-family:var(--font-mono);padding:0.15rem 0.5rem;border-radius:6px;letter-spacing:-0.02em;">${score}</span>
+                    </td>
+                    <td style="padding:0.55rem 0.75rem;text-align:center;">
+                        <button onclick="app.openSwingRangeModal('ALL','${ticker}')" class="btn-micro btn-micro-primary" title="Analyse ${ticker}" style="font-size:0.65rem;">Analyse</button>
+                    </td>
+                </tr>`;
+            });
+
+            tbody.innerHTML = rows.join('');
+        };
+
+        app.refreshBreakoutScan = async function() {
+            const btn = document.getElementById('breakoutRefreshBtn');
+            const icon = document.getElementById('breakoutRefreshIcon');
+            if (btn) btn.disabled = true;
+            if (icon) icon.textContent = '\u23f3';
+            try {
+                const res = await fetch(API_BASE + '/api/v1/breakout-radar/refresh', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    setTimeout(() => app.loadBreakoutRadar(), 8000);
+                    setTimeout(() => app.loadBreakoutRadar(), 20000);
+                }
+            } catch (e) {
+                console.error('[BREAKOUT] Refresh error:', e);
+            } finally {
+                setTimeout(() => {
+                    if (btn) btn.disabled = false;
+                    if (icon) icon.textContent = '\u26a1';
+                }, 5000);
+            }
+        };
+
+        app.sortBreakoutTable = function(key) {
+            if (app._breakoutSortKey === key) {
+                app._breakoutSortAsc = !app._breakoutSortAsc;
+            } else {
+                app._breakoutSortKey = key;
+                app._breakoutSortAsc = false;
+            }
+            const sorted = [...(app._breakoutData || [])].sort((a, b) => {
+                const av = a[key], bv = b[key];
+                if (av == null && bv == null) return 0;
+                if (av == null) return 1;
+                if (bv == null) return -1;
+                return app._breakoutSortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+            });
+            app.renderBreakoutTable(sorted);
         };
 
         // Initialize & export to window

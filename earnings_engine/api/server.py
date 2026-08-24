@@ -33,13 +33,18 @@ from pathlib import Path
 from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.migrations import apply_migrations
 from earnings_engine.logging_utils import get_logger, log_startup_diagnostics
+from earnings_engine.data import breakout_scanner as breakout_scanner_mod
 
 logger = get_logger("earnings_engine.api.server")
+
+# Background task handle (kept so we can cancel on shutdown)
+_breakout_scanner_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Run migrations and startup diagnostics on API startup."""
+    global _breakout_scanner_task
     try:
         applied = apply_migrations(_settings)
         if applied:
@@ -47,7 +52,27 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Startup database migration check failed: %s", e)
     log_startup_diagnostics(logger)
+
+    # Start the background breakout scanner loop
+    try:
+        _breakout_scanner_task = asyncio.create_task(
+            breakout_scanner_mod.breakout_scanner_loop(_settings()),
+            name="breakout_radar",
+        )
+        logger.info("[BREAKOUT] Background scanner task started.")
+    except Exception as e:
+        logger.warning("[BREAKOUT] Could not start scanner task: %s", e)
+
     yield
+
+    # Graceful shutdown: cancel the scanner task
+    if _breakout_scanner_task and not _breakout_scanner_task.done():
+        _breakout_scanner_task.cancel()
+        try:
+            await asyncio.wait_for(_breakout_scanner_task, timeout=5.0)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
+        logger.info("[BREAKOUT] Scanner task shut down.")
 
 
 app = FastAPI(
@@ -3557,11 +3582,51 @@ async def calc_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Qu
     }
 
 
+# ---------------------------------------------------------------------------
+# Breakout Radar — Background-scanned candidate endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/breakout-radar", tags=["Breakout Radar"])
+async def get_breakout_radar(
+    min_score: float = Query(35.0, description="Minimum composite score to include"),
+    limit: int = Query(50, ge=1, le=200, description="Max candidates to return"),
+    sort_by: str = Query("composite_score", description="Sort field (composite_score, fundamental_score, resistance_score, volume_score)"),
+):
+    """Return the latest cached breakout candidates from the background scanner."""
+    candidates = breakout_scanner_mod.get_cached_scan_results()
+    status = breakout_scanner_mod.get_scan_status()
+
+    # Apply min_score filter
+    candidates = [c for c in candidates if c.get("composite_score", 0) >= min_score]
+
+    # Sort
+    valid_sort = {"composite_score", "fundamental_score", "resistance_score", "volume_score", "compression_score", "momentum_score"}
+    if sort_by not in valid_sort:
+        sort_by = "composite_score"
+    candidates.sort(key=lambda x: x.get(sort_by, 0), reverse=True)
+
+    # Limit
+    candidates = candidates[:limit]
+
+    return {
+        "success": True,
+        "count": len(candidates),
+        "candidates": candidates,
+        "scan_status": status,
+    }
 
 
+@app.post("/api/v1/breakout-radar/refresh", tags=["Breakout Radar"])
+async def refresh_breakout_radar():
+    """Trigger an immediate re-scan of all tickers (runs in a background thread)."""
+    import threading
 
+    def _run():
+        try:
+            breakout_scanner_mod.run_breakout_scan(_settings())
+        except Exception as e:
+            logger.error("[BREAKOUT] Manual refresh error: %s", e)
 
-
-
-
-
+    t = threading.Thread(target=_run, daemon=True, name="breakout_manual_refresh")
+    t.start()
+    return {"success": True, "message": "Breakout scan triggered in background. Check /api/v1/breakout-radar shortly."}
