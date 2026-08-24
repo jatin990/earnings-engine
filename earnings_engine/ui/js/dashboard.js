@@ -7840,8 +7840,9 @@
             if (matches.length) {
                 selectedIndex = -1;
                 dropdown.innerHTML = matches.map((t, i) =>
-                    '<div class="autocomplete-item" data-i="' + i + '" onclick="app.selectTicker(\'' + t + '\')">' +
-                    '<strong>' + t + '</strong> <span style="color:var(--muted);font-size:0.8rem;">' + (t.endsWith('.NS') ? 'NSE' : 'US') + '</span>' +
+                    '<div class="autocomplete-item" data-i="' + i + '" onclick="app.selectTicker(\'' + t + '\')" onmouseenter="app.setSearchHoverIndex(' + i + ')">' +
+                    '<span style="font-weight:700;letter-spacing:0.02em;">' + t + '</span>' +
+                    '<span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);">' + (t.endsWith('.NS') ? 'NSE' : 'US') + '</span>' +
                     '</div>'
                 ).join('');
                 dropdown.style.display = 'block';
@@ -7850,16 +7851,30 @@
             }
         });
 
+        app.setSearchHoverIndex = function(idx) {
+            selectedIndex = idx;
+            const items = dropdown.querySelectorAll('.autocomplete-item');
+            items.forEach((it, i) => it.classList.toggle('selected', i === idx));
+        };
+
         searchInput.addEventListener('keydown', (e) => {
             const items = dropdown.querySelectorAll('.autocomplete-item');
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-                items.forEach((it, i) => it.classList.toggle('selected', i === selectedIndex));
+                items.forEach((it, i) => {
+                    const isSel = i === selectedIndex;
+                    it.classList.toggle('selected', isSel);
+                    if (isSel) it.scrollIntoView({ block: 'nearest' });
+                });
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 selectedIndex = Math.max(selectedIndex - 1, -1);
-                items.forEach((it, i) => it.classList.toggle('selected', i === selectedIndex));
+                items.forEach((it, i) => {
+                    const isSel = i === selectedIndex;
+                    it.classList.toggle('selected', isSel);
+                    if (isSel) it.scrollIntoView({ block: 'nearest' });
+                });
             } else if (e.key === 'Enter') {
                 e.preventDefault();
                 if (selectedIndex >= 0 && items[selectedIndex]) {
@@ -7882,7 +7897,8 @@
             if (!ticker) return;
             const sym = ticker.trim().toUpperCase();
             dropdown.style.display = 'none';
-            window.location.href = '/stock/' + encodeURIComponent(sym);
+            if (searchInput) searchInput.value = '';
+            window.open('/stock/' + encodeURIComponent(sym), '_blank');
         };
 
         // Global report popup handlers

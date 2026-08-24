@@ -177,9 +177,9 @@ class Autocomplete {
     selectTicker(ticker) {
         if (!ticker) return;
         const sym = ticker.trim().toUpperCase();
-        this.searchInput.value = sym;
+        if (this.searchInput) this.searchInput.value = '';
         this.hideDropdown();
-        window.location.href = '/stock/' + encodeURIComponent(sym);
+        window.open('/stock/' + encodeURIComponent(sym), '_blank');
     }
 }
 

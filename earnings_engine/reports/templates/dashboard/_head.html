@@ -792,12 +792,59 @@
         .bd-section-body { padding: 0.5rem; }
 
         .search-wrap { position: relative; z-index: 1000; }
-        .dropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #080312; border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 0.75rem; margin-top: 0.35rem; max-height: 340px; overflow-y: auto; z-index: 10000; box-shadow: 0 25px 60px rgba(0,0,0,0.95), 0 0 35px rgba(99, 102, 241, 0.3); }
+        .dropdown, #autocompleteDropdown { 
+            display: none; 
+            position: absolute; 
+            top: 100%; 
+            left: 0; 
+            right: 0; 
+            background: #09090b !important; 
+            border: 1px solid rgba(255, 255, 255, 0.15) !important; 
+            border-radius: 8px !important; 
+            margin-top: 4px !important; 
+            max-height: 380px !important; 
+            overflow-y: auto !important; 
+            z-index: 10000 !important; 
+            padding: 4px !important;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.95), 0 0 1px rgba(255,255,255,0.2) !important; 
+        }
+
+        .autocomplete-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0.75rem;
+            margin: 2px 0;
+            border-radius: 6px;
+            cursor: pointer !important;
+            user-select: none;
+            color: #e4e4e7;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+            border: 1px solid transparent;
+            background: transparent;
+        }
+
+        .autocomplete-item:hover,
+        .autocomplete-item.selected {
+            background: rgba(56, 189, 248, 0.16) !important;
+            color: #ffffff !important;
+            border-color: rgba(56, 189, 248, 0.45) !important;
+            cursor: pointer !important;
+            transform: translateX(2px);
+        }
+
+        .autocomplete-item * {
+            cursor: pointer !important;
+            user-select: none;
+            pointer-events: none;
+        }
 
         .timestamp { color: #94a3b8; font-size: 0.78rem; font-family: 'JetBrains Mono', monospace; }
         
         select { background-color: #080312 !important; color: var(--light) !important; position: relative; z-index: 10; border: 1px solid rgba(255, 255, 255, 0.15) !important; border-radius: 0.5rem; }
-        select:focus { border-color: var(--accent-vivid) !important; outline: none; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4) !important; }
+        select:focus { border-color: var(--accent-vivid) !important; outline: none; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4) !important; }
         select option { background-color: #080312; color: var(--light); }
 
         .loading-spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid rgba(99, 102, 241, 0.25); border-radius: 50%; border-top-color: var(--accent-vivid); animation: spin 0.8s ease-in-out infinite; }
