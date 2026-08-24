@@ -83,3 +83,26 @@ def test_recalculate_api_endpoints():
     audit_res = client.get("/api/v1/ticker/audit-log?limit=10")
     assert audit_res.status_code == 200
     assert isinstance(audit_res.json(), list)
+
+
+def test_recalculate_recounts_quality_and_generates_ai_notes(temp_settings):
+    """Test that recalculation recounts quality scores and creates quarterly AI notes."""
+    from earnings_engine.data.market_context import generate_quarter_result_ai_note
+
+    note = generate_quarter_result_ai_note(
+        quarter_label="Q1",
+        earnings_date="2026-05-14",
+        score=8,
+        surprise_pct=18.4,
+        eps_reported=24.5,
+        eps_estimate=20.7,
+        week_high_pct=8.7,
+        week_low_pct=-1.2,
+        price_7d=1250.0,
+    )
+    assert "Q1" in note
+    assert "Blowout Beat" in note or "Strong Beat" in note
+    assert "+18.4%" in note
+    assert "24.50" in note
+    assert "Peak move" in note
+    assert "+8.7%" in note

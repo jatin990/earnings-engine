@@ -39,6 +39,71 @@ def _score_surprise(surprise: float) -> int:
     return 3
 
 
+def generate_quarter_result_ai_note(
+    quarter_label: str,
+    earnings_date: str | pd.Timestamp | None,
+    score: int | None,
+    surprise_pct: float | None = None,
+    eps_reported: float | None = None,
+    eps_estimate: float | None = None,
+    week_high_pct: float | None = None,
+    week_low_pct: float | None = None,
+    price_7d: float | None = None,
+) -> str:
+    """Generate an institutional AI summary of how the quarterly result performed."""
+    parts = []
+    q_name = quarter_label.upper()
+    date_str = ""
+    if earnings_date:
+        try:
+            date_str = f" on {pd.Timestamp(earnings_date).strftime('%b %d, %Y')}"
+        except Exception:
+            date_str = f" on {earnings_date}"
+
+    # 1. Earnings Surprise & Numbers
+    if surprise_pct is not None and not pd.isna(surprise_pct):
+        surp_val = float(surprise_pct)
+        if surp_val > 15:
+            header = f"🔥 {q_name} Blowout Beat{date_str}: EPS crushed estimates by {surp_val:+.1f}%"
+        elif surp_val > 5:
+            header = f"📈 {q_name} Strong Beat{date_str}: EPS beat consensus by {surp_val:+.1f}%"
+        elif surp_val >= 0:
+            header = f"✅ {q_name} In-Line/Slight Beat{date_str}: EPS exceeded targets by {surp_val:+.1f}%"
+        elif surp_val > -10:
+            header = f"⚠️ {q_name} Slight Miss{date_str}: EPS missed estimates by {surp_val:.1f}%"
+        else:
+            header = f"📉 {q_name} Severe Miss{date_str}: EPS missed consensus by {surp_val:.1f}%"
+
+        if eps_reported is not None and eps_estimate is not None and not pd.isna(eps_reported) and not pd.isna(eps_estimate):
+            header += f" (Reported: ₹{float(eps_reported):.2f} vs Est: ₹{float(eps_estimate):.2f})"
+        parts.append(header)
+    elif score is not None:
+        if score >= 8:
+            parts.append(f"🔥 {q_name} High Quality Print{date_str}: Solid fundamental delivery (Score {score}/9)")
+        elif score >= 6:
+            parts.append(f"📈 {q_name} Constructive Result{date_str}: Met expectations with positive bias (Score {score}/9)")
+        elif score == 5:
+            parts.append(f"⚖️ {q_name} Neutral Result{date_str}: Balanced print (Score {score}/9)")
+        else:
+            parts.append(f"📉 {q_name} Subdued Result{date_str}: Result showed contraction (Score {score}/9)")
+    else:
+        parts.append(f"ℹ️ {q_name} Result{date_str}: Historic quarterly print")
+
+    # 2. Market / Price Reaction
+    reaction_parts = []
+    if week_high_pct is not None and not pd.isna(week_high_pct):
+        reaction_parts.append(f"Peak move: {float(week_high_pct):+.1f}% high")
+    if week_low_pct is not None and not pd.isna(week_low_pct):
+        reaction_parts.append(f"Drawdown: {float(week_low_pct):+.1f}% low")
+    if price_7d is not None and not pd.isna(price_7d):
+        reaction_parts.append(f"7D Post-Close: ₹{float(price_7d):,.0f}")
+
+    if reaction_parts:
+        parts.append("Reaction: " + " | ".join(reaction_parts))
+
+    return " • ".join(parts)
+
+
 def _close_n_calendar_days_ago(closes: pd.Series, latest_date, days: int) -> float | None:
     """Return the closing price on the last trading day on/before ``days`` calendar
     days before ``latest_date``.
@@ -443,6 +508,9 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             q1_earnings_score = None
             q2_earnings_score = None
             q3_earnings_score = None
+            q1_ai_summary = None
+            q2_ai_summary = None
+            q3_ai_summary = None
             q1_week_high_pct = None
             q1_week_low_pct = None
             q1_week_high_price = None
@@ -619,24 +687,42 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                     offset = (n_quarters - 1) - i
                     is_last = (offset == 0)
 
+                    eps_rep_raw = qrow.get("eps_reported")
+                    eps_est_raw = qrow.get("eps_estimate")
+                    eps_rep_val = float(eps_rep_raw) if (eps_rep_raw is not None and not pd.isna(eps_rep_raw)) else None
+                    eps_est_val = float(eps_est_raw) if (eps_est_raw is not None and not pd.isna(eps_est_raw)) else None
+                    surp_val = float(surprise) if pd.notna(surprise) else None
+
                     if offset == 0:  # most recent quarter -> Q1
                         q1_earnings_score = score
                         q1_price_7d = price_7d
                         q1_earnings_date = qrow["earnings_date"]
                         if week_data is not None:
                             q1_week_high_pct, q1_week_low_pct, q1_week_high_price, q1_week_low_price, q1_week_high_date, q1_week_low_date = week_data
+                        q1_ai_summary = generate_quarter_result_ai_note(
+                            "Q1", q1_earnings_date, score, surp_val, eps_rep_val, eps_est_val,
+                            q1_week_high_pct, q1_week_low_pct, price_7d
+                        )
                     elif offset == 1:  # 2nd most recent quarter -> Q2
                         q2_earnings_score = score
                         q2_price_7d = price_7d
                         q2_earnings_date = qrow["earnings_date"]
                         if week_data is not None:
                             q2_week_high_pct, q2_week_low_pct, q2_week_high_price, q2_week_low_price, q2_week_high_date, q2_week_low_date = week_data
+                        q2_ai_summary = generate_quarter_result_ai_note(
+                            "Q2", q2_earnings_date, score, surp_val, eps_rep_val, eps_est_val,
+                            q2_week_high_pct, q2_week_low_pct, price_7d
+                        )
                     elif offset == 2:  # 3rd most recent quarter -> Q3
                         q3_earnings_score = score
                         q3_price_7d = price_7d
                         q3_earnings_date = qrow["earnings_date"]
                         if week_data is not None:
                             q3_week_high_pct, q3_week_low_pct, q3_week_high_price, q3_week_low_price, q3_week_high_date, q3_week_low_date = week_data
+                        q3_ai_summary = generate_quarter_result_ai_note(
+                            "Q3", q3_earnings_date, score, surp_val, eps_rep_val, eps_est_val,
+                            q3_week_high_pct, q3_week_low_pct, price_7d
+                        )
 
                     if is_last:
                         last_quarter_score = score
@@ -703,6 +789,9 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "q1_earnings_score": q1_earnings_score,
                 "q2_earnings_score": q2_earnings_score,
                 "q3_earnings_score": q3_earnings_score,
+                "q1_ai_summary": q1_ai_summary,
+                "q2_ai_summary": q2_ai_summary,
+                "q3_ai_summary": q3_ai_summary,
                 "q1_week_high_pct": q1_week_high_pct,
                 "q1_week_low_pct": q1_week_low_pct,
                 "q1_week_high_price": q1_week_high_price,
@@ -761,6 +850,9 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "q1_earnings_score": q1_earnings_score,
                 "q2_earnings_score": q2_earnings_score,
                 "q3_earnings_score": q3_earnings_score,
+                "q1_ai_summary": q1_ai_summary,
+                "q2_ai_summary": q2_ai_summary,
+                "q3_ai_summary": q3_ai_summary,
                 "q1_week_high_pct": q1_week_high_pct,
                 "q1_week_low_pct": q1_week_low_pct,
                 "q1_week_high_price": q1_week_high_price,
@@ -820,6 +912,9 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "q1_earnings_score": None,
                 "q2_earnings_score": None,
                 "q3_earnings_score": None,
+                "q1_ai_summary": None,
+                "q2_ai_summary": None,
+                "q3_ai_summary": None,
                 "q1_week_high_pct": None,
                 "q1_week_low_pct": None,
                 "q1_week_high_price": None,

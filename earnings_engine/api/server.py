@@ -434,6 +434,9 @@ class MarketContextResponse(BaseModel):
     q1_earnings_score: int | None
     q2_earnings_score: int | None
     q3_earnings_score: int | None
+    q1_ai_summary: str | None = None
+    q2_ai_summary: str | None = None
+    q3_ai_summary: str | None = None
     next_resistance: float | None
     current_support: float | None
     eps_estimate: float | None
@@ -671,6 +674,9 @@ async def get_market_context(ticker: str, live: bool = Query(False)):
             q1_earnings_score=row.get("q1_earnings_score"),
             q2_earnings_score=row.get("q2_earnings_score"),
             q3_earnings_score=row.get("q3_earnings_score"),
+            q1_ai_summary=row.get("q1_ai_summary"),
+            q2_ai_summary=row.get("q2_ai_summary"),
+            q3_ai_summary=row.get("q3_ai_summary"),
             next_resistance=row.get("next_resistance"),
             current_support=row.get("current_support"),
             eps_estimate=row.get("eps_estimate"),

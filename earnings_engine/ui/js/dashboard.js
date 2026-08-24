@@ -2807,6 +2807,35 @@
                         if (supCell && m.current_support !== null && m.current_support !== undefined) {
                             supCell.textContent = Number(m.current_support).toFixed(2);
                         }
+
+                        // Update Recounted Quality Scores with AI Tooltips
+                        const qualCell = rowEl.querySelector('.cell-quality-scores');
+                        if (qualCell) {
+                            const q1 = (m.q1_earnings_score !== null && m.q1_earnings_score !== undefined) ? `${m.q1_earnings_score}/9` : '—';
+                            const q2 = (m.q2_earnings_score !== null && m.q2_earnings_score !== undefined) ? `${m.q2_earnings_score}/9` : '—';
+                            const q3 = (m.q3_earnings_score !== null && m.q3_earnings_score !== undefined) ? `${m.q3_earnings_score}/9` : '—';
+                            const q1t = (m.q1_ai_summary || `Q1 Quality: ${q1}`).replace(/"/g, '&quot;');
+                            const q2t = (m.q2_ai_summary || `Q2 Quality: ${q2}`).replace(/"/g, '&quot;');
+                            const q3t = (m.q3_ai_summary || `Q3 Quality: ${q3}`).replace(/"/g, '&quot;');
+                            qualCell.innerHTML = `
+                                <span class="q-score-badge" style="cursor:help;border-bottom:1px dotted rgba(56,189,248,0.6);" title="${q1t}">${q1}</span> | 
+                                <span class="q-score-badge" style="cursor:help;border-bottom:1px dotted rgba(56,189,248,0.6);" title="${q2t}">${q2}</span> | 
+                                <span class="q-score-badge" style="cursor:help;border-bottom:1px dotted rgba(56,189,248,0.6);" title="${q3t}">${q3}</span>
+                            `;
+                        }
+
+                        const avgCell = rowEl.querySelector('.cell-prev-3q-score');
+                        if (avgCell && m.prev_3q_earnings_score !== null && m.prev_3q_earnings_score !== undefined) {
+                            avgCell.textContent = `${m.prev_3q_earnings_score}/9`;
+                        }
+
+                        ['q1', 'q2', 'q3'].forEach(q => {
+                            const cell = rowEl.querySelector(`.cell-${q}-week-hl`);
+                            if (cell && m[`${q}_ai_summary`]) {
+                                const wrap = cell.querySelector('.q-week-hl-wrap') || cell;
+                                wrap.setAttribute('title', m[`${q}_ai_summary`]);
+                            }
+                        });
                     }
 
                     // Render Custom Recalculation Alert / Modal

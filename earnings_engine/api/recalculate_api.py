@@ -40,6 +40,9 @@ def _snapshot_ticker_state(ticker: str, settings: Settings) -> dict[str, Any]:
         "q2_earnings_score": None,
         "q3_earnings_score": None,
         "prev_3q_earnings_score": None,
+        "q1_ai_summary": None,
+        "q2_ai_summary": None,
+        "q3_ai_summary": None,
         "eps_estimate": None,
         "eps_reported": None,
         "surprise_pct": None,
@@ -73,6 +76,7 @@ def _snapshot_ticker_state(ticker: str, settings: Settings) -> dict[str, Any]:
                     "seven_day_return_pct", "earnings_week_move_pct",
                     "current_support", "next_resistance", "q1_earnings_score",
                     "q2_earnings_score", "q3_earnings_score", "prev_3q_earnings_score",
+                    "q1_ai_summary", "q2_ai_summary", "q3_ai_summary",
                     "eps_estimate", "eps_reported", "surprise_pct",
                 ]:
                     if k in m_data:
@@ -168,6 +172,9 @@ def recalculate_ticker_metrics(ticker: str, settings: Settings | None = None) ->
         "q2_earnings_score": enriched_row.get("q2_earnings_score"),
         "q3_earnings_score": enriched_row.get("q3_earnings_score"),
         "prev_3q_earnings_score": enriched_row.get("prev_3q_earnings_score"),
+        "q1_ai_summary": enriched_row.get("q1_ai_summary"),
+        "q2_ai_summary": enriched_row.get("q2_ai_summary"),
+        "q3_ai_summary": enriched_row.get("q3_ai_summary"),
         "eps_estimate": enriched_row.get("eps_estimate"),
         "eps_reported": enriched_row.get("eps_reported"),
         "surprise_pct": enriched_row.get("surprise_pct"),
@@ -197,6 +204,8 @@ def recalculate_ticker_metrics(ticker: str, settings: Settings | None = None) ->
         if val is None or pd.isna(val):
             return "—"
         if isinstance(val, (int, float)):
+            if "score" in k:
+                return f"{int(val)}/9"
             if "pct" in k or "return" in k or "change" in k:
                 sign = "+" if float(val) > 0 else ""
                 return f"{sign}{float(val):.2f}%"

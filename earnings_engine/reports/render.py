@@ -8,6 +8,7 @@ templates can contain clean CSS without brace escaping.
 
 from __future__ import annotations
 
+import html
 from datetime import datetime
 from pathlib import Path
 
@@ -620,8 +621,8 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
 
         def _fmt_quarter_week_hl(high_pct: object, high_price: object, low_pct: object, low_price: object,
                                   high_date: object = None, low_date: object = None, price_7d: object = None,
-                                  earnings_date: object = None, ticker: str = "") -> str:
-            """Format quarter week high/low as '+8.7%/+2.3%<br>(8,500/7,800)<br>Jan 18 / Jan 16 | 7D: ₹245'."""
+                                  earnings_date: object = None, ticker: str = "", ai_summary: object = None) -> str:
+            """Format quarter week high/low as '+8.7%/+2.3%<br>(8,500/7,800)<br>Jan 18 / Jan 16 | 7D: ₹245' with AI note tooltip."""
             def _is_valid_date(d: object) -> bool:
                 if d is None:
                     return False
@@ -630,13 +631,16 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
                 except (TypeError, ValueError):
                     return False
 
+            summary_title = html.escape(str(ai_summary).strip()) if (ai_summary and not pd.isna(ai_summary) and str(ai_summary).strip()) else ""
+
             has_high_low = high_pct is not None and not pd.isna(high_pct)
             if not has_high_low:
                 if _is_valid_date(earnings_date) and ticker:
                     ed_str = pd.Timestamp(earnings_date).strftime("%Y-%m-%d")
                     earned = pd.Timestamp(earnings_date).strftime("%b %d")
+                    title_attr = f' title="{summary_title}"' if summary_title else f' title="Calculate live week move since {earned} print based on current market price"'
                     return (
-                        f'<div class="pred-cell" style="display:inline-flex;flex-direction:column;align-items:center;gap:0.2rem;">'
+                        f'<div class="pred-cell"{title_attr} style="display:inline-flex;flex-direction:column;align-items:center;gap:0.2rem;cursor:help;">'
                         f'<button type="button" class="btn-micro btn-micro-primary" '
                         f'onclick="event.stopPropagation(); app.calcLiveWeekHL(\'{ticker}\', \'{ed_str}\', this)" '
                         f'title="Calculate live week move since {earned} print based on current market price">'
@@ -671,7 +675,10 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
                 parts.append(f"earn {earned}")
 
             extra = "<br>" + "<br>".join(parts) if parts else ""
-            return f"{base}{extra}"
+            content = f"{base}{extra}"
+            if summary_title:
+                return f'<div class="q-week-hl-wrap" title="{summary_title}" style="cursor:help;border-bottom:1px dotted rgba(56,189,248,0.3);">{content}</div>'
+            return content
 
         market_cap = _fmt(row.get("market_cap"), suffix="Cr")
         current_price = _fmt(row.get("current_price"))
@@ -687,21 +694,25 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
         # Per-quarter week high/low (±4 business days around each earnings date).
         # The earnings date for each quarter is shown so the reader knows WHICH
         # quarter the signal belongs to (Q1 = most recent).
+        q1_ai_note = row.get("q1_ai_summary") if "q1_ai_summary" in row.index else None
+        q2_ai_note = row.get("q2_ai_summary") if "q2_ai_summary" in row.index else None
+        q3_ai_note = row.get("q3_ai_summary") if "q3_ai_summary" in row.index else None
+
         q1_week_hl = _fmt_quarter_week_hl(row.get("q1_week_high_pct"), row.get("q1_week_high_price"),
                                            row.get("q1_week_low_pct"), row.get("q1_week_low_price"),
                                            row.get("q1_week_high_date"), row.get("q1_week_low_date"),
                                            row.get("q1_price_7d"), row.get("q1_earnings_date"),
-                                           ticker=ticker)
+                                           ticker=ticker, ai_summary=q1_ai_note)
         q2_week_hl = _fmt_quarter_week_hl(row.get("q2_week_high_pct"), row.get("q2_week_high_price"),
                                            row.get("q2_week_low_pct"), row.get("q2_week_low_price"),
                                            row.get("q2_week_high_date"), row.get("q2_week_low_date"),
                                            row.get("q2_price_7d"), row.get("q2_earnings_date"),
-                                           ticker=ticker)
+                                           ticker=ticker, ai_summary=q2_ai_note)
         q3_week_hl = _fmt_quarter_week_hl(row.get("q3_week_high_pct"), row.get("q3_week_high_price"),
                                            row.get("q3_week_low_pct"), row.get("q3_week_low_price"),
                                            row.get("q3_week_high_date"), row.get("q3_week_low_date"),
                                            row.get("q3_price_7d"), row.get("q3_earnings_date"),
-                                           ticker=ticker)
+                                           ticker=ticker, ai_summary=q3_ai_note)
         
         prev_quarter_score = _fmt(row.get("prev_quarter_earnings_score"), suffix="/9")
         prev_3q_score = _fmt(row.get("prev_3q_earnings_score"), suffix="/9")
@@ -912,7 +923,11 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             "q2_week_hl": q2_week_hl,
             "q3_week_hl": q3_week_hl,
             "pct_from_52w_high_low": pct_from_52w_high_low,
-            "quality_scores": f"{q1_score} | {q2_score} | {q3_score}",
+            "quality_scores": (
+                f'<span class="q-score-badge" style="cursor:help;border-bottom:1px dotted rgba(56,189,248,0.6);" title="{html.escape(str(q1_ai_note).strip()) if (q1_ai_note and not pd.isna(q1_ai_note) and str(q1_ai_note).strip()) else f"Q1 Quality Score: {q1_score}"}">{q1_score}</span> | '
+                f'<span class="q-score-badge" style="cursor:help;border-bottom:1px dotted rgba(56,189,248,0.6);" title="{html.escape(str(q2_ai_note).strip()) if (q2_ai_note and not pd.isna(q2_ai_note) and str(q2_ai_note).strip()) else f"Q2 Quality Score: {q2_score}"}">{q2_score}</span> | '
+                f'<span class="q-score-badge" style="cursor:help;border-bottom:1px dotted rgba(56,189,248,0.6);" title="{html.escape(str(q3_ai_note).strip()) if (q3_ai_note and not pd.isna(q3_ai_note) and str(q3_ai_note).strip()) else f"Q3 Quality Score: {q3_score}"}">{q3_score}</span>'
+            ),
             "prev_3q_score": prev_3q_score,
             "next_resistance": next_resistance,
             "current_support": current_support,
