@@ -1,106 +1,276 @@
         <!-- ================= SHORT-TERM CATALYSTS & NEWS TAB ================= -->
         <div id="tab-catalysts" class="tab-content" style="width: 100%; max-width: 100%;">
             
-            <!-- ⚡ Top Summary KPI Cards with Soft Under-Glow -->
-            <div id="catalystKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
-                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Catalysts Scanned</span>
-                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Live Feeds</span>
-                    </div>
-                    <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="catStatTotal">0</strong> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Headlines</span></div>
-                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Multi-source RSS & filings</div>
+            <!-- ⚡ Top View Switcher (Live Feed vs Trade Outcomes Track Record) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: inline-flex; background: #0a0a10; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 3px;">
+                    <button type="button" id="catViewFeedBtn" onclick="app.switchCatalystsView('feed')" class="btn-micro" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; font-weight: 700; border-radius: 6px; padding: 0.35rem 0.85rem; font-size: 0.76rem; border: 1px solid rgba(59, 130, 246, 0.35);">
+                        📰 Live Catalyst Feed
+                    </button>
+                    <button type="button" id="catViewOutcomesBtn" onclick="app.switchCatalystsView('outcomes')" class="btn-micro" style="background: transparent; color: #a1a1aa; font-weight: 600; border-radius: 6px; padding: 0.35rem 0.85rem; font-size: 0.76rem; border: 1px solid transparent;">
+                        📊 Trade Outcomes & Track Record
+                    </button>
                 </div>
 
-                <div class="card card-glow-amber" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.7rem;color:#f87171;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🔥 High Impact (Urgent)</span>
-                        <span class="signal-badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.62rem;">≥ 75% Score</span>
-                    </div>
-                    <div style="font-size:1.45rem;font-weight:800;color:#f87171;font-family:var(--font-heading);"><strong id="catStatHigh">0</strong> <span style="font-size:0.85rem;color:#fca5a5;font-weight:500;">Urgent</span></div>
-                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Order wins, FDA, large contracts</div>
-                </div>
-
-                <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Market Bias</span>
-                        <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Sentiment</span>
-                    </div>
-                    <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="catStatBias"><span style="color:#34d399;">0</span> / <span style="color:#f87171;">0</span></strong></div>
-                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Bullish vs Bearish Ratio</div>
-                </div>
-
-                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Top Catalyst Category</span>
-                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Dominant</span>
-                    </div>
-                    <div style="font-size:1.15rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><strong id="catStatTopCat">—</strong></div>
-                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Most frequent theme</div>
+                <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                    <select id="catWatchlistSelect" onchange="app.onCatWatchlistChange(this.value)" style="height:30px;padding:0 0.55rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.15);border-radius:6px;font-weight:500;outline:none;" title="Select Watchlist / Universe to scan">
+                        <option value="GLOBAL" selected>⭐ Active Watchlist</option>
+                        <option value="NIFTY_50">🇮🇳 NIFTY 50</option>
+                        <option value="NSE_LARGE_CAP">🇮🇳 NSE Large Cap</option>
+                        <option value="NSE_ALL">🇮🇳 All NSE Equities</option>
+                        <option value="US_TOP">🇺🇸 US Mega-Caps</option>
+                        <option value="US">🇺🇸 All US Equities</option>
+                    </select>
+                    <button onclick="app.scanCatalystsNow()" id="catScanBtn" class="btn btn-primary btn-sm" style="font-weight:600;"><span>⚡</span> Scan Feeds</button>
+                    <button onclick="app.evaluateNewsOutcomesNow()" id="catEvalOutcomesBtn" class="btn btn-secondary btn-sm" style="font-weight:600;display:none;"><span>🎯</span> Re-Verify Outcomes</button>
                 </div>
             </div>
 
-            <!-- Catalyst News Feed Section -->
-            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+            <!-- ================= VIEW 1: LIVE CATALYST FEED ================= -->
+            <div id="catalystsFeedView" style="display: block;">
+                <!-- ⚡ Top Summary KPI Cards for Live Feed -->
+                <div id="catalystKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                    <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                            <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Catalysts Scanned</span>
+                            <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Live Feeds</span>
+                        </div>
+                        <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="catStatTotal">0</strong> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Headlines</span></div>
+                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Multi-source RSS & filings</div>
+                    </div>
+
+                    <div class="card card-glow-amber" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                            <span style="font-size:0.7rem;color:#f87171;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🔥 High Impact (Urgent)</span>
+                            <span class="signal-badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.62rem;">≥ 75% Score</span>
+                        </div>
+                        <div style="font-size:1.45rem;font-weight:800;color:#f87171;font-family:var(--font-heading);"><strong id="catStatHigh">0</strong> <span style="font-size:0.85rem;color:#fca5a5;font-weight:500;">Urgent</span></div>
+                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Order wins, FDA, large contracts</div>
+                    </div>
+
+                    <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                            <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Market Bias</span>
+                            <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Sentiment</span>
+                        </div>
+                        <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="catStatBias"><span style="color:#34d399;">0</span> / <span style="color:#f87171;">0</span></strong></div>
+                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Bullish vs Bearish Ratio</div>
+                    </div>
+
+                    <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                            <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Top Catalyst Category</span>
+                            <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Dominant</span>
+                        </div>
+                        <div style="font-size:1.15rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><strong id="catStatTopCat">—</strong></div>
+                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Most frequent theme</div>
+                    </div>
+                </div>
+
+                <!-- Live Feed Section -->
+                <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+                    
+                    <!-- Section Header & Controls -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
+                                <span>📰 Short-Term Market Moving Catalysts</span>
+                                <span id="catFeedCountBadge" class="signal-badge" style="font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.12rem 0.45rem;">0 headlines</span>
+                            </h3>
+                        </div>
+                    </div>
+
+                    <!-- Operations Filter Toolbar -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.45rem;">
+                        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="catSearchInput" oninput="app.filterCatalysts()" placeholder="🔍 Search stock, order, FDA..." style="padding:0.25rem 0.55rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;min-width:180px;font-family:var(--font-mono);outline:none;">
+                            <select id="catImpactFilter" onchange="app.filterCatalysts()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
+                                <option value="ALL">All Impact Levels</option>
+                                <option value="HIGH">🔥 High Impact (≥75%)</option>
+                                <option value="MEDIUM+">⚡ Medium+ (≥50%)</option>
+                            </select>
+                            <select id="catDirectionFilter" onchange="app.filterCatalysts()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
+                                <option value="ALL">All Directions</option>
+                                <option value="BULLISH">🟢 Bullish Catalysts</option>
+                                <option value="BEARISH">🔴 Bearish Threats</option>
+                            </select>
+                            <select id="catCategoryFilter" onchange="app.filterCatalysts()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
+                                <option value="ALL">All Categories</option>
+                                <option value="Order Wins & Contracts">🤝 Order Wins & Deals</option>
+                                <option value="Earnings & Guidance Surprise">📈 Earnings & Guidance</option>
+                                <option value="Regulatory, Approvals & Policy">⚖️ Regulatory & Policy</option>
+                                <option value="M&A, Stake & Expansion">🏢 M&A & Expansion</option>
+                                <option value="Analyst Ratings & Targets">📊 Analyst Upgrades</option>
+                                <option value="Litigation, Risk & Probes">⚠️ Litigation & Risk</option>
+                                <option value="Corporate Action & Dividends">🎁 Dividends & Corporate</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Feed Grid / Container -->
+                    <div id="catalystsFeedGrid" style="display: flex; flex-direction: column; gap: 0.65rem;">
+                        <div class="card" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);background:#08080d;border:1px dashed rgba(255,255,255,0.12);border-radius:0.75rem;margin:0;">
+                            <div style="font-size:2rem;margin-bottom:0.5rem;">📰</div>
+                            <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;">Catalysts Feed Ready</h4>
+                            <p style="max-width:520px;margin:0 auto 1rem auto;font-size:0.8rem;line-height:1.45;color:var(--text-muted);">
+                                Click <strong>Scan Feeds</strong> to aggregate breaking news, regulatory filings, and market-moving events on demand.
+                            </p>
+                            <button onclick="app.scanCatalystsNow()" class="btn btn-primary btn-sm" style="font-weight:600;">⚡ Scan Breaking Feeds</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ================= VIEW 2: HISTORICAL OUTCOMES & TRADE METRICS ================= -->
+            <div id="catalystsOutcomesView" style="display: none;">
                 
-                <!-- Section Header & Controls -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <div style="display: flex; align-items: center; gap: 0.45rem;">
+                <!-- 🎯 Quantitative Trade-Readiness KPI Cards -->
+                <div id="outcomesKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                    
+                    <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                            <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🎯 Trade Win Rate</span>
+                            <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Edge KPI</span>
+                        </div>
+                        <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);"><strong id="outcomeWinRate">0.0%</strong></div>
+                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;" id="outcomeDirWinRates">Bull: 0.0% | Bear: 0.0%</div>
+                    </div>
+
+                    <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                            <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">📈 Trade Expectancy</span>
+                            <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">EV Per Trade</span>
+                        </div>
+                        <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="outcomeExpectancy">+0.00%</strong></div>
+                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Avg Net Return: <span id="outcomeAvgReturn">0.0%</span></div>
+                    </div>
+
+                    <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                            <span style="font-size:0.7rem;color:#38bdf8;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">⚖️ Profit Factor</span>
+                            <span class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.62rem;">Gross G/L</span>
+                        </div>
+                        <div style="font-size:1.45rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);"><strong id="outcomeProfitFactor">0.00</strong></div>
+                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Payoff: <span id="outcomePayoff">0.0x</span></div>
+                    </div>
+
+                    <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                            <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🚀 Top Max Gainer</span>
+                            <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Peak Move</span>
+                        </div>
+                        <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);"><strong id="outcomeTopGainerVal">+0.0%</strong></div>
+                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="outcomeTopGainerTicker">—</div>
+                    </div>
+
+                    <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                            <span style="font-size:0.7rem;color:#a1a1aa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Events Evaluated</span>
+                            <span class="signal-badge" style="background:rgba(255,255,255,0.06);color:#a1a1aa;font-size:0.62rem;">Backtest</span>
+                        </div>
+                        <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="outcomeTotalCount">0</strong></div>
+                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Verified: <span id="outcomeVerifiedCount">0</span> | Active: <span id="outcomeActiveCount">0</span></div>
+                    </div>
+
+                </div>
+
+                <!-- 📊 Category Alpha & Edge Table -->
+                <div class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                        <h4 style="margin:0;font-size:0.95rem;font-family:'Space Grotesk',sans-serif;color:#ffffff;display:flex;align-items:center;gap:0.4rem;">
+                            <span>🏆 Catalyst Category Alpha & Strategy Edge</span>
+                        </h4>
+                        <div style="font-size:0.72rem;color:#94a3b8;font-family:var(--font-mono);">
+                            1D: <span id="horizon1d" style="color:#60a5fa;">0.0%</span> | 3D: <span id="horizon3d" style="color:#34d399;">0.0%</span> | 5D: <span id="horizon5d" style="color:#38bdf8;">0.0%</span>
+                        </div>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.76rem; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8;">
+                                    <th style="padding: 0.4rem 0.5rem;">Category</th>
+                                    <th style="padding: 0.4rem 0.5rem; text-align: right;">Events</th>
+                                    <th style="padding: 0.4rem 0.5rem; text-align: right;">Win Rate (%)</th>
+                                    <th style="padding: 0.4rem 0.5rem; text-align: right;">Avg Net Return</th>
+                                    <th style="padding: 0.4rem 0.5rem; text-align: right;">Avg Peak Gain</th>
+                                    <th style="padding: 0.4rem 0.5rem; text-align: right;">Profit Factor</th>
+                                    <th style="padding: 0.4rem 0.5rem; text-align: center;">Trade Edge</th>
+                                </tr>
+                            </thead>
+                            <tbody id="outcomeCategoryTableBody">
+                                <tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--muted);">Loading category performance analytics...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 📜 Historical Verified News Outcomes Table -->
+                <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
                         <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
-                            <span>📰 Short-Term Market Moving Catalysts</span>
-                            <span id="catFeedCountBadge" class="signal-badge" style="font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.12rem 0.45rem;">0 headlines</span>
+                            <span>📜 Historical Verified News & Post-Event Returns</span>
+                            <span id="outcomesCountBadge" class="signal-badge" style="font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.12rem 0.45rem;">0 verified</span>
                         </h3>
                     </div>
-                    <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
-                        <select id="catWatchlistSelect" onchange="app.onCatWatchlistChange(this.value)" style="height:30px;padding:0 0.55rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.15);border-radius:6px;font-weight:500;outline:none;" title="Select Watchlist / Universe to scan">
-                            <option value="GLOBAL" selected>⭐ Active Watchlist</option>
-                            <option value="NIFTY_50">🇮🇳 NIFTY 50</option>
-                            <option value="NSE_LARGE_CAP">🇮🇳 NSE Large Cap</option>
-                            <option value="NSE_ALL">🇮🇳 All NSE Equities</option>
-                            <option value="US_TOP">🇺🇸 US Mega-Caps</option>
-                            <option value="US">🇺🇸 All US Equities</option>
-                        </select>
-                        <button onclick="app.scanCatalystsNow()" id="catScanBtn" class="btn btn-primary btn-sm" style="font-weight:600;"><span>⚡</span> Scan Feeds</button>
-                    </div>
-                </div>
 
-                <!-- Operations Filter Toolbar -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.45rem;">
-                    <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
-                        <input type="text" id="catSearchInput" oninput="app.filterCatalysts()" placeholder="🔍 Search stock, order, FDA..." style="padding:0.25rem 0.55rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;min-width:180px;font-family:var(--font-mono);outline:none;">
-                        <select id="catImpactFilter" onchange="app.filterCatalysts()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
-                            <option value="ALL">All Impact Levels</option>
-                            <option value="HIGH">🔥 High Impact (≥75%)</option>
-                            <option value="MEDIUM+">⚡ Medium+ (≥50%)</option>
-                        </select>
-                        <select id="catDirectionFilter" onchange="app.filterCatalysts()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
-                            <option value="ALL">All Directions</option>
-                            <option value="BULLISH">🟢 Bullish Catalysts</option>
-                            <option value="BEARISH">🔴 Bearish Threats</option>
-                        </select>
-                        <select id="catCategoryFilter" onchange="app.filterCatalysts()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
-                            <option value="ALL">All Categories</option>
-                            <option value="Order Wins & Contracts">🤝 Order Wins & Deals</option>
-                            <option value="Earnings & Guidance Surprise">📈 Earnings & Guidance</option>
-                            <option value="Regulatory, Approvals & Policy">⚖️ Regulatory & Policy</option>
-                            <option value="M&A, Stake & Expansion">🏢 M&A & Expansion</option>
-                            <option value="Analyst Ratings & Targets">📊 Analyst Upgrades</option>
-                            <option value="Litigation, Risk & Probes">⚠️ Litigation & Risk</option>
-                            <option value="Corporate Action & Dividends">🎁 Dividends & Corporate</option>
-                        </select>
+                    <!-- Outcomes Filter Toolbar -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.45rem;">
+                        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="outcomesSearchInput" oninput="app.filterOutcomes()" placeholder="🔍 Search ticker or headline..." style="padding:0.25rem 0.55rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;min-width:180px;font-family:var(--font-mono);outline:none;">
+                            <select id="outcomesCategoryFilter" onchange="app.filterOutcomes()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
+                                <option value="ALL">All Categories</option>
+                                <option value="Order Wins & Contracts">🤝 Order Wins & Deals</option>
+                                <option value="Earnings & Guidance Surprise">📈 Earnings & Guidance</option>
+                                <option value="Regulatory, Approvals & Policy">⚖️ Regulatory & Policy</option>
+                                <option value="M&A, Stake & Expansion">🏢 M&A & Expansion</option>
+                                <option value="Analyst Ratings & Targets">📊 Analyst Upgrades</option>
+                                <option value="Litigation, Risk & Probes">⚠️ Litigation & Risk</option>
+                                <option value="Corporate Action & Dividends">🎁 Dividends & Corporate</option>
+                            </select>
+                            <select id="outcomesDirectionFilter" onchange="app.filterOutcomes()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
+                                <option value="ALL">All Directions</option>
+                                <option value="BULLISH">🟢 Bullish</option>
+                                <option value="BEARISH">🔴 Bearish</option>
+                            </select>
+                            <select id="outcomesStatusFilter" onchange="app.filterOutcomes()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
+                                <option value="ALL">All Status</option>
+                                <option value="VERIFIED">✅ Verified Only</option>
+                                <option value="ACTIVE">⏳ Active In-Flight</option>
+                            </select>
+                            <select id="outcomesSortBy" onchange="app.filterOutcomes()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
+                                <option value="max_gain">🚀 Sort by Max Gain %</option>
+                                <option value="net_return">📈 Sort by Net Return %</option>
+                                <option value="published_at">📅 Sort by Date (Newest)</option>
+                                <option value="impact">⚡ Sort by Impact Score</option>
+                            </select>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Feed Grid / Container -->
-                <div id="catalystsFeedGrid" style="display: flex; flex-direction: column; gap: 0.65rem;">
-                    <div class="card" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);background:#08080d;border:1px dashed rgba(255,255,255,0.12);border-radius:0.75rem;margin:0;">
-                        <div style="font-size:2rem;margin-bottom:0.5rem;">📰</div>
-                        <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;">Catalysts Feed Ready</h4>
-                        <p style="max-width:520px;margin:0 auto 1rem auto;font-size:0.8rem;line-height:1.45;color:var(--text-muted);">
-                            Click <strong>Scan Feeds</strong> to aggregate breaking news, regulatory filings, and market-moving events on demand.
-                        </p>
-                        <button onclick="app.scanCatalystsNow()" class="btn btn-primary btn-sm" style="font-weight:600;">⚡ Scan Breaking Feeds</button>
+                    <!-- Outcomes Table -->
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.76rem; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8;">
+                                    <th style="padding: 0.45rem 0.5rem;">Stock</th>
+                                    <th style="padding: 0.45rem 0.5rem;">Date</th>
+                                    <th style="padding: 0.45rem 0.5rem;">Headline & Category</th>
+                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">Entry Px</th>
+                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">1D Return</th>
+                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">3D Return</th>
+                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">5D Return</th>
+                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">Peak Gain</th>
+                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">Max Drawdown</th>
+                                    <th style="padding: 0.45rem 0.5rem; text-align: center;">Outcome</th>
+                                </tr>
+                            </thead>
+                            <tbody id="outcomesTableBody">
+                                <tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted);">Loading historical verified news outcomes...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-            </section>
+                </section>
+            </div>
+
         </div>
+

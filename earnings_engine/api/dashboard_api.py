@@ -1638,6 +1638,68 @@ def scan_catalysts_api(watchlist: str | None = None) -> dict[str, Any]:
     return scan_watchlist_catalysts(watchlist_name=watchlist, settings=settings)
 
 
+@ttl_cache(seconds=30)
+def get_news_outcomes_api(
+    category: str | None = None,
+    direction: str | None = None,
+    status: str | None = None,
+    predicted_met: bool | None = None,
+    sort_by: str = "published_at",
+    limit: int = 50,
+    search: str | None = None,
+) -> list[dict[str, Any]]:
+    """Fetch evaluated news outcomes with filtering."""
+    from earnings_engine.data.news_outcomes import get_verified_catalyst_outcomes, evaluate_all_catalyst_outcomes
+    settings = _settings()
+    items = get_verified_catalyst_outcomes(
+        category=category,
+        direction=direction,
+        status=status,
+        predicted_met=predicted_met,
+        sort_by=sort_by,
+        limit=limit,
+        search_query=search,
+        settings=settings,
+    )
+    if not items:
+        evaluate_all_catalyst_outcomes(settings=settings)
+        items = get_verified_catalyst_outcomes(
+            category=category,
+            direction=direction,
+            status=status,
+            predicted_met=predicted_met,
+            sort_by=sort_by,
+            limit=limit,
+            search_query=search,
+            settings=settings,
+        )
+    return items
+
+
+def evaluate_news_outcomes_api(force: bool = False) -> dict[str, Any]:
+    """Trigger on-demand evaluation of news outcomes."""
+    clear_dashboard_caches()
+    from earnings_engine.data.news_outcomes import evaluate_all_catalyst_outcomes
+    settings = _settings()
+    return evaluate_all_catalyst_outcomes(settings=settings, force=force)
+
+
+@ttl_cache(seconds=30)
+def get_news_trade_metrics_api(
+    category: str | None = None,
+    min_impact: int = 0,
+) -> dict[str, Any]:
+    """Compute trade-readiness KPIs and historical accuracy metrics for news catalysts."""
+    from earnings_engine.data.news_outcomes import compute_news_trade_metrics, evaluate_all_catalyst_outcomes
+    settings = _settings()
+    res = compute_news_trade_metrics(settings=settings, category=category, min_impact=min_impact)
+    if res.get("total_evaluated", 0) == 0:
+        evaluate_all_catalyst_outcomes(settings=settings)
+        res = compute_news_trade_metrics(settings=settings, category=category, min_impact=min_impact)
+    return res
+
+
+
 # =========================================================================
 # Daily Top 10 Gainers, Driver Attribution & Pattern Discovery APIs
 # =========================================================================

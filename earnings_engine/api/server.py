@@ -2752,6 +2752,60 @@ async def scan_catalysts(request: dict | None = None):
         raise HTTPException(status_code=500, detail=f"Error scanning catalysts: {str(e)}")
 
 
+@app.get("/api/v1/news/outcomes", tags=["News & Catalysts"])
+async def get_news_outcomes_endpoint(
+    category: str | None = Query(None),
+    direction: str | None = Query(None),
+    status: str | None = Query(None),
+    predicted_met: bool | None = Query(None),
+    sort_by: str = Query("published_at"),
+    limit: int = Query(50),
+    search: str | None = Query(None),
+):
+    """Query evaluated historical news outcomes and forward price performance."""
+    try:
+        items = dashboard_api.get_news_outcomes_api(
+            category=category,
+            direction=direction,
+            status=status,
+            predicted_met=predicted_met,
+            sort_by=sort_by,
+            limit=limit,
+            search=search,
+        )
+        return {"success": True, "count": len(items), "outcomes": items}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching news outcomes: {str(e)}")
+
+
+@app.post("/api/v1/news/outcomes/evaluate", tags=["News & Catalysts"])
+async def evaluate_news_outcomes_endpoint(request: dict | None = None):
+    """Trigger on-demand evaluation of historical catalyst outcomes against price action."""
+    force = bool((request or {}).get("force", False))
+    try:
+        result = dashboard_api.evaluate_news_outcomes_api(force=force)
+        return {"success": True, **result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error evaluating news outcomes: {str(e)}")
+
+
+@app.get("/api/v1/news/trade-metrics", tags=["News & Catalysts"])
+async def get_news_trade_metrics_endpoint(
+    category: str | None = Query(None),
+    min_impact: int = Query(0),
+):
+    """Get trade-readiness KPIs (Win Rate, Profit Factor, Expectancy, Max Gainers, Category Edge)."""
+    try:
+        metrics = dashboard_api.get_news_trade_metrics_api(
+            category=category,
+            min_impact=min_impact,
+        )
+        return {"success": True, "metrics": metrics}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching news trade metrics: {str(e)}")
+
+
+
 # ---------------------------------------------------------------------------
 # Daily Top 10 Gainers, Driver Attribution & Pattern Discovery Endpoints
 # ---------------------------------------------------------------------------

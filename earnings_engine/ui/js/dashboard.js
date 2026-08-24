@@ -1450,6 +1450,42 @@
             // 📰 Short-Term Catalysts & High-Impact News Tab
             // =========================================================================
             catalystsData: [],
+            catalystsActiveView: 'feed',
+            outcomesData: [],
+            outcomesMetrics: {},
+
+            switchCatalystsView(view) {
+                this.catalystsActiveView = view;
+                const feedView = document.getElementById('catalystsFeedView');
+                const outcomesView = document.getElementById('catalystsOutcomesView');
+                const feedBtn = document.getElementById('catViewFeedBtn');
+                const outcomesBtn = document.getElementById('catViewOutcomesBtn');
+                const scanBtn = document.getElementById('catScanBtn');
+                const evalBtn = document.getElementById('catEvalOutcomesBtn');
+
+                if (feedView) feedView.style.display = (view === 'feed') ? 'block' : 'none';
+                if (outcomesView) outcomesView.style.display = (view === 'outcomes') ? 'block' : 'none';
+
+                if (feedBtn) {
+                    feedBtn.style.background = (view === 'feed') ? 'rgba(59, 130, 246, 0.2)' : 'transparent';
+                    feedBtn.style.color = (view === 'feed') ? '#60a5fa' : '#a1a1aa';
+                    feedBtn.style.borderColor = (view === 'feed') ? 'rgba(59, 130, 246, 0.35)' : 'transparent';
+                    feedBtn.style.fontWeight = (view === 'feed') ? '700' : '600';
+                }
+                if (outcomesBtn) {
+                    outcomesBtn.style.background = (view === 'outcomes') ? 'rgba(59, 130, 246, 0.2)' : 'transparent';
+                    outcomesBtn.style.color = (view === 'outcomes') ? '#60a5fa' : '#a1a1aa';
+                    outcomesBtn.style.borderColor = (view === 'outcomes') ? 'rgba(59, 130, 246, 0.35)' : 'transparent';
+                    outcomesBtn.style.fontWeight = (view === 'outcomes') ? '700' : '600';
+                }
+
+                if (scanBtn) scanBtn.style.display = (view === 'feed') ? 'inline-flex' : 'none';
+                if (evalBtn) evalBtn.style.display = (view === 'outcomes') ? 'inline-flex' : 'none';
+
+                if (view === 'outcomes') {
+                    this.loadNewsOutcomes();
+                }
+            },
 
             async loadCatalysts(watchlist) {
                 const feedGrid = document.getElementById('catalystsFeedGrid');
@@ -1474,6 +1510,261 @@
                 } catch (e) {
                     console.error('Error loading catalysts:', e);
                     if (feedGrid) feedGrid.innerHTML = '<div class="card" style="padding:1rem;color:var(--red);">Failed loading catalysts feed. Click "⚡ Scan Feeds" to refresh.</div>';
+                }
+            },
+
+            async loadNewsOutcomes() {
+                const tableBody = document.getElementById('outcomesTableBody');
+                if (tableBody) tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading historical verified news outcomes & performance metrics...</td></tr>';
+                
+                try {
+                    const [metricsRes, outcomesRes] = await Promise.all([
+                        fetch(API_BASE + '/api/v1/news/trade-metrics'),
+                        fetch(API_BASE + '/api/v1/news/outcomes?limit=100')
+                    ]);
+                    const metricsData = await metricsRes.json();
+                    const outcomesData = await outcomesRes.json();
+
+                    this.outcomesMetrics = metricsData.metrics || {};
+                    this.outcomesData = outcomesData.outcomes || [];
+
+                    this.renderNewsTradeMetrics(this.outcomesMetrics);
+                    this.renderNewsOutcomes();
+                } catch (e) {
+                    console.error('Error loading news outcomes:', e);
+                    if (tableBody) tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:1.5rem;color:var(--red);">Failed loading outcomes track record. Click "🎯 Re-Verify Outcomes" to calculate.</td></tr>';
+                }
+            },
+
+            renderNewsTradeMetrics(m) {
+                if (!m) return;
+                const winRateEl = document.getElementById('outcomeWinRate');
+                const dirWinEl = document.getElementById('outcomeDirWinRates');
+                const expEl = document.getElementById('outcomeExpectancy');
+                const avgRetEl = document.getElementById('outcomeAvgReturn');
+                const pfEl = document.getElementById('outcomeProfitFactor');
+                const payoffEl = document.getElementById('outcomePayoff');
+                const topGValEl = document.getElementById('outcomeTopGainerVal');
+                const topGTickEl = document.getElementById('outcomeTopGainerTicker');
+                const totalEl = document.getElementById('outcomeTotalCount');
+                const verEl = document.getElementById('outcomeVerifiedCount');
+                const actEl = document.getElementById('outcomeActiveCount');
+
+                const h1dEl = document.getElementById('horizon1d');
+                const h3dEl = document.getElementById('horizon3d');
+                const h5dEl = document.getElementById('horizon5d');
+
+                if (winRateEl) winRateEl.textContent = (m.win_rate_pct != null ? m.win_rate_pct.toFixed(1) : '0.0') + '%';
+                if (dirWinEl) dirWinEl.textContent = `Bull: ${(m.bullish_win_rate_pct || 0).toFixed(1)}% | Bear: ${(m.bearish_win_rate_pct || 0).toFixed(1)}%`;
+                
+                if (expEl) {
+                    const expVal = m.trade_expectancy_pct || 0;
+                    expEl.textContent = (expVal > 0 ? '+' : '') + expVal.toFixed(2) + '%';
+                    expEl.style.color = expVal >= 0 ? '#34d399' : '#f87171';
+                }
+                if (avgRetEl) {
+                    const rVal = m.avg_return_pct || 0;
+                    avgRetEl.textContent = (rVal > 0 ? '+' : '') + rVal.toFixed(2) + '%';
+                    avgRetEl.style.color = rVal >= 0 ? '#34d399' : '#f87171';
+                }
+                if (pfEl) pfEl.textContent = (m.profit_factor != null ? m.profit_factor.toFixed(2) : '0.00');
+                if (payoffEl) payoffEl.textContent = (m.payoff_ratio != null ? m.payoff_ratio.toFixed(2) : '0.0') + 'x';
+
+                if (m.max_gainers && m.max_gainers.length) {
+                    const topG = m.max_gainers[0];
+                    if (topGValEl) topGValEl.textContent = '+' + Number(topG.max_gain_pct).toFixed(1) + '%';
+                    if (topGTickEl) topGTickEl.textContent = `${topG.ticker}: ${topG.title}`;
+                }
+
+                if (totalEl) totalEl.textContent = m.total_evaluated || 0;
+                if (verEl) verEl.textContent = m.verified_count || 0;
+                if (actEl) actEl.textContent = (m.total_evaluated || 0) - (m.verified_count || 0);
+
+                if (m.horizon_performance) {
+                    const h1 = m.horizon_performance.avg_1d_pct || 0;
+                    const h3 = m.horizon_performance.avg_3d_pct || 0;
+                    const h5 = m.horizon_performance.avg_5d_pct || 0;
+                    if (h1dEl) { h1dEl.textContent = (h1 > 0 ? '+' : '') + h1.toFixed(2) + '%'; h1dEl.style.color = h1 >= 0 ? '#60a5fa' : '#f87171'; }
+                    if (h3dEl) { h3dEl.textContent = (h3 > 0 ? '+' : '') + h3.toFixed(2) + '%'; h3dEl.style.color = h3 >= 0 ? '#34d399' : '#f87171'; }
+                    if (h5dEl) { h5dEl.textContent = (h5 > 0 ? '+' : '') + h5.toFixed(2) + '%'; h5dEl.style.color = h5 >= 0 ? '#38bdf8' : '#f87171'; }
+                }
+
+                // Render Category Performance Table
+                const catTableBody = document.getElementById('outcomeCategoryTableBody');
+                if (catTableBody && m.category_performance) {
+                    if (!m.category_performance.length) {
+                        catTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:1rem;color:var(--muted);">No category data available.</td></tr>';
+                    } else {
+                        catTableBody.innerHTML = m.category_performance.map(c => {
+                            const wrColor = c.win_rate_pct >= 65 ? '#34d399' : (c.win_rate_pct >= 50 ? '#60a5fa' : '#f87171');
+                            const retColor = c.avg_return_pct >= 0 ? '#34d399' : '#f87171';
+                            const edgeBadge = c.win_rate_pct >= 70 && c.profit_factor >= 2.0
+                                ? '<span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.68rem;">🔥 High Edge</span>'
+                                : (c.win_rate_pct >= 55 ? '<span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.68rem;">⚡ Solid</span>' : '<span class="signal-badge" style="background:rgba(148,163,184,0.1);color:#94a3b8;font-size:0.68rem;">Neutral</span>');
+
+                            return `
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding: 0.4rem 0.5rem; font-weight: 600; color: #f8fafc;">${c.category}</td>
+                                    <td style="padding: 0.4rem 0.5rem; text-align: right; color: #a1a1aa; font-family: var(--font-mono);">${c.total_events}</td>
+                                    <td style="padding: 0.4rem 0.5rem; text-align: right; font-weight: 700; color: ${wrColor}; font-family: var(--font-mono);">${c.win_rate_pct.toFixed(1)}%</td>
+                                    <td style="padding: 0.4rem 0.5rem; text-align: right; font-weight: 600; color: ${retColor}; font-family: var(--font-mono);">${(c.avg_return_pct > 0 ? '+' : '') + c.avg_return_pct.toFixed(2)}%</td>
+                                    <td style="padding: 0.4rem 0.5rem; text-align: right; color: #38bdf8; font-family: var(--font-mono);">+${c.avg_max_gain_pct.toFixed(2)}%</td>
+                                    <td style="padding: 0.4rem 0.5rem; text-align: right; font-weight: 600; color: #e2e8f0; font-family: var(--font-mono);">${c.profit_factor.toFixed(2)}</td>
+                                    <td style="padding: 0.4rem 0.5rem; text-align: center;">${edgeBadge}</td>
+                                </tr>
+                            `;
+                        }).join('');
+                    }
+                }
+            },
+
+            filterOutcomes() {
+                this.renderNewsOutcomes();
+            },
+
+            renderNewsOutcomes() {
+                const tableBody = document.getElementById('outcomesTableBody');
+                const countBadge = document.getElementById('outcomesCountBadge');
+                if (!tableBody) return;
+
+                const searchQ = (document.getElementById('outcomesSearchInput')?.value || '').toLowerCase().trim();
+                const catFilter = document.getElementById('outcomesCategoryFilter')?.value || 'ALL';
+                const dirFilter = document.getElementById('outcomesDirectionFilter')?.value || 'ALL';
+                const statusFilter = document.getElementById('outcomesStatusFilter')?.value || 'ALL';
+                const sortBy = document.getElementById('outcomesSortBy')?.value || 'max_gain';
+
+                let filtered = (this.outcomesData || []).filter(item => {
+                    if (searchQ) {
+                        const mTicker = (item.ticker || '').toLowerCase().includes(searchQ);
+                        const mName = (item.stock_name || '').toLowerCase().includes(searchQ);
+                        const mTitle = (item.title || '').toLowerCase().includes(searchQ);
+                        if (!mTicker && !mName && !mTitle) return false;
+                    }
+                    if (catFilter !== 'ALL' && item.category !== catFilter) return false;
+                    if (dirFilter !== 'ALL' && item.direction !== dirFilter) return false;
+                    if (statusFilter !== 'ALL' && item.status !== statusFilter) return false;
+                    return true;
+                });
+
+                if (sortBy === 'max_gain') {
+                    filtered.sort((a, b) => (b.max_gain_pct || 0) - (a.max_gain_pct || 0));
+                } else if (sortBy === 'net_return') {
+                    filtered.sort((a, b) => (b.net_return_pct || 0) - (a.net_return_pct || 0));
+                } else if (sortBy === 'impact') {
+                    filtered.sort((a, b) => (b.impact_score || 0) - (a.impact_score || 0));
+                } else {
+                    filtered.sort((a, b) => (b.published_at || '').localeCompare(a.published_at || ''));
+                }
+
+                if (countBadge) countBadge.textContent = filtered.length + ' evaluated';
+
+                if (!filtered.length) {
+                    tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted);">No news outcomes matching selected filters.</td></tr>';
+                    return;
+                }
+
+                tableBody.innerHTML = filtered.map(o => {
+                    const isBull = o.direction === 'BULLISH';
+                    const isMet = Boolean(o.predicted_met);
+                    const isVerified = o.status === 'VERIFIED';
+
+                    const dirColor = isBull ? '#34d399' : '#f87171';
+                    const dirIcon = isBull ? '🟢 Bull' : '🔴 Bear';
+
+                    let outcomeBadge = '';
+                    if (isVerified) {
+                        if (isMet) {
+                            const retStr = o.net_return_pct != null ? (o.net_return_pct > 0 ? '+' : '') + o.net_return_pct.toFixed(1) + '%' : 'MET';
+                            outcomeBadge = `<span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-weight:700;border:1px solid rgba(16,185,129,0.3);">✅ MET (${retStr})</span>`;
+                        } else {
+                            const retStr = o.net_return_pct != null ? o.net_return_pct.toFixed(1) + '%' : 'FAILED';
+                            outcomeBadge = `<span class="signal-badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-weight:700;border:1px solid rgba(239,68,68,0.3);">❌ MISSED (${retStr})</span>`;
+                        }
+                    } else {
+                        outcomeBadge = `<span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">⏳ ACTIVE</span>`;
+                    }
+
+                    const fmtRet = (val) => {
+                        if (val == null || isNaN(val)) return '—';
+                        const sign = val > 0 ? '+' : '';
+                        const col = val > 0 ? '#34d399' : (val < 0 ? '#f87171' : '#94a3b8');
+                        return `<span style="color:${col};font-weight:600;font-family:var(--font-mono);">${sign}${Number(val).toFixed(2)}%</span>`;
+                    };
+
+                    const entryPx = o.entry_price ? `₹${Number(o.entry_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : '—';
+                    const maxGain = o.max_gain_pct != null ? `<span style="color:#38bdf8;font-weight:700;font-family:var(--font-mono);">+${Number(o.max_gain_pct).toFixed(2)}%</span>` : '—';
+                    const maxDD = o.max_drawdown_pct != null ? `<span style="color:#f87171;font-weight:600;font-family:var(--font-mono);">${Number(o.max_drawdown_pct).toFixed(2)}%</span>` : '—';
+
+                    const pubDate = o.published_at ? o.published_at.slice(0, 10) : '—';
+
+                    return `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.12s ease;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                            <td style="padding: 0.45rem 0.5rem; white-space: nowrap;">
+                                <a href="/stock/${encodeURIComponent(o.ticker)}" target="_blank" style="font-weight:700;color:#60a5fa;text-decoration:none;font-family:var(--font-mono);" title="Open stock intelligence page">
+                                    ${o.ticker} ↗
+                                </a>
+                                <div style="font-size:0.68rem;color:#71717a;">${o.stock_name || ''}</div>
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; white-space: nowrap; color: #a1a1aa; font-family: var(--font-mono); font-size: 0.72rem;">
+                                ${pubDate}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; max-width: 320px;">
+                                <div style="font-weight: 600; color: #f8fafc; font-size: 0.78rem; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${(o.title || '').replace(/"/g, '&quot;')}">
+                                    ${o.title}
+                                </div>
+                                <div style="display: flex; gap: 0.35rem; align-items: center; margin-top: 0.15rem;">
+                                    <span style="font-size: 0.65rem; color: ${dirColor}; font-weight: 700;">${dirIcon}</span>
+                                    <span style="font-size: 0.65rem; background: rgba(255,255,255,0.06); color: #94a3b8; padding: 0.05rem 0.3rem; border-radius: 3px;">${o.category}</span>
+                                    <span style="font-size: 0.65rem; color: #fbbf24;">⚡ ${o.impact_score}%</span>
+                                </div>
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; font-family: var(--font-mono); color: #e2e8f0; font-weight: 600; white-space: nowrap;">
+                                ${entryPx}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${fmtRet(o.return_1d_pct)}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${fmtRet(o.return_3d_pct)}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${fmtRet(o.return_5d_pct)}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${maxGain}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${maxDD}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: center; white-space: nowrap;">
+                                ${outcomeBadge}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            },
+
+            async evaluateNewsOutcomesNow() {
+                const btn = document.getElementById('catEvalOutcomesBtn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '⏳ Evaluating Outcomes...';
+                }
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/news/outcomes/evaluate', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({force: true})
+                    });
+                    const data = await res.json();
+                    await this.loadNewsOutcomes();
+                } catch (e) {
+                    console.error('Error evaluating news outcomes:', e);
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<span>🎯</span> Re-Verify Outcomes';
+                    }
                 }
             },
 
@@ -1601,8 +1892,8 @@
                         '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.45rem;">' +
                             '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">' +
                                 ((c.stock_name && c.stock_name.trim().toUpperCase() !== c.ticker.trim().toUpperCase())
-                                    ? '<strong style="font-size:1.05rem;color:#f8fafc;">' + c.stock_name + '</strong><span class="signal-badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;font-size:0.72rem;">' + c.ticker + '</span>'
-                                    : '<strong style="font-size:1.05rem;color:#f8fafc;">' + c.ticker + '</strong>') +
+                                    ? '<strong style="font-size:1.05rem;color:#f8fafc;">' + c.stock_name + '</strong><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" class="signal-badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;font-size:0.72rem;text-decoration:none;" title="Open stock intelligence">' + c.ticker + ' ↗</a>'
+                                    : '<a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="font-size:1.05rem;font-weight:700;color:#60a5fa;text-decoration:none;">' + c.ticker + ' ↗</a>') +
                                 '<span style="background:' + impactBadgeBg + ';color:' + impactBadgeColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + impactLabel + '</span>' +
                                 '<span style="background:' + dirBadgeBg + ';color:' + dirColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + dirIcon + '</span>' +
                                 '<span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;">' + c.category + '</span>' +
