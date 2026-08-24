@@ -248,9 +248,9 @@ def fetch_yahoo_rss_news(ticker: str) -> list[dict[str, Any]]:
 
 
 def fetch_google_news_rss(ticker: str, market: str = "IN") -> list[dict[str, Any]]:
-    """Fetch news headlines via Google News RSS search."""
+    """Fetch recent news headlines via Google News RSS search with strict recency filter."""
     base_sym = ticker.replace(".NS", "").replace(".BO", "").strip().upper()
-    query = f"{base_sym} stock news" if market == "IN" else f"{base_sym} stock earnings"
+    query = f"{base_sym} stock news when:7d" if market == "IN" else f"{base_sym} stock earnings when:7d"
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=en-IN&gl=IN&ceid=IN:en"
     articles: list[dict[str, Any]] = []
 

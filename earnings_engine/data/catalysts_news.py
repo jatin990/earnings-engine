@@ -243,6 +243,45 @@ def _generate_why_it_matters(category: str, direction: str, horizon: str, volati
     return f"Market news headline creating short-term sentiment momentum ({volatility})."
 
 
+def is_headline_current(title: str, summary: str = "", published_at: str = "") -> bool:
+    """Validate that a news headline represents a live/upcoming catalyst rather than historical/stale event."""
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+
+    # 1. Check published date recency (max 14 days old for short-term swing catalysts)
+    if published_at:
+        try:
+            # Handle YYYY-MM-DD HH:MM:SS or ISO
+            pub_dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+            if pub_dt.tzinfo is None:
+                pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+            if (now - pub_dt).days > 14:
+                return False
+        except Exception:
+            pass
+
+    # 2. Check for explicit historical event dates in title/summary (e.g. "sets July 2 for merger" in August)
+    full_text = (title + " " + summary).lower()
+    month_map = {
+        "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
+        "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
+        "jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12
+    }
+
+    # Match patterns like "sets July 2", "on June 15", "held on May 10", "dated July 12"
+    date_matches = re.findall(r"\b(sets|on|held|dated|meetings? on|for)\s+([a-z]+)\s+(\d{1,2})\b", full_text)
+    for _, m_name, d_str in date_matches:
+        m_num = month_map.get(m_name)
+        if m_num:
+            day = int(d_str)
+            # If the month is strictly before the current month in the current year, it's historical
+            if m_num < now.month or (m_num == now.month and day < (now.day - 7)):
+                logger.debug("[CATALYSTS] Filtering historical event headline: %s (%s %d is past)", title, m_name, day)
+                return False
+
+    return True
+
+
 def fetch_ticker_catalysts(
     ticker: str,
     limit: int = 8,
@@ -257,14 +296,14 @@ def fetch_ticker_catalysts(
     ticker = ticker.strip().upper()
     name = get_name(ticker, settings) or ticker
 
-    # 1. Check local cache freshness (6 hours TTL)
+    # 1. Check local cache freshness (6 hours TTL) and recency
     if not force:
         with _connect(settings) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 """
                 SELECT * FROM news_catalysts
-                WHERE ticker = ?
+                WHERE ticker = ? AND published_at >= datetime('now', '-14 days')
                 ORDER BY published_at DESC, impact_score DESC
                 LIMIT ?
                 """,
@@ -279,7 +318,7 @@ def fetch_ticker_catalysts(
                             dt = dt.tz_localize("UTC")
                         age_hours = (datetime.now(timezone.utc) - dt).total_seconds() / 3600.0
                         if age_hours < 6.0:
-                            return [dict(r) for r in rows]
+                            return [dict(r) for r in rows if is_headline_current(r["title"], r.get("summary", ""), r["published_at"])]
                     except Exception:
                         return [dict(r) for r in rows]
                 else:
@@ -327,6 +366,10 @@ def fetch_ticker_catalysts(
             link = item.get("link", "")
             raw_pub = item.get("published_at")
             pub_date = _parse_iso_pubdate(raw_pub)
+
+            # Strict recency and forward-catalyst check
+            if not is_headline_current(title, summary, pub_date):
+                continue
 
             scored = score_catalyst_headline(title, summary)
 
@@ -395,7 +438,7 @@ def get_short_term_catalysts(
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
 
-        query = "SELECT * FROM news_catalysts WHERE 1=1"
+        query = "SELECT * FROM news_catalysts WHERE published_at >= datetime('now', '-14 days')"
         params: list[Any] = []
 
         # Filter by watchlist / universe if supplied
@@ -432,7 +475,8 @@ def get_short_term_catalysts(
         params.append(limit)
 
         rows = conn.execute(query, params).fetchall()
-        return [dict(r) for r in rows]
+        valid = [dict(r) for r in rows if is_headline_current(r["title"], r.get("summary", ""), r["published_at"])]
+        return valid
 
 
 def get_catalyst_summary_stats(settings: Settings | None = None) -> dict[str, Any]:
