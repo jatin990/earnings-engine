@@ -136,3 +136,8 @@ def test_api_stock_rating_endpoints():
     data = resp.json()
     assert data["success"] is True
     assert data["ticker"] == "INFY.NS"
+
+    # 3. Live week high/low
+    resp = client.post("/api/v1/stock/MAXHEALTH.NS/live-week-hl?earnings_date=2026-08-20")
+    assert resp.status_code in (200, 404)  # 200 if yfinance network succeeds
+

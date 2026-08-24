@@ -3223,12 +3223,14 @@ async def recalculate_stock_rating_endpoint(ticker: str, req: RecalculateRatingR
 
     # Log to audit history
     try:
-        from earnings_engine.data.recalculate_audit import log_recalculate_event
+        from earnings_engine.data.ticker_audit import record_audit_entry
         diff_summary = f"Fundamental: {result['fundamental']['grade']} ({result['fundamental']['score']}), Tech: {result['technical']['grade']} ({result['technical']['score']})"
-        log_recalculate_event(
+        record_audit_entry(
             ticker=ticker,
-            source=src,
-            notes=req.audit_notes if req and req.audit_notes else diff_summary,
+            has_changes=True,
+            changes_summary=req.audit_notes if req and req.audit_notes else diff_summary,
+            updated_values={"fundamental": result["fundamental"], "technical": result["technical"]},
+            diff_dict=result.get("diff", {}),
             settings=_settings,
         )
     except Exception as e:
@@ -3253,7 +3255,7 @@ async def batch_stock_ratings_endpoint(req: BatchRatingRequest):
     return {"success": True, "count": len(results), "ratings": results}
 
 
-@app.post("/api/v1/stock/{ticker}/live-week-hl", tags=["Stock Intelligence & Ratings"])
+@app.api_route("/api/v1/stock/{ticker}/live-week-hl", methods=["GET", "POST"], tags=["Stock Intelligence & Ratings"])
 async def calc_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Query(None)):
     """Calculate live week high/low move since earnings print using latest real-time prices."""
     from earnings_engine.data.market_context import _week_high_low_around
@@ -3271,37 +3273,50 @@ async def calc_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Qu
     if ed is None:
         raise HTTPException(status_code=400, detail=f"No past earnings date found for {ticker}")
 
+    hist_df = pd.DataFrame(columns=["close"])
+    curr_price = None
     try:
         yf_ticker = yf.Ticker(ticker)
         hist = yf_ticker.history(period="1mo")
         fast_info = yf_ticker.fast_info or {}
         curr_price = fast_info.get("last_price")
-        if (curr_price is None or curr_price <= 0) and not hist.empty:
-            curr_price = float(hist["Close"].iloc[-1])
-        
-        hist_df = pd.DataFrame(index=pd.to_datetime(hist.index.date))
-        hist_df["close"] = hist["Close"].values
-        
-        week_data = _week_high_low_around(hist_df, ed, current_price=curr_price)
-        if week_data is None:
-            raise HTTPException(status_code=404, detail="Not enough price history around earnings date")
-        
-        high_pct, low_pct, high_p, low_p, high_d, low_d = week_data
-        
-        return {
-            "success": True,
-            "ticker": ticker,
-            "earnings_date": ed.strftime("%Y-%m-%d"),
-            "high_pct": round(high_pct, 2),
-            "low_pct": round(low_pct, 2),
-            "high_price": round(high_p, 2),
-            "low_price": round(low_p, 2),
-            "high_date": pd.Timestamp(high_d).strftime("%b %d") if high_d is not None else None,
-            "low_date": pd.Timestamp(low_d).strftime("%b %d") if low_d is not None else None,
-            "current_price": round(curr_price, 2) if curr_price else None,
-        }
+        if not hist.empty and "Close" in hist.columns:
+            if curr_price is None or curr_price <= 0:
+                curr_price = float(hist["Close"].iloc[-1])
+            hist_df = pd.DataFrame(index=pd.to_datetime(hist.index.date))
+            hist_df["close"] = hist["Close"].values
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error computing live week high/low: {e}")
+        logger.warning(f"Error querying yfinance live for {ticker}: {e}")
+
+    if hist_df.empty:
+        from earnings_engine.data.prices import fetch_prices
+        try:
+            hist_df = fetch_prices(ticker, _settings, force=False)
+        except Exception:
+            pass
+
+    if hist_df is None or hist_df.empty or "close" not in hist_df.columns:
+        raise HTTPException(status_code=404, detail="No price history available for ticker")
+
+    week_data = _week_high_low_around(hist_df, ed, current_price=curr_price)
+    if week_data is None:
+        raise HTTPException(status_code=404, detail="Not enough price history around earnings date")
+
+    high_pct, low_pct, high_p, low_p, high_d, low_d = week_data
+
+    return {
+        "success": True,
+        "ticker": ticker,
+        "earnings_date": ed.strftime("%Y-%m-%d"),
+        "high_pct": round(high_pct, 2),
+        "low_pct": round(low_pct, 2),
+        "high_price": round(high_p, 2),
+        "low_price": round(low_p, 2),
+        "high_date": pd.Timestamp(high_d).strftime("%b %d") if high_d is not None else None,
+        "low_date": pd.Timestamp(low_d).strftime("%b %d") if low_d is not None else None,
+        "current_price": round(curr_price, 2) if curr_price else None,
+    }
+
 
 
 
