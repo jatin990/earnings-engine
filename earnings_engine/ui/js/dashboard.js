@@ -268,6 +268,7 @@
                                     '<button onclick="app.openAddToWatchlistModal(\'' + it.ticker + '\')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.85rem;" title="Manage Watchlists">⭐</button>' +
                                     '<div>' +
                                         '<strong onclick="app.openSwingRangeModal(\'' + this.activeWatchlist.replace(/'/g, "\\'") + '\',\'' + it.ticker + '\')" style="color:#ffffff;font-size:0.85rem;cursor:pointer;" class="hover-underline" title="Inspect & edit swing range">' + it.ticker + '</strong>' +
+                                        '<a href="/stock/' + encodeURIComponent(it.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a>' +
                                         '<div style="font-size:0.7rem;color:#a1a1aa;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (it.company_name || it.ticker) + '</div>' +
                                     '</div>' +
                                 '</div>' +
@@ -1419,7 +1420,7 @@
                         '<td style="text-align:center;color:var(--muted);font-weight:700;">' + rank + '</td>' +
                         '<td>' +
                             '<div style="font-weight:700;font-size:0.85rem;color:var(--light);">' + (c.stock_name || c.ticker) + '</div>' +
-                            '<div style="font-size:0.72rem;color:var(--muted);">' + c.ticker + '</div>' +
+                            '<div style="font-size:0.72rem;color:var(--muted);">' + c.ticker + '<a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
                         '</td>' +
                         '<td><strong>₹' + (c.current_price ? Number(c.current_price).toFixed(2) : '—') + '</strong></td>' +
                         '<td><strong class="' + retClass + '" style="font-size:0.9rem;">' + retSign + ret.toFixed(2) + '%</strong></td>' +
@@ -2051,7 +2052,7 @@
                         '<td style="text-align:center;"><span style="background:' + rankBadgeBg + ';color:' + rankColor + ';width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:0.75rem;">' + rank + '</span></td>' +
                         '<td>' +
                             '<div style="font-weight:700;font-size:0.85rem;color:var(--light);">' + (g.stock_name || g.ticker) + '</div>' +
-                            '<div style="font-size:0.72rem;color:var(--muted);">' + g.ticker + '</div>' +
+                            '<div style="font-size:0.72rem;color:var(--muted);">' + g.ticker + '<a href="/stock/' + encodeURIComponent(g.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
                         '</td>' +
                         '<td><strong>' + currSym + (g.close_price ? Number(g.close_price).toFixed(2) : '—') + '</strong></td>' +
                         '<td><strong class="price-positive" style="font-size:0.95rem;">+' + Number(g.return_pct).toFixed(2) + '%</strong></td>' +
@@ -3507,7 +3508,7 @@
                     const trend = kp.trend || 'N/A';
                     const trendStyle = trend === 'Bullish' ? 'color:#10b981' : trend === 'Bearish' ? 'color:#ef4444' : 'color:#94a3b8';
                     return '<div class="widget-card">' +
-                        '<h4>' + (r.ticker || '?') + '</h4>' +
+                        '<h4>' + (r.ticker || '?') + '<a href="/stock/' + encodeURIComponent(r.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></h4>' +
                         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">' +
                         '<span class="timestamp">' + (r.earnings_date || 'N/A') + '</span>' +
                         '<span class="signal-badge" style="' + badgeStyle + '">' + signal + '</span></div>' +
@@ -3545,7 +3546,7 @@
                     const trend = kp.trend || '—';
                     const trendCls = trend === 'Bullish' ? 'price-positive' : trend === 'Bearish' ? 'price-negative' : '';
                     return '<tr>' +
-                        '<td><strong>' + (r.ticker || '?') + '</strong></td>' +
+                        '<td><strong>' + (r.ticker || '?') + '</strong><a href="/stock/' + encodeURIComponent(r.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></td>' +
                         '<td>' + (r.earnings_date || 'N/A') + '</td>' +
                         '<td>' + (r.current_price ? r.current_price.toFixed(2) : 'N/A') + '</td>' +
                         '<td>' + (r.market_cap ? this.formatMarketCap(r.market_cap) : 'N/A') + '</td>' +
@@ -3864,7 +3865,7 @@
                         const origBg = isBz ? 'rgba(16,185,129,0.08)' : '';
 
                         return '<tr style="' + rowStyle + 'cursor:pointer;" onmouseenter="this.style.background=\'' + hoverBg + '\'" onmouseleave="this.style.background=\'' + origBg + '\'" onclick="app.openSwingRangeModal(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\')" title="Click row to view 3-month history & set custom range">' +
-                            '<td><strong style="color:var(--light);font-size:0.95rem;">' + (r.ticker || '?') + '</strong></td>' +
+                            '<td><strong style="color:var(--light);font-size:0.95rem;">' + (r.ticker || '?') + '</strong><a href="/stock/' + encodeURIComponent(r.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a></td>' +
                             '<td style="font-weight:700;' + (isBz ? 'color:#34d399;font-size:0.98rem;' : '') + '">' + curPriceStr + '</td>' +
                             '<td>' + signalBadge + '</td>' +
                             '<td style="' + (isBz ? 'color:#34d399;font-weight:600;' : '') + '">' + suppStr + '</td>' +
@@ -10091,7 +10092,10 @@
                 return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);" data-ticker="${ticker}">
                     <td style="padding:0.55rem 0.75rem;">
                         <div style="display:flex;flex-direction:column;gap:0.05rem;">
-                            <span style="font-weight:700;color:#f1f5f9;font-family:var(--font-mono);font-size:0.78rem;cursor:pointer;" onclick="app.switchTab('results');" title="View ${ticker} in Results">${ticker}</span>
+                            <div style="display:flex;align-items:center;gap:0.25rem;">
+                                <span style="font-weight:700;color:#f1f5f9;font-family:var(--font-mono);font-size:0.78rem;cursor:pointer;" onclick="app.switchTab('results');" title="View ${ticker} in Results">${ticker}</span>
+                                <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-size:0.75rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
+                            </div>
                             <span style="font-size:0.65rem;color:#475569;" title="${c.company_name || ticker}">${company}</span>
                             <span style="font-size:0.6rem;color:#334155;">${industry}</span>
                         </div>
