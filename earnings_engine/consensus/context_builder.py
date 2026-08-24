@@ -215,9 +215,14 @@ def _build_swing_channel(ticker: str, settings: Settings) -> dict[str, Any]:
         if not rows:
             return {}
 
+        # Filter out rows where close is None/NULL
+        valid_rows = [(r[0], r[1]) for r in reversed(rows) if r[1] is not None]
+        if not valid_rows:
+            return {}
+
         closes = pd.Series(
-            [float(r[1]) for r in reversed(rows)],
-            index=pd.to_datetime([r[0] for r in reversed(rows)]),
+            [float(r[1]) for r in valid_rows],
+            index=pd.to_datetime([r[0] for r in valid_rows]),
         )
         swing = detect_swing_range(closes)
 
