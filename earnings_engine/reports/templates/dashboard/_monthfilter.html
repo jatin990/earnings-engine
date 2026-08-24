@@ -1,61 +1,89 @@
 {% import 'dashboard/_components.html' as comps %}
-        <div id="tab-monthfilter" class="tab-content">
-            <section class="card">
-                <!-- Header & Present-Day Fetch Record Bar -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.65rem;">
-                    <div>
-                        <h3 style="margin: 0; font-size: 1.2rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.5rem; background: linear-gradient(135deg, #c084fc 0%, #a855f7 50%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                            <span>🗓️ Month Filter & Earnings Calendar Matrix</span>
-                            <span id="mfCount" class="signal-badge" style="font-size:0.75rem;display:inline-block;background:rgba(168,85,247,0.2);color:#d8b4fe;border:1px solid rgba(168,85,247,0.3);"></span>
-                        </h3>
-                        <p class="timestamp" style="margin:0.2rem 0 0 0;font-size:0.8rem;color:var(--muted);">Precalculated earnings calendar categorized by Date → Market Cap → Industry with present-day delta syncing.</p>
+        <div id="tab-monthfilter" class="tab-content" style="width: 100%; max-width: 100%;">
+            
+            <!-- ⚡ Top Month Filter KPI Cards with Soft Under-Glow -->
+            <div id="monthfilterSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                <div class="card card-glow-purple" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#c084fc;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Calendar Events</span>
+                        <span class="signal-badge" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:0.62rem;">Scheduled</span>
                     </div>
-                    <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap;">
-                        <select id="mfMarket" onchange="app.loadMonthFilterTab()" style="padding: 0.45rem 0.7rem; border: 1px solid rgba(168,85,247,0.3); border-radius: 0.5rem; background: #0c0717; color: var(--light); font-size: 0.82rem; font-weight: 600;">
-                            <option value="ALL" selected>🌐 All Markets</option>
-                            <option value="IN">🇮🇳 NSE India</option>
-                            <option value="US">🇺🇸 US Markets</option>
-                            <option value="NSE_LARGE_CAP">🏛️ NSE LargeCap</option>
-                        </select>
-                        <button onclick="app.syncMonthFilter()" id="mfSyncBtn" class="btn btn-primary btn-sm">🔄 Sync Delta</button>
+                    <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><span id="mfStatTotalEvents">0</span> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Events</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Quarterly earnings releases</div>
+                </div>
+
+                <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Database Sync Status</span>
+                        <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Up to date</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);">Synchronized</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Live Bhavcopy & Feeds</div>
+                </div>
+
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Categorization</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Structured</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);">Market Cap & Industry</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Auto-grouped presentation</div>
+                </div>
+            </div>
+
+            <!-- Main Month Filter Card -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+                
+                <!-- Header & Present-Day Fetch Record Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
+                            <span>🗓️ Month Filter & Earnings Calendar Matrix</span>
+                            <span id="mfCount" class="signal-badge" style="font-size:0.68rem;display:inline-block;background:rgba(168,85,247,0.15);color:#d8b4fe;border:1px solid rgba(168,85,247,0.3);padding:0.12rem 0.45rem;"></span>
+                        </h3>
+                        <p class="timestamp" style="margin:0.15rem 0 0 0;font-size:0.72rem;color:var(--text-muted);">Precalculated earnings calendar categorized by Date → Market Cap → Industry with present-day delta syncing.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                        {{ comps.market_dropdown('mfMarket', 'ALL', 'app.loadMonthFilterTab();') }}
+                        <button onclick="app.syncMonthFilter()" id="mfSyncBtn" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Sync Delta</button>
                         <button onclick="app.loadMonthFilterTab(true)" id="mfRefreshBtn" class="btn btn-sm">↻ Refresh</button>
                         <button onclick="app.cancelReportLoad('monthfilter')" id="mfCancelBtn" class="btn btn-danger btn-sm" style="display:none;" title="Cancel pending load request">⏹ Cancel</button>
                     </div>
                 </div>
 
                 <!-- Fetch Record & Sync Banner -->
-                <div id="mfFetchRecordBanner" style="display: flex; align-items: center; justify-content: space-between; padding: 0.65rem 0.95rem; margin-bottom: 1rem; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); border-radius: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem;">
-                        <span id="mfStatusBadge" style="background: #10b981; color: #fff; padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 700; font-size: 0.7rem; box-shadow:0 0 10px rgba(16,185,129,0.4);">🟢 UP TO DATE</span>
+                <div id="mfFetchRecordBanner" style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; margin-bottom: 0.65rem; background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2); border-radius: 0.5rem; flex-wrap: wrap; gap: 0.4rem;">
+                    <div style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.75rem;">
+                        <span id="mfStatusBadge" style="background: #10b981; color: #fff; padding: 0.15rem 0.5rem; border-radius: 9999px; font-weight: 700; font-size: 0.65rem; box-shadow:0 0 10px rgba(16,185,129,0.3);">🟢 UP TO DATE</span>
                         <span style="color: var(--light); font-weight: 600;" id="mfSyncText">Present day earnings calendar is up-to-date.</span>
                     </div>
-                    <div style="font-size: 0.78rem; color: var(--muted); display: flex; gap: 1rem;">
-                        <span>Last Synced: <strong id="mfLastSynced" style="color: var(--light); font-family:'JetBrains Mono',monospace;">--</strong></span>
-                        <span>Present Day Events: <strong id="mfTotalEvents" style="color: #60a5fa; font-family:'JetBrains Mono',monospace;">--</strong></span>
-                        <span>New Delta: <strong id="mfInsertedCount" style="color: #34d399; font-family:'JetBrains Mono',monospace;">0</strong></span>
+                    <div style="font-size: 0.72rem; color: var(--muted); display: flex; gap: 0.75rem; font-family: var(--font-mono);">
+                        <span>Last Synced: <strong id="mfLastSynced" style="color: var(--light);">--</strong></span>
+                        <span>Present Day Events: <strong id="mfTotalEvents" style="color: #60a5fa;">--</strong></span>
+                        <span>New Delta: <strong id="mfInsertedCount" style="color: #34d399;">0</strong></span>
                     </div>
                 </div>
 
                 <!-- Industry & Quick Filter Bar -->
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; align-items: center;">
-                    <span style="font-size: 0.75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing:0.04em;">🔍 Quick Filter:</span>
-                    <input type="text" id="mfSearchInput" oninput="app.filterMonthFilterRows()" placeholder="Search ticker or industry..." style="padding: 0.35rem 0.65rem; font-size: 0.82rem; border-radius: 0.45rem; border: 1px solid rgba(168,85,247,0.25); background: rgba(12,7,23,0.7); color: var(--light); width: 220px; font-family:'JetBrains Mono',monospace;">
-                    <select id="mfIndustryFilter" onchange="app.filterMonthFilterRows()" style="padding: 0.35rem 0.65rem; font-size: 0.82rem; border-radius: 0.45rem; border: 1px solid rgba(168,85,247,0.25); background: #0c0717; color: var(--light);">
+                <div style="display: flex; gap: 0.35rem; margin-bottom: 0.65rem; flex-wrap: wrap; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem;">
+                    <span style="font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing:0.04em;">🔍 Quick Filter:</span>
+                    <input type="text" id="mfSearchInput" oninput="app.filterMonthFilterRows()" placeholder="Search ticker or industry..." style="padding: 0.25rem 0.55rem; font-size: 0.75rem; border-radius: 0.35rem; border: 1px solid rgba(255,255,255,0.15); background: #030305; color: var(--light); width: 200px; font-family:var(--font-mono); outline:none;">
+                    <select id="mfIndustryFilter" onchange="app.filterMonthFilterRows()" style="padding: 0.25rem 0.55rem; font-size: 0.75rem; border-radius: 0.35rem; border: 1px solid rgba(255,255,255,0.15); background: #030305; color: var(--light); outline:none;">
                         <option value="ALL">All Industries</option>
                     </select>
                 </div>
 
                 <!-- 📅 Month Breakdown Sub-Tabs -->
-                <div id="mfMonthTabs" style="display: flex; gap: 0.5rem; margin: 0.75rem 0 1rem 0; flex-wrap: wrap; align-items: center; padding: 0.5rem 0.75rem; background: rgba(18,10,32,0.5); border: 1px solid rgba(168,85,247,0.15); border-radius: 0.75rem;"></div>
+                <div id="mfMonthTabs" style="display: flex; gap: 0.35rem; margin: 0.5rem 0 0.75rem 0; flex-wrap: wrap; align-items: center; padding: 0.4rem 0.6rem; background: #08080d; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem;"></div>
 
                 <div id="mfReportSections">
-                    <div class="card" style="text-align:center;padding:2.75rem 1.5rem;color:var(--muted);background:rgba(18,10,32,0.5);border:1px dashed rgba(168,85,247,0.3);border-radius:1rem;margin:1rem 0;">
-                        <div style="font-size:2.2rem;margin-bottom:0.75rem;">🗓️</div>
-                        <h4 style="margin:0 0 0.4rem 0;color:var(--light);font-size:1.15rem;font-family:'Space Grotesk',sans-serif;">Month Filter & Earnings Calendar</h4>
-                        <p style="max-width:520px;margin:0 auto 1.25rem auto;font-size:0.85rem;line-height:1.55;color:var(--text-muted);">
+                    <div class="card" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);background:#08080d;border:1px dashed rgba(255,255,255,0.12);border-radius:0.75rem;margin:0.5rem 0;">
+                        <div style="font-size:2rem;margin-bottom:0.5rem;">🗓️</div>
+                        <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;font-family:'Space Grotesk',sans-serif;">Month Filter & Earnings Calendar</h4>
+                        <p style="max-width:520px;margin:0 auto 1rem auto;font-size:0.8rem;line-height:1.45;color:var(--text-muted);">
                             Select your market filter above and click <strong>Load Calendar</strong> to view structured events categorized by Date, Market Cap & Industry on demand.
                         </p>
-                        <button onclick="app.loadMonthFilterTab(true)" class="btn btn-primary" style="padding:0.55rem 1.4rem;font-size:0.88rem;font-weight:700;box-shadow:0 4px 20px rgba(147,51,234,0.5);">▶ Load Earnings Calendar</button>
+                        <button onclick="app.loadMonthFilterTab(true)" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Load Earnings Calendar</button>
                     </div>
                 </div>
                 <div id="mfReportStatus" class="timestamp" style="margin-top: 0.5rem;"></div>

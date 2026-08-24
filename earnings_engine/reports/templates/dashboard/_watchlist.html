@@ -1,30 +1,62 @@
-        <div id="tab-watchlist" class="tab-content">
-            <section class="card" style="padding: 0.85rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
-                <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <h3 style="margin:0; font-size:1.15rem; font-weight:700;">⭐ Watchlists & Universes</h3>
-                        <span id="wlTotalBadge" style="background:rgba(59,130,246,0.2);color:#93c5fd;font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:9999px;font-weight:600;">--</span>
+        <div id="tab-watchlist" class="tab-content" style="width: 100%; max-width: 100%;">
+            
+            <!-- ⚡ Top Watchlists KPI Cards with Soft Under-Glow -->
+            <div id="watchlistSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                <div class="card card-glow-purple" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#c084fc;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Custom Watchlists</span>
+                        <span class="signal-badge" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:0.62rem;">User Created</span>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <button onclick="app.watchlistTab.load()" class="btn btn-primary btn-sm">🔄 Refresh</button>
-                        <button onclick="app.watchlistTab.addWatchlist()" class="btn btn-primary btn-sm">＋ New Watchlist</button>
+                    <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="wlCustomCount">0</strong> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Lists</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Curated target portfolios</div>
+                </div>
+
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Built-in Universes</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Exchange</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);">NSE & US Top</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Nifty 50, Large Caps & Equities</div>
+                </div>
+
+                <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Sync & Coverage</span>
+                        <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Real-time</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);">Live Prices & H/L</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Automatic swing band overlays</div>
+                </div>
+            </div>
+
+            <!-- Main Watchlist Manager Card -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 0.45rem;">
+                        <h3 style="margin:0; font-size:1.05rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">⭐ Watchlists & Universes</h3>
+                        <span id="wlTotalBadge" class="signal-badge" style="background:rgba(59,130,246,0.15);color:#93c5fd;font-size:0.68rem;padding:0.12rem 0.45rem;border:1px solid rgba(59,130,246,0.3);">--</span>
+                    </div>
+                    <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                        <button onclick="app.watchlistTab.load()" class="btn btn-sm">🔄 Refresh</button>
+                        <button onclick="app.watchlistTab.addWatchlist()" class="btn btn-primary btn-sm" style="font-weight:600;">＋ New Watchlist</button>
                     </div>
                 </div>
 
                 <!-- Filter Sub-Tabs and Search Bar -->
-                <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.65rem;">
-                    <div id="wlFilterPills" style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
-                        <button type="button" class="btn btn-sm active" id="wlFilterAll" onclick="app.watchlistTab.setFilter('all')" style="padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.78rem;">🌐 All</button>
-                        <button type="button" class="btn btn-sm" id="wlFilterUnder100" onclick="app.watchlistTab.setFilter('under_100')" style="padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.78rem;background:rgba(234,179,8,0.15);color:#fef08a;border:1px solid rgba(234,179,8,0.3);">⚡ Under 100 Stocks</button>
-                        <button type="button" class="btn btn-sm" id="wlFilterUniverses" onclick="app.watchlistTab.setFilter('universes')" style="padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.78rem;background:rgba(99,102,241,0.15);color:#c7d2fe;border:1px solid rgba(99,102,241,0.3);">🏛️ Built-in Universes</button>
-                        <button type="button" class="btn btn-sm" id="wlFilterCustom" onclick="app.watchlistTab.setFilter('custom')" style="padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.78rem;background:rgba(168,85,247,0.15);color:#e9d5ff;border:1px solid rgba(168,85,247,0.3);">⭐ Custom Watchlists</button>
+                <div style="display: flex; gap: 0.45rem; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: 0.65rem; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem;">
+                    <div id="wlFilterPills" style="display: flex; gap: 0.3rem; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-sm active" id="wlFilterAll" onclick="app.watchlistTab.setFilter('all')" style="padding:0.2rem 0.55rem;border-radius:0.35rem;font-size:0.75rem;">🌐 All</button>
+                        <button type="button" class="btn btn-sm" id="wlFilterUnder100" onclick="app.watchlistTab.setFilter('under_100')" style="padding:0.2rem 0.55rem;border-radius:0.35rem;font-size:0.75rem;color:#fde68a;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);">⚡ Under 100 Stocks</button>
+                        <button type="button" class="btn btn-sm" id="wlFilterUniverses" onclick="app.watchlistTab.setFilter('universes')" style="padding:0.2rem 0.55rem;border-radius:0.35rem;font-size:0.75rem;color:#93c5fd;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);">🏛️ Built-in Universes</button>
+                        <button type="button" class="btn btn-sm" id="wlFilterCustom" onclick="app.watchlistTab.setFilter('custom')" style="padding:0.2rem 0.55rem;border-radius:0.35rem;font-size:0.75rem;color:#d8b4fe;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.25);">⭐ Custom Watchlists</button>
                     </div>
-                    <div style="flex:1; min-width: 200px; max-width: 320px;">
-                        <input id="wlSearchInput" oninput="app.watchlistTab.handleSearch(this.value)" placeholder="🔍 Search list or ticker..." style="width:100%;padding:0.35rem 0.65rem;border:1px solid rgba(255,255,255,0.15);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);font-size:0.8rem;" autocomplete="off">
+                    <div style="flex:1; min-width: 180px; max-width: 280px;">
+                        <input id="wlSearchInput" oninput="app.watchlistTab.handleSearch(this.value)" placeholder="🔍 Search list or ticker..." style="width:100%;padding:0.25rem 0.55rem;border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;background:#030305;color:var(--light);font-size:0.75rem;outline:none;" autocomplete="off">
                     </div>
                 </div>
             </section>
-            <div id="watchlistCards" style="display: flex; flex-direction: column; gap: 1rem; padding: 0.25rem; min-height: 50vh;"></div>
+            <div id="watchlistCards" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 0.25rem; min-height: 50vh;"></div>
         </div>
     </div>
 

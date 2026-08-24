@@ -1,66 +1,101 @@
-        <div id="tab-playground" class="tab-content">
-            <!-- Request builder -->
-            <section class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <h3 style="margin: 0;">🧪 API Console</h3>
-                    <span class="timestamp">Postman-style raw JSON explorer for Market Data / NSE / yfinance / Kronos</span>
+<div id="tab-playground" class="tab-content" style="width: 100%; max-width: 100%;">
+            
+            <!-- ⚡ Top Playground KPI Cards with Soft Under-Glow -->
+            <div id="playgroundSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Live Engine API</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Direct Access</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);">API Console</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Raw endpoints inspector</div>
                 </div>
-                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
-                    <div class="search-wrap" style="flex:1;min-width:200px;position:relative;">
-                        <input type="text" id="pgSymbol" placeholder="Symbol (e.g., RELIANCE.NS, ZOMATO.NS, AAPL)" value="RELIANCE.NS" style="width:100%;padding:0.4rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);" autocomplete="off">
+
+                <div class="card card-glow-purple" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#c084fc;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Data Sources</span>
+                        <span class="signal-badge" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:0.62rem;">Multi-Provider</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);">NSE & yfinance</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Live quotes, fast_info & Bhavcopy</div>
+                </div>
+
+                <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Neural Models</span>
+                        <span class="signal-badge" style="background:rgba(168,85,129,0.15);color:#34d399;font-size:0.62rem;">Inference</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);">Kronos AI 14D</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Ad-hoc multi-symbol forecasting</div>
+                </div>
+            </div>
+
+            <!-- Request builder -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">🧪 API Console</h3>
+                        <p class="timestamp" style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--text-muted);">Raw JSON explorer for Market Data / NSE / yfinance / Kronos</p>
+                    </div>
+                    <div style="display: flex; gap: 0.35rem; align-items: center;">
+                        <label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.75rem;color:var(--muted);cursor:pointer;" title="Always hit live source">
+                            <input type="checkbox" id="pgLive" checked style="accent-color:var(--accent);"> LIVE</label>
+                        <button id="pgSendBtn" onclick="app.pg.send()" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Send</button>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center;">
+                    <div class="search-wrap" style="flex:1;min-width:180px;position:relative;">
+                        <input type="text" id="pgSymbol" placeholder="Symbol (e.g., RELIANCE.NS, ZOMATO.NS, AAPL)" value="RELIANCE.NS" style="width:100%;height:30px;padding:0 0.55rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;background:#000000;color:#ededed;font-size:0.75rem;font-family:var(--font-mono);outline:none;" autocomplete="off">
                         <div id="pgSymbolDropdown" class="dropdown"></div>
                     </div>
-                    <select id="pgGroup" style="padding:0.4rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);">
+                    <select id="pgGroup" style="height:30px;padding:0 0.5rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;background:#000000;color:#ededed;font-size:0.75rem;outline:none;">
                         <option value="Market Data">Market Data</option>
                         <option value="NSE">NSE</option>
                         <option value="yfinance">yfinance</option>
                         <option value="Kronos">Kronos</option>
                     </select>
-                    <select id="pgEndpoint" style="flex:1;min-width:220px;padding:0.4rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);"></select>
-                    <button id="pgSendBtn" onclick="app.pg.send()" class="btn btn-primary">▶ Send</button>
-                    <label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.8rem;color:var(--muted);cursor:pointer;" title="Always hit the live source (yfinance / NSE) — no cache or DB fallback where the endpoint supports it">
-                        <input type="checkbox" id="pgLive" checked style="accent-color:var(--accent);"> LIVE</label>
+                    <select id="pgEndpoint" style="flex:1;min-width:200px;height:30px;padding:0 0.5rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;background:#000000;color:#ededed;font-size:0.75rem;outline:none;"></select>
                 </div>
-                <div id="pgParams" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem;"></div>
-                <p id="pgRequestLine" class="timestamp" style="margin:0.5rem 0 0 0;">Select an endpoint and click Send.</p>
+                <div id="pgParams" style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.4rem;"></div>
+                <p id="pgRequestLine" class="timestamp" style="margin:0.4rem 0 0 0;font-size:0.72rem;color:var(--text-muted);">Select an endpoint and click Send.</p>
             </section>
 
             <!-- Response viewer -->
-            <section class="card">
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-                    <h3 style="margin: 0; font-size: 1rem;">📦 Raw JSON Response</h3>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                        <span id="pgStatus" class="timestamp"></span>
-                        <button onclick="app.pg.copyJson()" class="btn btn-primary btn-sm">📋 Copy</button>
+                    <h4 style="margin: 0; font-size: 0.95rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">📦 Raw JSON Response</h4>
+                    <div style="display: flex; gap: 0.35rem; align-items: center;">
+                        <span id="pgStatus" class="timestamp" style="font-size:0.72rem;"></span>
+                        <button onclick="app.pg.copyJson()" class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.75rem;">📋 Copy</button>
                     </div>
                 </div>
-                <div id="pgResponse" class="table-wrapper" style="max-height:480px;overflow:auto;background:rgba(0,0,0,0.35);border-radius:0.5rem;padding:0.75rem;font-family:monospace;font-size:0.8rem;white-space:pre-wrap;word-break:break-word;">
+                <div id="pgResponse" class="table-wrapper" style="max-height:460px;overflow:auto;background:#030305;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.75rem;font-family:var(--font-mono);font-size:0.75rem;white-space:pre-wrap;word-break:break-word;color:#38bdf8;">
                     <span class="timestamp">No request sent yet.</span>
                 </div>
             </section>
 
-            <!-- Secondary: NSE universe stats + Kronos quick run (preserved) -->
-            <details>
-                <summary style="cursor:pointer;color:var(--muted);font-weight:600;margin-bottom:0.5rem;">📁 NSE Universe Stats & 🤖 Kronos Quick Run (secondary)</summary>
-                <section class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                        <h3 style="margin: 0;">🇮🇳 NSE Universe Stats</h3>
-                        <button onclick="app.loadPlaygroundNse()" class="btn btn-primary btn-sm">🔄 Load</button>
-                    </div>
-                    <p class="timestamp" style="margin: 0 0 0.75rem 0;">Universe sizes from nsetools (<code>NSE_ALL</code>) and yfinance fast_info (<code>NSE_LARGE_CAP</code>, > 1000 cr).</p>
-                    <div id="pgNseStats" class="widget-grid"></div>
-                </section>
-                <section class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                        <h3 style="margin: 0;">🤖 Kronos Quick Run</h3>
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <input type="text" id="pgKronosTickers" placeholder="Comma-separated tickers (blank = watchlist)" style="flex:1;min-width:200px;padding:0.4rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);">
-                            <button id="pgKronosRunBtn" onclick="app.runPlaygroundKronos()" class="btn btn-primary btn-sm">▶ Run</button>
+            <!-- Secondary: NSE universe stats + Kronos quick run -->
+            <details style="background:#060609;border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:0.6rem 0.85rem;">
+                <summary style="cursor:pointer;color:#c084fc;font-weight:700;font-size:0.78rem;">📁 NSE Universe Stats & 🤖 Kronos Quick Run (Secondary Utilities)</summary>
+                <div style="margin-top:0.65rem;display:flex;flex-direction:column;gap:0.75rem;">
+                    <div class="card" style="padding:0.75rem;background:#0a0a10;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <h4 style="margin: 0; font-size:0.9rem; color:#ffffff;">🇮🇳 NSE Universe Stats</h4>
+                            <button onclick="app.loadPlaygroundNse()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Load</button>
                         </div>
+                        <p class="timestamp" style="margin: 0 0 0.5rem 0; font-size:0.72rem;">Universe sizes from nsetools (<code>NSE_ALL</code>) and yfinance fast_info (<code>NSE_LARGE_CAP</code>, > 1000 cr).</p>
+                        <div id="pgNseStats" class="widget-grid"></div>
                     </div>
-                    <p class="timestamp" style="margin: 0 0 0.75rem 0;">Runs the bulk Kronos prediction action (<code>POST /api/v1/dashboard/kronos/run</code>) and persists everything to the audit trail.</p>
-                    <div id="pgKronosResults" class="widget-grid"></div>
-                </section>
+                    <div class="card" style="padding:0.75rem;background:#0a0a10;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <h4 style="margin: 0; font-size:0.9rem; color:#ffffff;">🤖 Kronos Quick Run</h4>
+                            <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                                <input type="text" id="pgKronosTickers" placeholder="Comma-separated tickers (blank = watchlist)" style="min-width:180px;height:28px;padding:0 0.5rem;border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;background:#030305;color:#fff;font-size:0.75rem;font-family:var(--font-mono);outline:none;">
+                                <button id="pgKronosRunBtn" onclick="app.runPlaygroundKronos()" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Run</button>
+                            </div>
+                        </div>
+                        <div id="pgKronosStatus" class="timestamp" style="font-size:0.72rem;"></div>
+                    </div>
+                </div>
             </details>
         </div>
-        <!-- ================= WATCHLIST TAB ================= -->

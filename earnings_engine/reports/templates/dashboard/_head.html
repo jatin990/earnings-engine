@@ -284,20 +284,69 @@
             font-variant-numeric: tabular-nums;
         }
 
-        /* Sleek Pitch Black OLED Card */
+        /* Sleek Pitch Black OLED Card with Soft Under-Glow */
         .card {
-            background: var(--card);
-            border: 1px solid var(--card-border);
+            background: #06060a;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 0.75rem;
             padding: 1.1rem 1.25rem;
             margin-bottom: 1rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.85), 0 0 20px -2px rgba(147, 51, 234, 0.08);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
             position: relative;
         }
 
         .card:hover {
-            border-color: rgba(255, 255, 255, 0.14);
+            border-color: rgba(255, 255, 255, 0.16);
+            box-shadow: 0 14px 38px -4px rgba(0, 0, 0, 0.92), 0 0 25px -1px rgba(168, 85, 247, 0.16);
+        }
+
+        .card-glow-blue {
+            background: #06060a;
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.85), 0 0 22px -2px rgba(59, 130, 246, 0.16);
+            transition: all 0.25s ease;
+        }
+        .card-glow-blue:hover {
+            border-color: rgba(59, 130, 246, 0.45);
+            box-shadow: 0 12px 35px -3px rgba(0, 0, 0, 0.9), 0 0 28px -1px rgba(59, 130, 246, 0.28);
+        }
+
+        .card-glow-purple {
+            background: #06060a;
+            border: 1px solid rgba(168, 85, 247, 0.25);
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.85), 0 0 22px -2px rgba(168, 85, 247, 0.16);
+            transition: all 0.25s ease;
+        }
+        .card-glow-purple:hover {
+            border-color: rgba(168, 85, 247, 0.45);
+            box-shadow: 0 12px 35px -3px rgba(0, 0, 0, 0.9), 0 0 28px -1px rgba(168, 85, 247, 0.28);
+        }
+
+        .card-glow-emerald {
+            background: #06060a;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.85), 0 0 22px -2px rgba(16, 185, 129, 0.16);
+            transition: all 0.25s ease;
+        }
+        .card-glow-emerald:hover {
+            border-color: rgba(16, 185, 129, 0.45);
+            box-shadow: 0 12px 35px -3px rgba(0, 0, 0, 0.9), 0 0 28px -1px rgba(16, 185, 129, 0.28);
+        }
+
+        .card-glow-amber {
+            background: #06060a;
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.85), 0 0 22px -2px rgba(245, 158, 11, 0.16);
+            transition: all 0.25s ease;
+        }
+        .card-glow-amber:hover {
+            border-color: rgba(245, 158, 11, 0.45);
+            box-shadow: 0 12px 35px -3px rgba(0, 0, 0, 0.9), 0 0 28px -1px rgba(245, 158, 11, 0.28);
         }
 
         .tab-btn {
