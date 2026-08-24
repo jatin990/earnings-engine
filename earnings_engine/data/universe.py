@@ -141,12 +141,17 @@ def is_market_cap_fresh(ticker: str, settings: Settings | None = None) -> bool:
     return age_days <= MARKET_CAP_MAX_AGE_DAYS
 
 
-def store_market_cap(ticker: str, market_cap: float | None, settings: Settings | None = None) -> None:
-    """Store market cap for a ticker in SQLite."""
+def store_market_caps_bulk(ticker_caps: dict[str, float | None], settings: Settings | None = None) -> None:
+    """Store market caps for multiple tickers in SQLite in a single transaction."""
+    if not ticker_caps:
+        return
     now = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+    params = [(ticker, cap, now, now) for ticker, cap in ticker_caps.items() if cap is not None]
+    if not params:
+        return
+
     with _connect(settings) as connection:
-        # Upsert into unified tickers master table
-        connection.execute(
+        connection.executemany(
             """
             INSERT INTO tickers (ticker, market_cap, market_cap_updated_at, last_updated)
             VALUES (?, ?, ?, ?)
@@ -155,17 +160,22 @@ def store_market_cap(ticker: str, market_cap: float | None, settings: Settings |
                 market_cap_updated_at = excluded.market_cap_updated_at,
                 last_updated = excluded.last_updated
             """,
-            (ticker, market_cap, now, now),
+            params,
         )
-        # Also maintain legacy ticker_market_cap for backward compatibility
         try:
-            connection.execute(
+            legacy_params = [(ticker, cap, now) for ticker, cap in ticker_caps.items() if cap is not None]
+            connection.executemany(
                 "INSERT OR REPLACE INTO ticker_market_cap (ticker, market_cap, fetched_at) VALUES (?, ?, ?)",
-                (ticker, market_cap, now),
+                legacy_params,
             )
         except Exception:
             pass
         connection.commit()
+
+
+def store_market_cap(ticker: str, market_cap: float | None, settings: Settings | None = None) -> None:
+    """Store market cap for a ticker in SQLite."""
+    store_market_caps_bulk({ticker: market_cap}, settings)
 
 
 def load_market_cap(ticker: str, settings: Settings | None = None) -> float | None:

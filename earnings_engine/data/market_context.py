@@ -397,10 +397,22 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
 
         # 5. Stored Swing Ranges
         sr_rows = conn.execute(
-            f"SELECT ticker, lower_bound, upper_bound, source FROM swing_ranges WHERE ticker IN ({placeholders})",
+            f"SELECT ticker, lower_bound, upper_bound, source, cycles, avg_cycle_days, last_updated FROM swing_ranges WHERE ticker IN ({placeholders})",
             tickers,
         ).fetchall()
-        sr_map = {r[0]: {"lower_bound": r[1], "upper_bound": r[2], "source": r[3]} for r in sr_rows}
+        sr_map = {
+            r[0]: {
+                "watchlist": "ALL",
+                "ticker": r[0],
+                "lower_bound": r[1],
+                "upper_bound": r[2],
+                "source": r[3],
+                "cycles": r[4],
+                "avg_cycle_days": r[5],
+                "last_updated": r[6],
+            }
+            for r in sr_rows
+        }
     except Exception:
         sr_map = {}
 
@@ -408,6 +420,7 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
 
     rows: list[dict] = []
     metrics_to_store: dict[str, dict[str, Any]] = {}
+    market_caps_to_store: dict[str, float] = {}
     for ticker in tickers:
         try:
             company_name = names_map.get(ticker) or ticker.replace(".NS", "")
@@ -516,9 +529,9 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 except Exception:
                     pass
 
-            # Store market cap in cache only when force-fetching
+            # Collect market cap in batch for bulk storage when force-fetching
             if market_cap is not None and force:
-                store_market_cap(ticker, market_cap, settings)
+                market_caps_to_store[ticker] = float(market_cap)
             if not prices.empty and "close" in prices.columns:
                 closes = pd.to_numeric(prices["close"], errors="coerce").dropna()
                 if len(closes) >= 2:
@@ -793,7 +806,7 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "last_week_low_price": last_week_low_price,
                 "next_resistance": next_resistance,
                 "current_support": current_support,
-                "swing_range": get_swing_range("ALL", ticker, settings),
+                "swing_range": sr_map.get(ticker),
                 "eps_estimate": eps_estimate,
                 "eps_reported": eps_reported,
                 "surprise_pct": surprise_pct,
@@ -845,6 +858,13 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "surprise_pct": None,
             })
             continue
+
+    if market_caps_to_store:
+        try:
+            from earnings_engine.data.universe import store_market_caps_bulk
+            store_market_caps_bulk(market_caps_to_store, settings)
+        except Exception as e:
+            logger.debug("Failed bulk storing market caps: %s", e)
 
     if metrics_to_store:
         try:
