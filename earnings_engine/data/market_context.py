@@ -58,52 +58,97 @@ def _close_n_calendar_days_ago(closes: pd.Series, latest_date, days: int) -> flo
 
 def _week_high_low_around(
     prices: pd.DataFrame,
-    earnings_date: pd.Timestamp,
+    earnings_date: pd.Timestamp | str,
     days: int = 7,
     current_price: float | None = None,
 ) -> tuple[float, float, float, float, pd.Timestamp, pd.Timestamp] | None:
-    """Compute the high/low close over the N trading days after an earnings date.
+    """Compute the true highest and lowest price point reached since earnings date vs pre-earnings base close.
 
-    Returns (week_high_pct, week_low_pct, week_high_price, week_low_price, high_date, low_date) as
-    % moves vs the close just before the earnings date, or None if there isn't enough
-    price data.  high_date and low_date are the dates when the high/low occurred.
-    If 7 trading days haven't elapsed yet (recent print), incorporates available trading
-    days and current_price.
+    Returns (high_pct, low_pct, high_price, low_price, high_date, low_date).
+    Uses high/low intraday levels if available in prices DataFrame, otherwise closes.
     """
-    if prices.empty or "close" not in prices.columns:
+    if prices is None or prices.empty:
         return None
-    closes = pd.to_numeric(prices["close"], errors="coerce").dropna()
+
+    df = prices.copy()
+    if not isinstance(df.index, pd.DatetimeIndex):
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"])
+            df = df.set_index("date")
+        else:
+            try:
+                df.index = pd.to_datetime(df.index)
+            except Exception:
+                return None
+
+    # Strip timezone to prevent comparison errors with tz-naive timestamps
+    if getattr(df.index, "tz", None) is not None:
+        df.index = df.index.tz_localize(None)
+    df.index = pd.to_datetime(df.index.date)
+
+    ed_raw = pd.to_datetime(earnings_date)
+    if getattr(ed_raw, "tz", None) is not None:
+        ed_raw = ed_raw.tz_localize(None)
+    ed = ed_raw.normalize()
+
+    df.columns = [str(c).lower() for c in df.columns]
+    if "close" not in df.columns:
+        return None
+
+    closes = pd.to_numeric(df["close"], errors="coerce").dropna()
     if closes.empty:
         return None
 
-    # Base close = last close strictly before the earnings date
-    before = closes[closes.index < earnings_date]
+    # Base close = last close strictly before the earnings date (or on earnings date if first available)
+    before = closes[closes.index < ed]
     if before.empty:
-        before = closes[closes.index <= earnings_date]
+        before = closes[closes.index <= ed]
     if before.empty:
         return None
     base_close = float(before.iloc[-1])
     if base_close <= 0:
         return None
 
-    # Window = trading days strictly AFTER the earnings date
-    window = closes[closes.index > earnings_date].iloc[:days].copy()
-    today = pd.Timestamp.today().normalize()
-    if current_price is not None and float(current_price) > 0 and today >= earnings_date:
-        if window.empty or today not in window.index:
-            window[today] = float(current_price)
+    # Highs and Lows series (use intraday high/low if present and non-empty, otherwise close)
+    highs = pd.to_numeric(df["high"], errors="coerce").dropna() if "high" in df.columns else pd.Series(dtype=float)
+    if highs.empty:
+        highs = closes
+    lows = pd.to_numeric(df["low"], errors="coerce").dropna() if "low" in df.columns else pd.Series(dtype=float)
+    if lows.empty:
+        lows = closes
 
-    if window.empty:
+    # Window of post-earnings price action: trading days strictly AFTER the earnings date
+    window_highs = highs[highs.index > ed].iloc[:days].copy()
+    window_lows = lows[lows.index > ed].iloc[:days].copy()
+
+    # If recent print and no subsequent trading days closed yet, fallback to earnings_date itself
+    if window_highs.empty:
+        window_highs = highs[highs.index >= ed].iloc[:days].copy()
+        window_lows = lows[lows.index >= ed].iloc[:days].copy()
+
+    today = pd.Timestamp.today().normalize()
+    if current_price is not None and float(current_price) > 0 and today >= ed:
+        curr_p = float(current_price)
+        if today in window_highs.index:
+            window_highs[today] = max(float(window_highs[today]), curr_p)
+        else:
+            window_highs[today] = curr_p
+
+        if today in window_lows.index:
+            window_lows[today] = min(float(window_lows[today]), curr_p)
+        else:
+            window_lows[today] = curr_p
+
+    if window_highs.empty or window_lows.empty:
         return None
 
-    week_high = float(window.max())
-    week_low = float(window.min())
-    high_pct = (week_high / base_close - 1.0) * 100
-    low_pct = (week_low / base_close - 1.0) * 100
+    week_high = float(window_highs.max())
+    week_low = float(window_lows.min())
+    high_pct = (week_high / base_close - 1.0) * 100.0
+    low_pct = (week_low / base_close - 1.0) * 100.0
 
-    # Find the dates when high and low occurred
-    high_date = window.idxmax()
-    low_date = window.idxmin()
+    high_date = window_highs.idxmax()
+    low_date = window_lows.idxmin()
 
     return high_pct, low_pct, week_high, week_low, high_date, low_date
 

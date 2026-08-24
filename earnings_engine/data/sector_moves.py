@@ -30,15 +30,26 @@ def _load_recent_earnings(tickers: list[str], settings: Settings, lookback_days:
     end = today.strftime("%Y-%m-%d")
     placeholders = ",".join("?" for _ in tickers)
     with _earnings_connect(settings) as connection:
-        rows = connection.execute(
-            f"""
-            SELECT DISTINCT ticker, earnings_date
-            FROM earnings_history
-            WHERE ticker IN ({placeholders})
-              AND earnings_date >= ? AND earnings_date < ?
-            """,
-            tickers + [start, end],
-        ).fetchall()
+        try:
+            rows = connection.execute(
+                f"""
+                SELECT DISTINCT ticker, earnings_date
+                FROM earnings_history
+                WHERE ticker IN ({placeholders})
+                  AND earnings_date >= ? AND earnings_date <= ?
+                """,
+                tickers + [start, end],
+            ).fetchall()
+        except Exception:
+            rows = connection.execute(
+                f"""
+                SELECT DISTINCT ticker, earnings_date
+                FROM earnings_calendar
+                WHERE ticker IN ({placeholders})
+                  AND earnings_date >= ? AND earnings_date <= ?
+                """,
+                tickers + [start, end],
+            ).fetchall()
     return [(t, pd.Timestamp(d)) for t, d in rows]
 
 

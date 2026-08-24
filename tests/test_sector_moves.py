@@ -57,35 +57,41 @@ def test_week_high_low_around_returns_none_without_prior_close():
 
 
 def _seed_moves_db(settings):
-    conn = sqlite3.connect(str(_db_path(settings)))
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS price_history (ticker TEXT, date TEXT, open REAL, high REAL, low REAL, close REAL, volume INTEGER)"
-    )
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS earnings_history (ticker TEXT, earnings_date TEXT, eps_estimate REAL, eps_reported REAL, surprise_pct REAL, source TEXT)"
-    )
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS ticker_industry (ticker TEXT, industry TEXT, sector TEXT, fetched_at TEXT)"
-    )
+    from earnings_engine.data.prices import _connect as _prices_connect
+    from earnings_engine.data.earnings import _connect as _earnings_connect
     today = pd.Timestamp.today().normalize()
     dates = pd.bdate_range(end=today, periods=20)
-    for ticker in ["A.NS", "B.NS"]:
-        for i, d in enumerate(dates):
-            conn.execute(
-                "INSERT INTO price_history (ticker, date, close) VALUES (?, ?, ?)",
-                (ticker, d.strftime("%Y-%m-%d"), 100 + i),
+    res_date = dates[10].strftime("%Y-%m-%d")
+
+    with _prices_connect(settings) as pconn:
+        pconn.execute(
+            "CREATE TABLE IF NOT EXISTS price_history (ticker TEXT, date TEXT, open REAL, high REAL, low REAL, close REAL, volume INTEGER, UNIQUE(ticker, date))"
+        )
+        for ticker in ["A.NS", "B.NS"]:
+            for i, d in enumerate(dates):
+                pconn.execute(
+                    "INSERT OR REPLACE INTO price_history (ticker, date, close) VALUES (?, ?, ?)",
+                    (ticker, d.strftime("%Y-%m-%d"), 100 + i),
+                )
+        pconn.commit()
+
+    with _earnings_connect(settings) as econn:
+        econn.execute(
+            "CREATE TABLE IF NOT EXISTS earnings_history (ticker TEXT, earnings_date TEXT, eps_estimate REAL, eps_reported REAL, surprise_pct REAL, source TEXT, UNIQUE(ticker, earnings_date))"
+        )
+        econn.execute(
+            "CREATE TABLE IF NOT EXISTS ticker_industry (ticker TEXT, industry TEXT, sector TEXT, fetched_at TEXT, UNIQUE(ticker))"
+        )
+        for ticker in ["A.NS", "B.NS"]:
+            econn.execute(
+                "INSERT OR REPLACE INTO earnings_history (ticker, earnings_date, source) VALUES (?, ?, 'yfinance')",
+                (ticker, res_date),
             )
-        res_date = (today - pd.Timedelta(days=10)).strftime("%Y-%m-%d")
-        conn.execute(
-            "INSERT INTO earnings_history (ticker, earnings_date, source) VALUES (?, ?, 'yfinance')",
-            (ticker, res_date),
-        )
-        conn.execute(
-            "INSERT INTO ticker_industry (ticker, industry) VALUES (?, ?)",
-            (ticker, "Banks" if ticker == "A.NS" else "IT"),
-        )
-    conn.commit()
-    conn.close()
+            econn.execute(
+                "INSERT OR REPLACE INTO ticker_industry (ticker, industry) VALUES (?, ?)",
+                (ticker, "Banks" if ticker == "A.NS" else "IT"),
+            )
+        econn.commit()
 
 
 def test_get_recent_earnings_moves_from_cache(settings):

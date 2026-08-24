@@ -3230,7 +3230,7 @@ async def recalculate_stock_rating_endpoint(ticker: str, req: RecalculateRatingR
             has_changes=True,
             changes_summary=req.audit_notes if req and req.audit_notes else diff_summary,
             updated_values={"fundamental": result["fundamental"], "technical": result["technical"]},
-            diff_dict=result.get("diff", {}),
+            diff_data=result.get("diff", {}),
             settings=_settings,
         )
     except Exception as e:
@@ -3285,6 +3285,12 @@ async def calc_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Qu
                 curr_price = float(hist["Close"].iloc[-1])
             hist_df = pd.DataFrame(index=pd.to_datetime(hist.index.date))
             hist_df["close"] = hist["Close"].values
+            if "High" in hist.columns:
+                hist_df["high"] = hist["High"].values
+            if "Low" in hist.columns:
+                hist_df["low"] = hist["Low"].values
+            if "Open" in hist.columns:
+                hist_df["open"] = hist["Open"].values
     except Exception as e:
         logger.warning(f"Error querying yfinance live for {ticker}: {e}")
 
