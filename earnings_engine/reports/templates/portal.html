@@ -14,18 +14,18 @@
             --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
             --font-heading: 'Geist', 'Space Grotesk', sans-serif;
 
-            --bg: #000000;
-            --card-bg: rgba(8, 4, 18, 0.85);
-            --card-border: rgba(168, 85, 247, 0.22);
-            --accent: #9333ea;
-            --accent-glow: rgba(168, 85, 247, 0.45);
+            --bg: #030712;
+            --card-bg: rgba(15, 23, 42, 0.85);
+            --card-border: rgba(59, 130, 246, 0.22);
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.35);
             --cyan: #38bdf8;
             --green: #10b981;
-            --purple: #c084fc;
+            --purple: #60a5fa;
             --amber: #fbbf24;
             --red: #f43f5e;
             --light: #f8fafc;
-            --muted: #d8b4fe;
+            --muted: #94a3b8;
         }
 
         * { box-sizing: border-box; }
@@ -36,9 +36,9 @@
             min-height: 100vh;
             background-color: var(--bg);
             background-image: 
-                radial-gradient(circle at 50% -20%, rgba(168, 85, 247, 0.18), transparent 60%),
+                radial-gradient(circle at 50% -20%, rgba(59, 130, 246, 0.18), transparent 60%),
                 radial-gradient(circle at 0% 100%, rgba(56, 189, 248, 0.08), transparent 50%),
-                radial-gradient(circle at 100% 50%, rgba(147, 51, 234, 0.12), transparent 50%);
+                radial-gradient(circle at 100% 50%, rgba(37, 99, 235, 0.12), transparent 50%);
             color: var(--light);
             font-family: var(--font-sans);
             display: flex;
@@ -54,8 +54,8 @@
             content: "";
             position: absolute;
             inset: 0;
-            background-image: linear-gradient(rgba(168, 85, 247, 0.04) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(168, 85, 247, 0.04) 1px, transparent 1px);
+            background-image: linear-gradient(rgba(59, 130, 246, 0.04) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
             background-size: 40px 40px;
             pointer-events: none;
             z-index: 0;
@@ -83,14 +83,14 @@
         }
 
         .glass-card:hover {
-            border-color: rgba(192, 132, 252, 0.65);
-            box-shadow: 0 35px 80px -15px rgba(0, 0, 0, 0.95), 0 0 50px rgba(168, 85, 247, 0.35);
+            border-color: rgba(96, 165, 250, 0.65);
+            box-shadow: 0 35px 80px -15px rgba(0, 0, 0, 0.95), 0 0 50px rgba(59, 130, 246, 0.35);
         }
 
         .brand-title {
             font-family: 'Space Grotesk', sans-serif;
             letter-spacing: -0.03em;
-            background: linear-gradient(135deg, #ffffff 0%, #e9d5ff 45%, #c084fc 100%);
+            background: linear-gradient(135deg, #ffffff 0%, #bae6fd 45%, #60a5fa 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -100,36 +100,36 @@
         }
 
         .input-box {
-            background: rgba(6, 2, 16, 0.88);
-            border: 1px solid rgba(168, 85, 247, 0.28);
+            background: rgba(6, 11, 25, 0.88);
+            border: 1px solid rgba(59, 130, 246, 0.28);
             color: var(--light);
             transition: all 0.22s ease;
         }
 
         .input-box:focus {
             outline: none;
-            border-color: #c084fc;
-            box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.3), 0 0 25px rgba(168, 85, 247, 0.25);
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3), 0 0 25px rgba(59, 130, 246, 0.25);
         }
 
         .glow-btn {
-            background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
             color: #ffffff;
             font-weight: 700;
-            border: 1px solid rgba(233, 213, 255, 0.3);
-            box-shadow: 0 4px 22px rgba(147, 51, 234, 0.5);
+            border: 1px solid rgba(191, 219, 254, 0.3);
+            box-shadow: 0 4px 22px rgba(37, 99, 235, 0.5);
             transition: all 0.2s ease;
         }
 
         .glow-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 32px rgba(147, 51, 234, 0.75), 0 0 16px rgba(192, 132, 252, 0.5);
-            background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+            box-shadow: 0 8px 32px rgba(37, 99, 235, 0.75), 0 0 16px rgba(96, 165, 250, 0.5);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
         }
 
         .app-card {
-            background: rgba(10, 4, 24, 0.75);
-            border: 1px solid rgba(168, 85, 247, 0.2);
+            background: rgba(10, 16, 32, 0.75);
+            border: 1px solid rgba(59, 130, 246, 0.2);
             border-radius: 1.15rem;
             padding: 1.6rem;
             position: relative;
@@ -147,9 +147,9 @@
 
         .app-card.authorized:hover {
             transform: translateY(-5px);
-            border-color: rgba(192, 132, 252, 0.8);
-            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.9), 0 0 35px rgba(168, 85, 247, 0.45);
-            background: rgba(18, 8, 38, 0.92);
+            border-color: rgba(96, 165, 250, 0.8);
+            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.9), 0 0 35px rgba(59, 130, 246, 0.45);
+            background: rgba(15, 23, 42, 0.92);
         }
 
         .app-card.restricted {
@@ -171,10 +171,10 @@
         }
 
         .tab-switch-btn.active {
-            background: rgba(168, 85, 247, 0.28);
+            background: rgba(59, 130, 246, 0.28);
             color: #ffffff;
-            border-color: rgba(192, 132, 252, 0.6);
-            box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
+            border-color: rgba(96, 165, 250, 0.6);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
         }
     </style>
 </head>

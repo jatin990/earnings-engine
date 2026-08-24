@@ -3,7 +3,7 @@
         <div class="card" style="max-width:1080px;width:95%;margin:3vh auto;position:relative;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:1rem;box-shadow:0 25px 60px rgba(0,0,0,0.7);padding:1.5rem;">
             <button onclick="app.closeSwingRangeModal()" style="position:absolute;top:1.25rem;right:1.25rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:var(--light);width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;" title="Close">✕</button>
             <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
-                <h3 style="margin:0;font-size:1.3rem;font-weight:700;background:linear-gradient(to right, #60a5fa, #c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">🎯 Stock Intelligence & Multi-Model Prediction</h3>
+                <h3 style="margin:0;font-size:1.3rem;font-weight:700;background:linear-gradient(to right, #ffffff, #60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">🎯 Stock Intelligence & Multi-Model Prediction</h3>
                 <span id="srModalSourceBadge" class="signal-badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;">Auto</span>
             </div>
             <p id="srModalSubtitle" class="timestamp" style="margin-bottom:0.85rem;font-size:0.85rem;"></p>
@@ -84,7 +84,7 @@
                         <span>🧠 AI Multi-Model Consensus (DeepSeek + Claude + Llama + Gemini)</span>
                         <span id="srModalConsensusBadge" class="signal-badge" style="font-size:0.7rem;display:none;"></span>
                     </h4>
-                    <button type="button" id="srModalConsensusRunBtn" onclick="app.runModalConsensus()" class="btn btn-sm" style="background:linear-gradient(135deg, #6366f1, #a855f7);color:#fff;border:none;font-size:0.75rem;font-weight:700;display:flex;align-items:center;gap:0.3rem;box-shadow:0 2px 8px rgba(99,102,241,0.3);">⚡ Run AI Consensus</button>
+                    <button type="button" id="srModalConsensusRunBtn" onclick="app.runModalConsensus()" class="btn btn-sm" style="background:linear-gradient(135deg, #2563eb, #3b82f6);color:#fff;border:none;font-size:0.75rem;font-weight:700;display:flex;align-items:center;gap:0.3rem;box-shadow:0 2px 8px rgba(37,99,235,0.3);">⚡ Run AI Consensus</button>
                 </div>
                 <div id="srModalConsensusContent">
                     <p class="timestamp" style="margin:0;font-size:0.8rem;">Click "Run AI Consensus" to trigger ensemble reasoning across DeepSeek-R1, Llama-3.3-70B, Claude, and Gemini.</p>
@@ -112,7 +112,7 @@
                         <span>🔮 Kronos AI 14-Day Deep Learning Trajectory</span>
                         <span id="srModalKronosBadge" class="signal-badge" style="font-size:0.7rem;display:none;"></span>
                     </h4>
-                    <button type="button" id="srModalKronosRunBtn" onclick="app.runModalKronos()" class="btn btn-sm" style="background:rgba(139,92,246,0.25);color:#c084fc;border:1px solid rgba(139,92,246,0.4);font-size:0.75rem;">⚡ Run Kronos AI</button>
+                    <button type="button" id="srModalKronosRunBtn" onclick="app.runModalKronos()" class="btn btn-sm" style="background:rgba(59,130,246,0.25);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);font-size:0.75rem;">⚡ Run Kronos AI</button>
                 </div>
                 <div id="srModalKronosContent">
                     <p class="timestamp" style="margin:0;font-size:0.8rem;">Click "Run Kronos AI" to generate real-time deep learning forecasts for this stock.</p>
@@ -229,7 +229,7 @@
     <!-- ⭐ UNIVERSAL ADD TO WATCHLIST MODAL -->
     <!-- ======================================================== -->
     <div id="addToWatchlistModal" onclick="if(event.target === this) app.closeAddToWatchlistModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:2700;padding:1.5rem;overflow-y:auto;">
-        <div class="card card-glow-purple" style="max-width:520px;width:95%;margin:8vh auto;position:relative;background:#060609;border:1px solid rgba(168,85,247,0.35);border-radius:14px;box-shadow:0 30px 80px rgba(0,0,0,0.9);padding:1.5rem;">
+        <div class="card card-glow-blue" style="max-width:520px;width:95%;margin:8vh auto;position:relative;background:#060609;border:1px solid rgba(59,130,246,0.35);border-radius:14px;box-shadow:0 30px 80px rgba(0,0,0,0.9);padding:1.5rem;">
             <button onclick="app.closeAddToWatchlistModal()" class="btn-icon" style="position:absolute;top:1.15rem;right:1.15rem;" title="Close">✕</button>
             
             <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
@@ -237,7 +237,7 @@
                 <h3 style="margin:0;font-size:1.2rem;font-family:'Space Grotesk',sans-serif;color:#ffffff;">Add to Watchlist</h3>
             </div>
             <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
-                <span id="wlModalTicker" style="font-size:1.15rem;font-weight:800;font-family:var(--font-mono);color:#c084fc;">TICKER</span>
+                <span id="wlModalTicker" style="font-size:1.15rem;font-weight:800;font-family:var(--font-mono);color:#38bdf8;">TICKER</span>
                 <span id="wlModalPrice" class="timestamp" style="font-size:0.85rem;color:#e2e8f0;"></span>
             </div>
 
@@ -261,7 +261,7 @@
                     <label style="display:block;font-size:0.72rem;color:#a1a1aa;margin-bottom:0.3rem;">Or create a new watchlist for this stock:</label>
                     <div style="display:flex;gap:0.35rem;">
                         <input id="wlModalNewName" placeholder="e.g. Momentum Breakouts" style="flex:1;height:32px;padding:0 0.55rem;background:#000000;color:#ffffff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;font-size:0.8rem;outline:none;">
-                        <button type="button" onclick="app.createAndAddWatchlist()" class="btn btn-sm" style="height:32px;font-size:0.75rem;background:rgba(168,85,247,0.2);color:#e9d5ff;border:1px solid rgba(168,85,247,0.4);">＋ Create & Add</button>
+                        <button type="button" onclick="app.createAndAddWatchlist()" class="btn btn-sm" style="height:32px;font-size:0.75rem;background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);">＋ Create & Add</button>
                     </div>
                 </div>
             </div>
@@ -314,9 +314,9 @@
                     <div id="catConsensusSlRisk" style="font-size:0.72rem;color:#f87171;font-weight:600;margin-top:0.2rem;">—</div>
                 </div>
 
-                <div class="card card-glow-purple" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(168,85,247,0.3);">
-                    <div style="font-size:0.68rem;color:#c084fc;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">⚖️ Risk / Reward</div>
-                    <div id="catConsensusRiskReward" style="font-size:1.35rem;font-weight:800;color:#e9d5ff;font-family:var(--font-mono);">—</div>
+                <div class="card card-glow-blue" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(59,130,246,0.3);">
+                    <div style="font-size:0.68rem;color:#60a5fa;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">⚖️ Risk / Reward</div>
+                    <div id="catConsensusRiskReward" style="font-size:1.35rem;font-weight:800;color:#93c5fd;font-family:var(--font-mono);">—</div>
                     <div style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">Target vs Invalidation</div>
                 </div>
 
@@ -348,7 +348,7 @@
                 
                 <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:0.5rem;background:rgba(0,0,0,0.3);padding:0.5rem 0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);font-size:0.74rem;">
                     <div><span style="color:#a1a1aa;">📊 Chart Pattern: </span><strong id="catConsensusPattern" style="color:#67e8f9;">—</strong></div>
-                    <div><span style="color:#a1a1aa;">📦 Volume Profile: </span><strong id="catConsensusVolume" style="color:#a78bfa;">—</strong></div>
+                    <div><span style="color:#a1a1aa;">📦 Volume Profile: </span><strong id="catConsensusVolume" style="color:#60a5fa;">—</strong></div>
                     <div style="grid-column:1/-1;"><span style="color:#a1a1aa;">⚠️ Primary Risk: </span><strong id="catConsensusRisk" style="color:#fca5a5;">—</strong></div>
                 </div>
             </div>
@@ -383,7 +383,7 @@
                 <div id="catConsensusStatus" class="timestamp" style="font-size:0.75rem;"></div>
                 <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
                     <button type="button" id="catConsensusApplySwingBtn" onclick="app.applyConsensusToSwingRange()" class="btn btn-sm" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);">💾 Apply to Swing Range</button>
-                    <button type="button" onclick="app.openAddToWatchlistModal(app.activeCatConsensusTicker)" class="btn btn-sm" style="background:rgba(168,85,247,0.2);color:#e9d5ff;border:1px solid rgba(168,85,247,0.4);">⭐ Add to Watchlist</button>
+                    <button type="button" onclick="app.openAddToWatchlistModal(app.activeCatConsensusTicker)" class="btn btn-sm" style="background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);">⭐ Add to Watchlist</button>
                     <button type="button" onclick="app.closeCatalystConsensusModal()" class="btn btn-secondary btn-sm">Close</button>
                 </div>
             </div>

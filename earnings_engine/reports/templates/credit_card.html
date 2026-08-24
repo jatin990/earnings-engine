@@ -15,16 +15,16 @@
             --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
             --font-heading: 'Geist', 'Space Grotesk', sans-serif;
 
-            --bg: #000000;
-            --card-bg: rgba(8, 4, 18, 0.85);
-            --card-border: rgba(168, 85, 247, 0.22);
-            --accent: #9333ea;
+            --bg: #030712;
+            --card-bg: rgba(15, 23, 42, 0.85);
+            --card-border: rgba(59, 130, 246, 0.22);
+            --accent: #3b82f6;
             --cyan: #38bdf8;
             --emerald: #10b981;
             --gold: #fbbf24;
-            --purple: #c084fc;
+            --blue: #60a5fa;
             --light: #f8fafc;
-            --muted: #d8b4fe;
+            --muted: #94a3b8;
         }
 
         * { box-sizing: border-box; }
@@ -35,9 +35,9 @@
             min-height: 100vh;
             background-color: var(--bg);
             background-image: 
-                radial-gradient(circle at 10% 0%, rgba(168, 85, 247, 0.2), transparent 50%),
+                radial-gradient(circle at 10% 0%, rgba(59, 130, 246, 0.18), transparent 50%),
                 radial-gradient(circle at 90% 100%, rgba(56, 189, 248, 0.1), transparent 50%),
-                radial-gradient(circle at 50% 50%, rgba(147, 51, 234, 0.08), transparent 60%);
+                radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.08), transparent 60%);
             color: var(--light);
             font-family: var(--font-sans);
             overflow-x: hidden;
@@ -46,7 +46,7 @@
         .brand-title {
             font-family: var(--font-heading);
             letter-spacing: -0.03em;
-            background: linear-gradient(135deg, #ffffff 0%, #e9d5ff 45%, #c084fc 100%);
+            background: linear-gradient(135deg, #ffffff 0%, #bae6fd 45%, #60a5fa 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -61,13 +61,13 @@
             -webkit-backdrop-filter: blur(24px) saturate(190%);
             border: 1px solid var(--card-border);
             border-radius: 1.25rem;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 25px rgba(168, 85, 247, 0.15);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 25px rgba(59, 130, 246, 0.15);
             transition: all 0.25s ease;
         }
 
         .glass-card:hover {
-            border-color: rgba(192, 132, 252, 0.65);
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 35px rgba(168, 85, 247, 0.3);
+            border-color: rgba(96, 165, 250, 0.65);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 35px rgba(59, 130, 246, 0.3);
             transform: translateY(-2px);
         }
 
@@ -77,9 +77,9 @@
             max-width: 420px;
             height: 250px;
             border-radius: 1.25rem;
-            background: linear-gradient(135deg, #160830 0%, #0c0418 50%, #200d44 100%);
-            border: 1px solid rgba(168, 85, 247, 0.35);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 35px rgba(168, 85, 247, 0.35);
+            background: linear-gradient(135deg, #0b1329 0%, #030712 50%, #0f1f44 100%);
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 35px rgba(59, 130, 246, 0.35);
             padding: 1.6rem;
             position: relative;
             overflow: hidden;
@@ -91,8 +91,8 @@
 
         .credit-card-3d:hover {
             transform: translateY(-6px) rotateX(4deg) rotateY(-4deg);
-            box-shadow: 0 35px 65px -15px rgba(0, 0, 0, 0.95), 0 0 50px rgba(192, 132, 252, 0.5);
-            border-color: rgba(233, 213, 255, 0.6);
+            box-shadow: 0 35px 65px -15px rgba(0, 0, 0, 0.95), 0 0 50px rgba(96, 165, 250, 0.5);
+            border-color: rgba(191, 219, 254, 0.6);
         }
 
         .credit-card-3d::before {
@@ -131,7 +131,7 @@
         <!-- Navigation Header -->
         <header class="glass-card p-4 sm:p-5 mb-8 flex flex-wrap items-center justify-between gap-4 border border-white/10">
             <div class="flex items-center gap-3">
-                <a href="/portal" class="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 font-bold hover:scale-105 transition" title="Return to Portal">
+                <a href="/portal" class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-300 font-bold hover:scale-105 transition" title="Return to Portal">
                     🧭
                 </a>
                 <div>
@@ -141,7 +141,7 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <a href="/dashboard" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 transition flex items-center gap-1.5">
+                <a href="/dashboard" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 transition flex items-center gap-1.5">
                     <span>📈</span>
                     <span>Trading Terminal</span>
                 </a>
@@ -161,7 +161,7 @@
                 <div class="credit-card-3d mx-auto">
                     <div class="flex justify-between items-start">
                         <div>
-                            <span class="text-[10px] font-bold tracking-widest text-indigo-400 uppercase">Nexus Black Edition</span>
+                            <span class="text-[10px] font-bold tracking-widest text-blue-400 uppercase">Nexus Black Edition</span>
                             <h3 class="brand-title text-lg font-extrabold text-white tracking-wider">OBSIDIAN INFINITE</h3>
                         </div>
                         <span class="text-xl">📡</span>
@@ -210,7 +210,7 @@
                                 <span class="font-mono font-bold text-emerald-400">₹4,28,760.00</span>
                             </div>
                             <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                                <div class="h-full bg-gradient-to-r from-emerald-500 to-indigo-500 rounded-full" style="width: 14.2%;"></div>
+                                <div class="h-full bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full" style="width: 14.2%;"></div>
                             </div>
                             <span class="text-[10px] text-slate-500 mt-1 block">Total Limit: ₹5,00,000.00 · Auto-revolving</span>
                         </div>
@@ -223,7 +223,7 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div class="bg-white/5 p-3 rounded-xl border border-white/5">
                             <span class="text-[11px] text-slate-400 block">Domestic Lounges</span>
-                            <span class="text-lg font-bold text-indigo-300 font-mono">6 / 8 Left</span>
+                            <span class="text-lg font-bold text-blue-300 font-mono">6 / 8 Left</span>
                         </div>
                         <div class="bg-white/5 p-3 rounded-xl border border-white/5">
                             <span class="text-[11px] text-slate-400 block">Golf Access</span>
@@ -249,19 +249,19 @@
                 <div class="glass-card p-6 sm:p-7">
                     <div class="flex justify-between items-center mb-6">
                         <div>
-                            <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">Cashback & Reward Maximizer</span>
+                            <span class="text-xs font-bold uppercase tracking-wider text-blue-400">Cashback & Reward Maximizer</span>
                             <h3 class="brand-title text-xl font-bold text-white mt-0.5">Active Multiplier Matrix</h3>
                         </div>
-                        <span class="text-xs bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 px-3 py-1 rounded-full font-bold">
+                        <span class="text-xs bg-blue-500/15 border border-blue-500/30 text-blue-300 px-3 py-1 rounded-full font-bold">
                             ✨ Active 10x Boost
                         </span>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-indigo-500/40 transition">
+                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-blue-500/40 transition">
                             <div class="flex justify-between items-center mb-1">
                                 <span class="text-sm font-bold text-slate-200">✈️ Flights & Hotels</span>
-                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">10x Points</span>
+                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300">10x Points</span>
                             </div>
                             <span class="text-xs text-slate-400">Direct bookings & luxury partner portals</span>
                         </div>
@@ -282,10 +282,10 @@
                             <span class="text-xs text-slate-400">All major fuel bunks & EV fast chargers</span>
                         </div>
 
-                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-purple-500/40 transition">
+                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-blue-500/40 transition">
                             <div class="flex justify-between items-center mb-1">
                                 <span class="text-sm font-bold text-slate-200">🛍️ General Spends</span>
-                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">2x Base</span>
+                                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300">2x Base</span>
                             </div>
                             <span class="text-xs text-slate-400">All other retail, groceries, tech subscriptions</span>
                         </div>
@@ -296,16 +296,16 @@
                         <h4 class="brand-title text-sm font-bold text-slate-100 mb-3">🧮 Interactive Spends & Yield Simulator</h4>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                             <div>
-                                <label class="block text-[11px] text-slate-400 mb-1">Monthly Travel Spend</label>
-                                <input type="number" id="spendTravel" value="25000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
+                                 <label class="block text-[11px] text-slate-400 mb-1">Monthly Travel Spend</label>
+                                 <input type="number" id="spendTravel" value="25000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-blue-500">
                             </div>
                             <div>
-                                <label class="block text-[11px] text-slate-400 mb-1">Monthly Dining Spend</label>
-                                <input type="number" id="spendDining" value="15000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
+                                 <label class="block text-[11px] text-slate-400 mb-1">Monthly Dining Spend</label>
+                                 <input type="number" id="spendDining" value="15000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-blue-500">
                             </div>
                             <div>
-                                <label class="block text-[11px] text-slate-400 mb-1">Monthly Other Spends</label>
-                                <input type="number" id="spendOther" value="40000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
+                                 <label class="block text-[11px] text-slate-400 mb-1">Monthly Other Spends</label>
+                                 <input type="number" id="spendOther" value="40000" oninput="recalcRewards()" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-blue-500">
                             </div>
                         </div>
 
@@ -316,7 +316,7 @@
                             </div>
                             <div>
                                 <span class="text-xs text-slate-400 block">Total Reward Points</span>
-                                <span class="text-xl font-extrabold text-indigo-300 font-mono" id="annualPointsVal">1,24,800 pts</span>
+                                <span class="text-xl font-extrabold text-blue-300 font-mono" id="annualPointsVal">1,24,800 pts</span>
                             </div>
                         </div>
                     </div>
@@ -339,7 +339,7 @@
                             <tbody class="divide-y divide-white/5">
                                 <tr>
                                     <td class="py-2.5 font-semibold text-slate-200">Singapore Airlines</td>
-                                    <td class="py-2.5 text-indigo-300">✈️ Flights (10x)</td>
+                                    <td class="py-2.5 text-blue-300">✈️ Flights (10x)</td>
                                     <td class="py-2.5 text-slate-400">22 Aug 2026</td>
                                     <td class="py-2.5 text-right font-mono text-slate-100">₹42,500</td>
                                     <td class="py-2.5 text-right font-mono font-bold text-emerald-400">+4,250 pts</td>
@@ -353,7 +353,7 @@
                                 </tr>
                                 <tr>
                                     <td class="py-2.5 font-semibold text-slate-200">Apple Store India</td>
-                                    <td class="py-2.5 text-purple-300">🛍️ Retail (2x)</td>
+                                    <td class="py-2.5 text-blue-300">🛍️ Retail (2x)</td>
                                     <td class="py-2.5 text-slate-400">19 Aug 2026</td>
                                     <td class="py-2.5 text-right font-mono text-slate-100">₹21,900</td>
                                     <td class="py-2.5 text-right font-mono font-bold text-emerald-400">+438 pts</td>

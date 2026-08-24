@@ -70,7 +70,7 @@ SCANNER_CATEGORIES: dict[str, dict[str, Any]] = {
         "type": "FUNDAMENTAL_CATALYST",
         "description": "Aggressive capacity capex expansions, strategic acquisitions, joint ventures, and institutional block purchases.",
         "icon": "🏢",
-        "color": "#c084fc",
+        "color": "#38bdf8",
         "target_horizon": "📅 3-5 Days",
     },
     "squeeze_coils": {

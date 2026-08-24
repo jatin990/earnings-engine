@@ -3,10 +3,10 @@
             
             <!-- ⚡ Top Summary KPI Cards with Soft Under-Glow -->
             <div id="consensusKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
-                <div class="card card-glow-purple" style="padding: 0.75rem 0.9rem; margin-bottom: 0;">
+                <div class="card card-glow-blue" style="padding: 0.75rem 0.9rem; margin-bottom: 0;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size: 0.7rem; color: #c084fc; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Total Predictions</span>
-                        <span class="signal-badge" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:0.62rem;">4-Model</span>
+                        <span style="font-size: 0.7rem; color: #60a5fa; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Total Predictions</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">4-Model</span>
                     </div>
                     <div style="font-size: 1.45rem; font-weight: 800; color: var(--light); font-family: var(--font-heading);"><strong id="consensusStatTotal">0</strong> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Forecasts</span></div>
                     <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Ensemble Consensus</div>
@@ -84,7 +84,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
                     <div style="display: flex; align-items: center; gap: 0.45rem;">
                         <h4 style="margin: 0; font-size: 0.95rem; color: var(--light); font-family: 'Space Grotesk', sans-serif;">📜 Consensus Predictions & Post-Mortem Audit</h4>
-                        <span id="consensusCountBadge" class="signal-badge" style="font-size:0.68rem;background:rgba(168,85,247,0.15);color:#d8b4fe;border:1px solid rgba(168,85,247,0.3);padding:0.12rem 0.45rem;">0 records</span>
+                        <span id="consensusCountBadge" class="signal-badge" style="font-size:0.68rem;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.3);padding:0.12rem 0.45rem;">0 records</span>
                     </div>
 
                     <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
@@ -114,10 +114,10 @@
         </div>
 
         <!-- ================= CONSENSUS DETAIL / POST-MORTEM MODAL ================= -->
-        <div id="consensusDetailModal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(5,3,10,0.85); backdrop-filter: blur(12px); justify-content: center; align-items: center; padding: 1rem;">
-            <div style="background: #0c0717; border: 1px solid rgba(168,85,247,0.35); border-radius: 1.15rem; width: 100%; max-width: 850px; max-height: 90vh; overflow-y: auto; box-shadow: 0 30px 80px rgba(0,0,0,0.9), 0 0 50px rgba(147,51,234,0.25); padding: 1.75rem; position: relative;">
+        <div id="consensusDetailModal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(3,7,18,0.85); backdrop-filter: blur(12px); justify-content: center; align-items: center; padding: 1rem;">
+            <div style="background: #0b1120; border: 1px solid rgba(59,130,246,0.35); border-radius: 1.15rem; width: 100%; max-width: 850px; max-height: 90vh; overflow-y: auto; box-shadow: 0 30px 80px rgba(0,0,0,0.9), 0 0 50px rgba(59,130,246,0.2); padding: 1.75rem; position: relative;">
                 <!-- Close button -->
-                <button onclick="app.closeConsensusModal()" style="position: absolute; top: 1rem; right: 1rem; background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.3); border-radius: 50%; width: 32px; height: 32px; color: #d8b4fe; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">✕</button>
+                <button onclick="app.closeConsensusModal()" style="position: absolute; top: 1rem; right: 1rem; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); border-radius: 50%; width: 32px; height: 32px; color: #93c5fd; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">✕</button>
 
                 <!-- Modal Content Hook -->
                 <div id="consensusModalBody">

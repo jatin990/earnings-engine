@@ -116,14 +116,14 @@ def render_predictions(preds: pd.DataFrame, name: str = "predictions") -> tuple[
 
 # Dark-theme-friendly palette for per-day color grouping (cycles after 8 days).
 _DAY_COLORS = [
-    "#60a5fa",  # blue
-    "#34d399",  # green
-    "#fbbf24",  # amber
-    "#f472b6",  # pink
-    "#a78bfa",  # purple
-    "#fb923c",  # orange
-    "#2dd4bf",  # teal
-    "#f87171",  # red
+    "#38bdf8",  # sky blue
+    "#10b981",  # emerald green
+    "#f59e0b",  # amber
+    "#06b6d4",  # cyan
+    "#6366f1",  # indigo
+    "#f97316",  # orange
+    "#14b8a6",  # teal
+    "#f43f5e",  # rose
 ]
 
 

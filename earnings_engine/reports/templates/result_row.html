@@ -2,7 +2,7 @@
   <td class="stock-cell">
     <div class="stock-cell-wrap">
       <span class="stock-ticker-main" onclick="app.toggleRowDrawer('{row_ticker_id}', '{ticker}')" title="Click to view full stock breakdown">
-        <span class="drawer-arrow" id="arrow_{row_ticker_id}" style="font-size:0.62rem;color:#a855f7;transition:transform 0.15s;">▶</span>
+        <span class="drawer-arrow" id="arrow_{row_ticker_id}" style="font-size:0.62rem;color:#38bdf8;transition:transform 0.15s;">▶</span>
         {ticker}
       </span>
       <span class="stock-company-sub" title="{company_name}">{company_name}</span>
@@ -33,5 +33,5 @@
   </td>
 </tr>
 <tr id="drawer_{row_ticker_id}" class="row-drawer-tr" style="display:none;">
-  <td colspan="17" id="drawer_body_{row_ticker_id}" style="padding:0;border-bottom:1px solid rgba(168,85,247,0.3);"></td>
+  <td colspan="17" id="drawer_body_{row_ticker_id}" style="padding:0;border-bottom:1px solid rgba(59,130,246,0.3);"></td>
 </tr>

@@ -33,8 +33,8 @@
                         if (listEl) listEl.style.display = 'block';
                         if (cardsEl) cardsEl.style.display = 'none';
                         if (btnList) {
-                            btnList.style.background = 'rgba(168,85,247,0.25)';
-                            btnList.style.color = '#e9d5ff';
+                            btnList.style.background = 'rgba(59,130,246,0.25)';
+                            btnList.style.color = '#93c5fd';
                             btnList.style.fontWeight = '700';
                         }
                         if (btnCards) {
@@ -47,8 +47,8 @@
                         if (listEl) listEl.style.display = 'none';
                         if (cardsEl) cardsEl.style.display = 'flex';
                         if (btnCards) {
-                            btnCards.style.background = 'rgba(168,85,247,0.25)';
-                            btnCards.style.color = '#e9d5ff';
+                            btnCards.style.background = 'rgba(59,130,246,0.25)';
+                            btnCards.style.color = '#93c5fd';
                             btnCards.style.fontWeight = '700';
                         }
                         if (btnList) {
@@ -282,7 +282,7 @@
                                 '<div style="color:#cbd5e1;">' + yL + ' – ' + yH + '</div>' +
                                 (pctH ? '<div style="font-size:0.68rem;color:' + pctHColor + ';font-weight:600;">' + pctH + ' from 52W H</div>' : '') +
                             '</td>' +
-                            '<td style="text-align:right;font-size:0.75rem;font-family:var(--font-mono);color:#d8b4fe;">' + mcStr + '</td>' +
+                            '<td style="text-align:right;font-size:0.75rem;font-family:var(--font-mono);color:#94a3b8;">' + mcStr + '</td>' +
                             '<td style="text-align:center;">' +
                                 '<div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">' +
                                     rangeStr +
@@ -292,7 +292,7 @@
                             '<td style="text-align:center;">' +
                                 '<div style="display:flex;gap:0.25rem;align-items:center;justify-content:center;">' +
                                     '<button type="button" onclick="app.runConsensusForStock(\'' + it.ticker + '\')" class="btn btn-sm" style="padding:0.12rem 0.4rem;font-size:0.68rem;background:rgba(99,102,241,0.2);color:#c7d2fe;border:1px solid rgba(99,102,241,0.4);border-radius:3px;" title="Run AI Consensus">🧠</button>' +
-                                    '<button type="button" onclick="app.runPredictionForTickerSingle(\'' + it.ticker + '\')" class="btn btn-sm" style="padding:0.12rem 0.4rem;font-size:0.68rem;background:rgba(139,92,246,0.2);color:#c084fc;border:1px solid rgba(139,92,246,0.4);border-radius:3px;" title="Run Kronos AI">🔮</button>' +
+                                    '<button type="button" onclick="app.runPredictionForTickerSingle(\'' + it.ticker + '\')" class="btn btn-sm" style="padding:0.12rem 0.4rem;font-size:0.68rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:3px;" title="Run Kronos AI">🔮</button>' +
                                     '<button type="button" onclick="app.watchlistTab.removeQuoteTicker(\'' + it.ticker + '\')" class="btn btn-sm btn-danger" style="padding:0.12rem 0.35rem;font-size:0.72rem;border-radius:3px;" title="Remove from this watchlist">🗑</button>' +
                                 '</div>' +
                             '</td>' +
@@ -426,7 +426,7 @@
                     // 2. Custom User Watchlists (if any match filter)
                     if (filteredCustom.length) {
                         html += '<div style="margin-top:1rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;">' +
-                            '<h4 style="margin:0;font-size:0.95rem;color:#e9d5ff;display:flex;align-items:center;gap:0.35rem;">⭐ Custom User Watchlists <span style="font-size:0.75rem;background:rgba(168,85,247,0.2);padding:0.1rem 0.4rem;border-radius:9999px;">' + filteredCustom.length + '</span></h4>' +
+                            '<h4 style="margin:0;font-size:0.95rem;color:#60a5fa;display:flex;align-items:center;gap:0.35rem;">⭐ Custom User Watchlists <span style="font-size:0.75rem;background:rgba(59,130,246,0.2);padding:0.1rem 0.4rem;border-radius:9999px;">' + filteredCustom.length + '</span></h4>' +
                             '</div>';
                         html += filteredCustom.map((w, wi) => this._customCard(w, wi)).join('');
                     }
@@ -437,7 +437,7 @@
 
                 _universeCard(u, ui) {
                     const name = u.display_name || u.name;
-                    const tickers = u.tickers || [];
+                        const tickers = u.tickers || [];
                     const isUnder100 = tickers.length <= 100;
                     const chips = tickers.length
                         ? tickers.map(t => {
@@ -447,11 +447,11 @@
                             const lowStr = hasRange && !isNaN(Number(r.lower_bound)) ? Number(r.lower_bound).toFixed(2) : (r ? r.lower_bound : '');
                             const upStr = hasRange && !isNaN(Number(r.upper_bound)) ? Number(r.upper_bound).toFixed(2) : (r ? r.upper_bound : '');
                             const rangeBadge = hasRange
-                                ? '<span style="font-size:0.72rem;opacity:0.85;margin-left:0.25rem;color:' + (isUser ? '#c084fc' : '#60a5fa') + ';" title="' + (isUser ? 'Custom swing range' : 'Auto swing range') + '">' +
+                                ? '<span style="font-size:0.72rem;opacity:0.85;margin-left:0.25rem;color:' + (isUser ? '#38bdf8' : '#60a5fa') + ';" title="' + (isUser ? 'Custom swing range' : 'Auto swing range') + '">' +
                                   lowStr + '–' + upStr + (r.cycles ? ' ⤫' + r.cycles : '') +
                                   '</span>'
                                 : '';
-                            return '<span style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(99,102,241,0.12);border:1px solid ' + (isUser ? 'rgba(139,92,246,0.45)' : 'rgba(99,102,241,0.25)') + ';padding:0.25rem 0.6rem;border-radius:9999px;font-size:0.78rem;" title="' + (this.names[t] || t) + '">' +
+                            return '<span style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(99,102,241,0.12);border:1px solid ' + (isUser ? 'rgba(56,189,248,0.45)' : 'rgba(99,102,241,0.25)') + ';padding:0.25rem 0.6rem;border-radius:9999px;font-size:0.78rem;" title="' + (this.names[t] || t) + '">' +
                                 '<strong onclick="app.watchlistTab.selectActiveWatchlist(\'' + u.name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="cursor:pointer;">' + t + '</strong>' +
                                 rangeBadge +
                                 '<button onclick="app.openAddToWatchlistModal(\'' + t.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:#fbbf24;cursor:pointer;font-size:0.75rem;padding:0;" title="Add to Custom Watchlist">⭐</button>' +
@@ -484,12 +484,12 @@
                                     '<span style="background:rgba(99,102,241,0.2);color:#c7d2fe;font-size:0.7rem;font-weight:600;padding:0.12rem 0.45rem;border-radius:9999px;">🏛️ Built-in Universe</span>' +
                                     under100Badge +
                                     marketBadge +
-                                '</div>' +
+                                    '</div>' +
                                 '<span class="timestamp" style="font-size:0.72rem;">' + tickers.length + ' stocks tracked</span>' +
                             '</div>' +
                             '<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">' +
-                                '<button class="btn btn-sm" onclick="app.watchlistTab.selectActiveWatchlist(\'' + u.name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="background:rgba(168,85,247,0.2);color:#e9d5ff;border:1px solid rgba(168,85,247,0.4);" title="Open list view with full OHLCV metrics">📋 List View</button>' +
-                                '<button class="btn btn-sm" onclick="app.watchlistTab.copyToCustom(\'' + u.name.replace(/'/g, "\\'") + '\',\'' + (u.display_name || u.name).replace(/'/g, "\\'") + '\',' + JSON.stringify(tickers).replace(/"/g, '&quot;') + ')" style="background:rgba(168,85,247,0.15);color:#e9d5ff;border:1px solid rgba(168,85,247,0.35);" title="Copy all tickers into a customizable custom watchlist">📋 Copy to Custom</button>' +
+                                '<button class="btn btn-sm" onclick="app.watchlistTab.selectActiveWatchlist(\'' + u.name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);" title="Open list view with full OHLCV metrics">📋 List View</button>' +
+                                '<button class="btn btn-sm" onclick="app.watchlistTab.copyToCustom(\'' + u.name.replace(/'/g, "\\'") + '\',\'' + (u.display_name || u.name).replace(/'/g, "\\'") + '\',' + JSON.stringify(tickers).replace(/"/g, '&quot;') + ')" style="background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.35);" title="Copy all tickers into a customizable custom watchlist">📋 Copy to Custom</button>' +
                                 '<button class="btn btn-sm" onclick="app.switchTab(\'results\'); const el = document.getElementById(\'resultsMarket\'); if(el) { el.value=\'' + u.name.toUpperCase() + '\'; app.loadResultsReport(); }" style="background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.35);" title="View in Corporate Results tab">📈 Results</button>' +
                             '</div>' +
                         '</div>' +
@@ -510,11 +510,11 @@
                             const lowStr = hasRange && !isNaN(Number(r.lower_bound)) ? Number(r.lower_bound).toFixed(2) : (r ? r.lower_bound : '');
                             const upStr = hasRange && !isNaN(Number(r.upper_bound)) ? Number(r.upper_bound).toFixed(2) : (r ? r.upper_bound : '');
                             const rangeBadge = hasRange
-                                ? '<span style="font-size:0.72rem;opacity:0.85;margin-left:0.25rem;color:' + (isUser ? '#c084fc' : '#60a5fa') + ';" title="' + (isUser ? 'Custom swing range' : 'Auto swing range') + '">' +
+                                ? '<span style="font-size:0.72rem;opacity:0.85;margin-left:0.25rem;color:' + (isUser ? '#38bdf8' : '#60a5fa') + ';" title="' + (isUser ? 'Custom swing range' : 'Auto swing range') + '">' +
                                   lowStr + '–' + upStr + (r.cycles ? ' ⤫' + r.cycles : '') +
                                   '</span>'
                                 : '';
-                            return '<span style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(59,130,246,0.15);border:1px solid ' + (isUser ? 'rgba(139,92,246,0.45)' : 'rgba(59,130,246,0.3)') + ';padding:0.3rem 0.65rem;border-radius:9999px;font-size:0.8rem;" title="' + (this.names[t] || t) + '">' +
+                            return '<span style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(59,130,246,0.15);border:1px solid ' + (isUser ? 'rgba(56,189,248,0.45)' : 'rgba(59,130,246,0.3)') + ';padding:0.3rem 0.65rem;border-radius:9999px;font-size:0.8rem;" title="' + (this.names[t] || t) + '">' +
                                 '<strong onclick="app.watchlistTab.selectActiveWatchlist(\'' + name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="cursor:pointer;">' + t + '</strong>' +
                                 rangeBadge +
                                 '<button onclick="app.openSwingRangeModal(\'' + name.replace(/'/g, "\\'") + '\',\'' + t.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--light);opacity:0.7;cursor:pointer;font-size:0.75rem;line-height:1;padding:0 0.15rem;" title="Edit Swing Range">⚙</button>' +
@@ -527,18 +527,18 @@
                         ? '<span style="background:rgba(234,179,8,0.2);color:#fef08a;border:1px solid rgba(234,179,8,0.4);font-size:0.7rem;font-weight:700;padding:0.12rem 0.45rem;border-radius:9999px;">⚡ Under 100 Stocks</span>'
                         : '';
 
-                    return '<div class="card" id="wlCard' + wi + '" style="margin:0 0 0.75rem 0;position:relative;z-index:' + (200 - wi) + ';border:1px solid rgba(168,85,247,0.25);">' +
+                    return '<div class="card" id="wlCard' + wi + '" style="margin:0 0 0.75rem 0;position:relative;z-index:' + (200 - wi) + ';border:1px solid rgba(59,130,246,0.25);">' +
                         '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.6rem;">' +
                             '<div>' +
                                 '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.2rem;">' +
                                     '<h4 style="margin:0;font-size:1.05rem;">' + name + '</h4>' +
-                                    '<span style="background:rgba(168,85,247,0.2);color:#e9d5ff;font-size:0.7rem;font-weight:600;padding:0.12rem 0.45rem;border-radius:9999px;">⭐ Custom Watchlist</span>' +
+                                    '<span style="background:rgba(59,130,246,0.2);color:#93c5fd;font-size:0.7rem;font-weight:600;padding:0.12rem 0.45rem;border-radius:9999px;">⭐ Custom Watchlist</span>' +
                                     under100Badge +
                                 '</div>' +
                                 '<span class="timestamp" style="font-size:0.72rem;">' + tickers.length + ' stock' + (tickers.length === 1 ? '' : 's') + '</span>' +
                             '</div>' +
                             '<div style="display:flex;gap:0.35rem;">' +
-                                '<button class="btn btn-sm" onclick="app.watchlistTab.selectActiveWatchlist(\'' + name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="background:rgba(168,85,247,0.2);color:#e9d5ff;border:1px solid rgba(168,85,247,0.4);" title="Open list view with full OHLCV metrics">📋 List View</button>' +
+                                '<button class="btn btn-sm" onclick="app.watchlistTab.selectActiveWatchlist(\'' + name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);" title="Open list view with full OHLCV metrics">📋 List View</button>' +
                                 '<button class="btn btn-sm" onclick="app.watchlistTab.rename(\'' + name.replace(/'/g, "\\'") + '\')">✎ Rename</button>' +
                                 '<button class="btn btn-sm btn-danger" onclick="app.watchlistTab.remove(\'' + name.replace(/'/g, "\\'") + '\')">🗑 Delete</button>' +
                             '</div>' +
@@ -1414,7 +1414,7 @@
                                 '<button onclick="event.stopPropagation(); app.openAddToWatchlistModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.4rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐</button>' +
                                 '<button onclick="event.stopPropagation(); app.runConsensusForStock(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.4rem;font-size:0.72rem;background:rgba(99,102,241,0.2);color:#c7d2fe;border:1px solid rgba(99,102,241,0.4);border-radius:0.3rem;" title="Run AI Consensus">🧠</button>' +
                                 '<button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="14D OHLCV Benchmark">📊 Benchmark</button>' +
-                                '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(139,92,246,0.2);color:#c084fc;border:1px solid rgba(139,92,246,0.4);border-radius:0.3rem;" title="Run AI Forecast">🔮 Predict</button>' +
+                                '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Forecast">🔮 Predict</button>' +
                             '</div>' +
                         '</td>' +
                     '</tr>';
@@ -1605,13 +1605,13 @@
                                     : '<strong style="font-size:1.05rem;color:#f8fafc;">' + c.ticker + '</strong>') +
                                 '<span style="background:' + impactBadgeBg + ';color:' + impactBadgeColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + impactLabel + '</span>' +
                                 '<span style="background:' + dirBadgeBg + ';color:' + dirColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + dirIcon + '</span>' +
-                                '<span style="background:rgba(139,92,246,0.15);color:#c084fc;padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;">' + c.category + '</span>' +
+                                '<span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;">' + c.category + '</span>' +
                             '</div>' +
                             '<div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">' +
                                 '<span class="timestamp" style="font-size:0.72rem;background:rgba(255,255,255,0.05);padding:0.15rem 0.45rem;border-radius:0.25rem;">' + (c.publisher || 'News') + ' &middot; ⏱️ ' + dateDisplay + '</span>' +
-                                `<button onclick="app.runConsensusForStock('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.25));color:#c7d2fe;border:1px solid rgba(99,102,241,0.45);border-radius:0.3rem;font-weight:700;" title="Run AI Multi-Model Consensus for Target, Resistance, Support & Buy Zone">🧠 Consensus</button>` +
+                                `<button onclick="app.runConsensusForStock('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.45);border-radius:0.3rem;font-weight:700;" title="Run AI Multi-Model Consensus for Target, Resistance, Support & Buy Zone">🧠 Consensus</button>` +
                                 `<button onclick="app.openAddToWatchlistModal('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐ Watchlist</button>` +
-                                `<button onclick="app.runPredictionForTickerSingle('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(139,92,246,0.2);color:#c084fc;border:1px solid rgba(139,92,246,0.4);border-radius:0.3rem;" title="Run Kronos Forecast">🔮 Predict</button>` +
+                                `<button onclick="app.runPredictionForTickerSingle('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run Kronos Forecast">🔮 Predict</button>` +
                             '</div>' +
                         '</div>' +
                         '<div style="margin-bottom:0.5rem;">' + headlineLink + '</div>' +
@@ -1748,12 +1748,12 @@
                             '<div style="font-weight:600;color:#38bdf8;font-size:0.78rem;margin-bottom:0.15rem;">' + (g.primary_driver || '').replace(/_/g, ' ') + '</div>' +
                             '<div style="font-size:0.73rem;color:#cbd5e1;line-height:1.35;">' + (g.driver_explanation || '') + '</div>' +
                         '</td>' +
-                        '<td><span style="background:rgba(139,92,246,0.15);color:#c084fc;padding:0.2rem 0.5rem;border-radius:0.3rem;font-size:0.72rem;font-weight:600;white-space:nowrap;">' + (g.pattern_name || 'Breakout') + '</span></td>' +
+                        '<td><span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:0.2rem 0.5rem;border-radius:0.3rem;font-size:0.72rem;font-weight:600;white-space:nowrap;">' + (g.pattern_name || 'Breakout') + '</span></td>' +
                         '<td>' + this.renderConsensusBadge(g.ticker, 'ALL') + '</td>' +
                         '<td style="text-align:center;">' +
                             '<div style="display:flex;gap:0.3rem;justify-content:center;">' +
                                 '<button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + g.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="14D OHLCV Forecast Benchmark">📊 Benchmark</button>' +
-                                '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + g.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(139,92,246,0.2);color:#c084fc;border:1px solid rgba(139,92,246,0.4);border-radius:0.3rem;" title="Run AI Prediction">🔮 Predict</button>' +
+                                '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + g.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Prediction">🔮 Predict</button>' +
                             '</div>' +
                         '</td>' +
                     '</tr>';
@@ -1838,14 +1838,14 @@
                             '<div style="font-size:0.72rem;color:var(--muted);">' + s.ticker + '</div>' +
                         '</td>' +
                         '<td><strong>' + currSym + (s.current_price ? Number(s.current_price).toFixed(2) : '—') + '</strong></td>' +
-                        '<td><span style="background:rgba(139,92,246,0.15);color:#c084fc;padding:0.2rem 0.5rem;border-radius:0.3rem;font-size:0.72rem;font-weight:600;">' + s.matching_pattern + '</span></td>' +
+                        '<td><span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:0.2rem 0.5rem;border-radius:0.3rem;font-size:0.72rem;font-weight:600;">' + s.matching_pattern + '</span></td>' +
                         '<td><span style="background:rgba(59,130,246,0.2);color:#60a5fa;padding:0.2rem 0.5rem;border-radius:0.3rem;font-size:0.72rem;font-weight:600;">' + s.setup_stage + '</span></td>' +
                         '<td><strong style="color:#fbbf24;font-size:0.85rem;">' + currSym + Number(s.trigger_level).toFixed(2) + '</strong></td>' +
                         '<td><span style="color:#34d399;font-weight:700;">' + s.confidence_score + '%</span></td>' +
                         '<td style="max-width:320px;font-size:0.75rem;color:#cbd5e1;line-height:1.35;">' + s.why_it_matches + '</td>' +
                         '<td>' + this.renderConsensusBadge(s.ticker, 'ALL') + '</td>' +
                         '<td style="text-align:center;">' +
-                            '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + s.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(139,92,246,0.2);color:#c084fc;border:1px solid rgba(139,92,246,0.4);border-radius:0.3rem;" title="Run AI Prediction">🔮 Predict</button>' +
+                            '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + s.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Prediction">🔮 Predict</button>' +
                         '</td>' +
                     '</tr>';
                 }).join('');
@@ -2213,7 +2213,7 @@
                     } else if (m.is_past) {
                         btnStyle = 'background:rgba(148,163,184,0.1);color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);';
                     } else {
-                        btnStyle = 'background:rgba(192,132,252,0.12);color:#d8b4fe;border:1px solid rgba(192,132,252,0.3);';
+                        btnStyle = 'background:rgba(59,130,246,0.12);color:#93c5fd;border:1px solid rgba(59,130,246,0.3);';
                     }
 
                     html += '<button type="button" onclick="app.filterResultsByMonth(\'' + m.month_key + '\')" class="btn btn-sm" style="' + btnStyle + 'padding:0.25rem 0.65rem;border-radius:0.4rem;font-size:0.75rem;cursor:pointer;">' +
@@ -2516,7 +2516,7 @@
                 summaryEl.innerHTML = `
                     <div class="metric">
                         <span>Total Tracked</span>
-                        <strong style="color:#ffffff;">${totalStocks} <span style="font-size:0.7rem;color:#a855f7;font-weight:600;">(${winWindow})</span></strong>
+                        <strong style="color:#ffffff;">${totalStocks} <span style="font-size:0.7rem;color:#60a5fa;font-weight:600;">(${winWindow})</span></strong>
                     </div>
                     <div class="metric">
                         <span>Avg 30D Momentum</span>
@@ -2528,7 +2528,7 @@
                     </div>
                     <div class="metric">
                         <span>AI Consensus</span>
-                        <strong style="color:#c084fc;font-size:0.85rem;"><span style="color:#34d399;">${bullConsensusCount} 🐂</span> / <span style="color:#f87171;">${bearConsensusCount} 🐻</span></strong>
+                        <strong style="color:#60a5fa;font-size:0.85rem;"><span style="color:#34d399;">${bullConsensusCount} 🐂</span> / <span style="color:#f87171;">${bearConsensusCount} 🐻</span></strong>
                     </div>
                     <div class="metric">
                         <span>Imminent (48h)</span>
@@ -3262,8 +3262,8 @@
                         btn.style.color = 'white';
                         btn.style.borderColor = p === 'buyzone' ? '#10b981' : 'transparent';
                     } else {
-                        btn.style.background = p === 'buyzone' ? 'rgba(16,185,129,0.12)' : (p === 'strongbuy' ? 'rgba(16,185,129,0.1)' : (p === 'custom' ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.06)'));
-                        btn.style.color = p === 'buyzone' ? '#34d399' : (p === 'strongbuy' ? '#10b981' : (p === 'custom' ? '#c084fc' : 'var(--muted)'));
+                        btn.style.background = p === 'buyzone' ? 'rgba(16,185,129,0.12)' : (p === 'strongbuy' ? 'rgba(16,185,129,0.1)' : (p === 'custom' ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.06)'));
+                        btn.style.color = p === 'buyzone' ? '#34d399' : (p === 'strongbuy' ? '#10b981' : (p === 'custom' ? '#60a5fa' : 'var(--muted)'));
                         btn.style.borderColor = p === 'buyzone' ? 'rgba(16,185,129,0.4)' : 'transparent';
                     }
                 });
@@ -3442,7 +3442,7 @@
                         const srUpper = hasSr ? Number(sr.upper_bound).toFixed(2) : (resis ? Number(resis).toFixed(2) : '—');
                         const isUser = sr.source === 'user';
                         const srSource = isUser ? 'Custom' : 'Auto';
-                        const srSourceCls = isUser ? 'background:rgba(139,92,246,0.25);color:#c084fc;' : 'background:rgba(148,163,184,0.15);color:#94a3b8;';
+                        const srSourceCls = isUser ? 'background:rgba(59,130,246,0.25);color:#60a5fa;' : 'background:rgba(148,163,184,0.15);color:#94a3b8;';
                         const srCycles = (sr.cycles != null && sr.cycles > 0) ? (sr.cycles + ' cyc' + (sr.avg_cycle_days ? ' · ~' + Math.round(sr.avg_cycle_days) + 'd' : '')) : '';
 
                         // Calculate spread %
@@ -3484,9 +3484,9 @@
                         const kronosColHtml = hasKp
                             ? ('<div style="display:flex;align-items:center;gap:0.35rem;">' +
                                '<span class="' + trendCls + '" style="font-weight:600;">' + trendStr + '</span>' +
-                               '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(139,92,246,0.18);color:#c084fc;border:1px solid rgba(139,92,246,0.3);" title="Re-run Kronos AI prediction">🔄</button>' +
+                               '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);" title="Re-run Kronos AI prediction">🔄</button>' +
                                '</div>')
-                            : ('<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.2rem 0.5rem;font-size:0.72rem;background:rgba(139,92,246,0.22);color:#c084fc;border:1px solid rgba(139,92,246,0.4);" title="Run on-demand Kronos AI prediction for ' + (r.ticker || '') + '">🔮 Predict</button>');
+                            : ('<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.2rem 0.5rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Run on-demand Kronos AI prediction for ' + (r.ticker || '') + '">🔮 Predict</button>');
 
                         // AI Multi-Modal & News Synthesis Column
                         const ai = r.ai_synthesis || {};
@@ -3544,7 +3544,7 @@
                             '<td style="text-align:right;">' +
                                 '<div style="display:flex;justify-content:flex-end;gap:0.3rem;align-items:center;">' +
                                 '<button class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\')" style="padding:0.25rem 0.55rem;font-size:0.75rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);">✎ Range</button>' +
-                                '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.25rem 0.55rem;font-size:0.75rem;background:rgba(139,92,246,0.2);color:#c084fc;border:1px solid rgba(139,92,246,0.4);" title="Run on-demand Kronos AI prediction">⚡ Kronos</button>' +
+                                '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.25rem 0.55rem;font-size:0.75rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Run on-demand Kronos AI prediction">⚡ Kronos</button>' +
                                 '<button class="btn btn-sm" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)" style="padding:0.25rem 0.55rem;font-size:0.75rem;background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);" title="View AI Reasons, Catalysts & Big News">🧠 AI</button>' +
                                 '</div>' +
                             '</td>' +
@@ -3581,7 +3581,7 @@
                         const srUpper = hasSr ? Number(sr.upper_bound).toFixed(2) : (r.next_resistance ? Number(r.next_resistance).toFixed(2) : '—');
                         const isUser = sr.source === 'user';
                         const srSource = isUser ? 'Custom' : 'Auto';
-                        const srSourceCls = isUser ? 'background:rgba(139,92,246,0.25);color:#c084fc;' : 'background:rgba(148,163,184,0.15);color:#94a3b8;';
+                        const srSourceCls = isUser ? 'background:rgba(59,130,246,0.25);color:#60a5fa;' : 'background:rgba(148,163,184,0.15);color:#94a3b8;';
                         const srCycles = (sr.cycles != null && sr.cycles > 0) ? (sr.cycles + ' cyc' + (sr.avg_cycle_days ? ' · ~' + Math.round(sr.avg_cycle_days) + 'd' : '')) : '';
                         const curPriceStr = r.current_price !== null && r.current_price !== undefined ? ('₹' + Number(r.current_price).toFixed(2)) : 'N/A';
 
@@ -3618,7 +3618,7 @@
                             (hasKp ? ('<div class="metric" style="margin-top:0.2rem"><span>Kronos 14D Return</span><strong class="' + trendCls + '">' + (kp.return_pct != null ? kp.return_pct.toFixed(2) + '%' : '—') + ' (' + trend + ')</strong></div>') : '') +
                             (kp.explanation ? '<p class="timestamp" style="margin-top:0.5rem;font-size:0.75rem;">' + kp.explanation + '</p>' : '') +
                             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;">' +
-                            '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(139,92,246,0.22);color:#c084fc;border:1px solid rgba(139,92,246,0.4);">' + (hasKp ? '🔄 Kronos' : '⚡ Kronos AI') + '</button>' +
+                            '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);">' + (hasKp ? '🔄 Kronos' : '⚡ Kronos AI') + '</button>' +
                             '<button class="btn btn-sm" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(59,130,246,0.22);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);">' + (hasAi ? '🔍 Reasons & News' : '🧠 AI Thesis') + '</button>' +
                             '</div>';
                     }).join('');
@@ -4053,7 +4053,7 @@
                             '<strong style="display:block;font-size:0.85rem;color:var(--light);">No Multi-Model Consensus on Record</strong>' +
                             '<span style="font-size:0.78rem;color:var(--muted);">Trigger an ensemble run to gather calibrated votes, support/resistance targets, and chart patterns from DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral Large.</span>' +
                             '</div>' +
-                            '<button class="btn btn-sm" onclick="app.runModalConsensus()" style="background:linear-gradient(135deg, #6366f1, #a855f7);color:#fff;border:none;font-size:0.78rem;font-weight:700;padding:0.4rem 0.85rem;border-radius:0.4rem;box-shadow:0 2px 8px rgba(99,102,241,0.3);">⚡ Run Consensus Now</button>' +
+                            '<button class="btn btn-sm" onclick="app.runModalConsensus()" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);color:#fff;border:none;font-size:0.78rem;font-weight:700;padding:0.4rem 0.85rem;border-radius:0.4rem;box-shadow:0 2px 8px rgba(37,99,235,0.3);">⚡ Run Consensus Now</button>' +
                             '</div>';
                         return;
                     }
@@ -4124,8 +4124,8 @@
 
                     // 3. Synthesis Thesis Callout
                     const thesisText = pred.synthesized_thesis || pred.synthesis_reasoning || pred.synthesis_summary;
-                    const thesisHtml = thesisText ? ('<div style="background:linear-gradient(135deg, rgba(99,102,241,0.1), rgba(168,85,247,0.1));border:1px solid rgba(99,102,241,0.35);border-radius:0.5rem;padding:0.75rem 0.95rem;margin-bottom:0.75rem;">' +
-                        '<strong style="color:#a5b4fc;font-size:0.82rem;display:flex;align-items:center;gap:0.35rem;margin-bottom:0.3rem;">✨ Ensemble Quantitative Thesis:</strong>' +
+                    const thesisHtml = thesisText ? ('<div style="background:linear-gradient(135deg, rgba(59,130,246,0.1), rgba(37,99,235,0.1));border:1px solid rgba(59,130,246,0.35);border-radius:0.5rem;padding:0.75rem 0.95rem;margin-bottom:0.75rem;">' +
+                        '<strong style="color:#93c5fd;font-size:0.82rem;display:flex;align-items:center;gap:0.35rem;margin-bottom:0.3rem;">✨ Ensemble Quantitative Thesis:</strong>' +
                         '<p style="margin:0;font-size:0.82rem;line-height:1.55;color:var(--light);">' + thesisText + '</p>' +
                         '</div>') : '';
 
@@ -4177,7 +4177,7 @@
                                 '</div>' +
 
                                 // Pattern & Order Flow
-                                (mPattern ? ('<div style="font-size:0.73rem;color:#c084fc;">📐 <strong>Pattern:</strong> ' + mPattern + '</div>') : '') +
+                                (mPattern ? ('<div style="font-size:0.73rem;color:#38bdf8;">📐 <strong>Pattern:</strong> ' + mPattern + '</div>') : '') +
                                 (mVolume ? ('<div style="font-size:0.73rem;color:#38bdf8;">📊 <strong>Order Flow:</strong> ' + mVolume + '</div>') : '') +
                                 (mAction ? ('<div style="font-size:0.73rem;color:#fcd34d;">🎯 <strong>Recommended:</strong> ' + mAction + '</div>') : '') +
 
@@ -4389,7 +4389,7 @@
                         '</div>';
                 } else {
                     return '<div id="' + domId + '">' +
-                        '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.18rem 0.45rem;font-size:0.7rem;background:linear-gradient(135deg, rgba(99,102,241,0.18), rgba(168,85,247,0.18));color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:0.3rem;font-weight:600;" title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model consensus for ' + safeSym + '">⚡ AI Consensus</button>' +
+                        '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.18rem 0.45rem;font-size:0.7rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:0.3rem;font-weight:600;" title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model consensus for ' + safeSym + '">⚡ AI Consensus</button>' +
                         '</div>';
                 }
             },
@@ -4400,7 +4400,7 @@
                 const oldHtml = btnEl ? btnEl.innerHTML : '';
                 if (btnEl) {
                     btnEl.disabled = true;
-                    btnEl.innerHTML = '<span class="loading-spinner" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#c084fc;animation:spin 0.8s linear infinite;"></span>';
+                    btnEl.innerHTML = '<span class="loading-spinner" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#60a5fa;animation:spin 0.8s linear infinite;"></span>';
                 }
                 
                 try {
@@ -5816,8 +5816,8 @@
                     const badge = document.getElementById('srModalSourceBadge');
                     if (badge) {
                         badge.textContent = isUser ? 'Custom (User Override)' : 'Auto-detected';
-                        badge.style.background = isUser ? 'rgba(139,92,246,0.25)' : 'rgba(59,130,246,0.2)';
-                        badge.style.color = isUser ? '#c084fc' : '#60a5fa';
+                        badge.style.background = isUser ? 'rgba(59,130,246,0.25)' : 'rgba(59,130,246,0.2)';
+                        badge.style.color = isUser ? '#60a5fa' : '#60a5fa';
                     }
 
                     setEl('srModalStatus', 'textContent', rng.last_updated ? ('Last updated: ' + rng.last_updated) : '');
@@ -5924,8 +5924,8 @@
                         statusEl.style.color = 'var(--green)';
                         const badge = document.getElementById('srModalSourceBadge');
                         badge.textContent = 'Custom (User Override)';
-                        badge.style.background = 'rgba(139,92,246,0.25)';
-                        badge.style.color = '#c084fc';
+                        badge.style.background = 'rgba(59,130,246,0.25)';
+                        badge.style.color = '#60a5fa';
                         // Refresh active tabs
                         if (app.watchlistTab && app.watchlistTab.load) app.watchlistTab.load();
                         if (app.loadSwing) app.loadSwing();
@@ -6453,7 +6453,7 @@
                 if (best) {
                     const bg = this.industryColor(best);
                     const bestGroup = industries.find(g => g.industry === best);
-                    bestEl.innerHTML = '<div class="card" style="border:2px solid ' + bg + ';background:rgba(139,92,246,0.1);">' +
+                    bestEl.innerHTML = '<div class="card" style="border:2px solid ' + bg + ';background:rgba(59,130,246,0.1);">' +
                         '<span style="font-size:0.8rem;color:var(--muted);font-weight:600;">🏆 BEST INDUSTRY BY POSITIVE RESULTS</span>' +
                         '<h3 style="margin:0.25rem 0;color:' + bg + ';">' + best + '</h3>' +
                         '<span class="timestamp">' + (bestGroup ? bestGroup.positive_count + ' positive / ' + bestGroup.count + ' results · avg high +' + bestGroup.avg_high_pct.toFixed(2) + '%' : '') + '</span>' +
@@ -6481,7 +6481,7 @@
                             '<td class="' + lcls + '">' + lp + '</td>' +
                             '</tr>';
                     }).join('');
-                    return '<details class="card" style="border-left:4px solid ' + color + ';' + (isBest ? 'border:2px solid ' + color + ';background:rgba(139,92,246,0.06);' : '') + '" ' + (isBest ? 'open' : '') + '>' +
+                    return '<details class="card" style="border-left:4px solid ' + color + ';' + (isBest ? 'border:2px solid ' + color + ';background:rgba(59,130,246,0.06);' : '') + '" ' + (isBest ? 'open' : '') + '>' +
                         '<summary style="cursor:pointer;display:flex;align-items:center;gap:0.75rem;font-weight:600;font-size:1rem;">' +
                         '<span class="signal-badge" style="background:' + color + ';color:#fff;">&nbsp;</span>' +
                         '<span>' + g.industry + (isBest ? ' 🏆' : '') + '</span>' +
@@ -7949,13 +7949,13 @@
 
         const THEME_PRESETS = {
             obsidian: {
-                '--bg': '#000000',
-                '--card': 'rgba(8,4,18,0.82)',
-                '--accent': '#9333ea',
+                '--bg': '#030712',
+                '--card': 'rgba(15,23,42,0.85)',
+                '--accent': '#3b82f6',
                 '--green': '#10b981',
                 '--red': '#f43f5e',
                 '--light': '#f8fafc',
-                '--muted': '#c084fc'
+                '--muted': '#94a3b8'
             },
             sapphire: {
                 '--bg': '#010510',
@@ -7975,14 +7975,14 @@
                 '--light': '#fafafa',
                 '--muted': '#34d399'
             },
-            amethyst: {
-                '--bg': '#080112',
-                '--card': 'rgba(22,6,42,0.8)',
-                '--accent': '#c084fc',
+            slate: {
+                '--bg': '#090d16',
+                '--card': 'rgba(15,23,42,0.85)',
+                '--accent': '#60a5fa',
                 '--green': '#34d399',
                 '--red': '#fb7185',
-                '--light': '#fdf4ff',
-                '--muted': '#e9d5ff'
+                '--light': '#f8fafc',
+                '--muted': '#94a3b8'
             }
         };
 
@@ -8159,8 +8159,8 @@
                     if (ds.key === 'openrouter' && ds.openrouter_key_info) {
                         const ki = ds.openrouter_key_info;
                         extraMetaHtml = `
-                            <div style="background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2); border-radius: 0.45rem; padding: 0.5rem 0.75rem; margin-top: 0.75rem; font-size: 0.75rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem;">
-                                <span>🔑 Key Label: <strong style="color: #c084fc;">${ki.label || 'Default'}</strong></span>
+                            <div style="background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); border-radius: 0.45rem; padding: 0.5rem 0.75rem; margin-top: 0.75rem; font-size: 0.75rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem;">
+                                <span>🔑 Key Label: <strong style="color: #60a5fa;">${ki.label || 'Default'}</strong></span>
                                 <span>Usage: <strong style="color: #38bdf8;">$${Number(ki.usage || 0).toFixed(4)}</strong></span>
                                 ${ki.limit ? `<span>Credit Cap: <strong>$${ki.limit}</strong></span>` : ''}
                             </div>
@@ -8244,8 +8244,8 @@
             } else {
                 statusEl.textContent = `🟢 ${rem} left · Healthy`;
                 statusEl.style.color = '#34d399';
-                pillEl.style.borderColor = 'rgba(99, 102, 241, 0.35)';
-                pillEl.style.background = 'rgba(99, 102, 241, 0.12)';
+                pillEl.style.borderColor = 'rgba(59, 130, 246, 0.35)';
+                pillEl.style.background = 'rgba(59, 130, 246, 0.12)';
             }
         };
 
@@ -8279,14 +8279,14 @@
                                 expDisplay = `<span style="color: #fde047; font-family: monospace; font-size: 0.75rem;">⏳ ${diffHours}h left</span>`;
                             } else {
                                 const diffDays = Math.round(diffHours / 24);
-                                expDisplay = `<span style="color: #c084fc; font-family: monospace; font-size: 0.75rem;">⏳ ${diffDays}d left</span>`;
+                                expDisplay = `<span style="color: #60a5fa; font-family: monospace; font-size: 0.75rem;">⏳ ${diffDays}d left</span>`;
                             }
                         }
                     }
 
                     return `
                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                            <td style="padding: 0.65rem 0.8rem; font-family: monospace; font-weight: 700; color: #a78bfa;">${item.code}</td>
+                            <td style="padding: 0.65rem 0.8rem; font-family: monospace; font-weight: 700; color: #60a5fa;">${item.code}</td>
                             <td style="padding: 0.65rem 0.8rem; font-weight: 600; color: var(--light);">${item.label}</td>
                             <td style="padding: 0.65rem 0.8rem;">
                                 <div style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
@@ -8385,8 +8385,8 @@
             const btnGrouped = document.getElementById('ccToggleGroupedBtn');
             const btnRaw = document.getElementById('ccToggleEncryptedBtn');
             if (btnGrouped) {
-                btnGrouped.style.background = app._customizer.telemetryGrouped ? 'rgba(168,85,247,0.3)' : 'rgba(255,255,255,0.08)';
-                btnGrouped.style.color = app._customizer.telemetryGrouped ? '#d8b4fe' : 'var(--light)';
+                btnGrouped.style.background = app._customizer.telemetryGrouped ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.08)';
+                btnGrouped.style.color = app._customizer.telemetryGrouped ? '#93c5fd' : 'var(--light)';
             }
             if (btnRaw) {
                 btnRaw.style.background = 'rgba(255,255,255,0.08)';
@@ -8476,12 +8476,12 @@
                         return `
                             <tr>
                                 <td>
-                                    <div><strong style="color:#c084fc;font-family:monospace;font-size:0.85rem;">${r.machine_name || '—'}</strong></div>
+                                    <div><strong style="color:#38bdf8;font-family:monospace;font-size:0.85rem;">${r.machine_name || '—'}</strong></div>
                                     <div style="color:var(--muted);font-size:0.72rem;margin-top:0.15rem;">👤 ${r.system_user || '—'}</div>
                                 </td>
                                 <td><strong style="color:#60a5fa;font-family:monospace;font-size:0.85rem;">${r.ip_address || '—'}</strong></td>
                                 <td style="text-align:center;">
-                                    <span class="signal-badge" style="font-size:0.75rem;background:rgba(168,85,247,0.22);color:#d8b4fe;border:1px solid rgba(168,85,247,0.45);padding:0.25rem 0.65rem;border-radius:9999px;font-weight:700;box-shadow:0 0 12px rgba(168,85,247,0.25);">
+                                    <span class="signal-badge" style="font-size:0.75rem;background:rgba(59,130,246,0.22);color:#93c5fd;border:1px solid rgba(59,130,246,0.45);padding:0.25rem 0.65rem;border-radius:9999px;font-weight:700;box-shadow:0 0 12px rgba(59,130,246,0.25);">
                                         ⚡ ${r.count}x Hits
                                     </span>
                                 </td>
@@ -8506,7 +8506,7 @@
                             <tr>
                                 <td style="font-family:monospace;white-space:nowrap;color:var(--muted);">${r.timestamp || '—'}</td>
                                 <td><strong style="color:#60a5fa;font-family:monospace;">${r.ip_address || '—'}</strong></td>
-                                <td><div><span style="color:#a78bfa;font-weight:600;">${r.machine_name || '—'}</span></div><div style="color:var(--muted);font-size:0.72rem;margin-top:0.15rem;">👤 ${r.system_user || '—'}</div></td>
+                                <td><div><span style="color:#60a5fa;font-weight:600;">${r.machine_name || '—'}</span></div><div style="color:var(--muted);font-size:0.72rem;margin-top:0.15rem;">👤 ${r.system_user || '—'}</div></td>
                                 <td><div><span>📍 ${loc}</span>${coordsHtml}</div></td>
                                 <td><span style="color:var(--muted);">${r.isp || '—'}</span></td>
                                 <td><span style="font-size:0.75rem;">${r.device_info || r.user_agent || '—'}</span></td>
@@ -9233,7 +9233,7 @@
             if (memEl) {
                 const memberships = (app.watchlistTab.customLists || []).filter(w =>
                     (w.tickers || []).includes(app.activeAddToWatchlistTicker)
-                ).map(w => `<span class="signal-badge" style="background:rgba(168,85,247,0.2);color:#e9d5ff;font-size:0.72rem;margin-right:0.25rem;">⭐ ${w.name}</span>`);
+                ).map(w => `<span class="signal-badge" style="background:rgba(59,130,246,0.2);color:#93c5fd;font-size:0.72rem;margin-right:0.25rem;">⭐ ${w.name}</span>`);
 
                 if (memberships.length) {
                     memEl.innerHTML = '<div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.2rem;">' + memberships.join('') + '</div>';
@@ -9549,7 +9549,7 @@
                                     <span style="color:#fca5a5;font-family:var(--font-mono);font-weight:600;">₹${mSL ? mSL.toFixed(2) : '—'}</span>
                                     ${slRiskPct ? `<div style="font-size:0.68rem;color:#f87171;">${slRiskPct}%</div>` : ''}
                                 </td>
-                                <td><span style="color:#e9d5ff;font-family:var(--font-mono);font-weight:700;">1 : ${mRR}</span></td>
+                                <td><span style="color:#93c5fd;font-family:var(--font-mono);font-weight:700;">1 : ${mRR}</span></td>
                             </tr>
                         `;
                     }).join('');
