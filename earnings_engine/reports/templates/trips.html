@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trips & Travel Hub // Nexus</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-heading: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+
+            --bg-base: #f8fafc;
+            --card-surface: #ffffff;
+            --border-soft: #e2e8f0;
+            --border-highlight: #cbd5e1;
+            
+            --primary: #0284c7;
+            --primary-light: #e0f2fe;
+            --emerald: #059669;
+            --emerald-light: #d1fae5;
+            --amber: #d97706;
+            --amber-light: #fef3c7;
+            --rose: #e11d48;
+            --rose-light: #ffe4e6;
+            --indigo: #4f46e5;
+            --indigo-light: #e0e7ff;
+            --purple: #7c3aed;
+            --purple-light: #ede9fe;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-base);
+            color: #1e293b;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(2, 132, 199, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(217, 119, 6, 0.04) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(5, 150, 105, 0.04) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        .heading-title {
+            font-family: var(--font-heading);
+        }
+
+        .font-mono-code {
+            font-family: var(--font-mono);
+        }
+
+        .soft-card {
+            background: #ffffff;
+            border: 1px solid var(--border-soft);
+            box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .soft-card:hover {
+            box-shadow: 0 10px 25px -3px rgba(15, 23, 42, 0.07), 0 4px 10px -2px rgba(15, 23, 42, 0.03);
+            border-color: var(--border-highlight);
+        }
+
+        /* Destination Hero Card */
+        .hero-banner {
+            position: relative;
+            border-radius: 1.5rem;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #0f172a 100%);
+            color: #ffffff;
+            box-shadow: 0 20px 30px -10px rgba(2, 132, 199, 0.25);
+        }
+
+        .hero-banner::before {
+            content: '';
+            position: absolute;
+            top: 0; right: 0; bottom: 0; left: 0;
+            background: radial-gradient(circle at top right, rgba(255,255,255,0.15), transparent 70%);
+            pointer-events: none;
+        }
+
+        /* Flight Ticket Card */
+        .boarding-pass {
+            background: #ffffff;
+            border: 1px dashed #cbd5e1;
+            border-radius: 1rem;
+            position: relative;
+        }
+
+        .modal-overlay {
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-8">
+
+        <!-- Header Nav -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+            <div class="flex items-center gap-4">
+                <a href="/portal" class="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:border-slate-300 transition shadow-sm" title="Back to Nexus Portal">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">✈️</span>
+                        <h1 class="heading-title text-2xl font-black tracking-tight text-slate-900">TRIPS & EXPEDITIONS</h1>
+                        <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider bg-sky-100 text-sky-700 border border-sky-200">Travel Hub</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium mt-0.5">Global itineraries, flight manifests, hotel vouchers, and collaborative group activities</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div id="userBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="userNameLabel">Loading access...</span>
+                </div>
+
+                <button id="addTripBtn" onclick="openAddTripModal()" class="hidden items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition shadow-sm shadow-sky-500/20">
+                    <span>+ Add Trip</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Overview Banner -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="soft-card p-4 rounded-2xl">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+                    <span>Upcoming Trips</span>
+                    <span class="text-sky-600">🌏</span>
+                </div>
+                <div id="statTotalTrips" class="heading-title text-2xl font-extrabold text-slate-900">--</div>
+                <div class="text-[11px] text-emerald-600 font-semibold mt-1">Active itineraries</div>
+            </div>
+
+            <div class="soft-card p-4 rounded-2xl">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+                    <span>Next Departure</span>
+                    <span class="text-amber-600">⏳</span>
+                </div>
+                <div id="statNextDate" class="heading-title text-xl font-extrabold text-slate-900">--</div>
+                <div id="statNextCity" class="text-[11px] text-slate-500 font-semibold mt-1 truncate">Kyoto, Japan</div>
+            </div>
+
+            <div class="soft-card p-4 rounded-2xl">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+                    <span>Group Budget Est.</span>
+                    <span class="text-indigo-600">💳</span>
+                </div>
+                <div id="statTotalBudget" class="heading-title text-2xl font-extrabold text-slate-900">--</div>
+                <div class="text-[11px] text-indigo-600 font-semibold mt-1">Estimated for active plans</div>
+            </div>
+
+            <div class="soft-card p-4 rounded-2xl">
+                <div class="flex items-center justify-between text-slate-500 text-xs font-semibold mb-1">
+                    <span>Suggested Activities</span>
+                    <span class="text-purple-600">💡</span>
+                </div>
+                <div id="statActivitiesCount" class="heading-title text-2xl font-extrabold text-slate-900">--</div>
+                <div class="text-[11px] text-purple-600 font-semibold mt-1">Community voted</div>
+            </div>
+        </div>
+
+        <!-- Featured Next Trip Hero Banner -->
+        <div id="featuredHeroCard" class="hero-banner p-6 md:p-8 space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <span class="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[11px] font-bold tracking-wider uppercase text-sky-100">Featured Destination</span>
+                        <span id="heroStatusBadge" class="px-3 py-1 bg-emerald-500/80 backdrop-blur-md rounded-full text-[11px] font-bold tracking-wider uppercase text-white">Confirmed</span>
+                    </div>
+                    <h2 id="heroTripTitle" class="heading-title text-2xl md:text-3xl font-black tracking-tight text-white">Kyoto & Tokyo Cherry Blossom Expedition</h2>
+                    <p id="heroTripDates" class="text-sm font-medium text-sky-100 flex items-center gap-2">
+                        <span>🗓️ Oct 10, 2026 – Oct 22, 2026</span>
+                        <span>•</span>
+                        <span>📍 Japan (Kyoto & Tokyo)</span>
+                    </p>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button onclick="openActivityModalForFeatured()" class="px-4 py-2.5 rounded-xl bg-white text-sky-900 hover:bg-sky-50 text-xs font-bold transition shadow-lg flex items-center gap-2">
+                        <span>💡 Suggest Activity</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Flight and Hotel Fast Info -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/15 space-y-2">
+                    <div class="flex items-center justify-between text-xs font-bold text-sky-200 uppercase tracking-wider">
+                        <span>✈️ Flight Manifest</span>
+                        <span class="text-[10px] bg-sky-400/20 px-2 py-0.5 rounded">Confirmed</span>
+                    </div>
+                    <div id="heroFlightDetails" class="text-sm font-semibold text-white">ANA All Nippon NH-830 (BOM -> HND)</div>
+                    <div class="text-xs text-sky-200">Baggage: 2x 23kg included • Terminal 2</div>
+                </div>
+
+                <div class="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/15 space-y-2">
+                    <div class="flex items-center justify-between text-xs font-bold text-sky-200 uppercase tracking-wider">
+                        <span>🏨 Luxury Accommodation</span>
+                        <span class="text-[10px] bg-emerald-400/20 px-2 py-0.5 rounded">Reserved</span>
+                    </div>
+                    <div id="heroHotelDetails" class="text-sm font-semibold text-white">Hyatt Regency Kyoto & Cerulean Tower Shibuya</div>
+                    <div class="text-xs text-sky-200">Breakfast included • Mountain & City Skyline view</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trips List & Itineraries -->
+        <section class="space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="heading-title text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <span>🗺️ All Expeditions & Itineraries</span>
+                    </h2>
+                    <p class="text-xs text-slate-500">Upcoming travel schedules and destinations</p>
+                </div>
+                <div class="text-xs text-slate-500 font-semibold" id="tripsCountLabel">Loading trips...</div>
+            </div>
+
+            <div id="tripsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Trips rendered via JS -->
+            </div>
+        </section>
+
+        <!-- Group Activities & Suggestions -->
+        <section class="soft-card p-6 rounded-2xl space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="heading-title text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <span>💡 Group Activities & Member Suggestions</span>
+                    </h2>
+                    <p class="text-xs text-slate-500">Collaborative itinerary suggestions, vote for your favorite spots</p>
+                </div>
+                <button onclick="openActivityModal()" class="px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-xs font-bold transition flex items-center gap-2 self-start md:self-auto">
+                    <span>+ Suggest New Activity</span>
+                </button>
+            </div>
+
+            <div id="activitiesListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Rendered dynamically -->
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ================= MODAL: ADD TRIP (Owner) ================= -->
+    <div id="addTripModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-white border border-slate-200 w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">✈️</span>
+                    <h3 class="heading-title text-base font-bold text-slate-900">Add New Trip Itinerary</h3>
+                </div>
+                <button onclick="closeAddTripModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
+            </div>
+
+            <form id="addTripForm" onsubmit="submitNewTrip(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Trip Title</label>
+                    <input type="text" id="tripTitle" required placeholder="e.g. Iceland Northern Lights & Glacier Tour" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Destination</label>
+                        <input type="text" id="tripDestination" required placeholder="e.g. Reykjavik, Iceland" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Status</label>
+                        <select id="tripStatus" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500">
+                            <option value="planning">Planning (Draft)</option>
+                            <option value="confirmed" selected>Confirmed</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Start Date</label>
+                        <input type="date" id="tripStartDate" required class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">End Date</label>
+                        <input type="date" id="tripEndDate" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Estimated Budget (₹)</label>
+                        <input type="number" id="tripBudget" value="250000" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Cover Theme</label>
+                        <select id="tripCover" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500">
+                            <option value="japan">🌸 Japan / Asian Garden</option>
+                            <option value="swiss">🏔️ Swiss Alps / Mountains</option>
+                            <option value="amalfi">⛵ Mediterranean Coast</option>
+                            <option value="aurora">🌌 Northern Lights / Arctic</option>
+                            <option value="safari">🦁 Safari & Wilderness</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Flight Details (Optional)</label>
+                    <input type="text" id="tripFlights" placeholder="e.g. Qatar Airways QR-556 (BOM -> DOH -> KEF)" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Accommodation / Hotel (Optional)</label>
+                    <input type="text" id="tripHotels" placeholder="e.g. The Reykjavik EDITION & Ion Adventure Hotel" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Trip Notes & Highlights</label>
+                    <textarea id="tripNotes" rows="2" placeholder="Key landmarks, visa guidelines, packing notes..." class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500"></textarea>
+                </div>
+
+                <div class="flex items-center gap-2 p-3 bg-sky-50 rounded-xl border border-sky-200">
+                    <input type="checkbox" id="tripShared" checked class="w-4 h-4 rounded text-sky-600 focus:ring-0">
+                    <label for="tripShared" class="text-xs font-semibold text-sky-900 cursor-pointer">
+                        Share this trip itinerary with verified friends
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                    <button type="button" onclick="closeAddTripModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-md">Create Trip</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL: SUGGEST ACTIVITY ================= -->
+    <div id="suggestActivityModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-white border border-slate-200 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">💡</span>
+                    <h3 class="heading-title text-base font-bold text-slate-900">Suggest Activity</h3>
+                </div>
+                <button onclick="closeActivityModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
+            </div>
+
+            <form id="suggestActivityForm" onsubmit="submitActivitySuggestion(event)" class="space-y-3">
+                <input type="hidden" id="actTripId">
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Target Trip</label>
+                    <select id="actTripSelect" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Your Name</label>
+                    <input type="text" id="actMemberName" required placeholder="e.g. Rohan / Sarah" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Activity Title</label>
+                    <input type="text" id="actTitle" required placeholder="e.g. Helicopter tour over Mount Fuji" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Location</label>
+                        <input type="text" id="actLocation" placeholder="e.g. Tokyo, Japan" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Approx Cost (₹)</label>
+                        <input type="number" id="actCost" value="5000" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                    <button type="button" onclick="closeActivityModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md">Submit Suggestion</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JS Logic -->
+    <script>
+        let allTrips = [];
+        let isOwner = false;
+
+        async function fetchTripsData() {
+            try {
+                const res = await fetch('/api/v1/trips');
+                if (!res.ok) throw new Error('Failed loading trips');
+                const data = await res.json();
+                allTrips = data.trips || [];
+                isOwner = Boolean(data.is_owner);
+
+                // Update UI badges
+                const userBadge = document.getElementById('userNameLabel');
+                const addBtn = document.getElementById('addTripBtn');
+                if (isOwner) {
+                    userBadge.textContent = 'Vault Owner (Full Admin)';
+                    userBadge.className = 'text-emerald-700 font-bold';
+                    addBtn.classList.remove('hidden');
+                    addBtn.classList.add('flex');
+                } else {
+                    userBadge.textContent = 'Friend Access (Shared Trips)';
+                    userBadge.className = 'text-sky-700 font-bold';
+                }
+
+                renderStats();
+                renderFeaturedHero();
+                renderTripsGrid();
+                fetchActivitiesForTrips();
+            } catch (err) {
+                console.error(err);
+                document.getElementById('tripsGrid').innerHTML = `
+                    <div class="col-span-3 text-center py-12 text-slate-500 text-xs">
+                        Failed to fetch trips. Please ensure your access passcode is active.
+                    </div>
+                `;
+            }
+        }
+
+        function renderStats() {
+            document.getElementById('statTotalTrips').textContent = allTrips.length;
+            const totalBudget = allTrips.reduce((acc, t) => acc + (t.estimated_budget || 0), 0);
+            document.getElementById('statTotalBudget').textContent = '₹' + (totalBudget / 100000).toFixed(1) + 'L';
+
+            if (allTrips.length > 0) {
+                const nextTrip = allTrips[0];
+                document.getElementById('statNextDate').textContent = nextTrip.start_date || 'TBD';
+                document.getElementById('statNextCity').textContent = nextTrip.destination || '--';
+            }
+        }
+
+        function renderFeaturedHero() {
+            if (!allTrips.length) return;
+            const t = allTrips[0];
+            document.getElementById('heroTripTitle').textContent = t.title;
+            document.getElementById('heroTripDates').innerHTML = `
+                <span>🗓️ ${t.start_date} ${t.end_date ? '– ' + t.end_date : ''}</span>
+                <span>•</span>
+                <span>📍 ${t.destination}</span>
+            `;
+            document.getElementById('heroFlightDetails').textContent = t.flight_details || 'Flight bookings in progress';
+            document.getElementById('heroHotelDetails').textContent = t.hotel_details || 'Luxury resorts and boutique stays';
+        }
+
+        function renderTripsGrid() {
+            const container = document.getElementById('tripsGrid');
+            document.getElementById('tripsCountLabel').textContent = `${allTrips.length} active itineraries`;
+
+            if (!allTrips.length) {
+                container.innerHTML = `
+                    <div class="col-span-3 text-center py-12 text-slate-400 text-xs font-semibold">
+                        No scheduled trips found.
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = allTrips.map(t => {
+                const statusBg = t.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                 t.status === 'completed' ? 'bg-slate-100 text-slate-700 border-slate-200' :
+                                 'bg-amber-50 text-amber-700 border-amber-200';
+
+                return `
+                    <div class="soft-card rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${statusBg}">
+                                    ${t.status}
+                                </span>
+                                <span class="text-xs text-slate-400 font-mono">₹${((t.estimated_budget || 0) / 1000).toLocaleString('en-IN')}k</span>
+                            </div>
+
+                            <div>
+                                <h3 class="heading-title text-base font-extrabold text-slate-900 tracking-tight leading-snug">${t.title}</h3>
+                                <p class="text-xs text-sky-600 font-semibold mt-0.5">📍 ${t.destination}</p>
+                            </div>
+
+                            <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs text-slate-600 space-y-1.5">
+                                <div class="flex items-center justify-between text-slate-500 font-semibold">
+                                    <span>🗓️ Dates</span>
+                                    <span class="text-slate-800">${t.start_date} ${t.end_date ? '→ ' + t.end_date : ''}</span>
+                                </div>
+                                ${t.flight_details ? `
+                                    <div class="flex items-center justify-between text-slate-500 font-semibold truncate">
+                                        <span>✈️ Flight</span>
+                                        <span class="text-slate-800 truncate ml-2">${t.flight_details}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+
+                            ${t.notes ? `
+                                <p class="text-xs text-slate-500 line-clamp-2 italic">"${t.notes}"</p>
+                            ` : ''}
+                        </div>
+
+                        <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                            <button onclick="openActivityModalForTrip('${t.id}')" class="px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold transition flex items-center gap-1.5">
+                                <span>💡 Suggest</span>
+                            </button>
+
+                            ${isOwner ? `
+                                <button onclick="deleteTrip('${t.id}')" class="text-xs text-rose-500 hover:text-rose-700 font-semibold px-2 py-1">
+                                    Delete
+                                </button>
+                            ` : `
+                                <span class="text-[11px] text-emerald-600 font-semibold">✓ Verified Shared</span>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function fetchActivitiesForTrips() {
+            if (!allTrips.length) return;
+            const container = document.getElementById('activitiesListContainer');
+            let allActivities = [];
+
+            for (const t of allTrips) {
+                try {
+                    const res = await fetch(`/api/v1/trips/${t.id}/activities`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.activities) {
+                            allActivities = allActivities.concat(data.activities.map(a => ({ ...a, trip_title: t.title })));
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            document.getElementById('statActivitiesCount').textContent = allActivities.length;
+
+            if (!allActivities.length) {
+                container.innerHTML = `
+                    <div class="col-span-2 text-center py-8 text-slate-400 text-xs">
+                        No activity suggestions yet. Click "+ Suggest New Activity" to recommend a spot!
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = allActivities.map(a => `
+                <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex items-start justify-between gap-3">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 uppercase">${a.trip_title}</span>
+                            <span class="text-[11px] text-slate-400">by ${a.suggested_by_name}</span>
+                        </div>
+                        <h4 class="text-xs font-bold text-slate-800">${a.activity_title}</h4>
+                        <p class="text-[11px] text-slate-500">📍 ${a.location || 'Local area'} • Est: ₹${a.approx_cost.toLocaleString('en-IN')}</p>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-bold text-indigo-600">
+                        <span>👍</span>
+                        <span>${a.votes_count || 1}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Modals & Handlers
+        function openAddTripModal() {
+            document.getElementById('addTripModal').style.display = 'flex';
+        }
+        function closeAddTripModal() {
+            document.getElementById('addTripModal').style.display = 'none';
+        }
+
+        function openActivityModal() {
+            populateTripSelect();
+            document.getElementById('suggestActivityModal').style.display = 'flex';
+        }
+        function openActivityModalForFeatured() {
+            if (allTrips.length) openActivityModalForTrip(allTrips[0].id);
+        }
+        function openActivityModalForTrip(tripId) {
+            populateTripSelect(tripId);
+            document.getElementById('suggestActivityModal').style.display = 'flex';
+        }
+        function closeActivityModal() {
+            document.getElementById('suggestActivityModal').style.display = 'none';
+        }
+
+        function populateTripSelect(selectedTripId = null) {
+            const select = document.getElementById('actTripSelect');
+            select.innerHTML = allTrips.map(t => `
+                <option value="${t.id}" ${t.id === selectedTripId ? 'selected' : ''}>${t.title} (${t.destination})</option>
+            `).join('');
+        }
+
+        async function submitNewTrip(e) {
+            e.preventDefault();
+            const payload = {
+                title: document.getElementById('tripTitle').value,
+                destination: document.getElementById('tripDestination').value,
+                start_date: document.getElementById('tripStartDate').value,
+                end_date: document.getElementById('tripEndDate').value || null,
+                status: document.getElementById('tripStatus').value,
+                estimated_budget: parseFloat(document.getElementById('tripBudget').value || 0),
+                cover_image: document.getElementById('tripCover').value,
+                flight_details: document.getElementById('tripFlights').value || null,
+                hotel_details: document.getElementById('tripHotels').value || null,
+                notes: document.getElementById('tripNotes').value || null,
+                is_shared_with_friends: document.getElementById('tripShared').checked,
+                packing_list: ["Passport & ID", "Universal Adapter", "Travel Insurance"]
+            };
+
+            try {
+                const res = await fetch('/api/v1/trips', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error((await res.json()).detail || 'Failed creating trip');
+                closeAddTripModal();
+                fetchTripsData();
+            } catch(err) {
+                alert('Error creating trip: ' + err.message);
+            }
+        }
+
+        async function submitActivitySuggestion(e) {
+            e.preventDefault();
+            const tripId = document.getElementById('actTripSelect').value;
+            const payload = {
+                suggested_by_name: document.getElementById('actMemberName').value,
+                activity_title: document.getElementById('actTitle').value,
+                location: document.getElementById('actLocation').value || null,
+                approx_cost: parseFloat(document.getElementById('actCost').value || 0)
+            };
+
+            try {
+                const res = await fetch(`/api/v1/trips/${tripId}/activities`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error((await res.json()).detail || 'Failed submitting suggestion');
+                closeActivityModal();
+                fetchActivitiesForTrips();
+            } catch(err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function deleteTrip(tripId) {
+            if (!confirm('Are you sure you want to delete this trip itinerary?')) return;
+            try {
+                const res = await fetch(`/api/v1/trips/${tripId}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed deleting trip');
+                fetchTripsData();
+            } catch(err) {
+                alert('Error deleting trip: ' + err.message);
+            }
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', fetchTripsData);
+    </script>
+</body>
+</html>

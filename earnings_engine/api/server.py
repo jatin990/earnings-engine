@@ -318,6 +318,10 @@ def is_route_authorized(path: str, session: dict[str, Any]) -> bool:
         return "dashboard" in scopes
     if path == "/credit-card":
         return bool("credit_card" in scopes or "can_view_cards" in scopes)
+    if path == "/trips":
+        return bool("trips" in scopes or "can_view_trips" in scopes or "credit_card" in scopes)
+    if path == "/net-worth":
+        return bool("net_worth" in scopes or "can_view_net_worth" in scopes or "credit_card" in scopes)
 
     # Default allow authenticated users for unclassified non-admin routes
     if not (path.startswith("/api/v1/system/telemetry") or path.startswith("/api/v1/friends") or path.startswith("/api/v1/config/env")):
@@ -341,7 +345,7 @@ async def enforce_auth_middleware(request: Request, call_next):
 
         # Verify RBAC route permission
         if not is_route_authorized(path, session):
-            if path in ("/dashboard", "/credit-card", "/dashboard.html") or not path.startswith("/api/"):
+            if path in ("/dashboard", "/credit-card", "/trips", "/net-worth", "/dashboard.html") or not path.startswith("/api/"):
                 return RedirectResponse(url=f"/portal?unauthorized=true&redirect={path}", status_code=302)
             return JSONResponse(
                 status_code=403,
@@ -384,8 +388,8 @@ async def enforce_auth_middleware(request: Request, call_next):
         return await call_next(request)
 
     # Unauthenticated request:
-    # 1. HTML Pages (e.g. /dashboard, /credit-card, /stock) -> ALWAYS redirect to portal gate
-    if path in ("/dashboard", "/credit-card", "/dashboard.html") or path.startswith("/stock/") or not path.startswith("/api/"):
+    # 1. HTML Pages (e.g. /dashboard, /credit-card, /trips, /net-worth) -> ALWAYS redirect to portal gate
+    if path in ("/dashboard", "/credit-card", "/trips", "/net-worth", "/dashboard.html") or path.startswith("/stock/") or not path.startswith("/api/"):
         return RedirectResponse(url=f"/portal?redirect={path}", status_code=302)
 
     # 3. Protected API Endpoints -> return 401 Unauthorized
@@ -1027,6 +1031,35 @@ class RejectCardOtpRequest(BaseModel):
     response_notes: str | None = None
 
 
+class CreateTripRequest(BaseModel):
+    title: str
+    destination: str
+    start_date: str
+    end_date: str | None = None
+    status: str = "planning"
+    notes: str | None = None
+    cover_image: str = "japan"
+    estimated_budget: float = 150000.0
+    is_shared_with_friends: bool = True
+    flight_details: str | None = None
+    hotel_details: str | None = None
+    packing_list: list[str] = []
+
+
+class SuggestTripActivityRequest(BaseModel):
+    suggested_by_name: str = "Friend"
+    activity_title: str
+    location: str | None = None
+    approx_cost: float = 0.0
+
+
+class CreateNetWorthSnapshotRequest(BaseModel):
+    as_of_date: str
+    total_net_worth_band: str
+    allocation_pct: dict[str, float]
+    yoy_growth_pct: float | None = None
+
+
 def _get_current_session(request: Request) -> dict[str, Any]:
     """Resolve active user session from request state or credentials."""
     session = getattr(request.state, "session", None)
@@ -1098,6 +1131,48 @@ async def serve_credit_card():
     except Exception as exc:
         return HTMLResponse(
             f"<html><body><h1>Credit Card Hub render error</h1><p>{exc}</p></body></html>",
+            status_code=500,
+        )
+
+
+@app.get("/trips", tags=["UI"], response_class=HTMLResponse)
+async def serve_trips():
+    """Serve the Trips & Travel Hub page."""
+    try:
+        from jinja2 import Environment, FileSystemLoader
+        env = Environment(
+            loader=FileSystemLoader(str(_templates_dir)),
+            autoescape=True,
+            auto_reload=True,
+            cache_size=0,
+        )
+        template = env.get_template("trips.html")
+        html = template.render()
+        return HTMLResponse(html)
+    except Exception as exc:
+        return HTMLResponse(
+            f"<html><body><h1>Trips Hub render error</h1><p>{exc}</p></body></html>",
+            status_code=500,
+        )
+
+
+@app.get("/net-worth", tags=["UI"], response_class=HTMLResponse)
+async def serve_net_worth():
+    """Serve the Net Worth & Asset Allocation Hub page."""
+    try:
+        from jinja2 import Environment, FileSystemLoader
+        env = Environment(
+            loader=FileSystemLoader(str(_templates_dir)),
+            autoescape=True,
+            auto_reload=True,
+            cache_size=0,
+        )
+        template = env.get_template("net_worth.html")
+        html = template.render()
+        return HTMLResponse(html)
+    except Exception as exc:
+        return HTMLResponse(
+            f"<html><body><h1>Net Worth Hub render error</h1><p>{exc}</p></body></html>",
             status_code=500,
         )
 
@@ -1340,11 +1415,32 @@ async def create_invite_endpoint(req: CreateInviteRequest, request: Request):
 @app.get("/api/v1/trips", tags=["Scoped Hubs"])
 async def get_trips_endpoint(session: dict = Depends(require_scope("can_view_trips"))):
     """Retrieve personal travel plans and upcoming trip itineraries."""
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    is_owner = bool(role == "owner" or "admin" in scopes)
+
     conn = get_db_connection(_settings)
     with conn:
-        rows = conn.execute("SELECT id, title, destination, start_date, end_date, status, notes, created_at FROM trips ORDER BY start_date ASC").fetchall()
-    trips = [
-        {
+        if is_owner:
+            rows = conn.execute("""
+                SELECT id, title, destination, start_date, end_date, status, notes, created_at,
+                       cover_image, estimated_budget, is_shared_with_friends, flight_details, hotel_details, packing_list
+                FROM trips ORDER BY start_date ASC
+            """).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT id, title, destination, start_date, end_date, status, notes, created_at,
+                       cover_image, estimated_budget, is_shared_with_friends, flight_details, hotel_details, packing_list
+                FROM trips WHERE is_shared_with_friends = 1 ORDER BY start_date ASC
+            """).fetchall()
+
+    trips = []
+    for r in rows:
+        try:
+            packing = json.loads(r[13]) if r[13] else []
+        except Exception:
+            packing = []
+        trips.append({
             "id": r[0],
             "title": r[1],
             "destination": r[2],
@@ -1353,10 +1449,121 @@ async def get_trips_endpoint(session: dict = Depends(require_scope("can_view_tri
             "status": r[5],
             "notes": r[6],
             "created_at": r[7],
+            "cover_image": r[8] or "japan",
+            "estimated_budget": float(r[9] or 0.0),
+            "is_shared_with_friends": bool(r[10]),
+            "flight_details": r[11],
+            "hotel_details": r[12],
+            "packing_list": packing,
+        })
+    return {"success": True, "count": len(trips), "trips": trips, "is_owner": is_owner}
+
+
+@app.post("/api/v1/trips", tags=["Scoped Hubs"])
+async def create_trip_endpoint(req: CreateTripRequest, session: dict = Depends(require_scope("can_view_trips"))):
+    """Create a new trip itinerary (Owner only)."""
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    if role != "owner" and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Only the vault owner can add new trips.")
+
+    import uuid
+    trip_id = f"trip_{uuid.uuid4().hex[:8]}"
+    now_str = datetime.now().isoformat(timespec="seconds")
+    packing_str = json.dumps(req.packing_list) if req.packing_list else "[]"
+
+    conn = get_db_connection(_settings)
+    with conn:
+        conn.execute("""
+            INSERT INTO trips (
+                id, title, destination, start_date, end_date, status, notes,
+                cover_image, estimated_budget, is_shared_with_friends, flight_details,
+                hotel_details, packing_list, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            trip_id, req.title, req.destination, req.start_date, req.end_date,
+            req.status, req.notes, req.cover_image, req.estimated_budget,
+            1 if req.is_shared_with_friends else 0, req.flight_details,
+            req.hotel_details, packing_str, now_str
+        ))
+        conn.commit()
+
+    logger.info("[TRIPS-API] Created new trip %s (%s - %s)", trip_id, req.title, req.destination)
+    return {"success": True, "trip_id": trip_id, "message": "Trip itinerary created successfully."}
+
+
+@app.delete("/api/v1/trips/{trip_id}", tags=["Scoped Hubs"])
+async def delete_trip_endpoint(trip_id: str, session: dict = Depends(require_scope("can_view_trips"))):
+    """Delete a trip from the vault (Owner only)."""
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    if role != "owner" and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Only the vault owner can delete trips.")
+
+    conn = get_db_connection(_settings)
+    with conn:
+        conn.execute("DELETE FROM trips WHERE id = ?", (trip_id,))
+        conn.execute("DELETE FROM trip_activities WHERE trip_id = ?", (trip_id,))
+        conn.commit()
+
+    logger.info("[TRIPS-API] Deleted trip %s", trip_id)
+    return {"success": True, "message": f"Trip {trip_id} deleted."}
+
+
+@app.get("/api/v1/trips/{trip_id}/activities", tags=["Scoped Hubs"])
+async def get_trip_activities_endpoint(trip_id: str, session: dict = Depends(require_scope("can_view_trips"))):
+    """Retrieve suggested activities and votes for a trip."""
+    conn = get_db_connection(_settings)
+    with conn:
+        rows = conn.execute("""
+            SELECT id, trip_id, suggested_by_name, suggested_by_role, activity_title, location, approx_cost, votes_count, status, created_at
+            FROM trip_activities WHERE trip_id = ? ORDER BY votes_count DESC, created_at ASC
+        """, (trip_id,)).fetchall()
+    activities = [
+        {
+            "id": r[0],
+            "trip_id": r[1],
+            "suggested_by_name": r[2],
+            "suggested_by_role": r[3],
+            "activity_title": r[4],
+            "location": r[5],
+            "approx_cost": float(r[6] or 0.0),
+            "votes_count": int(r[7] or 1),
+            "status": r[8],
+            "created_at": r[9],
         }
         for r in rows
     ]
-    return {"success": True, "count": len(trips), "trips": trips}
+    return {"success": True, "count": len(activities), "activities": activities}
+
+
+@app.post("/api/v1/trips/{trip_id}/activities", tags=["Scoped Hubs"])
+async def suggest_trip_activity_endpoint(
+    trip_id: str,
+    req: SuggestTripActivityRequest,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Suggest an activity or excursion for a trip."""
+    role = session.get("role") or "friend"
+    import uuid
+    act_id = f"act_{uuid.uuid4().hex[:8]}"
+    now_str = datetime.now().isoformat(timespec="seconds")
+
+    conn = get_db_connection(_settings)
+    with conn:
+        trip = conn.execute("SELECT id, title FROM trips WHERE id = ?", (trip_id,)).fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found.")
+
+        conn.execute("""
+            INSERT INTO trip_activities (
+                id, trip_id, suggested_by_name, suggested_by_role, activity_title, location, approx_cost, votes_count, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'suggested', ?)
+        """, (act_id, trip_id, req.suggested_by_name, role, req.activity_title, req.location, req.approx_cost, now_str))
+        conn.commit()
+
+    logger.info("[TRIPS-API] New activity '%s' suggested by %s for %s", req.activity_title, req.suggested_by_name, trip[1])
+    return {"success": True, "activity_id": act_id, "message": f"Activity '{req.activity_title}' suggested!"}
 
 
 @app.get("/api/v1/cards", tags=["Scoped Hubs"])
@@ -1650,17 +1857,22 @@ async def reject_card_otp_request_endpoint(
 @app.get("/api/v1/net-worth", tags=["Scoped Hubs"])
 async def get_net_worth_endpoint(session: dict = Depends(require_scope("can_view_net_worth"))):
     """Retrieve high-level net worth range, asset allocation, and YoY growth."""
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    is_owner = bool(role == "owner" or "admin" in scopes)
+
     conn = get_db_connection(_settings)
     with conn:
         row = conn.execute("SELECT id, as_of_date, total_net_worth_band, allocation_pct, yoy_growth_pct, updated_at FROM net_worth_snapshots ORDER BY as_of_date DESC LIMIT 1").fetchone()
     if not row:
-        return {"success": True, "snapshot": None}
+        return {"success": True, "snapshot": None, "is_owner": is_owner}
     try:
         alloc = json.loads(row[3]) if row[3] else {}
     except Exception:
         alloc = {}
     return {
         "success": True,
+        "is_owner": is_owner,
         "snapshot": {
             "id": row[0],
             "as_of_date": row[1],
@@ -1670,6 +1882,54 @@ async def get_net_worth_endpoint(session: dict = Depends(require_scope("can_view
             "updated_at": row[5],
         },
     }
+
+
+@app.get("/api/v1/net-worth/history", tags=["Scoped Hubs"])
+async def get_net_worth_history_endpoint(session: dict = Depends(require_scope("can_view_net_worth"))):
+    """Retrieve historical net worth snapshots for trend tracking."""
+    conn = get_db_connection(_settings)
+    with conn:
+        rows = conn.execute("SELECT id, as_of_date, total_net_worth_band, allocation_pct, yoy_growth_pct, updated_at FROM net_worth_snapshots ORDER BY as_of_date ASC").fetchall()
+    history = []
+    for r in rows:
+        try:
+            alloc = json.loads(r[3]) if r[3] else {}
+        except Exception:
+            alloc = {}
+        history.append({
+            "id": r[0],
+            "as_of_date": r[1],
+            "total_net_worth_band": r[2],
+            "allocation_pct": alloc,
+            "yoy_growth_pct": r[4],
+            "updated_at": r[5],
+        })
+    return {"success": True, "count": len(history), "history": history}
+
+
+@app.post("/api/v1/net-worth", tags=["Scoped Hubs"])
+async def create_net_worth_snapshot_endpoint(req: CreateNetWorthSnapshotRequest, session: dict = Depends(require_scope("can_view_net_worth"))):
+    """Record a new net worth snapshot and asset allocation (Owner only)."""
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    if role != "owner" and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Only the vault owner can update net worth snapshots.")
+
+    import uuid
+    snap_id = f"nw_{uuid.uuid4().hex[:8]}"
+    now_str = datetime.now().isoformat(timespec="seconds")
+    alloc_str = json.dumps(req.allocation_pct)
+
+    conn = get_db_connection(_settings)
+    with conn:
+        conn.execute("""
+            INSERT INTO net_worth_snapshots (id, as_of_date, total_net_worth_band, allocation_pct, yoy_growth_pct, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (snap_id, req.as_of_date, req.total_net_worth_band, alloc_str, req.yoy_growth_pct, now_str))
+        conn.commit()
+
+    logger.info("[NET-WORTH-API] Recorded new net worth snapshot %s (%s)", snap_id, req.total_net_worth_band)
+    return {"success": True, "snapshot_id": snap_id, "message": "Net worth snapshot updated successfully."}
 
 
 @app.get("/api-info", tags=["Root"])

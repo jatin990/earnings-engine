@@ -616,6 +616,95 @@ def _migration_010_credit_cards_and_otp_requests(conn: Any) -> None:
             pass
 
 
+def _migration_011_trips_and_net_worth_expansion(conn: Any) -> None:
+    """Enhance trips with rich itinerary fields, activities, and net worth history snapshots."""
+    now_str = datetime.now().isoformat(timespec="seconds")
+
+    # 1. Enhance trips table
+    existing_trip_cols = {r[1] for r in conn.execute("PRAGMA table_info(trips)").fetchall()}
+    new_trip_cols = [
+        ("cover_image", "TEXT DEFAULT 'japan'"),
+        ("estimated_budget", "REAL DEFAULT 150000.0"),
+        ("is_shared_with_friends", "INTEGER DEFAULT 1"),
+        ("flight_details", "TEXT"),
+        ("hotel_details", "TEXT"),
+        ("packing_list", "TEXT"),
+    ]
+    for col_name, col_type in new_trip_cols:
+        if col_name not in existing_trip_cols:
+            try:
+                conn.execute(f"ALTER TABLE trips ADD COLUMN {col_name} {col_type}")
+            except Exception:
+                pass
+
+    # 2. Trip Activities & Suggestions Table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS trip_activities (
+            id TEXT PRIMARY KEY,
+            trip_id TEXT NOT NULL,
+            suggested_by_name TEXT NOT NULL,
+            suggested_by_role TEXT DEFAULT 'friend',
+            activity_title TEXT NOT NULL,
+            location TEXT,
+            approx_cost REAL DEFAULT 0.0,
+            votes_count INTEGER DEFAULT 1,
+            status TEXT DEFAULT 'suggested',
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_trip_act_trip ON trip_activities(trip_id)")
+
+    # 3. Seed / Update sample trips with rich details
+    sample_trips = [
+        ("trip_001", "Kyoto & Tokyo Cherry Blossom Expedition", "Japan (Kyoto / Tokyo)", "2026-10-10", "2026-10-22", "confirmed", "Shinkansen bullet pass booked; stay in Gion Ryokan & Shinjuku tower.", now_str, "japan", 320000.0, 1, "ANA All Nippon NH-830 (BOM -> HND)", "Hyatt Regency Kyoto & Cerulean Tower Shibuya", '["Passport & Visa", "Universal Adapter", "JR Rail Pass Exchange", "Pocket Wi-Fi eSIM", "Cash Yen (20,000¥)"]'),
+        ("trip_002", "Swiss Alps High-Altitude Trekking", "Switzerland (Zermatt / Grindelwald)", "2027-01-15", "2027-01-25", "planning", "Matterhorn glacier trail & mountain rail passes.", now_str, "swiss", 450000.0, 1, "Swiss Int Air LX-155 (BOM -> ZRH)", "The Omnia Zermatt & Romantik Hotel Grindelwald", '["Gore-Tex Shell", "Thermal Base Layers", "Hiking Poles", "Swiss Travel Pass", "Action Camera"]'),
+        ("trip_003", "Amalfi Coast & Capri Yacht Charter", "Italy (Positano / Capri)", "2027-05-20", "2027-05-30", "planning", "Private catamaran charter along Amalfi cliffside.", now_str, "amalfi", 580000.0, 1, "Emirates (BOM -> DXB -> FCO)", "Le Sirenuse Positano & Hotel Caesar Augustus Capri", '["Linen Shirts", "Polarized Sunglasses", "Boat Shoes", "International Driving Permit"]'),
+    ]
+    for t in sample_trips:
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO trips
+                (id, title, destination, start_date, end_date, status, notes, created_at, cover_image, estimated_budget, is_shared_with_friends, flight_details, hotel_details, packing_list)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, t)
+        except Exception:
+            pass
+
+    # 4. Seed sample activities for trips
+    sample_activities = [
+        ("act_001", "trip_001", "Rohan (Friend)", "friend", "Fushimi Inari Sunrise Hike & Matcha Tasting", "Kyoto, Japan", 2500.0, 4, "accepted", now_str),
+        ("act_002", "trip_001", "Amit K.", "friend", "TeamLab Planets Digital Art Immersion", "Tokyo, Japan", 3800.0, 3, "accepted", now_str),
+        ("act_003", "trip_001", "Jatin (Owner)", "owner", "Sukiyabashi Jiro Sushi Tasting Course", "Ginza, Tokyo", 25000.0, 5, "accepted", now_str),
+        ("act_004", "trip_002", "Sarah M.", "friend", "Gornergrat Bahn Panoramic Train Ride", "Zermatt, Switzerland", 8500.0, 2, "suggested", now_str),
+    ]
+    for a in sample_activities:
+        try:
+            conn.execute("""
+                INSERT OR IGNORE INTO trip_activities
+                (id, trip_id, suggested_by_name, suggested_by_role, activity_title, location, approx_cost, votes_count, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, a)
+        except Exception:
+            pass
+
+    # 5. Seed historical Net Worth Snapshots
+    history_snapshots = [
+        ("nw_001", "2026-08-01", "₹1.5Cr - ₹2.5Cr Band", '{"Indian Equities": 58, "US Tech": 18, "Debt & Liquid Funds": 14, "Gold & Sovereign Bonds": 7, "Crypto & Sandbox": 3}', 24.8, now_str),
+        ("nw_002", "2026-05-01", "₹1.2Cr - ₹1.8Cr Band", '{"Indian Equities": 55, "US Tech": 19, "Debt & Liquid Funds": 16, "Gold & Sovereign Bonds": 7, "Crypto & Sandbox": 3}', 21.2, now_str),
+        ("nw_003", "2026-01-01", "₹1.0Cr - ₹1.5Cr Band", '{"Indian Equities": 52, "US Tech": 20, "Debt & Liquid Funds": 18, "Gold & Sovereign Bonds": 7, "Crypto & Sandbox": 3}', 18.5, now_str),
+        ("nw_004", "2025-08-01", "₹80L - ₹1.2Cr Band", '{"Indian Equities": 50, "US Tech": 20, "Debt & Liquid Funds": 20, "Gold & Sovereign Bonds": 7, "Crypto & Sandbox": 3}', 15.0, now_str),
+    ]
+    for s in history_snapshots:
+        try:
+            conn.execute("""
+                INSERT OR REPLACE INTO net_worth_snapshots
+                (id, as_of_date, total_net_worth_band, allocation_pct, yoy_growth_pct, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, s)
+        except Exception:
+            pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -628,6 +717,7 @@ MIGRATIONS: list[Migration] = [
     Migration(8, "008_passcodes", _migration_008_passcodes),
     Migration(9, "009_rbac_and_scoped_access", _migration_009_rbac_and_scoped_access),
     Migration(10, "010_credit_cards_and_otp_requests", _migration_010_credit_cards_and_otp_requests),
+    Migration(11, "011_trips_and_net_worth_expansion", _migration_011_trips_and_net_worth_expansion),
 ]
 
 
