@@ -649,9 +649,17 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
                 low_d = pd.Timestamp(low_date).strftime("%b %d") if _is_valid_date(low_date) else "—"
                 parts.append(f"{high_d} / {low_d}")
             
-            # Add 7-day price if available
+            # Add 7-day price if available, or Live Day label if recent
             if price_7d is not None and not pd.isna(price_7d):
-                parts.append(f"7D: ₹{float(price_7d):,.0f}")
+                if _is_valid_date(earnings_date):
+                    days_since = (pd.Timestamp.today().normalize() - pd.Timestamp(earnings_date).normalize()).days
+                    if days_since < 7:
+                        day_lbl = f"Day {max(1, days_since)}"
+                        parts.append(f"Live ({day_lbl}): ₹{float(price_7d):,.0f}")
+                    else:
+                        parts.append(f"7D: ₹{float(price_7d):,.0f}")
+                else:
+                    parts.append(f"7D: ₹{float(price_7d):,.0f}")
 
             # Add the quarter's earnings date if available (e.g. "earn Jan 15")
             if _is_valid_date(earnings_date):

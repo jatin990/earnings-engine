@@ -61,6 +61,8 @@ def _week_high_low_around(
     earnings_date: pd.Timestamp | str,
     days: int = 7,
     current_price: float | None = None,
+    day_high: float | None = None,
+    day_low: float | None = None,
 ) -> tuple[float, float, float, float, pd.Timestamp, pd.Timestamp] | None:
     """Compute the true highest and lowest price point reached since earnings date vs pre-earnings base close.
 
@@ -129,15 +131,18 @@ def _week_high_low_around(
     today = pd.Timestamp.today().normalize()
     if current_price is not None and float(current_price) > 0 and today >= ed:
         curr_p = float(current_price)
+        hi_p = float(day_high) if day_high is not None and float(day_high) > 0 else curr_p
+        lo_p = float(day_low) if day_low is not None and float(day_low) > 0 else curr_p
+
         if today in window_highs.index:
-            window_highs[today] = max(float(window_highs[today]), curr_p)
+            window_highs[today] = max(float(window_highs[today]), hi_p)
         else:
-            window_highs[today] = curr_p
+            window_highs[today] = hi_p
 
         if today in window_lows.index:
-            window_lows[today] = min(float(window_lows[today]), curr_p)
+            window_lows[today] = min(float(window_lows[today]), lo_p)
         else:
-            window_lows[today] = curr_p
+            window_lows[today] = lo_p
 
     if window_highs.empty or window_lows.empty:
         return None
