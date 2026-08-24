@@ -1602,9 +1602,9 @@
                             '</div>' +
                             '<div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">' +
                                 '<span class="timestamp" style="font-size:0.72rem;background:rgba(255,255,255,0.05);padding:0.15rem 0.45rem;border-radius:0.25rem;">' + (c.publisher || 'News') + ' &middot; ⏱️ ' + dateDisplay + '</span>' +
-                                '<button onclick="app.runConsensusForStock(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.25));color:#c7d2fe;border:1px solid rgba(99,102,241,0.45);border-radius:0.3rem;font-weight:700;" title="Run AI Multi-Model Consensus for Target, Resistance, Support & Buy Zone">🧠 Consensus</button>' +
-                                '<button onclick="app.openAddToWatchlistModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐ Watchlist</button>' +
-                                '<button onclick="app.runPredictionForTickerSingle(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(139,92,246,0.2);color:#c084fc;border:1px solid rgba(139,92,246,0.4);border-radius:0.3rem;" title="Run Kronos Forecast">🔮 Predict</button>' +
+                                `<button onclick="app.runConsensusForStock('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.25));color:#c7d2fe;border:1px solid rgba(99,102,241,0.45);border-radius:0.3rem;font-weight:700;" title="Run AI Multi-Model Consensus for Target, Resistance, Support & Buy Zone">🧠 Consensus</button>` +
+                                `<button onclick="app.openAddToWatchlistModal('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐ Watchlist</button>` +
+                                `<button onclick="app.runPredictionForTickerSingle('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(139,92,246,0.2);color:#c084fc;border:1px solid rgba(139,92,246,0.4);border-radius:0.3rem;" title="Run Kronos Forecast">🔮 Predict</button>` +
                             '</div>' +
                         '</div>' +
                         '<div style="margin-bottom:0.5rem;">' + headlineLink + '</div>' +
@@ -7510,9 +7510,9 @@
                             '<div>' +
                                 '<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">' +
                                     '<div style="display:flex;align-items:center;gap:0.35rem;">' +
-                                        '<button onclick="app.openAddToWatchlistModal(\'' + p.ticker + '\')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.9rem;cursor:pointer;" title="Add to Watchlist">⭐</button>' +
+                                        `<button onclick="app.openAddToWatchlistModal('${p.ticker}')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.9rem;cursor:pointer;" title="Add to Watchlist">⭐</button>` +
                                         '<strong style="font-size:1.15rem;color:var(--light);">' + p.ticker + '</strong>' +
-                                    </div>' +
+                                    '</div>' +
                                     '<span style="font-size:0.75rem;font-weight:700;background:' + dirBg + ';color:' + dirColor + ';padding:0.2rem 0.55rem;border-radius:0.35rem;border:1px solid ' + dirColor + '44;">' + dirIcon + '</span>' +
                                     '<span style="font-size:0.72rem;font-weight:700;background:' + statusBg + '22;color:' + statusBg + ';padding:0.18rem 0.5rem;border-radius:0.35rem;border:1px solid ' + statusBg + '66;">' + statusIcon + '</span>' +
                                 '</div>' +
@@ -9462,12 +9462,6 @@
                 }
 
                 if (statusEl) statusEl.textContent = 'Consensus & trade setup computed across all 4 AI engines';
-            } catch (e) {
-                console.error('runConsensusForStock error:', e);
-                if (thesisEl) thesisEl.innerHTML = `<span style="color:#f87171;">Failed to generate AI consensus: ${e.message}</span>`;
-                if (statusEl) statusEl.textContent = 'Error computing consensus';
-            }
-        };
             } catch (e) {
                 console.error('runConsensusForStock error:', e);
                 if (thesisEl) thesisEl.innerHTML = `<span style="color:#f87171;">Failed to generate AI consensus: ${e.message}</span>`;
