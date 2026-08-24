@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
     # Start the background breakout scanner loop
     try:
         _breakout_scanner_task = asyncio.create_task(
-            breakout_scanner_mod.breakout_scanner_loop(_settings()),
+            breakout_scanner_mod.breakout_scanner_loop(_settings),
             name="breakout_radar",
         )
         logger.info("[BREAKOUT] Background scanner task started.")
@@ -3623,7 +3623,7 @@ async def refresh_breakout_radar():
 
     def _run():
         try:
-            breakout_scanner_mod.run_breakout_scan(_settings())
+            breakout_scanner_mod.run_breakout_scan(_settings)
         except Exception as e:
             logger.error("[BREAKOUT] Manual refresh error: %s", e)
 

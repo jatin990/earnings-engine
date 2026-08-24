@@ -8798,6 +8798,12 @@
                 const url = '/api/v1/system/telemetry?limit=300' + (isGrouped ? '&grouped=true' : '&grouped=false');
                 const res = await fetch(url);
                 const data = await res.json();
+
+                if (!res.ok) {
+                    tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;color:#ef4444;padding:1.5rem;">⚠️ Access Denied: ${data.detail || 'Insufficient permissions to view system telemetry.'}</td></tr>`;
+                    return;
+                }
+
                 const records = data.records || [];
 
                 if (!records.length) {
