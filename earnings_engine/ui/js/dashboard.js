@@ -2076,6 +2076,7 @@
                     this.resultsMonths = (data.months && data.months.length) ? data.months : [];
                     this.resultsTotalStocks = data.total_stocks || 0;
                     this.resultsActiveMonth = 'ALL';
+                    if (this.selectedResultsDates) this.selectedResultsDates.clear();
 
                     // Fallback: If months array was not provided by API, construct from day_sections
                     if (!this.resultsMonths.length && this.resultsDaySections.length) {
@@ -2225,32 +2226,114 @@
                 el.style.display = 'flex';
             },
 
-            filterResultsByMonth(monthKey) {
-                this.resultsActiveMonth = monthKey;
-                this.renderResultsMonthTabs();
+            selectedResultsDates: new Set(),
 
-                let filtered = [];
-                let filteredStocks = 0;
+            toggleDateFilter(dateStr, event) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
 
-                if (monthKey === 'ALL') {
-                    filtered = this.resultsDaySectionsMeta.map(m => m.html);
-                    filteredStocks = this.resultsTotalStocks || this.resultsDaySectionsMeta.reduce((acc, m) => acc + (m.stocks_count || 1), 0);
+                if (!this.selectedResultsDates) {
+                    this.selectedResultsDates = new Set();
+                }
+
+                if (dateStr === 'ALL') {
+                    this.selectedResultsDates.clear();
                 } else {
-                    const matchingMeta = this.resultsDaySectionsMeta.filter(m => m.month_key === monthKey);
-                    filtered = matchingMeta.map(m => m.html);
-                    filteredStocks = matchingMeta.reduce((acc, m) => acc + (m.stocks_count || 0), 0);
+                    const isMulti = event && (event.ctrlKey || event.metaKey || event.shiftKey);
+                    if (isMulti) {
+                        // Multi-select toggle
+                        if (this.selectedResultsDates.has(dateStr)) {
+                            this.selectedResultsDates.delete(dateStr);
+                        } else {
+                            this.selectedResultsDates.add(dateStr);
+                        }
+                    } else {
+                        // Single-select: if clicking the only selected date, toggle off back to ALL
+                        if (this.selectedResultsDates.size === 1 && this.selectedResultsDates.has(dateStr)) {
+                            this.selectedResultsDates.clear();
+                        } else {
+                            this.selectedResultsDates.clear();
+                            this.selectedResultsDates.add(dateStr);
+                        }
+                    }
+                }
+
+                this.applyDateFilterUI();
+            },
+
+            applyDateFilterUI() {
+                if (!this.selectedResultsDates) this.selectedResultsDates = new Set();
+                const isAll = this.selectedResultsDates.size === 0;
+
+                // Update chip active states in legend bar
+                const legendEl = document.getElementById('resultsReportLegend') || document.getElementById('resultsDateLegendBar');
+                if (legendEl) {
+                    const allChip = legendEl.querySelector('.day-chip-all');
+                    if (allChip) allChip.classList.toggle('active', isAll);
+
+                    legendEl.querySelectorAll('.day-chip:not(.day-chip-all)').forEach(chip => {
+                        const d = chip.getAttribute('data-date');
+                        const isActive = !isAll && this.selectedResultsDates.has(d);
+                        chip.classList.toggle('active', isActive);
+                    });
+                }
+
+                // Filter sections in #resultsReportSections
+                let filtered = [];
+                let visibleCount = 0;
+                let visibleDatesCount = 0;
+
+                if (this.resultsDaySectionsMeta && this.resultsDaySectionsMeta.length) {
+                    let baseMeta = this.resultsDaySectionsMeta;
+                    if (this.resultsActiveMonth && this.resultsActiveMonth !== 'ALL') {
+                        baseMeta = baseMeta.filter(m => m.month_key === this.resultsActiveMonth);
+                    }
+
+                    if (isAll) {
+                        filtered = baseMeta.map(m => m.html);
+                        visibleCount = baseMeta.reduce((acc, m) => acc + (m.stocks_count || 1), 0);
+                        visibleDatesCount = baseMeta.length;
+                    } else {
+                        const matched = baseMeta.filter(m => this.selectedResultsDates.has(m.date));
+                        filtered = matched.map(m => m.html);
+                        visibleCount = matched.reduce((acc, m) => acc + (m.stocks_count || 1), 0);
+                        visibleDatesCount = matched.length;
+                    }
                 }
 
                 this.resultsDaySections = filtered;
-                this.resultsShowDays = Math.min(10, filtered.length || 1);
+                this.resultsShowDays = isAll ? Math.min(10, filtered.length || 1) : filtered.length;
                 this.renderResultsDays();
 
+                // If specific dates are selected, automatically expand them
+                if (!isAll) {
+                    document.querySelectorAll('#resultsReportSections .day-section').forEach(sec => {
+                        sec.open = true;
+                    });
+                }
+
+                // Update header count badge
                 const countBadge = document.getElementById('resultsCount');
                 if (countBadge) {
-                    const mObj = (this.resultsMonths || []).find(m => m.month_key === monthKey);
-                    const label = (monthKey === 'ALL') ? (this.resultsActiveWindowName || 'Selected Window') : (mObj ? mObj.month_label : monthKey);
-                    countBadge.textContent = filteredStocks + ' results (' + filtered.length + ' dates in ' + label + ')';
+                    if (isAll) {
+                        const mObj = (this.resultsMonths || []).find(m => m.month_key === this.resultsActiveMonth);
+                        const label = (this.resultsActiveMonth === 'ALL') ? (this.resultsActiveWindowName || 'Selected Window') : (mObj ? mObj.month_label : this.resultsActiveMonth);
+                        countBadge.textContent = visibleCount + ' results (' + visibleDatesCount + ' dates in ' + label + ')';
+                    } else {
+                        const datesArr = Array.from(this.selectedResultsDates);
+                        const label = datesArr.length === 1 ? datesArr[0] : (datesArr.length + ' selected dates');
+                        countBadge.textContent = visibleCount + ' results on ' + label;
+                    }
                 }
+            },
+
+            filterResultsByMonth(monthKey) {
+                this.resultsActiveMonth = monthKey;
+                if (this.selectedResultsDates) this.selectedResultsDates.clear();
+                this.renderResultsMonthTabs();
+                this.applyDateFilterUI();
             },
 
             async updateResultsMonthSummaryCards() {

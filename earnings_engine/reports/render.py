@@ -140,16 +140,20 @@ def _assign_day_classes(enriched: pd.DataFrame) -> dict[str, str]:
 
 
 def _build_day_legend(day_classes: dict[str, str]) -> str:
-    """Build the HTML legend strip showing date -> color chips."""
+    """Build the interactive HTML legend strip showing date -> color chips with multi-select support."""
     if not day_classes:
         return ""
-    chips: list[str] = []
+    chips: list[str] = [
+        '<button type="button" class="day-chip day-chip-all active" onclick="app.toggleDateFilter(\'ALL\', event)" title="Show all dates">🌐 All Dates</button>'
+    ]
     for date_str, cls in day_classes.items():
         color = _DAY_COLORS[int(cls.split("-")[1]) % len(_DAY_COLORS)]
         chips.append(
-            f'<span class="day-chip"><span class="swatch" style="background:{color}"></span>{date_str}</span>'
+            f'<button type="button" class="day-chip" data-date="{date_str}" onclick="app.toggleDateFilter(\'{date_str}\', event)" title="Filter {date_str} (Click: single date, Ctrl/Cmd+Click: multi-select)">'
+            f'<span class="swatch" style="background:{color}"></span>{date_str}'
+            f'</button>'
         )
-    return f'<div class="day-legend">{"".join(chips)}</div>'
+    return f'<div class="day-legend" id="resultsDateLegendBar">{"".join(chips)}</div>'
 
 
 def _pred_float(value: object, key: str, default: float = 0.0) -> float:
@@ -498,7 +502,7 @@ def _build_day_section(date_str: str, day_class: str, color: str,
     if small_section:
         body.append(small_section)
     return (
-        f'<details class="day-section" open>'
+        f'<details class="day-section" data-date="{date_str}" id="day-sec-{date_str}" open>'
         f'<summary><span class="day-dot" style="background:{color}"></span>{date_str}'
         f'<span class="day-count">{total} stock{"s" if total != 1 else ""}</span>'
         f'<span class="chevron">▾</span></summary>'
