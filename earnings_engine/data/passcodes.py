@@ -43,6 +43,7 @@ AVAILABLE_ROUTES: dict[str, dict[str, Any]] = {
             "/api/v1/watchlist",
             "/api/v1/stock",
             "/api/v1/stocks",
+            "/api/v1/ticker",
             "/api/v1/tickers",
             "/api/v1/news",
             "/api/v1/history",

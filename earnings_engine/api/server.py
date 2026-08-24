@@ -1419,6 +1419,61 @@ async def get_stock_overview_endpoint(ticker: str):
     return res
 
 
+@app.get("/api/v1/stock/{ticker}/rating", tags=["Stock Intelligence & Ratings"])
+async def get_stock_rating_endpoint(ticker: str):
+    """Return industry benchmark relative valuation multiples and technical strength rating."""
+    from earnings_engine.api.stock_api import calculate_stock_rating
+    res = await asyncio.to_thread(calculate_stock_rating, ticker, _settings)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to calculate stock rating"))
+    return res
+
+
+@app.post("/api/v1/stock/{ticker}/recalculate", tags=["Stock Intelligence & Ratings"])
+@app.post("/api/v1/recalculate/{ticker}", tags=["Stock Intelligence & Ratings"])
+async def recalculate_stock_endpoint(ticker: str, request: Request):
+    """Force re-fetch live earnings dates, daily prices, recalculate metrics, and log audit trail."""
+    from earnings_engine.api.recalculate_api import recalculate_ticker_metrics
+    from earnings_engine.api.stock_api import calculate_stock_rating
+    recalc_res = await asyncio.to_thread(recalculate_ticker_metrics, ticker, _settings)
+    if not recalc_res.get("success"):
+        raise HTTPException(status_code=400, detail=recalc_res.get("error", "Failed to recalculate ticker"))
+
+    rating_res = await asyncio.to_thread(calculate_stock_rating, ticker, _settings)
+    combined = {**rating_res, **recalc_res}
+    combined["fundamental"] = rating_res.get("fundamental")
+    combined["technical"] = rating_res.get("technical")
+    combined["composite"] = rating_res.get("composite")
+    combined["ai_note"] = rating_res.get("ai_note")
+    return combined
+
+
+@app.get("/api/v1/recalculate/audit/{ticker}", tags=["Stock Intelligence & Ratings"])
+@app.get("/api/v1/recalculate/audit", tags=["Stock Intelligence & Ratings"])
+async def get_ticker_audit_endpoint(ticker: str | None = None, limit: int = Query(50, ge=1, le=200)):
+    """Retrieve immutable recalculation audit trail for a ticker or across all recent events."""
+    from earnings_engine.data.ticker_audit import get_audit_history
+    entries = await asyncio.to_thread(get_audit_history, ticker, limit, _settings)
+    return {"success": True, "ticker": ticker, "entries": entries, "history": entries}
+
+
+@app.get("/api/v1/ticker/audit-log", tags=["Stock Intelligence & Ratings"])
+async def get_ticker_audit_log_endpoint(ticker: str | None = Query(None), limit: int = Query(50, ge=1, le=200)):
+    """Retrieve audit log list format for UI tables."""
+    from earnings_engine.data.ticker_audit import get_audit_history
+    return await asyncio.to_thread(get_audit_history, ticker, limit, _settings)
+
+
+@app.api_route("/api/v1/stock/{ticker}/live-week-hl", methods=["GET", "POST"], tags=["Stock Intelligence & Ratings"])
+async def get_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Query(None)):
+    """Calculate and return real-time post-earnings week move high/low statistics."""
+    from earnings_engine.api.stock_api import get_live_week_hl
+    res = await asyncio.to_thread(get_live_week_hl, ticker, earnings_date, _settings)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to calculate live week high/low"))
+    return res
+
+
 # ---------------------------------------------------------------------------
 # Dashboard Data Endpoints
 # ---------------------------------------------------------------------------
