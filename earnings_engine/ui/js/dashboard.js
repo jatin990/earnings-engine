@@ -1557,10 +1557,17 @@
                 });
 
                 // STRICT CHRONOLOGICAL SORT: Newest news always on top
+                const _toTime = (dStr) => {
+                    if (!dStr) return 0;
+                    const clean = dStr.includes('T') ? dStr : dStr.replace(' ', 'T') + 'Z';
+                    const t = new Date(clean).getTime();
+                    return isNaN(t) ? new Date(dStr).getTime() || 0 : t;
+                };
+
                 filtered.sort((a, b) => {
-                    const da = a.published_at || a.created_at || '';
-                    const db = b.published_at || b.created_at || '';
-                    if (da && db && da !== db) return db.localeCompare(da);
+                    const ta = _toTime(a.published_at || a.created_at);
+                    const tb = _toTime(b.published_at || b.created_at);
+                    if (tb !== ta) return tb - ta;
                     return (b.impact_score || 0) - (a.impact_score || 0);
                 });
 

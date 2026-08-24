@@ -155,6 +155,17 @@ def _connect(settings: Settings) -> Any:
         ON news_catalysts (ticker, impact_score DESC, published_at DESC)
         """
     )
+    # Self-healing: Ensure any raw RFC date strings with comma are converted to standard ISO YYYY-MM-DD HH:MM:SS
+    try:
+        raw_rows = conn.execute("SELECT id, published_at FROM news_catalysts WHERE published_at LIKE '%,%'").fetchall()
+        if raw_rows:
+            from earnings_engine.data.news_sentiment import _parse_iso_pubdate
+            for r in raw_rows:
+                iso_d = _parse_iso_pubdate(r[1])
+                conn.execute("UPDATE news_catalysts SET published_at = ? WHERE id = ?", (iso_d, r[0]))
+    except Exception:
+        pass
+
     conn.commit()
     return conn
 
