@@ -243,29 +243,76 @@ def _generate_why_it_matters(category: str, direction: str, horizon: str, volati
     return f"Market news headline creating short-term sentiment momentum ({volatility})."
 
 
-def fetch_ticker_catalysts(ticker: str, limit: int = 8, settings: Settings | None = None) -> list[dict[str, Any]]:
-    """Fetch and score short-term news catalysts for a single ticker."""
+def fetch_ticker_catalysts(
+    ticker: str,
+    limit: int = 8,
+    force: bool = False,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Fetch and score short-term news catalysts for a single ticker with fast TTL caching."""
+    import pandas as pd
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     settings = settings or Settings()
     ticker = ticker.strip().upper()
     name = get_name(ticker, settings) or ticker
 
-    logger.info("[CATALYSTS] Fetching real-time news & catalyst feeds for ticker=%s (%s)...", ticker, name)
+    # 1. Check local cache freshness (6 hours TTL)
+    if not force:
+        with _connect(settings) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM news_catalysts
+                WHERE ticker = ?
+                ORDER BY published_at DESC, impact_score DESC
+                LIMIT ?
+                """,
+                (ticker, limit),
+            ).fetchall()
+            if rows:
+                latest_created = rows[0]["created_at"]
+                if latest_created:
+                    try:
+                        dt = pd.to_datetime(latest_created)
+                        if dt.tzinfo is None:
+                            dt = dt.tz_localize("UTC")
+                        age_hours = (datetime.now(timezone.utc) - dt).total_seconds() / 3600.0
+                        if age_hours < 6.0:
+                            return [dict(r) for r in rows]
+                    except Exception:
+                        return [dict(r) for r in rows]
+                else:
+                    return [dict(r) for r in rows]
+
+    # 2. Parallel fetch from RSS / yfinance sources
+    from earnings_engine.data.news_sentiment import fetch_yahoo_rss_news, fetch_google_news_rss, fetch_yfinance_news
+
+    market = "IN" if ticker.endswith(".NS") or ticker.endswith(".BO") else "US"
+    raw_items: list[dict[str, Any]] = []
+
+    def _get_yahoo():
+        return fetch_yahoo_rss_news(ticker)
+
+    def _get_yf():
+        return fetch_yfinance_news(ticker)
+
+    def _get_google():
+        return fetch_google_news_rss(ticker, market=market)
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(_get_yahoo), executor.submit(_get_yf), executor.submit(_get_google)]
+        for f in as_completed(futures, timeout=3.5):
+            try:
+                res = f.result()
+                if res:
+                    raw_items.extend(res)
+            except Exception:
+                pass
 
     articles: list[dict[str, Any]] = []
     seen_titles: set[str] = set()
-
-    # Sources: Yahoo RSS, Google News RSS, yfinance
-    from earnings_engine.data.news_sentiment import fetch_yahoo_rss_news, fetch_google_news_rss, fetch_yfinance_news
-
-    raw_items = fetch_yahoo_rss_news(ticker) + fetch_yfinance_news(ticker)
-    if len(raw_items) < limit:
-        market = "IN" if ticker.endswith(".NS") or ticker.endswith(".BO") else "US"
-        raw_items += fetch_google_news_rss(ticker, market=market)
-
-    logger.info("[CATALYSTS] Retrieved %d raw news headlines for %s across Yahoo/Google RSS feeds", len(raw_items), ticker)
-
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-
     from earnings_engine.data.news_sentiment import _parse_iso_pubdate
 
     with _connect(settings) as conn:
@@ -327,7 +374,7 @@ def fetch_ticker_catalysts(ticker: str, limit: int = 8, settings: Settings | Non
 
         conn.commit()
 
-    logger.info("[CATALYSTS] Successfully processed and scored %d unique catalyst items for %s", len(articles), ticker)
+    logger.debug("[CATALYSTS] Processed %d catalyst items for %s", len(articles), ticker)
 
     # Sort by newest published date descending, then impact score
     articles.sort(key=lambda a: (a.get("published_at", ""), a.get("impact_score", 0)), reverse=True)
@@ -378,25 +425,22 @@ def get_short_term_catalysts(
 
         if search_query:
             sq = f"%{search_query.strip().lower()}%"
-            query += " AND (LOWER(ticker) LIKE ? OR LOWER(stock_name) LIKE ? OR LOWER(title) LIKE ?)"
-            params.extend([sq, sq, sq])
+            query += " AND (LOWER(title) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(ticker) LIKE ? OR LOWER(stock_name) LIKE ?)"
+            params.extend([sq, sq, sq, sq])
 
-        # ALWAYS sort by newest published date first, then created_at, then impact score
-        query += " ORDER BY published_at DESC, created_at DESC, impact_score DESC LIMIT ?"
+        query += " ORDER BY published_at DESC, impact_score DESC LIMIT ?"
         params.append(limit)
 
         rows = conn.execute(query, params).fetchall()
-        results = [dict(row) for row in rows]
-
-        return results
+        return [dict(r) for r in rows]
 
 
 def get_catalyst_summary_stats(settings: Settings | None = None) -> dict[str, Any]:
-    """Get high-level summary KPI metrics for short-term catalysts."""
+    """Return high-level summary counts for catalyst distribution."""
     settings = settings or Settings()
     with _connect(settings) as conn:
         total = conn.execute("SELECT COUNT(*) FROM news_catalysts").fetchone()[0]
-        high_impact = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_level = 'HIGH'").fetchone()[0]
+        high = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_level = 'HIGH'").fetchone()[0]
         bullish = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE direction = 'BULLISH'").fetchone()[0]
         bearish = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE direction = 'BEARISH'").fetchone()[0]
 
@@ -405,34 +449,33 @@ def get_catalyst_summary_stats(settings: Settings | None = None) -> dict[str, An
             SELECT category, COUNT(*) as c
             FROM news_catalysts
             GROUP BY category
-            ORDER BY c DESC LIMIT 4
-            """
-        ).fetchall()
-
-        top_stocks = conn.execute(
-            """
-            SELECT ticker, stock_name, COUNT(*) as c, MAX(impact_score) as max_imp
-            FROM news_catalysts
-            GROUP BY ticker
-            ORDER BY max_imp DESC, c DESC LIMIT 5
+            ORDER BY c DESC
+            LIMIT 5
             """
         ).fetchall()
 
         return {
             "total_catalysts": total,
-            "high_impact_count": high_impact,
+            "high_impact_count": high,
             "bullish_count": bullish,
             "bearish_count": bearish,
-            "top_categories": [{"category": row[0], "count": row[1]} for row in top_cats],
-            "top_stocks": [
-                {"ticker": row[0], "name": row[1] or row[0], "count": row[2], "max_impact": row[3]}
-                for row in top_stocks
+            "top_categories": [
+                {"category": r[0], "count": r[1]} for r in top_cats
             ],
         }
 
 
-def scan_watchlist_catalysts(watchlist_name: str | None = None, limit_per_stock: int = 3, settings: Settings | None = None) -> dict[str, Any]:
-    """Scan and fetch real-time catalysts for all stocks in a watchlist/universe."""
+def scan_watchlist_catalysts(
+    watchlist_name: str | None = None,
+    limit_per_stock: int = 3,
+    force: bool = False,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Scan and fetch real-time catalysts for all stocks in a watchlist/universe concurrently."""
+    import time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    t0 = time.perf_counter()
     settings = settings or Settings()
     from earnings_engine.data.watchlists import get_watchlist
     from earnings_engine.data.universe import get_universe
@@ -444,23 +487,34 @@ def scan_watchlist_catalysts(watchlist_name: str | None = None, limit_per_stock:
             tickers = get_universe(watchlist_name, settings)
     
     if not tickers:
-        # Default scan sample of active tickers
         tickers = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS", "BHARTIARTL.NS", "SBIN.NS", "LT.NS", "PCJEWELLER.NS", "FORCEMOT.NS"]
 
     all_found = 0
     high_impact_found = 0
-    for t in tickers:
+
+    def _worker(t: str):
         try:
-            items = fetch_ticker_catalysts(t, limit=limit_per_stock, settings=settings)
-            all_found += len(items)
-            high_impact_found += sum(1 for i in items if i.get("impact_level") == "HIGH")
+            items = fetch_ticker_catalysts(t, limit=limit_per_stock, force=force, settings=settings)
+            return len(items), sum(1 for i in items if i.get("impact_level") == "HIGH")
         except Exception as e:
             logger.debug("Catalyst scan error for %s: %s", t, e)
+            return 0, 0
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        future_map = {pool.submit(_worker, t): t for t in tickers}
+        for fut in as_completed(future_map):
+            cnt, hi_cnt = fut.result()
+            all_found += cnt
+            high_impact_found += hi_cnt
+
+    elapsed = time.perf_counter() - t0
+    logger.info("[CATALYSTS] Scanned %d tickers in %.2fs (found %d catalysts, %d high impact)", len(tickers), elapsed, all_found, high_impact_found)
 
     stats = get_catalyst_summary_stats(settings)
     return {
         "scanned_tickers": len(tickers),
         "catalysts_fetched": all_found,
         "high_impact_found": high_impact_found,
+        "elapsed_seconds": round(elapsed, 2),
         "stats": stats,
     }
