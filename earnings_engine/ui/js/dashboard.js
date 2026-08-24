@@ -831,6 +831,13 @@
                 this.refreshGainersTab();
             },
 
+            onResultsMarketChange(val) {
+                this.onGlobalWatchlistChange(val);
+                const gEl = document.getElementById('globalWatchlist');
+                if (gEl) gEl.value = val;
+                this.updateResultsMonthSummaryCards();
+            },
+
             _tabLoadedAt: {},
 
             _shouldReloadTab(name, ttlSec = 60) {
@@ -930,6 +937,9 @@
                 }
 
                 // Lazy-initialize client UI components on first visit without firing heavy backend scans
+                if (name === 'results') {
+                    this.updateResultsMonthSummaryCards();
+                }
                 if (name === 'watchlist' && (!this.watchlistTab.customLists || !this.watchlistTab.customLists.length)) {
                     this.watchlistTab.load();
                 }
@@ -1926,24 +1936,63 @@
                 }
             },
 
-            updateResultsMonthSummaryCards() {
+            async updateResultsMonthSummaryCards() {
                 const now = new Date();
                 const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                 const thisMonthDate = new Date(now.getFullYear(), now.getMonth(), 1);
                 const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-                const lastMonthKey = lastMonthDate.toISOString().slice(0, 7);
-                const thisMonthKey = thisMonthDate.toISOString().slice(0, 7);
-                const nextMonthKey = nextMonthDate.toISOString().slice(0, 7);
 
                 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
                 const lastMonthName = monthNames[lastMonthDate.getMonth()] + ' ' + lastMonthDate.getFullYear();
                 const thisMonthName = monthNames[thisMonthDate.getMonth()] + ' ' + thisMonthDate.getFullYear();
                 const nextMonthName = monthNames[nextMonthDate.getMonth()] + ' ' + nextMonthDate.getFullYear();
 
+                const lastLabelEl = document.getElementById('resultsCardLastMonthLabel');
+                const lastCountEl = document.getElementById('resultsCardLastMonthCount');
+                const lastSubEl = document.getElementById('resultsCardLastMonthSubtitle');
+                if (lastLabelEl) lastLabelEl.textContent = lastMonthName;
+
+                const thisLabelEl = document.getElementById('resultsCardThisMonthLabel');
+                const thisCountEl = document.getElementById('resultsCardThisMonthCount');
+                const thisSubEl = document.getElementById('resultsCardThisMonthSubtitle');
+                if (thisLabelEl) thisLabelEl.textContent = thisMonthName;
+
+                const nextLabelEl = document.getElementById('resultsCardNextMonthLabel');
+                const nextCountEl = document.getElementById('resultsCardNextMonthCount');
+                const nextSubEl = document.getElementById('resultsCardNextMonthSubtitle');
+                if (nextLabelEl) nextLabelEl.textContent = nextMonthName;
+
+                const market = document.getElementById('resultsMarket')?.value || '';
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/dashboard/results/month-summary' + (market ? `?market=${encodeURIComponent(market)}` : ''));
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.success) {
+                            if (lastLabelEl && data.last_month?.label) lastLabelEl.textContent = data.last_month.label;
+                            if (lastCountEl) lastCountEl.textContent = (data.last_month?.count || 0).toLocaleString() + ' Results';
+                            if (lastSubEl && data.last_month?.subtitle) lastSubEl.textContent = data.last_month.subtitle;
+
+                            if (thisLabelEl && data.this_month?.label) thisLabelEl.textContent = data.this_month.label;
+                            if (thisCountEl) thisCountEl.textContent = (data.this_month?.count || 0).toLocaleString() + ' Results';
+                            if (thisSubEl && data.this_month?.subtitle) thisSubEl.textContent = data.this_month.subtitle;
+
+                            if (nextLabelEl && data.next_month?.label) nextLabelEl.textContent = data.next_month.label;
+                            if (nextCountEl) nextCountEl.textContent = (data.next_month?.count || 0).toLocaleString() + ' Results';
+                            if (nextSubEl && data.next_month?.subtitle) nextSubEl.textContent = data.next_month.subtitle;
+                            return;
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Could not fetch month summary API, falling back to loaded results data:', err);
+                }
+
+                // Fallback if offline or API error
                 let lastCount = 0;
                 let thisCount = 0;
                 let nextCount = 0;
+                const lastMonthKey = lastMonthDate.toISOString().slice(0, 7);
+                const thisMonthKey = thisMonthDate.toISOString().slice(0, 7);
+                const nextMonthKey = nextMonthDate.toISOString().slice(0, 7);
 
                 if (this.resultsMonths && this.resultsMonths.length) {
                     this.resultsMonths.forEach(m => {
@@ -1960,25 +2009,11 @@
                     });
                 }
 
-                const lastLabelEl = document.getElementById('resultsCardLastMonthLabel');
-                const lastCountEl = document.getElementById('resultsCardLastMonthCount');
-                const lastSubEl = document.getElementById('resultsCardLastMonthSubtitle');
-                if (lastLabelEl) lastLabelEl.textContent = lastMonthName;
-                if (lastCountEl) lastCountEl.textContent = lastCount > 0 ? (lastCount.toLocaleString() + ' Results') : '0 Results';
+                if (lastCountEl) lastCountEl.textContent = lastCount.toLocaleString() + ' Results';
                 if (lastSubEl) lastSubEl.textContent = lastCount > 0 ? 'Reported prints in ' + monthNames[lastMonthDate.getMonth()] : 'No prints in loaded range';
-
-                const thisLabelEl = document.getElementById('resultsCardThisMonthLabel');
-                const thisCountEl = document.getElementById('resultsCardThisMonthCount');
-                const thisSubEl = document.getElementById('resultsCardThisMonthSubtitle');
-                if (thisLabelEl) thisLabelEl.textContent = thisMonthName;
-                if (thisCountEl) thisCountEl.textContent = thisCount > 0 ? (thisCount.toLocaleString() + ' Results') : '0 Results';
+                if (thisCountEl) thisCountEl.textContent = thisCount.toLocaleString() + ' Results';
                 if (thisSubEl) thisSubEl.textContent = thisCount > 0 ? 'Active prints in ' + monthNames[thisMonthDate.getMonth()] : 'No prints in loaded range';
-
-                const nextLabelEl = document.getElementById('resultsCardNextMonthLabel');
-                const nextCountEl = document.getElementById('resultsCardNextMonthCount');
-                const nextSubEl = document.getElementById('resultsCardNextMonthSubtitle');
-                if (nextLabelEl) nextLabelEl.textContent = nextMonthName;
-                if (nextCountEl) nextCountEl.textContent = nextCount > 0 ? (nextCount.toLocaleString() + ' Results') : '0 Results';
+                if (nextCountEl) nextCountEl.textContent = nextCount.toLocaleString() + ' Results';
                 if (nextSubEl) nextSubEl.textContent = nextCount > 0 ? 'Scheduled prints in ' + monthNames[nextMonthDate.getMonth()] : 'Pipeline in ' + monthNames[nextMonthDate.getMonth()];
             },
 
@@ -8753,7 +8788,14 @@
 
         // Initialize & export to window
         window.app = app;
-        app.init();
+        if (typeof app.init === 'function') {
+            try { app.init(); } catch (e) { console.warn('app.init:', e); }
+        }
+        try {
+            app.updateResultsMonthSummaryCards();
+        } catch (e) {
+            console.warn('Initial month summary fetch:', e);
+        }
 
 
 

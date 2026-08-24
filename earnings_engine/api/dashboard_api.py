@@ -1546,3 +1546,88 @@ def deep_sweep_api(universe: str = "NSE_TOP") -> dict[str, Any]:
     return deep_universe_sweep(universe_or_watchlist=universe, settings=settings)
 
 
+@ttl_cache(seconds=60)
+def get_results_3month_summary(
+    market: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Return exact counts and labels for Last Month, This Month, and Next Month results."""
+    from earnings_engine.data.earnings import _connect as _earnings_connect
+    if settings is None:
+        settings = _settings()
+
+    now = pd.Timestamp.today().normalize()
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    last_m_dt = now.replace(day=1) - pd.DateOffset(months=1)
+    this_m_dt = now.replace(day=1)
+    next_m_dt = now.replace(day=1) + pd.DateOffset(months=1)
+
+    last_m_start = last_m_dt.strftime("%Y-%m-01")
+    last_m_end = (this_m_dt - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+    this_m_start = this_m_dt.strftime("%Y-%m-01")
+    this_m_end = (next_m_dt - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+    next_m_start = next_m_dt.strftime("%Y-%m-01")
+    next_m_end = (now.replace(day=1) + pd.DateOffset(months=2) - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+    tickers: list[str] | None = None
+    if market:
+        try:
+            tickers = load_universe(market)
+        except Exception:
+            tickers = None
+
+    def _count_between(start_d: str, end_d: str) -> int:
+        with _earnings_connect(settings) as conn:
+            if tickers:
+                placeholders = ",".join("?" for _ in tickers)
+                try:
+                    q = f"SELECT COUNT(*) FROM earnings_history WHERE ticker IN ({placeholders}) AND earnings_date >= ? AND earnings_date <= ?"
+                    row = conn.execute(q, tickers + [start_d, end_d]).fetchone()
+                    return int(row[0]) if row else 0
+                except Exception:
+                    q = f"SELECT COUNT(*) FROM earnings_calendar WHERE ticker IN ({placeholders}) AND earnings_date >= ? AND earnings_date <= ?"
+                    row = conn.execute(q, tickers + [start_d, end_d]).fetchone()
+                    return int(row[0]) if row else 0
+            else:
+                try:
+                    q = "SELECT COUNT(*) FROM earnings_history WHERE earnings_date >= ? AND earnings_date <= ?"
+                    row = conn.execute(q, [start_d, end_d]).fetchone()
+                    return int(row[0]) if row else 0
+                except Exception:
+                    q = "SELECT COUNT(*) FROM earnings_calendar WHERE earnings_date >= ? AND earnings_date <= ?"
+                    row = conn.execute(q, [start_d, end_d]).fetchone()
+                    return int(row[0]) if row else 0
+
+    last_count = _count_between(last_m_start, last_m_end)
+    this_count = _count_between(this_m_start, this_m_end)
+    next_count = _count_between(next_m_start, next_m_end)
+
+    return {
+        "success": True,
+        "last_month": {
+            "key": last_m_dt.strftime("%Y-%m"),
+            "label": f"{month_names[last_m_dt.month - 1]} {last_m_dt.year}",
+            "month_name": month_names[last_m_dt.month - 1],
+            "count": last_count,
+            "subtitle": f"Reported prints in {month_names[last_m_dt.month - 1]}",
+        },
+        "this_month": {
+            "key": this_m_dt.strftime("%Y-%m"),
+            "label": f"{month_names[this_m_dt.month - 1]} {this_m_dt.year}",
+            "month_name": month_names[this_m_dt.month - 1],
+            "count": this_count,
+            "subtitle": f"Active season prints in {month_names[this_m_dt.month - 1]}",
+        },
+        "next_month": {
+            "key": next_m_dt.strftime("%Y-%m"),
+            "label": f"{month_names[next_m_dt.month - 1]} {next_m_dt.year}",
+            "month_name": month_names[next_m_dt.month - 1],
+            "count": next_count,
+            "subtitle": f"Scheduled pipeline in {month_names[next_m_dt.month - 1]}",
+        },
+    }
+
+

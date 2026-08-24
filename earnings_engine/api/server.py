@@ -1495,6 +1495,18 @@ async def dashboard_results_report(
         raise HTTPException(status_code=500, detail=f"Error fetching results report: {str(e)}")
 
 
+@app.get("/api/v1/dashboard/results/month-summary", tags=["Dashboard"])
+async def dashboard_results_month_summary(
+    market: str | None = Query(None, description="Market universe (IN, US, NSE_ALL, NSE_LARGE_CAP)"),
+):
+    """Get fast 3-month count metrics (Last Month, This Month, Next Month) for results dashboard."""
+    try:
+        import earnings_engine.api.dashboard_api as _dash_api
+        return await asyncio.to_thread(_dash_api.get_results_3month_summary, market=market)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching 3-month results summary: {str(e)}")
+
+
 @app.get("/api/v1/dashboard/month-filter", tags=["Dashboard"])
 async def dashboard_month_filter(
     days: int = Query(60, description="Look-ahead window in days", ge=0, le=180),
