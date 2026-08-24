@@ -24,13 +24,14 @@ DEFAULT_MODELS = [
     "deepseek/deepseek-r1",
     "meta-llama/llama-3.3-70b-instruct",
     "qwen/qwen-2.5-72b-instruct",
-    "mistralai/mistral-large-2411",
+    "mistralai/mistral-large",
 ]
 
-# Fallback models when primary model encounters 429 upstream rate limit
+# Fallback models when primary model encounters 429 rate limit or 404 endpoint deprecation
 MODEL_FALLBACKS: dict[str, str] = {
-    "mistralai/mistral-large": "mistralai/mistral-large-2411",
-    "mistralai/mistral-large-2411": "google/gemini-2.0-flash-001",
+    "mistralai/mistral-large": "google/gemini-2.0-flash-001",
+    "mistralai/mistral-large-2411": "mistralai/mistral-large",
+    "mistralai/mistral-large-2407": "mistralai/mistral-large",
     "qwen/qwen-2.5-72b-instruct": "meta-llama/llama-3.3-70b-instruct",
     "deepseek/deepseek-r1": "deepseek/deepseek-chat",
 }
@@ -135,13 +136,20 @@ def _query_single_model(
 
             elapsed_ms = (time.perf_counter() - start) * 1000
 
-            # If rate limited (429) or temporary server overload (502, 503), retry with backoff or fallback
-            if resp.status_code in (429, 502, 503):
+            # If rate limited (429), temporary server overload (502, 503), or model endpoint not found (404)
+            if resp.status_code in (404, 429, 502, 503):
                 logger.warning(
                     "[CONSENSUS] %s returned HTTP %d (attempt %d/%d): %.150s",
                     display_name, resp.status_code, attempt + 1, max_retries + 1, resp.text
                 )
-                if attempt < max_retries:
+                if resp.status_code == 404:
+                    if current_model in MODEL_FALLBACKS:
+                        fallback_id = MODEL_FALLBACKS[current_model]
+                        logger.info("[CONSENSUS] %s endpoint 404 not found. Failing over to fallback: %s", display_name, fallback_id)
+                        current_model = fallback_id
+                        display_name = f"{display_name} (via {MODEL_DISPLAY_NAMES.get(fallback_id, fallback_id.split('/')[-1])})"
+                        continue
+                elif attempt < max_retries:
                     sleep_sec = 1.5 * (attempt + 1)
                     time.sleep(sleep_sec)
                     continue
