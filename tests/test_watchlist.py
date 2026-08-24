@@ -40,3 +40,14 @@ def test_watchlist_remove_missing_is_rejected(watchlist_settings, monkeypatch):
     bad = remove_from_watchlist("MISSING.NS")
     assert bad["success"] is False
     assert "not in" in (bad.get("error") or "").lower()
+
+
+def test_watchlist_quotes_api(watchlist_settings, monkeypatch):
+    from earnings_engine.api.dashboard_api import get_watchlist_quotes_api
+    monkeypatch.setattr("earnings_engine.api.dashboard_api._settings", lambda: watchlist_settings)
+    add_to_watchlist("INFY.NS")
+    
+    quotes = get_watchlist_quotes_api(watchlist="my_watchlist", settings=watchlist_settings)
+    assert quotes["success"] is True
+    assert quotes["count"] == 1
+    assert quotes["items"][0]["ticker"] == "INFY.NS"

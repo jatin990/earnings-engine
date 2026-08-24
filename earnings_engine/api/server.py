@@ -1423,6 +1423,7 @@ from earnings_engine.api.dashboard_api import (
     get_universe_files,
     get_upcoming_results,
     get_watchlist,
+    get_watchlist_quotes_api,
     ingest_earnings_incremental_api,
     list_swing_ranges_api,
     refresh_data,
@@ -2232,6 +2233,57 @@ async def watchlist_delete(request: dict):
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "Failed to delete watchlist"))
     return result
+
+
+@app.post("/api/v1/watchlist/add", tags=["Dashboard"])
+async def watchlist_add_endpoint(request: dict):
+    """Add a ticker to a named watchlist. Body: {"ticker": str, "name"?: str}"""
+    ticker = request.get("ticker", "")
+    name = request.get("name", "my_watchlist")
+    if not ticker:
+        raise HTTPException(status_code=400, detail="Ticker is required")
+    result = add_to_watchlist(ticker=ticker, name=name)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to add ticker to watchlist"))
+    return result
+
+
+@app.post("/api/v1/watchlist/remove", tags=["Dashboard"])
+async def watchlist_remove_endpoint(request: dict):
+    """Remove a ticker from a named watchlist. Body: {"ticker": str, "name"?: str}"""
+    ticker = request.get("ticker", "")
+    name = request.get("name", "my_watchlist")
+    if not ticker:
+        raise HTTPException(status_code=400, detail="Ticker is required")
+    result = remove_from_watchlist(ticker=ticker, name=name)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to remove ticker from watchlist"))
+    return result
+
+
+@app.get("/api/v1/watchlist/quotes", tags=["Dashboard"])
+@app.get("/api/v1/watchlist/{name}/quotes", tags=["Dashboard"])
+async def watchlist_quotes_get(
+    name: str | None = None,
+    watchlist: str = Query("my_watchlist", description="Watchlist name"),
+    tickers: str | None = Query(None, description="Comma-separated ticker list (overrides watchlist name)"),
+    live: bool = Query(False, description="Force live intraday / price fetching"),
+):
+    """Retrieve full OHLCV, pricing, market cap, and swing levels for tickers in a watchlist."""
+    wl_name = name or watchlist or "my_watchlist"
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()] if tickers else None
+    return await asyncio.to_thread(get_watchlist_quotes_api, watchlist=wl_name, tickers=ticker_list, live=live)
+
+
+@app.post("/api/v1/watchlist/quotes", tags=["Dashboard"])
+async def watchlist_quotes_post(request: dict):
+    """Retrieve full OHLCV, pricing, market cap, and swing levels.
+    Body: {"watchlist"?: str, "tickers"?: list[str], "live"?: bool}
+    """
+    wl_name = request.get("watchlist", "my_watchlist")
+    tickers = request.get("tickers")
+    live = bool(request.get("live", False))
+    return await asyncio.to_thread(get_watchlist_quotes_api, watchlist=wl_name, tickers=tickers, live=live)
 
 
 @app.post("/api/v1/dashboard/predict/run", tags=["Dashboard"])

@@ -225,4 +225,141 @@
         </div>
     </div>
 
-    <script src="/static/js/dashboard.js?v=20260824_v15_rating"></script>
+    <!-- ======================================================== -->
+    <!-- ⭐ UNIVERSAL ADD TO WATCHLIST MODAL -->
+    <!-- ======================================================== -->
+    <div id="addToWatchlistModal" onclick="if(event.target === this) app.closeAddToWatchlistModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:2700;padding:1.5rem;overflow-y:auto;">
+        <div class="card card-glow-purple" style="max-width:520px;width:95%;margin:8vh auto;position:relative;background:#060609;border:1px solid rgba(168,85,247,0.35);border-radius:14px;box-shadow:0 30px 80px rgba(0,0,0,0.9);padding:1.5rem;">
+            <button onclick="app.closeAddToWatchlistModal()" class="btn-icon" style="position:absolute;top:1.15rem;right:1.15rem;" title="Close">✕</button>
+            
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
+                <span style="font-size:1.4rem;">⭐</span>
+                <h3 style="margin:0;font-size:1.2rem;font-family:'Space Grotesk',sans-serif;color:#ffffff;">Add to Watchlist</h3>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+                <span id="wlModalTicker" style="font-size:1.15rem;font-weight:800;font-family:var(--font-mono);color:#c084fc;">TICKER</span>
+                <span id="wlModalPrice" class="timestamp" style="font-size:0.85rem;color:#e2e8f0;"></span>
+            </div>
+
+            <!-- Current Watchlist Status -->
+            <div id="wlModalStatusBox" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.75rem;margin-bottom:1rem;font-size:0.8rem;color:#cbd5e1;">
+                <div style="font-size:0.7rem;text-transform:uppercase;color:#a1a1aa;font-weight:700;margin-bottom:0.25rem;">Active Membership:</div>
+                <div id="wlModalMembershipList">Checking membership...</div>
+            </div>
+
+            <!-- Add to Watchlist Form -->
+            <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1.25rem;">
+                <div>
+                    <label style="display:block;font-size:0.75rem;color:#a1a1aa;margin-bottom:0.3rem;font-weight:600;">Choose Target Watchlist:</label>
+                    <select id="wlModalSelect" style="width:100%;height:36px;padding:0 0.65rem;background:#000000;color:#ffffff;border:1px solid rgba(255,255,255,0.18);border-radius:6px;font-size:0.85rem;outline:none;">
+                        <option value="my_watchlist" selected>⭐ my_watchlist (Default)</option>
+                    </select>
+                </div>
+
+                <!-- Create New List Option -->
+                <div style="border-top:1px dashed rgba(255,255,255,0.1);padding-top:0.65rem;">
+                    <label style="display:block;font-size:0.72rem;color:#a1a1aa;margin-bottom:0.3rem;">Or create a new watchlist for this stock:</label>
+                    <div style="display:flex;gap:0.35rem;">
+                        <input id="wlModalNewName" placeholder="e.g. Momentum Breakouts" style="flex:1;height:32px;padding:0 0.55rem;background:#000000;color:#ffffff;border:1px solid rgba(255,255,255,0.15);border-radius:6px;font-size:0.8rem;outline:none;">
+                        <button type="button" onclick="app.createAndAddWatchlist()" class="btn btn-sm" style="height:32px;font-size:0.75rem;background:rgba(168,85,247,0.2);color:#e9d5ff;border:1px solid rgba(168,85,247,0.4);">＋ Create & Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                <button type="button" onclick="app.closeAddToWatchlistModal()" class="btn btn-secondary btn-sm">Cancel</button>
+                <button type="button" id="wlModalAddBtn" onclick="app.confirmAddToWatchlist()" class="btn btn-primary btn-sm" style="font-weight:700;">＋ Add to Selected List</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- 🧠 CATALYST AI CONSENSUS INTEL MODAL -->
+    <!-- ======================================================== -->
+    <div id="catalystConsensusModal" onclick="if(event.target === this) app.closeCatalystConsensusModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);backdrop-filter:blur(8px);z-index:2800;padding:1.5rem;overflow-y:auto;">
+        <div class="card card-glow-blue" style="max-width:880px;width:95%;margin:4vh auto;position:relative;background:#060609;border:1px solid rgba(59,130,246,0.35);border-radius:14px;box-shadow:0 30px 90px rgba(0,0,0,0.95);padding:1.5rem;">
+            <button onclick="app.closeCatalystConsensusModal()" class="btn-icon" style="position:absolute;top:1.15rem;right:1.15rem;" title="Close">✕</button>
+            
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
+                <span style="font-size:1.4rem;">🧠</span>
+                <h3 style="margin:0;font-size:1.25rem;font-family:'Space Grotesk',sans-serif;color:#ffffff;">Catalyst AI Consensus Intelligence</h3>
+                <span id="catConsensusTimeframeBadge" class="signal-badge" style="background:rgba(99,102,241,0.2);color:#93c5fd;font-size:0.68rem;">14-Day Horizon</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.85rem;flex-wrap:wrap;">
+                <span id="catConsensusTicker" style="font-size:1.2rem;font-weight:800;font-family:var(--font-mono);color:#60a5fa;">TICKER</span>
+                <span id="catConsensusPrice" class="timestamp" style="font-size:0.9rem;font-weight:600;color:#f8fafc;">₹—</span>
+                <span id="catConsensusDirectionBadge" class="signal-badge" style="font-size:0.75rem;font-weight:700;">NEUTRAL</span>
+            </div>
+
+            <!-- 4 Key Catalyst Consensus KPI Metric Cards -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:0.65rem;margin-bottom:1rem;">
+                <div class="card card-glow-emerald" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(16,185,129,0.3);">
+                    <div style="font-size:0.68rem;color:#34d399;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">🎯 Target Price</div>
+                    <div id="catConsensusTarget" style="font-size:1.35rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">₹—</div>
+                    <div id="catConsensusExpectedMove" style="font-size:0.72rem;color:#34d399;font-weight:600;margin-top:0.2rem;">—</div>
+                </div>
+
+                <div class="card card-glow-amber" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(245,158,11,0.3);">
+                    <div style="font-size:0.68rem;color:#f87171;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">🛑 Resistance / Exit</div>
+                    <div id="catConsensusResistance" style="font-size:1.35rem;font-weight:800;color:#fca5a5;font-family:var(--font-mono);">₹—</div>
+                    <div style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">Profit target zone</div>
+                </div>
+
+                <div class="card card-glow-blue" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(59,130,246,0.3);">
+                    <div style="font-size:0.68rem;color:#60a5fa;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">🛡️ Support / Buy Zone</div>
+                    <div id="catConsensusSupport" style="font-size:1.35rem;font-weight:800;color:#93c5fd;font-family:var(--font-mono);">₹—</div>
+                    <div style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">Optimal entry floor</div>
+                </div>
+
+                <div class="card card-glow-purple" style="padding:0.75rem 0.85rem;margin-bottom:0;background:#090d16;border:1px solid rgba(168,85,247,0.3);">
+                    <div style="font-size:0.68rem;color:#c084fc;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">⚡ Consensus Agreement</div>
+                    <div id="catConsensusStrength" style="font-size:1.35rem;font-weight:800;color:#e9d5ff;font-family:var(--font-mono);">0%</div>
+                    <div id="catConsensusModelCount" style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">4 Models Polled</div>
+                </div>
+            </div>
+
+            <!-- Synthesized Thesis Box -->
+            <div style="background:#0a0a10;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.85rem;margin-bottom:1rem;">
+                <div style="font-size:0.75rem;font-weight:700;color:#c7d2fe;margin-bottom:0.35rem;display:flex;align-items:center;gap:0.35rem;">
+                    <span>🧠</span> Synthesized Multi-Model Catalyst Thesis:
+                </div>
+                <p id="catConsensusThesis" style="margin:0;font-size:0.82rem;line-height:1.55;color:#e2e8f0;"></p>
+            </div>
+
+            <!-- Individual Model Breakdown -->
+            <div style="margin-bottom:1.25rem;">
+                <div style="font-size:0.74rem;font-weight:700;color:#a1a1aa;margin-bottom:0.45rem;text-transform:uppercase;">
+                    Individual Model Votes & Predictions
+                </div>
+                <div class="table-wrapper">
+                    <table class="results-table" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th>AI Model</th>
+                                <th>Direction</th>
+                                <th>Confidence</th>
+                                <th>Target Price</th>
+                                <th>Support / Buy</th>
+                                <th>Resistance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="catConsensusModelsBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Actions Bar -->
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;border-top:1px solid rgba(255,255,255,0.08);padding-top:0.85rem;">
+                <div id="catConsensusStatus" class="timestamp" style="font-size:0.75rem;"></div>
+                <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
+                    <button type="button" id="catConsensusApplySwingBtn" onclick="app.applyConsensusToSwingRange()" class="btn btn-sm" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);">💾 Apply to Swing Range</button>
+                    <button type="button" onclick="app.openAddToWatchlistModal(app.activeCatConsensusTicker)" class="btn btn-sm" style="background:rgba(168,85,247,0.2);color:#e9d5ff;border:1px solid rgba(168,85,247,0.4);">⭐ Add to Watchlist</button>
+                    <button type="button" onclick="app.closeCatalystConsensusModal()" class="btn btn-secondary btn-sm">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js?v=20260824_v16_watchlist_ohlcv"></script>

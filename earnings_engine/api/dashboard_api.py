@@ -1017,6 +1017,161 @@ def get_universe_files() -> list[dict[str, Any]]:
     return watchlists_mod.list_watchlists(_settings())
 
 
+def get_watchlist_quotes_api(
+    watchlist: str = "my_watchlist",
+    tickers: list[str] | None = None,
+    live: bool = False,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve full OHLCV, pricing, market cap, and swing levels for tickers in a watchlist.
+    
+    If len(ticker_list) < 10 or live=True, freshly fetches live intraday / price data in parallel.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from earnings_engine.data.universe import get_universe, load_all_market_caps, load_market_cap
+
+    settings = settings or _settings()
+    if tickers is not None and len(tickers) > 0:
+        ticker_list = [t.strip().upper() for t in tickers if t.strip()]
+    else:
+        ticker_list = watchlists_mod.get_watchlist(watchlist, settings)
+        if not ticker_list:
+            ticker_list = get_universe(watchlist, settings)
+
+    if not ticker_list:
+        return {"success": True, "watchlist": watchlist, "count": 0, "is_live": live, "items": []}
+
+    auto_live = live or (len(ticker_list) < 10)
+    all_ranges = swing_ranges_mod.list_ranges(watchlist, settings)
+    range_map = {r["ticker"]: r for r in all_ranges if "ticker" in r}
+    all_caps = load_all_market_caps(settings)
+
+    def process_ticker(t: str) -> dict[str, Any]:
+        item = {
+            "ticker": t,
+            "company_name": t,
+            "current_price": None,
+            "previous_close": None,
+            "change": None,
+            "change_pct": None,
+            "open": None,
+            "high": None,
+            "low": None,
+            "close": None,
+            "volume": None,
+            "volume_formatted": "—",
+            "market_cap": None,
+            "market_cap_formatted": "—",
+            "year_high": None,
+            "year_low": None,
+            "pct_from_52w_high": None,
+            "pct_from_52w_low": None,
+            "support": None,
+            "resistance": None,
+            "cycles": None,
+            "range_source": "none",
+            "earnings_date": None,
+            "last_updated": None,
+        }
+
+        # 1. Swing Range
+        sr = range_map.get(t) or swing_ranges_mod.get_swing_range(watchlist, t, settings)
+        if sr:
+            item["support"] = sr.get("lower") or sr.get("lower_bound")
+            item["resistance"] = sr.get("upper") or sr.get("upper_bound")
+            item["cycles"] = sr.get("cycles")
+            item["range_source"] = sr.get("source", "auto")
+
+        # 2. Market Cap
+        mc = all_caps.get(t)
+        if mc is None:
+            mc = load_market_cap(t, settings)
+        if mc:
+            item["market_cap"] = mc
+            if t.endswith(".NS") or t.endswith(".BO"):
+                item["market_cap_formatted"] = f"₹{mc / 1e7:,.0f} Cr" if mc >= 1e7 else f"₹{mc:,.0f}"
+            else:
+                item["market_cap_formatted"] = f"${mc / 1e9:,.2f}B" if mc >= 1e9 else f"${mc / 1e6:,.1f}M"
+
+        # 3. Prices / OHLCV
+        df = prices_mod.load_prices(t, settings)
+        if df.empty or auto_live:
+            try:
+                df = prices_mod.fetch_prices(t, settings, force=auto_live)
+            except Exception as e:
+                logger.debug("Failed to fetch prices for %s: %s", t, e)
+
+        if not df.empty and "close" in df.columns:
+            try:
+                closes = pd.to_numeric(df["close"], errors="coerce").dropna()
+                if not closes.empty:
+                    latest_close = float(closes.iloc[-1])
+                    item["current_price"] = round(latest_close, 2)
+                    item["close"] = round(latest_close, 2)
+
+                    if len(closes) > 1:
+                        prev_close = float(closes.iloc[-2])
+                        item["previous_close"] = round(prev_close, 2)
+                        chg = latest_close - prev_close
+                        item["change"] = round(chg, 2)
+                        item["change_pct"] = round((chg / prev_close) * 100, 2) if prev_close else 0.0
+                    else:
+                        item["change"] = 0.0
+                        item["change_pct"] = 0.0
+
+                    if "open" in df.columns:
+                        opens = pd.to_numeric(df["open"], errors="coerce").dropna()
+                        if not opens.empty:
+                            item["open"] = round(float(opens.iloc[-1]), 2)
+                    if "high" in df.columns:
+                        highs = pd.to_numeric(df["high"], errors="coerce").dropna()
+                        if not highs.empty:
+                            item["high"] = round(float(highs.iloc[-1]), 2)
+                            y_high = float(highs.tail(252).max())
+                            item["year_high"] = round(y_high, 2)
+                            if y_high > 0:
+                                item["pct_from_52w_high"] = round(((latest_close - y_high) / y_high) * 100, 2)
+                    if "low" in df.columns:
+                        lows = pd.to_numeric(df["low"], errors="coerce").dropna()
+                        if not lows.empty:
+                            item["low"] = round(float(lows.iloc[-1]), 2)
+                            y_low = float(lows.tail(252).min())
+                            item["year_low"] = round(y_low, 2)
+                            if y_low > 0:
+                                item["pct_from_52w_low"] = round(((latest_close - y_low) / y_low) * 100, 2)
+                    if "volume" in df.columns:
+                        vols = pd.to_numeric(df["volume"], errors="coerce").dropna()
+                        if not vols.empty:
+                            v = float(vols.iloc[-1])
+                            item["volume"] = v
+                            if v >= 1e9:
+                                item["volume_formatted"] = f"{v / 1e9:.2f}B"
+                            elif v >= 1e6:
+                                item["volume_formatted"] = f"{v / 1e6:.2f}M"
+                            elif v >= 1e3:
+                                item["volume_formatted"] = f"{v / 1e3:.1f}K"
+                            else:
+                                item["volume_formatted"] = str(int(v))
+
+                    item["last_updated"] = str(df.index[-1])[:10] if hasattr(df.index[-1], "strftime") or isinstance(df.index[-1], str) else str(df.index[-1])
+            except Exception as exc:
+                logger.debug("Error computing OHLCV for %s: %s", t, exc)
+
+        return item
+
+    workers = min(12, max(1, len(ticker_list)))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        results = list(executor.map(process_ticker, ticker_list))
+
+    return {
+        "success": True,
+        "watchlist": watchlist,
+        "count": len(results),
+        "is_live": auto_live,
+        "items": results,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Data coverage
 # ---------------------------------------------------------------------------
