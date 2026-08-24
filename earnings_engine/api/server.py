@@ -3170,6 +3170,7 @@ class ConsensusPredictRequest(BaseModel):
     tickers: list[str] | None = None
     timeframe_days: int = Field(default=14, ge=1, le=90)
     models: list[str] | None = None
+    force: bool = False
 
 
 class ConsensusSettleRequest(BaseModel):
@@ -3178,7 +3179,7 @@ class ConsensusSettleRequest(BaseModel):
 
 @app.post("/api/v1/consensus/predict", tags=["AI Consensus Engine"])
 async def consensus_predict_endpoint(req: ConsensusPredictRequest):
-    """Run multi-model consensus prediction for one or more tickers."""
+    """Run multi-model consensus prediction for one or more tickers (cached unless force=True)."""
     from datetime import datetime, timedelta
     from earnings_engine.consensus import context_builder, model_runner, aggregator, storage
 
@@ -3196,6 +3197,27 @@ async def consensus_predict_endpoint(req: ConsensusPredictRequest):
     results: list[dict[str, Any]] = []
     for ticker in target_tickers:
         try:
+            # Check cached prediction if force is False
+            if not req.force:
+                cached_preds = storage.get_predictions(settings=_settings, ticker=ticker, limit=1)
+                if cached_preds:
+                    latest = cached_preds[0]
+                    created_at_str = latest.get("created_at") or ""
+                    is_usable_cache = False
+                    try:
+                        created_dt = datetime.fromisoformat(created_at_str)
+                        age_secs = (datetime.now() - created_dt).total_seconds()
+                        if age_secs < 86400 or latest.get("settlement_status") == "PENDING":
+                            is_usable_cache = True
+                    except Exception:
+                        is_usable_cache = bool(latest.get("consensus_direction"))
+
+                    if is_usable_cache:
+                        logger.info("[CONSENSUS-CACHE] Returning cached prediction for %s (id=%s, direction=%s)",
+                                    ticker, latest.get("id"), latest.get("consensus_direction"))
+                        results.append(latest)
+                        continue
+
             # 1. Build rich context
             ctx = context_builder.build_context(ticker, timeframe_days=req.timeframe_days, settings=_settings)
             as_of_price = ctx.get("price_action", {}).get("current_price") or 0.0
@@ -3238,6 +3260,7 @@ async def consensus_predict_endpoint(req: ConsensusPredictRequest):
         "success": True,
         "count": len(results),
         "predictions": results,
+        "results": results,
     }
 
 

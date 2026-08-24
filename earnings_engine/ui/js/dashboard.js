@@ -4727,11 +4727,12 @@
                     const res = await fetch(API_BASE + '/api/v1/consensus/predict', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ticker: sym, timeframe_days: 14 })
+                        body: JSON.stringify({ ticker: sym, timeframe_days: 14, force: false })
                     });
                     const data = await res.json();
-                    if (data && data.results && data.results.length) {
-                        const pred = data.results[0];
+                    const preds = (data && (data.predictions || data.results)) ? (data.predictions || data.results) : [];
+                    if (preds && preds.length) {
+                        const pred = preds[0];
                         if (pred && !pred.error) {
                             this.consensusMap[sym] = pred;
                             
@@ -9735,7 +9736,8 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         tickers: [app.activeCatConsensusTicker],
-                        timeframe_days: 14
+                        timeframe_days: 14,
+                        force: false
                     })
                 });
 
@@ -9743,7 +9745,20 @@
                 const data = await res.json();
                 app.activeConsensusResult = data;
 
-                const pred = (data.predictions && data.predictions[0]) ? data.predictions[0] : data;
+                const preds = (data && (data.predictions || data.results)) ? (data.predictions || data.results) : [];
+                const pred = (preds && preds.length) ? preds[0] : data;
+
+                if (pred && !pred.error) {
+                    app.consensusMap[app.activeCatConsensusTicker] = pred;
+                    const domId = 'consensus-cell-' + app.activeCatConsensusTicker.replace(/[^A-Za-z0-9]/g, '_');
+                    const cells = document.querySelectorAll('[id="' + domId + '"]');
+                    if (typeof app.renderConsensusBadge === 'function') {
+                        const newHtml = app.renderConsensusBadge(app.activeCatConsensusTicker, app.currentMarket || 'ALL');
+                        cells.forEach(el => {
+                            el.outerHTML = newHtml;
+                        });
+                    }
+                }
 
                 const currP = Number(pred.as_of_price || pred.current_price || data.as_of_price || data.current_price || 0);
                 if (priceEl) priceEl.textContent = currP > 0 ? '₹' + currP.toFixed(2) : '';
@@ -9891,7 +9906,7 @@
                     }).join('');
                 }
 
-                if (statusEl) statusEl.textContent = 'Consensus & trade setup computed across all 4 AI engines';
+                if (statusEl) statusEl.textContent = 'Consensus & trade setup ready across all 4 AI engines';
             } catch (e) {
                 console.error('runConsensusForStock error:', e);
                 if (thesisEl) thesisEl.innerHTML = `<span style="color:#f87171;">Failed to generate AI consensus: ${e.message}</span>`;

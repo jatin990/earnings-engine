@@ -730,7 +730,9 @@
             const stEl = document.getElementById('kpiStrength');
             const thEl = document.getElementById('txtThesis');
 
-            if (!c || !c.direction) {
+            const dir = (c && (c.consensus_direction || c.direction || '')).toUpperCase();
+
+            if (!c || !dir) {
                 vPill.textContent = 'NO RECENT PREDICTION';
                 vPill.style.background = 'rgba(255, 255, 255, 0.05)';
                 vPill.style.borderColor = 'var(--border)';
@@ -741,32 +743,46 @@
                 return;
             }
 
-            const isBull = c.direction === 'BULLISH';
-            vPill.textContent = `${c.direction} (${(c.strength_pct || 100).toFixed(0)}%)`;
+            const isBull = dir === 'BULLISH';
+            const str = Number(c.consensus_strength != null ? c.consensus_strength : (c.strength_pct || 80));
+            vPill.textContent = `${dir} (${str.toFixed(0)}%)`;
             vPill.style.background = isBull ? 'var(--emerald-subtle)' : 'var(--rose-subtle)';
             vPill.style.borderColor = isBull ? 'var(--emerald-border)' : 'var(--rose-border)';
             vPill.style.color = isBull ? 'var(--emerald)' : 'var(--rose)';
 
-            wEl.textContent = c.is_worth_entering || (isBull ? 'YES - ACCUMULATE' : 'AVOID');
+            wEl.textContent = c.is_worth_entering || (dir === 'BULLISH' && str >= 75 ? 'YES - HIGH CONVICTION' : (dir === 'BULLISH' ? 'YES - ACCUMULATE ON DIPS' : (dir === 'BEARISH' ? 'NO - HIGH RISK' : 'WAIT FOR BREAKOUT')));
             wEl.style.color = (c.is_worth_entering && c.is_worth_entering.includes('HIGH')) ? 'var(--emerald)' : (isBull ? 'var(--sky)' : 'var(--rose)');
 
-            eEl.textContent = c.consensus_entry_zone || `₹${(curr * 0.985).toFixed(2)} – ₹${curr.toFixed(2)}`;
+            const supportP = Number(c.consensus_support || 0);
+            if (c.consensus_entry_zone) {
+                eEl.textContent = c.consensus_entry_zone;
+            } else if (curr > 0) {
+                const floor = supportP && supportP <= curr ? supportP : (curr * 0.985);
+                eEl.textContent = `₹${floor.toFixed(2)} – ₹${curr.toFixed(2)}`;
+            } else {
+                eEl.textContent = 'Market Price';
+            }
 
-            const targetP = c.consensus_target_price || 0;
+            const targetP = Number(c.consensus_target_price || c.target_price || 0);
             tgEl.textContent = targetP ? `₹${targetP.toFixed(2)}` : '—';
-            const gainPct = (targetP && curr) ? ((targetP / curr - 1.0) * 100).toFixed(1) : '0.0';
+            const gainPct = (targetP && curr) ? ((targetP / curr - 1.0) * 100).toFixed(1) : (c.consensus_return_pct ? Number(c.consensus_return_pct).toFixed(1) : '0.0');
             tgSub.textContent = `+${gainPct}% upside target`;
 
-            const slP = c.consensus_stop_loss || (curr * 0.94);
+            const slP = Number(c.consensus_stop_loss || (supportP && supportP < curr ? supportP : (curr * 0.94)));
             slEl.textContent = slP ? `₹${slP.toFixed(2)}` : '—';
             const riskPct = (slP && curr) ? ((slP / curr - 1.0) * 100).toFixed(1) : '-6.0';
             slSub.textContent = `${riskPct}% risk cut`;
 
-            rrEl.textContent = `1 : ${c.consensus_risk_reward || '2.5'}`;
-            stEl.textContent = `${(c.strength_pct || 100).toFixed(0)}%`;
-            document.getElementById('kpiAgreeCount').textContent = `${c.agreeing_models || 4} / ${c.total_models || 4} AI Models Agree`;
+            const rrVal = c.consensus_risk_reward || (targetP && slP && curr && (curr - slP) > 0 ? ((targetP - curr) / (curr - slP)).toFixed(1) : '2.5');
+            rrEl.textContent = `1 : ${rrVal}`;
+            stEl.textContent = `${str.toFixed(0)}%`;
 
-            thEl.textContent = c.failure_reason_summary || c.consensus_narrative || 'Price momentum and technical structure align with multi-model consensus targets.';
+            const agreeRatio = c.agreement_ratio != null ? c.agreement_ratio : (c.agreeing_models ? c.agreeing_models / (c.total_models || 4) : 1.0);
+            const modelCnt = c.model_count || c.total_models || 4;
+            const agreeCnt = Math.round(agreeRatio * modelCnt);
+            document.getElementById('kpiAgreeCount').textContent = `${agreeCnt} / ${modelCnt} AI Models Agree`;
+
+            thEl.textContent = c.synthesized_thesis || c.failure_reason_summary || c.consensus_narrative || 'Price momentum and technical structure align with multi-model consensus targets.';
 
             if (c.chart_pattern) document.getElementById('badgePattern').textContent = `📈 Pattern: ${c.chart_pattern}`;
             if (c.volume_profile_insight) document.getElementById('badgeVolume').textContent = `📊 Volume: ${c.volume_profile_insight}`;
@@ -856,7 +872,7 @@
             }).join('');
         }
 
-        async function runConsensus() {
+        async function runConsensus(force = true) {
             const btn = document.getElementById('btnConsensus');
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span> Running Consensus...';
@@ -864,7 +880,7 @@
                 const res = await fetch('/api/v1/consensus/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ticker: ACTIVE_SYM, days_ahead: 14 })
+                    body: JSON.stringify({ ticker: ACTIVE_SYM, timeframe_days: 14, force: force })
                 });
                 if (!res.ok) throw new Error('Prediction request failed');
                 await fetchStockDetails();
