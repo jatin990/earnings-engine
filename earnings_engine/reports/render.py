@@ -613,14 +613,11 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
                 lp = f"{float(low_price):,.0f}" if not pd.isna(low_price) else "—"
                 prices_str = f"<br>({hp}/{lp})"
             return f"{high_str}/{low_str}{prices_str}"
-        
+
         def _fmt_quarter_week_hl(high_pct: object, high_price: object, low_pct: object, low_price: object,
                                   high_date: object = None, low_date: object = None, price_7d: object = None,
-                                  earnings_date: object = None) -> str:
+                                  earnings_date: object = None, ticker: str = "") -> str:
             """Format quarter week high/low as '+8.7%/+2.3%<br>(8,500/7,800)<br>Jan 18 / Jan 16 | 7D: ₹245'."""
-            base = _fmt_hl_pair(high_pct, high_price, low_pct, low_price)
-            
-            # Add dates if available (handle None, NaN, and NaT)
             def _is_valid_date(d: object) -> bool:
                 if d is None:
                     return False
@@ -629,6 +626,23 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
                 except (TypeError, ValueError):
                     return False
 
+            has_high_low = high_pct is not None and not pd.isna(high_pct)
+            if not has_high_low:
+                if _is_valid_date(earnings_date) and ticker:
+                    ed_str = pd.Timestamp(earnings_date).strftime("%Y-%m-%d")
+                    earned = pd.Timestamp(earnings_date).strftime("%b %d")
+                    return (
+                        f'<div class="pred-cell" style="display:inline-flex;flex-direction:column;align-items:center;gap:0.2rem;">'
+                        f'<button type="button" class="btn-micro btn-micro-primary" '
+                        f'onclick="event.stopPropagation(); app.calcLiveWeekHL(\'{ticker}\', \'{ed_str}\', this)" '
+                        f'title="Calculate live week move since {earned} print based on current market price">'
+                        f'Live H/L</button>'
+                        f'<span style="font-size:0.65rem;color:var(--text-muted);">earn {earned}</span>'
+                        f'</div>'
+                    )
+                return "—/—"
+
+            base = _fmt_hl_pair(high_pct, high_price, low_pct, low_price)
             parts: list[str] = []
             if _is_valid_date(high_date) or _is_valid_date(low_date):
                 high_d = pd.Timestamp(high_date).strftime("%b %d") if _is_valid_date(high_date) else "—"
@@ -639,7 +653,7 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             if price_7d is not None and not pd.isna(price_7d):
                 parts.append(f"7D: ₹{float(price_7d):,.0f}")
 
-            # Add the quarter's earnings date if available (e.g. "earned Jan 15")
+            # Add the quarter's earnings date if available (e.g. "earn Jan 15")
             if _is_valid_date(earnings_date):
                 earned = pd.Timestamp(earnings_date).strftime("%b %d")
                 parts.append(f"earn {earned}")
@@ -664,15 +678,18 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
         q1_week_hl = _fmt_quarter_week_hl(row.get("q1_week_high_pct"), row.get("q1_week_high_price"),
                                            row.get("q1_week_low_pct"), row.get("q1_week_low_price"),
                                            row.get("q1_week_high_date"), row.get("q1_week_low_date"),
-                                           row.get("q1_price_7d"), row.get("q1_earnings_date"))
+                                           row.get("q1_price_7d"), row.get("q1_earnings_date"),
+                                           ticker=ticker)
         q2_week_hl = _fmt_quarter_week_hl(row.get("q2_week_high_pct"), row.get("q2_week_high_price"),
                                            row.get("q2_week_low_pct"), row.get("q2_week_low_price"),
                                            row.get("q2_week_high_date"), row.get("q2_week_low_date"),
-                                           row.get("q2_price_7d"), row.get("q2_earnings_date"))
+                                           row.get("q2_price_7d"), row.get("q2_earnings_date"),
+                                           ticker=ticker)
         q3_week_hl = _fmt_quarter_week_hl(row.get("q3_week_high_pct"), row.get("q3_week_high_price"),
                                            row.get("q3_week_low_pct"), row.get("q3_week_low_price"),
                                            row.get("q3_week_high_date"), row.get("q3_week_low_date"),
-                                           row.get("q3_price_7d"), row.get("q3_earnings_date"))
+                                           row.get("q3_price_7d"), row.get("q3_earnings_date"),
+                                           ticker=ticker)
         
         prev_quarter_score = _fmt(row.get("prev_quarter_earnings_score"), suffix="/9")
         prev_3q_score = _fmt(row.get("prev_3q_earnings_score"), suffix="/9")

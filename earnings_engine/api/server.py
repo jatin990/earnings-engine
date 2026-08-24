@@ -3253,6 +3253,58 @@ async def batch_stock_ratings_endpoint(req: BatchRatingRequest):
     return {"success": True, "count": len(results), "ratings": results}
 
 
+@app.post("/api/v1/stock/{ticker}/live-week-hl", tags=["Stock Intelligence & Ratings"])
+async def calc_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Query(None)):
+    """Calculate live week high/low move since earnings print using latest real-time prices."""
+    from earnings_engine.data.market_context import _week_high_low_around
+    import yfinance as yf
+    
+    ed = pd.to_datetime(earnings_date) if earnings_date else None
+    if ed is None:
+        from earnings_engine.data.earnings import load_earnings
+        edf = load_earnings(ticker, _settings)
+        if edf is not None and not edf.empty:
+            past = edf[edf["earnings_date"] < pd.Timestamp.today().normalize()]
+            if not past.empty:
+                ed = pd.to_datetime(past.sort_values("earnings_date").iloc[-1]["earnings_date"])
+    
+    if ed is None:
+        raise HTTPException(status_code=400, detail=f"No past earnings date found for {ticker}")
+
+    try:
+        yf_ticker = yf.Ticker(ticker)
+        hist = yf_ticker.history(period="1mo")
+        fast_info = yf_ticker.fast_info or {}
+        curr_price = fast_info.get("last_price")
+        if (curr_price is None or curr_price <= 0) and not hist.empty:
+            curr_price = float(hist["Close"].iloc[-1])
+        
+        hist_df = pd.DataFrame(index=pd.to_datetime(hist.index.date))
+        hist_df["close"] = hist["Close"].values
+        
+        week_data = _week_high_low_around(hist_df, ed, current_price=curr_price)
+        if week_data is None:
+            raise HTTPException(status_code=404, detail="Not enough price history around earnings date")
+        
+        high_pct, low_pct, high_p, low_p, high_d, low_d = week_data
+        
+        return {
+            "success": True,
+            "ticker": ticker,
+            "earnings_date": ed.strftime("%Y-%m-%d"),
+            "high_pct": round(high_pct, 2),
+            "low_pct": round(low_pct, 2),
+            "high_price": round(high_p, 2),
+            "low_price": round(low_p, 2),
+            "high_date": pd.Timestamp(high_d).strftime("%b %d") if high_d is not None else None,
+            "low_date": pd.Timestamp(low_d).strftime("%b %d") if low_d is not None else None,
+            "current_price": round(curr_price, 2) if curr_price else None,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error computing live week high/low: {e}")
+
+
+
 
 
 

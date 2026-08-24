@@ -8621,8 +8621,55 @@
             if (modal) modal.style.display = 'none';
         };
 
+        app.calcLiveWeekHL = async function(ticker, earningsDate, btnElement) {
+            if (!ticker) return;
+            const container = btnElement ? btnElement.closest('.pred-cell') || btnElement.parentElement : null;
+            if (btnElement) {
+                btnElement.disabled = true;
+                btnElement.textContent = 'Calculating...';
+            }
+
+            try {
+                const url = `/api/v1/stock/${encodeURIComponent(ticker)}/live-week-hl${earningsDate ? `?earnings_date=${encodeURIComponent(earningsDate)}` : ''}`;
+                const res = await fetch(url, { method: 'POST' });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Live calculation failed');
+                }
+                const data = await res.json();
+                
+                const highSign = data.high_pct >= 0 ? '+' : '';
+                const lowSign = data.low_pct >= 0 ? '+' : '';
+                const highColor = data.high_pct >= 0 ? '#34d399' : '#f87171';
+                const lowColor = data.low_pct >= 0 ? '#34d399' : '#f87171';
+                
+                const hp = Number(data.high_price).toLocaleString();
+                const lp = Number(data.low_price).toLocaleString();
+                const datesStr = (data.high_date || data.low_date) ? `<br><span style="color:#a1a1aa;font-size:0.68rem;">${data.high_date || '—'} / ${data.low_date || '—'}</span>` : '';
+                const livePriceStr = data.current_price ? `<br><span style="color:#60a5fa;font-size:0.68rem;font-weight:600;">Live: ₹${data.current_price}</span>` : '';
+                
+                if (container) {
+                    container.innerHTML = `
+                        <div style="line-height:1.2;font-family:var(--font-mono);font-size:0.75rem;">
+                            <span style="color:${highColor};font-weight:700;">${highSign}${data.high_pct}%</span>/<span style="color:${lowColor};font-weight:700;">${lowSign}${data.low_pct}%</span>
+                            <br><span style="color:var(--text-muted);font-size:0.68rem;">(${hp}/${lp})</span>
+                            ${datesStr}
+                            ${livePriceStr}
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                alert(`Error computing live week move for ${ticker}: ${e.message}`);
+                if (btnElement) {
+                    btnElement.disabled = false;
+                    btnElement.textContent = 'Live H/L';
+                }
+            }
+        };
+
         // Initialize & export to window
         window.app = app;
         app.init();
+
 
 

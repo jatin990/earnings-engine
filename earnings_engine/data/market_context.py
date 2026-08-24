@@ -56,12 +56,19 @@ def _close_n_calendar_days_ago(closes: pd.Series, latest_date, days: int) -> flo
 
 
 
-def _week_high_low_around(prices: pd.DataFrame, earnings_date: pd.Timestamp, days: int = 7) -> tuple[float, float, float, float, pd.Timestamp, pd.Timestamp] | None:
+def _week_high_low_around(
+    prices: pd.DataFrame,
+    earnings_date: pd.Timestamp,
+    days: int = 7,
+    current_price: float | None = None,
+) -> tuple[float, float, float, float, pd.Timestamp, pd.Timestamp] | None:
     """Compute the high/low close over the N trading days after an earnings date.
 
     Returns (week_high_pct, week_low_pct, week_high_price, week_low_price, high_date, low_date) as
     % moves vs the close just before the earnings date, or None if there isn't enough
     price data.  high_date and low_date are the dates when the high/low occurred.
+    If 7 trading days haven't elapsed yet (recent print), incorporates available trading
+    days and current_price.
     """
     if prices.empty or "close" not in prices.columns:
         return None
@@ -72,13 +79,20 @@ def _week_high_low_around(prices: pd.DataFrame, earnings_date: pd.Timestamp, day
     # Base close = last close strictly before the earnings date
     before = closes[closes.index < earnings_date]
     if before.empty:
+        before = closes[closes.index <= earnings_date]
+    if before.empty:
         return None
     base_close = float(before.iloc[-1])
     if base_close <= 0:
         return None
 
-    # Window = the `days` trading days strictly AFTER the earnings date
-    window = closes[closes.index > earnings_date].iloc[:days]
+    # Window = trading days strictly AFTER the earnings date
+    window = closes[closes.index > earnings_date].iloc[:days].copy()
+    today = pd.Timestamp.today().normalize()
+    if current_price is not None and float(current_price) > 0 and today >= earnings_date:
+        if window.empty or today not in window.index:
+            window[today] = float(current_price)
+
     if window.empty:
         return None
 
@@ -543,33 +557,38 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                     # Week high/low for this quarter's result week (±4 business days)
                     week_data = None
                     if not prices.empty:
-                        week_data = _week_high_low_around(prices, qrow["earnings_date"])
+                        week_data = _week_high_low_around(prices, qrow["earnings_date"], current_price=current_price)
 
                     # Price 7 working days after earnings
+                    price_7d = None
                     if not prices.empty:
                         price_7d = _price_after_earnings(prices, qrow["earnings_date"], days=7)
+                    if price_7d is None and current_price is not None and (today - qrow["earnings_date"]).days <= 10:
+                        price_7d = current_price  # Dynamic live price for recent prints
 
                     # Quarter labels are mapped so Q1 = MOST recent quarter,
-                    # Q2 = middle, Q3 = oldest (most intuitive reading order).
-                    is_last = (i == n_quarters - 1)
-                    if i == 0:  # oldest of the 3 quarters -> Q3
-                        q3_earnings_score = score
-                        q3_price_7d = price_7d
-                        q3_earnings_date = qrow["earnings_date"]
-                        if week_data is not None:
-                            q3_week_high_pct, q3_week_low_pct, q3_week_high_price, q3_week_low_price, q3_week_high_date, q3_week_low_date = week_data
-                    elif i == 1:  # middle quarter -> Q2
-                        q2_earnings_score = score
-                        q2_price_7d = price_7d
-                        q2_earnings_date = qrow["earnings_date"]
-                        if week_data is not None:
-                            q2_week_high_pct, q2_week_low_pct, q2_week_high_price, q2_week_low_price, q2_week_high_date, q2_week_low_date = week_data
-                    elif i == 2:  # most recent quarter -> Q1
+                    # Q2 = 2nd most recent, Q3 = 3rd most recent.
+                    offset = (n_quarters - 1) - i
+                    is_last = (offset == 0)
+
+                    if offset == 0:  # most recent quarter -> Q1
                         q1_earnings_score = score
                         q1_price_7d = price_7d
                         q1_earnings_date = qrow["earnings_date"]
                         if week_data is not None:
                             q1_week_high_pct, q1_week_low_pct, q1_week_high_price, q1_week_low_price, q1_week_high_date, q1_week_low_date = week_data
+                    elif offset == 1:  # 2nd most recent quarter -> Q2
+                        q2_earnings_score = score
+                        q2_price_7d = price_7d
+                        q2_earnings_date = qrow["earnings_date"]
+                        if week_data is not None:
+                            q2_week_high_pct, q2_week_low_pct, q2_week_high_price, q2_week_low_price, q2_week_high_date, q2_week_low_date = week_data
+                    elif offset == 2:  # 3rd most recent quarter -> Q3
+                        q3_earnings_score = score
+                        q3_price_7d = price_7d
+                        q3_earnings_date = qrow["earnings_date"]
+                        if week_data is not None:
+                            q3_week_high_pct, q3_week_low_pct, q3_week_high_price, q3_week_low_price, q3_week_high_date, q3_week_low_date = week_data
 
                     if is_last:
                         last_quarter_score = score
