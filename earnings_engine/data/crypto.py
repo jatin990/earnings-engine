@@ -20,10 +20,20 @@ import os
 from pathlib import Path
 from typing import Any
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding, rsa
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+try:
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding, rsa
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    _HAS_CRYPTOGRAPHY = True
+except ImportError:
+    default_backend = None  # type: ignore
+    hashes = None  # type: ignore
+    serialization = None  # type: ignore
+    padding = None  # type: ignore
+    rsa = None  # type: ignore
+    AESGCM = None  # type: ignore
+    _HAS_CRYPTOGRAPHY = False
 
 _ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 _PRIVATE_KEY_FILE = _ROOT_DIR / ".local_private.key"
@@ -43,12 +53,14 @@ _EMBEDDED_PUBLIC_KEY_PEM = (
     b"-----END PUBLIC KEY-----\n"
 )
 
-_CACHED_PUB_KEY: rsa.RSAPublicKey | None = None
-_CACHED_PRIV_KEY: rsa.RSAPrivateKey | None = None
+_CACHED_PUB_KEY: Any = None
+_CACHED_PRIV_KEY: Any = None
 
 
-def get_public_key() -> rsa.RSAPublicKey:
+def get_public_key() -> Any:
     """Retrieve the embedded RSA Public Key for encryption."""
+    if not _HAS_CRYPTOGRAPHY:
+        return None
     global _CACHED_PUB_KEY
     if _CACHED_PUB_KEY is not None:
         return _CACHED_PUB_KEY
@@ -71,8 +83,10 @@ def get_public_key() -> rsa.RSAPublicKey:
     return _CACHED_PUB_KEY
 
 
-def get_private_key() -> rsa.RSAPrivateKey | None:
+def get_private_key() -> Any:
     """Retrieve the local RSA Private Key for decryption (local machine only)."""
+    if not _HAS_CRYPTOGRAPHY:
+        return None
     global _CACHED_PRIV_KEY
     if _CACHED_PRIV_KEY is not None:
         return _CACHED_PRIV_KEY

@@ -3189,6 +3189,71 @@ async def resolve_error_endpoint(error_id: str, req: ResolveErrorRequest | None 
     return {"success": True, "resolved_id": error_id, "notes": notes}
 
 
+# ===========================================================================
+# 📊 Industry-Benchmarked Fundamental & Technical Stock Rating Endpoints
+# ===========================================================================
+
+class RecalculateRatingRequest(BaseModel):
+    source: str = "manual_recalc"
+    audit_notes: str | None = None
+
+
+class BatchRatingRequest(BaseModel):
+    tickers: list[str]
+    force_recalculate: bool = False
+
+
+@app.get("/api/v1/stock/{ticker}/rating", tags=["Stock Intelligence & Ratings"])
+async def get_stock_rating_endpoint(ticker: str):
+    """Retrieve the industry-benchmarked fundamental rating, technical score, and AI note."""
+    from earnings_engine.data.stock_rating import get_stock_rating, recalculate_stock_rating
+    rating = get_stock_rating(ticker, _settings)
+    if not rating:
+        # Compute on-demand if not cached yet
+        rating = recalculate_stock_rating(ticker, _settings, source="auto_on_demand")
+    return {"success": True, **rating}
+
+
+@app.post("/api/v1/stock/{ticker}/recalculate", tags=["Stock Intelligence & Ratings"])
+async def recalculate_stock_rating_endpoint(ticker: str, req: RecalculateRatingRequest | None = None):
+    """Recalculate stock metrics live, compare diff against previous snapshot, and log audit trail."""
+    from earnings_engine.data.stock_rating import recalculate_stock_rating
+    src = req.source if req and req.source else "user_recalculate"
+    result = recalculate_stock_rating(ticker, _settings, source=src)
+
+    # Log to audit history
+    try:
+        from earnings_engine.data.recalculate_audit import log_recalculate_event
+        diff_summary = f"Fundamental: {result['fundamental']['grade']} ({result['fundamental']['score']}), Tech: {result['technical']['grade']} ({result['technical']['score']})"
+        log_recalculate_event(
+            ticker=ticker,
+            source=src,
+            notes=req.audit_notes if req and req.audit_notes else diff_summary,
+            settings=_settings,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to log recalculate audit event for {ticker}: {e}")
+
+    return {"success": True, **result}
+
+
+@app.post("/api/v1/stock/ratings/batch", tags=["Stock Intelligence & Ratings"])
+async def batch_stock_ratings_endpoint(req: BatchRatingRequest):
+    """Batch fetch or compute ratings for multiple tickers."""
+    from earnings_engine.data.stock_rating import get_stock_rating, recalculate_stock_rating
+    results = {}
+    for sym in req.tickers[:100]:  # Limit batch to 100
+        if req.force_recalculate:
+            results[sym] = recalculate_stock_rating(sym, _settings, source="batch_recalc")
+        else:
+            r = get_stock_rating(sym, _settings)
+            if not r:
+                r = recalculate_stock_rating(sym, _settings, source="batch_auto")
+            results[sym] = r
+    return {"success": True, "count": len(results), "ratings": results}
+
+
+
 
 
 

@@ -57,9 +57,13 @@ def render_dashboard(html_path: Path | None = None) -> Path:
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         html_path = OUTPUT_DIR / "dashboard.html"
     
-    from earnings_engine.data.crypto import has_private_key
+    try:
+        from earnings_engine.data.crypto import has_private_key
+        has_key = has_private_key()
+    except Exception:
+        has_key = False
     template = _JINJA_ENV.get_template("dashboard.html")
-    html = template.render(has_diagnostics_key=has_private_key(), has_tracker_key=has_private_key())
+    html = template.render(has_diagnostics_key=has_key, has_tracker_key=has_key)
 
     import re
     js_path = TEMPLATES_DIR.parent.parent / "ui" / "js" / "dashboard.js"
@@ -226,13 +230,12 @@ def _fmt_prediction(value: object, kind: str = "kronos",
     if is_empty:
         if on_demand and ticker:
             engine = "kronos" if kind == "kronos" else "gbm"
-            label = "🤖" if kind == "kronos" else "📈"
             return (
                 f'<span class="pred-cell">'
                 f'<button type="button" class="btn-micro btn-micro-neutral pred-run-btn" data-ticker="{ticker}" '
                 f'data-engine="{engine}" '
                 f'onclick="app.runRowPrediction(\'{ticker}\',\'{engine}\',this)" title="Run {engine.upper()} on-demand">'
-                f'{label} Run</button></span>'
+                f'Run</button></span>'
             )
         return '<span class="pred-muted">—</span>'
     if isinstance(value, dict):
@@ -851,18 +854,18 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
                 f'<span class="signal-badge" style="background:{dir_bg};color:{dir_color};border:1px solid {dir_color}44;font-size:0.68rem;padding:0.12rem 0.45rem;font-weight:700;cursor:pointer;line-height:1.2;" '
                 f'onclick="event.stopPropagation(); app.openAiDetails(\'ALL\', \'{ticker}\', event)" '
                 f'title="DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral: {dir_str}{ret_disp}">'
-                f'🤖 {dir_str}{ret_disp}'
+                f'{dir_str}{ret_disp}'
                 f'</span>'
-                f'<button type="button" class="btn-micro btn-micro-violet" onclick="event.stopPropagation(); app.runConsensusForTicker(\'{ticker}\', this)" '
-                f'title="Re-run 4-Model AI Consensus for {ticker}">⚡</button>'
+                f'<button type="button" class="btn-micro btn-micro-neutral" onclick="event.stopPropagation(); app.runConsensusForTicker(\'{ticker}\', this)" '
+                f'title="Re-run 4-Model AI Consensus for {ticker}">Re-run</button>'
                 f'</div>'
             )
         else:
             clean_dom_id = "consensus-cell-" + re.sub(r"[^A-Za-z0-9]", "_", ticker)
             consensus_badge = (
                 f'<div id="{clean_dom_id}">'
-                f'<button type="button" class="btn-micro btn-micro-violet" onclick="event.stopPropagation(); app.runConsensusForTicker(\'{ticker}\', this)" '
-                f'title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral consensus for {ticker}">⚡ AI Consensus</button>'
+                f'<button type="button" class="btn-micro btn-micro-neutral" onclick="event.stopPropagation(); app.runConsensusForTicker(\'{ticker}\', this)" '
+                f'title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral consensus for {ticker}">Consensus</button>'
                 f'</div>'
             )
 
