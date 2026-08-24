@@ -3,307 +3,463 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ ticker }} | Stock Intelligence & AI Consensus</title>
+    <title>{{ ticker }} · Stock Intelligence & AI Consensus</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-base: #000000;
-            --bg-card: #080808;
-            --bg-surface: #0e0e0e;
-            --bg-elevated: #141414;
-            --border-subtle: rgba(255, 255, 255, 0.08);
-            --border-bright: rgba(255, 255, 255, 0.16);
-            --text-main: #f4f4f5;
-            --text-muted: #a1a1aa;
-            --text-dim: #71717a;
-            --accent-green: #34d399;
-            --accent-red: #f87171;
-            --accent-blue: #60a5fa;
-            --accent-purple: #c084fc;
-            --accent-amber: #fbbf24;
-            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --bg-void: #090a0f;
+            --bg-card: #11131a;
+            --bg-surface: #171922;
+            --bg-elevated: #1e2230;
+            --border: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(255, 255, 255, 0.16);
+            --border-focus: rgba(99, 102, 241, 0.5);
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-tertiary: #64748b;
+            
+            --emerald: #10b981;
+            --emerald-subtle: rgba(16, 185, 129, 0.12);
+            --emerald-border: rgba(16, 185, 129, 0.25);
+            
+            --rose: #f43f5e;
+            --rose-subtle: rgba(244, 63, 94, 0.12);
+            --rose-border: rgba(244, 63, 94, 0.25);
+            
+            --indigo: #6366f1;
+            --indigo-subtle: rgba(99, 102, 241, 0.12);
+            --indigo-border: rgba(99, 102, 241, 0.3);
+            
+            --sky: #0ea5e9;
+            --amber: #f59e0b;
+            
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        
         body {
-            background-color: var(--bg-base);
-            color: var(--text-main);
+            background-color: var(--bg-void);
+            background-image: radial-gradient(ellipse 90% 40% at 50% -10%, rgba(99, 102, 241, 0.09), transparent 70%);
+            color: var(--text-primary);
             font-family: var(--font-sans);
             -webkit-font-smoothing: antialiased;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            line-height: 1.5;
         }
 
-        /* Top Header */
+        /* Topbar Header */
         .topbar {
             position: sticky;
             top: 0;
             z-index: 100;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-bottom: 1px solid var(--border-subtle);
-            padding: 0.65rem 1.5rem;
+            background: rgba(9, 10, 15, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 2rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
         }
 
-        .brand-link {
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.4rem 0.8rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+
+        .breadcrumb {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            color: var(--text-main);
-            text-decoration: none;
-            font-size: 0.875rem;
-            font-weight: 600;
+            font-size: 0.825rem;
+            color: var(--text-tertiary);
+        }
+        .breadcrumb strong {
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            letter-spacing: -0.01em;
         }
 
-        .back-btn {
+        .btn {
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid var(--border-subtle);
-            color: var(--text-main);
-            padding: 0.35rem 0.75rem;
-            border-radius: 6px;
-            font-size: 0.78rem;
-            font-weight: 500;
-            text-decoration: none;
-            transition: all 0.15s;
+            gap: 0.45rem;
+            padding: 0.45rem 1rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.825rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+            font-family: var(--font-sans);
         }
-        .back-btn:hover {
-            background: rgba(255, 255, 255, 0.12);
-            border-color: var(--border-bright);
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5, #3b82f6);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
+        }
+        .btn-primary:hover {
+            opacity: 0.92;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35);
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--border);
+            color: var(--text-secondary);
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.09);
+            border-color: var(--border-hover);
+            color: var(--text-primary);
         }
 
         /* Container */
-        .main-container {
-            max-width: 1360px;
+        .container {
+            max-width: 1320px;
             width: 100%;
             margin: 0 auto;
-            padding: 1.5rem;
+            padding: 2rem;
             display: flex;
             flex-direction: column;
-            gap: 1.5rem;
+            gap: 1.75rem;
             flex: 1;
         }
 
-        /* Cards */
+        /* Card Container */
         .card {
             background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: 10px;
-            padding: 1.25rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
             position: relative;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         }
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding-bottom: 0.6rem;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
         }
         .card-title {
-            font-size: 0.85rem;
+            font-size: 0.875rem;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
             display: flex;
             align-items: center;
-            gap: 0.45rem;
+            gap: 0.5rem;
         }
 
-        /* Hero Header */
-        .hero-banner {
+        /* Hero Stock Banner */
+        .hero {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             flex-wrap: wrap;
-            gap: 1.25rem;
-            background: linear-gradient(180deg, #0e0e0e 0%, #080808 100%);
-            border: 1px solid var(--border-subtle);
-            border-radius: 12px;
-            padding: 1.5rem;
+            gap: 1.5rem;
+            background: linear-gradient(180deg, var(--bg-card) 0%, #0d0f15 100%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.75rem 2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
 
-        .ticker-badge {
-            font-family: var(--font-mono);
-            font-size: 1.75rem;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            color: #ffffff;
-        }
-        .company-name {
-            font-size: 0.95rem;
-            color: var(--text-muted);
-            margin-top: 0.15rem;
-        }
-
-        .price-display {
-            display: flex;
-            align-items: baseline;
-            gap: 0.6rem;
-            margin-top: 0.4rem;
-        }
-        .current-price {
-            font-family: var(--font-mono);
-            font-size: 2.2rem;
-            font-weight: 800;
-            color: #ffffff;
-        }
-        .change-badge {
-            font-family: var(--font-mono);
-            font-size: 0.9rem;
-            font-weight: 700;
-            padding: 0.2rem 0.6rem;
-            border-radius: 6px;
-        }
-        .change-up { background: rgba(52, 211, 153, 0.15); color: var(--accent-green); border: 1px solid rgba(52, 211, 153, 0.3); }
-        .change-down { background: rgba(248, 113, 113, 0.15); color: var(--accent-red); border: 1px solid rgba(248, 113, 113, 0.3); }
-
-        .btn-action {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.45rem 0.9rem;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            transition: all 0.15s;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #3b82f6, #6366f1);
-            color: #ffffff;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-        }
-        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text-main);
-            border: 1px solid var(--border-subtle);
-        }
-        .btn-secondary:hover { background: rgba(255, 255, 255, 0.14); }
-
-        /* KPI Glow Grid */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 0.85rem;
-        }
-        .kpi-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border-subtle);
-            border-radius: 8px;
-            padding: 0.9rem 1rem;
+        .hero-left {
             display: flex;
             flex-direction: column;
-            gap: 0.25rem;
+            gap: 0.4rem;
         }
-        .kpi-label {
+        .ticker-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .ticker-symbol {
+            font-family: var(--font-mono);
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: var(--text-primary);
+        }
+        .tag-pill {
             font-size: 0.72rem;
-            font-weight: 600;
-            color: var(--text-muted);
+            font-weight: 700;
+            padding: 0.2rem 0.55rem;
+            border-radius: var(--radius-sm);
             text-transform: uppercase;
             letter-spacing: 0.04em;
         }
-        .kpi-val {
-            font-family: var(--font-mono);
-            font-size: 1.25rem;
-            font-weight: 800;
-            color: #ffffff;
+        .tag-market {
+            background: var(--indigo-subtle);
+            color: #a5b4fc;
+            border: 1px solid var(--indigo-border);
         }
-        .kpi-sub {
-            font-size: 0.72rem;
-            color: var(--text-dim);
+        .tag-sector {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
         }
 
-        /* 4 Model Matrix Grid */
-        .models-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1rem;
+        .company-desc {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            font-weight: 500;
         }
-        .model-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border-subtle);
-            border-radius: 8px;
-            padding: 1rem;
+
+        .price-row {
+            display: flex;
+            align-items: baseline;
+            gap: 0.85rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .price-main {
+            font-family: var(--font-mono);
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.03em;
+            font-variant-numeric: tabular-nums;
+        }
+        .change-pill {
+            font-family: var(--font-mono);
+            font-size: 0.925rem;
+            font-weight: 700;
+            padding: 0.25rem 0.7rem;
+            border-radius: var(--radius-sm);
+            font-variant-numeric: tabular-nums;
+        }
+        .change-pill.up {
+            background: var(--emerald-subtle);
+            color: var(--emerald);
+            border: 1px solid var(--emerald-border);
+        }
+        .change-pill.down {
+            background: var(--rose-subtle);
+            color: var(--rose);
+            border: 1px solid var(--rose-border);
+        }
+        .prev-close-text {
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            font-family: var(--font-mono);
+        }
+
+        .hero-right {
             display: flex;
             flex-direction: column;
-            gap: 0.6rem;
+            gap: 0.75rem;
+            min-width: 280px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1rem 1.25rem;
         }
-        .model-header {
+        .range-bar-track {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+            margin: 0.25rem 0;
+        }
+        .range-bar-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, #10b981, #6366f1, #0ea5e9);
+            border-radius: 3px;
+        }
+        .meta-stat {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+        .meta-stat strong {
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+        }
+
+        /* 6 KPI Cards Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+        .kpi-box {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.1rem 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            transition: border-color 0.15s ease;
+        }
+        .kpi-box:hover {
+            border-color: var(--border-hover);
+        }
+        .kpi-tag {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .kpi-number {
+            font-family: var(--font-mono);
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: -0.02em;
+            font-variant-numeric: tabular-nums;
+        }
+        .kpi-subtext {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* AI Consensus Models Matrix */
+        .models-matrix {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+            gap: 1rem;
+        }
+        .model-tile {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 1.15rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            transition: all 0.15s ease;
+        }
+        .model-tile:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+        .model-top {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .model-name {
+        .model-label {
             font-weight: 700;
-            font-size: 0.85rem;
+            font-size: 0.875rem;
             color: #ffffff;
+            letter-spacing: -0.01em;
         }
-        .model-dir {
+        .model-vote {
             font-size: 0.72rem;
             font-weight: 700;
-            padding: 0.15rem 0.45rem;
-            border-radius: 4px;
+            padding: 0.18rem 0.5rem;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-mono);
+        }
+        .model-targets {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            font-family: var(--font-mono);
+            background: rgba(0, 0, 0, 0.25);
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .model-rationale {
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            line-height: 1.5;
         }
 
-        /* Table */
-        .data-table {
+        /* Tables */
+        .clean-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.8rem;
-            font-family: var(--font-sans);
+            font-size: 0.825rem;
         }
-        .data-table th {
+        .clean-table th {
             text-align: left;
-            padding: 0.6rem 0.75rem;
+            padding: 0.75rem 1rem;
             background: rgba(255, 255, 255, 0.02);
-            color: var(--text-muted);
-            font-weight: 600;
-            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-tertiary);
+            font-weight: 700;
+            border-bottom: 1px solid var(--border);
             font-size: 0.72rem;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
-        .data-table td {
-            padding: 0.65rem 0.75rem;
+        .clean-table td {
+            padding: 0.8rem 1rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-            color: var(--text-main);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
         }
-        .data-table tr:hover td {
+        .clean-table tr:hover td {
             background: rgba(255, 255, 255, 0.02);
         }
 
-        /* Catalysts List */
-        .catalyst-item {
-            padding: 0.85rem;
+        /* Catalysts Items */
+        .catalyst-card {
+            padding: 1rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             display: flex;
             flex-direction: column;
-            gap: 0.35rem;
+            gap: 0.4rem;
+            transition: background 0.15s ease;
         }
-        .catalyst-item:last-child { border-bottom: none; }
-        .catalyst-title {
-            font-size: 0.88rem;
+        .catalyst-card:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .catalyst-card:last-child { border-bottom: none; }
+        .catalyst-headline {
+            font-size: 0.9rem;
             font-weight: 600;
             color: #ffffff;
             text-decoration: none;
+            line-height: 1.4;
         }
-        .catalyst-title:hover { color: var(--accent-blue); }
+        .catalyst-headline:hover {
+            color: var(--sky);
+        }
 
-        /* Spinner */
+        /* Loading Spinner */
         .spinner {
             display: inline-block;
             width: 14px;
@@ -320,142 +476,147 @@
 
     <!-- TOPBAR -->
     <header class="topbar">
-        <div style="display: flex; align-items: center; gap: 0.85rem;">
-            <a href="/dashboard" class="back-btn">← Back to Dashboard</a>
-            <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem;">
-                <span style="color: var(--text-dim);">engine</span>
-                <span style="color: var(--text-dim);">/</span>
-                <span style="color: var(--text-dim);">stocks</span>
-                <span style="color: var(--text-dim);">/</span>
-                <strong id="topbarTicker" style="color: #ffffff; font-family: var(--font-mono);">{{ ticker }}</strong>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <a href="/dashboard" class="back-link">
+                <span>←</span>
+                <span>Dashboard</span>
+            </a>
+            <div class="breadcrumb">
+                <span>stocks</span>
+                <span>/</span>
+                <strong id="topTicker">{{ ticker }}</strong>
             </div>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <button id="btnToggleWatchlist" onclick="toggleWatchlist()" class="btn-action btn-secondary" title="Add or remove from Watchlist">
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+            <button id="btnWatchlist" onclick="toggleWatchlist()" class="btn btn-secondary">
                 ⭐ Watchlist
             </button>
-            <button id="btnRunConsensus" onclick="triggerConsensus()" class="btn-action btn-primary" title="Execute AI Multi-Model Consensus Analysis">
+            <button id="btnConsensus" onclick="runConsensus()" class="btn btn-primary">
                 🧠 Run AI Consensus
             </button>
         </div>
     </header>
 
-    <!-- MAIN BODY -->
-    <main class="main-container">
+    <!-- MAIN CONTAINER -->
+    <main class="container">
         
         <!-- HERO PROFILE & PRICE BANNER -->
-        <section class="hero-banner" id="heroBanner">
-            <div>
-                <div style="display: flex; align-items: center; gap: 0.6rem;">
-                    <span class="ticker-badge" id="stockTicker">{{ ticker }}</span>
-                    <span id="marketBadge" style="font-size: 0.72rem; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.3);">NSE</span>
-                    <span id="sectorBadge" style="font-size: 0.72rem; background: rgba(255, 255, 255, 0.06); color: var(--text-muted); padding: 0.2rem 0.5rem; border-radius: 4px;">Equities</span>
+        <section class="hero">
+            <div class="hero-left">
+                <div class="ticker-row">
+                    <h1 class="ticker-symbol" id="symTicker">{{ ticker }}</h1>
+                    <span class="tag-pill tag-market" id="tagMarket">NSE</span>
+                    <span class="tag-pill tag-sector" id="tagSector">Equities</span>
                 </div>
-                <div class="company-name" id="stockName">Loading company profile...</div>
+                <div class="company-desc" id="lblCompanyName">Loading company profile...</div>
                 
-                <div class="price-display">
-                    <span class="current-price" id="currentPrice">₹—</span>
-                    <span class="change-badge change-up" id="changeBadge">+0.00%</span>
-                    <span style="font-size: 0.75rem; color: var(--text-dim);" id="prevCloseLabel">Prev Close: ₹—</span>
+                <div class="price-row">
+                    <span class="price-main" id="valCurrentPrice">₹—</span>
+                    <span class="change-pill up" id="pillDayChange">+0.00%</span>
+                    <span class="prev-close-text" id="lblPrevClose">Prev Close: ₹—</span>
                 </div>
             </div>
 
-            <!-- 52W Range & Fundamentals -->
-            <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 260px;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
-                    <span>52W Low: <strong id="lbl52Low" style="color: #ffffff;">₹—</strong></span>
-                    <span>52W High: <strong id="lbl52High" style="color: #ffffff;">₹—</strong></span>
+            <!-- 52W Range & Market Details -->
+            <div class="hero-right">
+                <div class="meta-stat">
+                    <span>52W Low: <strong id="val52Low">₹—</strong></span>
+                    <span>52W High: <strong id="val52High">₹—</strong></span>
                 </div>
-                <div style="height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; position: relative; overflow: hidden;">
-                    <div id="range52Bar" style="position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: linear-gradient(90deg, #34d399, #60a5fa); border-radius: 3px;"></div>
+                <div class="range-bar-track">
+                    <div class="range-bar-fill" id="fill52Range" style="width: 50%;"></div>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-dim); margin-top: 0.2rem;">
-                    <span>Market Cap: <strong id="lblMarketCap" style="color: var(--text-muted);">₹— Cr</strong></span>
-                    <span>Intraday Range: <strong id="lblDayRange" style="color: var(--text-muted);">₹— – ₹—</strong></span>
+                <div class="meta-stat" style="margin-top: 0.25rem;">
+                    <span>Market Cap:</span>
+                    <strong id="valMarketCap">—</strong>
+                </div>
+                <div class="meta-stat">
+                    <span>Day Range:</span>
+                    <strong id="valDayRange">₹— – ₹—</strong>
                 </div>
             </div>
         </section>
 
-        <!-- TRADE SETUP & CONSENSUS HERO CARD -->
-        <section class="card" id="tradeSetupCard" style="border-color: rgba(99, 102, 241, 0.25);">
+        <!-- TRADE SETUP & STRATEGIC VERDICT CARD -->
+        <section class="card" style="border-color: var(--indigo-border);">
             <div class="card-header">
                 <div class="card-title">
                     <span>⚡ AI Consensus Trade Setup & Strategic Verdict</span>
                 </div>
-                <div id="verdictBadge" style="font-size: 0.78rem; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 6px; background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3);">
-                    ANALYZING...
+                <div id="verdictPill" style="font-size: 0.78rem; font-weight: 800; padding: 0.28rem 0.8rem; border-radius: var(--radius-sm); font-family: var(--font-mono); background: var(--emerald-subtle); color: var(--emerald); border: 1px solid var(--emerald-border);">
+                    ANALYZING SETUP...
                 </div>
             </div>
 
-            <!-- 6 KPI GLOW METRICS -->
+            <!-- 6 KPI BLOCKS -->
             <div class="kpi-grid" style="margin-bottom: 1.25rem;">
-                <div class="kpi-card" style="border-left: 3px solid #34d399;">
-                    <div class="kpi-label">Worth Entering</div>
-                    <div class="kpi-val" id="valWorthEntering" style="font-size: 1.05rem; color: #34d399;">—</div>
-                    <div class="kpi-sub" id="subConviction">Risk / Reward Score</div>
+                <div class="kpi-box" style="border-top: 2px solid var(--emerald);">
+                    <div class="kpi-tag">Worth Entering</div>
+                    <div class="kpi-number" id="kpiWorth" style="color: var(--emerald); font-size: 1.15rem;">—</div>
+                    <div class="kpi-subtext">Actionable Rating</div>
                 </div>
-                <div class="kpi-card" style="border-left: 3px solid #60a5fa;">
-                    <div class="kpi-label">Optimal Entry Zone</div>
-                    <div class="kpi-val" id="valEntryZone" style="font-size: 1.1rem; color: #60a5fa;">₹— – ₹—</div>
-                    <div class="kpi-sub">Support pullback range</div>
+                <div class="kpi-box" style="border-top: 2px solid var(--sky);">
+                    <div class="kpi-tag">Optimal Entry Zone</div>
+                    <div class="kpi-number" id="kpiEntry" style="color: var(--sky); font-size: 1.1rem;">₹— – ₹—</div>
+                    <div class="kpi-subtext">Pullback Buy Range</div>
                 </div>
-                <div class="kpi-card" style="border-left: 3px solid #34d399;">
-                    <div class="kpi-label">Consensus Target</div>
-                    <div class="kpi-val" id="valTargetPrice" style="color: #ffffff;">₹—</div>
-                    <div class="kpi-sub" id="subTargetGain" style="color: #34d399;">+0.0% upside</div>
+                <div class="kpi-box" style="border-top: 2px solid var(--emerald);">
+                    <div class="kpi-tag">Consensus Target</div>
+                    <div class="kpi-number" id="kpiTarget" style="color: #ffffff;">₹—</div>
+                    <div class="kpi-subtext" id="kpiTargetSub" style="color: var(--emerald);">+0.0% upside</div>
                 </div>
-                <div class="kpi-card" style="border-left: 3px solid #f87171;">
-                    <div class="kpi-label">Stop Loss Level</div>
-                    <div class="kpi-val" id="valStopLoss" style="color: #fca5a5;">₹—</div>
-                    <div class="kpi-sub" id="subStopLossRisk" style="color: #f87171;">-0.0% risk</div>
+                <div class="kpi-box" style="border-top: 2px solid var(--rose);">
+                    <div class="kpi-tag">Stop Loss Level</div>
+                    <div class="kpi-number" id="kpiSL" style="color: #fca5a5;">₹—</div>
+                    <div class="kpi-subtext" id="kpiSLSub" style="color: var(--rose);">-0.0% risk</div>
                 </div>
-                <div class="kpi-card" style="border-left: 3px solid #c084fc;">
-                    <div class="kpi-label">Risk-to-Reward</div>
-                    <div class="kpi-val" id="valRiskReward" style="color: #e9d5ff;">1 : —</div>
-                    <div class="kpi-sub">Reward vs Invalidation</div>
+                <div class="kpi-box" style="border-top: 2px solid #a855f7;">
+                    <div class="kpi-tag">Risk-to-Reward</div>
+                    <div class="kpi-number" id="kpiRR" style="color: #e9d5ff;">1 : —</div>
+                    <div class="kpi-subtext">Reward vs Invalidation</div>
                 </div>
-                <div class="kpi-card" style="border-left: 3px solid #fbbf24;">
-                    <div class="kpi-label">Consensus Strength</div>
-                    <div class="kpi-val" id="valStrength" style="color: #fbbf24;">—%</div>
-                    <div class="kpi-sub" id="subAgreement">AI Models Agreeing</div>
+                <div class="kpi-box" style="border-top: 2px solid var(--amber);">
+                    <div class="kpi-tag">Consensus Strength</div>
+                    <div class="kpi-number" id="kpiStrength" style="color: var(--amber);">—%</div>
+                    <div class="kpi-subtext" id="kpiAgreeCount">AI Models Agreeing</div>
                 </div>
             </div>
 
-            <!-- ACTIONABLE INSIGHTS CALLOUT -->
-            <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem; display: flex; flex-direction: column; gap: 0.6rem;">
-                <div style="font-size: 0.85rem; color: #e2e8f0; line-height: 1.5;" id="txtConsensusThesis">
+            <!-- SYNTHESIZED QUANT THESIS -->
+            <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.15rem; display: flex; flex-direction: column; gap: 0.65rem;">
+                <div id="txtThesis" style="font-size: 0.875rem; color: var(--text-primary); line-height: 1.55;">
                     Loading AI thesis and strategic rationale...
                 </div>
                 <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.25rem;">
-                    <span id="pillPattern" style="font-size: 0.72rem; background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.25); padding: 0.2rem 0.55rem; border-radius: 4px;">📈 Pattern: —</span>
-                    <span id="pillVolume" style="font-size: 0.72rem; background: rgba(168, 85, 247, 0.12); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.25); padding: 0.2rem 0.55rem; border-radius: 4px;">📊 Volume: —</span>
-                    <span id="pillRisk" style="font-size: 0.72rem; background: rgba(239, 68, 68, 0.12); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.25); padding: 0.2rem 0.55rem; border-radius: 4px;">⚠️ Primary Risk: —</span>
+                    <span id="badgePattern" style="font-size: 0.72rem; font-weight: 600; background: var(--sky); color: #082f49; padding: 0.2rem 0.6rem; border-radius: 4px;">📈 Pattern: —</span>
+                    <span id="badgeVolume" style="font-size: 0.72rem; font-weight: 600; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 0.2rem 0.6rem; border-radius: 4px;">📊 Volume: —</span>
+                    <span id="badgeRisk" style="font-size: 0.72rem; font-weight: 600; background: var(--rose-subtle); color: var(--rose); border: 1px solid var(--rose-border); padding: 0.2rem 0.6rem; border-radius: 4px;">⚠️ Primary Risk: —</span>
                 </div>
             </div>
         </section>
 
-        <!-- 4-MODEL CONSENSUS BREAKDOWN MATRIX -->
+        <!-- 4-MODEL AI MATRIX -->
         <section class="card">
             <div class="card-header">
                 <div class="card-title">🤖 4-Model AI Engine Breakdown</div>
-                <span style="font-size: 0.72rem; color: var(--text-dim);">DeepSeek-R1 · Llama-3.3-70B · Qwen-2.5-72B · Mistral-Large</span>
+                <span style="font-size: 0.75rem; color: var(--text-tertiary);">DeepSeek-R1 · Llama-3.3-70B · Qwen-2.5-72B · Mistral-Large</span>
             </div>
-            <div class="models-grid" id="modelsGrid">
-                <div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); padding: 2rem;">Loading model consensus breakdown...</div>
+            <div class="models-matrix" id="modelsContainer">
+                <div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 2rem;">Loading model outputs...</div>
             </div>
         </section>
 
-        <!-- TWO COLUMN: EARNINGS SIGNAL HISTORY & SHORT-TERM CATALYSTS -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;">
+        <!-- TWO COLUMN LAYOUT: EARNINGS TRACK RECORD & SHORT-TERM CATALYSTS -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 1.75rem;">
             
-            <!-- Quarterly Earnings Track Record -->
+            <!-- Earnings History -->
             <section class="card">
                 <div class="card-header">
                     <div class="card-title">📅 Quarterly Earnings Track Record</div>
                 </div>
                 <div style="overflow-x: auto;">
-                    <table class="data-table">
+                    <table class="clean-table">
                         <thead>
                             <tr>
                                 <th>Quarter / Date</th>
@@ -464,21 +625,21 @@
                                 <th>Result Week Move</th>
                             </tr>
                         </thead>
-                        <tbody id="earningsTableBody">
-                            <tr><td colspan="4" style="text-align: center; color: var(--text-dim);">Loading earnings signals...</td></tr>
+                        <tbody id="tblEarningsBody">
+                            <tr><td colspan="4" style="text-align: center; color: var(--text-tertiary);">Loading past earnings signals...</td></tr>
                         </tbody>
                     </table>
                 </div>
             </section>
 
-            <!-- Short-Term News Catalysts Feed -->
+            <!-- News Catalysts -->
             <section class="card">
                 <div class="card-header">
                     <div class="card-title">🔥 Short-Term News Catalysts</div>
-                    <span style="font-size: 0.72rem; color: var(--text-dim);" id="catFeedCount">0 headlines</span>
+                    <span style="font-size: 0.75rem; color: var(--text-tertiary);" id="lblCatalystCount">0 headlines</span>
                 </div>
-                <div id="catalystsList" style="display: flex; flex-direction: column; max-height: 420px; overflow-y: auto;">
-                    <div style="text-align: center; color: var(--text-dim); padding: 2rem;">Loading fresh catalyst news...</div>
+                <div id="listCatalysts" style="display: flex; flex-direction: column; max-height: 420px; overflow-y: auto;">
+                    <div style="text-align: center; color: var(--text-tertiary); padding: 2rem;">Loading news headlines...</div>
                 </div>
             </section>
 
@@ -487,181 +648,181 @@
     </main>
 
     <script>
-        const ACTIVE_TICKER = "{{ ticker }}";
-        let stockData = null;
+        const ACTIVE_SYM = "{{ ticker }}";
+        let stockState = null;
 
-        async function loadStockProfile() {
+        async function fetchStockDetails() {
             try {
-                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_TICKER)}/overview`);
-                if (!res.ok) throw new Error('Failed to load stock intelligence');
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/overview`);
+                if (!res.ok) throw new Error('Could not retrieve stock overview');
                 const data = await res.json();
-                stockData = data;
-                renderProfile(data);
+                stockState = data;
+                renderUI(data);
             } catch (err) {
                 console.error(err);
-                document.getElementById('stockName').textContent = 'Error loading stock: ' + err.message;
+                document.getElementById('lblCompanyName').textContent = 'Error loading stock: ' + err.message;
             }
         }
 
-        function renderProfile(data) {
+        function renderUI(data) {
             const p = data.profile || {};
             const q = data.quote || {};
             const t = data.technical || {};
             const c = data.consensus || {};
 
-            // Header & Info
-            document.getElementById('stockName').textContent = p.name || p.ticker;
-            document.getElementById('marketBadge').textContent = p.market || 'NSE';
-            document.getElementById('sectorBadge').textContent = p.sector || 'Equities';
+            // Header profile
+            document.getElementById('lblCompanyName').textContent = p.name || p.ticker;
+            document.getElementById('tagMarket').textContent = p.market || 'NSE';
+            document.getElementById('tagSector').textContent = p.sector || 'Equities';
 
-            const currP = q.current_price || 0;
-            document.getElementById('currentPrice').textContent = `₹${currP.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            
-            const changePct = q.day_change_pct || 0;
-            const changeBadge = document.getElementById('changeBadge');
-            changeBadge.textContent = `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}% (${q.day_change >= 0 ? '+' : ''}${q.day_change || 0})`;
-            changeBadge.className = `change-badge ${changePct >= 0 ? 'change-up' : 'change-down'}`;
+            const curr = q.current_price || 0;
+            document.getElementById('valCurrentPrice').textContent = `₹${curr.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 
-            document.getElementById('prevCloseLabel').textContent = `Prev Close: ₹${q.previous_close || '—'}`;
-            document.getElementById('lbl52Low').textContent = `₹${q.week_52_low || '—'}`;
-            document.getElementById('lbl52High').textContent = `₹${q.week_52_high || '—'}`;
-            document.getElementById('lblMarketCap').textContent = p.market_cap ? `₹${(p.market_cap / 10000000).toLocaleString(undefined, {maximumFractionDigits: 0})} Cr` : '—';
-            document.getElementById('lblDayRange').textContent = (q.day_low && q.day_high) ? `₹${q.day_low} – ₹${q.day_high}` : '—';
+            const chgPct = q.day_change_pct || 0;
+            const chgEl = document.getElementById('pillDayChange');
+            chgEl.textContent = `${chgPct >= 0 ? '+' : ''}${chgPct.toFixed(2)}% (${q.day_change >= 0 ? '+' : ''}${q.day_change || 0})`;
+            chgEl.className = `change-pill ${chgPct >= 0 ? 'up' : 'down'}`;
 
-            // 52W range bar position
-            if (q.week_52_low && q.week_52_high && currP) {
-                const pct = Math.max(0, Math.min(100, ((currP - q.week_52_low) / (q.week_52_high - q.week_52_low)) * 100));
-                document.getElementById('range52Bar').style.width = pct + '%';
+            document.getElementById('lblPrevClose').textContent = `Prev Close: ₹${q.previous_close || '—'}`;
+            document.getElementById('val52Low').textContent = `₹${q.week_52_low || '—'}`;
+            document.getElementById('val52High').textContent = `₹${q.week_52_high || '—'}`;
+            document.getElementById('valMarketCap').textContent = p.market_cap ? `₹${(p.market_cap / 10000000).toLocaleString(undefined, {maximumFractionDigits: 0})} Cr` : '—';
+            document.getElementById('valDayRange').textContent = (q.day_low && q.day_high) ? `₹${q.day_low} – ₹${q.day_high}` : '—';
+
+            if (q.week_52_low && q.week_52_high && curr) {
+                const ratio = Math.max(0, Math.min(100, ((curr - q.week_52_low) / (q.week_52_high - q.week_52_low)) * 100));
+                document.getElementById('fill52Range').style.width = ratio + '%';
             }
 
-            // Watchlist Button State
-            const btnWl = document.getElementById('btnToggleWatchlist');
+            // Watchlist button
+            const btnW = document.getElementById('btnWatchlist');
             if (data.is_in_watchlist) {
-                btnWl.innerHTML = '⭐ In Watchlist';
-                btnWl.style.background = 'rgba(251, 191, 36, 0.2)';
-                btnWl.style.borderColor = 'rgba(251, 191, 36, 0.4)';
-                btnWl.style.color = '#fbbf24';
+                btnW.innerHTML = '⭐ In Watchlist';
+                btnW.style.background = 'rgba(245, 158, 11, 0.15)';
+                btnW.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+                btnW.style.color = '#fbbf24';
             } else {
-                btnWl.innerHTML = '☆ Add to Watchlist';
-                btnWl.style.background = 'rgba(255, 255, 255, 0.08)';
-                btnWl.style.borderColor = 'var(--border-subtle)';
-                btnWl.style.color = 'var(--text-main)';
+                btnW.innerHTML = '☆ Add to Watchlist';
+                btnW.style.background = 'rgba(255, 255, 255, 0.05)';
+                btnW.style.borderColor = 'var(--border)';
+                btnW.style.color = 'var(--text-secondary)';
             }
 
-            // Consensus & Trade Setup
-            renderTradeSetup(c, currP, t);
+            // Render Consensus Setup
+            renderConsensus(c, curr);
 
-            // Earnings Track Record
+            // Render Earnings History
             renderEarnings(data.earnings_history || []);
 
-            // Catalysts Feed
+            // Render News Catalysts
             renderCatalysts(data.catalysts || []);
         }
 
-        function renderTradeSetup(c, currP, t) {
-            const verdictEl = document.getElementById('verdictBadge');
-            const worthEl = document.getElementById('valWorthEntering');
-            const entryEl = document.getElementById('valEntryZone');
-            const targetEl = document.getElementById('valTargetPrice');
-            const subTargetEl = document.getElementById('subTargetGain');
-            const slEl = document.getElementById('valStopLoss');
-            const subSLEl = document.getElementById('subStopLossRisk');
-            const rrEl = document.getElementById('valRiskReward');
-            const strEl = document.getElementById('valStrength');
-            const thesisEl = document.getElementById('txtConsensusThesis');
+        function renderConsensus(c, curr) {
+            const vPill = document.getElementById('verdictPill');
+            const wEl = document.getElementById('kpiWorth');
+            const eEl = document.getElementById('kpiEntry');
+            const tgEl = document.getElementById('kpiTarget');
+            const tgSub = document.getElementById('kpiTargetSub');
+            const slEl = document.getElementById('kpiSL');
+            const slSub = document.getElementById('kpiSLSub');
+            const rrEl = document.getElementById('kpiRR');
+            const stEl = document.getElementById('kpiStrength');
+            const thEl = document.getElementById('txtThesis');
 
             if (!c || !c.direction) {
-                verdictEl.textContent = 'NO RECENT PREDICTION';
-                verdictEl.style.background = 'rgba(255, 255, 255, 0.08)';
-                verdictEl.style.color = 'var(--text-muted)';
-                worthEl.textContent = 'Click "Run AI Consensus"';
-                thesisEl.textContent = 'No multi-model consensus prediction has been computed yet for this stock. Click the "🧠 Run AI Consensus" button in the header to execute 4 AI engines.';
+                vPill.textContent = 'NO RECENT PREDICTION';
+                vPill.style.background = 'rgba(255, 255, 255, 0.05)';
+                vPill.style.borderColor = 'var(--border)';
+                vPill.style.color = 'var(--text-tertiary)';
+                wEl.textContent = 'Click "Run AI Consensus"';
+                thEl.textContent = 'No multi-model consensus prediction has been computed yet. Click the "🧠 Run AI Consensus" button above to evaluate DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large.';
                 renderModelsMatrix([]);
                 return;
             }
 
             const isBull = c.direction === 'BULLISH';
-            verdictEl.textContent = `${c.direction} (${(c.strength_pct || 100).toFixed(0)}%)`;
-            verdictEl.style.background = isBull ? 'rgba(52, 211, 153, 0.18)' : 'rgba(248, 113, 113, 0.18)';
-            verdictEl.style.borderColor = isBull ? 'rgba(52, 211, 153, 0.4)' : 'rgba(248, 113, 113, 0.4)';
-            verdictEl.style.color = isBull ? '#34d399' : '#f87171';
+            vPill.textContent = `${c.direction} (${(c.strength_pct || 100).toFixed(0)}%)`;
+            vPill.style.background = isBull ? 'var(--emerald-subtle)' : 'var(--rose-subtle)';
+            vPill.style.borderColor = isBull ? 'var(--emerald-border)' : 'var(--rose-border)';
+            vPill.style.color = isBull ? 'var(--emerald)' : 'var(--rose)';
 
-            worthEl.textContent = c.is_worth_entering || (isBull ? 'YES - ACCUMULATE' : 'AVOID');
-            worthEl.style.color = (c.is_worth_entering && c.is_worth_entering.includes('HIGH')) ? '#34d399' : (isBull ? '#60a5fa' : '#f87171');
+            wEl.textContent = c.is_worth_entering || (isBull ? 'YES - ACCUMULATE' : 'AVOID');
+            wEl.style.color = (c.is_worth_entering && c.is_worth_entering.includes('HIGH')) ? 'var(--emerald)' : (isBull ? 'var(--sky)' : 'var(--rose)');
 
-            entryEl.textContent = c.consensus_entry_zone || `₹${(currP * 0.985).toFixed(2)} – ₹${currP.toFixed(2)}`;
-            
+            eEl.textContent = c.consensus_entry_zone || `₹${(curr * 0.985).toFixed(2)} – ₹${curr.toFixed(2)}`;
+
             const targetP = c.consensus_target_price || 0;
-            targetEl.textContent = targetP ? `₹${targetP.toFixed(2)}` : '—';
-            const gainPct = (targetP && currP) ? ((targetP / currP - 1.0) * 100).toFixed(1) : '0.0';
-            subTargetEl.textContent = `+${gainPct}% upside target`;
+            tgEl.textContent = targetP ? `₹${targetP.toFixed(2)}` : '—';
+            const gainPct = (targetP && curr) ? ((targetP / curr - 1.0) * 100).toFixed(1) : '0.0';
+            tgSub.textContent = `+${gainPct}% upside target`;
 
-            const slP = c.consensus_stop_loss || (currP * 0.94);
+            const slP = c.consensus_stop_loss || (curr * 0.94);
             slEl.textContent = slP ? `₹${slP.toFixed(2)}` : '—';
-            const riskPct = (slP && currP) ? ((slP / currP - 1.0) * 100).toFixed(1) : '-6.0';
-            subSLEl.textContent = `${riskPct}% risk cut`;
+            const riskPct = (slP && curr) ? ((slP / curr - 1.0) * 100).toFixed(1) : '-6.0';
+            slSub.textContent = `${riskPct}% risk cut`;
 
             rrEl.textContent = `1 : ${c.consensus_risk_reward || '2.5'}`;
-            strEl.textContent = `${(c.strength_pct || 100).toFixed(0)}%`;
-            document.getElementById('subAgreement').textContent = `${c.agreeing_models || 4} / ${c.total_models || 4} AI Models Agree`;
+            stEl.textContent = `${(c.strength_pct || 100).toFixed(0)}%`;
+            document.getElementById('kpiAgreeCount').textContent = `${c.agreeing_models || 4} / ${c.total_models || 4} AI Models Agree`;
 
-            thesisEl.textContent = c.failure_reason_summary || c.consensus_narrative || 'Strong price momentum supported by technical channel and multi-model consensus alignment.';
+            thEl.textContent = c.failure_reason_summary || c.consensus_narrative || 'Price momentum and technical structure align with multi-model consensus targets.';
 
-            if (c.chart_pattern) document.getElementById('pillPattern').textContent = `📈 Pattern: ${c.chart_pattern}`;
-            if (c.volume_profile_insight) document.getElementById('pillVolume').textContent = `📊 Volume: ${c.volume_profile_insight}`;
-            if (c.primary_risk) document.getElementById('pillRisk').textContent = `⚠️ Primary Risk: ${c.primary_risk}`;
+            if (c.chart_pattern) document.getElementById('badgePattern').textContent = `📈 Pattern: ${c.chart_pattern}`;
+            if (c.volume_profile_insight) document.getElementById('badgeVolume').textContent = `📊 Volume: ${c.volume_profile_insight}`;
+            if (c.primary_risk) document.getElementById('badgeRisk').textContent = `⚠️ Primary Risk: ${c.primary_risk}`;
 
             renderModelsMatrix(c.models_breakdown || []);
         }
 
         function renderModelsMatrix(models) {
-            const grid = document.getElementById('modelsGrid');
+            const container = document.getElementById('modelsContainer');
             if (!models || !models.length) {
-                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); padding: 1.5rem;">Click "🧠 Run AI Consensus" above to evaluate DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large.</div>';
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 1.5rem;">Click "🧠 Run AI Consensus" above to evaluate 4 AI engines.</div>';
                 return;
             }
 
-            grid.innerHTML = models.map(m => {
+            container.innerHTML = models.map(m => {
                 const isBull = (m.direction || 'BULLISH').toUpperCase() === 'BULLISH';
-                const dirCol = isBull ? '#34d399' : '#f87171';
-                const dirBg = isBull ? 'rgba(52, 211, 153, 0.15)' : 'rgba(248, 113, 113, 0.15)';
+                const dirCol = isBull ? 'var(--emerald)' : 'var(--rose)';
+                const dirBg = isBull ? 'var(--emerald-subtle)' : 'var(--rose-subtle)';
                 return `
-                    <div class="model-card">
-                        <div class="model-header">
-                            <span class="model-name">${m.model_name || m.model_id}</span>
-                            <span class="model-dir" style="background: ${dirBg}; color: ${dirCol};">${m.direction || 'NEUTRAL'} (${m.confidence_pct || 80}%)</span>
+                    <div class="model-tile">
+                        <div class="model-top">
+                            <span class="model-label">${m.model_name || m.model_id}</span>
+                            <span class="model-vote" style="background: ${dirBg}; color: ${dirCol};">${m.direction || 'NEUTRAL'} (${m.confidence_pct || 80}%)</span>
                         </div>
-                        <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; font-family: var(--font-mono); margin-top: 0.2rem;">
+                        <div class="model-targets">
                             <span>Target: <strong style="color: #ffffff;">₹${m.target_price || '—'}</strong></span>
                             <span>SL: <strong style="color: #fca5a5;">₹${m.stop_loss_price || '—'}</strong></span>
                             <span>R:R: <strong style="color: #e9d5ff;">1:${m.risk_reward_ratio || '2.0'}</strong></span>
                         </div>
-                        <p style="font-size: 0.78rem; color: #cbd5e1; line-height: 1.45; margin-top: 0.3rem;">
-                            ${m.rationale_summary || m.thesis || 'Technical levels align with price action momentum.'}
-                        </p>
+                        <div class="model-rationale">
+                            ${m.rationale_summary || m.thesis || 'Technical structure aligns with directional trend.'}
+                        </div>
                     </div>
                 `;
             }).join('');
         }
 
         function renderEarnings(history) {
-            const tbody = document.getElementById('earningsTableBody');
+            const tbody = document.getElementById('tblEarningsBody');
             if (!history.length) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-dim); padding: 1rem;">No historical earnings prints found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-tertiary); padding: 1rem;">No historical earnings signals found.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = history.map(e => {
                 const surp = e.surprise_pct != null ? `${e.surprise_pct >= 0 ? '+' : ''}${e.surprise_pct}%` : '—';
-                const surpCol = e.surprise_pct != null ? (e.surprise_pct >= 0 ? '#34d399' : '#f87171') : 'var(--text-muted)';
+                const surpCol = e.surprise_pct != null ? (e.surprise_pct >= 0 ? 'var(--emerald)' : 'var(--rose)') : 'var(--text-tertiary)';
                 const weekMove = (e.week_high_pct != null && e.week_low_pct != null) ? 
-                    `<span style="color: #34d399;">+${e.week_high_pct}%</span> / <span style="color: #f87171;">${e.week_low_pct}%</span>` : '—';
+                    `<span style="color: var(--emerald);">+${e.week_high_pct}%</span> / <span style="color: var(--rose);">${e.week_low_pct}%</span>` : '—';
                 
                 return `
                     <tr>
-                        <td><strong>${e.earnings_date}</strong></td>
+                        <td style="font-weight: 700; color: #ffffff;">${e.earnings_date}</td>
                         <td>${e.eps_estimate ?? '—'} / ${e.eps_reported ?? '—'}</td>
-                        <td><strong style="color: ${surpCol};">${surp}</strong></td>
+                        <td style="color: ${surpCol}; font-weight: 700;">${surp}</td>
                         <td>${weekMove}</td>
                     </tr>
                 `;
@@ -669,46 +830,46 @@
         }
 
         function renderCatalysts(catalysts) {
-            const list = document.getElementById('catalystsList');
-            const countEl = document.getElementById('catFeedCount');
+            const list = document.getElementById('listCatalysts');
+            const countEl = document.getElementById('lblCatalystCount');
             countEl.textContent = `${catalysts.length} headlines`;
 
             if (!catalysts.length) {
-                list.innerHTML = '<div style="text-align: center; color: var(--text-dim); padding: 2rem;">No recent catalysts found for this stock.</div>';
+                list.innerHTML = '<div style="text-align: center; color: var(--text-tertiary); padding: 2rem;">No recent news catalysts found for this stock.</div>';
                 return;
             }
 
             list.innerHTML = catalysts.map(c => {
                 const isHigh = c.impact_level === 'HIGH';
-                const impactCol = isHigh ? '#f87171' : '#60a5fa';
+                const impactCol = isHigh ? 'var(--rose)' : 'var(--sky)';
+                const impactBg = isHigh ? 'var(--rose-subtle)' : 'rgba(14, 165, 233, 0.12)';
                 return `
-                    <div class="catalyst-item">
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--text-dim);">
+                    <div class="catalyst-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--text-tertiary);">
                             <span>${c.publisher || 'Market News'} · ⏱️ ${c.published_at || 'Recent'}</span>
-                            <span style="color: ${impactCol}; font-weight: 700;">${c.impact_level || 'MED'} IMPACT (${c.impact_score || 70}%)</span>
+                            <span style="background: ${impactBg}; color: ${impactCol}; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; font-family: var(--font-mono);">${c.impact_level || 'MED'} (${c.impact_score || 70}%)</span>
                         </div>
-                        <a href="${c.link || '#'}" target="_blank" class="catalyst-title">${c.title}</a>
-                        ${c.why_it_matters ? `<div style="font-size: 0.75rem; color: #38bdf8;">💡 ${c.why_it_matters}</div>` : ''}
+                        <a href="${c.link || '#'}" target="_blank" class="catalyst-headline">${c.title}</a>
+                        ${c.why_it_matters ? `<div style="font-size: 0.75rem; color: #38bdf8; font-weight: 500;">💡 ${c.why_it_matters}</div>` : ''}
                     </div>
                 `;
             }).join('');
         }
 
-        async function triggerConsensus() {
-            const btn = document.getElementById('btnRunConsensus');
+        async function runConsensus() {
+            const btn = document.getElementById('btnConsensus');
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Running AI Consensus...';
+            btn.innerHTML = '<span class="spinner"></span> Running Consensus...';
             try {
                 const res = await fetch('/api/v1/consensus/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ticker: ACTIVE_TICKER, days_ahead: 14 })
+                    body: JSON.stringify({ ticker: ACTIVE_SYM, days_ahead: 14 })
                 });
-                if (!res.ok) throw new Error('Consensus prediction failed');
-                const data = await res.json();
-                loadStockProfile();
+                if (!res.ok) throw new Error('Prediction request failed');
+                await fetchStockDetails();
             } catch (e) {
-                alert('Error running consensus: ' + e.message);
+                alert('Error computing consensus: ' + e.message);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '🧠 Run AI Consensus';
@@ -716,21 +877,20 @@
         }
 
         async function toggleWatchlist() {
-            const btn = document.getElementById('btnToggleWatchlist');
-            const isIn = stockData && stockData.is_in_watchlist;
+            const isIn = stockState && stockState.is_in_watchlist;
             try {
                 if (isIn) {
-                    await fetch(`/api/v1/watchlist/remove?ticker=${encodeURIComponent(ACTIVE_TICKER)}`, { method: 'POST' });
+                    await fetch(`/api/v1/watchlist/remove?ticker=${encodeURIComponent(ACTIVE_SYM)}`, { method: 'POST' });
                 } else {
-                    await fetch(`/api/v1/watchlist/add?ticker=${encodeURIComponent(ACTIVE_TICKER)}`, { method: 'POST' });
+                    await fetch(`/api/v1/watchlist/add?ticker=${encodeURIComponent(ACTIVE_SYM)}`, { method: 'POST' });
                 }
-                loadStockProfile();
+                await fetchStockDetails();
             } catch (e) {
                 console.error(e);
             }
         }
 
-        document.addEventListener('DOMContentLoaded', loadStockProfile);
+        document.addEventListener('DOMContentLoaded', fetchStockDetails);
     </script>
 </body>
 </html>
