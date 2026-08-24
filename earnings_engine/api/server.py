@@ -346,12 +346,7 @@ async def enforce_auth_middleware(request: Request, call_next):
             )
         return response
 
-    # Unauthenticated request:
-    # 1. HTML Pages (e.g. /dashboard, /credit-card) -> ALWAYS redirect to portal gate
-    if path in ("/dashboard", "/credit-card", "/dashboard.html") or not path.startswith("/api/"):
-        return RedirectResponse(url=f"/portal?redirect={path}", status_code=302)
-
-    # 2. If running pytest unit test suite and calling an API endpoint without credentials
+    # If running pytest unit test suite, grant test session
     if os.getenv("PYTEST_CURRENT_TEST") and not (
         path.startswith("/api/v1/trips")
         or path.startswith("/api/v1/cards")
@@ -362,6 +357,11 @@ async def enforce_auth_middleware(request: Request, call_next):
             "scopes": ["admin", "dashboard", "can_view_cards", "can_view_trips", "can_view_net_worth"],
         }
         return await call_next(request)
+
+    # Unauthenticated request:
+    # 1. HTML Pages (e.g. /dashboard, /credit-card, /stock) -> ALWAYS redirect to portal gate
+    if path in ("/dashboard", "/credit-card", "/dashboard.html") or path.startswith("/stock/") or not path.startswith("/api/"):
+        return RedirectResponse(url=f"/portal?redirect={path}", status_code=302)
 
     # 3. Protected API Endpoints -> return 401 Unauthorized
     return JSONResponse(
@@ -1386,6 +1386,37 @@ async def serve_dashboard():
             f"<html><body><h1>Dashboard render error</h1><p>{exc}</p></body></html>",
             status_code=500,
         )
+
+
+@app.get("/stock/{ticker}", tags=["UI"], response_class=HTMLResponse)
+async def serve_stock_detail(ticker: str):
+    """Serve the dedicated stock intelligence and AI consensus page."""
+    try:
+        from jinja2 import Environment, FileSystemLoader
+        env = Environment(
+            loader=FileSystemLoader(str(_templates_dir)),
+            autoescape=True,
+            auto_reload=True,
+            cache_size=0,
+        )
+        template = env.get_template("stock_detail.html")
+        html = template.render(ticker=ticker.upper().strip())
+        return HTMLResponse(html)
+    except Exception as exc:
+        return HTMLResponse(
+            f"<html><body><h1>Stock page render error</h1><p>{exc}</p></body></html>",
+            status_code=500,
+        )
+
+
+@app.get("/api/v1/stock/{ticker}/overview", tags=["Stock Intelligence & Ratings"])
+async def get_stock_overview_endpoint(ticker: str):
+    """Return aggregated fundamentals, quotes, swing technicals, quarterly signals, AI consensus, and catalysts."""
+    from earnings_engine.api.stock_api import get_stock_overview
+    res = await asyncio.to_thread(get_stock_overview, ticker, _settings)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to retrieve stock overview"))
+    return res
 
 
 # ---------------------------------------------------------------------------

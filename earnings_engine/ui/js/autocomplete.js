@@ -175,13 +175,11 @@ class Autocomplete {
     }
     
     selectTicker(ticker) {
-        this.searchInput.value = ticker;
+        if (!ticker) return;
+        const sym = ticker.trim().toUpperCase();
+        this.searchInput.value = sym;
         this.hideDropdown();
-        
-        // Trigger ticker search
-        if (window.app) {
-            app.loadTickerData(ticker);
-        }
+        window.location.href = '/stock/' + encodeURIComponent(sym);
     }
 }
 

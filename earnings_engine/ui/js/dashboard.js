@@ -7750,8 +7750,13 @@
                 items.forEach((it, i) => it.classList.toggle('selected', i === selectedIndex));
             } else if (e.key === 'Enter') {
                 e.preventDefault();
-                if (selectedIndex >= 0 && items[selectedIndex]) items[selectedIndex].click();
-                else if (items.length) items[0].click();
+                if (selectedIndex >= 0 && items[selectedIndex]) {
+                    items[selectedIndex].click();
+                } else if (items.length) {
+                    items[0].click();
+                } else if (searchInput.value.trim()) {
+                    app.selectTicker(searchInput.value.trim());
+                }
             } else if (e.key === 'Escape') {
                 dropdown.style.display = 'none';
             }
@@ -7762,11 +7767,10 @@
         });
 
         app.selectTicker = function (ticker) {
-            searchInput.value = ticker;
+            if (!ticker) return;
+            const sym = ticker.trim().toUpperCase();
             dropdown.style.display = 'none';
-            document.getElementById('tab-results').classList.add('active');
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            document.querySelector('.tab-btn').classList.add('active');
+            window.location.href = '/stock/' + encodeURIComponent(sym);
         };
 
         // Global report popup handlers

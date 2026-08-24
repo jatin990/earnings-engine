@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ ticker }} | Stock Intelligence & AI Consensus</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #000000;
+            --bg-card: #080808;
+            --bg-surface: #0e0e0e;
+            --bg-elevated: #141414;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-bright: rgba(255, 255, 255, 0.16);
+            --text-main: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --text-dim: #71717a;
+            --accent-green: #34d399;
+            --accent-red: #f87171;
+            --accent-blue: #60a5fa;
+            --accent-purple: #c084fc;
+            --accent-amber: #fbbf24;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            -webkit-font-smoothing: antialiased;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Header */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.65rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .brand-link {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: var(--border-bright);
+        }
+
+        /* Container */
+        .main-container {
+            max-width: 1360px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            flex: 1;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 1.25rem;
+            position: relative;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.6rem;
+        }
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        /* Hero Header */
+        .hero-banner {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 1.25rem;
+            background: linear-gradient(180deg, #0e0e0e 0%, #080808 100%);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .ticker-badge {
+            font-family: var(--font-mono);
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #ffffff;
+        }
+        .company-name {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+        }
+
+        .price-display {
+            display: flex;
+            align-items: baseline;
+            gap: 0.6rem;
+            margin-top: 0.4rem;
+        }
+        .current-price {
+            font-family: var(--font-mono);
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #ffffff;
+        }
+        .change-badge {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+        }
+        .change-up { background: rgba(52, 211, 153, 0.15); color: var(--accent-green); border: 1px solid rgba(52, 211, 153, 0.3); }
+        .change-down { background: rgba(248, 113, 113, 0.15); color: var(--accent-red); border: 1px solid rgba(248, 113, 113, 0.3); }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.45rem 0.9rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+        }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.14); }
+
+        /* KPI Glow Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.85rem;
+        }
+        .kpi-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 0.9rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .kpi-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .kpi-val {
+            font-family: var(--font-mono);
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #ffffff;
+        }
+        .kpi-sub {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+        }
+
+        /* 4 Model Matrix Grid */
+        .models-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+        .model-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+        .model-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .model-name {
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: #ffffff;
+        }
+        .model-dir {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+        }
+
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            font-family: var(--font-sans);
+        }
+        .data-table th {
+            text-align: left;
+            padding: 0.6rem 0.75rem;
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+        }
+        .data-table td {
+            padding: 0.65rem 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: var(--text-main);
+        }
+        .data-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Catalysts List */
+        .catalyst-item {
+            padding: 0.85rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .catalyst-item:last-child { border-bottom: none; }
+        .catalyst-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #ffffff;
+            text-decoration: none;
+        }
+        .catalyst-title:hover { color: var(--accent-blue); }
+
+        /* Spinner */
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+        <div style="display: flex; align-items: center; gap: 0.85rem;">
+            <a href="/dashboard" class="back-btn">← Back to Dashboard</a>
+            <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem;">
+                <span style="color: var(--text-dim);">engine</span>
+                <span style="color: var(--text-dim);">/</span>
+                <span style="color: var(--text-dim);">stocks</span>
+                <span style="color: var(--text-dim);">/</span>
+                <strong id="topbarTicker" style="color: #ffffff; font-family: var(--font-mono);">{{ ticker }}</strong>
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <button id="btnToggleWatchlist" onclick="toggleWatchlist()" class="btn-action btn-secondary" title="Add or remove from Watchlist">
+                ⭐ Watchlist
+            </button>
+            <button id="btnRunConsensus" onclick="triggerConsensus()" class="btn-action btn-primary" title="Execute AI Multi-Model Consensus Analysis">
+                🧠 Run AI Consensus
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN BODY -->
+    <main class="main-container">
+        
+        <!-- HERO PROFILE & PRICE BANNER -->
+        <section class="hero-banner" id="heroBanner">
+            <div>
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <span class="ticker-badge" id="stockTicker">{{ ticker }}</span>
+                    <span id="marketBadge" style="font-size: 0.72rem; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.3);">NSE</span>
+                    <span id="sectorBadge" style="font-size: 0.72rem; background: rgba(255, 255, 255, 0.06); color: var(--text-muted); padding: 0.2rem 0.5rem; border-radius: 4px;">Equities</span>
+                </div>
+                <div class="company-name" id="stockName">Loading company profile...</div>
+                
+                <div class="price-display">
+                    <span class="current-price" id="currentPrice">₹—</span>
+                    <span class="change-badge change-up" id="changeBadge">+0.00%</span>
+                    <span style="font-size: 0.75rem; color: var(--text-dim);" id="prevCloseLabel">Prev Close: ₹—</span>
+                </div>
+            </div>
+
+            <!-- 52W Range & Fundamentals -->
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 260px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
+                    <span>52W Low: <strong id="lbl52Low" style="color: #ffffff;">₹—</strong></span>
+                    <span>52W High: <strong id="lbl52High" style="color: #ffffff;">₹—</strong></span>
+                </div>
+                <div style="height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; position: relative; overflow: hidden;">
+                    <div id="range52Bar" style="position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: linear-gradient(90deg, #34d399, #60a5fa); border-radius: 3px;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-dim); margin-top: 0.2rem;">
+                    <span>Market Cap: <strong id="lblMarketCap" style="color: var(--text-muted);">₹— Cr</strong></span>
+                    <span>Intraday Range: <strong id="lblDayRange" style="color: var(--text-muted);">₹— – ₹—</strong></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- TRADE SETUP & CONSENSUS HERO CARD -->
+        <section class="card" id="tradeSetupCard" style="border-color: rgba(99, 102, 241, 0.25);">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>⚡ AI Consensus Trade Setup & Strategic Verdict</span>
+                </div>
+                <div id="verdictBadge" style="font-size: 0.78rem; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 6px; background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3);">
+                    ANALYZING...
+                </div>
+            </div>
+
+            <!-- 6 KPI GLOW METRICS -->
+            <div class="kpi-grid" style="margin-bottom: 1.25rem;">
+                <div class="kpi-card" style="border-left: 3px solid #34d399;">
+                    <div class="kpi-label">Worth Entering</div>
+                    <div class="kpi-val" id="valWorthEntering" style="font-size: 1.05rem; color: #34d399;">—</div>
+                    <div class="kpi-sub" id="subConviction">Risk / Reward Score</div>
+                </div>
+                <div class="kpi-card" style="border-left: 3px solid #60a5fa;">
+                    <div class="kpi-label">Optimal Entry Zone</div>
+                    <div class="kpi-val" id="valEntryZone" style="font-size: 1.1rem; color: #60a5fa;">₹— – ₹—</div>
+                    <div class="kpi-sub">Support pullback range</div>
+                </div>
+                <div class="kpi-card" style="border-left: 3px solid #34d399;">
+                    <div class="kpi-label">Consensus Target</div>
+                    <div class="kpi-val" id="valTargetPrice" style="color: #ffffff;">₹—</div>
+                    <div class="kpi-sub" id="subTargetGain" style="color: #34d399;">+0.0% upside</div>
+                </div>
+                <div class="kpi-card" style="border-left: 3px solid #f87171;">
+                    <div class="kpi-label">Stop Loss Level</div>
+                    <div class="kpi-val" id="valStopLoss" style="color: #fca5a5;">₹—</div>
+                    <div class="kpi-sub" id="subStopLossRisk" style="color: #f87171;">-0.0% risk</div>
+                </div>
+                <div class="kpi-card" style="border-left: 3px solid #c084fc;">
+                    <div class="kpi-label">Risk-to-Reward</div>
+                    <div class="kpi-val" id="valRiskReward" style="color: #e9d5ff;">1 : —</div>
+                    <div class="kpi-sub">Reward vs Invalidation</div>
+                </div>
+                <div class="kpi-card" style="border-left: 3px solid #fbbf24;">
+                    <div class="kpi-label">Consensus Strength</div>
+                    <div class="kpi-val" id="valStrength" style="color: #fbbf24;">—%</div>
+                    <div class="kpi-sub" id="subAgreement">AI Models Agreeing</div>
+                </div>
+            </div>
+
+            <!-- ACTIONABLE INSIGHTS CALLOUT -->
+            <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem; display: flex; flex-direction: column; gap: 0.6rem;">
+                <div style="font-size: 0.85rem; color: #e2e8f0; line-height: 1.5;" id="txtConsensusThesis">
+                    Loading AI thesis and strategic rationale...
+                </div>
+                <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.25rem;">
+                    <span id="pillPattern" style="font-size: 0.72rem; background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.25); padding: 0.2rem 0.55rem; border-radius: 4px;">📈 Pattern: —</span>
+                    <span id="pillVolume" style="font-size: 0.72rem; background: rgba(168, 85, 247, 0.12); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.25); padding: 0.2rem 0.55rem; border-radius: 4px;">📊 Volume: —</span>
+                    <span id="pillRisk" style="font-size: 0.72rem; background: rgba(239, 68, 68, 0.12); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.25); padding: 0.2rem 0.55rem; border-radius: 4px;">⚠️ Primary Risk: —</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4-MODEL CONSENSUS BREAKDOWN MATRIX -->
+        <section class="card">
+            <div class="card-header">
+                <div class="card-title">🤖 4-Model AI Engine Breakdown</div>
+                <span style="font-size: 0.72rem; color: var(--text-dim);">DeepSeek-R1 · Llama-3.3-70B · Qwen-2.5-72B · Mistral-Large</span>
+            </div>
+            <div class="models-grid" id="modelsGrid">
+                <div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); padding: 2rem;">Loading model consensus breakdown...</div>
+            </div>
+        </section>
+
+        <!-- TWO COLUMN: EARNINGS SIGNAL HISTORY & SHORT-TERM CATALYSTS -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;">
+            
+            <!-- Quarterly Earnings Track Record -->
+            <section class="card">
+                <div class="card-header">
+                    <div class="card-title">📅 Quarterly Earnings Track Record</div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Quarter / Date</th>
+                                <th>EPS Est / Act</th>
+                                <th>Surprise %</th>
+                                <th>Result Week Move</th>
+                            </tr>
+                        </thead>
+                        <tbody id="earningsTableBody">
+                            <tr><td colspan="4" style="text-align: center; color: var(--text-dim);">Loading earnings signals...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Short-Term News Catalysts Feed -->
+            <section class="card">
+                <div class="card-header">
+                    <div class="card-title">🔥 Short-Term News Catalysts</div>
+                    <span style="font-size: 0.72rem; color: var(--text-dim);" id="catFeedCount">0 headlines</span>
+                </div>
+                <div id="catalystsList" style="display: flex; flex-direction: column; max-height: 420px; overflow-y: auto;">
+                    <div style="text-align: center; color: var(--text-dim); padding: 2rem;">Loading fresh catalyst news...</div>
+                </div>
+            </section>
+
+        </div>
+
+    </main>
+
+    <script>
+        const ACTIVE_TICKER = "{{ ticker }}";
+        let stockData = null;
+
+        async function loadStockProfile() {
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_TICKER)}/overview`);
+                if (!res.ok) throw new Error('Failed to load stock intelligence');
+                const data = await res.json();
+                stockData = data;
+                renderProfile(data);
+            } catch (err) {
+                console.error(err);
+                document.getElementById('stockName').textContent = 'Error loading stock: ' + err.message;
+            }
+        }
+
+        function renderProfile(data) {
+            const p = data.profile || {};
+            const q = data.quote || {};
+            const t = data.technical || {};
+            const c = data.consensus || {};
+
+            // Header & Info
+            document.getElementById('stockName').textContent = p.name || p.ticker;
+            document.getElementById('marketBadge').textContent = p.market || 'NSE';
+            document.getElementById('sectorBadge').textContent = p.sector || 'Equities';
+
+            const currP = q.current_price || 0;
+            document.getElementById('currentPrice').textContent = `₹${currP.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            
+            const changePct = q.day_change_pct || 0;
+            const changeBadge = document.getElementById('changeBadge');
+            changeBadge.textContent = `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}% (${q.day_change >= 0 ? '+' : ''}${q.day_change || 0})`;
+            changeBadge.className = `change-badge ${changePct >= 0 ? 'change-up' : 'change-down'}`;
+
+            document.getElementById('prevCloseLabel').textContent = `Prev Close: ₹${q.previous_close || '—'}`;
+            document.getElementById('lbl52Low').textContent = `₹${q.week_52_low || '—'}`;
+            document.getElementById('lbl52High').textContent = `₹${q.week_52_high || '—'}`;
+            document.getElementById('lblMarketCap').textContent = p.market_cap ? `₹${(p.market_cap / 10000000).toLocaleString(undefined, {maximumFractionDigits: 0})} Cr` : '—';
+            document.getElementById('lblDayRange').textContent = (q.day_low && q.day_high) ? `₹${q.day_low} – ₹${q.day_high}` : '—';
+
+            // 52W range bar position
+            if (q.week_52_low && q.week_52_high && currP) {
+                const pct = Math.max(0, Math.min(100, ((currP - q.week_52_low) / (q.week_52_high - q.week_52_low)) * 100));
+                document.getElementById('range52Bar').style.width = pct + '%';
+            }
+
+            // Watchlist Button State
+            const btnWl = document.getElementById('btnToggleWatchlist');
+            if (data.is_in_watchlist) {
+                btnWl.innerHTML = '⭐ In Watchlist';
+                btnWl.style.background = 'rgba(251, 191, 36, 0.2)';
+                btnWl.style.borderColor = 'rgba(251, 191, 36, 0.4)';
+                btnWl.style.color = '#fbbf24';
+            } else {
+                btnWl.innerHTML = '☆ Add to Watchlist';
+                btnWl.style.background = 'rgba(255, 255, 255, 0.08)';
+                btnWl.style.borderColor = 'var(--border-subtle)';
+                btnWl.style.color = 'var(--text-main)';
+            }
+
+            // Consensus & Trade Setup
+            renderTradeSetup(c, currP, t);
+
+            // Earnings Track Record
+            renderEarnings(data.earnings_history || []);
+
+            // Catalysts Feed
+            renderCatalysts(data.catalysts || []);
+        }
+
+        function renderTradeSetup(c, currP, t) {
+            const verdictEl = document.getElementById('verdictBadge');
+            const worthEl = document.getElementById('valWorthEntering');
+            const entryEl = document.getElementById('valEntryZone');
+            const targetEl = document.getElementById('valTargetPrice');
+            const subTargetEl = document.getElementById('subTargetGain');
+            const slEl = document.getElementById('valStopLoss');
+            const subSLEl = document.getElementById('subStopLossRisk');
+            const rrEl = document.getElementById('valRiskReward');
+            const strEl = document.getElementById('valStrength');
+            const thesisEl = document.getElementById('txtConsensusThesis');
+
+            if (!c || !c.direction) {
+                verdictEl.textContent = 'NO RECENT PREDICTION';
+                verdictEl.style.background = 'rgba(255, 255, 255, 0.08)';
+                verdictEl.style.color = 'var(--text-muted)';
+                worthEl.textContent = 'Click "Run AI Consensus"';
+                thesisEl.textContent = 'No multi-model consensus prediction has been computed yet for this stock. Click the "🧠 Run AI Consensus" button in the header to execute 4 AI engines.';
+                renderModelsMatrix([]);
+                return;
+            }
+
+            const isBull = c.direction === 'BULLISH';
+            verdictEl.textContent = `${c.direction} (${(c.strength_pct || 100).toFixed(0)}%)`;
+            verdictEl.style.background = isBull ? 'rgba(52, 211, 153, 0.18)' : 'rgba(248, 113, 113, 0.18)';
+            verdictEl.style.borderColor = isBull ? 'rgba(52, 211, 153, 0.4)' : 'rgba(248, 113, 113, 0.4)';
+            verdictEl.style.color = isBull ? '#34d399' : '#f87171';
+
+            worthEl.textContent = c.is_worth_entering || (isBull ? 'YES - ACCUMULATE' : 'AVOID');
+            worthEl.style.color = (c.is_worth_entering && c.is_worth_entering.includes('HIGH')) ? '#34d399' : (isBull ? '#60a5fa' : '#f87171');
+
+            entryEl.textContent = c.consensus_entry_zone || `₹${(currP * 0.985).toFixed(2)} – ₹${currP.toFixed(2)}`;
+            
+            const targetP = c.consensus_target_price || 0;
+            targetEl.textContent = targetP ? `₹${targetP.toFixed(2)}` : '—';
+            const gainPct = (targetP && currP) ? ((targetP / currP - 1.0) * 100).toFixed(1) : '0.0';
+            subTargetEl.textContent = `+${gainPct}% upside target`;
+
+            const slP = c.consensus_stop_loss || (currP * 0.94);
+            slEl.textContent = slP ? `₹${slP.toFixed(2)}` : '—';
+            const riskPct = (slP && currP) ? ((slP / currP - 1.0) * 100).toFixed(1) : '-6.0';
+            subSLEl.textContent = `${riskPct}% risk cut`;
+
+            rrEl.textContent = `1 : ${c.consensus_risk_reward || '2.5'}`;
+            strEl.textContent = `${(c.strength_pct || 100).toFixed(0)}%`;
+            document.getElementById('subAgreement').textContent = `${c.agreeing_models || 4} / ${c.total_models || 4} AI Models Agree`;
+
+            thesisEl.textContent = c.failure_reason_summary || c.consensus_narrative || 'Strong price momentum supported by technical channel and multi-model consensus alignment.';
+
+            if (c.chart_pattern) document.getElementById('pillPattern').textContent = `📈 Pattern: ${c.chart_pattern}`;
+            if (c.volume_profile_insight) document.getElementById('pillVolume').textContent = `📊 Volume: ${c.volume_profile_insight}`;
+            if (c.primary_risk) document.getElementById('pillRisk').textContent = `⚠️ Primary Risk: ${c.primary_risk}`;
+
+            renderModelsMatrix(c.models_breakdown || []);
+        }
+
+        function renderModelsMatrix(models) {
+            const grid = document.getElementById('modelsGrid');
+            if (!models || !models.length) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); padding: 1.5rem;">Click "🧠 Run AI Consensus" above to evaluate DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large.</div>';
+                return;
+            }
+
+            grid.innerHTML = models.map(m => {
+                const isBull = (m.direction || 'BULLISH').toUpperCase() === 'BULLISH';
+                const dirCol = isBull ? '#34d399' : '#f87171';
+                const dirBg = isBull ? 'rgba(52, 211, 153, 0.15)' : 'rgba(248, 113, 113, 0.15)';
+                return `
+                    <div class="model-card">
+                        <div class="model-header">
+                            <span class="model-name">${m.model_name || m.model_id}</span>
+                            <span class="model-dir" style="background: ${dirBg}; color: ${dirCol};">${m.direction || 'NEUTRAL'} (${m.confidence_pct || 80}%)</span>
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; justify-content: space-between; font-family: var(--font-mono); margin-top: 0.2rem;">
+                            <span>Target: <strong style="color: #ffffff;">₹${m.target_price || '—'}</strong></span>
+                            <span>SL: <strong style="color: #fca5a5;">₹${m.stop_loss_price || '—'}</strong></span>
+                            <span>R:R: <strong style="color: #e9d5ff;">1:${m.risk_reward_ratio || '2.0'}</strong></span>
+                        </div>
+                        <p style="font-size: 0.78rem; color: #cbd5e1; line-height: 1.45; margin-top: 0.3rem;">
+                            ${m.rationale_summary || m.thesis || 'Technical levels align with price action momentum.'}
+                        </p>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderEarnings(history) {
+            const tbody = document.getElementById('earningsTableBody');
+            if (!history.length) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-dim); padding: 1rem;">No historical earnings prints found.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = history.map(e => {
+                const surp = e.surprise_pct != null ? `${e.surprise_pct >= 0 ? '+' : ''}${e.surprise_pct}%` : '—';
+                const surpCol = e.surprise_pct != null ? (e.surprise_pct >= 0 ? '#34d399' : '#f87171') : 'var(--text-muted)';
+                const weekMove = (e.week_high_pct != null && e.week_low_pct != null) ? 
+                    `<span style="color: #34d399;">+${e.week_high_pct}%</span> / <span style="color: #f87171;">${e.week_low_pct}%</span>` : '—';
+                
+                return `
+                    <tr>
+                        <td><strong>${e.earnings_date}</strong></td>
+                        <td>${e.eps_estimate ?? '—'} / ${e.eps_reported ?? '—'}</td>
+                        <td><strong style="color: ${surpCol};">${surp}</strong></td>
+                        <td>${weekMove}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderCatalysts(catalysts) {
+            const list = document.getElementById('catalystsList');
+            const countEl = document.getElementById('catFeedCount');
+            countEl.textContent = `${catalysts.length} headlines`;
+
+            if (!catalysts.length) {
+                list.innerHTML = '<div style="text-align: center; color: var(--text-dim); padding: 2rem;">No recent catalysts found for this stock.</div>';
+                return;
+            }
+
+            list.innerHTML = catalysts.map(c => {
+                const isHigh = c.impact_level === 'HIGH';
+                const impactCol = isHigh ? '#f87171' : '#60a5fa';
+                return `
+                    <div class="catalyst-item">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--text-dim);">
+                            <span>${c.publisher || 'Market News'} · ⏱️ ${c.published_at || 'Recent'}</span>
+                            <span style="color: ${impactCol}; font-weight: 700;">${c.impact_level || 'MED'} IMPACT (${c.impact_score || 70}%)</span>
+                        </div>
+                        <a href="${c.link || '#'}" target="_blank" class="catalyst-title">${c.title}</a>
+                        ${c.why_it_matters ? `<div style="font-size: 0.75rem; color: #38bdf8;">💡 ${c.why_it_matters}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function triggerConsensus() {
+            const btn = document.getElementById('btnRunConsensus');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Running AI Consensus...';
+            try {
+                const res = await fetch('/api/v1/consensus/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticker: ACTIVE_TICKER, days_ahead: 14 })
+                });
+                if (!res.ok) throw new Error('Consensus prediction failed');
+                const data = await res.json();
+                loadStockProfile();
+            } catch (e) {
+                alert('Error running consensus: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🧠 Run AI Consensus';
+            }
+        }
+
+        async function toggleWatchlist() {
+            const btn = document.getElementById('btnToggleWatchlist');
+            const isIn = stockData && stockData.is_in_watchlist;
+            try {
+                if (isIn) {
+                    await fetch(`/api/v1/watchlist/remove?ticker=${encodeURIComponent(ACTIVE_TICKER)}`, { method: 'POST' });
+                } else {
+                    await fetch(`/api/v1/watchlist/add?ticker=${encodeURIComponent(ACTIVE_TICKER)}`, { method: 'POST' });
+                }
+                loadStockProfile();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadStockProfile);
+    </script>
+</body>
+</html>

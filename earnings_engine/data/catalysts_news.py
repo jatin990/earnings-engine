@@ -486,7 +486,7 @@ def get_short_term_catalysts(
         params.append(limit)
 
         rows = conn.execute(query, params).fetchall()
-        valid = [dict(r) for r in rows if is_headline_current(r["title"], r.get("summary", ""), r["published_at"])]
+        valid = [dict(r) for r in rows if is_headline_current(r["title"], dict(r).get("summary") or "", r["published_at"])]
         return valid
 
 
