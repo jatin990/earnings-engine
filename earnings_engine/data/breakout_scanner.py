@@ -1,19 +1,33 @@
-"""Breakout Radar — Background Scanner & Scoring Engine.
+"""Breakout Radar — Tiered Async Pooling Scanner & Scoring Engine.
 
-Runs on a configurable interval while the server is live.  For each ticker
-that has local cached prices it computes a 5-component **Breakout Score**
-(0 – 100) and stores the sorted candidate list in an in-memory cache so the
-``/api/v1/breakout-radar`` endpoint can respond instantly.
+Architecture: Three-tier graduated pool system that avoids rescanning the
+entire universe every cycle.  Stocks are promoted/demoted between tiers
+based on their breakout conviction score, with higher-conviction candidates
+receiving more frequent rescoring.
 
-Score Components
-----------------
+Tiers
+-----
+- **T0 (Cold)** — Full universe scan every ``COLD_INTERVAL_MIN`` (default 60 min).
+  Discovers new candidates and feeds them into T1/T2.
+- **T1 (Warm)** — Rescored every ``WARM_INTERVAL_MIN`` (default 15 min).
+  Stocks with ``composite_score ≥ WARM_THRESHOLD`` (25).
+- **T2 (Hot)** — Rescored every ``HOT_INTERVAL_MIN`` (default 5 min).
+  Stocks within striking distance of breakout: ``composite_score ≥ HOT_THRESHOLD``
+  (50), or ``pct_from_high ≥ -5%``, or ``volume_ratio ≥ 1.5×``.
+
+Demotion requires **two consecutive** low scores to prevent flicker from
+a single noisy bar.  Volume-spike fast-tracking immediately promotes any
+stock with ``volume_ratio ≥ 1.5×`` into the Hot pool.
+
+Score Components (0 – 100)
+--------------------------
 1. Resistance Proximity  (0-30 pts) — price within 0-5% below the 20D / 52W high
 2. Volume Surge          (0-20 pts) — today's volume vs 20D average
 3. Price Compression     (0-15 pts) — ATR(14)/price squeeze (low volatility = coiling)
 4. Momentum              (0-15 pts) — 30D return > 0 and price > 20D SMA
 5. Fundamental Bonus     (0-20 pts) — earnings quality score (q1/q2/q3 avg, normalised)
 
-Minimum score to appear in results: BREAKOUT_MIN_SCORE (default 35).
+Minimum score to appear in API results: BREAKOUT_MIN_SCORE (default 35).
 """
 
 from __future__ import annotations
@@ -35,22 +49,117 @@ logger = get_logger("earnings_engine.data.breakout_scanner")
 # ---------------------------------------------------------------------------
 # Configuration (overridable via environment variables)
 # ---------------------------------------------------------------------------
-BREAKOUT_SCAN_INTERVAL_MIN: int = int(os.environ.get("BREAKOUT_SCAN_INTERVAL_MIN", "30"))
 BREAKOUT_MIN_SCORE: int = int(os.environ.get("BREAKOUT_MIN_SCORE", "35"))
 BREAKOUT_MAX_CANDIDATES: int = int(os.environ.get("BREAKOUT_MAX_CANDIDATES", "100"))
 
+# Tier thresholds
+HOT_THRESHOLD: int = int(os.environ.get("BREAKOUT_HOT_THRESHOLD", "50"))
+WARM_THRESHOLD: int = int(os.environ.get("BREAKOUT_WARM_THRESHOLD", "25"))
+HOT_DEMOTION_THRESHOLD: int = int(os.environ.get("BREAKOUT_HOT_DEMOTION", "25"))
+WARM_DEMOTION_THRESHOLD: int = int(os.environ.get("BREAKOUT_WARM_DEMOTION", "15"))
+
+# Scan intervals (minutes)
+COLD_INTERVAL_MIN: int = int(os.environ.get("BREAKOUT_COLD_INTERVAL_MIN", "60"))
+WARM_INTERVAL_MIN: int = int(os.environ.get("BREAKOUT_WARM_INTERVAL_MIN", "15"))
+HOT_INTERVAL_MIN: int = int(os.environ.get("BREAKOUT_HOT_INTERVAL_MIN", "5"))
+
+# Legacy compat alias
+BREAKOUT_SCAN_INTERVAL_MIN: int = COLD_INTERVAL_MIN
+
 # ---------------------------------------------------------------------------
-# In-memory cache
+# Tiered in-memory pool
 # ---------------------------------------------------------------------------
-_cache: dict[str, Any] = {
-    "candidates": [],          # list[dict] sorted by score DESC
-    "last_scan_at": None,      # ISO8601 str
+_pool: dict[str, Any] = {
+    "hot": {},               # ticker → {"result": dict, "consecutive_low": 0}
+    "warm": {},              # ticker → {"result": dict, "consecutive_low": 0}
+    "candidates": [],        # merged sorted list for API (score ≥ BREAKOUT_MIN_SCORE)
+    "last_cold_scan_at": None,
+    "last_warm_scan_at": None,
+    "last_hot_scan_at": None,
+    "last_scan_at": None,    # most recent of any tier (compat)
     "last_scan_duration_s": 0.0,
-    "tickers_scanned": 0,
-    "status": "idle",          # "idle" | "running" | "done" | "error"
+    "cold_tickers_scanned": 0,
+    "hot_count": 0,
+    "warm_count": 0,
+    "status": "idle",        # "idle" | "running" | "done" | "error"
     "error": None,
 }
 
+# Legacy compat alias
+_cache = _pool
+
+
+def _rebuild_candidates() -> None:
+    """Merge hot + warm pools into a deduplicated, sorted candidates list."""
+    merged: dict[str, dict] = {}
+    for ticker, entry in _pool["hot"].items():
+        merged[ticker] = entry["result"]
+    for ticker, entry in _pool["warm"].items():
+        if ticker not in merged:
+            merged[ticker] = entry["result"]
+
+    candidates = [r for r in merged.values() if r.get("composite_score", 0) >= BREAKOUT_MIN_SCORE]
+    candidates.sort(key=lambda x: x.get("composite_score", 0), reverse=True)
+    _pool["candidates"] = candidates[:BREAKOUT_MAX_CANDIDATES]
+    _pool["hot_count"] = len(_pool["hot"])
+    _pool["warm_count"] = len(_pool["warm"])
+
+
+def _should_be_hot(result: dict) -> bool:
+    """Check if a scored result qualifies for the Hot pool."""
+    if result.get("composite_score", 0) >= HOT_THRESHOLD:
+        return True
+    pct = result.get("pct_from_high")
+    if pct is not None and pct >= -5:
+        return True
+    vol = result.get("volume_ratio")
+    if vol is not None and vol >= 1.5:
+        return True
+    return False
+
+
+def _promote(ticker: str, result: dict) -> None:
+    """Place a ticker into the correct tier based on its score."""
+    if _should_be_hot(result):
+        _pool["hot"][ticker] = {"result": result, "consecutive_low": 0}
+        _pool["warm"].pop(ticker, None)
+    elif result.get("composite_score", 0) >= WARM_THRESHOLD:
+        if ticker not in _pool["hot"]:
+            _pool["warm"][ticker] = {"result": result, "consecutive_low": 0}
+    # Below warm threshold: don't add to any pool
+
+
+def _demote_hot(ticker: str) -> None:
+    """Demote a Hot ticker: increment consecutive_low, remove after 2 strikes."""
+    entry = _pool["hot"].get(ticker)
+    if not entry:
+        return
+    entry["consecutive_low"] += 1
+    if entry["consecutive_low"] >= 2:
+        result = entry["result"]
+        del _pool["hot"][ticker]
+        # Maybe keep in warm if score still qualifies
+        if result.get("composite_score", 0) >= WARM_THRESHOLD:
+            _pool["warm"][ticker] = {"result": result, "consecutive_low": 0}
+            logger.debug("[BREAKOUT] %s demoted Hot → Warm (score %.1f)", ticker, result.get("composite_score", 0))
+        else:
+            logger.debug("[BREAKOUT] %s demoted Hot → Cold (score %.1f)", ticker, result.get("composite_score", 0))
+
+
+def _demote_warm(ticker: str) -> None:
+    """Demote a Warm ticker: increment consecutive_low, remove after 2 strikes."""
+    entry = _pool["warm"].get(ticker)
+    if not entry:
+        return
+    entry["consecutive_low"] += 1
+    if entry["consecutive_low"] >= 2:
+        logger.debug("[BREAKOUT] %s demoted Warm → Cold (score %.1f)", ticker, entry["result"].get("composite_score", 0))
+        del _pool["warm"][ticker]
+
+
+# ---------------------------------------------------------------------------
+# Public API (backward-compatible)
+# ---------------------------------------------------------------------------
 
 def get_cached_scan_results(
     universe: str | None = None,
@@ -62,7 +171,7 @@ def get_cached_scan_results(
     if asof_date:
         return run_breakout_scan(settings, universe=universe, asof_date=asof_date)
 
-    all_candidates = list(_cache["candidates"])
+    all_candidates = list(_pool["candidates"])
     if not universe or universe.lower() in ("all", "any", "global", "monitored"):
         return all_candidates
 
@@ -70,7 +179,7 @@ def get_cached_scan_results(
     try:
         from earnings_engine.data.universe import load_universe
         from earnings_engine.data.watchlists import get_watchlist
-        
+
         u_clean = universe.lower().strip()
         uni_tickers: set[str] = set()
         if u_clean in ("nifty_50", "nifty50", "nifty_top_50", "nse_top", "in", "nse"):
@@ -99,20 +208,29 @@ def get_cached_scan_results(
 def get_scan_status(universe: str | None = None) -> dict[str, Any]:
     """Return a lightweight status dict for the API."""
     return {
-        "status": _cache["status"],
-        "last_scan_at": _cache["last_scan_at"],
-        "last_scan_duration_s": _cache["last_scan_duration_s"],
-        "tickers_scanned": _cache["tickers_scanned"],
-        "candidates_found": len(_cache["candidates"]),
-        "universe": universe or _cache.get("last_universe", "ALL"),
+        "status": _pool["status"],
+        "last_scan_at": _pool["last_scan_at"],
+        "last_cold_scan_at": _pool["last_cold_scan_at"],
+        "last_warm_scan_at": _pool["last_warm_scan_at"],
+        "last_hot_scan_at": _pool["last_hot_scan_at"],
+        "last_scan_duration_s": _pool["last_scan_duration_s"],
+        "cold_tickers_scanned": _pool["cold_tickers_scanned"],
+        "hot_count": _pool["hot_count"],
+        "warm_count": _pool["warm_count"],
+        "candidates_found": len(_pool["candidates"]),
+        "universe": universe or "ALL",
         "min_score": BREAKOUT_MIN_SCORE,
-        "scan_interval_min": BREAKOUT_SCAN_INTERVAL_MIN,
-        "error": _cache["error"],
+        "scan_intervals": {
+            "cold_min": COLD_INTERVAL_MIN,
+            "warm_min": WARM_INTERVAL_MIN,
+            "hot_min": HOT_INTERVAL_MIN,
+        },
+        "error": _pool["error"],
     }
 
 
 # ---------------------------------------------------------------------------
-# Scoring helpers
+# Scoring helpers (unchanged from original)
 # ---------------------------------------------------------------------------
 
 def _score_resistance_proximity(closes: pd.Series) -> tuple[float, float]:
@@ -320,7 +438,7 @@ def score_breakout(
         f_lows = pd.to_numeric(future_df["low"], errors="coerce") if "low" in future_df.columns else pd.to_numeric(future_df["close"], errors="coerce")
         post_high = float(f_highs.max()) if not f_highs.empty else signal_price
         post_low = float(f_lows.min()) if not f_lows.empty else signal_price
-        
+
         realized_return_pct = round(((current_price - signal_price) / signal_price) * 100, 2)
         max_gain_pct = round(((post_high - signal_price) / signal_price) * 100, 2)
         days_elapsed = len(future_df)
@@ -394,32 +512,55 @@ def score_breakout(
 
 
 # ---------------------------------------------------------------------------
-# Full universe scan
+# Internal: score a single ticker with DB lookups
 # ---------------------------------------------------------------------------
 
-def run_breakout_scan(
-    settings: Settings,
-    universe: str | None = None,
-    asof_date: str | None = None,
-) -> list[dict[str, Any]]:
-    """Scan available tickers and return candidates sorted by score DESC point-in-time."""
-    from concurrent.futures import ThreadPoolExecutor
-    from earnings_engine.data import prices as prices_mod
+def _score_single_ticker(ticker: str, settings: Settings, asof_date: str | None = None) -> dict[str, Any] | None:
+    """Load prices, metrics, and score a single ticker. Returns result dict or None."""
+    try:
+        from earnings_engine.data.prices import load_prices, load_price_metrics
+
+        prices_df = load_prices(ticker, settings)
+        if prices_df is None or prices_df.empty:
+            return None
+
+        metrics = load_price_metrics(ticker, settings) or {}
+        quality_scores: list[float | None] = []
+        for key in ("q1_earnings_score", "q2_earnings_score", "q3_earnings_score"):
+            v = metrics.get(key)
+            if v is not None:
+                try:
+                    quality_scores.append(float(v))
+                except (TypeError, ValueError):
+                    quality_scores.append(None)
+            else:
+                quality_scores.append(None)
+
+        result = score_breakout(ticker, prices_df, quality_scores, asof_date=asof_date)
+        if result:
+            result["company_name"] = metrics.get("company_name") or ticker
+            result["market_cap_cr"] = metrics.get("market_cap_cr") or metrics.get("market_cap")
+            result["industry"] = metrics.get("industry") or metrics.get("sector") or "—"
+        return result
+    except Exception as e:
+        logger.debug("[BREAKOUT] Error scoring %s: %s", ticker, e)
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Tier-specific scan functions
+# ---------------------------------------------------------------------------
+
+def _resolve_universe_tickers(settings: Settings, universe: str | None = None) -> list[str]:
+    """Resolve the full set of tickers to scan from universes, watchlists, and DB."""
     from earnings_engine.data.watchlists import all_watchlists, get_watchlist
     from earnings_engine.data.universe import load_universe
-    from earnings_engine.data.prices import load_prices, load_price_metrics, _connect
-
-    is_live_scan = asof_date is None
-    if is_live_scan:
-        _cache["status"] = "running"
-        _cache["error"] = None
-    t0 = time.perf_counter()
+    from earnings_engine.data.prices import _connect
 
     tickers: set[str] = set()
     u_clean = universe.lower().strip() if universe else "all"
 
     if u_clean in ("nifty_50", "nifty50", "nifty_top_50", "nse_top"):
-        # Specifically scan NIFTY 50 benchmark constituents
         uni = load_universe("NSE_TOP", settings) or load_universe("NIFTY_50", settings)
         if uni:
             tickers.update(uni)
@@ -432,7 +573,6 @@ def run_breakout_scan(
         if us_uni:
             tickers.update(us_uni)
     elif u_clean != "all":
-        # Try custom watchlist first, then named universe
         wl_tickers = get_watchlist(universe, settings)
         if wl_tickers:
             tickers.update(wl_tickers)
@@ -441,7 +581,6 @@ def run_breakout_scan(
             if custom_uni:
                 tickers.update(custom_uni)
 
-    # If universe was "all" or nothing matched above, collect comprehensive universe
     if not tickers:
         try:
             wls = all_watchlists(settings)
@@ -474,103 +613,285 @@ def run_breakout_scan(
             except Exception:
                 pass
 
-    if not tickers:
-        logger.info("[BREAKOUT] No tickers found to scan.")
-        if is_live_scan:
-            _cache["status"] = "done"
-            _cache["candidates"] = []
-            _cache["tickers_scanned"] = 0
-            _cache["last_scan_at"] = datetime.now(timezone.utc).isoformat()
-            _cache["last_scan_duration_s"] = round(time.perf_counter() - t0, 2)
+    return sorted(tickers)
+
+
+def run_cold_scan(settings: Settings, universe: str | None = None) -> None:
+    """T0 Cold Scan: score the entire universe and populate warm/hot pools."""
+    t0 = time.perf_counter()
+    _pool["status"] = "running"
+    _pool["error"] = None
+
+    ticker_list = _resolve_universe_tickers(settings, universe)
+    if not ticker_list:
+        logger.info("[BREAKOUT-COLD] No tickers found to scan.")
+        _pool["status"] = "done"
+        _pool["cold_tickers_scanned"] = 0
+        _pool["last_cold_scan_at"] = datetime.now(timezone.utc).isoformat()
+        _pool["last_scan_at"] = _pool["last_cold_scan_at"]
+        return
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _score(ticker: str) -> tuple[str, dict | None]:
+        result = _score_single_ticker(ticker, settings)
+        return ticker, result
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        scored = list(executor.map(_score, ticker_list))
+
+    promoted_hot = 0
+    promoted_warm = 0
+    for ticker, result in scored:
+        if result is None:
+            continue
+        _promote(ticker, result)
+        if ticker in _pool["hot"]:
+            promoted_hot += 1
+        elif ticker in _pool["warm"]:
+            promoted_warm += 1
+
+    _rebuild_candidates()
+
+    elapsed = round(time.perf_counter() - t0, 2)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    _pool.update({
+        "last_cold_scan_at": now_iso,
+        "last_scan_at": now_iso,
+        "last_scan_duration_s": elapsed,
+        "cold_tickers_scanned": len(ticker_list),
+        "status": "done",
+        "error": None,
+    })
+
+    logger.info(
+        "[BREAKOUT-COLD] Full scan: %d tickers → %d hot, %d warm, %d API candidates in %.1fs",
+        len(ticker_list), len(_pool["hot"]), len(_pool["warm"]), len(_pool["candidates"]), elapsed,
+    )
+
+
+def run_warm_rescore(settings: Settings) -> None:
+    """T1 Warm Rescore: rescore only warm-pool tickers."""
+    warm_tickers = list(_pool["warm"].keys())
+    if not warm_tickers:
+        return
+
+    t0 = time.perf_counter()
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _score(ticker: str) -> tuple[str, dict | None]:
+        return ticker, _score_single_ticker(ticker, settings)
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        scored = list(executor.map(_score, warm_tickers))
+
+    for ticker, result in scored:
+        if result is None:
+            _demote_warm(ticker)
+            continue
+
+        new_score = result.get("composite_score", 0)
+        if _should_be_hot(result):
+            # Promote to hot
+            _pool["warm"].pop(ticker, None)
+            _pool["hot"][ticker] = {"result": result, "consecutive_low": 0}
+        elif new_score >= WARM_THRESHOLD:
+            _pool["warm"][ticker] = {"result": result, "consecutive_low": 0}
+        elif new_score < WARM_DEMOTION_THRESHOLD:
+            _demote_warm(ticker)
+        else:
+            # Between demotion threshold and warm threshold: keep but update
+            if ticker in _pool["warm"]:
+                _pool["warm"][ticker]["result"] = result
+
+    _rebuild_candidates()
+
+    elapsed = round(time.perf_counter() - t0, 2)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    _pool["last_warm_scan_at"] = now_iso
+    _pool["last_scan_at"] = now_iso
+
+    logger.info(
+        "[BREAKOUT-WARM] Rescore: %d warm tickers in %.1fs (hot=%d, warm=%d)",
+        len(warm_tickers), elapsed, len(_pool["hot"]), len(_pool["warm"]),
+    )
+
+
+def run_hot_rescore(settings: Settings) -> None:
+    """T2 Hot Rescore: rescore only hot-pool tickers for maximum freshness."""
+    hot_tickers = list(_pool["hot"].keys())
+    if not hot_tickers:
+        return
+
+    t0 = time.perf_counter()
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _score(ticker: str) -> tuple[str, dict | None]:
+        return ticker, _score_single_ticker(ticker, settings)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        scored = list(executor.map(_score, hot_tickers))
+
+    for ticker, result in scored:
+        if result is None:
+            _demote_hot(ticker)
+            continue
+
+        new_score = result.get("composite_score", 0)
+        if _should_be_hot(result):
+            _pool["hot"][ticker] = {"result": result, "consecutive_low": 0}
+        elif new_score < HOT_DEMOTION_THRESHOLD:
+            # Score dropped: track for two-strike demotion
+            if ticker in _pool["hot"]:
+                _pool["hot"][ticker]["result"] = result
+                _demote_hot(ticker)
+        else:
+            # Between demotion threshold and hot threshold: keep but update
+            if ticker in _pool["hot"]:
+                _pool["hot"][ticker]["result"] = result
+                _pool["hot"][ticker]["consecutive_low"] = 0
+
+    _rebuild_candidates()
+
+    elapsed = round(time.perf_counter() - t0, 2)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    _pool["last_hot_scan_at"] = now_iso
+    _pool["last_scan_at"] = now_iso
+
+    logger.debug(
+        "[BREAKOUT-HOT] Rescore: %d hot tickers in %.1fs",
+        len(hot_tickers), elapsed,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Full universe scan (backward-compatible, used for asof_date point-in-time)
+# ---------------------------------------------------------------------------
+
+def run_breakout_scan(
+    settings: Settings,
+    universe: str | None = None,
+    asof_date: str | None = None,
+) -> list[dict[str, Any]]:
+    """Scan available tickers and return candidates sorted by score DESC point-in-time.
+
+    For live scans (no asof_date), this delegates to `run_cold_scan` which
+    populates the tiered pool and returns the merged candidates.
+    For historical asof_date scans, performs a standalone full-universe scan.
+    """
+    if asof_date is None:
+        # Live scan: use the tiered pool system
+        run_cold_scan(settings, universe=universe)
+        return list(_pool["candidates"])
+
+    # Historical point-in-time scan (standalone, doesn't touch the pool)
+    from concurrent.futures import ThreadPoolExecutor
+
+    ticker_list = _resolve_universe_tickers(settings, universe)
+    if not ticker_list:
         return []
 
-    ticker_list = sorted(tickers)
+    t0 = time.perf_counter()
 
-    def _score_single(ticker: str) -> dict[str, Any] | None:
-        try:
-            prices_df = load_prices(ticker, settings)
-            if prices_df is None or prices_df.empty:
-                return None
+    def _score(ticker: str) -> dict | None:
+        return _score_single_ticker(ticker, settings, asof_date=asof_date)
 
-            # Load quality scores from stored metrics
-            metrics = load_price_metrics(ticker, settings) or {}
-            quality_scores: list[float | None] = []
-            for key in ("q1_earnings_score", "q2_earnings_score", "q3_earnings_score"):
-                v = metrics.get(key)
-                if v is not None:
-                    try:
-                        quality_scores.append(float(v))
-                    except (TypeError, ValueError):
-                        quality_scores.append(None)
-                else:
-                    quality_scores.append(None)
-
-            result = score_breakout(ticker, prices_df, quality_scores, asof_date=asof_date)
-            if result and result["composite_score"] >= BREAKOUT_MIN_SCORE:
-                # Enrich with company name from metrics if available
-                result["company_name"] = metrics.get("company_name") or ticker
-                result["market_cap_cr"] = metrics.get("market_cap_cr") or metrics.get("market_cap")
-                result["industry"] = metrics.get("industry") or metrics.get("sector") or "—"
-                return result
-        except Exception as e:
-            logger.debug("[BREAKOUT] Error scoring %s: %s", ticker, e)
-        return None
-
-    # Run scoring concurrently using thread pool (I/O & DB queries)
-    candidates: list[dict[str, Any]] = []
     with ThreadPoolExecutor(max_workers=8) as executor:
-        scored = list(executor.map(_score_single, ticker_list))
-        candidates = [c for c in scored if c is not None]
+        scored = list(executor.map(_score, ticker_list))
 
-    # Sort by composite score descending
+    candidates = [c for c in scored if c is not None and c.get("composite_score", 0) >= BREAKOUT_MIN_SCORE]
     candidates.sort(key=lambda x: x["composite_score"], reverse=True)
     candidates = candidates[:BREAKOUT_MAX_CANDIDATES]
 
     elapsed = round(time.perf_counter() - t0, 2)
-    if is_live_scan:
-        _cache.update({
-            "candidates": candidates,
-            "last_scan_at": datetime.now(timezone.utc).isoformat(),
-            "last_scan_duration_s": elapsed,
-            "tickers_scanned": len(ticker_list),
-            "last_universe": universe or "ALL",
-            "status": "done",
-            "error": None,
-        })
-
     logger.info(
-        "[BREAKOUT] Scan complete (asof=%s): %d tickers scanned, %d candidates in %.1fs",
-        asof_date or "LIVE", len(ticker_list), len(candidates), elapsed,
+        "[BREAKOUT] Historical scan (asof=%s): %d tickers, %d candidates in %.1fs",
+        asof_date, len(ticker_list), len(candidates), elapsed,
     )
     return candidates
 
 
 # ---------------------------------------------------------------------------
-# Background asyncio loop (started from server lifespan)
+# Background asyncio loop — Tiered Scanner
 # ---------------------------------------------------------------------------
 
-async def breakout_scanner_loop(settings: Settings) -> None:
-    """Asyncio task: runs run_breakout_scan() every BREAKOUT_SCAN_INTERVAL_MIN minutes."""
-    interval_s = BREAKOUT_SCAN_INTERVAL_MIN * 60
+async def tiered_scanner_loop(settings: Settings) -> None:
+    """Asyncio task: orchestrates cold/warm/hot scans at independent intervals.
+
+    Timeline (example with defaults):
+    - t=0s:    Cold scan (bootstrap all pools)
+    - t=5m:    Hot rescore
+    - t=10m:   Hot rescore
+    - t=15m:   Hot rescore + Warm rescore
+    - t=20m:   Hot rescore
+    - ...
+    - t=60m:   Hot rescore + Cold scan (discover new candidates)
+    """
+    cold_interval_s = COLD_INTERVAL_MIN * 60
+    warm_interval_s = WARM_INTERVAL_MIN * 60
+    hot_interval_s = HOT_INTERVAL_MIN * 60
+
     logger.info(
-        "[BREAKOUT] Scanner started. Interval: %d min, min score: %d",
-        BREAKOUT_SCAN_INTERVAL_MIN, BREAKOUT_MIN_SCORE,
+        "[BREAKOUT] Tiered scanner started. Cold: %dm, Warm: %dm, Hot: %dm, Min score: %d",
+        COLD_INTERVAL_MIN, WARM_INTERVAL_MIN, HOT_INTERVAL_MIN, BREAKOUT_MIN_SCORE,
     )
+
+    loop = asyncio.get_event_loop()
+
+    # Bootstrap: run initial cold scan immediately
+    try:
+        await loop.run_in_executor(None, run_cold_scan, settings, None)
+        logger.info("[BREAKOUT] Bootstrap cold scan complete. Hot: %d, Warm: %d", len(_pool["hot"]), len(_pool["warm"]))
+    except Exception as e:
+        logger.error("[BREAKOUT] Bootstrap cold scan failed: %s", e)
+        _pool["status"] = "error"
+        _pool["error"] = str(e)
+
+    # Track time since last scan of each tier
+    last_cold = time.monotonic()
+    last_warm = time.monotonic()
+    last_hot = time.monotonic()
+
     while True:
         try:
-            # Run blocking scan in a thread pool executor so we don't block the event loop
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, run_breakout_scan, settings)
+            await asyncio.sleep(hot_interval_s)
         except asyncio.CancelledError:
-            logger.info("[BREAKOUT] Scanner loop cancelled (server shutdown).")
+            logger.info("[BREAKOUT] Tiered scanner cancelled during sleep.")
             break
-        except Exception as e:
-            logger.error("[BREAKOUT] Scan error: %s", e)
-            _cache["status"] = "error"
-            _cache["error"] = str(e)
+
+        now = time.monotonic()
 
         try:
-            await asyncio.sleep(interval_s)
+            # Check which tiers need rescoring (in priority order: cold > warm > hot)
+            if now - last_cold >= cold_interval_s:
+                await loop.run_in_executor(None, run_cold_scan, settings, None)
+                last_cold = now
+                last_warm = now  # cold scan effectively rescores everything
+                last_hot = now
+
+            elif now - last_warm >= warm_interval_s:
+                await loop.run_in_executor(None, run_hot_rescore, settings)
+                await loop.run_in_executor(None, run_warm_rescore, settings)
+                last_warm = now
+                last_hot = now
+
+            else:
+                # Just hot rescore
+                await loop.run_in_executor(None, run_hot_rescore, settings)
+                last_hot = now
+
         except asyncio.CancelledError:
-            logger.info("[BREAKOUT] Scanner loop cancelled during sleep.")
+            logger.info("[BREAKOUT] Tiered scanner cancelled.")
             break
+        except Exception as e:
+            logger.error("[BREAKOUT] Scan cycle error: %s", e)
+            _pool["status"] = "error"
+            _pool["error"] = str(e)
+
+
+# ---------------------------------------------------------------------------
+# Legacy compat alias
+# ---------------------------------------------------------------------------
+breakout_scanner_loop = tiered_scanner_loop

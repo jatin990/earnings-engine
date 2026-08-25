@@ -10658,7 +10658,17 @@
                 
                 // Update KPI Cards
                 setEl('breakoutStatTotal', total);
-                setEl('breakoutStatScanned', status.tickers_scanned || total || '\u2014');
+
+                // Pool tier badge for scanned count
+                const hotCount = status.hot_count || 0;
+                const warmCount = status.warm_count || 0;
+                const coldScanned = status.cold_tickers_scanned || total || '\u2014';
+                setEl('breakoutStatScanned', coldScanned);
+                // Update the sub-label for scanned to show tier breakdown
+                const scannedSub = document.getElementById('breakoutKpiSub4');
+                if (scannedSub) {
+                    scannedSub.innerHTML = `<span style="color:#ef4444">🔴 ${hotCount}</span> <span style="color:#eab308">🟡 ${warmCount}</span>`;
+                }
 
                 if (asofDate && summary.win_rate_pct != null) {
                     // Backtest Mode KPIs
@@ -10685,14 +10695,16 @@
 
                     setEl('breakoutKpiLabel5', 'Scan Duration');
                     setEl('breakoutStatDuration', status.last_scan_duration_s != null ? `${status.last_scan_duration_s}s` : '\u2014');
-                    setEl('breakoutKpiSub5', 'Last Full Scan');
+                    const intervals = status.scan_intervals || {};
+                    setEl('breakoutKpiSub5', intervals.hot_min ? `Hot: ${intervals.hot_min}m · Warm: ${intervals.warm_min}m · Cold: ${intervals.cold_min}m` : 'Last Full Scan');
                 }
 
                 if (lastScanEl && status.last_scan_at) {
                     try {
                         const d = new Date(status.last_scan_at);
                         const uniLabel = universe === 'nifty_50' ? 'Nifty 50' : (universe === 'all' ? 'All' : universe);
-                        lastScanEl.textContent = `${uniLabel} • ${asofDate ? 'As-Of ' + asofDate : 'Live • Last scan: ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+                        const tierInfo = hotCount > 0 ? ` · 🔴${hotCount} Hot · 🟡${warmCount} Warm` : '';
+                        lastScanEl.textContent = `${uniLabel} • ${asofDate ? 'As-Of ' + asofDate : 'Live • Last scan: ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}${tierInfo}`;
                     } catch { lastScanEl.textContent = 'Last scan: ' + status.last_scan_at; }
                 } else if (lastScanEl) {
                     lastScanEl.textContent = status.status === 'running' ? 'Scanning now\u2026' : (asofDate ? `As-Of ${asofDate}` : 'Waiting for first scan\u2026');

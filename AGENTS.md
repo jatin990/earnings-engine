@@ -24,7 +24,7 @@ Whenever you work on this repository, you must maintain zero-error hygiene using
 
 ### 1.2 Git Commit & Push Protocol
 - **Local Commits**: Keep committing changes locally as each feature, fix, or refactor is completed and verified.
-- **Push Policy**: Do **NOT** push to the remote repository after every individual change. Only push once per day after **10:00 PM IST** (or when explicitly commanded by the user).
+- **Push Policy**: Do **NOT** push to the remote repository after every individual change. Push to remote once every **5 local commits** (or when explicitly commanded by the user).
 
 ### 1.3 Execution Environment
 - **OS**: Windows (PowerShell / pwsh)
