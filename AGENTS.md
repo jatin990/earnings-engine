@@ -1,6 +1,6 @@
 # Earnings Engine — Agent Master Guidelines & Knowledge Base
 
-> **Primary Instruction for AI Agents**: This document is the single source of truth for repository architecture, operating rules, error ledger protocols, subsystem design, CLI workflows, and common modification points. Read and adhere strictly to these guidelines before making changes.
+> **Primary Instruction for AI Agents**: This document is the single source of truth for repository architecture, operating rules, error ledger protocols, subsystem design, database schemas, feature engineering, data flows, CLI workflows, and common modification points. Read and adhere strictly to these guidelines before making changes.
 
 ---
 
@@ -32,7 +32,7 @@ Whenever you work on this repository, you must maintain zero-error hygiene using
 
 ---
 
-## 2. Project Architecture & Subsystems
+## 2. Project Architecture & Directory Layout
 
 ```
 earnings-engine/
@@ -47,6 +47,9 @@ earnings-engine/
 │   ├── logging_utils.py              # Centralized logging setup
 │   ├── emailing.py                   # SMTP report dispatching
 │   ├── rate_limits.py                # Sliding-window per-model & provider rate limit tracker
+│   ├── dataset.py                    # Event dataset generation & historical aggregation
+│   ├── predict.py                    # GBM upcoming earnings scoring pipeline
+│   ├── kronos_predictor.py           # Kronos AI 14-day price sequence forecast
 │   ├── api/
 │   │   ├── server.py                 # FastAPI application, route mounting, UI endpoints
 │   │   ├── stock_api.py              # Dedicated stock intelligence & EPS derivation routes
@@ -64,14 +67,17 @@ earnings-engine/
 │   │   ├── watchlists.py             # Watchlist management (SQLite + Turso sync)
 │   │   ├── universe.py               # Market universe resolution (IN, NSE_ALL, US, etc.)
 │   │   ├── market_context.py         # 52W range, week high/low around earnings
-│   │   └── predictions.py            # Legacy prediction cache management
+│   │   ├── predictions.py            # Kronos prediction persistence and audit trail
+│   │   ├── swing_ranges.py           # Swing ranges and cycle timing history
+│   │   ├── strategy_auditor.py       # Multi-strategy backtest and outcome auditing
+│   │   └── coverage.py               # Price & earnings data coverage reporting
 │   ├── features/                     # Point-in-Time (PIT) Feature Engineering
 │   │   ├── price_features.py         # Technical momentum, volatility & volume metrics
 │   │   ├── earnings_features.py      # Historical surprise streak & beat frequency
 │   │   └── labels.py                 # 1-day post-earnings reaction calculation
 │   ├── models/                       # Predictive Models & Heuristics
 │   │   ├── base.py                   # BaseModel abstract class
-│   │   ├── baseline.py               # PastUpRateBaseline heuristics
+│   │   ├── baseline.py               # AlwaysUp and PastUpRateBaseline heuristics
 │   │   ├── classifier.py             # LightGBM Classifier with Platt probability calibration
 │   │   └── registry.py               # Model registration & lookup
 │   ├── backtest/
@@ -80,44 +86,131 @@ earnings-engine/
 │   │   └── radar.py                  # Breakout Radar scanner, tracking & outcome verification
 │   ├── reports/
 │   │   ├── render.py                 # Report generation (HTML/CSV/Telegram/Email)
+│   │   ├── checker.py                # Database verification & report audit subworkflow
 │   │   └── templates/                # Jinja2 & HTML templates (stock_detail.html, dashboard/)
 │   └── ui/                           # Frontend static assets (CSS, JS, dashboard.js)
 ```
 
 ---
 
-## 3. Subsystem Deep-Dives
+## 3. Comprehensive Knowledge Base
 
-### 3.1 AI Consensus Engine (`earnings_engine/consensus/`)
-- **Models**:
+### 3.1 Database Architecture & Table Schemas (`prices.sqlite3` / `earnings_engine.db`)
+The storage layer uses a centralized SQLite database (`data/cache/prices/prices.sqlite3` or `earnings_engine.db`), backed by optional remote Turso synchronization (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`).
+
+| Table Name | Primary Key / Index | Description & Columns |
+| :--- | :--- | :--- |
+| `price_history` | `(ticker, date)` | Daily OHLCV price series (`open`, `high`, `low`, `close`, `volume`). |
+| `earnings_history` | `(ticker, earnings_date)` | Corporate earnings calendar (`eps_estimate`, `eps_reported`, `surprise_pct`). |
+| `earnings_freshness` | `(ticker)` | Ingestion tracking timestamp (`fetched_at`). Max age 1 day unless `--force`. |
+| `ticker_metrics` | `(ticker, as_of_date)` | Once-per-day cache of price-derived report fields (`week_change`, `pct_from_52w_high/low`, `thirty_day_return_pct`, `earnings_week_move_pct`). |
+| `ticker_market_cap` | `(ticker)` | Fundamental company market capitalization and fetch timestamp (`fetched_at`). |
+| `event_dataset` | `(ticker, earnings_date)` | Built point-in-time dataset containing features, labels, and reaction returns. |
+| `consensus_predictions` | `(id)` / `(ticker, event_date)` | Multi-model AI consensus predictions, model breakdowns, target prices, stop losses, and settlement auditing. |
+| `kronos_predictions` | `(id)` / `idx_kronos (ticker, run_at DESC)` | 14-day Kronos AI deep sequence forecasts, support, resistance, and price trajectories. |
+| `breakout_radar` | `(id)` / `(ticker, detected_at)` | High-conviction breakout setups, trigger price, targets, stop loss, and outcome logs. |
+| `watchlists` | `(name, ticker)` | User watchlists (`swing`, `my_watchlist`, etc.) with Turso Cloud replication. |
+| `universes` | `(universe_name, ticker)` | Ticker universe memberships (`IN`, `US`, `NSE_ALL`, `NSE_LARGE_CAP`, custom). |
+| `universe_freshness` | `(universe_name)` | Universe metadata cache freshness (`fetched_at`). |
+| `swing_ranges` | `(watchlist, ticker)` | Support and resistance channel bounds, cycle counts, and user vs auto source. |
+| `swing_cycle_history` | `(watchlist, ticker, cycle_idx)` | Historical swing cycle durations and channel extremes. |
+| `strategy_predictions` | `(id)` / `(strategy_name, ticker, entry_date)` | Multi-strategy forecast log for systematic performance auditing. |
+| `strategy_audit_logs` | `(id)` / `(prediction_id)` | Realized return, win/loss status, and settlement metrics per strategy signal. |
+
+---
+
+### 3.2 Point-in-Time (PIT) Feature Engineering & Labels
+
+#### 1. Label Computation (`features/labels.py`)
+- Post-earnings reaction is computed as:
+  $$\text{reaction\_return} = \frac{\text{close}(T+1)}{\text{close}(T-1)} - 1$$
+- Binary classification label:
+  $$\text{label} = \begin{cases} 1 & \text{if } \text{reaction\_return} > 0 \\ 0 & \text{otherwise} \end{cases}$$
+- `compute_reaction()` returns `None` if $T-1$ or $T+1$ price bars are missing, if the trading day gap exceeds 10 days, or if prices are non-positive.
+
+#### 2. Price Technical Features (`features/price_features.py`)
+Requires a minimum of 70 trading days of historical price data before `asof_date` ($T-1$):
+- `ret_5d`, `ret_21d`, `ret_63d`: Trailing momentum returns.
+- `vol_21d`: 21-day annualized volatility.
+- `vol_ratio_5d_63d`: Short-to-medium term volatility compression/expansion ratio.
+- `volume_ratio_5d_63d`: Volume surge indicator.
+- `abs_ret_mean_21d`: Mean absolute daily return over 21 trading sessions.
+- `dist_52w_high`, `dist_52w_low`: Percentage distance from 52-week high and low.
+
+#### 3. Earnings Track Record Features (`features/earnings_features.py`)
+Computed strictly from earnings events prior to the current announcement:
+- `n_past_events`: Number of historical earnings releases available.
+- `past_reaction_mean`: Mean historical post-earnings reaction return.
+- `past_reaction_std`: Volatility/dispersion of past post-earnings moves.
+- `past_up_rate`: Fraction of past earnings resulting in a positive reaction.
+- `last_reaction_return`: Reaction return on the immediately preceding earnings date.
+- `last_surprise_pct`: EPS surprise percentage on the immediately preceding earnings date.
+
+---
+
+### 3.3 Multi-Model AI Consensus Engine (`consensus/`)
+- **Parallel AI Architecture**:
   - `deepseek/deepseek-r1`: Deep reasoning & chain-of-thought analysis.
   - `meta-llama/llama-3.3-70b-instruct`: Institutional macro & fundamental momentum.
   - `qwen/qwen-2.5-72b-instruct`: Algorithmic structure & volume pattern recognition.
-  - `mistralai/mistral-large` (fallback `google/gemini-2.0-flash-001`): News catalyst analysis.
+  - `mistralai/mistral-large` (fallback `google/gemini-2.0-flash-001`): News catalyst & filing analysis.
 - **Workflow**:
-  1. `context_builder.py` gathers real-time live price, swing momentum, volume spikes, quarterly EPS history, and news catalysts.
-  2. `model_runner.py` sends parallel requests to OpenRouter / LLM APIs.
-  3. `rate_limits.py` tracks sliding-window RPM/RPD per model and records response headers.
-  4. If a single model is run (e.g. user clicks "⚡ Run DeepSeek-R1"), `server.py` merges the single output with cached predictions from other models and triggers `aggregator.aggregate_predictions()` for a unified consensus verdict.
-  5. `storage.py` saves the forecast with settlement date for future accuracy auditing.
+  1. `context_builder.py` aggregates point-in-time stock data: live prices, swing momentum, deliverable volume, 3Q EPS surprise quality, and news catalysts.
+  2. `model_runner.py` executes parallel asynchronous queries to OpenRouter / LLM endpoints.
+  3. `rate_limits.py` tracks sliding-window RPM (requests per minute) and RPD (requests per day) per model.
+  4. **Single-Model Partial Execution**: When the user triggers an individual model (e.g. `⚡ Run DeepSeek-R1`), only that model is queried. Its new prediction is merged with existing cached outputs from the other models, and `aggregator.aggregate_predictions()` re-computes the unified consensus verdict.
+  5. `storage.py` records predictions with settlement dates for accuracy auditing.
 
-### 3.2 Data Layer & Cloud Sync (`earnings_engine/data/`)
-- **Database**: SQLite (`earnings_engine.db`) with fallback and optional Turso Cloud replication (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`).
-- **Key Tables**:
-  - `price_history`: Daily OHLCV prices per ticker.
-  - `earnings_calendar`: Earnings announcement dates, reported EPS, estimated EPS, surprise %.
-  - `consensus_predictions`: Historical AI forecasts, direction, stop loss, targets, settlement status.
-  - `breakout_radar`: Detected breakouts, trigger price, target, stop loss, and outcome tracking.
-  - `watchlists`: User watchlist groupings (`swing`, `my_watchlist`, etc.).
-  - `ticker_metrics` / `ticker_market_cap`: Fundamental market cap and metadata.
+---
 
-### 3.3 Stock Intelligence & EPS Derivation (`earnings_engine/api/stock_api.py`)
-- **Live Pricing**: `/api/v1/stock/{ticker}/quote` and `/api/v1/stock/{ticker}` fetch live intraday prices via `yfinance` fast_info.
-- **Missing EPS Calculation**: `/api/v1/stock/{ticker}/calculate-eps` automatically derives missing historical EPS for passed earnings dates using trailing quarterly income statements or user manual overrides.
+### 3.4 Predictive Models & Walk-Forward Backtesting
 
-### 3.4 Breakout Radar & Swing Scanner
-- Scans `IN` (Nifty 50), `NSE_ALL`, or custom watchlists for high-conviction breakout setups based on 52W highs, volume expansion, and compression channels.
-- Persists found breakouts to database and tracks if targets or stop losses are hit over subsequent trading sessions.
+#### 1. Models (`models/`)
+- `GBClassifier` (`gbm`): LightGBM classifier with Platt probability calibration (`CalibratedClassifierCV(method="sigmoid", cv=3)` when $N \ge 150$).
+- `PastUpRate` (`past_up_rate`): Empirical Bayes shrinkage model regularizing ticker-specific up rates toward the global universe base rate (shrinkage factor = 4.0).
+- `AlwaysUp` (`always_up`): Base rate benchmark.
+- `Kronos AI`: Deep neural sequence model generating 14-day price paths with support/resistance levels (GPU accelerated via `--device cuda:0`).
+
+#### 2. Walk-Forward Backtesting Engine (`backtest/engine.py`)
+- Simulates realistic quarterly out-of-sample deployment without future data leakage.
+- `BacktestConfig`: `initial_train_frac = 0.4`, `test_window_days = 90`, `cost_per_trade = 0.001` (10 bps slippage/commission).
+- Trade simulation:
+  - Long if $\hat{p} \ge \text{threshold}$ (e.g. 0.50).
+  - Short if $\hat{p} \le 1 - \text{threshold}$.
+  - Net return: $\text{trade\_return} = \text{side} \times \text{reaction\_return} - \text{cost\_per\_trade}$.
+- Metrics: Win rate, coverage, Sharpe ratio per event, profit factor, and maximum drawdown.
+
+---
+
+### 3.5 End-to-End Data Flows
+
+#### Ingestion Flow
+```
+CLI: earnings-engine ingest --market NSE_ALL
+  ├── data/prices.py: Ingest OHLCV prices (ThreadPoolExecutor 10 workers, batch 50, 2s delay)
+  ├── data/earnings.py: Ingest earnings calendar & EPS surprise history
+  └── data/universe.py: Ingest & update market cap database
+```
+
+#### Dataset Construction Flow
+```
+CLI: earnings-engine build-dataset
+  └── dataset.py: build_dataset()
+        ├── Load prices & earnings from SQLite
+        ├── features/labels.py: compute_reaction()
+        ├── features/price_features.py: compute_price_features()
+        ├── features/earnings_features.py: compute_earnings_features()
+        └── Save unified rows to SQLite `event_dataset` table
+```
+
+#### Prediction & Report Generation Flow
+```
+CLI: earnings-engine upcoming-results --market NSE_ALL --days 14
+  ├── data/earnings.py: upcoming_earnings() look-ahead window
+  ├── data/market_context.py: enrich_upcoming_results() (52W range, week high/low, quality scores)
+  ├── predict.py: score with LightGBM / Kronos AI
+  └── reports/render.py: generate styled HTML reports & CSV exports
+```
 
 ---
 
@@ -125,23 +218,27 @@ earnings-engine/
 
 > [!IMPORTANT]
 > **1. Point-in-Time (PIT) Guarantee**:
-> In `features/` and `dataset.py`, never leak future information. All feature computation for event date $T$ must strictly filter `prices.loc[prices.index <= asof_date]` where `asof_date` is the trading day before earnings announcement.
+> In `features/` and `dataset.py`, never leak future information. All feature computation for event date $T$ must strictly filter `prices.loc[prices.index <= asof_date]` where `asof_date` is the trading day before earnings announcement ($T-1$).
 
 > [!WARNING]
 > **2. FastAPI Route Precedence**:
-> In `earnings_engine/api/server.py`, explicit literal routes (e.g. `/api/v1/watchlist/quotes`, `/api/v1/watchlist/all`, `/api/v1/watchlist/names`) **MUST ALWAYS** be defined **before** parameterized routes like `/api/v1/watchlist/{name}`. Otherwise, FastAPI will treat literal words like `"quotes"` as path parameters.
+> In `earnings_engine/api/server.py`, explicit literal routes (e.g. `/api/v1/watchlist/quotes`, `/api/v1/watchlist/all`, `/api/v1/watchlist/names`, `/api/v1/consensus/models`) **MUST ALWAYS** be defined **before** parameterized routes like `/api/v1/watchlist/{name}`. Otherwise, FastAPI matches literal route strings as path parameters.
 
 > [!TIP]
 > **3. Turso Remote Database Error Handling**:
 > When querying remote Turso instances, always encapsulate calls with local SQLite fallback in case of network timeouts (`ConnectionResetError` / `ReadTimeout`).
 
 > [!NOTE]
-> **4. yfinance Symbol Suffixes**:
-> Indian NSE equities require the `.NS` suffix (e.g., `TCS.NS`, `RELIANCE.NS`). Check for symbol aliases where applicable (e.g., `STERTECH.NS` $\rightarrow$ `STLTECH.NS`).
+> **4. yfinance Symbol Suffixes & Aliases**:
+> Indian NSE equities require the `.NS` suffix (e.g., `TCS.NS`, `RELIANCE.NS`). Maintain symbol alias mappings where tickers have renamed on NSE (e.g., `STERTECH.NS` $\rightarrow$ `STLTECH.NS`).
+
+> [!TIP]
+> **5. Rate Limit Sliding Windows**:
+> OpenRouter and LLM APIs enforce strict RPM and daily quotas. `RateLimitTracker` tracks sliding-window deques across 1m, 1h, and 24h intervals and captures response headers (`x-ratelimit-remaining`, `x-ratelimit-reset`).
 
 ---
 
-## 5. Common Modification Points
+## 5. Common Modification Points & Capability Map
 
 | Goal | Primary Files to Change |
 | :--- | :--- |
@@ -154,6 +251,8 @@ earnings-engine/
 | **Modify Main Dashboard UI & Tabs** | `earnings_engine/reports/templates/dashboard/` + `earnings_engine/ui/js/dashboard.js` |
 | **Add a new CLI command** | `earnings_engine/cli.py` |
 | **Modify Database Schemas or Turso Sync** | `earnings_engine/data/db.py` + `turso.py` |
+| **Modify Swing Range Detection or Scan** | `earnings_engine/data/swing_ranges.py` + `dashboard_api.py` |
+| **Modify Breakout Radar Scanning Logic** | `earnings_engine/breakout/radar.py` |
 
 ---
 
