@@ -34,6 +34,7 @@ from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.migrations import apply_migrations
 from earnings_engine.logging_utils import get_logger, log_startup_diagnostics
 from earnings_engine.data import breakout_scanner as breakout_scanner_mod
+from earnings_engine.data import quarter_repeaters as repeaters_mod
 
 logger = get_logger("earnings_engine.api.server")
 
@@ -4322,3 +4323,105 @@ async def refresh_breakout_radar(
     t = threading.Thread(target=_run, daemon=True, name="breakout_manual_refresh")
     t.start()
     return {"success": True, "message": f"Breakout scan triggered for {universe or 'all universes'} in background. Check /api/v1/breakout-radar shortly."}
+
+
+# ---------------------------------------------------------------------------
+# Quarter Repeaters & AI Forward Earnings Radar Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/earnings-radar/repeaters", tags=["Quarter Repeaters Radar"])
+async def get_quarter_repeaters(
+    universe: str | None = Query(None, description="Universe or watchlist to screen (e.g. nifty_50, nse_top, nse_large_cap, us_top, all)"),
+    min_beat_pct: float = Query(0.0, description="Minimum prior EPS surprise percentage"),
+    min_week_high_pct: float = Query(2.5, description="Minimum post-earnings week peak high percentage"),
+    limit: int = Query(50, ge=1, le=150, description="Max candidates to return"),
+    verdict: str | None = Query(None, description="Filter by AI repeat verdict (e.g. STRONG_REPEAT_BEAT, MODERATE_BEAT)"),
+):
+    """Screen for companies that had stellar past earnings beats & week highs, with AI continuity forecasts."""
+    candidates = repeaters_mod.scan_quarter_repeaters(
+        settings=_settings,
+        universe=universe,
+        min_beat_pct=min_beat_pct,
+        min_week_high_pct=min_week_high_pct,
+        limit=limit,
+    )
+
+    if verdict:
+        v_clean = verdict.upper().strip()
+        candidates = [
+            c for c in candidates
+            if c.get("ai_forecast") and c["ai_forecast"].get("ai_repeat_verdict") == v_clean
+        ]
+
+    # Calculate summary metrics
+    total_screened = len(candidates)
+    avg_beat = round(sum(c.get("last_eps_surprise") or 0 for c in candidates) / total_screened, 1) if total_screened > 0 else 0.0
+    top_conviction = max(candidates, key=lambda x: x.get("conviction_score", 0)) if candidates else None
+
+    # Count industry buzz themes
+    buzz_counts: dict[str, int] = {}
+    for c in candidates:
+        tag = c.get("industry_buzz_tag", "Growth")
+        buzz_counts[tag] = buzz_counts.get(tag, 0) + 1
+    dominant_buzz = max(buzz_counts.items(), key=lambda x: x[1])[0] if buzz_counts else "—"
+
+    return {
+        "success": True,
+        "count": total_screened,
+        "universe": universe or "ALL",
+        "summary": {
+            "total_screened": total_screened,
+            "avg_prior_beat_pct": avg_beat,
+            "top_pick_ticker": top_conviction.get("ticker") if top_conviction else "—",
+            "top_pick_score": top_conviction.get("conviction_score") if top_conviction else 0,
+            "dominant_industry_buzz": dominant_buzz,
+        },
+        "candidates": candidates,
+    }
+
+
+@app.post("/api/v1/earnings-radar/repeaters/forecast/{ticker}", tags=["Quarter Repeaters Radar"])
+async def forecast_single_repeater(ticker: str):
+    """Run on-demand AI Forward reasoning for upcoming quarter earnings continuity for a single ticker."""
+    sym = ticker.strip().upper()
+    try:
+        forecast = repeaters_mod.generate_ai_repeater_forecast(sym, settings=_settings)
+        return {
+            "success": True,
+            "ticker": sym,
+            "forecast": forecast,
+        }
+    except Exception as e:
+        logger.error("[REPEATERS-API] Forecast failed for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"AI Forecast failed for {sym}: {str(e)}")
+
+
+@app.post("/api/v1/earnings-radar/repeaters/batch-forecast", tags=["Quarter Repeaters Radar"])
+async def batch_forecast_repeaters(
+    universe: str | None = Query(None, description="Universe to batch forecast"),
+    limit: int = Query(15, ge=1, le=40, description="Max stocks to process in batch"),
+):
+    """Run background batch AI Forward analysis for top quarter repeat candidates."""
+    candidates = repeaters_mod.scan_quarter_repeaters(
+        settings=_settings,
+        universe=universe,
+        limit=limit,
+    )
+    tickers = [c["ticker"] for c in candidates]
+
+    def _run_batch():
+        for t in tickers:
+            try:
+                repeaters_mod.generate_ai_repeater_forecast(t, settings=_settings)
+            except Exception as ex:
+                logger.warning("[REPEATERS-BATCH] Error forecasting %s: %s", t, ex)
+
+    t = threading.Thread(target=_run_batch, daemon=True, name="repeaters_batch_forecast")
+    t.start()
+
+    return {
+        "success": True,
+        "message": f"Started AI Forward batch forecasting for {len(tickers)} stocks in {universe or 'all universes'}.",
+        "tickers": tickers,
+    }
+

@@ -705,6 +705,36 @@ def _migration_011_trips_and_net_worth_expansion(conn: Any) -> None:
             pass
 
 
+def _migration_012_quarter_repeaters(conn: Any) -> None:
+    """Create table for Quarter Repeaters & AI Forward Earnings Radar predictions."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS quarter_repeater_predictions (
+            ticker TEXT NOT NULL,
+            run_at TEXT NOT NULL,
+            as_of_quarter TEXT,
+            last_eps_surprise REAL,
+            last_week_high_pct REAL,
+            last_quality_score INTEGER,
+            beat_streak INTEGER,
+            industry_buzz_tag TEXT,
+            ai_repeat_verdict TEXT,
+            repeat_probability_pct REAL,
+            confidence_pct REAL,
+            expected_price_bias TEXT,
+            growth_drivers_json TEXT,
+            risk_factors_json TEXT,
+            thesis TEXT,
+            news_summary TEXT,
+            days_to_next_earnings INTEGER,
+            next_earnings_date TEXT,
+            payload_json TEXT,
+            PRIMARY KEY (ticker, run_at)
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_repeater_ticker ON quarter_repeater_predictions (ticker)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_repeater_verdict ON quarter_repeater_predictions (ai_repeat_verdict)")
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -718,6 +748,7 @@ MIGRATIONS: list[Migration] = [
     Migration(9, "009_rbac_and_scoped_access", _migration_009_rbac_and_scoped_access),
     Migration(10, "010_credit_cards_and_otp_requests", _migration_010_credit_cards_and_otp_requests),
     Migration(11, "011_trips_and_net_worth_expansion", _migration_011_trips_and_net_worth_expansion),
+    Migration(12, "012_quarter_repeater_predictions", _migration_012_quarter_repeaters),
 ]
 
 
