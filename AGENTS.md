@@ -62,6 +62,8 @@ earnings-engine/
 │   ├── data/                         # Ingestion & Data Management
 │   │   ├── db.py                     # SQLite / Turso database connection & table schemas
 │   │   ├── turso.py                  # Turso Cloud database sync & pipeline client
+│   │   ├── auth.py                   # Nexus Authentication, OTP, session tokens & RBAC
+│   │   ├── passcodes.py              # Passcode generation, validation & scope enforcement
 │   │   ├── prices.py                 # Daily OHLCV price ingestion, caching & indicators
 │   │   ├── earnings.py               # Corporate earnings dates, EPS estimates & surprises
 │   │   ├── watchlists.py             # Watchlist management (SQLite + Turso sync)
@@ -87,15 +89,73 @@ earnings-engine/
 │   ├── reports/
 │   │   ├── render.py                 # Report generation (HTML/CSV/Telegram/Email)
 │   │   ├── checker.py                # Database verification & report audit subworkflow
-│   │   └── templates/                # Jinja2 & HTML templates (stock_detail.html, dashboard/)
+│   │   └── templates/                # Jinja2 & HTML templates (stock_detail.html, portal.html, dashboard/)
 │   └── ui/                           # Frontend static assets (CSS, JS, dashboard.js)
 ```
 
 ---
 
-## 3. Comprehensive Knowledge Base
+## 3. Overall Nexus Platform Architecture
 
-### 3.1 Database Architecture & Table Schemas (`prices.sqlite3` / `earnings_engine.db`)
+```mermaid
+graph TD
+    User([User / Browser / API Client]) --> Gateway[Nexus Gateway / Portal : /portal]
+    
+    subgraph Nexus Security & Access Control
+        Gateway --> AuthMiddleware[Nexus Auth Middleware]
+        AuthMiddleware --> TokenAuth[HMAC-SHA256 Token Auth 'nexus_session']
+        AuthMiddleware --> PasscodeAuth[Passcode Engine 'NEXUS-MASTER' / Scoped Invites]
+        AuthMiddleware --> OTPAuth[6-Digit Email OTP Engine via Resend / SMTP]
+        PasscodeAuth --> RBAC[Fine-Grained RBAC & Scope Verifier]
+    end
+
+    subgraph Nexus Scoped Application Hubs
+        RBAC --> HubDashboard[1. Market Intelligence & Earnings Hub : /dashboard]
+        RBAC --> HubStock[2. Stock Detail & AI Consensus Engine : /stock/:ticker]
+        RBAC --> HubBreakout[3. Breakout Radar & Scanner Hub : /dashboard#breakout]
+        RBAC --> HubWealth[4. Net Worth & Asset Allocation Hub : /net-worth]
+        RBAC --> HubCards[5. Credit Card & Rewards Hub : /credit-cards]
+        RBAC --> HubTrips[6. Travel & Trips Hub : /trips]
+        RBAC --> HubAdmin[7. Passcode Management & Admin Hub : /passcodes]
+    end
+
+    subgraph Intelligence & Quantitative Pipelines
+        HubStock --> Consensus[Multi-Model AI Consensus Engine]
+        Consensus --> Models[DeepSeek-R1 | Llama-3.3-70B | Qwen-2.5-72B | Mistral-Large]
+        HubStock --> Kronos[Kronos AI 14-Day Deep Sequence Forecast]
+        HubDashboard --> LightGBM[LightGBM Directional Classifier]
+        HubBreakout --> RadarScanner[Breakout Radar Algorithm]
+    end
+
+    subgraph Data & Persistence Layer
+        Consensus & Kronos & LightGBM & RadarScanner & HubWealth & HubCards --> Storage[SQLite Storage : prices.sqlite3 / earnings_engine.db]
+        Storage <--> Turso[Turso Cloud DB Replication]
+    end
+```
+
+### 3.1 Nexus Scoped Hub Specifications
+1. **Nexus Gateway & Portal (`/portal`)**:
+   - Master entry point for authentication, onboarding, hub switching, and session management.
+   - Handles passcode entry, OTP verification flows, and direct deep-linking via `?code=NEXUS-XXXXXX`.
+2. **Market Intelligence & Earnings Hub (`/dashboard`, `/stock/{ticker}`)**:
+   - 13,133+ event Point-in-Time dataset with LightGBM earnings reaction probability estimation.
+   - Multi-Model AI Consensus Engine featuring per-model rate limiting, individual execution triggers, and structured schema extraction.
+   - Kronos AI deep sequence forecasting (14-day price paths with support/resistance levels).
+   - Real-time stock quotes, deliverable volume spikes, 52-week position analysis, and EPS derivation engine.
+3. **Breakout Radar Hub (`/dashboard#breakout`)**:
+   - Automated scanner detecting compression breakouts, volume surges, and 52-week momentum setups across NSE All, Nifty 50, and custom universes.
+   - Tracks detected breakouts and audits real-world post-signal performance.
+4. **Credit Cards & Wealth Hub (`/credit-cards`, `/net-worth`)**:
+   - Credit card statement cycle management, rewards optimization by spend category, and bill payment tracking.
+   - Net worth consolidation across equities, mutual funds, provident funds (EPF/PPF), real estate, and liquid cash.
+5. **Admin & Passcode Hub (`/passcodes`, `/api/v1/auth/*`)**:
+   - Generates scoped, single-use, or permanent access passcodes (`NEXUS-<CODE>`) with fine-grained hub permissions and device tracking.
+
+---
+
+## 4. Comprehensive Knowledge Base
+
+### 4.1 Database Architecture & Table Schemas (`prices.sqlite3` / `earnings_engine.db`)
 The storage layer uses a centralized SQLite database (`data/cache/prices/prices.sqlite3` or `earnings_engine.db`), backed by optional remote Turso synchronization (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`).
 
 | Table Name | Primary Key / Index | Description & Columns |
@@ -119,7 +179,7 @@ The storage layer uses a centralized SQLite database (`data/cache/prices/prices.
 
 ---
 
-### 3.2 Point-in-Time (PIT) Feature Engineering & Labels
+### 4.2 Point-in-Time (PIT) Feature Engineering & Labels
 
 #### 1. Label Computation (`features/labels.py`)
 - Post-earnings reaction is computed as:
@@ -148,7 +208,7 @@ Computed strictly from earnings events prior to the current announcement:
 
 ---
 
-### 3.3 Multi-Model AI Consensus Engine (`consensus/`)
+### 4.3 Multi-Model AI Consensus Engine (`consensus/`)
 - **Parallel AI Architecture**:
   - `deepseek/deepseek-r1`: Deep reasoning & chain-of-thought analysis.
   - `meta-llama/llama-3.3-70b-instruct`: Institutional macro & fundamental momentum.
@@ -163,7 +223,7 @@ Computed strictly from earnings events prior to the current announcement:
 
 ---
 
-### 3.4 Predictive Models & Walk-Forward Backtesting
+### 4.4 Predictive Models & Walk-Forward Backtesting
 
 #### 1. Models (`models/`)
 - `GBClassifier` (`gbm`): LightGBM classifier with Platt probability calibration (`CalibratedClassifierCV(method="sigmoid", cv=3)` when $N \ge 150$).
@@ -182,7 +242,7 @@ Computed strictly from earnings events prior to the current announcement:
 
 ---
 
-### 3.5 End-to-End Data Flows
+### 4.5 End-to-End Data Flows
 
 #### Ingestion Flow
 ```
@@ -214,7 +274,7 @@ CLI: earnings-engine upcoming-results --market NSE_ALL --days 14
 
 ---
 
-## 4. Critical Engineering Quirks & Gotchas
+## 5. Critical Engineering Quirks & Gotchas
 
 > [!IMPORTANT]
 > **1. Point-in-Time (PIT) Guarantee**:
@@ -238,7 +298,7 @@ CLI: earnings-engine upcoming-results --market NSE_ALL --days 14
 
 ---
 
-## 5. Common Modification Points & Capability Map
+## 6. Common Modification Points & Capability Map
 
 | Goal | Primary Files to Change |
 | :--- | :--- |
@@ -256,7 +316,7 @@ CLI: earnings-engine upcoming-results --market NSE_ALL --days 14
 
 ---
 
-## 6. CLI Command Quick Reference
+## 7. CLI Command Quick Reference
 
 ### Ingestion & Data
 ```bash

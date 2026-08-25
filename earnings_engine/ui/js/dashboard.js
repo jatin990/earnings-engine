@@ -891,9 +891,27 @@
                         }
                         const autoEl = document.getElementById('autocompleteDropdown');
                         if (autoEl) autoEl.style.display = 'none';
+                        app.toggleMobileSidebar(false);
                         if (document.activeElement) document.activeElement.blur();
                     }
                 });
+            },
+
+            toggleMobileSidebar(open = null) {
+                const sidebar = document.getElementById('appSidebar') || document.querySelector('.app-sidebar');
+                const backdrop = document.getElementById('sidebarBackdrop');
+                if (!sidebar) return;
+                
+                const willOpen = (open !== null) ? !!open : !sidebar.classList.contains('mobile-open');
+                sidebar.classList.toggle('mobile-open', willOpen);
+                if (backdrop) {
+                    backdrop.classList.toggle('active', willOpen);
+                    backdrop.style.display = willOpen ? 'block' : 'none';
+                }
+                // Prevent body scrolling when sidebar drawer is open on mobile
+                if (window.innerWidth <= 992) {
+                    document.body.style.overflow = willOpen ? 'hidden' : '';
+                }
             },
 
             filterSidebarTabs(query) {

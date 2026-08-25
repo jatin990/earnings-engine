@@ -3,54 +3,59 @@
 <!-- ========================================================================= -->
 <header class="app-topbar">
     
+    <!-- Mobile Hamburger Toggle Button -->
+    <button id="mobileSidebarToggle" class="mobile-menu-btn" onclick="app.toggleMobileSidebar()" aria-label="Toggle navigation menu" title="Open Navigation Menu">
+        <span class="hamburger-icon">☰</span>
+    </button>
+    
     <!-- Left: Breadcrumb & Universe Selector -->
-    <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">
-        <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8125rem;">
-            <span style="color: #71717a;">engine</span>
-            <span style="color: #3f3f46;">/</span>
-            <span id="topbarBreadcrumbTab" style="color: #ededed; font-weight: 600; text-transform: capitalize;">Results</span>
+    <div class="topbar-left" style="display: flex; align-items: center; gap: 0.6rem; min-width: 0; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8125rem;">
+            <span class="topbar-breadcrumb-prefix" style="color: #71717a;">engine</span>
+            <span class="topbar-breadcrumb-prefix" style="color: #3f3f46;">/</span>
+            <span id="topbarBreadcrumbTab" style="color: #ededed; font-weight: 600; text-transform: capitalize; white-space: nowrap;">Results</span>
         </div>
 
         <!-- Global Watchlist / Universe Selector -->
         <div style="display: flex; align-items: center; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 0.15rem 0.45rem;">
-            <label for="globalWatchlist" style="font-size: 0.72rem; color: #a1a1aa; margin-right: 0.3rem;">⭐</label>
-            <select id="globalWatchlist" onchange="app.onGlobalWatchlistChange(this.value)" style="background: transparent; border: none; color: #ededed; font-size: 0.75rem; font-weight: 500; cursor: pointer; outline: none; padding-right: 0.3rem;" title="Active universe or watchlist across all dashboard tabs">
+            <label for="globalWatchlist" style="font-size: 0.72rem; color: #a1a1aa; margin-right: 0.25rem;">⭐</label>
+            <select id="globalWatchlist" onchange="app.onGlobalWatchlistChange(this.value)" style="background: transparent; border: none; color: #ededed; font-size: 0.75rem; font-weight: 500; cursor: pointer; outline: none; padding-right: 0.2rem; max-width: 140px;" title="Active universe or watchlist across all dashboard tabs">
                 <option value="">All Stocks (Global)</option>
             </select>
         </div>
     </div>
 
     <!-- Center: Global Stock Search with [/] shortcut -->
-    <div style="flex: 1; max-width: 420px; position: relative; margin: 0 0.5rem;">
+    <div class="topbar-search-wrap" style="flex: 1; max-width: 420px; min-width: 130px; position: relative; margin: 0 0.4rem;">
         <div style="position: relative; display: flex; align-items: center;">
-            <span style="position: absolute; left: 0.6rem; font-size: 0.75rem; color: #71717a;">🔍</span>
-            <input type="text" id="tickerSearch" placeholder="Search ticker (e.g., RELIANCE.NS, NVDA)..." style="width: 100%; padding: 0.32rem 1.8rem 0.32rem 1.8rem; background: #080808; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; color: #ededed; font-size: 0.76rem; font-family: var(--font-mono); outline: none; transition: border-color 0.15s ease;" autocomplete="off">
+            <span style="position: absolute; left: 0.6rem; font-size: 0.75rem; color: #71717a; pointer-events: none;">🔍</span>
+            <input type="text" id="tickerSearch" placeholder="Search ticker (e.g. RELIANCE, NVDA)..." style="width: 100%; padding: 0.32rem 1.8rem 0.32rem 1.8rem; background: #080808; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; color: #ededed; font-size: 0.76rem; font-family: var(--font-mono); outline: none; transition: border-color 0.15s ease;" autocomplete="off">
             <span class="kbd-badge" style="position: absolute; right: 0.45rem;">/</span>
         </div>
         <div id="autocompleteDropdown" class="dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.9);"></div>
     </div>
 
     <!-- Right: Freshness Status, Rate Quota, Control Center -->
-    <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
+    <div class="topbar-right-actions" style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
         
         <!-- Earnings Freshness Pill -->
-        <div id="topEarningsFreshnessPill" style="display: flex; align-items: center; gap: 0.35rem; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 0.2rem 0.5rem;" title="Last updated timestamp for active universe/watchlist earnings">
+        <div id="topEarningsFreshnessPill" style="display: flex; align-items: center; gap: 0.3rem; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 0.2rem 0.45rem;" title="Last updated timestamp for active universe/watchlist earnings">
             <span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 6px #34d399;"></span>
-            <span id="topEarningsFreshnessLabel" style="font-size: 0.7rem; font-weight: 500; color: #34d399; font-family: var(--font-mono);">Earnings: Loading...</span>
-            <button onclick="app.refreshCurrentWatchlistEarnings()" id="topRefreshEarningsBtn" class="btn-micro" style="padding: 0.08rem 0.3rem; font-size: 0.62rem; margin-left: 0.2rem; background: rgba(255,255,255,0.06); color: #ededed;" title="Refresh earnings data">
+            <span id="topEarningsFreshnessLabel" style="font-size: 0.7rem; font-weight: 500; color: #34d399; font-family: var(--font-mono); white-space: nowrap;">Earnings</span>
+            <button onclick="app.refreshCurrentWatchlistEarnings()" id="topRefreshEarningsBtn" class="btn-micro" style="padding: 0.08rem 0.3rem; font-size: 0.62rem; margin-left: 0.15rem; background: rgba(255,255,255,0.06); color: #ededed; border: none; border-radius: 4px; cursor: pointer;" title="Refresh earnings data">
                 🔄
             </button>
         </div>
 
         <!-- OpenRouter API Quota Pill -->
-        <div id="topRateLimitPill" onclick="app.openCustomizerModal('ratelimits')" style="display: flex; align-items: center; gap: 0.35rem; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 0.22rem 0.5rem; cursor: pointer;" title="Click to view API rate limits & quotas in Control Center">
+        <div id="topRateLimitPill" onclick="app.openCustomizerModal('ratelimits')" style="display: flex; align-items: center; gap: 0.3rem; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 0.22rem 0.45rem; cursor: pointer;" title="Click to view API rate limits & quotas in Control Center">
             <span style="font-size: 0.72rem;">⚡</span>
-            <span id="topOpenRouterQuota" style="font-size: 0.7rem; font-weight: 600; color: #e2e8f0; font-family: var(--font-mono);">0/200</span>
+            <span id="topOpenRouterQuota" style="font-size: 0.7rem; font-weight: 600; color: #e2e8f0; font-family: var(--font-mono); white-space: nowrap;">0/200</span>
         </div>
 
         <!-- Control Center Button -->
-        <button onclick="app.openCustomizerModal()" class="btn-micro" style="background: #ffffff; color: #000000; font-weight: 600; font-size: 0.72rem; padding: 0.25rem 0.55rem; border-radius: 5px; border: none; cursor: pointer;" title="Open Control Center">
-            Settings
+        <button onclick="app.openCustomizerModal()" class="btn-micro" style="background: #ffffff; color: #000000; font-weight: 600; font-size: 0.72rem; padding: 0.25rem 0.55rem; border-radius: 5px; border: none; cursor: pointer; white-space: nowrap;" title="Open Control Center">
+            ⚙️ <span class="desktop-btn-label">Settings</span>
         </button>
     </div>
 </header>

@@ -1,7 +1,7 @@
 <!-- ========================================================================= -->
 <!-- 🖤 VERCEL-STYLE LEFT SIDEBAR NAVIGATION -->
 <!-- ========================================================================= -->
-<aside class="app-sidebar">
+<aside class="app-sidebar" id="appSidebar">
     
     <!-- 1. Workspace / Account Switcher Header -->
     <div style="padding: 0.75rem 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between;">
@@ -16,9 +16,14 @@
                 </div>
             </div>
         </div>
-        <button onclick="app.openCustomizerModal()" class="btn-icon" style="background: transparent; border: none; color: #71717a; cursor: pointer; padding: 0.2rem; font-size: 0.8rem;" title="Account & Control Center">
-            ⚙️
-        </button>
+        <div style="display: flex; align-items: center; gap: 0.25rem;">
+            <button onclick="app.openCustomizerModal()" class="btn-icon" style="background: transparent; border: none; color: #71717a; cursor: pointer; padding: 0.2rem; font-size: 0.8rem;" title="Account & Control Center">
+                ⚙️
+            </button>
+            <button onclick="app.toggleMobileSidebar(false)" class="btn-icon mobile-sidebar-close" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #ededed; border-radius: 6px; cursor: pointer; padding: 0.2rem 0.45rem; font-size: 0.75rem;" title="Close Menu">
+                ✕
+            </button>
+        </div>
     </div>
 
     <!-- 2. Sidebar Quick Filter -->

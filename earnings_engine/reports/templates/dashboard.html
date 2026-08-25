@@ -1,6 +1,7 @@
 {% include 'dashboard/_head.html' %}
 <body>
 <div class="app-shell">
+    <div id="sidebarBackdrop" class="sidebar-backdrop" onclick="app.toggleMobileSidebar(false)"></div>
     {% include 'dashboard/_sidebar.html' %}
     <div class="app-main">
         {% include 'dashboard/_body_header.html' %}
