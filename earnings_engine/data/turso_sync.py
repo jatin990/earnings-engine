@@ -1,7 +1,14 @@
-"""Upstream Turso Cloud and Local SQLite Bidirectional Synchronization.
+"""Upstream Turso Cloud and Local SQLite Lossless Bidirectional Merge.
 
 Enables local SQLite execution with high speed and zero network latency, while
-automatically keeping local data and upstream Turso Cloud synchronized on startup.
+automatically keeping local data and upstream Turso Cloud merged on startup.
+
+Merging Rules (Strict No-Override / Lossless Union Policy):
+1. Records existing on Local but missing in Remote are pushed to Remote.
+2. Records existing on Remote but missing in Local are pulled down to Local.
+3. Existing records with matching Primary Keys are NEVER overwritten or deleted
+   (using INSERT OR IGNORE / non-destructive union semantics).
+4. Watchlists, predictions, and radars union-merge together across both environments.
 """
 from __future__ import annotations
 
@@ -20,7 +27,7 @@ from earnings_engine.data.db import (
 
 logger = logging.getLogger("earnings_engine.data.turso_sync")
 
-# Core state tables synchronized between local SQLite and upstream Turso Cloud
+# Core state tables synchronized and merged bidirectionally
 SYNC_TABLES = [
     "watchlists",
     "watchlist_meta",
@@ -29,6 +36,8 @@ SYNC_TABLES = [
     "user_sessions",
     "consensus_predictions",
     "breakout_radar",
+    "swing_ranges",
+    "swing_cycle_history",
 ]
 
 
@@ -50,10 +59,9 @@ def _get_table_columns(conn: Any, table_name: str) -> list[str]:
 
 
 def sync_local_to_upstream(settings: Settings | None = None) -> dict[str, Any]:
-    """Synchronize state between local SQLite and Upstream Turso Cloud.
+    """Lossless bidirectional union merge between local SQLite and Upstream Turso Cloud.
 
-    Pushes newly created/updated local records to Turso and pulls remote cloud
-    records down to local SQLite.
+    Merges all local and remote data without destructive overrides or deletions.
     """
     s = settings or Settings()
     url = os.getenv("TURSO_DATABASE_URL", "").strip()
@@ -64,7 +72,7 @@ def sync_local_to_upstream(settings: Settings | None = None) -> dict[str, Any]:
         return {"status": "skipped", "reason": "No Turso credentials configured"}
 
     start_t = time.perf_counter()
-    logger.info("[TURSO-SYNC] Starting upstream synchronization with Turso Cloud...")
+    logger.info("[TURSO-SYNC] Starting lossless union merge with Turso Cloud (no overrides)...")
 
     db_path = str(_cache_path(s))
     s.ensure_dirs()
@@ -86,11 +94,11 @@ def sync_local_to_upstream(settings: Settings | None = None) -> dict[str, Any]:
 
     try:
         for table in SYNC_TABLES:
-            if table not in local_tables:
+            if table not in local_tables and table not in remote_tables:
                 continue
 
-            # Ensure table exists on remote Turso
-            if table not in remote_tables:
+            # Ensure table exists on remote Turso if it exists locally
+            if table in local_tables and table not in remote_tables:
                 try:
                     cur = local_conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,))
                     row = cur.fetchone()
@@ -100,37 +108,53 @@ def sync_local_to_upstream(settings: Settings | None = None) -> dict[str, Any]:
                 except Exception as e:
                     logger.debug("[TURSO-SYNC] Could not create remote table %s: %s", table, e)
 
-            cols = _get_table_columns(local_conn, table)
+            # Ensure table exists locally if it exists on remote
+            if table in remote_tables and table not in local_tables:
+                try:
+                    cur = remote_conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,))
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        with local_conn:
+                            local_conn.execute(row[0])
+                        local_tables.add(table)
+                except Exception as e:
+                    logger.debug("[TURSO-SYNC] Could not create local table %s: %s", table, e)
+
+            cols = _get_table_columns(local_conn if table in local_tables else remote_conn, table)
             if not cols:
                 continue
 
             col_str = ", ".join([f'"{c}"' for c in cols])
             placeholders = ", ".join(["?" for _ in cols])
-            upsert_sql = f'INSERT OR REPLACE INTO "{table}" ({col_str}) VALUES ({placeholders})'
+            
+            # Lossless Merge Query: INSERT OR IGNORE guarantees existing records are never overwritten
+            merge_sql = f'INSERT OR IGNORE INTO "{table}" ({col_str}) VALUES ({placeholders})'
 
             # 1. Fetch Local Rows
-            local_rows = local_conn.execute(f'SELECT {col_str} FROM "{table}"').fetchall()
+            local_rows = []
+            if table in local_tables:
+                local_rows = local_conn.execute(f'SELECT {col_str} FROM "{table}"').fetchall()
 
-            # 2. Push Local Rows Upstream to Turso
+            # 2. Push Local Rows Upstream to Turso (Union Merge)
             pushed = 0
             if local_rows and table in remote_tables:
                 try:
-                    remote_conn.executemany(upsert_sql, local_rows)
+                    remote_conn.executemany(merge_sql, local_rows)
                     pushed = len(local_rows)
                 except Exception as e:
-                    logger.warning("[TURSO-SYNC] Upstream push error on table %s: %s", table, e)
+                    logger.warning("[TURSO-SYNC] Upstream merge push error on table %s: %s", table, e)
 
-            # 3. Pull Remote Rows Down to Local SQLite
+            # 3. Pull Remote Rows Down to Local SQLite (Union Merge)
             pulled = 0
             if table in remote_tables:
                 try:
                     remote_rows = remote_conn.execute(f'SELECT {col_str} FROM "{table}"').fetchall()
                     if remote_rows:
                         with local_conn:
-                            local_conn.executemany(upsert_sql, [tuple(r) for r in remote_rows])
+                            local_conn.executemany(merge_sql, [tuple(r) for r in remote_rows])
                         pulled = len(remote_rows)
                 except Exception as e:
-                    logger.debug("[TURSO-SYNC] Downstream pull error on table %s: %s", table, e)
+                    logger.debug("[TURSO-SYNC] Downstream merge pull error on table %s: %s", table, e)
 
             stats[table] = {"pushed": pushed, "pulled": pulled}
             total_pushed += pushed
@@ -144,7 +168,7 @@ def sync_local_to_upstream(settings: Settings | None = None) -> dict[str, Any]:
 
     elapsed = time.perf_counter() - start_t
     logger.info(
-        "[TURSO-SYNC] Upstream sync completed in %.2fs. Pushed %d records, pulled %d records across %d tables.",
+        "[TURSO-SYNC] Lossless merge completed in %.2fs. Merged %d local records & %d remote records across %d tables (no overrides).",
         elapsed,
         total_pushed,
         total_pulled,
@@ -153,6 +177,7 @@ def sync_local_to_upstream(settings: Settings | None = None) -> dict[str, Any]:
 
     return {
         "status": "success",
+        "merge_policy": "lossless_union_no_overrides",
         "elapsed_seconds": round(elapsed, 2),
         "total_pushed": total_pushed,
         "total_pulled": total_pulled,
