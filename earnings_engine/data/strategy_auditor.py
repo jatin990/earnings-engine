@@ -970,6 +970,15 @@ def backtest_strategy_history(
 
     if not tickers:
         try:
+            with _connect(settings) as conn:
+                db_tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM price_history").fetchall() if r[0]]
+                if db_tickers:
+                    tickers = db_tickers
+        except Exception:
+            pass
+
+    if not tickers:
+        try:
             from earnings_engine.data.universe import _SEED_NSE_TOP, _SEED_US_TOP
             tickers = _SEED_NSE_TOP + _SEED_US_TOP
         except Exception:

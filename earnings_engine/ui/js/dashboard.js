@@ -9990,9 +9990,10 @@
                     { model_name: 'Qwen-2.5-72B', model_id: 'qwen/qwen-2.5-72b-instruct', direction: dir, confidence_pct: 82, target_price: targetP ? targetP * 0.99 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.5, recommended_action: 'ACCUMULATE' },
                     { model_name: 'Mistral-Large', model_id: 'mistralai/mistral-large', direction: dir, confidence_pct: 84, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.7, recommended_action: 'BUY ON DIPS' }
                 ];
+                app.activeConsensusModels = models;
 
                 if (tbody) {
-                    tbody.innerHTML = models.map(m => {
+                    tbody.innerHTML = models.map((m, idx) => {
                         const mId = m.model_id || '';
                         const mName = m.model_name || m.name || mId.split('/').pop() || 'AI Model';
                         const mDir = (m.direction || 'NEUTRAL').toUpperCase();
@@ -10012,7 +10013,10 @@
                                     <td>
                                         <div style="display:flex;align-items:center;justify-content:space-between;gap:0.4rem;">
                                             <strong style="color:#ffffff;">${mName}</strong>
-                                            <button type="button" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['${mId || mName}'], true)" class="btn btn-sm" style="font-size:0.65rem;padding:0.15rem 0.4rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);color:#c7d2fe;" title="Retry ${mName}">⚡ Retry</button>
+                                            <div style="display:flex;gap:0.25rem;">
+                                                <button type="button" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['${mId || mName}'], true)" class="btn btn-sm" style="font-size:0.65rem;padding:0.15rem 0.35rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);color:#c7d2fe;" title="Retry ${mName}">⚡ Retry</button>
+                                                <button type="button" onclick="app.showRawModelModal(${idx})" class="btn btn-sm" style="font-size:0.65rem;padding:0.15rem 0.35rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;" title="View raw error/output">📄 Raw</button>
+                                            </div>
                                         </div>
                                     </td>
                                     <td colspan="6"><span style="color:#fca5a5;font-size:0.75rem;font-weight:600;">⚠️ Rate-limited upstream (Retried / Falling back)</span></td>
@@ -10028,7 +10032,10 @@
                                 <td>
                                     <div style="display:flex;align-items:center;justify-content:space-between;gap:0.4rem;">
                                         <strong style="color:#ffffff;">${mName}</strong>
-                                        <button type="button" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['${mId || mName}'], true)" class="btn btn-sm" style="font-size:0.65rem;padding:0.15rem 0.4rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);color:#c7d2fe;" title="Re-run ${mName}">⚡ Run</button>
+                                        <div style="display:flex;gap:0.25rem;">
+                                            <button type="button" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['${mId || mName}'], true)" class="btn btn-sm" style="font-size:0.65rem;padding:0.15rem 0.35rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);color:#c7d2fe;" title="Re-run ${mName}">⚡ Run</button>
+                                            <button type="button" onclick="app.showRawModelModal(${idx})" class="btn btn-sm" style="font-size:0.65rem;padding:0.15rem 0.35rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;" title="View raw model output & reasoning">📄 Raw</button>
+                                        </div>
                                     </div>
                                 </td>
                                 <td>
@@ -10057,6 +10064,74 @@
                 if (thesisEl) thesisEl.innerHTML = `<span style="color:#f87171;">Failed to generate AI consensus: ${e.message}</span>`;
                 if (statusEl) statusEl.textContent = 'Error computing consensus';
             }
+        };
+
+        app.showRawModelModal = function(idx) {
+            const models = app.activeConsensusModels || [];
+            const m = models[idx] || {};
+            const mid = m.model_id || 'unknown-model';
+            const mName = m.model_name || m.name || mid.split('/').pop() || 'AI Model';
+
+            let icon = '🤖';
+            if (mid.includes('llama') || mName.includes('Llama')) icon = '🦙';
+            else if (mid.includes('qwen') || mName.includes('Qwen')) icon = '🌐';
+            else if (mid.includes('mistral') || mName.includes('Mistral')) icon = '⚡';
+            else if (mid.includes('gemini') || mName.includes('Gemini')) icon = '✨';
+
+            const iconEl = document.getElementById('dashRawModalIcon');
+            const titleEl = document.getElementById('dashRawModalTitle');
+            const subEl = document.getElementById('dashRawModalSubtitle');
+            const badgeEl = document.getElementById('dashRawModalBadge');
+            const latEl = document.getElementById('dashRawModalLatency');
+            const tokEl = document.getElementById('dashRawModalTokens');
+            const contentEl = document.getElementById('dashRawModalContent');
+            const modalEl = document.getElementById('modalDashboardRawOutput');
+
+            if (iconEl) iconEl.textContent = icon;
+            if (titleEl) titleEl.textContent = `${mName} — Raw Output & Reasoning`;
+            if (subEl) subEl.textContent = mid;
+
+            const isBull = (m.direction || 'NEUTRAL').toUpperCase() === 'BULLISH';
+            const isBear = (m.direction || '').toUpperCase() === 'BEARISH';
+            if (badgeEl) {
+                badgeEl.textContent = `${m.direction || 'NEUTRAL'} (${m.confidence_pct || 75}%)`;
+                badgeEl.style.background = isBull ? 'rgba(16,185,129,0.2)' : (isBear ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)');
+                badgeEl.style.color = isBull ? '#34d399' : (isBear ? '#f87171' : '#fbbf24');
+                badgeEl.style.border = isBull ? '1px solid rgba(16,185,129,0.4)' : (isBear ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(245,158,11,0.4)');
+            }
+
+            if (latEl) latEl.textContent = m.latency_ms ? `${m.latency_ms} ms` : '—';
+            if (tokEl) tokEl.textContent = m.tokens_used ? `${m.tokens_used} tokens` : (m.tokens ? `${m.tokens}` : '—');
+
+            let rawText = m.raw_response || '';
+            if (!rawText) {
+                const formatted = { ...m };
+                delete formatted.raw_response;
+                rawText = JSON.stringify(formatted, null, 2);
+            }
+
+            if (contentEl) contentEl.textContent = rawText;
+            if (modalEl) modalEl.style.display = 'flex';
+        };
+
+        app.closeDashboardRawModal = function() {
+            const modalEl = document.getElementById('modalDashboardRawOutput');
+            if (modalEl) modalEl.style.display = 'none';
+        };
+
+        app.copyDashboardRawOutput = function() {
+            const contentEl = document.getElementById('dashRawModalContent');
+            if (!contentEl || !contentEl.textContent) return;
+            navigator.clipboard.writeText(contentEl.textContent).then(() => {
+                const btn = document.getElementById('btnDashCopyRaw');
+                if (btn) {
+                    const old = btn.textContent;
+                    btn.textContent = '✅ Copied!';
+                    setTimeout(() => { btn.textContent = old; }, 2000);
+                }
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
         };
 
         app.closeCatalystConsensusModal = function() {

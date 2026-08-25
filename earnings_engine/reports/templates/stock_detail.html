@@ -552,6 +552,43 @@
             opacity: 0.6;
             cursor: not-allowed;
         }
+        .btn-tile-raw {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.35rem 0.55rem;
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .btn-tile-raw:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        .code-box {
+            background: #060911;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-sm);
+            padding: 1rem;
+            color: #e2e8f0;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            line-height: 1.55;
+            overflow-x: auto;
+            max-height: 520px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin: 0;
+        }
 
         /* Tables */
         .clean-table {
@@ -997,13 +1034,14 @@
         }
 
         function renderModelsMatrix(models) {
+            window.currentModelsBreakdown = models || [];
             const container = document.getElementById('modelsContainer');
             if (!models || !models.length) {
                 container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 1.5rem;">Click any AI Model button above or "🧠 All Consensus" to generate trade predictions.</div>';
                 return;
             }
 
-            container.innerHTML = models.map(m => {
+            container.innerHTML = models.map((m, idx) => {
                 const isBull = (m.direction || 'BULLISH').toUpperCase() === 'BULLISH';
                 const isBear = (m.direction || '').toUpperCase() === 'BEARISH';
                 const dirCol = isBull ? 'var(--emerald)' : (isBear ? 'var(--rose)' : 'var(--amber)');
@@ -1038,9 +1076,12 @@
                         <div class="model-rationale">
                             ${m.rationale_summary || m.thesis || m.chart_pattern || 'Quantitative structure and momentum align with directional setup.'}
                         </div>
-                        <div style="margin-top: auto; pt: 0.35rem;">
-                            <button id="tileBtn-${safeMid}" onclick="runConsensus(true, '${mid || mName}')" class="btn-tile-run" title="Run and refresh prediction specifically for ${mName}">
+                        <div style="margin-top: auto; padding-top: 0.45rem; display: flex; gap: 0.4rem; align-items: center;">
+                            <button id="tileBtn-${safeMid}" onclick="runConsensus(true, '${mid || mName}')" class="btn-tile-run" style="flex: 1;" title="Run and refresh prediction specifically for ${mName}">
                                 ⚡ Run ${mName}
+                            </button>
+                            <button type="button" onclick="openRawModal('${safeMid}', ${idx})" class="btn-tile-raw" title="View full raw reasoning, chain-of-thought, and JSON output from ${mName}">
+                                📄 Raw
                             </button>
                         </div>
                     </div>
@@ -1318,6 +1359,61 @@
             }
         }
 
+        function openRawModal(safeMid, idx) {
+            const models = window.currentModelsBreakdown || [];
+            const m = models[idx] || models.find(x => (x.model_id || x.model_name || '').replace(/[^a-zA-Z0-9]/g, '_') === safeMid) || {};
+            
+            const mid = m.model_id || 'unknown-model';
+            const mName = m.model_name || mid.split('/').pop() || 'AI Model';
+            let icon = '🤖';
+            if (mid.includes('llama') || mName.includes('Llama')) icon = '🦙';
+            else if (mid.includes('qwen') || mName.includes('Qwen')) icon = '🌐';
+            else if (mid.includes('mistral') || mName.includes('Mistral')) icon = '⚡';
+            else if (mid.includes('gemini') || mName.includes('Gemini')) icon = '✨';
+
+            document.getElementById('rawModalIcon').textContent = icon;
+            document.getElementById('rawModalTitle').textContent = `${mName} — Raw Model Output`;
+            document.getElementById('rawModalSubtitle').textContent = mid;
+            
+            const isBull = (m.direction || 'NEUTRAL').toUpperCase() === 'BULLISH';
+            const isBear = (m.direction || '').toUpperCase() === 'BEARISH';
+            const bEl = document.getElementById('rawModalBadge');
+            bEl.textContent = `${m.direction || 'NEUTRAL'} (${m.confidence_pct || 75}%)`;
+            bEl.style.background = isBull ? 'var(--emerald-subtle)' : (isBear ? 'var(--rose-subtle)' : 'rgba(245,158,11,0.15)');
+            bEl.style.color = isBull ? 'var(--emerald)' : (isBear ? 'var(--rose)' : '#fbbf24');
+            bEl.style.border = isBull ? '1px solid var(--emerald-border)' : (isBear ? '1px solid var(--rose-border)' : '1px solid rgba(245,158,11,0.3)');
+
+            document.getElementById('rawModalLatency').textContent = m.latency_ms ? `${m.latency_ms} ms` : '—';
+            document.getElementById('rawModalTokens').textContent = m.tokens_used ? `${m.tokens_used} tokens` : (m.tokens ? `${m.tokens}` : '—');
+
+            let rawText = m.raw_response || '';
+            if (!rawText) {
+                const formatted = { ...m };
+                delete formatted.raw_response;
+                rawText = JSON.stringify(formatted, null, 2);
+            }
+
+            document.getElementById('rawModalContent').textContent = rawText;
+            document.getElementById('modalRawOutput').style.display = 'flex';
+        }
+
+        function closeRawModal() {
+            document.getElementById('modalRawOutput').style.display = 'none';
+        }
+
+        function copyRawOutput() {
+            const text = document.getElementById('rawModalContent').textContent;
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('btnCopyRaw');
+                const old = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => { btn.textContent = old; }, 2000);
+            }).catch(err => {
+                alert('Failed to copy to clipboard: ' + err);
+            });
+        }
+
         async function toggleWatchlist() {
             const isIn = stockState && stockState.is_in_watchlist;
             try {
@@ -1337,6 +1433,43 @@
             fetchRateLimits();
         });
     </script>
+
+    <!-- MODAL: VIEW RAW MODEL OUTPUT & REASONING -->
+    <div id="modalRawOutput" onclick="if(event.target === this) closeRawModal();" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, 0.84); backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 1.25rem;">
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); width: 100%; max-width: 820px; max-height: 90vh; border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); display: flex; flex-direction: column; gap: 1rem; overflow: hidden;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <span id="rawModalIcon" style="font-size: 1.3rem;">🤖</span>
+                    <div>
+                        <div id="rawModalTitle" style="font-weight: 700; font-size: 1.05rem; color: #ffffff;">Model Name</div>
+                        <div id="rawModalSubtitle" style="font-size: 0.72rem; color: var(--text-tertiary); font-family: var(--font-mono);">model_id</div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span id="rawModalBadge" style="font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px;">BULLISH (85%)</span>
+                    <button onclick="closeRawModal()" style="background: none; border: none; color: var(--text-tertiary); font-size: 1.3rem; cursor: pointer; padding: 0.2rem 0.5rem;">✕</button>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.74rem; color: var(--text-secondary); background: rgba(255,255,255,0.02); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <span>⏱️ Latency: <strong id="rawModalLatency" style="color: #ffffff;">—</strong></span>
+                    <span>🔢 Tokens: <strong id="rawModalTokens" style="color: #ffffff;">—</strong></span>
+                </div>
+                <div>
+                    <button type="button" onclick="copyRawOutput()" id="btnCopyRaw" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.65rem;">📋 Copy Raw Output</button>
+                </div>
+            </div>
+
+            <div style="flex: 1; overflow-y: auto;">
+                <pre id="rawModalContent" class="code-box">Loading raw model response...</pre>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border);">
+                <button type="button" onclick="closeRawModal()" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.9rem;">Close</button>
+            </div>
+        </div>
+    </div>
 
     <!-- MODAL: CALCULATE / OVERRIDE EPS -->
     <div id="modalEpsCalc" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 1rem;">

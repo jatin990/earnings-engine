@@ -375,11 +375,12 @@ async def enforce_auth_middleware(request: Request, call_next):
             )
         return response
 
-    # If running pytest unit test suite, grant test session
+    # If running pytest unit test suite, grant test session unless explicitly running auth middleware unit tests
     if os.getenv("PYTEST_CURRENT_TEST") and not (
         path.startswith("/api/v1/trips")
         or path.startswith("/api/v1/cards")
         or path.startswith("/api/v1/net-worth")
+        or "test_auth_middleware" in (os.getenv("PYTEST_CURRENT_TEST") or "")
     ):
         request.state.session = {
             "role": "owner",
