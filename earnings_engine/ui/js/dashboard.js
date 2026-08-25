@@ -11177,10 +11177,10 @@
                     </td>
                     <td style="padding:0.75rem 0.85rem;text-align:center;white-space:nowrap;">
                         <div style="display:flex;align-items:center;justify-content:center;gap:0.35rem;">
-                            <button onclick="app.openRepeaterDetails('${ticker}')" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-size:0.68rem;padding:0.25rem 0.55rem;border-radius:5px;cursor:pointer;" title="View AI Thesis & Drivers">
+                            <button type="button" onclick="event.preventDefault(); event.stopPropagation(); app.openRepeaterDetails('${ticker}');" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-size:0.68rem;padding:0.25rem 0.55rem;border-radius:5px;cursor:pointer;" title="View AI Thesis & Drivers">
                                 🧠 Thesis
                             </button>
-                            <button onclick="app.runSingleRepeaterAi('${ticker}', this)" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.68rem;padding:0.25rem 0.45rem;border-radius:5px;cursor:pointer;" title="Run AI Inference">
+                            <button type="button" onclick="event.preventDefault(); event.stopPropagation(); app.runSingleRepeaterAi('${ticker}', this);" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.68rem;padding:0.25rem 0.45rem;border-radius:5px;cursor:pointer;" title="Run AI Inference">
                                 ⚡
                             </button>
                         </div>
@@ -11192,80 +11192,90 @@
         };
 
         app.openRepeaterDetails = function(ticker) {
-            const candidate = (app._repeatersData || []).find(c => c.ticker === ticker);
-            if (!candidate) return;
+            try {
+                const candidate = (app._repeatersData || []).find(c => c.ticker === ticker);
+                if (!candidate) return;
 
-            const modal = document.getElementById('repeatersAiModal');
-            const content = document.getElementById('repeatersAiModalContent');
-            if (!modal || !content) return;
+                const modal = document.getElementById('repeatersAiModal');
+                const content = document.getElementById('repeatersAiModalContent');
+                if (!modal || !content) return;
 
-            const ai = candidate.ai_forecast;
-            const streak = candidate.beat_streak || 1;
-            const surp = candidate.last_eps_surprise != null ? `${candidate.last_eps_surprise >= 0 ? '+' : ''}${candidate.last_eps_surprise}%` : 'N/A';
-            const weekHigh = candidate.last_week_high_pct != null ? `+${candidate.last_week_high_pct}%` : 'N/A';
+                const ai = candidate.ai_forecast;
+                const streak = candidate.beat_streak || 1;
+                const hasSurp = candidate.last_eps_surprise != null && !isNaN(candidate.last_eps_surprise);
+                const surp = hasSurp ? `${Number(candidate.last_eps_surprise) >= 0 ? '+' : ''}${Number(candidate.last_eps_surprise).toFixed(1)}% Beat` : 'Solid Quality Beat';
+                const hasWkHigh = candidate.last_week_high_pct != null && !isNaN(candidate.last_week_high_pct);
+                const weekHigh = hasWkHigh ? `+${Number(candidate.last_week_high_pct).toFixed(1)}%` : 'N/A';
 
-            let driversHtml = '<li style="color:#94a3b8;">No specific growth drivers parsed.</li>';
-            let risksHtml = '<li style="color:#94a3b8;">Standard market risk factors apply.</li>';
-            let thesisText = 'Run AI Forecast to generate multi-modal reasoning and upcoming quarter earnings continuity thesis.';
+                let driversHtml = '<li style="color:#94a3b8;">No specific growth drivers parsed yet. Click ⚡ Re-Run AI to generate.</li>';
+                let risksHtml = '<li style="color:#94a3b8;">Standard market risk factors apply.</li>';
+                let thesisText = 'Run AI Forecast to generate multi-modal reasoning and upcoming quarter earnings continuity thesis.';
 
-            if (ai) {
-                thesisText = ai.thesis || thesisText;
-                if (ai.growth_drivers && ai.growth_drivers.length > 0) {
-                    driversHtml = ai.growth_drivers.map(d => `<li style="color:#cbd5e1;margin-bottom:0.3rem;">${d}</li>`).join('');
+                if (ai) {
+                    thesisText = ai.thesis || thesisText;
+                    const rawDrivers = ai.primary_growth_drivers || ai.growth_drivers;
+                    const drivers = Array.isArray(rawDrivers) ? rawDrivers : (typeof rawDrivers === 'string' ? [rawDrivers] : []);
+                    if (drivers.length > 0) {
+                        driversHtml = drivers.map(d => `<li style="color:#cbd5e1;margin-bottom:0.3rem;">${d}</li>`).join('');
+                    }
+                    const rawRisks = ai.key_risk_factors || ai.risk_factors;
+                    const risks = Array.isArray(rawRisks) ? rawRisks : (typeof rawRisks === 'string' ? [rawRisks] : []);
+                    if (risks.length > 0) {
+                        risksHtml = risks.map(r => `<li style="color:#cbd5e1;margin-bottom:0.3rem;">${r}</li>`).join('');
+                    }
                 }
-                if (ai.risk_factors && ai.risk_factors.length > 0) {
-                    risksHtml = ai.risk_factors.map(r => `<li style="color:#cbd5e1;margin-bottom:0.3rem;">${r}</li>`).join('');
-                }
-            }
 
-            content.innerHTML = `
-                <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;">
-                    <div style="font-size:1.5rem;">🔁</div>
-                    <div>
-                        <div style="font-size:1.1rem;font-weight:800;color:#f1f5f9;display:flex;align-items:center;gap:0.5rem;">
-                            <span>${candidate.ticker}</span>
-                            <span style="font-size:0.75rem;background:rgba(168,85,247,0.2);color:#c084fc;padding:0.15rem 0.45rem;border-radius:4px;">${candidate.industry_buzz_tag || 'Theme'}</span>
+                content.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem;">
+                        <div style="font-size:1.5rem;">🔁</div>
+                        <div>
+                            <div style="font-size:1.1rem;font-weight:800;color:#f1f5f9;display:flex;align-items:center;gap:0.5rem;">
+                                <span>${candidate.ticker}</span>
+                                <span style="font-size:0.75rem;background:rgba(168,85,247,0.2);color:#c084fc;padding:0.15rem 0.45rem;border-radius:4px;">${candidate.industry_buzz_tag || 'Theme'}</span>
+                            </div>
+                            <div style="font-size:0.76rem;color:#94a3b8;">${candidate.company_name || candidate.ticker} &middot; Prior Delivery: ${surp} &middot; ${weekHigh} Peak Reaction</div>
                         </div>
-                        <div style="font-size:0.76rem;color:#94a3b8;">${candidate.company_name || candidate.ticker} &middot; Prior Delivery: ${surp} Beat &middot; ${weekHigh} Peak Reaction</div>
                     </div>
-                </div>
 
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;margin-bottom:1rem;">
-                    <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:0.75rem;">
-                        <div style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;">QoQ Beat Track Record</div>
-                        <div style="font-size:1.2rem;font-weight:800;color:#6ee7b7;font-family:var(--font-mono);margin-top:0.2rem;">${streak} Quarter Beat Streak</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;margin-bottom:1rem;">
+                        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:0.75rem;">
+                            <div style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;">QoQ Beat Track Record</div>
+                            <div style="font-size:1.2rem;font-weight:800;color:#6ee7b7;font-family:var(--font-mono);margin-top:0.2rem;">${streak} Quarter Beat Streak</div>
+                        </div>
+                        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:8px;padding:0.75rem;">
+                            <div style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;">AI Repeat Probability</div>
+                            <div style="font-size:1.2rem;font-weight:800;color:#93c5fd;font-family:var(--font-mono);margin-top:0.2rem;">${ai && ai.repeat_probability_pct ? ai.repeat_probability_pct + '%' : 'Pending Inference'}</div>
+                        </div>
                     </div>
-                    <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:8px;padding:0.75rem;">
-                        <div style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;">AI Repeat Probability</div>
-                        <div style="font-size:1.2rem;font-weight:800;color:#93c5fd;font-family:var(--font-mono);margin-top:0.2rem;">${ai ? ai.repeat_probability_pct + '%' : 'Pending Inference'}</div>
+
+                    <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+                        <div style="font-size:0.75rem;font-weight:700;color:#38bdf8;margin-bottom:0.4rem;">🧠 AI Forward Earnings Thesis</div>
+                        <div style="font-size:0.82rem;color:#e2e8f0;line-height:1.55;">${thesisText}</div>
                     </div>
-                </div>
 
-                <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1rem;margin-bottom:1rem;">
-                    <div style="font-size:0.75rem;font-weight:700;color:#38bdf8;margin-bottom:0.4rem;">🧠 AI Forward Earnings Thesis</div>
-                    <div style="font-size:0.82rem;color:#e2e8f0;line-height:1.55;">${thesisText}</div>
-                </div>
-
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
-                    <div style="background:#0f172a;border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:0.85rem;">
-                        <div style="font-size:0.72rem;font-weight:700;color:#4ade80;margin-bottom:0.4rem;">🚀 Key Growth Drivers & Order Flow</div>
-                        <ul style="margin:0;padding-left:1.1rem;font-size:0.76rem;line-height:1.5;">${driversHtml}</ul>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+                        <div style="background:#0f172a;border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:0.85rem;">
+                            <div style="font-size:0.72rem;font-weight:700;color:#4ade80;margin-bottom:0.4rem;">🚀 Key Growth Drivers & Order Flow</div>
+                            <ul style="margin:0;padding-left:1.1rem;font-size:0.76rem;line-height:1.5;">${driversHtml}</ul>
+                        </div>
+                        <div style="background:#0f172a;border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:0.85rem;">
+                            <div style="font-size:0.72rem;font-weight:700;color:#f87171;margin-bottom:0.4rem;">⚠️ Watchlist Risks & Margin Pressures</div>
+                            <ul style="margin:0;padding-left:1.1rem;font-size:0.76rem;line-height:1.5;">${risksHtml}</ul>
+                        </div>
                     </div>
-                    <div style="background:#0f172a;border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:0.85rem;">
-                        <div style="font-size:0.72rem;font-weight:700;color:#f87171;margin-bottom:0.4rem;">⚠️ Watchlist Risks & Margin Pressures</div>
-                        <ul style="margin:0;padding-left:1.1rem;font-size:0.76rem;line-height:1.5;">${risksHtml}</ul>
+
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding-top:0.75rem;border-top:1px solid rgba(255,255,255,0.08);">
+                        <a href="/stock/${encodeURIComponent(candidate.ticker)}" target="_blank" style="color:#38bdf8;font-size:0.78rem;text-decoration:none;font-weight:600;">Open Full Stock Intelligence ↗</a>
+                        <button type="button" onclick="event.preventDefault(); event.stopPropagation(); app.runSingleRepeaterAi('${candidate.ticker}'); document.getElementById('repeatersAiModal').style.display='none';" class="btn btn-sm" style="background:#2563eb;color:#ffffff;border:none;padding:0.35rem 0.85rem;border-radius:6px;font-size:0.75rem;cursor:pointer;">
+                            ⚡ Re-Run AI Analysis
+                        </button>
                     </div>
-                </div>
+                `;
 
-                <div style="display:flex;align-items:center;justify-content:space-between;padding-top:0.75rem;border-top:1px solid rgba(255,255,255,0.08);">
-                    <a href="/stock/${encodeURIComponent(candidate.ticker)}" target="_blank" style="color:#38bdf8;font-size:0.78rem;text-decoration:none;font-weight:600;">Open Full Stock Intelligence ↗</a>
-                    <button onclick="app.runSingleRepeaterAi('${candidate.ticker}'); document.getElementById('repeatersAiModal').style.display='none';" class="btn btn-sm" style="background:#2563eb;color:#ffffff;border:none;padding:0.35rem 0.85rem;border-radius:6px;font-size:0.75rem;cursor:pointer;">
-                        ⚡ Re-Run AI Analysis
-                    </button>
-                </div>
-            `;
-
-            modal.style.display = 'flex';
+                modal.style.display = 'flex';
+            } catch (err) {
+                console.error('[REPEATERS] openRepeaterDetails error:', err);
+            }
         };
 
         app.runSingleRepeaterAi = async function(ticker, btnEl) {

@@ -54,12 +54,12 @@
             </div>
 
             <!-- Batch AI Runner Button -->
-            <button id="repeatersBatchBtn" onclick="app.runBatchRepeatersAi()" class="btn btn-sm" style="background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);font-weight:600;font-size:0.76rem;padding:0.35rem 0.75rem;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:0.35rem;">
+            <button type="button" id="repeatersBatchBtn" onclick="event.preventDefault(); app.runBatchRepeatersAi()" class="btn btn-sm" style="background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);font-weight:600;font-size:0.76rem;padding:0.35rem 0.75rem;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:0.35rem;">
                 <span>⚡ Run AI Batch</span>
             </button>
 
             <!-- Refresh Button -->
-            <button onclick="app.loadQuarterRepeaters()" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.76rem;padding:0.35rem 0.65rem;border-radius:6px;cursor:pointer;" title="Refresh screened repeaters">
+            <button type="button" onclick="event.preventDefault(); app.loadQuarterRepeaters()" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.76rem;padding:0.35rem 0.65rem;border-radius:6px;cursor:pointer;" title="Refresh screened repeaters">
                 🔄
             </button>
         </div>
