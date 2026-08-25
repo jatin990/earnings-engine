@@ -281,3 +281,52 @@ def test_consensus_models_endpoint_and_rate_limits():
     assert "rate_limits" in data
     assert len(data["models"]) >= 4
 
+
+def test_consensus_single_model_merges_breakdown(monkeypatch, mock_model_results):
+    """Test that predicting with a single model merges with cached 4-model breakdown."""
+    settings = Settings()
+    # 1. Save an initial prediction with 4 models
+    consensus_initial = aggregator.aggregate_predictions(
+        model_results=mock_model_results,
+        ticker="MERGE_TEST.NS",
+        as_of_price=1000.0,
+        timeframe_days=14,
+    )
+    storage.save_prediction(consensus_initial, evaluation_date="2026-09-01", settings=settings)
+
+    # 2. Mock model runner to return only 1 model output
+    from earnings_engine.consensus import model_runner
+    single_model_output = [{
+        "model_name": "DeepSeek-R1",
+        "model_id": "deepseek/deepseek-r1",
+        "direction": "BEARISH",
+        "confidence_pct": 92,
+        "target_return_pct": -4.0,
+        "target_price": 960.0,
+        "support_level": 940.0,
+        "resistance_level": 1020.0,
+        "key_drivers": ["Updated quarterly headwind"],
+        "primary_risk": "Breakout above 1020",
+    }]
+    monkeypatch.setattr(model_runner, "run_consensus_models", lambda **kwargs: single_model_output)
+
+    client = TestClient(app)
+    res = client.post("/api/v1/consensus/predict", json={
+        "ticker": "MERGE_TEST.NS",
+        "force": True,
+        "models": ["deepseek/deepseek-r1"]
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    preds = data["predictions"]
+    assert len(preds) == 1
+    p = preds[0]
+    # Check that breakdown contains merged models (4 total, with DeepSeek-R1 updated)
+    breakdown = p["models_breakdown"]
+    assert len(breakdown) == 4
+    r1 = next(m for m in breakdown if m.get("model_name") == "DeepSeek-R1" or m.get("model_id") == "deepseek/deepseek-r1")
+    assert r1["direction"] == "BEARISH"
+    assert r1["confidence_pct"] == 92
+
+

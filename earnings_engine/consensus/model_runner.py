@@ -178,7 +178,7 @@ def _query_single_model(
                     "stop_loss_price": None,
                     "risk_reward_ratio": None,
                     "recommended_action": "HOLD / WAIT",
-                    "raw": resp.text[:200],
+                    "raw_response": resp.text,
                 }
 
             data = resp.json()
@@ -190,15 +190,23 @@ def _query_single_model(
             content = msg.get("content") or ""
             reasoning = msg.get("reasoning") or ""
 
+            # Assemble full raw response including chain-of-thought/reasoning
+            full_raw_text = ""
+            if reasoning and reasoning not in content:
+                full_raw_text = f"<think>\n{reasoning}\n</think>\n\n{content}".strip()
+            else:
+                full_raw_text = (content or reasoning or "").strip()
+
+            if not full_raw_text and data:
+                full_raw_text = json.dumps(data, indent=2)
+
             # For reasoning models where content might be in reasoning tag
-            if not content and reasoning:
-                content = reasoning
+            parse_target = content if content else reasoning
 
             # Parse the JSON response
-            prediction = _parse_model_json(content)
+            prediction = _parse_model_json(parse_target)
             if prediction is None:
-                raw_preview = (content if isinstance(content, str) else str(content)) or ""
-                logger.warning("[CONSENSUS] %s returned unparseable response (%.2fs): %.200s", display_name, elapsed_ms / 1000.0, raw_preview)
+                logger.warning("[CONSENSUS] %s returned unparseable response (%.2fs): %.200s", display_name, elapsed_ms / 1000.0, full_raw_text)
                 return {
                     "model_name": display_name,
                     "model_id": current_model,
@@ -211,7 +219,7 @@ def _query_single_model(
                     "stop_loss_price": None,
                     "risk_reward_ratio": None,
                     "recommended_action": "HOLD / WAIT",
-                    "raw_response": raw_preview[:500],
+                    "raw_response": full_raw_text,
                 }
 
             # Field normalization
@@ -255,6 +263,7 @@ def _query_single_model(
                 "primary_risk": str(prediction.get("primary_risk") or "General market volatility"),
                 "latency_ms": round(elapsed_ms),
                 "tokens_used": total_tokens,
+                "raw_response": full_raw_text,
             }
 
         except requests.Timeout:
@@ -274,6 +283,7 @@ def _query_single_model(
                 "stop_loss_price": None,
                 "risk_reward_ratio": None,
                 "recommended_action": "HOLD / WAIT",
+                "raw_response": f"Request to {current_model} timed out after {timeout}s",
             }
         except Exception as e:
             if attempt < max_retries:
@@ -292,6 +302,7 @@ def _query_single_model(
                 "stop_loss_price": None,
                 "risk_reward_ratio": None,
                 "recommended_action": "HOLD / WAIT",
+                "raw_response": f"Exception connecting to {current_model}: {str(e)}",
             }
 
     return {
@@ -306,6 +317,7 @@ def _query_single_model(
         "stop_loss_price": None,
         "risk_reward_ratio": None,
         "recommended_action": "HOLD / WAIT",
+        "raw_response": f"Max retries ({max_retries}) exceeded for {current_model}",
     }
 
 

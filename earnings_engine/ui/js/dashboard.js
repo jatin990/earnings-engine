@@ -8075,10 +8075,31 @@
                     // Build Models Breakdown Matrix
                     let modelsGrid = '';
                     if (p.models_breakdown && p.models_breakdown.length) {
-                        modelsGrid = p.models_breakdown.map(m => {
+                        modelsGrid = p.models_breakdown.map((m, idx) => {
                             const mDir = (m.direction || 'ERR').toUpperCase();
                             const mColor = mDir === 'BULLISH' ? '#34d399' : mDir === 'BEARISH' ? '#f87171' : '#94a3b8';
                             const drivers = m.key_drivers ? m.key_drivers.map(d => '<li style="margin-bottom:0.25rem;">' + d + '</li>').join('') : '<li>No specific drivers</li>';
+                            
+                            const rawResp = m.raw_response ? m.raw_response : JSON.stringify(m, null, 2);
+                            const escapedRaw = String(rawResp)
+                                .replace(/&/g, "&amp;")
+                                .replace(/</g, "&lt;")
+                                .replace(/>/g, "&gt;")
+                                .replace(/"/g, "&quot;")
+                                .replace(/'/g, "&#039;");
+
+                            const rawAccordion = `
+                                <details style="margin-top:0.65rem;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);border-radius:0.4rem;padding:0.45rem 0.65rem;">
+                                    <summary style="cursor:pointer;font-size:0.75rem;font-weight:700;color:#93c5fd;display:flex;align-items:center;justify-content:space-between;user-select:none;">
+                                        <span>📄 Full Raw LLM Response &amp; Chain-of-Thought</span>
+                                        <span style="font-size:0.68rem;color:#94a3b8;background:rgba(255,255,255,0.06);padding:0.1rem 0.35rem;border-radius:3px;">${m.tokens_used ? m.tokens_used + ' tokens' : (m.latency_ms ? m.latency_ms + 'ms' : 'Raw Text')} ▾</span>
+                                    </summary>
+                                    <div style="margin-top:0.45rem;position:relative;">
+                                        <pre style="margin:0;padding:0.65rem;background:#030712;border:1px solid rgba(255,255,255,0.12);border-radius:0.35rem;font-family:var(--font-mono);font-size:0.73rem;color:#e2e8f0;white-space:pre-wrap;word-break:break-word;max-height:280px;overflow-y:auto;line-height:1.5;">${escapedRaw}</pre>
+                                    </div>
+                                </details>
+                            `;
+
                             return '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:0.5rem;padding:0.85rem;">' +
                                 '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">' +
                                     '<strong style="color:var(--light);font-size:0.9rem;">' + (m.model_name || m.model_id) + '</strong>' +
@@ -8088,7 +8109,8 @@
                                     'Target Return: <strong style="color:#60a5fa;">' + (m.target_return_pct ? (m.target_return_pct >= 0 ? '+' : '') + m.target_return_pct + '%' : '—') + '</strong> | Target ₹: ' + (m.target_price || '—') +
                                 '</div>' +
                                 '<div style="font-size:0.75rem;color:#cbd5e1;margin-bottom:0.4rem;"><strong>Key Drivers:</strong><ul style="padding-left:1.2rem;margin:0.2rem 0 0 0;">' + drivers + '</ul></div>' +
-                                (m.primary_risk ? '<div style="font-size:0.75rem;color:#fca5a5;"><strong>Primary Risk:</strong> ' + m.primary_risk + '</div>' : '') +
+                                (m.primary_risk ? '<div style="font-size:0.75rem;color:#fca5a5;margin-bottom:0.3rem;"><strong>Primary Risk:</strong> ' + m.primary_risk + '</div>' : '') +
+                                rawAccordion +
                             '</div>';
                         }).join('');
                     }
@@ -9740,6 +9762,49 @@
         // =========================================================================
         app.activeCatConsensusTicker = null;
         app.activeConsensusResult = null;
+
+        app.fetchModalRateLimits = async function() {
+            try {
+                const res = await fetch(API_BASE + '/api/v1/consensus/models');
+                if (!res.ok) return;
+                const data = await res.json();
+                const rlStatusEl = document.getElementById('modalRatelimitStatus');
+                if (rlStatusEl && data.rate_limits?.downstreams?.openrouter) {
+                    const or = data.rate_limits.downstreams.openrouter;
+                    const tf1m = or.timeframes?.['1m'] || {};
+                    const tf24h = or.timeframes?.['24h'] || {};
+                    const rem1m = tf1m.remaining != null ? tf1m.remaining : 20;
+                    const rem24h = tf24h.remaining != null ? tf24h.remaining : 200;
+                    rlStatusEl.textContent = `🟢 AI Quota: ${rem1m}/${tf1m.allowed || 20} RPM | ${rem24h}/${tf24h.allowed || 200} RPD`;
+                    if (rem1m <= 3 || rem24h <= 15) {
+                        rlStatusEl.style.color = '#fbbf24';
+                        rlStatusEl.style.borderColor = 'rgba(245,158,11,0.3)';
+                        rlStatusEl.style.background = 'rgba(245,158,11,0.1)';
+                    }
+                    if (rem1m <= 0 || rem24h <= 0) {
+                        rlStatusEl.textContent = `🔴 Cooldown: 0 RPM`;
+                        rlStatusEl.style.color = '#f87171';
+                        rlStatusEl.style.borderColor = 'rgba(239,68,68,0.3)';
+                        rlStatusEl.style.background = 'rgba(239,68,68,0.1)';
+                    }
+                }
+                const models = data.models || [];
+                models.forEach(m => {
+                    const btnKey = m.name ? m.name.toLowerCase().split('-')[0].replace(/[^a-z]/g, '') : '';
+                    const btn = document.getElementById('modalBtn-' + btnKey);
+                    if (btn) {
+                        btn.title = `${m.name} (${m.badge}): ${m.remaining_1m}/${m.allowed_1m} RPM | ${m.remaining_24h}/${m.allowed_24h} RPD remaining.`;
+                        if (m.remaining_1m <= 0 || m.remaining_24h <= 0) {
+                            btn.style.opacity = '0.5';
+                        } else {
+                            btn.style.opacity = '1';
+                        }
+                    }
+                });
+            } catch (e) {
+                console.debug('Failed to fetch modal rate limits:', e);
+            }
+        };
 
         app.runConsensusForStock = async function(ticker, models = null, force = true) {
             if (!ticker) return;

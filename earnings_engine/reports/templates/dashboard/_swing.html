@@ -56,8 +56,7 @@
                     <!-- Right Controls -->
                     <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
                         {{ comps.market_dropdown('swingMarket', 'ALL', 'app.onGlobalWatchlistChange(this.value); app.loadSwing();') }}
-                        <button onclick="app.loadSwing(event)" class="btn btn-primary btn-sm">▶ Load Setups</button>
-                        <button onclick="app.refreshSwing(event)" class="btn btn-sm" title="Refresh prices and recalculate swing signals">🔄 Refresh</button>
+                        <button onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" title="Load and refresh swing setups">🔄 Refresh Setups</button>
                         <button onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-sm" title="Compute Kronos AI predictions for all stocks in the selected watchlist">🔮 Predict All</button>
                         <button onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-sm" title="Run Multi-Modal AI News & Synthesis">🧠 AI Thesis</button>
                         <button onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-sm" title="Run 4-Model AI Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral)">🤖 Consensus</button>
