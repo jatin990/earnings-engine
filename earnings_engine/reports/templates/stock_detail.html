@@ -1428,9 +1428,37 @@
             }
         }
 
+        async function autoRunLocalModels() {
+            try {
+                // Auto-execute local AI models in background upon opening stock page
+                fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/intelligence-note?model_name=llama3.2:3b&provider=ollama`, {
+                    method: 'POST'
+                }).then(async (res) => {
+                    if (res.ok) {
+                        const note = await res.json();
+                        console.debug('[LOCAL-AI] Local Ollama intelligence note generated:', note);
+                    }
+                }).catch(err => console.debug('[LOCAL-AI] Background local note skipped:', err));
+
+                // Auto-run Kronos AI 14-day price prediction if missing
+                fetch(`/api/v1/kronos/predict/${encodeURIComponent(ACTIVE_SYM)}`, {
+                    method: 'POST'
+                }).then(async (res) => {
+                    if (res.ok) {
+                        const kronosRes = await res.json();
+                        console.debug('[LOCAL-AI] Kronos sequence forecast updated:', kronosRes);
+                        await fetchStockDetails();
+                    }
+                }).catch(err => console.debug('[LOCAL-AI] Background Kronos prediction skipped:', err));
+            } catch (e) {
+                console.debug('[LOCAL-AI] Auto-run error:', e);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             fetchStockDetails();
             fetchRateLimits();
+            autoRunLocalModels();
         });
     </script>
 

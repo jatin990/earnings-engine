@@ -55,6 +55,19 @@
                         <input id="breakoutMinScore" type="number" min="0" max="100" value="35" onchange="app.loadBreakoutRadar()" style="width:52px;background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;font-size:0.74rem;padding:0.35rem 0.4rem;border-radius:6px;font-family:var(--font-mono);text-align:center;">
                     </div>
 
+                    <!-- Top N Selector (Top 2, 5, 10, 20, All) -->
+                    <div style="display:flex;align-items:center;gap:0.3rem;">
+                        <span style="font-size:0.72rem;color:#64748b;">Show</span>
+                        <select id="breakoutLimitSelect" onchange="app.loadBreakoutRadar()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#38bdf8;font-size:0.74rem;font-weight:700;padding:0.35rem 0.55rem;border-radius:6px;font-family:var(--font-mono);cursor:pointer;" title="Limit number of top breakout candidates displayed">
+                            <option value="2">Top 2</option>
+                            <option value="5">Top 5</option>
+                            <option value="10" selected>Top 10</option>
+                            <option value="20">Top 20</option>
+                            <option value="50">Top 50</option>
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+
                     <!-- Formula breakdown toggle -->
                     <button type="button" onclick="app.toggleBreakoutExplainer()" class="btn btn-secondary" style="padding:0.35rem 0.65rem;font-size:0.74rem;display:flex;align-items:center;gap:0.25rem;">
                         <span>📐</span> Formula & Logic

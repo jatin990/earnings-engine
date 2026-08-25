@@ -50,17 +50,27 @@ def build_context(ticker: str, timeframe_days: int = 14, settings: Settings | No
     ctx["earnings"] = _build_earnings_context(sym, settings)
     ctx["catalysts"] = _build_catalysts(sym, settings)
 
+    # 2. Multi-Factor Fundamental & Institutional Intelligence Pipeline
+    try:
+        from earnings_engine.features.fundamental_pipeline import build_multi_factor_pipeline
+        ctx["multi_factor"] = build_multi_factor_pipeline(sym, settings=settings)
+    except Exception as e:
+        logger.debug("[CONSENSUS-CTX] Multi-factor pipeline build skipped for %s: %s", sym, e)
+
     return ctx
 
 
 def context_to_prompt(ctx: dict[str, Any]) -> str:
     """Render a context dict into a markdown prompt string for LLMs."""
+    from earnings_engine.features.fundamental_pipeline import format_pipeline_for_llm_prompt
+
     ticker = ctx.get("ticker", "UNKNOWN")
     timeframe = ctx.get("timeframe_days", 14)
     pa = ctx.get("price_action", {})
     sw = ctx.get("swing_channel", {})
     ea = ctx.get("earnings", {})
     cat = ctx.get("catalysts", [])
+    mf = ctx.get("multi_factor", {})
     is_live = ctx.get("is_live", False)
     curr_sym = "$" if not ticker.endswith(".NS") else "₹"
 
@@ -70,8 +80,14 @@ def context_to_prompt(ctx: dict[str, Any]) -> str:
         f"**Prediction Timeframe:** {timeframe} days",
         f"**Data Status:** {'🟢 Live Real-Time Market Feed' if is_live else '📊 Cached Daily Historical Feed'}",
         "",
-        "## Price Action & Momentum",
     ]
+
+    # Include formatted 6-pillar multi-factor briefing if available
+    if mf and mf.get("success"):
+        lines.append(format_pipeline_for_llm_prompt(mf))
+        lines.append("")
+
+    lines.append("## Price Action & Technical Momentum")
 
     if pa:
         lines.extend([

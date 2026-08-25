@@ -10829,7 +10829,9 @@
                     lastScanEl.textContent = status.status === 'running' ? 'Scanning now\u2026' : (asofDate ? `As-Of ${asofDate}` : 'Waiting for first scan\u2026');
                 }
 
-                app.renderBreakoutTable(app._breakoutData, asofDate);
+                const limitVal = document.getElementById('breakoutLimitSelect')?.value || '10';
+                const limitNum = limitVal === 'all' ? app._breakoutData.length : parseInt(limitVal, 10);
+                app.renderBreakoutTable(app._breakoutData.slice(0, limitNum), asofDate);
             } catch (err) {
                 console.error('[BREAKOUT] Load error:', err);
                 if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#ef4444;font-size:0.8rem;">\u26a1 Failed to load breakout data. Is the server running?</td></tr>';
