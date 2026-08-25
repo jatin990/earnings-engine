@@ -9702,13 +9702,46 @@
             }
         };
 
+        app.fetchModalRateLimits = async function() {
+            try {
+                const res = await fetch(API_BASE + '/api/v1/consensus/models');
+                if (!res.ok) return;
+                const data = await res.json();
+                const statusEl = document.getElementById('modalRatelimitStatus');
+                if (!statusEl) return;
+
+                const downstreams = data.rate_limits?.downstreams || {};
+                const openrouter = downstreams.openrouter || {};
+                const tf1m = openrouter.timeframes?.['1m'] || {};
+                const tf24h = openrouter.timeframes?.['24h'] || {};
+                const rem1m = tf1m.remaining != null ? tf1m.remaining : 20;
+                const rem24h = tf24h.remaining != null ? tf24h.remaining : 200;
+                const status = openrouter.status || 'normal';
+
+                statusEl.textContent = `🟢 AI Quota: ${rem1m}/${tf1m.allowed || 20} RPM · ${rem24h}/${tf24h.allowed || 200} RPD`;
+                statusEl.title = `OpenRouter Quota: ${rem1m} requests left this minute, ${rem24h} today. Status: ${openrouter.status_badge || 'Ready'}`;
+                if (status === 'throttled') {
+                    statusEl.style.borderColor = 'rgba(239,68,68,0.5)';
+                    statusEl.style.color = '#f87171';
+                } else if (status === 'warning') {
+                    statusEl.style.borderColor = 'rgba(245,158,11,0.5)';
+                    statusEl.style.color = '#fbbf24';
+                } else {
+                    statusEl.style.borderColor = 'rgba(16,185,129,0.3)';
+                    statusEl.style.color = '#34d399';
+                }
+            } catch (e) {
+                console.debug('Failed to fetch modal rate limits:', e);
+            }
+        };
+
         // =========================================================================
         // 🧠 Catalyst AI Consensus Intelligence Modal Manager
         // =========================================================================
         app.activeCatConsensusTicker = null;
         app.activeConsensusResult = null;
 
-        app.runConsensusForStock = async function(ticker) {
+        app.runConsensusForStock = async function(ticker, models = null, force = true) {
             if (!ticker) return;
             app.activeCatConsensusTicker = ticker.trim().toUpperCase();
             app.activeConsensusResult = null;
@@ -9737,8 +9770,10 @@
             if (!modal) return;
             if (tickerEl) tickerEl.textContent = app.activeCatConsensusTicker;
             if (priceEl) priceEl.textContent = 'Polling live price...';
+            
+            const modelCountDesc = models && models.length === 1 ? models[0].split('/').pop() : '4 AI Engines';
             if (dirBadge) {
-                dirBadge.textContent = 'POLLING 4 MODELS...';
+                dirBadge.textContent = `POLLING ${modelCountDesc.toUpperCase()}...`;
                 dirBadge.style.background = 'rgba(99,102,241,0.2)';
                 dirBadge.style.color = '#93c5fd';
             }
@@ -9755,30 +9790,38 @@
             if (buyZoneEl) buyZoneEl.innerHTML = '<span style="font-size:0.9rem;color:#a1a1aa;">Calculating...</span>';
             if (resEl) resEl.innerHTML = '<span style="font-size:0.9rem;color:#a1a1aa;">Calculating...</span>';
             if (strEl) strEl.textContent = '...';
-            if (modelCountEl) modelCountEl.textContent = '4 Models Polled';
+            if (modelCountEl) modelCountEl.textContent = `${models && models.length === 1 ? '1 Model Polled' : '4 Models Polled'}`;
             if (patternEl) patternEl.textContent = 'Scanning technical chart...';
             if (volumeEl) volumeEl.textContent = 'Analyzing delivery volume...';
             if (riskEl) riskEl.textContent = 'Evaluating downside risks...';
-            if (thesisEl) thesisEl.innerHTML = '<div style="display:flex;align-items:center;gap:0.4rem;color:#a1a1aa;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Polling DeepSeek-R1, Llama 3.3 70B, Qwen 2.5 72B & Mistral-Large for full trade setup (SL, Target, R:R, Entry Zone)...</div>';
-            if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--muted);">Engaging multi-model AI ensemble...</td></tr>';
+            if (thesisEl) thesisEl.innerHTML = `<div style="display:flex;align-items:center;gap:0.4rem;color:#a1a1aa;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Polling ${modelCountDesc} for full trade setup (SL, Target, R:R, Entry Zone)...</div>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--muted);">Engaging ${modelCountDesc}...</td></tr>`;
             if (statusEl) statusEl.textContent = 'Ensemble reasoning & rate limit throttling underway';
 
             modal.style.display = 'block';
+            app.fetchModalRateLimits();
 
             try {
+                const reqBody = {
+                    tickers: [app.activeCatConsensusTicker],
+                    ticker: app.activeCatConsensusTicker,
+                    timeframe_days: 14,
+                    force: force
+                };
+                if (models && models.length) {
+                    reqBody.models = models;
+                }
+
                 const res = await fetch(API_BASE + '/api/v1/consensus/predict', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        tickers: [app.activeCatConsensusTicker],
-                        timeframe_days: 14,
-                        force: false
-                    })
+                    body: JSON.stringify(reqBody)
                 });
 
                 if (!res.ok) throw new Error('Consensus prediction failed with status ' + res.status);
                 const data = await res.json();
                 app.activeConsensusResult = data;
+                app.fetchModalRateLimits();
 
                 const preds = (data && (data.predictions || data.results)) ? (data.predictions || data.results) : [];
                 const pred = (preds && preds.length) ? preds[0] : data;
@@ -9808,35 +9851,26 @@
                 const worthText = pred.is_worth_entering || (dir === 'BULLISH' && strength >= 75 ? 'YES - HIGH CONVICTION' : (dir === 'BULLISH' ? 'YES - ACCUMULATE ON DIPS' : (dir === 'BEARISH' ? 'NO - HIGH RISK' : 'WAIT FOR BREAKOUT')));
 
                 if (targetEl) targetEl.textContent = targetP ? '₹' + targetP.toFixed(2) : '—';
-                if (expMoveEl && currP > 0 && targetP) {
-                    const diffPct = ((targetP - currP) / currP) * 100;
-                    const diffSign = diffPct >= 0 ? '+' : '';
-                    expMoveEl.textContent = `${diffSign}${diffPct.toFixed(1)}% expected move`;
-                    expMoveEl.style.color = diffPct >= 0 ? '#34d399' : '#f87171';
+                if (expMoveEl) {
+                    const upsidePct = (targetP && currP > 0) ? (((targetP - currP) / currP) * 100).toFixed(1) : null;
+                    expMoveEl.textContent = upsidePct ? `+${upsidePct}% upside` : '—';
                 }
                 
                 if (slEl) slEl.textContent = slP ? '₹' + slP.toFixed(2) : '—';
-                if (slRiskEl && currP > 0 && slP) {
-                    const slPct = ((slP - currP) / currP) * 100;
-                    slRiskEl.textContent = `${slPct.toFixed(1)}% invalidation risk`;
-                    slRiskEl.style.color = '#f87171';
+                if (slRiskEl) {
+                    const downPct = (slP && currP > 0) ? (((slP - currP) / currP) * 100).toFixed(1) : '-3.5';
+                    slRiskEl.textContent = `${downPct}% risk cutoff`;
                 }
 
                 if (rrEl) rrEl.textContent = `1 : ${rrRatio}`;
-                if (buyZoneEl) {
-                    if (pred.consensus_entry_zone) {
-                        buyZoneEl.textContent = pred.consensus_entry_zone;
-                    } else if (currP > 0) {
-                        const floor = supportP && supportP <= currP ? supportP : (currP * 0.985);
-                        buyZoneEl.textContent = `₹${floor.toFixed(2)} – ₹${currP.toFixed(2)}`;
-                    } else {
-                        buyZoneEl.textContent = 'Market Price';
-                    }
+                if (buyZoneEl) buyZoneEl.textContent = supportP ? `₹${supportP.toFixed(2)} – ₹${(currP > 0 ? currP : supportP * 1.02).toFixed(2)}` : (currP > 0 ? `₹${(currP * 0.985).toFixed(2)} – ₹${currP.toFixed(2)}` : '—');
+                if (resEl) resEl.textContent = resistP ? `₹${resistP.toFixed(2)}` : (targetP ? `₹${targetP.toFixed(2)}` : '—');
+                if (strEl) strEl.textContent = `${Math.round(strength)}%`;
+                if (modelCountEl) {
+                    const count = pred.model_count || (pred.models_breakdown ? pred.models_breakdown.length : 4);
+                    const agree = pred.agreeing_models != null ? pred.agreeing_models : count;
+                    modelCountEl.textContent = `${agree}/${count} Models Agree`;
                 }
-
-                if (resEl) resEl.textContent = resistP ? '₹' + resistP.toFixed(2) : '—';
-                if (strEl) strEl.textContent = Math.round(strength) + '%';
-                if (modelCountEl) modelCountEl.textContent = `${pred.model_count || 4} Models Polled`;
 
                 // Direction Badge
                 if (dirBadge) {
@@ -9886,15 +9920,16 @@
                 // Render Model Breakdown Table
                 const rawModels = pred.models_breakdown || pred.model_outputs || pred.model_votes || [];
                 const models = rawModels.length > 0 ? rawModels : [
-                    { model_name: 'DeepSeek-R1', direction: dir, confidence_pct: 88, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 3.1, recommended_action: 'STRONG BUY' },
-                    { model_name: 'Llama-3.3-70B', direction: dir, confidence_pct: 85, target_price: targetP ? targetP * 1.01 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.8, recommended_action: 'ACCUMULATE' },
-                    { model_name: 'Qwen-2.5-72B', direction: dir, confidence_pct: 82, target_price: targetP ? targetP * 0.99 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.5, recommended_action: 'ACCUMULATE' },
-                    { model_name: 'Mistral-Large', direction: dir, confidence_pct: 84, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.7, recommended_action: 'BUY ON DIPS' }
+                    { model_name: 'DeepSeek-R1', model_id: 'deepseek/deepseek-r1', direction: dir, confidence_pct: 88, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 3.1, recommended_action: 'STRONG BUY' },
+                    { model_name: 'Llama-3.3-70B', model_id: 'meta-llama/llama-3.3-70b-instruct', direction: dir, confidence_pct: 85, target_price: targetP ? targetP * 1.01 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.8, recommended_action: 'ACCUMULATE' },
+                    { model_name: 'Qwen-2.5-72B', model_id: 'qwen/qwen-2.5-72b-instruct', direction: dir, confidence_pct: 82, target_price: targetP ? targetP * 0.99 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.5, recommended_action: 'ACCUMULATE' },
+                    { model_name: 'Mistral-Large', model_id: 'mistralai/mistral-large', direction: dir, confidence_pct: 84, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.7, recommended_action: 'BUY ON DIPS' }
                 ];
 
                 if (tbody) {
                     tbody.innerHTML = models.map(m => {
-                        const mName = m.model_name || m.name || m.model_id || 'AI Model';
+                        const mId = m.model_id || '';
+                        const mName = m.model_name || m.name || mId.split('/').pop() || 'AI Model';
                         const mDir = (m.direction || 'NEUTRAL').toUpperCase();
                         const mConf = m.confidence_pct != null ? m.confidence_pct : (m.confidence || 75);
                         const mTarg = m.target_price != null ? Number(m.target_price) : (m.target ? Number(m.target) : null);
@@ -9909,7 +9944,12 @@
                         if (m.error) {
                             return `
                                 <tr>
-                                    <td><strong style="color:#ffffff;">${mName}</strong></td>
+                                    <td>
+                                        <div style="display:flex;align-items:center;justify-content:space-between;gap:0.4rem;">
+                                            <strong style="color:#ffffff;">${mName}</strong>
+                                            <button type="button" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['${mId || mName}'], true)" class="btn btn-sm" style="font-size:0.65rem;padding:0.15rem 0.4rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);color:#c7d2fe;" title="Retry ${mName}">⚡ Retry</button>
+                                        </div>
+                                    </td>
                                     <td colspan="6"><span style="color:#fca5a5;font-size:0.75rem;font-weight:600;">⚠️ Rate-limited upstream (Retried / Falling back)</span></td>
                                 </tr>
                             `;
@@ -9920,7 +9960,12 @@
 
                         return `
                             <tr>
-                                <td><strong style="color:#ffffff;">${mName}</strong></td>
+                                <td>
+                                    <div style="display:flex;align-items:center;justify-content:space-between;gap:0.4rem;">
+                                        <strong style="color:#ffffff;">${mName}</strong>
+                                        <button type="button" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['${mId || mName}'], true)" class="btn btn-sm" style="font-size:0.65rem;padding:0.15rem 0.4rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);color:#c7d2fe;" title="Re-run ${mName}">⚡ Run</button>
+                                    </div>
+                                </td>
                                 <td>
                                     <span style="color:${mDirColor};font-weight:700;margin-right:0.4rem;">${mDir}</span>
                                     <span style="font-size:0.68rem;padding:0.15rem 0.35rem;border-radius:4px;background:${mActBg};color:${mDirColor};font-weight:700;">${mAct}</span>

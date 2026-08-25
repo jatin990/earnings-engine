@@ -254,3 +254,30 @@ def test_parse_model_json():
     assert parsed_trunc is not None
     assert parsed_trunc["direction"] == "NEUTRAL"
     assert parsed_trunc["confidence_pct"] == 60
+
+
+def test_consensus_models_endpoint_and_rate_limits():
+    """Test GET /api/v1/consensus/models returns available models and live rate limits."""
+    from earnings_engine.rate_limits import get_models_rate_limits, record_request
+
+    # Record some requests
+    record_request("deepseek/deepseek-r1")
+    record_request("meta-llama/llama-3.3-70b-instruct")
+
+    models = get_models_rate_limits()
+    assert len(models) >= 4
+    model_ids = [m["id"] for m in models]
+    assert "deepseek/deepseek-r1" in model_ids
+    assert "meta-llama/llama-3.3-70b-instruct" in model_ids
+    assert "qwen/qwen-2.5-72b-instruct" in model_ids
+    assert "mistralai/mistral-large" in model_ids
+
+    client = TestClient(app)
+    res = client.get("/api/v1/consensus/models")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "models" in data
+    assert "rate_limits" in data
+    assert len(data["models"]) >= 4
+

@@ -131,6 +131,8 @@ def _query_single_model(
             try:
                 from earnings_engine.rate_limits import record_request, update_openrouter_headers
                 record_request("openrouter", resp.status_code)
+                record_request(current_model, resp.status_code)
+                record_request(display_name, resp.status_code)
                 update_openrouter_headers(dict(resp.headers))
             except Exception:
                 pass

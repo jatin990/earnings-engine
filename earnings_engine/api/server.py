@@ -3843,6 +3843,20 @@ async def consensus_predict_endpoint(req: ConsensusPredictRequest):
                 models=req.models,
             )
 
+            # If running a single model (or subset), merge with previous model outputs to keep 4-model matrix updated
+            if req.models and len(req.models) < len(model_runner.DEFAULT_MODELS):
+                cached_preds = storage.get_predictions(settings=_settings, ticker=ticker, limit=1)
+                if cached_preds:
+                    prev_models = cached_preds[0].get("models_breakdown", [])
+                    new_ids = {m.get("model_id") for m in model_outputs}
+                    new_names = {m.get("model_name") for m in model_outputs}
+                    merged = [
+                        m for m in prev_models
+                        if m.get("model_id") not in new_ids and m.get("model_name") not in new_names
+                    ]
+                    merged.extend(model_outputs)
+                    model_outputs = merged
+
             # 3. Aggregate consensus
             consensus = aggregator.aggregate_predictions(
                 model_results=model_outputs,
@@ -3864,11 +3878,25 @@ async def consensus_predict_endpoint(req: ConsensusPredictRequest):
             logger.error("[CONSENSUS-API] Error predicting for %s: %s", ticker, e)
             results.append({"ticker": ticker, "error": str(e)})
 
+    from earnings_engine.rate_limits import get_models_rate_limits, get_ratelimits_summary
     return {
         "success": True,
         "count": len(results),
         "predictions": results,
         "results": results,
+        "models": get_models_rate_limits(),
+        "rate_limits": get_ratelimits_summary(_settings),
+    }
+
+
+@app.get("/api/v1/consensus/models", tags=["AI Consensus Engine"])
+async def consensus_models_endpoint():
+    """Return available AI consensus models, icons, metadata, and live rate limit counters."""
+    from earnings_engine.rate_limits import get_models_rate_limits, get_ratelimits_summary
+    return {
+        "success": True,
+        "models": get_models_rate_limits(),
+        "rate_limits": get_ratelimits_summary(_settings),
     }
 
 

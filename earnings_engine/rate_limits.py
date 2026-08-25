@@ -126,15 +126,68 @@ DOWNSTREAM_CRITERIA: dict[str, dict[str, Any]] = {
 }
 
 
+# Available AI Models in Consensus Suite
+AVAILABLE_AI_MODELS: list[dict[str, Any]] = [
+    {
+        "id": "deepseek/deepseek-r1",
+        "name": "DeepSeek-R1",
+        "icon": "🤖",
+        "badge": "Reasoning",
+        "description": "DeepSeek-R1 chain-of-thought quantitative and market structure reasoning.",
+        "color": "#6366f1",
+        "default_limit_1m": 20,
+        "default_limit_1h": 100,
+        "default_limit_24h": 200,
+    },
+    {
+        "id": "meta-llama/llama-3.3-70b-instruct",
+        "name": "Llama-3.3-70B",
+        "icon": "🦙",
+        "badge": "Institutional",
+        "description": "Meta 70B flagship instruction model for macro trends and swing setups.",
+        "color": "#38bdf8",
+        "default_limit_1m": 20,
+        "default_limit_1h": 100,
+        "default_limit_24h": 200,
+    },
+    {
+        "id": "qwen/qwen-2.5-72b-instruct",
+        "name": "Qwen-2.5-72B",
+        "icon": "🌐",
+        "badge": "Algorithmic",
+        "description": "Alibaba 72B model specialized in numerical price structures and key levels.",
+        "color": "#a855f7",
+        "default_limit_1m": 20,
+        "default_limit_1h": 100,
+        "default_limit_24h": 200,
+    },
+    {
+        "id": "mistralai/mistral-large",
+        "name": "Mistral-Large",
+        "icon": "⚡",
+        "badge": "Catalysts",
+        "description": "Mistral AI reasoning model for corporate earnings surprises and news catalysts.",
+        "color": "#f59e0b",
+        "default_limit_1m": 20,
+        "default_limit_1h": 100,
+        "default_limit_24h": 200,
+    },
+]
+
+
 class RateLimitTracker:
     """Thread-safe in-memory sliding window request tracker and OpenRouter quota cache."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        # Deque of timestamps per downstream
+        # Deque of timestamps per downstream and model
         self._request_timestamps: dict[str, collections.deque[float]] = {
             k: collections.deque(maxlen=10000) for k in DOWNSTREAM_CRITERIA
         }
+        for m in AVAILABLE_AI_MODELS:
+            self._request_timestamps[m["id"].lower()] = collections.deque(maxlen=10000)
+            self._request_timestamps[m["name"].lower()] = collections.deque(maxlen=10000)
+
         # Last known HTTP response headers from OpenRouter
         self._openrouter_headers: dict[str, Any] = {
             "limit": None,
@@ -147,7 +200,7 @@ class RateLimitTracker:
         self._openrouter_key_last_fetched: float = 0.0
 
     def record_request(self, service: str, status_code: int = 200) -> None:
-        """Record an outbound request timestamp for the given downstream service."""
+        """Record an outbound request timestamp for the given downstream service or model."""
         now = time.time()
         service_key = service.lower().strip()
         with self._lock:
@@ -203,6 +256,63 @@ class RateLimitTracker:
             logger.debug("Failed checking OpenRouter key info: %s", e)
 
         return self._openrouter_key_cache
+
+
+    def get_models_summary(self) -> list[dict[str, Any]]:
+        """Compute rate limit consumption and remaining capacity for each supported AI model."""
+        now = time.time()
+        openrouter_summary = self.get_downstream_summary().get("downstreams", {}).get("openrouter", {})
+        or_remaining_1m = openrouter_summary.get("timeframes", {}).get("1m", {}).get("remaining", 20)
+        or_remaining_24h = openrouter_summary.get("timeframes", {}).get("24h", {}).get("remaining", 200)
+
+        out = []
+        with self._lock:
+            for m in AVAILABLE_AI_MODELS:
+                m_id = m["id"].lower()
+                m_name = m["name"].lower()
+                # Aggregate timestamps recorded under id or display name
+                timestamps = list(self._request_timestamps.get(m_id, [])) + list(self._request_timestamps.get(m_name, []))
+
+                count_1m = sum(1 for t in timestamps if now - t <= 60)
+                count_1h = sum(1 for t in timestamps if now - t <= 3600)
+                count_24h = sum(1 for t in timestamps if now - t <= 86400)
+
+                allowed_1m = m.get("default_limit_1m", 20)
+                allowed_1h = m.get("default_limit_1h", 100)
+                allowed_24h = m.get("default_limit_24h", 200)
+
+                # Effective remaining is min of model local window and openrouter overall quota
+                rem_1m = max(0, min(allowed_1m - count_1m, or_remaining_1m))
+                rem_24h = max(0, min(allowed_24h - count_24h, or_remaining_24h))
+
+                status = "normal"
+                status_badge = "🟢 Ready"
+                if rem_1m <= 0 or rem_24h <= 0:
+                    status = "throttled"
+                    status_badge = "🔴 Cooldown / Limit"
+                elif rem_1m <= 3 or rem_24h <= 15:
+                    status = "warning"
+                    status_badge = "🟡 Near Quota"
+
+                out.append({
+                    "id": m["id"],
+                    "name": m["name"],
+                    "icon": m["icon"],
+                    "badge": m["badge"],
+                    "description": m["description"],
+                    "color": m["color"],
+                    "status": status,
+                    "status_badge": status_badge,
+                    "count_1m": count_1m,
+                    "allowed_1m": allowed_1m,
+                    "remaining_1m": rem_1m,
+                    "count_1h": count_1h,
+                    "allowed_1h": allowed_1h,
+                    "count_24h": count_24h,
+                    "allowed_24h": allowed_24h,
+                    "remaining_24h": rem_24h,
+                })
+        return out
 
     def get_downstream_summary(self, settings: Settings | None = None) -> dict[str, Any]:
         """Compute the allowed vs used metrics across 1m, 1h, and 24h timeframes for all downstreams."""
@@ -341,3 +451,8 @@ def update_openrouter_headers(headers: dict[str, Any]) -> None:
 def get_ratelimits_summary(settings: Settings | None = None) -> dict[str, Any]:
     """Retrieve the unified rate limit & quota payload."""
     return tracker.get_downstream_summary(settings)
+
+
+def get_models_rate_limits() -> list[dict[str, Any]]:
+    """Retrieve list of supported models and their live rate limit stats."""
+    return tracker.get_models_summary()

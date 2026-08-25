@@ -453,6 +453,106 @@
             line-height: 1.5;
         }
 
+        /* AI Model Action Toolbar & Rate Limits Badges */
+        .ai-model-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+        }
+        .btn-model-opt {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.32rem 0.65rem;
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .btn-model-opt:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+        .btn-model-opt:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-model-opt.deepseek:hover:not(:disabled) {
+            border-color: rgba(99, 102, 241, 0.6);
+            color: #c7d2fe;
+            background: rgba(99, 102, 241, 0.18);
+        }
+        .btn-model-opt.llama:hover:not(:disabled) {
+            border-color: rgba(56, 189, 248, 0.6);
+            color: #bae6fd;
+            background: rgba(56, 189, 248, 0.18);
+        }
+        .btn-model-opt.qwen:hover:not(:disabled) {
+            border-color: rgba(168, 85, 247, 0.6);
+            color: #e9d5ff;
+            background: rgba(168, 85, 247, 0.18);
+        }
+        .btn-model-opt.mistral:hover:not(:disabled) {
+            border-color: rgba(245, 158, 11, 0.6);
+            color: #fde68a;
+            background: rgba(245, 158, 11, 0.18);
+        }
+        .rate-limit-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.7rem;
+            font-family: var(--font-mono);
+            padding: 0.25rem 0.6rem;
+            border-radius: var(--radius-sm);
+            background: rgba(16, 185, 129, 0.1);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            white-space: nowrap;
+        }
+        .rate-limit-pill.warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+            border-color: rgba(245, 158, 11, 0.4);
+        }
+        .rate-limit-pill.throttled {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+        .btn-tile-run {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.35rem 0.6rem;
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-tile-run:hover:not(:disabled) {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.5);
+            color: #ffffff;
+        }
+        .btn-tile-run:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         /* Tables */
         .clean-table {
             width: 100%;
@@ -534,12 +634,34 @@
             </div>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 0.65rem;">
-            <button id="btnWatchlist" onclick="toggleWatchlist()" class="btn btn-secondary">
+        <div class="ai-model-toolbar">
+            <button id="btnWatchlist" onclick="toggleWatchlist()" class="btn btn-secondary" style="padding: 0.32rem 0.65rem; font-size: 0.75rem;">
                 ⭐ Watchlist
             </button>
-            <button id="btnConsensus" onclick="runConsensus()" class="btn btn-primary">
-                🧠 Run AI Consensus
+
+            <!-- Rate Limit Monitor Pill -->
+            <div id="ratelimitPill" class="rate-limit-pill" title="Real-time OpenRouter & downstream rate limit tracking">
+                <span class="pulse-dot" style="background:#10b981;"></span>
+                <span id="txtRatelimit">AI Quota: 20/20 RPM</span>
+            </div>
+
+            <!-- Per-Model Action Buttons -->
+            <button id="btnModel-deepseek-r1" onclick="runConsensus(true, 'deepseek/deepseek-r1')" class="btn-model-opt deepseek" title="Run DeepSeek-R1 reasoning engine (Chain of thought)">
+                <span>🤖</span> DeepSeek-R1
+            </button>
+            <button id="btnModel-llama-70b" onclick="runConsensus(true, 'meta-llama/llama-3.3-70b-instruct')" class="btn-model-opt llama" title="Run Meta Llama-3.3-70B institutional model">
+                <span>🦙</span> Llama-70B
+            </button>
+            <button id="btnModel-qwen-72b" onclick="runConsensus(true, 'qwen/qwen-2.5-72b-instruct')" class="btn-model-opt qwen" title="Run Alibaba Qwen-2.5-72B algorithmic model">
+                <span>🌐</span> Qwen-72B
+            </button>
+            <button id="btnModel-mistral-large" onclick="runConsensus(true, 'mistralai/mistral-large')" class="btn-model-opt mistral" title="Run Mistral-Large catalyst model">
+                <span>⚡</span> Mistral
+            </button>
+
+            <!-- Run All Consensus Button -->
+            <button id="btnConsensus" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.32rem 0.75rem; font-size: 0.75rem;" title="Run all 4 AI engines in parallel and synthesize consensus">
+                🧠 All Consensus
             </button>
         </div>
     </header>
@@ -877,18 +999,35 @@
         function renderModelsMatrix(models) {
             const container = document.getElementById('modelsContainer');
             if (!models || !models.length) {
-                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 1.5rem;">Click "🧠 Run AI Consensus" above to evaluate 4 AI engines.</div>';
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 1.5rem;">Click any AI Model button above or "🧠 All Consensus" to generate trade predictions.</div>';
                 return;
             }
 
             container.innerHTML = models.map(m => {
                 const isBull = (m.direction || 'BULLISH').toUpperCase() === 'BULLISH';
-                const dirCol = isBull ? 'var(--emerald)' : 'var(--rose)';
-                const dirBg = isBull ? 'var(--emerald-subtle)' : 'var(--rose-subtle)';
+                const isBear = (m.direction || '').toUpperCase() === 'BEARISH';
+                const dirCol = isBull ? 'var(--emerald)' : (isBear ? 'var(--rose)' : 'var(--amber)');
+                const dirBg = isBull ? 'var(--emerald-subtle)' : (isBear ? 'var(--rose-subtle)' : 'rgba(245, 158, 11, 0.15)');
+                
+                const mid = m.model_id || '';
+                const mName = m.model_name || mid.split('/').pop() || 'AI Model';
+                const safeMid = mid.replace(/[^a-zA-Z0-9]/g, '_') || mName.replace(/[^a-zA-Z0-9]/g, '_');
+                
+                let icon = '🤖';
+                if (mid.includes('llama') || mName.includes('Llama')) icon = '🦙';
+                else if (mid.includes('qwen') || mName.includes('Qwen')) icon = '🌐';
+                else if (mid.includes('mistral') || mName.includes('Mistral')) icon = '⚡';
+                else if (mid.includes('gemini') || mName.includes('Gemini')) icon = '✨';
+
                 return `
                     <div class="model-tile">
                         <div class="model-top">
-                            <span class="model-label">${m.model_name || m.model_id}</span>
+                            <div style="display:flex; align-items:center; gap:0.4rem;">
+                                <span style="font-size:1.1rem;">${icon}</span>
+                                <div>
+                                    <span class="model-label">${mName}</span>
+                                </div>
+                            </div>
                             <span class="model-vote" style="background: ${dirBg}; color: ${dirCol};">${m.direction || 'NEUTRAL'} (${m.confidence_pct || 80}%)</span>
                         </div>
                         <div class="model-targets">
@@ -897,7 +1036,12 @@
                             <span>R:R: <strong style="color: #93c5fd;">1:${m.risk_reward_ratio || '2.0'}</strong></span>
                         </div>
                         <div class="model-rationale">
-                            ${m.rationale_summary || m.thesis || 'Technical structure aligns with directional trend.'}
+                            ${m.rationale_summary || m.thesis || m.chart_pattern || 'Quantitative structure and momentum align with directional setup.'}
+                        </div>
+                        <div style="margin-top: auto; pt: 0.35rem;">
+                            <button id="tileBtn-${safeMid}" onclick="runConsensus(true, '${mid || mName}')" class="btn-tile-run" title="Run and refresh prediction specifically for ${mName}">
+                                ⚡ Run ${mName}
+                            </button>
                         </div>
                     </div>
                 `;
@@ -1076,23 +1220,101 @@
             }).join('');
         }
 
-        async function runConsensus(force = true) {
-            const btn = document.getElementById('btnConsensus');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Evaluating Live Data across 4 AI Engines...';
+        let rateLimitsData = null;
+
+        async function fetchRateLimits() {
             try {
+                const res = await fetch('/api/v1/consensus/models');
+                if (!res.ok) return;
+                const data = await res.json();
+                rateLimitsData = data;
+                
+                const pill = document.getElementById('ratelimitPill');
+                const txt = document.getElementById('txtRatelimit');
+                if (!pill || !txt) return;
+
+                const downstreams = data.rate_limits?.downstreams || {};
+                const openrouter = downstreams.openrouter || {};
+                const tf1m = openrouter.timeframes?.['1m'] || {};
+                const tf24h = openrouter.timeframes?.['24h'] || {};
+                const rem1m = tf1m.remaining != null ? tf1m.remaining : 20;
+                const rem24h = tf24h.remaining != null ? tf24h.remaining : 200;
+                const status = openrouter.status || 'normal';
+
+                txt.textContent = `AI Quota: ${rem1m}/${tf1m.allowed || 20} RPM · ${rem24h}/${tf24h.allowed || 200} RPD`;
+                pill.className = `rate-limit-pill ${status}`;
+                pill.title = `OpenRouter AI Quota: ${rem1m} requests remaining this minute, ${rem24h} today. Status: ${openrouter.status_badge || '🟢 Ready'}`;
+
+                // Update individual model button tooltips and states
+                const models = data.models || [];
+                models.forEach(m => {
+                    const btnId = 'btnModel-' + (m.name ? m.name.toLowerCase().replace(/[^a-z0-9]/g, '-') : '');
+                    const btn = document.getElementById(btnId);
+                    if (btn) {
+                        btn.title = `${m.name} (${m.badge}): ${m.remaining_1m}/${m.allowed_1m} RPM remaining. ${m.description}`;
+                        if (m.remaining_1m <= 0 || m.remaining_24h <= 0) {
+                            btn.style.opacity = '0.5';
+                            btn.title += ' (Rate Limited - Cooldown)';
+                        } else {
+                            btn.style.opacity = '1';
+                        }
+                    }
+                });
+            } catch (e) {
+                console.debug('Failed to fetch rate limits:', e);
+            }
+        }
+
+        async function runConsensus(force = true, modelId = null) {
+            const allBtn = document.getElementById('btnConsensus');
+            let targetBtn = allBtn;
+            let prevHtml = '';
+
+            // If a specific model was chosen, locate its button
+            if (modelId) {
+                const mKey = modelId.toLowerCase();
+                if (mKey.includes('deepseek')) targetBtn = document.getElementById('btnModel-deepseek-r1') || allBtn;
+                else if (mKey.includes('llama')) targetBtn = document.getElementById('btnModel-llama-70b') || allBtn;
+                else if (mKey.includes('qwen')) targetBtn = document.getElementById('btnModel-qwen-72b') || allBtn;
+                else if (mKey.includes('mistral')) targetBtn = document.getElementById('btnModel-mistral-large') || allBtn;
+            }
+
+            if (targetBtn) {
+                prevHtml = targetBtn.innerHTML;
+                targetBtn.disabled = true;
+                targetBtn.innerHTML = `<span class="spinner"></span> ${modelId ? 'Running Model...' : 'Running All 4 AI Engines...'}`;
+            }
+
+            try {
+                const reqBody = {
+                    ticker: ACTIVE_SYM,
+                    timeframe_days: 14,
+                    force: force
+                };
+                if (modelId) {
+                    reqBody.models = [modelId];
+                }
+
                 const res = await fetch('/api/v1/consensus/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ticker: ACTIVE_SYM, timeframe_days: 14, force: force })
+                    body: JSON.stringify(reqBody)
                 });
-                if (!res.ok) throw new Error('Prediction request failed');
+                
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.detail || 'Prediction request failed with HTTP ' + res.status);
+                }
+
                 await fetchStockDetails();
+                await fetchRateLimits();
             } catch (e) {
-                alert('Error computing consensus: ' + e.message);
+                alert('Error computing AI consensus: ' + e.message);
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = '🧠 Run AI Consensus';
+                if (targetBtn) {
+                    targetBtn.disabled = false;
+                    targetBtn.innerHTML = prevHtml;
+                }
             }
         }
 
@@ -1110,7 +1332,10 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', fetchStockDetails);
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchStockDetails();
+            fetchRateLimits();
+        });
     </script>
 
     <!-- MODAL: CALCULATE / OVERRIDE EPS -->
