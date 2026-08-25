@@ -499,11 +499,6 @@ def scan_category(
                 (universe_or_watchlist, cat_id, limit),
             ).fetchall()
 
-    # If DB is cold (first ever run before background worker finishes), compute and save once
-    if not rows:
-        compute_and_save_scanner_universe(universe_or_watchlist=universe_or_watchlist, settings=settings)
-        return scan_category(category_id=category_id, universe_or_watchlist=universe_or_watchlist, limit=limit, settings=settings)
-
     candidates: list[dict[str, Any]] = []
     seen: set[str] = set()
     for r in rows:
@@ -532,17 +527,6 @@ def get_categories_overview(
                 (universe_or_watchlist,),
             ).fetchall()
         )
-
-    # Cold start fallback if table is completely empty
-    if not counts_map:
-        compute_and_save_scanner_universe(universe_or_watchlist=universe_or_watchlist, settings=settings)
-        with _connect_scanner_db(settings) as conn:
-            counts_map = dict(
-                conn.execute(
-                    "SELECT category_id, COUNT(DISTINCT ticker) FROM scanner_candidates WHERE universe = ? GROUP BY category_id",
-                    (universe_or_watchlist,),
-                ).fetchall()
-            )
 
     results: list[dict[str, Any]] = []
     for cat_id, meta in SCANNER_CATEGORIES.items():
