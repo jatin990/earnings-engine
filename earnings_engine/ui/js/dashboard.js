@@ -825,7 +825,7 @@
                 // 3. Check LocalStorage
                 const storedTab = localStorage.getItem('dashboard_active_tab');
 
-                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 
                 if (hash && validTabs.includes(hash.toLowerCase())) return hash.toLowerCase();
                 if (queryTab && validTabs.includes(queryTab.toLowerCase())) return queryTab.toLowerCase();
@@ -1281,7 +1281,7 @@
 
             switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'results').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'results';
 
                 // Abort any pending fetch requests when switching tabs
@@ -1318,6 +1318,7 @@
                         'catalysts': 'Catalysts & News',
                         'gainers': 'Gainers & Breakouts',
                         'breakout': '⚡ Breakout Radar',
+                        'repeaters': '🔁 Quarter Repeaters',
                         'swing': 'Swing Ranges',
                         'kronos': 'Kronos 14D Forecast',
                         'consensus': '4-Model Consensus',
