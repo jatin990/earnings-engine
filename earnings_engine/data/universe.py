@@ -29,7 +29,9 @@ _SEED_NSE_TOP = [
     "BAJAJ-AUTO.NS", "TITAN.NS", "ADANIPORTS.NS", "HEROMOTOCO.NS", "INDUSINDBK.NS",
     "EICHERMOT.NS", "DIVISLAB.NS", "DRREDDY.NS", "CIPLA.NS", "NESTLEIND.NS",
     "GRASIM.NS", "BEL.NS", "IOC.NS", "BPCL.NS", "COALINDIA.NS",
-    "BANKBARODA.NS", "PNB.NS", "SHREECEM.NS", "ETERNAL.NS",
+    "BANKBARODA.NS", "PNB.NS", "SHREECEM.NS", "ETERNAL.NS", "ADANIENT.NS",
+    "BAJFINANCE.NS", "BAJAJFINSV.NS", "TRENT.NS", "APOLLOHOSP.NS", "BRITANNIA.NS",
+    "TATAMOTORS.NS", "SBILIFE.NS", "HDFCLIFE.NS", "HINDALCO.NS",
 ]
 
 _SEED_US_TOP = [
@@ -304,7 +306,7 @@ def get_universe(name: str, settings: Settings | None = None) -> list[str]:
             return [row[0] for row in rows]
 
     # Fallback to seed universes if not populated
-    if clean_name in ("nse_top", "in", "nse"):
+    if clean_name in ("nse_top", "nifty_50", "nifty50", "nifty_top_50", "in", "nse"):
         return list(_SEED_NSE_TOP)
     elif clean_name in ("us_top", "us"):
         return list(_SEED_US_TOP)
@@ -313,6 +315,17 @@ def get_universe(name: str, settings: Settings | None = None) -> list[str]:
 
 
 UNIVERSE_METADATA: dict[str, dict[str, Any]] = {
+    "nifty_50": {
+        "name": "nifty_50",
+        "display_name": "🇮🇳 NIFTY Top 50 (Bluechips)",
+        "market": "IN",
+        "type": "universe",
+        "is_builtin": True,
+        "is_under_100": True,
+        "summary": "India's premier 50 large-cap benchmark constituents listed on the National Stock Exchange of India (NSE).",
+        "explanation": "Includes benchmark NIFTY 50 market leaders across banking, IT, energy, consumer, auto, and pharma.",
+        "selection_criteria": "Official 50 constituents of the Nifty 50 Index.",
+    },
     "nse_top": {
         "name": "nse_top",
         "display_name": "🇮🇳 NSE Top 50 (NIFTY 50 Bluechips)",

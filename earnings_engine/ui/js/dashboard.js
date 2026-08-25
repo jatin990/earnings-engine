@@ -9998,17 +9998,22 @@
         app._breakoutSortKey = 'composite_score';
         app._breakoutSortAsc = false;
 
+        app.onBreakoutUniverseChange = function(uni) {
+            app.loadBreakoutRadar();
+        };
+
         app.loadBreakoutRadar = async function() {
             const badge = document.getElementById('breakoutScanningBadge');
             const lastScanEl = document.getElementById('breakoutLastScanTime');
             const tbody = document.getElementById('breakoutTableBody');
             if (badge) badge.style.display = 'inline-block';
 
+            const universe = document.getElementById('breakoutUniverseSelect')?.value || 'nifty_50';
             const sortBy = document.getElementById('breakoutSortBy')?.value || 'composite_score';
             const minScore = document.getElementById('breakoutMinScore')?.value || 35;
 
             try {
-                const params = new URLSearchParams({ sort_by: sortBy, min_score: minScore, limit: 100 });
+                const params = new URLSearchParams({ universe: universe, sort_by: sortBy, min_score: minScore, limit: 100 });
                 const res = await fetch(API_BASE + '/api/v1/breakout-radar?' + params.toString());
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
@@ -10033,7 +10038,8 @@
                 if (lastScanEl && status.last_scan_at) {
                     try {
                         const d = new Date(status.last_scan_at);
-                        lastScanEl.textContent = 'Last scan: ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                        const uniLabel = universe === 'nifty_50' ? 'Nifty 50' : (universe === 'all' ? 'All' : universe);
+                        lastScanEl.textContent = `${uniLabel} • Last scan: ` + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
                     } catch { lastScanEl.textContent = 'Last scan: ' + status.last_scan_at; }
                 } else if (lastScanEl) {
                     lastScanEl.textContent = status.status === 'running' ? 'Scanning now\u2026' : 'Waiting for first scan\u2026';
@@ -10123,14 +10129,15 @@
         app.refreshBreakoutScan = async function() {
             const btn = document.getElementById('breakoutRefreshBtn');
             const icon = document.getElementById('breakoutRefreshIcon');
+            const universe = document.getElementById('breakoutUniverseSelect')?.value || 'nifty_50';
             if (btn) btn.disabled = true;
             if (icon) icon.textContent = '\u23f3';
             try {
-                const res = await fetch(API_BASE + '/api/v1/breakout-radar/refresh', { method: 'POST' });
+                const res = await fetch(API_BASE + '/api/v1/breakout-radar/refresh?universe=' + encodeURIComponent(universe), { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
-                    setTimeout(() => app.loadBreakoutRadar(), 8000);
-                    setTimeout(() => app.loadBreakoutRadar(), 20000);
+                    setTimeout(() => app.loadBreakoutRadar(), 3000);
+                    setTimeout(() => app.loadBreakoutRadar(), 10000);
                 }
             } catch (e) {
                 console.error('[BREAKOUT] Refresh error:', e);

@@ -15,6 +15,17 @@
                     <span id="breakoutScanningBadge" style="display:none;background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);font-size:0.65rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:20px;animation:breakoutPulse 1.4s ease-in-out infinite;">● Scanning</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                    <!-- Universe / Watchlist Selector -->
+                    <div style="display:flex;align-items:center;gap:0.35rem;background:#0f172a;border:1px solid rgba(255,255,255,0.12);padding:0.15rem 0.5rem;border-radius:6px;">
+                        <span style="font-size:0.75rem;">🏛️</span>
+                        <select id="breakoutUniverseSelect" onchange="app.onBreakoutUniverseChange(this.value)" style="background:transparent;border:none;color:#38bdf8;font-size:0.74rem;font-weight:600;font-family:var(--font-mono);cursor:pointer;outline:none;">
+                            <option value="nifty_50" selected>🇮🇳 Nifty Top 50</option>
+                            <option value="all">🌐 All Monitored Tickers</option>
+                            <option value="nse_large_cap">🏛️ NSE Large Cap</option>
+                            <option value="my_watchlist">⭐ My Watchlist</option>
+                            <option value="us_top">🇺🇸 US Top Universe</option>
+                        </select>
+                    </div>
                     <!-- Sort control -->
                     <select id="breakoutSortBy" onchange="app.loadBreakoutRadar()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#cbd5e1;font-size:0.74rem;padding:0.35rem 0.55rem;border-radius:6px;font-family:var(--font-mono);cursor:pointer;">
                         <option value="composite_score">↓ Composite Score</option>

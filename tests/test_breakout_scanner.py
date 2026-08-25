@@ -241,3 +241,17 @@ class TestBreakoutRadarEndpoints:
         data = resp.json()
         assert data["success"] is True
         assert "message" in data
+
+    def test_get_breakout_radar_nifty_50_universe(self):
+        resp = self.client.get("/api/v1/breakout-radar?universe=nifty_50")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["universe"] == "nifty_50"
+
+    def test_post_refresh_with_nifty_50_universe(self):
+        resp = self.client.post("/api/v1/breakout-radar/refresh?universe=nifty_50")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert "nifty_50" in data["message"]

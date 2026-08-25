@@ -52,12 +52,45 @@ _cache: dict[str, Any] = {
 }
 
 
-def get_cached_scan_results() -> list[dict[str, Any]]:
-    """Return the latest cached breakout candidates (thread-safe read)."""
-    return list(_cache["candidates"])
+def get_cached_scan_results(universe: str | None = None, settings: Settings | None = None) -> list[dict[str, Any]]:
+    """Return the latest cached breakout candidates (thread-safe read), optionally filtered by universe."""
+    all_candidates = list(_cache["candidates"])
+    if not universe or universe.lower() in ("all", "any", "global", "monitored"):
+        return all_candidates
+
+    # Filter candidates by the requested universe / watchlist
+    try:
+        settings = settings or Settings()
+        from earnings_engine.data.universe import load_universe
+        from earnings_engine.data.watchlists import get_watchlist
+        
+        u_clean = universe.lower().strip()
+        uni_tickers: set[str] = set()
+        if u_clean in ("nifty_50", "nifty50", "nifty_top_50", "nse_top", "in", "nse"):
+            uni_tickers = set(load_universe("NSE_TOP", settings) or load_universe("NIFTY_50", settings) or [])
+        elif u_clean == "nse_large_cap":
+            uni_tickers = set(load_universe("NSE_LARGE_CAP", settings) or [])
+        elif u_clean in ("us_top", "us"):
+            uni_tickers = set(load_universe("US_TOP", settings) or [])
+        else:
+            # Check custom watchlist
+            wl_tickers = get_watchlist(universe, settings)
+            if wl_tickers:
+                uni_tickers = set(wl_tickers)
+            else:
+                uni_tickers = set(load_universe(universe, settings) or [])
+
+        if uni_tickers:
+            # Case-insensitive / prefix matching
+            uni_normalized = {t.upper() for t in uni_tickers}
+            return [c for c in all_candidates if c.get("ticker", "").upper() in uni_normalized]
+    except Exception as e:
+        logger.debug("[BREAKOUT] Error filtering by universe %s: %s", universe, e)
+
+    return all_candidates
 
 
-def get_scan_status() -> dict[str, Any]:
+def get_scan_status(universe: str | None = None) -> dict[str, Any]:
     """Return a lightweight status dict for the API."""
     return {
         "status": _cache["status"],
@@ -65,6 +98,7 @@ def get_scan_status() -> dict[str, Any]:
         "last_scan_duration_s": _cache["last_scan_duration_s"],
         "tickers_scanned": _cache["tickers_scanned"],
         "candidates_found": len(_cache["candidates"]),
+        "universe": universe or _cache.get("last_universe", "ALL"),
         "min_score": BREAKOUT_MIN_SCORE,
         "scan_interval_min": BREAKOUT_SCAN_INTERVAL_MIN,
         "error": _cache["error"],
@@ -258,57 +292,82 @@ def score_breakout(
 # Full universe scan
 # ---------------------------------------------------------------------------
 
-def run_breakout_scan(settings: Settings) -> list[dict[str, Any]]:
-    """Scan all available tickers and return candidates sorted by score DESC.
+def run_breakout_scan(settings: Settings, universe: str | None = None) -> list[dict[str, Any]]:
+    """Scan available tickers and return candidates sorted by score DESC.
 
+    Supports scoping the scan to a specific universe (e.g. NIFTY_50, NSE_TOP,
+    NSE_LARGE_CAP, US_TOP, or custom watchlist name).
     Pulls prices from the local SQLite cache only — no live network calls.
     Quality scores are loaded from stored price_metrics where available.
     """
     from concurrent.futures import ThreadPoolExecutor
     from earnings_engine.data import prices as prices_mod
     from earnings_engine.data.watchlists import all_watchlists, get_watchlist
+    from earnings_engine.data.universe import load_universe
     from earnings_engine.data.prices import load_prices, load_price_metrics, _connect
 
     _cache["status"] = "running"
     _cache["error"] = None
     t0 = time.perf_counter()
 
-    # Collect all unique tickers across every watchlist
     tickers: set[str] = set()
-    try:
-        wls = all_watchlists(settings)
-        for wl in wls:
-            if isinstance(wl, dict):
-                tickers.update(wl.get("tickers", []))
-            elif isinstance(wl, str):
-                wl_tickers = get_watchlist(wl, settings)
-                if wl_tickers:
-                    tickers.update(wl_tickers)
-    except Exception as e:
-        logger.warning("[BREAKOUT] Could not load watchlists: %s", e)
+    u_clean = universe.lower().strip() if universe else "all"
 
-    # Pull top tickers from universe
-    try:
-        from earnings_engine.data.universe import load_universe
-        for u in ("NSE_TOP", "IN"):
-            uni = load_universe(u, settings)
-            if uni:
-                tickers.update(uni)
-        # Also grab top large cap tickers (capped to prevent scanning thousands)
+    if u_clean in ("nifty_50", "nifty50", "nifty_top_50", "nse_top"):
+        # Specifically scan NIFTY 50 benchmark constituents
+        uni = load_universe("NSE_TOP", settings) or load_universe("NIFTY_50", settings)
+        if uni:
+            tickers.update(uni)
+    elif u_clean == "nse_large_cap":
         large_caps = load_universe("NSE_LARGE_CAP", settings)
         if large_caps:
-            tickers.update(large_caps[:100])
-    except Exception as e:
-        logger.debug("[BREAKOUT] Universe load fallback: %s", e)
+            tickers.update(large_caps[:120])
+    elif u_clean in ("us_top", "us"):
+        us_uni = load_universe("US_TOP", settings)
+        if us_uni:
+            tickers.update(us_uni)
+    elif u_clean != "all":
+        # Try custom watchlist first, then named universe
+        wl_tickers = get_watchlist(universe, settings)
+        if wl_tickers:
+            tickers.update(wl_tickers)
+        else:
+            custom_uni = load_universe(universe, settings)
+            if custom_uni:
+                tickers.update(custom_uni)
 
-    # If still small, pull active tickers from price_history
-    if len(tickers) < 50:
+    # If universe was "all" or nothing matched above, collect comprehensive universe
+    if not tickers:
         try:
-            with _connect(settings) as conn:
-                rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 100").fetchall()
-                tickers.update([r[0] for r in rows if r[0]])
-        except Exception:
-            pass
+            wls = all_watchlists(settings)
+            for wl in wls:
+                if isinstance(wl, dict):
+                    tickers.update(wl.get("tickers", []))
+                elif isinstance(wl, str):
+                    wl_tickers = get_watchlist(wl, settings)
+                    if wl_tickers:
+                        tickers.update(wl_tickers)
+        except Exception as e:
+            logger.warning("[BREAKOUT] Could not load watchlists: %s", e)
+
+        try:
+            for u in ("NSE_TOP", "IN"):
+                uni = load_universe(u, settings)
+                if uni:
+                    tickers.update(uni)
+            large_caps = load_universe("NSE_LARGE_CAP", settings)
+            if large_caps:
+                tickers.update(large_caps[:100])
+        except Exception as e:
+            logger.debug("[BREAKOUT] Universe load fallback: %s", e)
+
+        if len(tickers) < 50:
+            try:
+                with _connect(settings) as conn:
+                    rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 100").fetchall()
+                    tickers.update([r[0] for r in rows if r[0]])
+            except Exception:
+                pass
 
     if not tickers:
         logger.info("[BREAKOUT] No tickers found to scan.")
@@ -367,6 +426,7 @@ def run_breakout_scan(settings: Settings) -> list[dict[str, Any]]:
         "last_scan_at": datetime.now(timezone.utc).isoformat(),
         "last_scan_duration_s": elapsed,
         "tickers_scanned": len(ticker_list),
+        "last_universe": universe or "ALL",
         "status": "done",
         "error": None,
     })
