@@ -1377,9 +1377,14 @@
                 if (name === 'kronos') {
                     this.maybeShowKronosPrompt();
                 }
-                if (name === 'playground' && !this.pg._initialized) {
-                    this.pg.init();
-                    this.pg._initialized = true;
+                if (name === 'playground') {
+                    if (!this.pg._initialized) {
+                        this.pg.init();
+                        this.pg._initialized = true;
+                    }
+                    if (this.pgLocalAi && (!this.pgLocalAi._candidates || !this.pgLocalAi._candidates.length)) {
+                        this.pgLocalAi.loadCandidates();
+                    }
                 }
                 if (name === 'backtest') {
                     this.initBacktestTab();
@@ -11900,6 +11905,288 @@
                 alert('AI Inference failed: ' + e.message);
             } finally {
                 if (btnEl) btnEl.textContent = '⚡ Run Model';
+            }
+        };
+
+        app.pgLocalAi = {
+            _candidates: [],
+            _isRunning: false,
+            _timerInterval: null,
+            _startTime: 0,
+            _completedCount: 0,
+
+            onSourceChange: function(source) {
+                const customRow = document.getElementById('pgBatchCustomRow');
+                if (customRow) {
+                    customRow.style.display = (source === 'custom') ? 'block' : 'none';
+                }
+                this.loadCandidates();
+            },
+
+            loadCandidates: async function() {
+                const source = document.getElementById('pgBatchSource')?.value || 'watchlist';
+                const countVal = document.getElementById('pgBatchCount')?.value || '5';
+                const limit = countVal === 'all' ? 100 : parseInt(countVal, 10);
+                const container = document.getElementById('pgBatchListContainer');
+                const countEl = document.getElementById('pgBatchSelectedCount');
+
+                if (container) {
+                    container.innerHTML = '<div style="padding:1.5rem;text-align:center;color:#60a5fa;font-size:0.78rem;"><span class="spinner"></span> Loading stock candidates for local AI...</div>';
+                }
+
+                let tickers = [];
+                try {
+                    if (source === 'custom') {
+                        const raw = document.getElementById('pgBatchCustomTickers')?.value || '';
+                        tickers = raw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+                        if (!tickers.length) {
+                            tickers = ['BAJAJ-AUTO.NS', 'TCS.NS', 'INFY.NS', 'RELIANCE.NS', 'HDFCBANK.NS'];
+                        }
+                    } else if (source === 'breakout') {
+                        const res = await fetch(API_BASE + '/api/v1/breakout-radar?limit=' + limit);
+                        if (res.ok) {
+                            const data = await res.json();
+                            tickers = (data.candidates || []).map(c => c.ticker);
+                        }
+                    } else if (source === 'repeaters') {
+                        const res = await fetch(API_BASE + '/api/v1/earnings-radar/repeaters?limit=' + limit);
+                        if (res.ok) {
+                            const data = await res.json();
+                            tickers = (data.repeaters || []).map(r => r.ticker);
+                        }
+                    } else if (source === 'nifty_50') {
+                        const res = await fetch(API_BASE + '/api/v1/watchlist/quotes?name=nifty_50');
+                        if (res.ok) {
+                            const data = await res.json();
+                            tickers = (data.quotes || []).map(q => q.ticker);
+                        }
+                    } else {
+                        // Default: My Watchlist
+                        const res = await fetch(API_BASE + '/api/v1/watchlist/quotes?name=my_watchlist');
+                        if (res.ok) {
+                            const data = await res.json();
+                            tickers = (data.quotes || []).map(q => q.ticker);
+                        }
+                    }
+                } catch (e) {
+                    console.error('[PG-LOCAL-AI] Failed to fetch source tickers:', e);
+                }
+
+                if (!tickers.length) {
+                    tickers = ['BAJAJ-AUTO.NS', 'TCS.NS', 'INFY.NS', 'RELIANCE.NS', 'TATAMOTORS.NS'];
+                }
+
+                tickers = tickers.slice(0, limit);
+                this._candidates = tickers.map(t => ({
+                    ticker: t,
+                    status: 'pending',
+                    result: null,
+                    error: null
+                }));
+
+                if (countEl) countEl.textContent = `${this._candidates.length} stocks`;
+                this.renderCandidates();
+            },
+
+            renderCandidates: function() {
+                const container = document.getElementById('pgBatchListContainer');
+                if (!container) return;
+
+                if (!this._candidates.length) {
+                    container.innerHTML = '<div style="padding:2rem;text-align:center;color:#64748b;font-size:0.8rem;">No stocks selected. Choose another source or enter custom tickers above.</div>';
+                    return;
+                }
+
+                container.innerHTML = this._candidates.map((c, idx) => {
+                    const sym = c.ticker;
+                    const res = c.result || {};
+                    const thesis = res.ai_thesis || {};
+                    const dir = thesis.expected_price_bias || thesis.direction || 'PENDING';
+                    const isBull = dir.toUpperCase() === 'BULLISH';
+                    const isBear = dir.toUpperCase() === 'BEARISH';
+                    const isComplete = c.status === 'completed';
+                    const isRunning = c.status === 'running';
+
+                    let statusBadge = `<span style="font-size:0.68rem;background:rgba(255,255,255,0.05);color:#94a3b8;padding:0.15rem 0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.1);">Pending ⏳</span>`;
+                    if (isRunning) {
+                        statusBadge = `<span style="font-size:0.68rem;background:rgba(251,191,36,0.15);color:#fbbf24;padding:0.15rem 0.45rem;border-radius:4px;border:1px solid rgba(251,191,36,0.3);animation:pulse 1.2s infinite;">⚡ Inferencing (GPU)</span>`;
+                    } else if (isComplete) {
+                        statusBadge = `<span style="font-size:0.68rem;background:rgba(16,185,129,0.15);color:#34d399;padding:0.15rem 0.45rem;border-radius:4px;border:1px solid rgba(16,185,129,0.3);">✅ Completed</span>`;
+                    } else if (c.status === 'error') {
+                        statusBadge = `<span style="font-size:0.68rem;background:rgba(239,68,68,0.15);color:#f87171;padding:0.15rem 0.45rem;border-radius:4px;border:1px solid rgba(239,68,68,0.3);">❌ Error</span>`;
+                    }
+
+                    const verdictHtml = isComplete ? `
+                        <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem;flex-wrap:wrap;">
+                            <span style="font-size:0.75rem;font-weight:800;background:${isBull ? 'rgba(16,185,129,0.15)' : isBear ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.08)'};color:${isBull ? '#34d399' : isBear ? '#f87171' : '#94a3b8'};padding:0.12rem 0.45rem;border-radius:4px;border:1px solid ${isBull ? 'rgba(16,185,129,0.3)' : isBear ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'};">${dir} (${thesis.conviction_score_pct || 80}%)</span>
+                            <span style="font-size:0.7rem;color:#38bdf8;font-weight:600;">${(thesis.suggested_action || 'ACCUMULATE').replace(/_/g, ' ')}</span>
+                        </div>
+                        <div style="font-size:0.74rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.35rem;">
+                            ${(thesis.executive_thesis || 'Technical structure and momentum align with local model forecast.').substring(0, 140)}...
+                        </div>
+                    ` : (isRunning ? `
+                        <div style="font-size:0.75rem;color:#fbbf24;display:flex;align-items:center;gap:0.4rem;">
+                            <span class="spinner" style="width:12px;height:12px;border-width:2px;"></span> Running local Ollama multi-factor reasoning on GPU...
+                        </div>
+                    ` : `
+                        <div style="font-size:0.75rem;color:#64748b;font-style:italic;">
+                            Waiting for batch execution trigger...
+                        </div>
+                    `);
+
+                    return `
+                        <div style="padding:0.85rem 1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;background:${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'};border-bottom:1px solid rgba(255,255,255,0.04);">
+                            <div style="flex:1;min-width:200px;">
+                                <div style="display:flex;align-items:center;gap:0.45rem;margin-bottom:0.2rem;">
+                                    <strong style="font-size:0.88rem;color:#ffffff;font-family:var(--font-mono);">${sym}</strong>
+                                    ${statusBadge}
+                                </div>
+                                <div style="font-size:0.72rem;color:#94a3b8;">
+                                    ${res.profile?.company_name || sym.replace('.NS', '')} • ${res.profile?.sector || 'Equities'}
+                                    ${res.price_reaction?.current_price ? ` • <span style="color:#ffffff;font-family:var(--font-mono);">₹${res.price_reaction.current_price}</span>` : ''}
+                                </div>
+                            </div>
+
+                            <div style="flex:2;min-width:260px;">
+                                ${verdictHtml}
+                            </div>
+
+                            <div style="display:flex;gap:0.35rem;align-items:center;">
+                                <button type="button" onclick="app.openStockNote('${sym}', event)" class="btn btn-secondary btn-sm" style="font-size:0.74rem;padding:0.3rem 0.65rem;border-color:rgba(99,102,241,0.3);color:#a5b4fc;display:flex;align-items:center;gap:0.3rem;">
+                                    <span>🧠</span> View Note
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            },
+
+            runBatch: async function() {
+                if (this._isRunning) return;
+                if (!this._candidates.length) {
+                    await this.loadCandidates();
+                }
+                if (!this._candidates.length) return;
+
+                this._isRunning = true;
+                this._startTime = Date.now();
+                this._completedCount = 0;
+
+                const modelName = document.getElementById('pgBatchModel')?.value || 'llama3.2:3b';
+                const provider = modelName.includes('kronos') ? 'kronos' : 'ollama';
+                const concurrency = parseInt(document.getElementById('pgBatchConcurrency')?.value || '1', 10);
+
+                const progressCard = document.getElementById('pgBatchProgressCard');
+                const stopBtn = document.getElementById('pgBatchStopBtn');
+                const runBtn = document.getElementById('pgBatchRunBtn');
+                const gpuStatus = document.getElementById('pgBatchGpuStatus');
+                const activityEl = document.getElementById('pgBatchActivity');
+                const elapsedEl = document.getElementById('pgBatchElapsed');
+                const etaEl = document.getElementById('pgBatchEta');
+                const percentEl = document.getElementById('pgBatchPercent');
+                const progressBar = document.getElementById('pgBatchProgressBar');
+
+                if (progressCard) progressCard.style.display = 'block';
+                if (stopBtn) stopBtn.style.display = 'inline-block';
+                if (runBtn) {
+                    runBtn.disabled = true;
+                    runBtn.innerHTML = `<span class="spinner"></span> Processing Batch...`;
+                }
+                if (gpuStatus) {
+                    gpuStatus.textContent = '🖥️ GPU: Busy (Inference In Progress)';
+                    gpuStatus.style.color = '#fbbf24';
+                    gpuStatus.style.borderColor = 'rgba(251,191,36,0.3)';
+                }
+
+                // Live Timer
+                this._timerInterval = setInterval(() => {
+                    const elapsedSec = Math.floor((Date.now() - this._startTime) / 1000);
+                    const m = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+                    const s = String(elapsedSec % 60).padStart(2, '0');
+                    if (elapsedEl) elapsedEl.textContent = `${m}:${s}`;
+
+                    if (this._completedCount > 0 && this._completedCount < this._candidates.length) {
+                        const avgSecPerItem = elapsedSec / this._completedCount;
+                        const remainingItems = this._candidates.length - this._completedCount;
+                        const remainingSec = Math.ceil(remainingItems * avgSecPerItem);
+                        const rm = String(Math.floor(remainingSec / 60)).padStart(2, '0');
+                        const rs = String(remainingSec % 60).padStart(2, '0');
+                        if (etaEl) etaEl.textContent = `ETA: ~${rm}:${rs}`;
+                    }
+                }, 500);
+
+                // Execute batch bounded by concurrency
+                const total = this._candidates.length;
+                for (let i = 0; i < total; i += concurrency) {
+                    if (!this._isRunning) break;
+                    const chunk = this._candidates.slice(i, i + concurrency);
+                    
+                    // Mark running
+                    chunk.forEach(c => { c.status = 'running'; });
+                    if (activityEl) {
+                        activityEl.textContent = `[${i + 1}/${total}] Processing ${chunk.map(c => c.ticker).join(', ')} on GPU (${modelName})...`;
+                    }
+                    this.renderCandidates();
+
+                    await Promise.all(chunk.map(async (cand) => {
+                        if (!this._isRunning) return;
+                        try {
+                            let url = API_BASE + '/api/v1/stock/' + encodeURIComponent(cand.ticker) + '/intelligence-note';
+                            url += '?model_name=' + encodeURIComponent(modelName) + '&provider=' + encodeURIComponent(provider);
+                            const res = await fetch(url, { method: 'POST' });
+                            if (!res.ok) throw new Error('HTTP ' + res.status);
+                            const note = await res.json();
+                            cand.result = note;
+                            cand.status = 'completed';
+                        } catch (err) {
+                            console.error('[PG-LOCAL-AI] Inference failed for ' + cand.ticker, err);
+                            cand.status = 'error';
+                            cand.error = err.message;
+                        } finally {
+                            this._completedCount++;
+                            const pct = Math.round((this._completedCount / total) * 100);
+                            if (percentEl) percentEl.textContent = `${pct}%`;
+                            if (progressBar) progressBar.style.width = `${pct}%`;
+                        }
+                    }));
+
+                    this.renderCandidates();
+                }
+
+                // Finish
+                this.stopBatch();
+            },
+
+            stopBatch: function() {
+                this._isRunning = false;
+                if (this._timerInterval) {
+                    clearInterval(this._timerInterval);
+                    this._timerInterval = null;
+                }
+
+                const stopBtn = document.getElementById('pgBatchStopBtn');
+                const runBtn = document.getElementById('pgBatchRunBtn');
+                const gpuStatus = document.getElementById('pgBatchGpuStatus');
+                const activityEl = document.getElementById('pgBatchActivity');
+                const etaEl = document.getElementById('pgBatchEta');
+
+                if (stopBtn) stopBtn.style.display = 'none';
+                if (runBtn) {
+                    runBtn.disabled = false;
+                    runBtn.innerHTML = `<span>⚡</span> Run Local AI Notes`;
+                }
+                if (gpuStatus) {
+                    gpuStatus.textContent = '🖥️ GPU: Idle / Ready';
+                    gpuStatus.style.color = '#38bdf8';
+                    gpuStatus.style.borderColor = 'rgba(56,189,248,0.25)';
+                }
+                if (activityEl) {
+                    activityEl.textContent = `Batch run finished (${this._completedCount}/${this._candidates.length} processed).`;
+                }
+                if (etaEl) {
+                    etaEl.textContent = 'ETA: Done ✅';
+                }
+                this.renderCandidates();
             }
         };
 
