@@ -421,6 +421,7 @@ Analyze whether the following stock will SUSTAIN its earnings winning streak and
     output_dict: dict[str, Any] | None = None
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
 
+    # 1. Try OpenRouter if key is present
     if openrouter_key:
         try:
             import urllib.request
@@ -443,14 +444,41 @@ Analyze whether the following stock will SUSTAIN its earnings winning streak and
             with urllib.request.urlopen(req, timeout=15) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 content = data["choices"][0]["message"]["content"]
-                # Extract json
                 m = re.search(r"\{[\s\S]*\}", content)
                 if m:
                     output_dict = json.loads(m.group(0))
         except Exception as e:
             logger.debug("[REPEATERS] OpenRouter inference failed for %s: %s", sym, e)
 
-    # Heuristic fallback if LLM unavailable
+    # 2. Try Local Ollama (llama3.2:3b or deepseek-r1:8b)
+    if not output_dict:
+        ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+        try:
+            import urllib.request
+            data_payload = json.dumps({
+                "model": ollama_model,
+                "prompt": prompt,
+                "stream": False,
+                "format": "json",
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                f"{ollama_host}/api/generate",
+                data=data_payload,
+                headers={"Content-Type": "application/json"},
+            )
+            timeout = 35 if "8b" in ollama_model or "deepseek" in ollama_model else 15
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw_res = json.loads(resp.read().decode("utf-8"))
+                resp_text = raw_res.get("response", "")
+                m = re.search(r"\{[\s\S]*\}", resp_text)
+                if m:
+                    output_dict = json.loads(m.group(0))
+                    output_dict["source"] = f"Local Ollama ({ollama_model})"
+        except Exception as e:
+            logger.debug("[REPEATERS] Local Ollama call failed for %s: %s", sym, e)
+
+    # 3. Heuristic fallback if LLMs unavailable
     if not output_dict:
         surp_score = float(last_surp or 5.0)
         high_score = float(last_week_high or 3.0)

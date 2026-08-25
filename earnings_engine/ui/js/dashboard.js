@@ -11103,11 +11103,22 @@
                 const compName = c.company_name || ticker;
                 const buzz = c.industry_buzz_tag || 'Growth';
                 const curPrice = c.current_price != null ? `₹${Number(c.current_price).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—';
-                const surp = c.last_eps_surprise != null ? `${c.last_eps_surprise >= 0 ? '+' : ''}${Number(c.last_eps_surprise).toFixed(1)}%` : '—';
+                const hasSurp = c.last_eps_surprise != null && !isNaN(c.last_eps_surprise);
+                const surpVal = hasSurp ? Number(c.last_eps_surprise) : null;
+                const surpStr = hasSurp ? `${surpVal >= 0 ? '+' : ''}${surpVal.toFixed(1)}% Beat` : 'Solid Quality Beat';
                 const score = c.last_quality_score != null ? `${c.last_quality_score}/9` : '—';
                 const weekHigh = c.last_week_high_pct != null ? `+${Number(c.last_week_high_pct).toFixed(1)}%` : '—';
                 const streak = c.beat_streak || 1;
-                const daysToNext = c.days_to_next_earnings != null ? `${c.days_to_next_earnings}d` : (c.next_earnings_date || '—');
+                
+                let upcomingHtml = '<span style="color:#475569;font-size:0.7rem;">Calendar TBD</span>';
+                if (c.days_to_next_earnings != null) {
+                    upcomingHtml = `<span style="color:#38bdf8;font-weight:700;">⏱️ In ${c.days_to_next_earnings}d</span>`;
+                } else if (c.next_earnings_date) {
+                    upcomingHtml = `<span>⏱️ ${c.next_earnings_date}</span>`;
+                }
+
+                const ret30 = c.thirty_day_return_pct != null && !isNaN(c.thirty_day_return_pct) ? Number(c.thirty_day_return_pct) : null;
+                const ret30Html = ret30 != null ? `<div style="font-size:0.65rem;color:${ret30 >= 0 ? '#34d399' : '#f87171'};font-weight:normal;margin-top:0.1rem;">30D: ${ret30 >= 0 ? '+' : ''}${ret30.toFixed(1)}%</div>` : '';
                 
                 const ai = c.ai_forecast;
                 let verdictBadge = `<span style="background:rgba(148,163,184,0.15);color:#94a3b8;border:1px solid rgba(148,163,184,0.25);font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;">Pending AI</span>`;
@@ -11141,15 +11152,15 @@
                             <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${ticker}</a>
                         </div>
                         <div style="font-size:0.7rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;">${compName}</div>
-                        <div style="margin-top:0.25rem;"><span style="font-size:0.65rem;background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.25);padding:0.1rem 0.35rem;border-radius:3px;">${buzz}</span></div>
+                        <div style="margin-top:0.25rem;"><span style="font-size:0.65rem;background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.25);padding:0.1rem 0.35rem;border-radius:3px;display:inline-block;">${buzz}</span></div>
                     </td>
                     <td style="padding:0.75rem 0.85rem;font-family:var(--font-mono);font-weight:700;color:#e2e8f0;white-space:nowrap;">
                         ${curPrice}
-                        ${c.thirty_day_return_pct != null ? `<div style="font-size:0.65rem;color:${c.thirty_day_return_pct >= 0 ? '#34d399' : '#f87171'};font-weight:normal;">30D: ${c.thirty_day_return_pct >= 0 ? '+' : ''}${c.thirty_day_return_pct}%</div>` : ''}
+                        ${ret30Html}
                     </td>
                     <td style="padding:0.75rem 0.85rem;white-space:nowrap;">
-                        <div style="color:#34d399;font-weight:700;font-family:var(--font-mono);">${surp} Beat</div>
-                        <div style="font-size:0.68rem;color:#94a3b8;">Score: <strong style="color:#e2e8f0;">${score}</strong></div>
+                        <div style="color:#34d399;font-weight:700;font-family:var(--font-mono);">${surpStr}</div>
+                        <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.1rem;">Score: <strong style="color:#e2e8f0;">${score}</strong></div>
                     </td>
                     <td style="padding:0.75rem 0.85rem;white-space:nowrap;">
                         <span style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.72rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:4px;">${weekHigh} Peak</span>
@@ -11162,7 +11173,7 @@
                         ${probHtml}
                     </td>
                     <td style="padding:0.75rem 0.85rem;white-space:nowrap;font-size:0.75rem;color:#cbd5e1;font-family:var(--font-mono);">
-                        ⏱️ ${daysToNext}
+                        ${upcomingHtml}
                     </td>
                     <td style="padding:0.75rem 0.85rem;text-align:center;white-space:nowrap;">
                         <div style="display:flex;align-items:center;justify-content:center;gap:0.35rem;">
