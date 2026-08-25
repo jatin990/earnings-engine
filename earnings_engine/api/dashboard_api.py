@@ -1095,11 +1095,16 @@ def get_watchlist_quotes_api(
 
         # 3. Prices / OHLCV
         df = prices_mod.load_prices(t, settings)
-        if df.empty or auto_live:
+        if df.empty:
             try:
-                df = prices_mod.fetch_prices(t, settings, force=auto_live)
+                df = prices_mod.fetch_prices(t, settings, force=False)
             except Exception as e:
                 logger.debug("Failed to fetch prices for %s: %s", t, e)
+        elif live:
+            try:
+                df = prices_mod.fetch_prices(t, settings, force=True)
+            except Exception as e:
+                logger.debug("Failed to fetch live prices for %s: %s", t, e)
 
         if not df.empty and "close" in df.columns:
             try:

@@ -181,37 +181,29 @@ def store_market_cap(ticker: str, market_cap: float | None, settings: Settings |
 
 
 def load_market_cap(ticker: str, settings: Settings | None = None) -> float | None:
-    """Load market cap for a ticker from SQLite cache."""
+    """Load cached market cap for a ticker."""
     with _connect(settings) as connection:
-        row = connection.execute(
-            "SELECT market_cap FROM tickers WHERE ticker = ?",
-            (ticker,),
-        ).fetchone()
-        if row and row[0] is not None:
-            return float(row[0])
         try:
-            legacy_row = connection.execute(
-                "SELECT market_cap FROM ticker_market_cap WHERE ticker = ?",
+            row = connection.execute(
+                "SELECT market_cap FROM tickers WHERE ticker = ?",
                 (ticker,),
             ).fetchone()
-            return float(legacy_row[0]) if legacy_row and legacy_row[0] is not None else None
+            if row and row[0] is not None:
+                return float(row[0])
         except Exception:
-            return None
+            pass
+        return None
 
 
 def load_all_market_caps(settings: Settings | None = None) -> dict[str, float]:
     """Load all market caps from SQLite cache. Returns {ticker: market_cap}."""
     with _connect(settings) as connection:
-        rows = connection.execute(
-            "SELECT ticker, market_cap FROM tickers WHERE market_cap IS NOT NULL"
-        ).fetchall()
-        if not rows:
-            try:
-                rows = connection.execute(
-                    "SELECT ticker, market_cap FROM ticker_market_cap WHERE market_cap IS NOT NULL"
-                ).fetchall()
-            except Exception:
-                rows = []
+        try:
+            rows = connection.execute(
+                "SELECT ticker, market_cap FROM tickers WHERE market_cap IS NOT NULL"
+            ).fetchall()
+        except Exception:
+            rows = []
     return {row[0]: float(row[1]) for row in rows if row[1] is not None}
 
 

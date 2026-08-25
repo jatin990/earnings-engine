@@ -234,6 +234,7 @@ def _merge_prices(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
 
 KNOWN_TICKER_ALIASES: dict[str, str] = {
     "STERLITE.NS": "STLTECH.NS",
+    "STERTECH.NS": "STLTECH.NS",
     "ZOMATO.NS": "ETERNAL.NS",
     "MINDTREE.NS": "LTIM.NS",
     "LTI.NS": "LTIM.NS",

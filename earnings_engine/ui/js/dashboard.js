@@ -100,8 +100,14 @@
                     sel.innerHTML = '<optgroup label="⭐ Custom Watchlists">' + (customOpts || '<option value="my_watchlist">⭐ my_watchlist (0)</option>') + '</optgroup>' +
                         (univOpts ? '<optgroup label="🏛️ Built-in Universes">' + univOpts + '</optgroup>' : '');
 
-                    // Keep selected value if present
-                    if (Array.from(sel.options).some(o => o.value === this.activeWatchlist)) {
+                    // Keep selected value if present and populated, or default to first non-empty custom list
+                    const populatedCustom = this.customLists.find(w => w.tickers && w.tickers.length > 0);
+                    if (this.activeWatchlist && this.activeWatchlist !== 'my_watchlist' && Array.from(sel.options).some(o => o.value === this.activeWatchlist)) {
+                        sel.value = this.activeWatchlist;
+                    } else if (populatedCustom) {
+                        this.activeWatchlist = populatedCustom.name;
+                        sel.value = this.activeWatchlist;
+                    } else if (Array.from(sel.options).some(o => o.value === this.activeWatchlist)) {
                         sel.value = this.activeWatchlist;
                     } else if (sel.options.length) {
                         this.activeWatchlist = sel.options[0].value;
@@ -110,7 +116,7 @@
                 },
 
                 selectActiveWatchlist(name) {
-                    this.activeWatchlist = name || 'my_watchlist';
+                    this.activeWatchlist = name || (this.customLists.length ? this.customLists[0].name : 'my_watchlist');
                     this.loadActiveQuotes(false);
                 },
 

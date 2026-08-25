@@ -36,9 +36,10 @@ def _connect(settings: Settings) -> Any:
         )
         """
     )
-    # Auto-migrate rebranded/renamed symbols (e.g. ZOMATO.NS -> ETERNAL.NS)
+    # Auto-migrate rebranded/renamed symbols (e.g. ZOMATO.NS -> ETERNAL.NS, STERTECH.NS -> STLTECH.NS)
     try:
         conn.execute("UPDATE watchlists SET ticker = 'ETERNAL.NS' WHERE ticker = 'ZOMATO.NS'")
+        conn.execute("UPDATE watchlists SET ticker = 'STLTECH.NS' WHERE ticker IN ('STERTECH.NS', 'STERLITE.NS')")
     except Exception:
         pass
     conn.commit()
@@ -61,14 +62,33 @@ def _ensure_meta(conn: sqlite3.Connection, name: str) -> None:
 def get_watchlist(name: str, settings: Settings | None = None) -> list[str]:
     """Return the tickers in a named watchlist, in insertion order."""
     settings = settings or Settings()
-    if not _cache_path(settings).exists():
+    if not is_turso_enabled() and not _cache_path(settings).exists():
         return []
+    sym_name = name.strip() if name else ""
     with _connect(settings) as conn:
         rows = conn.execute(
             "SELECT ticker FROM watchlists WHERE name = ? ORDER BY added_at, rowid",
-            (name,),
+            (sym_name,),
         ).fetchall()
-    return [r[0] for r in rows]
+        # Case-insensitive fallback
+        if not rows and sym_name:
+            rows = conn.execute(
+                "SELECT ticker FROM watchlists WHERE LOWER(name) = LOWER(?) ORDER BY added_at, rowid",
+                (sym_name,),
+            ).fetchall()
+        # Default alias fallback: if "my_watchlist" or "DEFAULT" requested but empty, check first available custom list
+        if not rows and sym_name in ("my_watchlist", "DEFAULT", "watchlist", ""):
+            meta_rows = conn.execute("SELECT name FROM watchlist_meta ORDER BY created_at").fetchall()
+            for m in meta_rows:
+                m_name = m[0]
+                m_rows = conn.execute(
+                    "SELECT ticker FROM watchlists WHERE name = ? ORDER BY added_at, rowid",
+                    (m_name,),
+                ).fetchall()
+                if m_rows:
+                    rows = m_rows
+                    break
+    return [r[0] for r in rows if r[0]]
 
 
 def add_to_watchlist(name: str, ticker: str, settings: Settings | None = None) -> dict[str, Any]:
@@ -172,7 +192,7 @@ def list_watchlists(settings: Settings | None = None) -> list[dict[str, Any]]:
     only have ticker rows.
     """
     settings = settings or Settings()
-    if not _cache_path(settings).exists():
+    if not is_turso_enabled() and not _cache_path(settings).exists():
         return []
     with _connect(settings) as conn:
         rows = conn.execute(
@@ -197,7 +217,7 @@ def list_watchlists(settings: Settings | None = None) -> list[dict[str, Any]]:
 def all_watchlists(settings: Settings | None = None) -> list[dict[str, Any]]:
     """Return every watchlist with its full ordered ticker list."""
     settings = settings or Settings()
-    if not _cache_path(settings).exists():
+    if not is_turso_enabled() and not _cache_path(settings).exists():
         return []
     with _connect(settings) as conn:
         rows = conn.execute(

@@ -2871,30 +2871,30 @@ async def watchlist_list():
     return {"watchlists": get_universe_files()}
 
 
-@app.get("/api/v1/watchlist/{name}", tags=["Dashboard"])
-async def watchlist_get_by_path(name: str):
-    """Get a named watchlist or universe from the SQLite DB / universe files."""
-    from earnings_engine.data.universe import get_universe as fetch_universe_tickers
-    from earnings_engine.data.watchlists import get_watchlist as fetch_db_watchlist
-
-    tickers = fetch_db_watchlist(name, _settings)
-    if not tickers:
-        tickers = fetch_universe_tickers(name, _settings)
-    return {"name": name, "tickers": tickers or []}
-
-
-@app.get("/api/v1/watchlist", tags=["Dashboard"])
-async def watchlist_get(
-    name: str = Query("my_watchlist", description="Watchlist name (defaults to my_watchlist)"),
+@app.get("/api/v1/watchlist/quotes", tags=["Dashboard"])
+@app.get("/api/v1/watchlist/{name}/quotes", tags=["Dashboard"])
+async def watchlist_quotes_get(
+    name: str | None = None,
+    watchlist: str | None = Query(None, description="Watchlist name"),
+    tickers: str | None = Query(None, description="Comma-separated ticker list (overrides watchlist name)"),
+    live: bool = Query(False, description="Force live intraday / price fetching"),
 ):
-    """Get a named watchlist or universe from the SQLite DB / universe files."""
-    from earnings_engine.data.universe import get_universe as fetch_universe_tickers
-    from earnings_engine.data.watchlists import get_watchlist as fetch_db_watchlist
+    """Retrieve full OHLCV, pricing, market cap, and swing levels for tickers in a watchlist."""
+    # When hitting /api/v1/watchlist/quotes?watchlist=X, 'name' might be 'quotes' or None
+    wl_name = watchlist or (name if name and name != "quotes" else None) or "my_watchlist"
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()] if tickers else None
+    return await asyncio.to_thread(get_watchlist_quotes_api, watchlist=wl_name, tickers=ticker_list, live=live)
 
-    tickers = fetch_db_watchlist(name, _settings)
-    if not tickers:
-        tickers = fetch_universe_tickers(name, _settings)
-    return {"name": name, "tickers": tickers or []}
+
+@app.post("/api/v1/watchlist/quotes", tags=["Dashboard"])
+async def watchlist_quotes_post(request: dict):
+    """Retrieve full OHLCV, pricing, market cap, and swing levels.
+    Body: {"watchlist"?: str, "tickers"?: list[str], "live"?: bool}
+    """
+    wl_name = request.get("watchlist") or "my_watchlist"
+    tickers = request.get("tickers")
+    live = bool(request.get("live", False))
+    return await asyncio.to_thread(get_watchlist_quotes_api, watchlist=wl_name, tickers=tickers, live=live)
 
 
 @app.post("/api/v1/watchlist/create", tags=["Dashboard"])
@@ -2957,29 +2957,30 @@ async def watchlist_remove_endpoint(request: dict):
     return result
 
 
-@app.get("/api/v1/watchlist/quotes", tags=["Dashboard"])
-@app.get("/api/v1/watchlist/{name}/quotes", tags=["Dashboard"])
-async def watchlist_quotes_get(
-    name: str | None = None,
-    watchlist: str = Query("my_watchlist", description="Watchlist name"),
-    tickers: str | None = Query(None, description="Comma-separated ticker list (overrides watchlist name)"),
-    live: bool = Query(False, description="Force live intraday / price fetching"),
+@app.get("/api/v1/watchlist", tags=["Dashboard"])
+async def watchlist_get(
+    name: str = Query("my_watchlist", description="Watchlist name (defaults to my_watchlist)"),
 ):
-    """Retrieve full OHLCV, pricing, market cap, and swing levels for tickers in a watchlist."""
-    wl_name = name or watchlist or "my_watchlist"
-    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()] if tickers else None
-    return await asyncio.to_thread(get_watchlist_quotes_api, watchlist=wl_name, tickers=ticker_list, live=live)
+    """Get a named watchlist or universe from the SQLite DB / universe files."""
+    from earnings_engine.data.universe import get_universe as fetch_universe_tickers
+    from earnings_engine.data.watchlists import get_watchlist as fetch_db_watchlist
+
+    tickers = fetch_db_watchlist(name, _settings)
+    if not tickers:
+        tickers = fetch_universe_tickers(name, _settings)
+    return {"name": name, "tickers": tickers or []}
 
 
-@app.post("/api/v1/watchlist/quotes", tags=["Dashboard"])
-async def watchlist_quotes_post(request: dict):
-    """Retrieve full OHLCV, pricing, market cap, and swing levels.
-    Body: {"watchlist"?: str, "tickers"?: list[str], "live"?: bool}
-    """
-    wl_name = request.get("watchlist", "my_watchlist")
-    tickers = request.get("tickers")
-    live = bool(request.get("live", False))
-    return await asyncio.to_thread(get_watchlist_quotes_api, watchlist=wl_name, tickers=tickers, live=live)
+@app.get("/api/v1/watchlist/{name}", tags=["Dashboard"])
+async def watchlist_get_by_path(name: str):
+    """Get a named watchlist or universe from the SQLite DB / universe files."""
+    from earnings_engine.data.universe import get_universe as fetch_universe_tickers
+    from earnings_engine.data.watchlists import get_watchlist as fetch_db_watchlist
+
+    tickers = fetch_db_watchlist(name, _settings)
+    if not tickers:
+        tickers = fetch_universe_tickers(name, _settings)
+    return {"name": name, "tickers": tickers or []}
 
 
 @app.post("/api/v1/dashboard/predict/run", tags=["Dashboard"])
