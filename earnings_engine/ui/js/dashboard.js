@@ -11915,6 +11915,30 @@
             _startTime: 0,
             _completedCount: 0,
 
+            _watchlistsPopulated: false,
+
+            populateWatchlists: async function() {
+                const group = document.getElementById('pgBatchWatchlistsGroup');
+                if (!group) return;
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/watchlist/all');
+                    if (!res.ok) return;
+                    const lists = await res.json();
+                    if (!Array.isArray(lists) || !lists.length) return;
+
+                    const currentVal = document.getElementById('pgBatchSource')?.value;
+                    group.innerHTML = lists.map(wl => {
+                        const count = Array.isArray(wl.tickers) ? wl.tickers.length : (wl.count || 0);
+                        const val = `watchlist:${wl.name}`;
+                        const isSel = (currentVal === val || (!currentVal && wl.name === 'my_watchlist')) ? 'selected' : '';
+                        return `<option value="${val}" ${isSel}>⭐ ${wl.display_name || wl.name} (${count} stocks)</option>`;
+                    }).join('');
+                    this._watchlistsPopulated = true;
+                } catch (e) {
+                    console.debug('[PG-LOCAL-AI] Failed to populate watchlists:', e);
+                }
+            },
+
             onSourceChange: function(source) {
                 const customRow = document.getElementById('pgBatchCustomRow');
                 if (customRow) {
@@ -11924,7 +11948,11 @@
             },
 
             loadCandidates: async function() {
-                const source = document.getElementById('pgBatchSource')?.value || 'watchlist';
+                if (!this._watchlistsPopulated) {
+                    await this.populateWatchlists();
+                }
+
+                const source = document.getElementById('pgBatchSource')?.value || 'watchlist:my_watchlist';
                 const countVal = document.getElementById('pgBatchCount')?.value || '5';
                 const limit = countVal === 'all' ? 100 : parseInt(countVal, 10);
                 const container = document.getElementById('pgBatchListContainer');
@@ -11942,6 +11970,20 @@
                         if (!tickers.length) {
                             tickers = ['BAJAJ-AUTO.NS', 'TCS.NS', 'INFY.NS', 'RELIANCE.NS', 'HDFCBANK.NS'];
                         }
+                    } else if (source.startsWith('watchlist:')) {
+                        const wlName = source.replace('watchlist:', '');
+                        const res = await fetch(API_BASE + '/api/v1/watchlist/quotes?name=' + encodeURIComponent(wlName));
+                        if (res.ok) {
+                            const data = await res.json();
+                            tickers = (data.quotes || []).map(q => q.ticker);
+                        }
+                        if (!tickers.length) {
+                            const res2 = await fetch(API_BASE + '/api/v1/watchlist/' + encodeURIComponent(wlName));
+                            if (res2.ok) {
+                                const data2 = await res2.json();
+                                tickers = data2.tickers || [];
+                            }
+                        }
                     } else if (source === 'breakout') {
                         const res = await fetch(API_BASE + '/api/v1/breakout-radar?limit=' + limit);
                         if (res.ok) {
@@ -11954,14 +11996,13 @@
                             const data = await res.json();
                             tickers = (data.repeaters || []).map(r => r.ticker);
                         }
-                    } else if (source === 'nifty_50') {
-                        const res = await fetch(API_BASE + '/api/v1/watchlist/quotes?name=nifty_50');
+                    } else if (source === 'nifty_50' || source === 'nse_large_cap' || source === 'all') {
+                        const res = await fetch(API_BASE + '/api/v1/watchlist/quotes?name=' + encodeURIComponent(source));
                         if (res.ok) {
                             const data = await res.json();
                             tickers = (data.quotes || []).map(q => q.ticker);
                         }
                     } else {
-                        // Default: My Watchlist
                         const res = await fetch(API_BASE + '/api/v1/watchlist/quotes?name=my_watchlist');
                         if (res.ok) {
                             const data = await res.json();
