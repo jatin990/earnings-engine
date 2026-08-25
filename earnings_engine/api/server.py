@@ -2059,6 +2059,27 @@ async def get_stock_rating_endpoint(ticker: str):
     return res
 
 
+@app.get("/api/v1/stock/{ticker}/intelligence-note", tags=["Stock Intelligence & Ratings"])
+@app.post("/api/v1/stock/{ticker}/intelligence-note", tags=["Stock Intelligence & Ratings"])
+async def get_stock_intelligence_note_endpoint(
+    ticker: str,
+    model_name: str | None = Query(None, description="Specific local Ollama or OpenRouter model"),
+    provider: str = Query("auto", description="Inference provider: 'auto', 'ollama', or 'openrouter'"),
+):
+    """Return transparent multi-dimensional intelligence note for a single stock."""
+    from earnings_engine.api.stock_api import get_stock_intelligence_note
+    res = await asyncio.to_thread(
+        get_stock_intelligence_note,
+        ticker,
+        model_name=model_name,
+        provider=provider,
+        settings=_settings,
+    )
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to retrieve stock intelligence note"))
+    return res
+
+
 @app.post("/api/v1/stock/{ticker}/recalculate", tags=["Stock Intelligence & Ratings"])
 @app.post("/api/v1/recalculate/{ticker}", tags=["Stock Intelligence & Ratings"])
 async def recalculate_stock_endpoint(ticker: str, request: Request):
