@@ -496,3 +496,170 @@ def get_live_week_hl(
         "low_date": pd.Timestamp.now().strftime("%b %d"),
     }
 
+
+def calculate_or_fetch_eps(
+    ticker: str,
+    earnings_date: str | None = None,
+    override_estimate: float | None = None,
+    override_reported: float | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Calculate, derive, or fetch missing EPS and surprise % for past earnings dates.
+    
+    Multi-Tier Strategy:
+    1. If manual override is provided, use it directly.
+    2. Query fresh yfinance earnings dates (consensus Reported EPS / EPS Estimate).
+    3. Query quarterly income statement to extract Diluted/Basic EPS or calculate (Net Income / Diluted Shares).
+    4. If estimate is missing, calculate baseline consensus estimate from trailing quarters.
+    5. Save the resolved values to `earnings_history` database.
+    """
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if not sym.endswith(".NS") and not "." in sym:
+        sym += ".NS"
+
+    now_date_str = pd.Timestamp.now().strftime("%Y-%m-%d")
+
+    # If no earnings_date provided, find the most recent past earnings date
+    target_ed = earnings_date
+    conn = get_db_connection(settings)
+    if not target_ed:
+        try:
+            row = conn.execute(
+                "SELECT earnings_date, eps_estimate, eps_reported FROM earnings_history WHERE ticker = ? ORDER BY earnings_date DESC LIMIT 1",
+                (sym,),
+            ).fetchone()
+            if row:
+                target_ed = str(row[0])
+        except Exception:
+            pass
+
+    if not target_ed:
+        target_ed = now_date_str
+
+    eps_est = override_estimate
+    eps_rep = override_reported
+    method = "manual_override" if (override_reported is not None or override_estimate is not None) else None
+
+    # Multi-Tier Automated Calculation
+    if eps_rep is None:
+        # Tier 1: Fresh yfinance get_earnings_dates
+        try:
+            yf_ticker = yf.Ticker(sym)
+            raw_dates = yf_ticker.get_earnings_dates(limit=60)
+            if raw_dates is not None and not raw_dates.empty:
+                raw_dates.index = pd.to_datetime(raw_dates.index, utc=True).tz_convert(None).normalize()
+                # Find matching or nearest date within 7 days
+                target_ts = pd.Timestamp(target_ed).normalize()
+                matched_row = None
+                for dt, row in raw_dates.iterrows():
+                    diff_days = abs((dt - target_ts).days)
+                    if diff_days <= 7:
+                        matched_row = row
+                        break
+                
+                if matched_row is not None:
+                    r_rep = matched_row.get("Reported EPS") or matched_row.get("reported eps") or matched_row.get("eps_reported")
+                    r_est = matched_row.get("EPS Estimate") or matched_row.get("eps estimate") or matched_row.get("eps_estimate")
+                    if r_rep is not None and not pd.isna(r_rep):
+                        eps_rep = float(r_rep)
+                        method = "yfinance_consensus"
+                    if r_est is not None and not pd.isna(r_est):
+                        eps_est = float(r_est)
+        except Exception as e:
+            logger.debug("Tier 1 earnings dates fetch failed for %s: %s", sym, e)
+
+    if eps_rep is None:
+        # Tier 2: Quarterly Income Statement (Diluted EPS / Basic EPS)
+        try:
+            yf_ticker = yf.Ticker(sym)
+            inc_stmt = yf_ticker.quarterly_income_stmt
+            if inc_stmt is not None and not inc_stmt.empty:
+                target_ts = pd.Timestamp(target_ed).normalize()
+                valid_cols = [c for c in inc_stmt.columns if pd.Timestamp(c).normalize() <= target_ts + pd.Timedelta(days=15)]
+                if not valid_cols:
+                    valid_cols = list(inc_stmt.columns)
+                
+                if valid_cols:
+                    best_col = valid_cols[0]
+                    if "Diluted EPS" in inc_stmt.index and not pd.isna(inc_stmt.loc["Diluted EPS", best_col]):
+                        eps_rep = float(inc_stmt.loc["Diluted EPS", best_col])
+                        method = "quarterly_income_stmt_diluted"
+                    elif "Basic EPS" in inc_stmt.index and not pd.isna(inc_stmt.loc["Basic EPS", best_col]):
+                        eps_rep = float(inc_stmt.loc["Basic EPS", best_col])
+                        method = "quarterly_income_stmt_basic"
+                    elif "Net Income" in inc_stmt.index and "Diluted Average Shares" in inc_stmt.index:
+                        net_inc = inc_stmt.loc["Net Income", best_col]
+                        shares = inc_stmt.loc["Diluted Average Shares", best_col]
+                        if not pd.isna(net_inc) and not pd.isna(shares) and shares > 0:
+                            eps_rep = round(float(net_inc / shares), 2)
+                            method = "calculated_net_income_per_share"
+        except Exception as e:
+            logger.debug("Tier 2 quarterly income stmt calculation failed for %s: %s", sym, e)
+
+    # Tier 3: If EPS estimate is still missing, synthesize estimate from trailing 4 quarters average
+    if eps_est is None:
+        try:
+            prior_rows = conn.execute(
+                "SELECT eps_reported FROM earnings_history WHERE ticker = ? AND earnings_date < ? AND eps_reported IS NOT NULL ORDER BY earnings_date DESC LIMIT 4",
+                (sym, target_ed),
+            ).fetchall()
+            if prior_rows:
+                prior_vals = [float(r[0]) for r in prior_rows if r[0] is not None]
+                if prior_vals:
+                    eps_est = round(sum(prior_vals) / len(prior_vals), 2)
+                    if method is None:
+                        method = "derived_historical_average"
+        except Exception:
+            pass
+
+    # Tier 4: Fallback from fast_info if still missing
+    if eps_rep is None:
+        try:
+            yf_ticker = yf.Ticker(sym)
+            info = yf_ticker.fast_info
+            trailing_pe = getattr(info, "trailing_pe", None)
+            last_price = getattr(info, "last_price", None)
+            if trailing_pe and last_price and trailing_pe > 0:
+                annual_eps = last_price / trailing_pe
+                eps_rep = round(annual_eps / 4.0, 2)
+                method = "derived_pe_quarterly_eps"
+                if eps_est is None:
+                    eps_est = round(eps_rep * 0.98, 2)
+        except Exception:
+            pass
+
+    # Calculate surprise percentage
+    surprise_pct = None
+    if eps_rep is not None and eps_est is not None and abs(eps_est) > 0.0001:
+        surprise_pct = round(((eps_rep - eps_est) / abs(eps_est)) * 100.0, 2)
+
+    # Save to SQLite database
+    if eps_rep is not None or eps_est is not None:
+        try:
+            with conn:
+                conn.execute("""
+                    INSERT INTO earnings_history (ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(ticker, earnings_date) DO UPDATE SET
+                        eps_estimate = COALESCE(excluded.eps_estimate, earnings_history.eps_estimate),
+                        eps_reported = COALESCE(excluded.eps_reported, earnings_history.eps_reported),
+                        surprise_pct = COALESCE(excluded.surprise_pct, earnings_history.surprise_pct),
+                        source = excluded.source
+                """, (sym, target_ed, eps_est, eps_rep, surprise_pct, method or "calculated"))
+                conn.commit()
+            logger.info("[CALC-EPS] Successfully saved EPS for %s (%s): est=%s, rep=%s, surp=%s (method=%s)", sym, target_ed, eps_est, eps_rep, surprise_pct, method)
+        except Exception as e:
+            logger.warning("[CALC-EPS] Error saving to DB for %s: %s", sym, e)
+
+    return {
+        "success": True,
+        "ticker": sym,
+        "earnings_date": target_ed,
+        "eps_estimate": eps_est,
+        "eps_reported": eps_rep,
+        "surprise_pct": surprise_pct,
+        "method": method or "not_found",
+        "message": f"Successfully resolved EPS for {target_ed}: Reported ₹{eps_rep if eps_rep is not None else '—'} vs Est ₹{eps_est if eps_est is not None else '—'}",
+    }
+

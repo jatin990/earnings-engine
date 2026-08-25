@@ -1060,6 +1060,12 @@ class CreateNetWorthSnapshotRequest(BaseModel):
     yoy_growth_pct: float | None = None
 
 
+class CalculateEpsRequest(BaseModel):
+    earnings_date: str | None = None
+    override_estimate: float | None = None
+    override_reported: float | None = None
+
+
 def _get_current_session(request: Request) -> dict[str, Any]:
     """Resolve active user session from request state or credentials."""
     session = getattr(request.state, "session", None)
@@ -2061,6 +2067,20 @@ async def get_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Que
     res = await asyncio.to_thread(get_live_week_hl, ticker, earnings_date, _settings)
     if not res.get("success"):
         raise HTTPException(status_code=400, detail=res.get("error", "Failed to calculate live week high/low"))
+    return res
+
+
+@app.post("/api/v1/stock/{ticker}/calculate-eps", tags=["Stock Intelligence & Ratings"])
+@app.post("/api/v1/earnings/{ticker}/calculate-eps", tags=["Stock Intelligence & Ratings"])
+async def calculate_stock_eps_endpoint(ticker: str, req: CalculateEpsRequest | None = None):
+    """Calculate, derive, or fetch missing EPS and surprise % for past earnings dates."""
+    from earnings_engine.api.stock_api import calculate_or_fetch_eps
+    ed = req.earnings_date if req else None
+    est = req.override_estimate if req else None
+    rep = req.override_reported if req else None
+    res = await asyncio.to_thread(calculate_or_fetch_eps, ticker, ed, est, rep, _settings)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to calculate EPS"))
     return res
 
 
