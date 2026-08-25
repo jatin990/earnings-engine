@@ -4405,11 +4405,20 @@ async def get_quarter_repeaters(
 
 
 @app.post("/api/v1/earnings-radar/repeaters/forecast/{ticker}", tags=["Quarter Repeaters Radar"])
-async def forecast_single_repeater(ticker: str):
+async def forecast_single_repeater(
+    ticker: str,
+    model_name: str | None = Query(None, description="Specific local Ollama or OpenRouter model"),
+    provider: str = Query("auto", description="Inference provider: 'auto', 'ollama', or 'openrouter'"),
+):
     """Run on-demand AI Forward reasoning for upcoming quarter earnings continuity for a single ticker."""
     sym = ticker.strip().upper()
     try:
-        forecast = repeaters_mod.generate_ai_repeater_forecast(sym, settings=_settings)
+        forecast = repeaters_mod.generate_ai_repeater_forecast(
+            sym,
+            settings=_settings,
+            model_name=model_name,
+            provider=provider,
+        )
         return {
             "success": True,
             "ticker": sym,

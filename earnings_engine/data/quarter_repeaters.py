@@ -327,8 +327,10 @@ def scan_quarter_repeaters(
                 "last_eps_surprise": surp_val,
                 "last_quality_score": int(score_val) if score_val is not None else None,
                 "last_week_high_pct": high_val,
+                "last_week_low_pct": metrics.get("q1_week_low_pct"),
+                "earnings_week_move_pct": metrics.get("earnings_week_move_pct"),
                 "last_earnings_date": str(q1_date)[:10] if q1_date else None,
-                "last_ai_note": q1_ai_note,
+                "last_ai_note": q1_ai_note or metrics.get("q1_ai_summary"),
                 "beat_streak": streak,
                 "streak_history": streak_history,
                 "conviction_score": conviction_score,
@@ -347,8 +349,13 @@ def scan_quarter_repeaters(
     return candidates[:limit]
 
 
-def generate_ai_repeater_forecast(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
-    """Execute AI Forward reasoning for upcoming quarter earnings continuity."""
+def generate_ai_repeater_forecast(
+    ticker: str,
+    settings: Settings | None = None,
+    model_name: str | None = None,
+    provider: str = "auto",
+) -> dict[str, Any]:
+    """Execute AI Forward reasoning for upcoming quarter earnings continuity with model selection."""
     settings = settings or Settings()
     sym = ticker.strip().upper()
 
@@ -361,15 +368,18 @@ def generate_ai_repeater_forecast(ticker: str, settings: Settings | None = None)
     # Gather news & sentiment
     news_res = get_ticker_news_and_sentiment(sym, limit=6)
     articles = news_res.get("articles", [])
-    news_headlines = [f"• [{a.get('published_at', '')[:10]}] {a.get('title', '')}" for a in articles[:5]]
+    news_headlines = [f"• [{a.get('published_at', '')[:10]}] {a.get('title', '')} ({a.get('sentiment_label', 'Neutral')})" for a in articles[:5]]
     news_summary_text = "\n".join(news_headlines) if news_headlines else "No recent material headlines found."
 
     streak, history = compute_beat_streak(metrics)
     last_surp = metrics.get("q1_surprise_pct")
     last_week_high = metrics.get("q1_week_high_pct")
+    last_week_low = metrics.get("q1_week_low_pct")
+    last_week_move = metrics.get("earnings_week_move_pct")
     last_score = metrics.get("q1_earnings_score")
+    q1_summary = metrics.get("q1_ai_summary") or ""
 
-    # Construct prompt
+    # Construct quantitative multi-factor prompt
     prompt = f"""You are an elite institutional equity analyst specializing in Indian and global corporate earnings cycles.
 Analyze whether the following stock will SUSTAIN its earnings winning streak and deliver a REPEAT BEAT in the upcoming quarterly earnings release.
 
@@ -378,21 +388,24 @@ Analyze whether the following stock will SUSTAIN its earnings winning streak and
 - Industry / Sector: {industry} | {sector}
 - Market Theme / Buzz: {buzz_tag}
 - Current Price: ₹{metrics.get('current_price', 'N/A')}
-- 30-Day Return: {metrics.get('thirty_day_return_pct', 'N/A')}%
+- 30-Day Momentum Return: {metrics.get('thirty_day_return_pct', 'N/A')}%
 - Distance from 52W High: {metrics.get('pct_from_52w_high', 'N/A')}%
 
-### Past Earnings Delivery & Reaction Track Record
-- Last Quarter EPS Surprise: {f'{last_surp:+.1f}%' if last_surp is not None else 'N/A'}
-- Last Post-Earnings Week Peak High: {f'{last_week_high:+.1f}%' if last_week_high is not None else 'N/A'}
-- Last Quality Score: {last_score}/9
+### Past Earnings Delivery & Reaction Mechanics
+- Prior Quarter EPS Surprise: {f'{last_surp:+.1f}%' if last_surp is not None else 'N/A'}
+- Prior Post-Earnings Week Peak High: {f'{last_week_high:+.1f}%' if last_week_high is not None else 'N/A'}
+- Prior Post-Earnings Week Low (Drawdown): {f'{last_week_low:+.1f}%' if last_week_low is not None else 'N/A'}
+- Prior Net 1-Week Post-Earnings Move: {f'{last_week_move:+.1f}%' if last_week_move is not None else 'N/A'}
+- Prior Result Summary: {q1_summary}
+- Quality Score: {last_score}/9
 - Consecutive Beat Streak: {streak} quarters
-- Quarterly History: {json.dumps(history)}
+- 3-Quarter Delivery History: {json.dumps(history)}
 
-### Recent Corporate News, Filings & Order Wins
+### Recent Corporate News, Filings, Catalysts & Order Wins
 {news_summary_text}
 
-### Instructions
-1. Assess if the last earnings beat was driven by structural operational delivery or transient one-offs.
+### Instructions:
+1. Assess why the prior quarterly result moved as it did (e.g. initial dip or pullback due to profit-taking despite stellar peak rally and EPS beat vs sustained continuation).
 2. Evaluate recent news flow, new contracts, order wins, and industry macro tailwinds for upcoming quarter revenue visibility.
 3. Predict if the upcoming quarterly result will be a Repeat Beat, In-Line, or Risk of Miss.
 4. Output STRICT JSON adhering to this exact schema (no markdown outside JSON):
@@ -404,6 +417,7 @@ Analyze whether the following stock will SUSTAIN its earnings winning streak and
   "predicted_next_quarter_quality": 8,
   "industry_buzz_tag": "{buzz_tag}",
   "industry_tailwind_score": 8,
+  "price_action_assessment": "Explanation of the prior earnings reaction dynamics (e.g., peak rally vs net move) and current technical setup.",
   "primary_growth_drivers": [
     "Driver 1 (order flow, margin expansion)",
     "Driver 2 (sector tailwind)"
@@ -417,12 +431,13 @@ Analyze whether the following stock will SUSTAIN its earnings winning streak and
 }}
 """
 
-    # Model inference (OpenRouter -> Ollama -> Heuristic fallback)
     output_dict: dict[str, Any] | None = None
+    model_used = model_name or "auto"
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
 
-    # 1. Try OpenRouter if key is present
-    if openrouter_key:
+    # 1. Targeted or Auto OpenRouter Inference
+    if (provider == "openrouter" or (provider == "auto" and model_name and "/" in model_name)) and openrouter_key:
+        target_model = model_name or "deepseek/deepseek-r1:free"
         try:
             import urllib.request
             req = urllib.request.Request(
@@ -434,26 +449,27 @@ Analyze whether the following stock will SUSTAIN its earnings winning streak and
                     "X-Title": "Earnings Engine Repeater Radar",
                 },
                 data=json.dumps({
-                    "model": "deepseek/deepseek-r1:free",
+                    "model": target_model,
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.3,
                     "max_tokens": 1000,
                 }).encode("utf-8"),
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=25) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 content = data["choices"][0]["message"]["content"]
                 m = re.search(r"\{[\s\S]*\}", content)
                 if m:
                     output_dict = json.loads(m.group(0))
+                    model_used = f"OpenRouter ({target_model})"
         except Exception as e:
-            logger.debug("[REPEATERS] OpenRouter inference failed for %s: %s", sym, e)
+            logger.debug("[REPEATERS] OpenRouter inference failed for %s (%s): %s", sym, target_model, e)
 
-    # 2. Try Local Ollama (llama3.2:3b or deepseek-r1:8b)
-    if not output_dict:
+    # 2. Targeted or Auto Local Ollama Inference
+    if not output_dict and (provider in ("ollama", "auto") or not openrouter_key):
         ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+        ollama_model = model_name if (model_name and "/" not in model_name) else os.getenv("OLLAMA_MODEL", "llama3.2:3b")
         try:
             import urllib.request
             data_payload = json.dumps({
@@ -467,24 +483,33 @@ Analyze whether the following stock will SUSTAIN its earnings winning streak and
                 data=data_payload,
                 headers={"Content-Type": "application/json"},
             )
-            timeout = 35 if "8b" in ollama_model or "deepseek" in ollama_model else 15
+            timeout = 45 if "8b" in ollama_model or "deepseek" in ollama_model else 18
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 raw_res = json.loads(resp.read().decode("utf-8"))
                 resp_text = raw_res.get("response", "")
                 m = re.search(r"\{[\s\S]*\}", resp_text)
                 if m:
                     output_dict = json.loads(m.group(0))
-                    output_dict["source"] = f"Local Ollama ({ollama_model})"
+                    model_used = f"Local Ollama ({ollama_model})"
         except Exception as e:
-            logger.debug("[REPEATERS] Local Ollama call failed for %s: %s", sym, e)
+            logger.debug("[REPEATERS] Local Ollama call failed for %s (%s): %s", sym, ollama_model, e)
 
-    # 3. Heuristic fallback if LLMs unavailable
+    # 3. Heuristic institutional fallback if LLMs unavailable
     if not output_dict:
         surp_score = float(last_surp or 5.0)
         high_score = float(last_week_high or 3.0)
         rep_prob = min(95.0, max(50.0, 60.0 + surp_score * 1.5 + streak * 4.0 + (high_score * 0.5)))
         
         verdict = "STRONG_REPEAT_BEAT" if rep_prob >= 80 else ("MODERATE_BEAT" if rep_prob >= 65 else "IN_LINE")
+        model_used = "Institutional Quantitative Rules"
+        
+        # Price action explanation
+        reaction_desc = "Strong positive earnings reaction."
+        if last_week_move is not None and last_week_move < 0 and high_score > 3.0:
+            reaction_desc = f"Stock rallied to a peak of +{high_score:.1f}% intra-week before experiencing short-term profit booking to close at {last_week_move:+.1f}%. Medium-term momentum remains positive ({metrics.get('thirty_day_return_pct', 0):+.1f}% 30D return)."
+        elif high_score > 0:
+            reaction_desc = f"Stock demonstrated healthy demand with a +{high_score:.1f}% peak post-earnings rally."
+
         output_dict = {
             "ai_repeat_verdict": verdict,
             "repeat_probability_pct": round(rep_prob, 1),
@@ -492,6 +517,7 @@ Analyze whether the following stock will SUSTAIN its earnings winning streak and
             "predicted_next_quarter_quality": 8 if rep_prob >= 80 else 7,
             "industry_buzz_tag": buzz_tag,
             "industry_tailwind_score": 8,
+            "price_action_assessment": reaction_desc,
             "primary_growth_drivers": [
                 f"Sustained fundamental momentum following {f'{last_surp:+.1f}%' if last_surp is not None else 'strong'} EPS delivery",
                 f"{buzz_tag} macro industry upcycle and healthy order book visibility",
@@ -506,14 +532,41 @@ Analyze whether the following stock will SUSTAIN its earnings winning streak and
         }
 
     output_dict["ticker"] = sym
+    output_dict["model_used"] = model_used
     output_dict["as_of_quarter"] = "Q1"
     output_dict["last_eps_surprise"] = last_surp
     output_dict["last_week_high_pct"] = last_week_high
+    output_dict["last_week_low_pct"] = last_week_low
+    output_dict["earnings_week_move_pct"] = last_week_move
     output_dict["last_quality_score"] = last_score
     output_dict["beat_streak"] = streak
+    output_dict["streak_history"] = history
     output_dict["news_summary"] = news_summary_text
+    output_dict["news_articles"] = articles[:6]
     output_dict["next_earnings_date"] = str(metrics.get("next_earnings_date"))[:10] if metrics.get("next_earnings_date") else None
     
+    # Store complete input audit trail for full transparency
+    output_dict["considered_data"] = {
+        "ticker": sym,
+        "company_name": company_name,
+        "industry": industry,
+        "sector": sector,
+        "industry_buzz_tag": buzz_tag,
+        "current_price": metrics.get("current_price"),
+        "thirty_day_return_pct": metrics.get("thirty_day_return_pct"),
+        "pct_from_52w_high": metrics.get("pct_from_52w_high"),
+        "earnings_week_move_pct": last_week_move,
+        "last_week_high_pct": last_week_high,
+        "last_week_low_pct": last_week_low,
+        "last_eps_surprise": last_surp,
+        "last_quality_score": last_score,
+        "q1_ai_summary": q1_summary,
+        "beat_streak": streak,
+        "streak_history": history,
+        "news_articles": articles[:6],
+        "screening_rationale": f"Screened into Repeaters because company delivered prior {f'{last_surp:+.1f}%' if last_surp is not None else 'High Quality (Score ' + str(last_score or '6') + '/9)'} EPS beat and {f'+{last_week_high:.1f}%' if last_week_high is not None else 'positive'} peak post-earnings rally.",
+    }
+
     # Store to database
     store_repeater_prediction(sym, output_dict, settings)
     return output_dict
