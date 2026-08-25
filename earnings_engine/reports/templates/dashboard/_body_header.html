@@ -53,9 +53,45 @@
             <span id="topOpenRouterQuota" style="font-size: 0.7rem; font-weight: 600; color: #e2e8f0; font-family: var(--font-mono); white-space: nowrap;">0/200</span>
         </div>
 
+        <!-- Page Guide Button -->
+        <button onclick="app.openPageGuideModal()" class="btn-micro" style="background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); font-weight: 600; font-size: 0.72rem; padding: 0.25rem 0.55rem; border-radius: 5px; cursor: pointer; white-space: nowrap;" title="Explain this page and the quantitative thought behind it">
+            💡 <span class="desktop-btn-label">Page Guide</span>
+        </button>
+
         <!-- Control Center Button -->
         <button onclick="app.openCustomizerModal()" class="btn-micro" style="background: #ffffff; color: #000000; font-weight: 600; font-size: 0.72rem; padding: 0.25rem 0.55rem; border-radius: 5px; border: none; cursor: pointer; white-space: nowrap;" title="Open Control Center">
             ⚙️ <span class="desktop-btn-label">Settings</span>
         </button>
     </div>
 </header>
+
+<!-- ========================================================================= -->
+<!-- 💡 GLOBAL PAGE GUIDE & FINANCIAL LOGIC MODAL                              -->
+<!-- ========================================================================= -->
+<div id="pageGuideModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10000; backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #090d16; border: 1px solid rgba(59,130,246,0.35); border-radius: 12px; width: 100%; max-width: 680px; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.85);">
+        
+        <!-- Modal Header -->
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; background: rgba(15,23,42,0.6);">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <span id="pageGuideIcon" style="font-size: 1.3rem;">💡</span>
+                <div>
+                    <div id="pageGuideTitle" style="font-size: 1.05rem; font-weight: 700; color: #f8fafc;">Page Guide & Thought Architecture</div>
+                    <div id="pageGuideSubtitle" style="font-size: 0.72rem; color: #94a3b8;">Quantitative edge, metrics breakdown, and financial reasoning</div>
+                </div>
+            </div>
+            <button onclick="app.closePageGuideModal()" style="background: transparent; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 0.2rem 0.4rem; line-height: 1;">✕</button>
+        </div>
+
+        <!-- Modal Body Content -->
+        <div id="pageGuideBody" style="padding: 1.2rem 1.25rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; font-size: 0.8rem; color: #cbd5e1; line-height: 1.5;">
+            <!-- Injected dynamically based on active tab -->
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="padding: 0.75rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; background: rgba(15,23,42,0.4); font-size: 0.72rem; color: #64748b;">
+            <span>💡 Nexus Quantitative Intelligence System</span>
+            <button onclick="app.closePageGuideModal()" class="btn btn-secondary" style="padding: 0.35rem 0.85rem; font-size: 0.75rem;">Got it</button>
+        </div>
+    </div>
+</div>

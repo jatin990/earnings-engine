@@ -10314,36 +10314,340 @@
 
 
         // =========================================================================
-        // ⚡ BREAKOUT RADAR MODULE
+        // 💡 COMPREHENSIVE PAGE GUIDES & FINANCIAL LOGIC ARCHITECTURE
+        // =========================================================================
+        app.PAGE_GUIDES = {
+            'results': {
+                title: 'Earnings Results Ledger & Post-Announcement Drift',
+                icon: '📊',
+                what: 'Displays upcoming and recent corporate earnings releases, consensus EPS estimates vs actual reported figures, 1-day historical reaction returns, surprise streaks, and quantitative beat probabilities.',
+                thought: 'Post-Earnings Announcement Drift (PEAD) is one of the most robust market anomalies in empirical finance. Stocks that beat revenue and EPS expectations while expanding gross margins tend to systematically outperform benchmark indices for 1–14 trading sessions as institutional consensus models re-rate target valuations.',
+                metrics: [
+                    { name: 'Surprise Streak', desc: 'Number of consecutive quarters beating consensus EPS estimates.' },
+                    { name: 'Reaction Return (1D)', desc: 'Percentage return from session before earnings (T-1) to session after (T+1).' },
+                    { name: 'AI Probability (p_up)', desc: 'LightGBM Platt-calibrated probability of positive post-earnings move.' }
+                ],
+                tips: 'Look for stocks with high past beat rates (>75%) and positive 30-day pre-earnings momentum entering earnings week.'
+            },
+            'monthfilter': {
+                title: 'Cohort Matrix & Sector Earnings Clustering',
+                icon: '🗓️',
+                what: 'Hierarchical earnings calendar grouping corporate announcements by Announcement Date → Market Cap Cohort (Large/Mid/Small) → Industry Sector, featuring present-day delta sync.',
+                thought: 'Institutional capital rarely buys isolated stocks in a vacuum; it flows into entire industry cohorts. When bellwether companies (e.g. TCS, HDFC Bank) report strong numbers, sympathetic buying propagates across peer supply chains and sector ETFs. Grouping by market cap and sector isolates cohort-wide tailwinds.',
+                metrics: [
+                    { name: 'Delta Sync', desc: 'Real-time delta update capturing unscheduled or updated corporate filing dates.' },
+                    { name: 'Market Cap Cohorts', desc: 'Separates mega-caps (>₹50,000 Cr) from high-beta small/mid-caps to calibrate position sizing.' }
+                ],
+                tips: 'Trade the highest-quality peer in a sector cohort once the leading bellwether confirms a strong quarterly beat.'
+            },
+            'scanner': {
+                title: 'Multi-Category Fundamental & Technical Scanner',
+                icon: '🔍',
+                what: 'Curated scanner filtering companies into high-momentum institutional themes: 52-Week High Breakouts, Deliverable Volume Surges, Corporate Order Wins, Margin Expansions, and Share Buybacks.',
+                thought: 'Alpha generation requires continuous pre-filtering across distinct market catalysts. Scanning pre-classified catalysts eliminates manual noise and highlights equities experiencing abnormal institutional accumulation before earnings.',
+                metrics: [
+                    { name: 'Order Wins', desc: 'Classified commercial contract wins and capital expenditure approvals.' },
+                    { name: '52W High Proximity', desc: 'Stocks trading within 3% of all-time or annual resistance levels.' }
+                ],
+                tips: 'Filter for Volume Surges accompanied by Order Wins for the highest conviction trend-continuation setups.'
+            },
+            'catalysts': {
+                title: 'Corporate Catalysts & AI Impact Scoring',
+                icon: '⚡',
+                what: 'Real-time regulatory filings feed (BSE/NSE/SEC), strategic corporate actions, management commentary, and AI-scored sentiment impact ratings (0–100%).',
+                thought: 'Markets are information processing machines. Traditional news feeds inundate traders with un-actionable headlines. Categorizing material corporate events (FDA approvals, major contracts, acquisitions, buybacks) and scoring their directional impact separates high-conviction catalysts from general market chatter.',
+                metrics: [
+                    { name: 'Impact Score (0-100%)', desc: 'AI-evaluated quantitative materiality of the announcement on future free cash flow.' },
+                    { name: 'Sentiment Polarity', desc: 'Directional classification (Bullish, Neutral, Bearish).' }
+                ],
+                tips: 'Focus on high impact (>80%) catalysts on mid-cap equities where news is often slower to be fully priced in.'
+            },
+            'gainers': {
+                title: 'Daily Gainers & Deliverable Volume Spikes',
+                icon: '🚀',
+                what: 'Tracks top daily percentage advancers, deliverable volume spikes (>2.0x 20-day average), and tight multi-session consolidation coils.',
+                thought: 'Deliverable volume (shares taken into demat custody rather than squared off intraday) is the clearest signature of institutional smart money accumulation. A price move on 3x average deliverable volume signals long-term positioning rather than transient retail day trading.',
+                metrics: [
+                    { name: 'Delivery Spike Ratio', desc: 'Today’s delivery volume divided by 20-day moving average delivery.' },
+                    { name: 'Consolidation Width', desc: 'Percentage spread between multi-week high and low.' }
+                ],
+                tips: 'A delivery surge emerging from a multi-week tight base provides ideal low-risk breakout entries.'
+            },
+            'breakout': {
+                title: 'Breakout Radar & Historical Outcome Engine',
+                icon: '⚡',
+                what: 'Multi-factor 0–100 breakout scoring engine and point-in-time historical backtest date picker. Evaluates Resistance Proximity (30 pts), Volume Surge (20 pts), Volatility Compression (15 pts), Momentum (15 pts), and Fundamentals (20 pts), verifying predicted vs realized outcomes.',
+                thought: 'Volatility cycles strictly alternate between compression (coiling) and expansion (breakout). Identifying equities with narrow ATR volatility squeezes right below major resistance that also possess volume accumulation and earnings quality yields asymmetric risk/reward setups with minimal drawdown.',
+                metrics: [
+                    { name: 'Signal / Predicted Price', desc: 'Price bar as of the selected point-in-time scan date.' },
+                    { name: 'Breakout Trigger', desc: '20-day / 52-week resistance ceiling that confirms the breakout.' },
+                    { name: 'Target & Stop Loss', desc: 'Target = Trigger + max(8%, 2x ATR); Stop Loss = Signal Price - min(5%, 1.5x ATR).' },
+                    { name: 'Breakout Outcome', desc: 'Realized historical verdict: Target Hit 🎯, Succeeded ✅, Retraced ⚠️, Stop Loss 🛑.' }
+                ],
+                tips: 'Use the Date Picker to test setups from 30 or 60 days ago to observe how high-score candidates performed.'
+            },
+            'swing': {
+                title: 'Swing Range Channels & Cyclic Oscillations',
+                icon: '〰️',
+                what: 'Automated horizontal channel detection identifying established support and resistance boundaries, cycle counts, oscillation durations, and actionable channel trading zones.',
+                thought: 'Equities spend over 70% of market sessions oscillating within horizontal channels defined by institutional liquidity pools. Buying at validated support and taking profit at channel resistance offers high win-rate cyclical trades with tight invalidation levels.',
+                metrics: [
+                    { name: 'Channel Support & Resistance', desc: 'High-volume liquidity boundaries where price pivots.' },
+                    { name: 'Cycle Duration', desc: 'Average number of trading sessions to traverse from floor to ceiling.' }
+                ],
+                tips: 'Set stop losses 1.5% below channel support and aim for the upper 25% zone of the channel.'
+            },
+            'kronos': {
+                title: 'Kronos AI 14-Day Neural Sequence Forecast',
+                icon: '🔮',
+                what: 'Deep sequence neural network forecasting 14-day price paths, dynamic confidence bands, support/resistance channel projections, and realization audit logs.',
+                thought: 'Financial time-series exhibit complex non-linear autoregressive structures. Kronos AI captures multi-scale temporal dependencies across price action and volatility to project likely forward trajectories and turning points post-earnings.',
+                metrics: [
+                    { name: 'Projected 14D Path', desc: 'Sequential daily price forecast trajectory.' },
+                    { name: 'Realization Error', desc: 'Root-Mean-Squared-Error comparing historical predictions to actual market prints.' }
+                ],
+                tips: 'Combine Kronos trajectory direction with multi-model AI consensus for maximum directional confidence.'
+            },
+            'consensus': {
+                title: 'Multi-Model AI Consensus Engine',
+                icon: '🤖',
+                what: 'Ensemble reasoning across DeepSeek-R1 (logical chain-of-thought), Llama-3.3-70B (macro/quant), Qwen-2.5-72B (patterns), and Mistral/Gemini (news catalysts), generating unified verdicts and target ranges.',
+                thought: 'Single LLM models suffer from idiosyncratic hallucinations and blind spots. Orchestrating distinct specialized open-weight models in parallel—each evaluating from different analytical perspectives—produces robust ensemble signals superior to any single model.',
+                metrics: [
+                    { name: 'Consensus Strength %', desc: 'Agreement magnitude across all contributing models (0–100%).' },
+                    { name: 'Synthesized Target', desc: 'Consensus upside target and recommended stop loss level.' }
+                ],
+                tips: 'Trigger single-model runs via the matrix buttons if you wish to refresh one specific model without consuming global API quotas.'
+            },
+            'coverage': {
+                title: 'Data Integrity, Price Series & Filing Registry',
+                icon: '🗄️',
+                what: 'Audit log of historical daily OHLCV prices, corporate earnings calendar entries, missing price bars, and Turso cloud database replication status.',
+                thought: 'Quantitative backtesting and machine learning models are entirely dependent on point-in-time data cleanliness. Continuous verification of price continuity and filing timestamps prevents lookahead bias and data leakage.',
+                metrics: [
+                    { name: 'Price Bars Freshness', desc: 'Days elapsed since latest price ingestion.' },
+                    { name: 'Earnings Records', desc: 'Total quarterly events tracked in database.' }
+                ],
+                tips: 'Master users can execute incremental refreshes to ingest missing earnings dates automatically.'
+            },
+            'industries': {
+                title: 'Industry Sector Reactions & Cohort Performance',
+                icon: '🏭',
+                what: 'Historical 7-day post-earnings reaction distributions grouped by industry, ranking sectors by beat frequency and mean percentage gain.',
+                thought: 'Upwards of 70% of single-stock variance is driven by macro and sector cohort momentum. Allocating capital exclusively to the top-quartile performing industries substantially boosts strategy Sharpe ratios.',
+                metrics: [
+                    { name: 'Mean Sector Reaction', desc: 'Average 7-day post-earnings percentage move across industry constituents.' },
+                    { name: 'Beat Rate %', desc: 'Proportion of companies in sector beating estimates.' }
+                ],
+                tips: 'Prioritize individual stock longs in sectors where the cohort beat rate exceeds 70%.'
+            },
+            'patterns': {
+                title: 'Algorithmic Technical Chart Patterns',
+                icon: '📐',
+                what: 'Algorithmic recognition of classical geometric patterns: Cup & Handle, Ascending Triangles, Double Bottoms, Flags, and Pennants with pivot confirmation.',
+                thought: 'Structural chart patterns reflect the mechanical balance between supply and demand. Recognising apex compression in ascending triangles and cup-with-handle bases pinpoints optimal breakout timing.',
+                metrics: [
+                    { name: 'Pattern Quality Score', desc: 'Geometric symmetry and volume confirmation score (0–100).' },
+                    { name: 'Pivot Price', desc: 'Breakout trigger price for pattern confirmation.' }
+                ],
+                tips: 'Ensure breakout volume is at least 1.5x the 20-day average when price crosses the pivot level.'
+            },
+            'buydip': {
+                title: 'Buy The Dip — Mean Reversion on Quality Equities',
+                icon: '📉',
+                what: 'Identifies high-quality compounders with pristine multi-quarter earnings track records currently experiencing temporary oversold pullbacks (RSI < 35, near 200 SMA).',
+                thought: 'Market overreactions and short-term liquidity shocks frequently push structurally growing, profitable businesses into deep oversold territory. Buying quality compounders at support yields high asymmetric reward with minimal long-term downside.',
+                metrics: [
+                    { name: 'Quality Score (1-9)', desc: 'Fundamental multi-quarter earnings beat quality score.' },
+                    { name: 'RSI(14)', desc: 'Relative Strength Index showing oversold condition (<35).' },
+                    { name: 'Distance to 200 SMA', desc: 'Percentage distance from the long-term institutional trend line.' }
+                ],
+                tips: 'Only buy dips on stocks with Quality Scores ≥ 7 and intact long-term fundamental earnings growth.'
+            },
+            'backtest': {
+                title: 'Walk-Forward Quantitative Backtesting Engine',
+                icon: '🔬',
+                what: 'Quarterly walk-forward simulation of LightGBM predictions, calculating Sharpe Ratio, Sortino Ratio, Maximum Drawdown, Win Rate, and transaction cost modeling.',
+                thought: 'Standard in-sample backtests overfit to past noise. Walk-forward quarterly retraining trains exclusively on past data (T-1) and evaluates strictly out-of-sample on future quarters, providing rigorous statistical proof of edge.',
+                metrics: [
+                    { name: 'Sharpe Ratio', desc: 'Risk-adjusted excess return per unit of volatility.' },
+                    { name: 'Max Drawdown (MDD)', desc: 'Peak-to-trough maximum portfolio decline.' },
+                    { name: 'Profit Factor', desc: 'Gross profits divided by gross losses across simulated trades.' }
+                ],
+                tips: 'Maintain transaction cost modeling (10 bps slippage/commission) to reflect realistic live execution performance.'
+            },
+            'watchlist': {
+                title: 'Custom Watchlist Hub & Portfolio Streaming',
+                icon: '⭐',
+                what: 'Manage custom watchlists, view live price quotes, track deliverable volume, and synchronize portfolios seamlessly with Turso Cloud database.',
+                thought: 'Efficient portfolio management requires personalized grouping of monitored equities, rapid switching between universes, and instantaneous access to deep-dive analytics.',
+                metrics: [
+                    { name: 'Watchlist Tickers', desc: 'Custom monitored equities saved to user profile.' },
+                    { name: 'Cloud Sync', desc: 'Real-time synchronization across devices via Turso SQLite engine.' }
+                ],
+                tips: 'Organize watchlists into distinct strategies (e.g. "Breakout Coils", "Earnings Momentum", "Dividend Compounders").'
+            },
+            'playground': {
+                title: 'Quant API Playground & Interactive Sandbox',
+                icon: '🧪',
+                what: 'Interactive API console allowing live exploration of endpoints, parameters, JSON response schemas, and algorithmic execution payloads.',
+                thought: 'Empowers developers and quantitative traders to prototype custom scripts, test edge-case payloads, and integrate Nexus APIs directly into external trading algorithms and bots.',
+                metrics: [
+                    { name: 'Endpoint Schema', desc: 'Full OpenAPI parameters and response formats.' },
+                    { name: 'Response Latency', desc: 'Execution time in milliseconds.' }
+                ],
+                tips: 'Use the playground to test custom query parameters before deploying algorithmic integrations.'
+            }
+        };
+
+        app.openPageGuideModal = function(tabName) {
+            const currentTab = tabName || app.currentTab || 'results';
+            const guide = app.PAGE_GUIDES[currentTab] || app.PAGE_GUIDES['results'];
+            const modal = document.getElementById('pageGuideModal');
+            const titleEl = document.getElementById('pageGuideTitle');
+            const iconEl = document.getElementById('pageGuideIcon');
+            const subtitleEl = document.getElementById('pageGuideSubtitle');
+            const bodyEl = document.getElementById('pageGuideBody');
+
+            if (titleEl) titleEl.textContent = guide.title;
+            if (iconEl) iconEl.textContent = guide.icon;
+            if (subtitleEl) subtitleEl.textContent = `Nexus Quantitative Edge & Logic (${currentTab.toUpperCase()})`;
+
+            if (bodyEl) {
+                let html = `
+                    <div style="background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25); padding: 0.85rem 1rem; border-radius: 8px;">
+                        <div style="font-weight: 700; color: #60a5fa; margin-bottom: 0.3rem; font-size: 0.85rem;">📋 What is on this screen?</div>
+                        <div style="color: #e2e8f0;">${guide.what}</div>
+                    </div>
+
+                    <div style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); padding: 0.85rem 1rem; border-radius: 8px;">
+                        <div style="font-weight: 700; color: #34d399; margin-bottom: 0.3rem; font-size: 0.85rem;">🧠 Quantitative & Financial Thought Behind It</div>
+                        <div style="color: #cbd5e1; line-height: 1.55;">${guide.thought}</div>
+                    </div>
+                `;
+
+                if (guide.metrics && guide.metrics.length > 0) {
+                    html += `
+                        <div style="background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.08); padding: 0.85rem 1rem; border-radius: 8px;">
+                            <div style="font-weight: 700; color: #fbbf24; margin-bottom: 0.4rem; font-size: 0.85rem;">📐 Key Metrics & Signals</div>
+                            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                                ${guide.metrics.map(m => `
+                                    <div style="font-size: 0.76rem;">
+                                        <strong style="color: #f1f5f9;">${m.name}:</strong> <span style="color: #94a3b8;">${m.desc}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (guide.tips) {
+                    html += `
+                        <div style="background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.25); padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.76rem;">
+                            <strong style="color: #c4b5fd;">💡 Pro Trading Tip:</strong> <span style="color: #e2e8f0;">${guide.tips}</span>
+                        </div>
+                    `;
+                }
+
+                bodyEl.innerHTML = html;
+            }
+
+            if (modal) modal.style.display = 'flex';
+        };
+
+        app.closePageGuideModal = function() {
+            const modal = document.getElementById('pageGuideModal');
+            if (modal) modal.style.display = 'none';
+        };
+
+        // Close guide modal on clicking outside or ESC key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                app.closePageGuideModal();
+            }
+        });
+
+        // =========================================================================
+        // ⚡ BREAKOUT RADAR MODULE (ENHANCED WITH DATE PICKER & OUTCOME TRACKING)
         // =========================================================================
         app._breakoutLoaded = false;
         app._breakoutPollTimer = null;
         app._breakoutData = [];
         app._breakoutSortKey = 'composite_score';
         app._breakoutSortAsc = false;
+        app._breakoutAsofDate = null;
+
+        app.toggleBreakoutExplainer = function() {
+            const card = document.getElementById('breakoutExplainerCard');
+            if (!card) return;
+            card.style.display = card.style.display === 'none' ? 'block' : 'none';
+        };
 
         app.onBreakoutUniverseChange = function(uni) {
+            app.loadBreakoutRadar();
+        };
+
+        app.onBreakoutDateChange = function(dateStr) {
+            app._breakoutAsofDate = dateStr && dateStr.trim() !== '' ? dateStr.trim() : null;
+            app.loadBreakoutRadar();
+        };
+
+        app.setBreakoutDatePreset = function(daysAgo) {
+            const dateInput = document.getElementById('breakoutDateInput');
+            if (daysAgo === 0) {
+                if (dateInput) dateInput.value = '';
+                app._breakoutAsofDate = null;
+            } else {
+                const d = new Date();
+                d.setDate(d.getDate() - daysAgo);
+                const iso = d.toISOString().split('T')[0];
+                if (dateInput) dateInput.value = iso;
+                app._breakoutAsofDate = iso;
+            }
             app.loadBreakoutRadar();
         };
 
         app.loadBreakoutRadar = async function() {
             const badge = document.getElementById('breakoutScanningBadge');
             const lastScanEl = document.getElementById('breakoutLastScanTime');
+            const modeBadge = document.getElementById('breakoutModeBadge');
+            const histNotice = document.getElementById('breakoutHistoricalNotice');
             const tbody = document.getElementById('breakoutTableBody');
             if (badge) badge.style.display = 'inline-block';
 
             const universe = document.getElementById('breakoutUniverseSelect')?.value || 'nifty_50';
             const sortBy = document.getElementById('breakoutSortBy')?.value || 'composite_score';
             const minScore = document.getElementById('breakoutMinScore')?.value || 35;
+            const asofDate = app._breakoutAsofDate || document.getElementById('breakoutDateInput')?.value || null;
+
+            if (modeBadge) {
+                if (asofDate) {
+                    modeBadge.textContent = `BACKTEST: ${asofDate}`;
+                    modeBadge.style.background = 'rgba(234,179,8,0.15)';
+                    modeBadge.style.color = '#fbbf24';
+                    modeBadge.style.borderColor = 'rgba(234,179,8,0.3)';
+                    if (histNotice) histNotice.style.display = 'inline';
+                } else {
+                    modeBadge.textContent = 'LIVE SCAN';
+                    modeBadge.style.background = 'rgba(59,130,246,0.15)';
+                    modeBadge.style.color = '#60a5fa';
+                    modeBadge.style.borderColor = 'rgba(59,130,246,0.3)';
+                    if (histNotice) histNotice.style.display = 'none';
+                }
+            }
 
             try {
                 const params = new URLSearchParams({ universe: universe, sort_by: sortBy, min_score: minScore, limit: 100 });
+                if (asofDate) {
+                    params.set('asof_date', asofDate);
+                }
                 const res = await fetch(API_BASE + '/api/v1/breakout-radar?' + params.toString());
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
 
                 app._breakoutData = data.candidates || [];
                 const status = data.scan_status || {};
+                const summary = data.backtest_summary || {};
                 const total = app._breakoutData.length;
                 const topCandidate = total > 0 ? app._breakoutData[0] : null;
                 const avgScore = total > 0
@@ -10351,25 +10655,50 @@
                     : '\u2014';
 
                 const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+                
+                // Update KPI Cards
                 setEl('breakoutStatTotal', total);
-                setEl('breakoutStatTopScore', topCandidate ? topCandidate.composite_score : '\u2014');
-                setEl('breakoutStatTopTicker', topCandidate ? (topCandidate.ticker || '\u2014') : '\u2014');
-                setEl('breakoutStatAvg', avgScore);
-                setEl('breakoutStatScanned', status.tickers_scanned || '\u2014');
-                setEl('breakoutStatDuration', status.last_scan_duration_s != null ? status.last_scan_duration_s : '\u2014');
-                setEl('breakoutIntervalDisplay', status.scan_interval_min || 30);
+                setEl('breakoutStatScanned', status.tickers_scanned || total || '\u2014');
+
+                if (asofDate && summary.win_rate_pct != null) {
+                    // Backtest Mode KPIs
+                    setEl('breakoutKpiLabel2', 'Win Rate %');
+                    setEl('breakoutStatTopScore', `${summary.win_rate_pct}%`);
+                    setEl('breakoutStatTopTicker', `${summary.success_count}/${summary.total_evaluated} Breakouts Succeeded`);
+
+                    setEl('breakoutKpiLabel3', 'Avg Realized Return');
+                    setEl('breakoutStatAvg', `${summary.avg_return_pct >= 0 ? '+' : ''}${summary.avg_return_pct}%`);
+                    setEl('breakoutKpiSub3', summary.top_winner_ticker ? `Top: ${summary.top_winner_ticker} (${summary.top_winner_gain_pct >= 0 ? '+' : ''}${summary.top_winner_gain_pct}%)` : 'Across candidates');
+
+                    setEl('breakoutKpiLabel5', 'Backtest Date');
+                    setEl('breakoutStatDuration', asofDate);
+                    setEl('breakoutKpiSub5', 'Point-in-time simulation');
+                } else {
+                    // Live Mode KPIs
+                    setEl('breakoutKpiLabel2', 'Top Score');
+                    setEl('breakoutStatTopScore', topCandidate ? topCandidate.composite_score : '\u2014');
+                    setEl('breakoutStatTopTicker', topCandidate ? (topCandidate.ticker || '\u2014') : '\u2014');
+
+                    setEl('breakoutKpiLabel3', 'Avg Score');
+                    setEl('breakoutStatAvg', avgScore);
+                    setEl('breakoutKpiSub3', 'Composite Average');
+
+                    setEl('breakoutKpiLabel5', 'Scan Duration');
+                    setEl('breakoutStatDuration', status.last_scan_duration_s != null ? `${status.last_scan_duration_s}s` : '\u2014');
+                    setEl('breakoutKpiSub5', 'Last Full Scan');
+                }
 
                 if (lastScanEl && status.last_scan_at) {
                     try {
                         const d = new Date(status.last_scan_at);
                         const uniLabel = universe === 'nifty_50' ? 'Nifty 50' : (universe === 'all' ? 'All' : universe);
-                        lastScanEl.textContent = `${uniLabel} • Last scan: ` + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                        lastScanEl.textContent = `${uniLabel} • ${asofDate ? 'As-Of ' + asofDate : 'Live • Last scan: ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
                     } catch { lastScanEl.textContent = 'Last scan: ' + status.last_scan_at; }
                 } else if (lastScanEl) {
-                    lastScanEl.textContent = status.status === 'running' ? 'Scanning now\u2026' : 'Waiting for first scan\u2026';
+                    lastScanEl.textContent = status.status === 'running' ? 'Scanning now\u2026' : (asofDate ? `As-Of ${asofDate}` : 'Waiting for first scan\u2026');
                 }
 
-                app.renderBreakoutTable(app._breakoutData);
+                app.renderBreakoutTable(app._breakoutData, asofDate);
             } catch (err) {
                 console.error('[BREAKOUT] Load error:', err);
                 if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#ef4444;font-size:0.8rem;">\u26a1 Failed to load breakout data. Is the server running?</td></tr>';
@@ -10378,46 +10707,60 @@
             }
         };
 
-        app.renderBreakoutTable = function(candidates) {
+        app.renderBreakoutTable = function(candidates, asofDate) {
             const tbody = document.getElementById('breakoutTableBody');
             if (!tbody) return;
 
             if (!candidates || candidates.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="padding:2.5rem;text-align:center;color:#334155;font-size:0.82rem;">\u26a1 No candidates above the minimum score threshold.<br><span style="font-size:0.72rem;color:#1e293b;">Lower the Min Score or wait for the next scan cycle.</span></td></tr>';
+                tbody.innerHTML = `<tr><td colspan="9" style="padding:2.5rem;text-align:center;color:#334155;font-size:0.82rem;">\u26a1 No candidates found for ${asofDate ? 'date ' + asofDate : 'current scan'} above score threshold.<br><span style="font-size:0.72rem;color:#1e293b;">Try lowering the Min Score or selecting another universe.</span></td></tr>`;
                 return;
             }
 
             const scoreBar = (val, max, color) => {
                 const pct = max > 0 ? Math.round((val / max) * 100) : 0;
-                return `<div style="display:flex;align-items:center;gap:0.3rem;"><span style="font-family:var(--font-mono);color:${color};font-weight:600;min-width:2rem;text-align:right;">${val}</span><div style="flex:1;height:4px;background:rgba(255,255,255,0.07);border-radius:2px;min-width:40px;"><div style="width:${pct}%;height:100%;background:${color};border-radius:2px;transition:width 0.3s;"></div></div></div>`;
+                return `<div style="display:flex;align-items:center;gap:0.3rem;"><span style="font-family:var(--font-mono);color:${color};font-weight:600;min-width:1.8rem;text-align:right;font-size:0.68rem;">${val}</span><div style="flex:1;height:3px;background:rgba(255,255,255,0.07);border-radius:2px;min-width:30px;"><div style="width:${pct}%;height:100%;background:${color};border-radius:2px;"></div></div></div>`;
             };
 
-            const momentumColor = s => ({ 'Strong': '#34d399', 'Moderate': '#60a5fa', 'Weak': '#fbbf24', 'None': '#475569' }[s] || '#475569');
+            const outcomeBadgeHtml = (c) => {
+                const badge = c.outcome_badge || 'blue';
+                const label = c.outcome_label || (c.breakout_happened ? 'Breakout Succeeded ✅' : 'Pending ⏳');
+                const colors = {
+                    emerald: { bg: 'rgba(16,185,129,0.15)', text: '#34d399', border: 'rgba(16,185,129,0.3)' },
+                    amber: { bg: 'rgba(234,179,8,0.15)', text: '#fbbf24', border: 'rgba(234,179,8,0.3)' },
+                    rose: { bg: 'rgba(239,68,68,0.15)', text: '#f87171', border: 'rgba(239,68,68,0.3)' },
+                    slate: { bg: 'rgba(71,85,105,0.15)', text: '#94a3b8', border: 'rgba(71,85,105,0.3)' },
+                    blue: { bg: 'rgba(59,130,246,0.15)', text: '#60a5fa', border: 'rgba(59,130,246,0.3)' }
+                };
+                const style = colors[badge] || colors.blue;
+                return `<span style="display:inline-block;background:${style.bg};color:${style.text};border:1px solid ${style.border};font-size:0.68rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:4px;white-space:nowrap;">${label}</span>`;
+            };
 
             const rows = candidates.map((c) => {
                 const score = c.composite_score || 0;
                 const scoreColor = score >= 75 ? '#fde68a' : score >= 55 ? '#34d399' : '#60a5fa';
                 const scoreBg = score >= 75 ? 'rgba(234,179,8,0.15)' : score >= 55 ? 'rgba(16,185,129,0.12)' : 'rgba(59,130,246,0.1)';
 
-                const pctHighStr = c.pct_from_high != null
-                    ? `<span style="color:${c.pct_from_high >= 0 ? '#34d399' : '#f87171'};">${c.pct_from_high >= 0 ? '+' : ''}${c.pct_from_high.toFixed(1)}%</span>`
-                    : '<span style="color:#334155;">\u2014</span>';
-
-                const volRatioStr = c.volume_ratio != null
-                    ? `<span style="color:${c.volume_ratio >= 1.5 ? '#34d399' : '#94a3b8'};">${c.volume_ratio.toFixed(2)}x</span>`
-                    : '<span style="color:#334155;">\u2014</span>';
-
-                const atrStr = c.atr_pct != null
-                    ? `<span style="color:${c.atr_pct < 1.0 ? '#fbbf24' : '#64748b'};">${c.atr_pct.toFixed(2)}%</span>`
-                    : '<span style="color:#334155;">\u2014</span>';
-
-                const momSignal = c.momentum_signal || 'None';
-                const momBg = { 'Strong': 'rgba(16,185,129,0.15)', 'Moderate': 'rgba(59,130,246,0.12)', 'Weak': 'rgba(234,179,8,0.12)', 'None': 'rgba(71,85,105,0.12)' }[momSignal] || 'rgba(71,85,105,0.12)';
-
                 const ticker = c.ticker || '\u2014';
-                const company = (c.company_name || ticker).substring(0, 22);
-                const industry = (c.industry || '\u2014').substring(0, 18);
-                const price = c.current_price != null ? `\u20b9${Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
+                const company = (c.company_name || ticker).substring(0, 20);
+                const industry = (c.industry || '\u2014').substring(0, 16);
+
+                const sigPrice = c.predicted_value || c.signal_price || c.current_price;
+                const sigPriceStr = sigPrice != null ? `\u20b9${Number(sigPrice).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
+                
+                const curPriceStr = c.current_price != null ? `\u20b9${Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
+                const triggerStr = c.breakout_trigger != null ? `\u20b9${Number(c.breakout_trigger).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
+                const targetStr = c.target_price != null ? `\u20b9${Number(c.target_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
+                const stopStr = c.stop_loss != null ? `\u20b9${Number(c.stop_loss).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
+
+                const retPct = c.realized_return_pct;
+                const retColor = retPct > 0 ? '#34d399' : retPct < 0 ? '#f87171' : '#94a3b8';
+                const retStr = retPct != null
+                    ? `<span style="font-weight:700;color:${retColor};font-family:var(--font-mono);">${retPct >= 0 ? '+' : ''}${Number(retPct).toFixed(1)}%</span>`
+                    : '<span style="color:#475569;">\u2014</span>';
+
+                const gapPct = c.pct_from_high != null
+                    ? `<span style="font-size:0.62rem;color:${c.pct_from_high >= 0 ? '#34d399' : '#f87171'};">(${c.pct_from_high >= 0 ? '+' : ''}${c.pct_from_high.toFixed(1)}%)</span>`
+                    : '';
 
                 return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);" data-ticker="${ticker}">
                     <td style="padding:0.55rem 0.75rem;">
@@ -10430,16 +10773,33 @@
                             <span style="font-size:0.6rem;color:#334155;">${industry}</span>
                         </div>
                     </td>
-                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);color:#e2e8f0;font-size:0.75rem;white-space:nowrap;">${price}</td>
-                    <td style="padding:0.55rem 0.75rem;text-align:right;">${pctHighStr}</td>
-                    <td style="padding:0.55rem 0.75rem;text-align:right;">${volRatioStr}</td>
-                    <td style="padding:0.55rem 0.75rem;text-align:right;">${atrStr}</td>
-                    <td style="padding:0.55rem 0.75rem;text-align:center;">
-                        <span style="background:${momBg};color:${momentumColor(momSignal)};font-size:0.65rem;font-weight:700;padding:0.12rem 0.4rem;border-radius:4px;">${momSignal}</span>
+                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);color:#93c5fd;font-size:0.74rem;white-space:nowrap;">
+                        <div>${sigPriceStr}</div>
+                        <div style="font-size:0.6rem;color:#475569;">${c.signal_date || ''}</div>
                     </td>
-                    <td style="padding:0.55rem 0.75rem;">${scoreBar(c.fundamental_score || 0, 20, '#a78bfa')}</td>
+                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);color:#fca5a5;font-size:0.74rem;white-space:nowrap;">
+                        <div>${triggerStr}</div>
+                        <div>${gapPct}</div>
+                    </td>
+                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);font-size:0.7rem;white-space:nowrap;">
+                        <div style="color:#34d399;" title="Target Price">T: ${targetStr}</div>
+                        <div style="color:#f87171;" title="Stop Loss">SL: ${stopStr}</div>
+                    </td>
+                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);color:#e2e8f0;font-size:0.74rem;white-space:nowrap;">
+                        <div>${curPriceStr}</div>
+                        <div style="font-size:0.6rem;color:#475569;">${c.current_date || 'Live'}</div>
+                    </td>
+                    <td style="padding:0.55rem 0.75rem;text-align:right;font-size:0.76rem;white-space:nowrap;">
+                        ${retStr}
+                        ${c.max_gain_pct != null ? `<div style="font-size:0.6rem;color:#64748b;" title="Max high post-signal">Peak: +${c.max_gain_pct}%</div>` : ''}
+                    </td>
+                    <td style="padding:0.55rem 0.75rem;text-align:center;">
+                        ${outcomeBadgeHtml(c)}
+                    </td>
                     <td style="padding:0.55rem 0.75rem;text-align:right;">
-                        <span style="background:${scoreBg};color:${scoreColor};font-size:0.82rem;font-weight:800;font-family:var(--font-mono);padding:0.15rem 0.5rem;border-radius:6px;letter-spacing:-0.02em;">${score}</span>
+                        <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.4rem;">
+                            <span style="background:${scoreBg};color:${scoreColor};font-size:0.8rem;font-weight:800;font-family:var(--font-mono);padding:0.12rem 0.45rem;border-radius:5px;">${score}</span>
+                        </div>
                     </td>
                     <td style="padding:0.55rem 0.75rem;text-align:center;">
                         <button onclick="app.openSwingRangeModal('ALL','${ticker}')" class="btn-micro btn-micro-primary" title="Analyse ${ticker}" style="font-size:0.65rem;">Analyse</button>
@@ -10487,7 +10847,7 @@
                 if (bv == null) return -1;
                 return app._breakoutSortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
             });
-            app.renderBreakoutTable(sorted);
+            app.renderBreakoutTable(sorted, app._breakoutAsofDate);
         };
 
         // Initialize & export to window

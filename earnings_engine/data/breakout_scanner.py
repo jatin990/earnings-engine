@@ -52,15 +52,22 @@ _cache: dict[str, Any] = {
 }
 
 
-def get_cached_scan_results(universe: str | None = None, settings: Settings | None = None) -> list[dict[str, Any]]:
-    """Return the latest cached breakout candidates (thread-safe read), optionally filtered by universe."""
+def get_cached_scan_results(
+    universe: str | None = None,
+    settings: Settings | None = None,
+    asof_date: str | None = None,
+) -> list[dict[str, Any]]:
+    """Return breakout candidates, optionally filtered by universe and point-in-time as-of date."""
+    settings = settings or Settings()
+    if asof_date:
+        return run_breakout_scan(settings, universe=universe, asof_date=asof_date)
+
     all_candidates = list(_cache["candidates"])
     if not universe or universe.lower() in ("all", "any", "global", "monitored"):
         return all_candidates
 
     # Filter candidates by the requested universe / watchlist
     try:
-        settings = settings or Settings()
         from earnings_engine.data.universe import load_universe
         from earnings_engine.data.watchlists import get_watchlist
         
@@ -81,7 +88,6 @@ def get_cached_scan_results(universe: str | None = None, settings: Settings | No
                 uni_tickers = set(load_universe(universe, settings) or [])
 
         if uni_tickers:
-            # Case-insensitive / prefix matching
             uni_normalized = {t.upper() for t in uni_tickers}
             return [c for c in all_candidates if c.get("ticker", "").upper() in uni_normalized]
     except Exception as e:
@@ -238,24 +244,47 @@ def score_breakout(
     ticker: str,
     prices_df: pd.DataFrame,
     quality_scores: list[float | None] | None = None,
+    asof_date: str | None = None,
 ) -> dict[str, Any] | None:
-    """Score a single ticker.  Returns None if not enough data.
+    """Score a single ticker point-in-time, and compute realized breakout outcomes.
 
-    ``prices_df`` must have at least a ``close`` column (and optionally ``volume``).
+    ``prices_df`` must have at least a ``close`` column (and optionally ``high``, ``low``, ``volume``).
     """
     if prices_df is None or prices_df.empty:
         return None
 
+    df = prices_df.copy()
+    if not isinstance(df.index, pd.DatetimeIndex):
+        try:
+            df.index = pd.to_datetime(df.index)
+        except Exception:
+            pass
+
+    df = df.sort_index()
+
+    # Point-in-time slicing
+    if asof_date:
+        asof_clean = str(asof_date).strip()[:10]
+        hist_df = df.loc[df.index <= asof_clean]
+        future_df = df.loc[df.index > asof_clean]
+    else:
+        hist_df = df
+        future_df = pd.DataFrame()
+
+    if hist_df.empty:
+        return None
+
     # Ensure numeric close series
-    closes = pd.to_numeric(prices_df["close"], errors="coerce").dropna()
+    closes = pd.to_numeric(hist_df["close"], errors="coerce").dropna()
     if len(closes) < 10:
         return None
 
-    current_price = float(closes.iloc[-1])
+    signal_date = str(hist_df.index[-1])[:10]
+    signal_price = float(closes.iloc[-1])
 
     # Volume (optional)
-    if "volume" in prices_df.columns:
-        volumes = pd.to_numeric(prices_df["volume"], errors="coerce").fillna(0)
+    if "volume" in hist_df.columns:
+        volumes = pd.to_numeric(hist_df["volume"], errors="coerce").fillna(0)
         volumes = volumes.reindex(closes.index, fill_value=0)
     else:
         volumes = pd.Series(dtype=float)
@@ -269,9 +298,85 @@ def score_breakout(
 
     composite = round(res_score + vol_score + comp_score + mom_score + fund_score, 1)
 
+    # Calculate Breakout Levels
+    window = min(len(hist_df), 252)
+    high_series = pd.to_numeric(hist_df["high"], errors="coerce") if "high" in hist_df.columns else pd.to_numeric(hist_df["close"], errors="coerce")
+    resistance_high = float(high_series.tail(window).max())
+    breakout_trigger = round(resistance_high, 2)
+
+    atr_pct_val = atr_pct if (atr_pct is not None and not np.isnan(atr_pct)) else 2.0
+    atr_val = signal_price * (atr_pct_val / 100.0)
+    target_price = round(max(breakout_trigger * 1.08, breakout_trigger + 2.0 * atr_val), 2)
+    stop_loss = round(min(signal_price * 0.95, signal_price - 1.5 * atr_val), 2)
+
+    # Current / Latest Market Data
+    all_closes = pd.to_numeric(df["close"], errors="coerce").dropna()
+    current_price = float(all_closes.iloc[-1])
+    current_date = str(df.index[-1])[:10]
+
+    # Evaluate Outcome (Did Breakout Happen?)
+    if not future_df.empty and signal_date != current_date:
+        f_highs = pd.to_numeric(future_df["high"], errors="coerce") if "high" in future_df.columns else pd.to_numeric(future_df["close"], errors="coerce")
+        f_lows = pd.to_numeric(future_df["low"], errors="coerce") if "low" in future_df.columns else pd.to_numeric(future_df["close"], errors="coerce")
+        post_high = float(f_highs.max()) if not f_highs.empty else signal_price
+        post_low = float(f_lows.min()) if not f_lows.empty else signal_price
+        
+        realized_return_pct = round(((current_price - signal_price) / signal_price) * 100, 2)
+        max_gain_pct = round(((post_high - signal_price) / signal_price) * 100, 2)
+        days_elapsed = len(future_df)
+
+        if post_high >= target_price:
+            breakout_happened = True
+            outcome = "TARGET_HIT"
+            outcome_label = f"Target Hit 🎯 (+{max_gain_pct}%)"
+            outcome_badge = "emerald"
+        elif post_high >= breakout_trigger:
+            breakout_happened = True
+            if current_price >= signal_price:
+                outcome = "BREAKOUT_SUCCEEDED"
+                outcome_label = f"Breakout Succeeded ✅ ({realized_return_pct:+0.1f}%)"
+                outcome_badge = "emerald"
+            else:
+                outcome = "BREAKOUT_RETRACED"
+                outcome_label = f"Breakout Retraced ⚠️ ({realized_return_pct:+0.1f}%)"
+                outcome_badge = "amber"
+        elif post_low <= stop_loss:
+            breakout_happened = False
+            outcome = "STOP_LOSS_HIT"
+            outcome_label = f"Stop Loss Hit 🛑 ({realized_return_pct:+0.1f}%)"
+            outcome_badge = "rose"
+        else:
+            breakout_happened = False
+            outcome = "NO_BREAKOUT"
+            outcome_label = f"Failed / In Range ❌ ({realized_return_pct:+0.1f}%)"
+            outcome_badge = "slate"
+    else:
+        breakout_happened = None
+        outcome = "PENDING"
+        outcome_label = "Pending Breakout ⏳"
+        outcome_badge = "blue"
+        realized_return_pct = 0.0
+        max_gain_pct = None
+        days_elapsed = 0
+        post_high = signal_price
+
     return {
         "ticker": ticker,
+        "signal_date": signal_date,
+        "signal_price": round(signal_price, 2),
+        "predicted_value": round(signal_price, 2),
+        "breakout_trigger": breakout_trigger,
+        "target_price": target_price,
+        "stop_loss": stop_loss,
         "current_price": round(current_price, 2),
+        "current_date": current_date,
+        "realized_return_pct": realized_return_pct,
+        "max_gain_pct": max_gain_pct,
+        "breakout_happened": breakout_happened,
+        "outcome": outcome,
+        "outcome_label": outcome_label,
+        "outcome_badge": outcome_badge,
+        "days_elapsed": days_elapsed,
         "composite_score": composite,
         "resistance_score": res_score,
         "volume_score": vol_score,
@@ -292,22 +397,22 @@ def score_breakout(
 # Full universe scan
 # ---------------------------------------------------------------------------
 
-def run_breakout_scan(settings: Settings, universe: str | None = None) -> list[dict[str, Any]]:
-    """Scan available tickers and return candidates sorted by score DESC.
-
-    Supports scoping the scan to a specific universe (e.g. NIFTY_50, NSE_TOP,
-    NSE_LARGE_CAP, US_TOP, or custom watchlist name).
-    Pulls prices from the local SQLite cache only — no live network calls.
-    Quality scores are loaded from stored price_metrics where available.
-    """
+def run_breakout_scan(
+    settings: Settings,
+    universe: str | None = None,
+    asof_date: str | None = None,
+) -> list[dict[str, Any]]:
+    """Scan available tickers and return candidates sorted by score DESC point-in-time."""
     from concurrent.futures import ThreadPoolExecutor
     from earnings_engine.data import prices as prices_mod
     from earnings_engine.data.watchlists import all_watchlists, get_watchlist
     from earnings_engine.data.universe import load_universe
     from earnings_engine.data.prices import load_prices, load_price_metrics, _connect
 
-    _cache["status"] = "running"
-    _cache["error"] = None
+    is_live_scan = asof_date is None
+    if is_live_scan:
+        _cache["status"] = "running"
+        _cache["error"] = None
     t0 = time.perf_counter()
 
     tickers: set[str] = set()
@@ -371,11 +476,12 @@ def run_breakout_scan(settings: Settings, universe: str | None = None) -> list[d
 
     if not tickers:
         logger.info("[BREAKOUT] No tickers found to scan.")
-        _cache["status"] = "done"
-        _cache["candidates"] = []
-        _cache["tickers_scanned"] = 0
-        _cache["last_scan_at"] = datetime.now(timezone.utc).isoformat()
-        _cache["last_scan_duration_s"] = round(time.perf_counter() - t0, 2)
+        if is_live_scan:
+            _cache["status"] = "done"
+            _cache["candidates"] = []
+            _cache["tickers_scanned"] = 0
+            _cache["last_scan_at"] = datetime.now(timezone.utc).isoformat()
+            _cache["last_scan_duration_s"] = round(time.perf_counter() - t0, 2)
         return []
 
     ticker_list = sorted(tickers)
@@ -399,7 +505,7 @@ def run_breakout_scan(settings: Settings, universe: str | None = None) -> list[d
                 else:
                     quality_scores.append(None)
 
-            result = score_breakout(ticker, prices_df, quality_scores)
+            result = score_breakout(ticker, prices_df, quality_scores, asof_date=asof_date)
             if result and result["composite_score"] >= BREAKOUT_MIN_SCORE:
                 # Enrich with company name from metrics if available
                 result["company_name"] = metrics.get("company_name") or ticker
@@ -421,19 +527,20 @@ def run_breakout_scan(settings: Settings, universe: str | None = None) -> list[d
     candidates = candidates[:BREAKOUT_MAX_CANDIDATES]
 
     elapsed = round(time.perf_counter() - t0, 2)
-    _cache.update({
-        "candidates": candidates,
-        "last_scan_at": datetime.now(timezone.utc).isoformat(),
-        "last_scan_duration_s": elapsed,
-        "tickers_scanned": len(ticker_list),
-        "last_universe": universe or "ALL",
-        "status": "done",
-        "error": None,
-    })
+    if is_live_scan:
+        _cache.update({
+            "candidates": candidates,
+            "last_scan_at": datetime.now(timezone.utc).isoformat(),
+            "last_scan_duration_s": elapsed,
+            "tickers_scanned": len(ticker_list),
+            "last_universe": universe or "ALL",
+            "status": "done",
+            "error": None,
+        })
 
     logger.info(
-        "[BREAKOUT] Scan complete: %d tickers scanned, %d candidates in %.1fs",
-        len(ticker_list), len(candidates), elapsed,
+        "[BREAKOUT] Scan complete (asof=%s): %d tickers scanned, %d candidates in %.1fs",
+        asof_date or "LIVE", len(ticker_list), len(candidates), elapsed,
     )
     return candidates
 

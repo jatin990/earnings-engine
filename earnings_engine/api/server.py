@@ -4249,20 +4249,48 @@ async def get_breakout_radar(
     universe: str | None = Query(None, description="Universe or watchlist to filter/scan (e.g. nifty_50, nse_top, nse_large_cap, us_top, all)"),
     min_score: float = Query(35.0, description="Minimum composite score to include"),
     limit: int = Query(50, ge=1, le=200, description="Max candidates to return"),
-    sort_by: str = Query("composite_score", description="Sort field (composite_score, fundamental_score, resistance_score, volume_score)"),
+    sort_by: str = Query("composite_score", description="Sort field (composite_score, fundamental_score, resistance_score, volume_score, realized_return_pct)"),
+    asof_date: str | None = Query(None, description="Point-in-time scan date in YYYY-MM-DD format"),
 ):
-    """Return the latest cached breakout candidates from the background scanner."""
-    candidates = breakout_scanner_mod.get_cached_scan_results(universe=universe, settings=_settings)
+    """Return breakout candidates from the background scanner or point-in-time historical backtest."""
+    candidates = breakout_scanner_mod.get_cached_scan_results(
+        universe=universe,
+        settings=_settings,
+        asof_date=asof_date,
+    )
     status = breakout_scanner_mod.get_scan_status(universe=universe)
 
     # Apply min_score filter
     candidates = [c for c in candidates if c.get("composite_score", 0) >= min_score]
 
     # Sort
-    valid_sort = {"composite_score", "fundamental_score", "resistance_score", "volume_score", "compression_score", "momentum_score"}
+    valid_sort = {
+        "composite_score", "fundamental_score", "resistance_score", "volume_score",
+        "compression_score", "momentum_score", "realized_return_pct", "predicted_value",
+    }
     if sort_by not in valid_sort:
         sort_by = "composite_score"
-    candidates.sort(key=lambda x: x.get(sort_by, 0), reverse=True)
+    candidates.sort(key=lambda x: x.get(sort_by) or 0, reverse=True)
+
+    # Compute historical outcome metrics if evaluating an older asof_date
+    backtest_summary = {}
+    if asof_date and candidates:
+        evaluated = [c for c in candidates if c.get("breakout_happened") is not None]
+        if evaluated:
+            successes = [c for c in evaluated if c.get("breakout_happened") is True]
+            win_rate = round(len(successes) / len(evaluated) * 100, 1)
+            returns = [c.get("realized_return_pct", 0) for c in evaluated]
+            avg_return = round(sum(returns) / len(returns), 2)
+            top_winner = max(evaluated, key=lambda x: x.get("realized_return_pct", -999))
+            backtest_summary = {
+                "asof_date": asof_date,
+                "total_evaluated": len(evaluated),
+                "success_count": len(successes),
+                "win_rate_pct": win_rate,
+                "avg_return_pct": avg_return,
+                "top_winner_ticker": top_winner.get("ticker"),
+                "top_winner_gain_pct": top_winner.get("realized_return_pct"),
+            }
 
     # Limit
     candidates = candidates[:limit]
@@ -4270,9 +4298,11 @@ async def get_breakout_radar(
     return {
         "success": True,
         "count": len(candidates),
+        "asof_date": asof_date,
         "candidates": candidates,
         "universe": universe or "ALL",
         "scan_status": status,
+        "backtest_summary": backtest_summary,
     }
 
 
