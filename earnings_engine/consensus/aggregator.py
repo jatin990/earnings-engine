@@ -268,8 +268,14 @@ def _synthesize_thesis(
                 dissenting_drivers.append(f"{model_name}: {d}")
 
     if all_drivers:
-        unique_drivers = list(dict.fromkeys(all_drivers))[:3]
-        parts.append("Key drivers: " + "; ".join(unique_drivers) + ".")
+        seen = set()
+        unique_drivers = []
+        for d in all_drivers:
+            norm = d.strip().lower()
+            if norm and norm not in seen:
+                seen.add(norm)
+                unique_drivers.append(d.strip())
+        parts.append("Key drivers: " + "; ".join(unique_drivers[:3]) + ".")
 
     if dissenting_drivers:
         parts.append("Dissent: " + "; ".join(dissenting_drivers[:2]) + ".")

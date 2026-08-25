@@ -751,59 +751,60 @@
         </section>
 
         <!-- TRADE SETUP & STRATEGIC VERDICT CARD -->
-        <section class="card" style="border-color: var(--indigo-border);">
-            <div class="card-header">
-                <div class="card-title">
-                    <span>⚡ AI Consensus Trade Setup & Strategic Verdict</span>
+        <section class="card" style="border: 1px solid rgba(99, 102, 241, 0.25); background: linear-gradient(180deg, #0e111a 0%, #08090f 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
+            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center;">
+                <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #ffffff;">
+                    <span style="color: #6366f1;">⚡</span>
+                    <span>AI Consensus Trade Setup & Strategic Verdict</span>
                 </div>
-                <div id="verdictPill" style="font-size: 0.78rem; font-weight: 800; padding: 0.28rem 0.8rem; border-radius: var(--radius-sm); font-family: var(--font-mono); background: var(--emerald-subtle); color: var(--emerald); border: 1px solid var(--emerald-border);">
+                <div id="verdictPill" style="font-size: 0.76rem; font-weight: 800; padding: 0.28rem 0.85rem; border-radius: var(--radius-sm); font-family: var(--font-mono); background: var(--emerald-subtle); color: var(--emerald); border: 1px solid var(--emerald-border); letter-spacing: 0.03em;">
                     ANALYZING SETUP...
                 </div>
             </div>
 
             <!-- 6 KPI BLOCKS -->
-            <div class="kpi-grid" style="margin-bottom: 1.25rem;">
-                <div class="kpi-box" style="border-top: 2px solid var(--emerald);">
-                    <div class="kpi-tag">Worth Entering</div>
-                    <div class="kpi-number" id="kpiWorth" style="color: var(--emerald); font-size: 1.15rem;">—</div>
-                    <div class="kpi-subtext">Actionable Rating</div>
+            <div class="kpi-grid" style="margin-bottom: 1.15rem; gap: 0.75rem;">
+                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Worth Entering</div>
+                    <div class="kpi-number" id="kpiWorth" style="color: var(--emerald); font-size: 1.05rem; line-height: 1.3; font-weight: 800;">—</div>
+                    <div class="kpi-subtext" style="font-size: 0.7rem; color: #64748b;">Actionable Rating</div>
                 </div>
-                <div class="kpi-box" style="border-top: 2px solid var(--sky);">
-                    <div class="kpi-tag">Optimal Entry Zone</div>
-                    <div class="kpi-number" id="kpiEntry" style="color: var(--sky); font-size: 1.1rem;">₹— – ₹—</div>
-                    <div class="kpi-subtext">Pullback Buy Range</div>
+                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Optimal Entry Zone</div>
+                    <div class="kpi-number" id="kpiEntry" style="color: #38bdf8; font-size: 1rem; font-family: var(--font-mono); font-weight: 700;">₹— – ₹—</div>
+                    <div class="kpi-subtext" style="font-size: 0.7rem; color: #64748b;">Pullback Buy Range</div>
                 </div>
-                <div class="kpi-box" style="border-top: 2px solid var(--emerald);">
-                    <div class="kpi-tag">Consensus Target</div>
-                    <div class="kpi-number" id="kpiTarget" style="color: #ffffff;">₹—</div>
-                    <div class="kpi-subtext" id="kpiTargetSub" style="color: var(--emerald);">+0.0% upside</div>
+                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Consensus Target</div>
+                    <div class="kpi-number" id="kpiTarget" style="color: #ffffff; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">₹—</div>
+                    <div class="kpi-subtext" id="kpiTargetSub" style="font-size: 0.7rem; color: var(--emerald); font-weight: 600;">+0.0% upside</div>
                 </div>
-                <div class="kpi-box" style="border-top: 2px solid var(--rose);">
-                    <div class="kpi-tag">Stop Loss Level</div>
-                    <div class="kpi-number" id="kpiSL" style="color: #fca5a5;">₹—</div>
-                    <div class="kpi-subtext" id="kpiSLSub" style="color: var(--rose);">-0.0% risk</div>
+                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Stop Loss Level</div>
+                    <div class="kpi-number" id="kpiSL" style="color: #fca5a5; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">₹—</div>
+                    <div class="kpi-subtext" id="kpiSLSub" style="font-size: 0.7rem; color: var(--rose); font-weight: 600;">-0.0% risk cut</div>
                 </div>
-                <div class="kpi-box" style="border-top: 2px solid #3b82f6;">
-                    <div class="kpi-tag">Risk-to-Reward</div>
-                    <div class="kpi-number" id="kpiRR" style="color: #93c5fd;">1 : —</div>
-                    <div class="kpi-subtext">Reward vs Invalidation</div>
+                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Risk-to-Reward</div>
+                    <div class="kpi-number" id="kpiRR" style="color: #93c5fd; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">1 : —</div>
+                    <div class="kpi-subtext" style="font-size: 0.7rem; color: #64748b;">Reward vs Invalidation</div>
                 </div>
-                <div class="kpi-box" style="border-top: 2px solid var(--amber);">
-                    <div class="kpi-tag">Consensus Strength</div>
-                    <div class="kpi-number" id="kpiStrength" style="color: var(--amber);">—%</div>
-                    <div class="kpi-subtext" id="kpiAgreeCount">AI Models Agreeing</div>
+                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Consensus Strength</div>
+                    <div class="kpi-number" id="kpiStrength" style="color: #fbbf24; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">—%</div>
+                    <div class="kpi-subtext" id="kpiAgreeCount" style="font-size: 0.7rem; color: #64748b;">AI Models Agreeing</div>
                 </div>
             </div>
 
             <!-- SYNTHESIZED QUANT THESIS -->
-            <div style="background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.15rem; display: flex; flex-direction: column; gap: 0.65rem;">
-                <div id="txtThesis" style="font-size: 0.875rem; color: var(--text-primary); line-height: 1.55;">
+            <div id="thesisCardContainer" style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.65rem;">
+                <div id="txtThesis" style="font-size: 0.85rem; color: #e2e8f0; line-height: 1.55;">
                     Loading AI thesis and strategic rationale...
                 </div>
-                <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.25rem;">
-                    <span id="badgePattern" style="font-size: 0.72rem; font-weight: 600; background: var(--sky); color: #082f49; padding: 0.2rem 0.6rem; border-radius: 4px;">📈 Pattern: —</span>
-                    <span id="badgeVolume" style="font-size: 0.72rem; font-weight: 600; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.2rem 0.6rem; border-radius: 4px;">📊 Volume: —</span>
-                    <span id="badgeRisk" style="font-size: 0.72rem; font-weight: 600; background: var(--rose-subtle); color: var(--rose); border: 1px solid var(--rose-border); padding: 0.2rem 0.6rem; border-radius: 4px;">⚠️ Primary Risk: —</span>
+                <div id="thesisBadgesRow" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.15rem;">
+                    <span id="badgePattern" style="display: none; font-size: 0.7rem; font-weight: 600; background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); padding: 0.2rem 0.6rem; border-radius: 4px;"></span>
+                    <span id="badgeVolume" style="display: none; font-size: 0.7rem; font-weight: 600; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.2rem 0.6rem; border-radius: 4px;"></span>
+                    <span id="badgeRisk" style="display: none; font-size: 0.7rem; font-weight: 600; background: rgba(244, 63, 94, 0.12); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.25); padding: 0.2rem 0.6rem; border-radius: 4px;"></span>
                 </div>
             </div>
         </section>
@@ -1024,11 +1025,79 @@
             const agreeCnt = Math.round(agreeRatio * modelCnt);
             document.getElementById('kpiAgreeCount').textContent = `${agreeCnt} / ${modelCnt} AI Models Agree`;
 
-            thEl.textContent = c.synthesized_thesis || c.failure_reason_summary || c.consensus_narrative || 'Price momentum and technical structure align with multi-model consensus targets.';
+            // Clean & structured thesis display
+            const rawThesis = c.synthesized_thesis || c.failure_reason_summary || c.consensus_narrative || '';
+            if (rawThesis) {
+                let narrative = rawThesis;
+                let drivers = [];
+                let risk = c.primary_risk || '';
 
-            if (c.chart_pattern) document.getElementById('badgePattern').textContent = `📈 Pattern: ${c.chart_pattern}`;
-            if (c.volume_profile_insight) document.getElementById('badgeVolume').textContent = `📊 Volume: ${c.volume_profile_insight}`;
-            if (c.primary_risk) document.getElementById('badgeRisk').textContent = `⚠️ Primary Risk: ${c.primary_risk}`;
+                if (narrative.includes('Key drivers:')) {
+                    const parts = narrative.split('Key drivers:');
+                    narrative = parts[0].trim();
+                    const rest = parts[1] || '';
+                    if (rest.includes('Primary risk:')) {
+                        const rParts = rest.split('Primary risk:');
+                        drivers = rParts[0].replace(/\.$/, '').split(';').map(s => s.trim()).filter(Boolean);
+                        if (!risk) risk = rParts[1].replace(/\.$/, '').trim();
+                    } else {
+                        drivers = rest.replace(/\.$/, '').split(';').map(s => s.trim()).filter(Boolean);
+                    }
+                }
+
+                // Case-insensitive deduplication of drivers
+                const seenD = new Set();
+                const cleanDrivers = [];
+                drivers.forEach(d => {
+                    const norm = d.toLowerCase();
+                    if (!seenD.has(norm)) {
+                        seenD.add(norm);
+                        cleanDrivers.push(d);
+                    }
+                });
+
+                let html = `<div style="color:#f1f5f9;font-weight:500;margin-bottom:${cleanDrivers.length || risk ? '0.6rem' : '0'};font-size:0.86rem;line-height:1.5;">${narrative}</div>`;
+                
+                if (cleanDrivers.length || (risk && risk !== '—' && !risk.toLowerCase().includes('null'))) {
+                    html += `<div style="display:flex;gap:0.45rem;flex-wrap:wrap;align-items:center;">`;
+                    cleanDrivers.forEach(d => {
+                        html += `<span style="font-size:0.72rem;background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25);padding:0.2rem 0.55rem;border-radius:5px;font-weight:600;">🚀 ${d}</span>`;
+                    });
+                    if (risk && risk !== '—' && !risk.toLowerCase().includes('null')) {
+                        html += `<span style="font-size:0.72rem;background:rgba(239,68,68,0.12);color:#fca5a5;border:1px solid rgba(239,68,68,0.25);padding:0.2rem 0.55rem;border-radius:5px;font-weight:600;">⚠️ ${risk}</span>`;
+                    }
+                    html += `</div>`;
+                }
+
+                thEl.innerHTML = html;
+            } else {
+                thEl.textContent = 'Price momentum and technical structure align with multi-model consensus targets.';
+            }
+
+            // Only display pattern and volume badges if genuine content is provided
+            const bp = document.getElementById('badgePattern');
+            const bv = document.getElementById('badgeVolume');
+            const br = document.getElementById('badgeRisk');
+
+            if (bp) {
+                if (c.chart_pattern && c.chart_pattern !== '—' && !c.chart_pattern.toLowerCase().includes('null')) {
+                    bp.textContent = `📈 Pattern: ${c.chart_pattern}`;
+                    bp.style.display = 'inline-block';
+                } else {
+                    bp.style.display = 'none';
+                }
+            }
+            if (bv) {
+                if (c.volume_profile_insight && c.volume_profile_insight !== '—' && !c.volume_profile_insight.toLowerCase().includes('null')) {
+                    bv.textContent = `📊 Volume: ${c.volume_profile_insight}`;
+                    bv.style.display = 'inline-block';
+                } else {
+                    bv.style.display = 'none';
+                }
+            }
+            if (br) {
+                br.style.display = 'none';
+            }
 
             renderModelsMatrix(c.models_breakdown || []);
         }
