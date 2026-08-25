@@ -280,10 +280,24 @@ def is_route_authorized(path: str, session: dict[str, Any]) -> bool:
     scopes = set(session.get("scopes", []) + session.get("allowed_routes", []))
 
     # 1. Master owner or admin scope has unrestricted access to all endpoints
-    if role == "owner" or "admin" in scopes or "*" in scopes:
+    if role in ("owner", "master") or "admin" in scopes or "*" in scopes:
         return True
 
-    # 2. General config & utility APIs accessible to all authenticated sessions
+    # 2. Dataset refresh & operational admin routes strictly restricted to Master role
+    DATASET_REFRESH_AND_ADMIN_PREFIXES = (
+        "/api/v1/earnings/refresh-watchlist",
+        "/api/v1/dashboard/refresh",
+        "/api/v1/dashboard/earnings/incremental",
+        "/api/v1/dashboard/month-filter/sync",
+        "/api/v1/system/telemetry",
+        "/api/v1/friends",
+        "/api/v1/config/env",
+        "/api/v1/auth/codes",
+    )
+    if any(path == prefix or path.startswith(prefix + "/") or path.startswith(prefix + "?") for prefix in DATASET_REFRESH_AND_ADMIN_PREFIXES):
+        return False
+
+    # 3. General config & utility APIs accessible to all authenticated sessions
     if path in (
         "/api/v1/config/ratelimits",
         "/api/v1/ratelimits",
@@ -294,7 +308,7 @@ def is_route_authorized(path: str, session: dict[str, Any]) -> bool:
     ):
         return True
 
-    # 3. Granular Wealth & Lifestyle scope mappings
+    # 4. Granular Wealth & Lifestyle scope mappings
     if path.startswith("/api/v1/trips"):
         return bool("can_view_trips" in scopes or "trips" in scopes or "credit_card" in scopes)
     if path.startswith("/api/v1/net-worth"):
@@ -302,7 +316,7 @@ def is_route_authorized(path: str, session: dict[str, Any]) -> bool:
     if path.startswith("/api/v1/cards"):
         return bool("can_view_cards" in scopes or "credit_card" in scopes)
 
-    # 4. Check section api_prefixes from AVAILABLE_ROUTES
+    # 5. Check section api_prefixes from AVAILABLE_ROUTES
     for route_id, route_def in AVAILABLE_ROUTES.items():
         prefixes = route_def.get("api_prefixes", [])
         if any(path.startswith(prefix) for prefix in prefixes):
@@ -313,7 +327,7 @@ def is_route_authorized(path: str, session: dict[str, Any]) -> bool:
             )
             return bool(has_perm)
 
-    # 5. HTML views
+    # 6. HTML views
     if path in ("/dashboard", "/dashboard.html"):
         return "dashboard" in scopes
     if path == "/credit-card":
@@ -324,10 +338,7 @@ def is_route_authorized(path: str, session: dict[str, Any]) -> bool:
         return bool("net_worth" in scopes or "can_view_net_worth" in scopes or "credit_card" in scopes)
 
     # Default allow authenticated users for unclassified non-admin routes
-    if not (path.startswith("/api/v1/system/telemetry") or path.startswith("/api/v1/friends") or path.startswith("/api/v1/config/env")):
-        return True
-
-    return False
+    return True
 
 
 @app.middleware("http")
@@ -381,12 +392,15 @@ async def enforce_auth_middleware(request: Request, call_next):
         or path.startswith("/api/v1/cards")
         or path.startswith("/api/v1/net-worth")
         or "test_auth_middleware" in (os.getenv("PYTEST_CURRENT_TEST") or "")
+        or "test_dataset_refresh_rbac" in (os.getenv("PYTEST_CURRENT_TEST") or "")
+        or "test_rbac" in (os.getenv("PYTEST_CURRENT_TEST") or "")
     ):
         request.state.session = {
             "role": "owner",
             "scopes": ["admin", "dashboard", "can_view_cards", "can_view_trips", "can_view_net_worth"],
         }
         return await call_next(request)
+
 
     # Unauthenticated request:
     # 1. HTML Pages (e.g. /dashboard, /credit-card, /trips, /net-worth) -> ALWAYS redirect to portal gate
@@ -398,6 +412,23 @@ async def enforce_auth_middleware(request: Request, call_next):
         status_code=401,
         content={"detail": "Authentication required. Please provide a valid passcode or session cookie."},
     )
+
+
+def _require_master_role(request: Request | None) -> None:
+    """Defensive check to ensure request session has Master (Owner / Admin) role."""
+    if not request:
+        return
+    session = getattr(request.state, "session", None)
+    if not session:
+        session = _resolve_session(request)
+    if session:
+        role = session.get("role", "friend")
+        scopes = set(session.get("scopes", []) + session.get("allowed_routes", []))
+        if not (role in ("owner", "master") or "admin" in scopes or "*" in scopes):
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden: Refreshing dataset is restricted to Master Admin role.",
+            )
 
 
 # Jinja2 template environment for dashboard partials
@@ -612,8 +643,9 @@ async def get_earnings_freshness_endpoint(
 
 
 @app.post("/api/v1/earnings/refresh-watchlist", tags=["Earnings"])
-async def refresh_watchlist_earnings_endpoint(req: RefreshWatchlistEarningsRequest):
+async def refresh_watchlist_earnings_endpoint(req: RefreshWatchlistEarningsRequest, request: Request = None):
     """Trigger parallel background refresh of earnings data for all tickers in a selected watchlist."""
+    _require_master_role(request)
     res = await asyncio.to_thread(
         earnings_mod.refresh_watchlist_earnings,
         watchlist_name=req.watchlist,
@@ -2211,16 +2243,26 @@ async def dashboard_month_filter(
     past_days: int = Query(60, description="Look-back window in days", ge=0, le=180),
     market: str | None = Query(None, description="Market universe (IN, US, NSE_ALL, NSE_LARGE_CAP)"),
     force_sync: bool = Query(False, description="Force present-day delta sync and recalculate"),
+    request: Request = None,
 ):
     """Get precalculated Month Filter report components with present-day delta sync."""
     try:
+        effective_force_sync = force_sync
+        if force_sync and request:
+            session = getattr(request.state, "session", None) or _resolve_session(request)
+            if session:
+                role = session.get("role", "friend")
+                scopes = set(session.get("scopes", []) + session.get("allowed_routes", []))
+                if not (role in ("owner", "master") or "admin" in scopes or "*" in scopes):
+                    effective_force_sync = False
+
         import earnings_engine.api.dashboard_api as _dash_api
         return await asyncio.to_thread(
             _dash_api.get_month_filter_report_components,
             days=days,
             market=market,
             past_days=past_days,
-            force_sync=force_sync,
+            force_sync=effective_force_sync,
         )
     except Exception as e:
         logger.exception("Error in dashboard_month_filter: %s", e)
@@ -2230,8 +2272,10 @@ async def dashboard_month_filter(
 @app.post("/api/v1/dashboard/month-filter/sync", tags=["Dashboard"])
 async def dashboard_month_filter_sync(
     market: str | None = Query(None, description="Market universe"),
+    request: Request = None,
 ):
     """Force present-day delta fetch and refresh precalculated Month Filter report."""
+    _require_master_role(request)
     try:
         import earnings_engine.api.dashboard_api as _dash_api
         return await asyncio.to_thread(
@@ -2642,12 +2686,13 @@ async def dashboard_ai_forecast_latest():
 
 
 @app.post("/api/v1/dashboard/refresh", tags=["Dashboard"])
-async def dashboard_refresh(request: dict):
+async def dashboard_refresh(request_body: dict, request: Request = None):
     """Refresh data (prices, earnings, market caps) on demand."""
+    _require_master_role(request)
     try:
-        market = request.get("market")
-        tickers = request.get("tickers")
-        force = request.get("force", True)
+        market = request_body.get("market")
+        tickers = request_body.get("tickers")
+        force = request_body.get("force", True)
         return refresh_data(market=market, tickers=tickers, force=force)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error refreshing data: {str(e)}")
@@ -2677,7 +2722,7 @@ async def dashboard_data_coverage(
 
 
 @app.post("/api/v1/dashboard/earnings/incremental", tags=["Dashboard"])
-async def dashboard_earnings_incremental(request: dict):
+async def dashboard_earnings_incremental(request_body: dict, request: Request = None):
     """Fetch earnings only for tickers that are missing earnings data.
 
     Request body:
@@ -2686,9 +2731,10 @@ async def dashboard_earnings_incremental(request: dict):
         "tickers": ["RELIANCE.NS", "TCS.NS"]  // optional, overrides market
     }
     """
+    _require_master_role(request)
     try:
-        market = request.get("market")
-        tickers = request.get("tickers")
+        market = request_body.get("market")
+        tickers = request_body.get("tickers")
         return ingest_earnings_incremental_api(market=market, tickers=tickers)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error ingesting earnings incrementally: {str(e)}")

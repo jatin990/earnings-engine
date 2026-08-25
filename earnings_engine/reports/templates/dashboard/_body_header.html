@@ -42,7 +42,7 @@
         <div id="topEarningsFreshnessPill" style="display: flex; align-items: center; gap: 0.3rem; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 0.2rem 0.45rem;" title="Last updated timestamp for active universe/watchlist earnings">
             <span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 6px #34d399;"></span>
             <span id="topEarningsFreshnessLabel" style="font-size: 0.7rem; font-weight: 500; color: #34d399; font-family: var(--font-mono); white-space: nowrap;">Earnings</span>
-            <button onclick="app.refreshCurrentWatchlistEarnings()" id="topRefreshEarningsBtn" class="btn-micro" style="padding: 0.08rem 0.3rem; font-size: 0.62rem; margin-left: 0.15rem; background: rgba(255,255,255,0.06); color: #ededed; border: none; border-radius: 4px; cursor: pointer;" title="Refresh earnings data">
+            <button onclick="app.refreshCurrentWatchlistEarnings()" id="topRefreshEarningsBtn" data-master-only="true" class="btn-micro" style="padding: 0.08rem 0.3rem; font-size: 0.62rem; margin-left: 0.15rem; background: rgba(255,255,255,0.06); color: #ededed; border: none; border-radius: 4px; cursor: pointer;" title="Refresh earnings data (Master only)">
                 🔄
             </button>
         </div>

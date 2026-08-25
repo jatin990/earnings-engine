@@ -833,7 +833,98 @@
                 return 'results';
             },
 
+            isMaster: null,
+
+            async initAuthAndPermissions() {
+                try {
+                    const res = await fetch('/api/v1/auth/me');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.authenticated && data.user) {
+                            const user = data.user;
+                            const isMaster = user.role === 'owner' || user.role === 'master' || (user.scopes && (user.scopes.includes('admin') || user.scopes.includes('*')));
+                            this.isMaster = isMaster;
+                            
+                            const userBadge = document.getElementById('topUserBadge');
+                            if (userBadge) {
+                                userBadge.textContent = user.name || (isMaster ? 'Master Admin' : 'Verified Friend');
+                            }
+                            
+                            this.applyRoleRestrictions();
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.debug('[AUTH] Session check error:', e);
+                }
+                
+                // Fallback check from localStorage / default
+                const friendName = localStorage.getItem('ee_friend_name');
+                if (friendName && friendName !== 'Master Admin' && friendName !== 'Owner Account') {
+                    this.isMaster = false;
+                } else {
+                    this.isMaster = true;
+                }
+                this.applyRoleRestrictions();
+            },
+
+            applyRoleRestrictions() {
+                const isMaster = this.isMaster !== false;
+                
+                // 1. Topbar refresh earnings button
+                const topRefreshBtn = document.getElementById('topRefreshEarningsBtn');
+                if (topRefreshBtn) {
+                    if (!isMaster) {
+                        topRefreshBtn.style.display = 'none';
+                        topRefreshBtn.disabled = true;
+                        topRefreshBtn.title = 'Dataset refresh is restricted to Master Admin';
+                    } else {
+                        topRefreshBtn.style.display = 'inline-block';
+                        topRefreshBtn.disabled = false;
+                        topRefreshBtn.title = 'Refresh earnings dataset (Master only)';
+                    }
+                }
+                
+                // 2. Coverage tab "Fetch Missing" button
+                const covMissingBtn = document.getElementById('coverageFetchMissingBtn');
+                if (covMissingBtn) {
+                    if (!isMaster) {
+                        covMissingBtn.style.display = 'none';
+                        covMissingBtn.disabled = true;
+                        covMissingBtn.title = 'Incremental dataset ingest is restricted to Master Admin';
+                    } else {
+                        covMissingBtn.style.display = 'inline-block';
+                        covMissingBtn.disabled = false;
+                    }
+                }
+                
+                // 3. Month filter "Sync Delta" button
+                const mfSyncBtn = document.getElementById('mfSyncBtn');
+                if (mfSyncBtn) {
+                    if (!isMaster) {
+                        mfSyncBtn.style.display = 'none';
+                        mfSyncBtn.disabled = true;
+                        mfSyncBtn.title = 'Dataset sync is restricted to Master Admin';
+                    } else {
+                        mfSyncBtn.style.display = 'inline-block';
+                        mfSyncBtn.disabled = false;
+                    }
+                }
+
+                // 4. All other elements marked with data-master-only
+                document.querySelectorAll('[data-master-only="true"]').forEach(el => {
+                    if (!isMaster) {
+                        el.style.display = 'none';
+                        el.setAttribute('disabled', 'true');
+                    } else {
+                        el.style.display = '';
+                        el.removeAttribute('disabled');
+                    }
+                });
+            },
+
             async init() {
+                await this.initAuthAndPermissions();
                 this.initCustomizer();
                 this.bindKeyboardShortcuts();
                 this._bindWatchlistSelectionPersistence();
@@ -848,7 +939,7 @@
                     this.updateTopRateLimitPill();
                 }, 30000);
 
-                const friendName = localStorage.getItem('ee_friend_name') || 'Master Admin';
+                const friendName = localStorage.getItem('ee_friend_name') || (this.isMaster ? 'Master Admin' : 'Verified Friend');
                 const userBadge = document.getElementById('topUserBadge');
                 if (userBadge) userBadge.textContent = friendName;
                 
@@ -1109,6 +1200,10 @@
             },
 
             async refreshCurrentWatchlistEarnings() {
+                if (this.isMaster === false) {
+                    alert('⚠️ Access Restricted: Refreshing large datasets is restricted to Master role.');
+                    return;
+                }
                 const wl = document.getElementById('globalWatchlist')?.value || '';
                 const btn = document.getElementById('topRefreshEarningsBtn');
 
@@ -1123,6 +1218,10 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ watchlist: wl || null })
                     });
+                    if (res.status === 403) {
+                        alert('⚠️ Access Restricted: Refreshing large datasets is restricted to Master role.');
+                        return;
+                    }
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.detail || 'Failed refreshing watchlist earnings');
 
@@ -1305,6 +1404,7 @@
                         this._breakoutPollTimer = null;
                     }
                 }
+                this.applyRoleRestrictions();
             },
 
             // =========================================================================
@@ -3409,6 +3509,10 @@
             },
 
             async syncMonthFilter() {
+                if (this.isMaster === false) {
+                    alert('⚠️ Access Restricted: Syncing dataset delta is restricted to Master role.');
+                    return;
+                }
                 const syncBtn = document.getElementById('mfSyncBtn');
                 if (syncBtn) {
                     syncBtn.disabled = true;
@@ -6745,19 +6849,30 @@
             },
 
             async runIncrementalEarnings() {
-                const btn = event.target;
-                const originalText = btn.textContent;
-                btn.disabled = true;
-                btn.textContent = '⏳ Fetching...';
+                if (this.isMaster === false) {
+                    alert('⚠️ Access Restricted: Incremental dataset ingestion is restricted to Master role.');
+                    return;
+                }
+                const btn = (typeof event !== 'undefined' && event && event.target) ? event.target : document.getElementById('coverageFetchMissingBtn');
+                const originalText = btn ? btn.textContent : '⚡ Fetch Missing';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = '⏳ Fetching...';
+                }
                 const statusEl = document.getElementById('coverageStatus');
-                statusEl.textContent = 'Fetching earnings for tickers missing data... this can take a while.';
-                const market = document.getElementById('coverageMarket').value || 'ALL';
+                if (statusEl) statusEl.textContent = 'Fetching earnings for tickers missing data... this can take a while.';
+                const market = document.getElementById('coverageMarket')?.value || 'ALL';
                 try {
                     const res = await fetch(API_BASE + '/api/v1/dashboard/earnings/incremental', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({market: market})
                     });
+                    if (res.status === 403) {
+                        if (statusEl) statusEl.textContent = '⚠️ Access Denied: Master role required.';
+                        alert('⚠️ Access Restricted: Incremental dataset ingestion is restricted to Master role.');
+                        return;
+                    }
                     const data = await res.json();
                     if (data.success) {
                         statusEl.textContent = 'Done: ' + data.fetched + ' fetched, ' + data.already_cached + ' already cached, ' +
@@ -6768,7 +6883,7 @@
                     }
                 } catch (e) {
                     console.error('Error running incremental earnings:', e);
-                    statusEl.textContent = 'Error: ' + e.message;
+                    if (statusEl) statusEl.textContent = 'Error: ' + e.message;
                 } finally {
                     btn.disabled = false;
                     btn.textContent = originalText;
