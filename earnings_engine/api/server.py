@@ -4325,6 +4325,30 @@ async def refresh_breakout_radar(
     return {"success": True, "message": f"Breakout scan triggered for {universe or 'all universes'} in background. Check /api/v1/breakout-radar shortly."}
 
 
+@app.post("/api/v1/breakout-radar/ai-reasoning/{ticker}", tags=["Breakout Radar"])
+async def get_breakout_ai_reasoning(
+    ticker: str,
+    model_name: str | None = Query(None, description="Local Ollama model name (e.g. llama3.2:3b, deepseek-r1:8b, qwen2.5-coder:latest)"),
+):
+    """Generate multi-model AI reasoning and calculation breakdown notes for a breakout candidate using local Ollama."""
+    sym = ticker.strip().upper()
+    try:
+        reasoning = breakout_scanner_mod.generate_breakout_ai_reasoning(
+            ticker=sym,
+            model_name=model_name,
+            settings=_settings,
+        )
+        return {
+            "success": True,
+            "ticker": sym,
+            "reasoning": reasoning,
+        }
+    except Exception as e:
+        logger.error("[BREAKOUT-API] Reasoning generation failed for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Breakout AI reasoning failed: {str(e)}")
+
+
+
 # ---------------------------------------------------------------------------
 # Quarter Repeaters & AI Forward Earnings Radar Endpoints
 # ---------------------------------------------------------------------------

@@ -127,3 +127,44 @@ def test_api_breakout_radar_with_asof_date(client, monkeypatch):
     assert data["candidates"][0]["current_price"] == 2750.0
     assert data["candidates"][0]["breakout_happened"] is True
     assert data["backtest_summary"]["win_rate_pct"] == 100.0
+
+
+def test_score_breakout_includes_calculation_notes():
+    """Verify that score_breakout includes structured calculation notes and setup archetypes."""
+    dates = pd.date_range("2026-01-01", periods=40, freq="B")
+    prices = [100.0 + i * 0.1 for i in range(40)]
+    df = pd.DataFrame({
+        "open": prices,
+        "high": [p + 0.5 for p in prices],
+        "low": [p - 0.5 for p in prices],
+        "close": prices,
+        "volume": [1000] * 39 + [2500],
+    }, index=dates)
+
+    res = score_breakout("COIL.NS", df, quality_scores=[8.0, 7.0, 9.0])
+    assert res is not None
+    assert "calculation_notes" in res
+    notes = res["calculation_notes"]
+    assert "resistance_reasoning" in notes
+    assert "volume_reasoning" in notes
+    assert "compression_reasoning" in notes
+    assert "momentum_reasoning" in notes
+    assert "fundamental_reasoning" in notes
+    assert "setup_archetype" in res
+    assert res["risk_reward_ratio"] > 0
+
+
+def test_api_breakout_ai_reasoning_endpoint(client):
+    """Verify /api/v1/breakout-radar/ai-reasoning/{ticker} returns structured reasoning."""
+    resp = client.post("/api/v1/breakout-radar/ai-reasoning/TCS.NS")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["ticker"] == "TCS.NS"
+    assert "reasoning" in data
+    r = data["reasoning"]
+    assert "verdict" in r
+    assert "confidence_pct" in r
+    assert "accumulation_analysis" in r
+    assert "execution_plan" in r
+

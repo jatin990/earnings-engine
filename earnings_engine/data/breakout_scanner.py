@@ -478,6 +478,50 @@ def score_breakout(
         days_elapsed = 0
         post_high = signal_price
 
+    # Mathematical Calculation & Reasoning Notes
+    res_note = (
+        f"Price ₹{signal_price:,.2f} is {pct_from_high:+.1f}% from 52W/recent high of ₹{resistance_high:,.2f} (awarding {res_score:.1f}/30 pts for proximity)"
+        if not (isinstance(pct_from_high, float) and np.isnan(pct_from_high)) else "Insufficient price range data."
+    )
+    vol_note = (
+        f"Latest volume is {vol_ratio:.2f}× the 20-day baseline average (awarding {vol_score:.1f}/20 pts for institutional participation)"
+        if not (isinstance(vol_ratio, float) and np.isnan(vol_ratio)) else "Volume in line with 20D average (0/20 pts)."
+    )
+    comp_note = (
+        f"ATR(14) is {atr_pct:.2f}% of price, indicating {'tight energy coiling & volatility compression' if (atr_pct or 0) < 1.5 else 'moderate volatility'} (awarding {comp_score:.1f}/15 pts)"
+        if not (isinstance(atr_pct, float) and np.isnan(atr_pct)) else "Normal price volatility."
+    )
+    mom_note = f"Momentum signal is '{momentum_signal}' based on 30D return & 20D SMA trend posture (awarding {mom_score:.1f}/15 pts)"
+    fund_note = (
+        f"Historical quarterly earnings quality averages {avg_quality:.1f}/9 (awarding {fund_score:.1f}/20 pts fundamental bonus)"
+        if not (isinstance(avg_quality, float) and np.isnan(avg_quality)) else "No quarterly quality history (0/20 pts)."
+    )
+
+    # Setup Archetype
+    if (pct_from_high is not None and pct_from_high >= -1.5) and (vol_ratio is not None and vol_ratio >= 1.5):
+        archetype = "🔥 High-Volume 52W Breakout"
+    elif comp_score >= 12 and res_score >= 20:
+        archetype = "🗜️ Coiling Resistance Squeeze"
+    elif vol_ratio is not None and vol_ratio >= 1.8:
+        archetype = "📊 Institutional Accumulation Surge"
+    elif mom_score >= 10:
+        archetype = "🚀 Trend Continuation Breakout"
+    else:
+        archetype = "📈 Resistance Approach Coil"
+
+    risk_reward_ratio = round((target_price - signal_price) / max(0.01, (signal_price - stop_loss)), 2)
+
+    calculation_notes = {
+        "setup_archetype": archetype,
+        "risk_reward_ratio": risk_reward_ratio,
+        "resistance_reasoning": res_note,
+        "volume_reasoning": vol_note,
+        "compression_reasoning": comp_note,
+        "momentum_reasoning": mom_note,
+        "fundamental_reasoning": fund_note,
+        "formula_summary": f"Score {composite}/100 = Res({res_score:.0f}) + Vol({vol_score:.0f}) + Squeeze({comp_score:.0f}) + Mom({mom_score:.0f}) + Fund({fund_score:.0f})",
+    }
+
     return {
         "ticker": ticker,
         "signal_date": signal_date,
@@ -486,6 +530,9 @@ def score_breakout(
         "breakout_trigger": breakout_trigger,
         "target_price": target_price,
         "stop_loss": stop_loss,
+        "risk_reward_ratio": risk_reward_ratio,
+        "setup_archetype": archetype,
+        "calculation_notes": calculation_notes,
         "current_price": round(current_price, 2),
         "current_date": current_date,
         "realized_return_pct": realized_return_pct,
@@ -509,6 +556,166 @@ def score_breakout(
         "data_points": len(closes),
         "scanned_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Local Ollama Multi-Model AI Reasoning Engine
+# ---------------------------------------------------------------------------
+
+_AI_REASONING_CACHE: dict[str, dict[str, Any]] = {}
+
+
+def generate_breakout_ai_reasoning(
+    ticker: str,
+    model_name: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Generate multi-model AI reasoning for a breakout candidate using local Ollama models.
+
+    Supports:
+    - `llama3.2:3b` (Fast local consensus)
+    - `deepseek-r1:8b` (Deep chain-of-thought institutional reasoning)
+    - `qwen2.5-coder:latest` (Algorithmic technical validation)
+    """
+    sym = ticker.strip().upper()
+    settings = settings or Settings()
+
+    # Check in-memory cache
+    cache_key = f"{sym}_{model_name or 'default'}"
+    if cache_key in _AI_REASONING_CACHE:
+        return _AI_REASONING_CACHE[cache_key]
+
+    # Get scored candidate details
+    from earnings_engine.data.prices import load_prices, load_price_metrics
+    prices_df = load_prices(sym, settings)
+    metrics = load_price_metrics(sym, settings) or {}
+    company_name = metrics.get("company_name") or sym
+    industry = metrics.get("industry") or metrics.get("sector") or "—"
+
+    quality_scores = [
+        float(metrics.get(k)) if metrics.get(k) is not None else None
+        for k in ("q1_earnings_score", "q2_earnings_score", "q3_earnings_score")
+    ]
+    scored = score_breakout(sym, prices_df, quality_scores) or {}
+
+    notes = scored.get("calculation_notes", {})
+    target = scored.get("target_price", 0)
+    stop = scored.get("stop_loss", 0)
+    trigger = scored.get("breakout_trigger", 0)
+    cur_p = scored.get("current_price", 0)
+    score = scored.get("composite_score", 0)
+    archetype = scored.get("setup_archetype", "Breakout Coil")
+
+    # Construct quantitative prompt
+    prompt = f"""You are an elite quantitative trading analyst specializing in breakout pattern recognition and price action momentum.
+Evaluate the following breakout setup for {sym} ({company_name}) and provide an institutional opinion.
+
+### Setup Metrics:
+- Ticker: {sym} | Industry: {industry}
+- Setup Archetype: {archetype}
+- Composite Breakout Score: {score}/100
+- Current Price: ₹{cur_p}
+- Breakout Trigger (Resistance): ₹{trigger} ({scored.get('pct_from_high', 0):+.1f}% from high)
+- Upside Target Price: ₹{target}
+- Invalidation Stop Loss: ₹{stop}
+- Risk/Reward Ratio: {scored.get('risk_reward_ratio', 2.0)} : 1
+- Volume Surge: {scored.get('volume_ratio', 1.0)}x of 20D average
+- Price Compression (ATR %): {scored.get('atr_pct', 2.0)}%
+- Momentum Signal: {scored.get('momentum_signal', 'Moderate')}
+- Earnings Quality (1-9): {scored.get('avg_quality_score', 'N/A')}
+
+### Instructions:
+1. Explain whether this breakout has genuine institutional volume accumulation or fakeout/exhaustion risk.
+2. Outline key execution game plan (Entry confirmation, trailing stop, target scaling).
+3. Output strict JSON adhering to this schema:
+{{
+  "verdict": "HIGH_CONVICTION_BREAKOUT",
+  "confidence_pct": 82,
+  "model_used": "{model_name or 'Ollama'}",
+  "accumulation_analysis": "2-3 sentences evaluating the volume surge and price coiling.",
+  "fakeout_risk_assessment": "Key vulnerability or fakeout warning signs to monitor.",
+  "execution_plan": "Specific entry trigger, stop loss discipline, and target level.",
+  "key_reasons": ["Reason 1", "Reason 2", "Reason 3"]
+}}
+"""
+
+    model_to_use = model_name or os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+    ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+    output_dict: dict[str, Any] | None = None
+
+    # 1. Try Local Ollama
+    try:
+        import urllib.request
+        data_payload = json.dumps({
+            "model": model_to_use,
+            "prompt": prompt,
+            "stream": False,
+            "format": "json",
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            f"{ollama_host}/api/generate",
+            data=data_payload,
+            headers={"Content-Type": "application/json"},
+        )
+        # Timeout: 45s for 8B deepseek, 15s for 3b
+        timeout = 45 if "8b" in model_to_use.lower() or "deepseek" in model_to_use.lower() else 18
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw_res = json.loads(resp.read().decode("utf-8"))
+            resp_text = raw_res.get("response", "")
+            m = re.search(r"\{[\s\S]*\}", resp_text)
+            if m:
+                output_dict = json.loads(m.group(0))
+                output_dict["source"] = f"Local Ollama ({model_to_use})"
+    except Exception as e:
+        logger.debug("[BREAKOUT-AI] Local Ollama call (%s) failed/timed out: %s", model_to_use, e)
+
+    # 2. Rule-based Institutional Fallback if local model unavailable
+    if not output_dict:
+        vol_r = scored.get("volume_ratio") or 1.0
+        pct_h = scored.get("pct_from_high") or -3.0
+        is_high_conviction = score >= 60 and vol_r >= 1.3 and pct_h >= -3.0
+
+        verdict = "HIGH_CONVICTION_BREAKOUT" if is_high_conviction else ("POTENTIAL_BREAKOUT_COIL" if score >= 40 else "WATCHLIST_SETUP")
+        conf = min(92, max(60, int(score * 0.9 + (vol_r * 5))))
+
+        output_dict = {
+            "verdict": verdict,
+            "confidence_pct": conf,
+            "model_used": "Institutional Quantitative Rule Engine",
+            "source": "Quantitative Synthesis",
+            "accumulation_analysis": (
+                f"{sym} displays {vol_r:.2f}× volume surge alongside an ATR compression of {scored.get('atr_pct', 1.5):.2f}%, "
+                f"indicating tight price energy coiled directly under key resistance at ₹{trigger:,.2f}."
+            ),
+            "fakeout_risk_assessment": (
+                f"Watch for rejection at ₹{trigger:,.2f} on declining volume. Stop loss is strictly placed at ₹{stop:,.2f} "
+                f"to protect capital against false breakouts."
+            ),
+            "execution_plan": (
+                f"Enter on confirmed hourly close above ₹{trigger:,.2f}. Scale out 50% at initial target ₹{target:,.2f}, "
+                f"and trail remaining position using 20D SMA."
+            ),
+            "key_reasons": [
+                notes.get("resistance_reasoning", f"Within {pct_h:+.1f}% of key resistance high"),
+                notes.get("volume_reasoning", f"{vol_r:.2f}x volume surge confirming buyer interest"),
+                notes.get("compression_reasoning", "ATR squeeze signaling high potential energy release"),
+            ],
+        }
+
+    output_dict["ticker"] = sym
+    output_dict["company_name"] = company_name
+    output_dict["score"] = score
+    output_dict["archetype"] = archetype
+    output_dict["trigger"] = trigger
+    output_dict["target"] = target
+    output_dict["stop_loss"] = stop
+    output_dict["risk_reward_ratio"] = scored.get("risk_reward_ratio", 2.0)
+    output_dict["calculation_notes"] = notes
+    output_dict["generated_at"] = datetime.now(timezone.utc).isoformat()
+
+    _AI_REASONING_CACHE[cache_key] = output_dict
+    return output_dict
 
 
 # ---------------------------------------------------------------------------

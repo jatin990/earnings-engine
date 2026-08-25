@@ -10793,6 +10793,8 @@
                     ? `<span style="font-size:0.62rem;color:${c.pct_from_high >= 0 ? '#34d399' : '#f87171'};">(${c.pct_from_high >= 0 ? '+' : ''}${c.pct_from_high.toFixed(1)}%)</span>`
                     : '';
 
+                const archetype = c.setup_archetype || (score >= 60 ? '🔥 Strong Breakout' : '📈 Resistance Coil');
+
                 return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);" data-ticker="${ticker}">
                     <td style="padding:0.55rem 0.75rem;">
                         <div style="display:flex;flex-direction:column;gap:0.05rem;">
@@ -10801,7 +10803,7 @@
                                 <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-size:0.75rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
                             </div>
                             <span style="font-size:0.65rem;color:#475569;" title="${c.company_name || ticker}">${company}</span>
-                            <span style="font-size:0.6rem;color:#334155;">${industry}</span>
+                            <div style="margin-top:0.2rem;"><span style="font-size:0.62rem;background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.25);padding:0.08rem 0.35rem;border-radius:3px;">${archetype}</span></div>
                         </div>
                     </td>
                     <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);color:#93c5fd;font-size:0.74rem;white-space:nowrap;">
@@ -10832,13 +10834,174 @@
                             <span style="background:${scoreBg};color:${scoreColor};font-size:0.8rem;font-weight:800;font-family:var(--font-mono);padding:0.12rem 0.45rem;border-radius:5px;">${score}</span>
                         </div>
                     </td>
-                    <td style="padding:0.55rem 0.75rem;text-align:center;">
-                        <button onclick="app.openSwingRangeModal('ALL','${ticker}')" class="btn-micro btn-micro-primary" title="Analyse ${ticker}" style="font-size:0.65rem;">Analyse</button>
+                    <td style="padding:0.55rem 0.75rem;text-align:center;white-space:nowrap;">
+                        <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">
+                            <button onclick="app.openBreakoutNotesModal('${ticker}')" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-size:0.68rem;padding:0.2rem 0.5rem;border-radius:5px;cursor:pointer;" title="View Mathematical Calculation Notes & Ollama AI Reasoning">
+                                🧠 Reasoning
+                            </button>
+                            <button onclick="app.openSwingRangeModal('ALL','${ticker}')" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:5px;" title="Analyse ${ticker}">
+                                📊
+                            </button>
+                        </div>
                     </td>
                 </tr>`;
             });
 
             tbody.innerHTML = rows.join('');
+        };
+
+        app.openBreakoutNotesModal = async function(ticker) {
+            const candidate = (app._breakoutData || []).find(c => c.ticker === ticker) || { ticker: ticker };
+            const modal = document.getElementById('breakoutNotesModal');
+            const content = document.getElementById('breakoutNotesModalContent');
+            if (!modal || !content) return;
+
+            const notes = candidate.calculation_notes || {};
+            const score = candidate.composite_score || 0;
+            const resScore = candidate.resistance_score || 0;
+            const volScore = candidate.volume_score || 0;
+            const compScore = candidate.compression_score || 0;
+            const momScore = candidate.momentum_score || 0;
+            const fundScore = candidate.fundamental_score || 0;
+            const archetype = candidate.setup_archetype || notes.setup_archetype || 'Breakout Setup';
+
+            content.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.85rem;margin-bottom:1rem;">
+                    <div style="display:flex;align-items:center;gap:0.6rem;">
+                        <div style="font-size:1.6rem;">⚡</div>
+                        <div>
+                            <div style="font-size:1.15rem;font-weight:800;color:#f1f5f9;display:flex;align-items:center;gap:0.5rem;">
+                                <span>${ticker}</span>
+                                <span style="font-size:0.72rem;background:rgba(234,179,8,0.2);color:#fbbf24;padding:0.15rem 0.45rem;border-radius:4px;">${archetype}</span>
+                                <span style="font-size:0.75rem;background:rgba(59,130,246,0.2);color:#60a5fa;padding:0.15rem 0.45rem;border-radius:4px;font-family:var(--font-mono);">Score ${score}/100</span>
+                            </div>
+                            <div style="font-size:0.76rem;color:#94a3b8;">${candidate.company_name || ticker} &middot; Signal Price: ₹${candidate.signal_price || candidate.current_price || '—'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1. Mathematical 5-Factor Calculation Breakdown -->
+                <div style="margin-bottom:1.25rem;">
+                    <div style="font-size:0.8rem;font-weight:700;color:#38bdf8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.35rem;">
+                        <span>📐 Mathematical Formula &amp; Factor Reasoning</span>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:0.5rem;font-size:0.78rem;">
+                        <!-- Resistance -->
+                        <div style="background:#0f172a;border:1px solid rgba(239,68,68,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
+                                <strong style="color:#f87171;">1. Resistance Proximity (0–30 pts)</strong>
+                                <span style="font-family:var(--font-mono);font-weight:700;color:#fca5a5;">${resScore.toFixed(1)} / 30 pts</span>
+                            </div>
+                            <div style="color:#cbd5e1;">${notes.resistance_reasoning || `Within ${candidate.pct_from_high != null ? candidate.pct_from_high.toFixed(1) : '0'}% of key resistance high.`}</div>
+                        </div>
+
+                        <!-- Volume -->
+                        <div style="background:#0f172a;border:1px solid rgba(59,130,246,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
+                                <strong style="color:#60a5fa;">2. Volume Surge (0–20 pts)</strong>
+                                <span style="font-family:var(--font-mono);font-weight:700;color:#93c5fd;">${volScore.toFixed(1)} / 20 pts</span>
+                            </div>
+                            <div style="color:#cbd5e1;">${notes.volume_reasoning || `Volume is ${candidate.volume_ratio != null ? candidate.volume_ratio.toFixed(2) : '1.0'}x of 20D baseline.`}</div>
+                        </div>
+
+                        <!-- Compression -->
+                        <div style="background:#0f172a;border:1px solid rgba(234,179,8,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
+                                <strong style="color:#fbbf24;">3. Price Compression / ATR Squeeze (0–15 pts)</strong>
+                                <span style="font-family:var(--font-mono);font-weight:700;color:#fde68a;">${compScore.toFixed(1)} / 15 pts</span>
+                            </div>
+                            <div style="color:#cbd5e1;">${notes.compression_reasoning || `ATR is ${candidate.atr_pct != null ? candidate.atr_pct.toFixed(2) : '2.0'}% of price (volatility coiling).`}</div>
+                        </div>
+
+                        <!-- Momentum -->
+                        <div style="background:#0f172a;border:1px solid rgba(16,185,129,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
+                                <strong style="color:#34d399;">4. Momentum Posture (0–15 pts)</strong>
+                                <span style="font-family:var(--font-mono);font-weight:700;color:#6ee7b7;">${momScore.toFixed(1)} / 15 pts</span>
+                            </div>
+                            <div style="color:#cbd5e1;">${notes.momentum_reasoning || `Momentum signal: ${candidate.momentum_signal || 'Moderate'}.`}</div>
+                        </div>
+
+                        <!-- Fundamental -->
+                        <div style="background:#0f172a;border:1px solid rgba(168,85,247,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
+                                <strong style="color:#c084fc;">5. Fundamental Earnings Bonus (0–20 pts)</strong>
+                                <span style="font-family:var(--font-mono);font-weight:700;color:#e9d5ff;">${fundScore.toFixed(1)} / 20 pts</span>
+                            </div>
+                            <div style="color:#cbd5e1;">${notes.fundamental_reasoning || `Historical earnings quality score.`}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Local Ollama Multi-Model AI Opinion -->
+                <div style="background:#0c1222;border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;flex-wrap:wrap;gap:0.4rem;">
+                        <div style="font-size:0.8rem;font-weight:700;color:#60a5fa;display:flex;align-items:center;gap:0.35rem;">
+                            <span>🤖 Local AI Consensus (Ollama Models)</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.35rem;">
+                            <select id="breakoutOllamaModelSelect" style="background:#0f172a;border:1px solid rgba(255,255,255,0.15);color:#e2e8f0;font-size:0.72rem;padding:0.2rem 0.45rem;border-radius:5px;outline:none;">
+                                <option value="llama3.2:3b">llama3.2:3b (Fast Local)</option>
+                                <option value="deepseek-r1:8b">deepseek-r1:8b (Deep Reasoning)</option>
+                                <option value="qwen2.5-coder:latest">qwen2.5-coder (Algorithmic)</option>
+                            </select>
+                            <button onclick="app.runBreakoutAiReasoning('${ticker}')" class="btn btn-sm" style="background:#2563eb;color:#fff;font-size:0.72rem;padding:0.2rem 0.55rem;border-radius:5px;cursor:pointer;">
+                                ⚡ Generate Opinion
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="breakoutAiOpinionBody" style="font-size:0.8rem;color:#cbd5e1;line-height:1.55;">
+                        <div style="color:#94a3b8;font-style:italic;">Click "⚡ Generate Opinion" to run local Ollama multi-model analysis on volume accumulation, key levels, and fakeout risks.</div>
+                    </div>
+                </div>
+
+                <!-- Footer Action -->
+                <div style="display:flex;align-items:center;justify-content:space-between;padding-top:0.75rem;border-top:1px solid rgba(255,255,255,0.08);">
+                    <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="color:#38bdf8;font-size:0.78rem;text-decoration:none;font-weight:600;">Open Full Stock Intelligence ↗</a>
+                    <button onclick="document.getElementById('breakoutNotesModal').style.display='none'" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);padding:0.35rem 0.85rem;border-radius:6px;font-size:0.75rem;cursor:pointer;">
+                        Close
+                    </button>
+                </div>
+            `;
+
+            modal.style.display = 'flex';
+            // Auto-trigger fast local opinion
+            app.runBreakoutAiReasoning(ticker);
+        };
+
+        app.runBreakoutAiReasoning = async function(ticker) {
+            const bodyEl = document.getElementById('breakoutAiOpinionBody');
+            const model = document.getElementById('breakoutOllamaModelSelect')?.value || 'llama3.2:3b';
+            if (bodyEl) {
+                bodyEl.innerHTML = `<div style="color:#60a5fa;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Generating institutional reasoning with <strong>${model}</strong> on local Ollama...</div>`;
+            }
+
+            try {
+                const res = await fetch(API_BASE + '/api/v1/breakout-radar/ai-reasoning/' + encodeURIComponent(ticker) + '?model_name=' + encodeURIComponent(model), { method: 'POST' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                const r = data.reasoning || {};
+
+                if (bodyEl) {
+                    const verdictColor = r.verdict === 'HIGH_CONVICTION_BREAKOUT' ? '#34d399' : (r.verdict === 'POTENTIAL_BREAKOUT_COIL' ? '#60a5fa' : '#fbbf24');
+                    bodyEl.innerHTML = `
+                        <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.5rem;">
+                            <span style="background:rgba(59,130,246,0.15);color:${verdictColor};font-weight:700;padding:0.15rem 0.45rem;border-radius:4px;font-size:0.74rem;">${r.verdict || 'ANALYSIS COMPLETE'}</span>
+                            <span style="color:#94a3b8;font-size:0.72rem;font-family:var(--font-mono);">Confidence: ${r.confidence_pct || 80}% &middot; Model: ${r.model_used || model}</span>
+                        </div>
+                        <div style="margin-bottom:0.5rem;"><strong style="color:#38bdf8;">📊 Accumulation vs Fakeout:</strong> ${r.accumulation_analysis || 'Solid volume posture.'}</div>
+                        <div style="margin-bottom:0.5rem;"><strong style="color:#f87171;">⚠️ Fakeout Risk Warning:</strong> ${r.fakeout_risk_assessment || 'Monitor volume on breakout bar.'}</div>
+                        <div><strong style="color:#34d399;">🎯 Execution Plan:</strong> ${r.execution_plan || 'Confirm with hourly close.'}</div>
+                    `;
+                }
+            } catch (e) {
+                console.error('[BREAKOUT-AI] Error:', e);
+                if (bodyEl) {
+                    bodyEl.innerHTML = `<div style="color:#f87171;">AI reasoning call failed: ${e.message}. Using rule-based calculation notes above.</div>`;
+                }
+            }
         };
 
         app.refreshBreakoutScan = async function() {

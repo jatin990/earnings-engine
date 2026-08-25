@@ -196,6 +196,16 @@
             </div>
         </div>
 
+        <!-- Breakout Reasoning & AI Notes Modal -->
+        <div id="breakoutNotesModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;align-items:center;justify-content:center;padding:1rem;">
+            <div style="background:#090d16;border:1px solid rgba(59,130,246,0.35);border-radius:12px;max-width:720px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,0.9);padding:1.5rem;position:relative;">
+                <button onclick="document.getElementById('breakoutNotesModal').style.display='none'" style="position:absolute;top:1rem;right:1rem;background:transparent;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;">✕</button>
+                <div id="breakoutNotesModalContent">
+                    <!-- Injected via JavaScript -->
+                </div>
+            </div>
+        </div>
+
 <style>
 @keyframes breakoutPulse {
     0%, 100% { opacity: 1; }
