@@ -1442,11 +1442,15 @@
                     this.scannerCategoriesData = data.categories || [];
                     this.renderScannerCategoriesPills();
 
-                    // If active category not in data, pick first
-                    if (!this.scannerCategoriesData.some(c => c.id === this.activeScannerCategory) && this.scannerCategoriesData.length) {
-                        this.activeScannerCategory = this.scannerCategoriesData[0].id;
+                    // Default to 'all' category if not set or not matching
+                    if (!this.activeScannerCategory) {
+                        this.activeScannerCategory = 'all';
+                    }
+                    if (this.activeScannerCategory !== 'all' && !this.scannerCategoriesData.some(c => c.id === this.activeScannerCategory) && this.scannerCategoriesData.length) {
+                        this.activeScannerCategory = 'all';
                     }
 
+                    this.renderScannerCategoriesPills();
                     await this.loadScannerCategoryCandidates(this.activeScannerCategory);
                 } catch (e) {
                     console.error('Error loading scanner categories:', e);
@@ -1457,8 +1461,17 @@
                 const pillsEl = document.getElementById('scannerCategoryPills');
                 if (!pillsEl) return;
                 const items = this.scannerCategoriesData || [];
+                const totalAllCount = items.reduce((acc, c) => acc + (Number(c.count) || 0), 0);
 
-                pillsEl.innerHTML = items.map(c => {
+                const allPill = {
+                    id: 'all',
+                    icon: '🌟',
+                    badge: 'All Categories',
+                    count: totalAllCount,
+                };
+                const pillList = [allPill, ...items];
+
+                pillsEl.innerHTML = pillList.map(c => {
                     const isActive = c.id === this.activeScannerCategory;
                     const pillBg = isActive ? 'linear-gradient(135deg, #0284c7, #4f46e5)' : 'rgba(255,255,255,0.06)';
                     const pillBorder = isActive ? 'border: 1px solid #38bdf8;' : 'border: 1px solid rgba(255,255,255,0.1);';
@@ -1485,22 +1498,32 @@
                 const descEl = document.getElementById('activeCatDescription');
                 const countBadge = document.getElementById('activeCatCountBadge');
 
-                const catMeta = (this.scannerCategoriesData || []).find(c => c.id === catId) || {};
+                let catMeta = (this.scannerCategoriesData || []).find(c => c.id === catId);
+                if (catId === 'all') {
+                    catMeta = {
+                        icon: '🌟',
+                        name: 'All Scanner Setups & Catalysts',
+                        description: 'Unified multi-category scanner across all Fundamental News Catalysts, Technical Squeeze Coils, 52W Highs, and Momentum Waves.'
+                    };
+                } else if (!catMeta) {
+                    catMeta = { icon: '🔍', name: catId, description: 'Active market candidates matching this setup.' };
+                }
+
                 if (titleEl) titleEl.innerHTML = (catMeta.icon || '🔍') + ' ' + (catMeta.name || catId);
                 if (descEl) descEl.textContent = catMeta.description || 'Active market candidates matching this setup.';
 
-                if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="padding:1.5rem;text-align:center;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Scanning candidates for ' + (catMeta.name || catId) + '...</td></tr>';
+                if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="padding:1.5rem;text-align:center;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Scanning candidates for ' + (catMeta.name || catId) + '...</td></tr>';
 
                 const wl = localStorage.getItem('selectedGlobalWatchlist') || 'NSE_TOP';
                 try {
-                    const res = await fetch(API_BASE + '/api/v1/scanner/category/' + encodeURIComponent(catId) + '?universe=' + encodeURIComponent(wl) + '&limit=25');
+                    const res = await fetch(API_BASE + '/api/v1/scanner/category/' + encodeURIComponent(catId) + '?universe=' + encodeURIComponent(wl) + '&limit=50');
                     const data = await res.json();
                     this.scannerCandidatesData = data.candidates || [];
                     if (countBadge) countBadge.textContent = this.scannerCandidatesData.length + ' stocks';
                     this.renderScannerCandidates();
                 } catch (e) {
                     console.error('Error loading category candidates:', e);
-                    if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="padding:1rem;text-align:center;color:var(--red);">Failed loading category candidates.</td></tr>';
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="padding:1rem;text-align:center;color:var(--red);">Failed loading category candidates.</td></tr>';
                 }
             },
 
@@ -1565,6 +1588,7 @@
                         '<td style="text-align:center;"><span style="color:' + confColor + ';font-weight:700;font-size:0.85rem;font-family:var(--font-mono);">' + confScore + '%</span></td>' +
                         '<td style="text-align:center;"><span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;">' + (c.expected_horizon || '1-3 Days') + '</span></td>' +
                         '<td style="min-width:240px;max-width:380px;">' +
+                            (c.category_name ? '<div style="margin-bottom:0.2rem;"><span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#93c5fd;font-size:0.62rem;padding:0.08rem 0.35rem;border:1px solid rgba(59,130,246,0.3);border-radius:0.25rem;font-weight:600;">' + c.category_name + '</span></div>' : '') +
                             '<div style="font-size:0.75rem;color:#cbd5e1;line-height:1.4;white-space:normal;word-break:break-word;">' + (c.why_it_matches || c.catalyst_summary || '') + '</div>' +
                         '</td>' +
                         '<td style="text-align:center;white-space:nowrap;min-width:120px;">' + this.renderConsensusBadge(c.ticker, 'ALL') + '</td>' +

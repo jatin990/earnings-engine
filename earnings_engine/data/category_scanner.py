@@ -157,9 +157,30 @@ def scan_category(
     limit: int = 25,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Scan and return ranked candidate stocks matching a specific category."""
+    """Scan and return ranked candidate stocks matching a specific category or all categories."""
     settings = settings or Settings()
     cat_id = category_id.lower().strip()
+
+    # Aggregate across all categories if 'all' is requested
+    if cat_id in ("all", "all_categories", "all_setups"):
+        seen_tickers: dict[str, dict[str, Any]] = {}
+        for sub_cat_id in SCANNER_CATEGORIES:
+            sub_candidates = scan_category(
+                category_id=sub_cat_id,
+                universe_or_watchlist=universe_or_watchlist,
+                limit=limit,
+                settings=settings,
+            )
+            for c in sub_candidates:
+                t = c.get("ticker")
+                if not t:
+                    continue
+                if t not in seen_tickers or (c.get("confidence_score", 0) > seen_tickers[t].get("confidence_score", 0)):
+                    seen_tickers[t] = c
+        aggregated = list(seen_tickers.values())
+        aggregated.sort(key=lambda x: (x.get("confidence_score", 0), x.get("return_pct", 0)), reverse=True)
+        return aggregated[:limit]
+
     cat_meta = SCANNER_CATEGORIES.get(cat_id)
     if not cat_meta:
         return []
