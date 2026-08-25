@@ -1,9 +1,9 @@
-"""Active Multi-Category Stock Scanner Hub & Sweep Engine.
+"""Active Multi-Category Stock Scanner Hub & Background Sweep Engine.
 
-Provides unified active scanning across fundamental catalyst categories,
-technical breakout pattern archetypes, and sector momentum contagion.
+Provides DB-persisted, instant-query multi-category scanning across fundamental
+catalyst categories, technical breakout pattern archetypes, and sector momentum contagion.
+Background jobs pre-compute and maintain scanner setups in SQLite for 0ms retrieval.
 """
-
 from __future__ import annotations
 
 import logging
@@ -11,6 +11,8 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+import pandas as pd
 
 from earnings_engine.config import Settings
 from earnings_engine.data.prices import _connect, load_prices
@@ -126,6 +128,46 @@ SCANNER_CATEGORIES: dict[str, dict[str, Any]] = {
 }
 
 
+def _connect_scanner_db(settings: Settings) -> sqlite3.Connection:
+    """Connect to SQLite database and ensure scanner tables & indices exist."""
+    conn = _connect(settings)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS scanner_candidates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            universe TEXT NOT NULL,
+            category_id TEXT NOT NULL,
+            category_name TEXT,
+            category_badge TEXT,
+            ticker TEXT NOT NULL,
+            stock_name TEXT,
+            current_price REAL,
+            return_pct REAL,
+            volume_multiple REAL,
+            trigger_level REAL,
+            confidence_score INTEGER,
+            expected_horizon TEXT,
+            volatility_est TEXT,
+            headline TEXT,
+            catalyst_summary TEXT,
+            why_it_matches TEXT,
+            published_at TEXT,
+            link TEXT,
+            scanned_at TEXT NOT NULL,
+            UNIQUE(universe, category_id, ticker)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_scanner_univ_cat ON scanner_candidates(universe, category_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_scanner_scanned_at ON scanner_candidates(scanned_at DESC)"
+    )
+    conn.commit()
+    return conn
+
+
 def _resolve_universe_tickers(universe_or_watchlist: str = "NSE_TOP", settings: Settings | None = None) -> list[str]:
     """Resolve a universe name or custom watchlist into a list of ticker symbols."""
     settings = settings or Settings()
@@ -136,7 +178,6 @@ def _resolve_universe_tickers(universe_or_watchlist: str = "NSE_TOP", settings: 
             tickers = get_universe(universe_or_watchlist, settings)
 
     if not tickers:
-        # If NSE_ALL or empty, load available cached tickers
         with _connect(settings) as conn:
             rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 350").fetchall()
             tickers = [r[0] for r in rows]
@@ -151,36 +192,15 @@ def _resolve_universe_tickers(universe_or_watchlist: str = "NSE_TOP", settings: 
     return tickers
 
 
-def scan_category(
+def _compute_category_candidates_live(
     category_id: str,
     universe_or_watchlist: str = "NSE_TOP",
-    limit: int = 25,
+    limit: int = 50,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Scan and return ranked candidate stocks matching a specific category or all categories."""
+    """Internal calculation engine for a specific category (called by background sweep)."""
     settings = settings or Settings()
     cat_id = category_id.lower().strip()
-
-    # Aggregate across all categories if 'all' is requested
-    if cat_id in ("all", "all_categories", "all_setups"):
-        seen_tickers: dict[str, dict[str, Any]] = {}
-        for sub_cat_id in SCANNER_CATEGORIES:
-            sub_candidates = scan_category(
-                category_id=sub_cat_id,
-                universe_or_watchlist=universe_or_watchlist,
-                limit=limit,
-                settings=settings,
-            )
-            for c in sub_candidates:
-                t = c.get("ticker")
-                if not t:
-                    continue
-                if t not in seen_tickers or (c.get("confidence_score", 0) > seen_tickers[t].get("confidence_score", 0)):
-                    seen_tickers[t] = c
-        aggregated = list(seen_tickers.values())
-        aggregated.sort(key=lambda x: (x.get("confidence_score", 0), x.get("return_pct", 0)), reverse=True)
-        return aggregated[:limit]
-
     cat_meta = SCANNER_CATEGORIES.get(cat_id)
     if not cat_meta:
         return []
@@ -190,7 +210,6 @@ def scan_category(
 
     # 1. Fundamental News Categories
     if cat_meta["type"] in ("FUNDAMENTAL_CATALYST", "RISK_WARNING"):
-        # Map to news catalyst category string
         news_cat_map = {
             "order_wins": "Order Wins & Contracts",
             "earnings_beats": "Earnings & Guidance Surprise",
@@ -200,7 +219,6 @@ def scan_category(
         }
         target_news_cat = news_cat_map.get(cat_id, "")
         
-        # Query short-term news catalysts
         items = get_short_term_catalysts(
             category_filter=target_news_cat,
             limit=limit * 2,
@@ -212,7 +230,6 @@ def scan_category(
             if tickers and t not in tickers and universe_or_watchlist.upper() not in ("ALL", "GLOBAL", "NSE_ALL"):
                 continue
 
-            # Enrich with telemetry if available
             df = load_prices(t, settings=settings)
             telem = compute_stock_daily_telemetry(t, df) if not df.empty and len(df) >= 2 else None
 
@@ -224,8 +241,10 @@ def scan_category(
             confidence = item.get("impact_score", 75)
 
             candidates.append({
+                "universe": universe_or_watchlist,
                 "category_id": cat_id,
                 "category_name": cat_meta["name"],
+                "category_badge": cat_meta["badge"],
                 "ticker": t,
                 "stock_name": item.get("stock_name") or get_name(t, settings) or t,
                 "current_price": curr_price,
@@ -263,8 +282,10 @@ def scan_category(
                 if cat_id == "squeeze_coils" and c_range <= 6.5:
                     trigger = round(close * 1.025, 2)
                     candidates.append({
+                        "universe": universe_or_watchlist,
                         "category_id": cat_id,
                         "category_name": cat_meta["name"],
+                        "category_badge": cat_meta["badge"],
                         "ticker": t,
                         "stock_name": name,
                         "current_price": close,
@@ -281,8 +302,10 @@ def scan_category(
                 elif cat_id == "blue_sky_52w" and (telem["is_52w_high"] or -3.0 <= dist_52w <= 0.0):
                     trigger = telem["high_52w"]
                     candidates.append({
+                        "universe": universe_or_watchlist,
                         "category_id": cat_id,
                         "category_name": cat_meta["name"],
+                        "category_badge": cat_meta["badge"],
                         "ticker": t,
                         "stock_name": name,
                         "current_price": close,
@@ -299,8 +322,10 @@ def scan_category(
                 elif cat_id == "sector_waves" and (ret >= 4.0 or vol_mult >= 2.5):
                     trigger = round(close * 1.02, 2)
                     candidates.append({
+                        "universe": universe_or_watchlist,
                         "category_id": cat_id,
                         "category_name": cat_meta["name"],
+                        "category_badge": cat_meta["badge"],
                         "ticker": t,
                         "stock_name": name,
                         "current_price": close,
@@ -317,8 +342,10 @@ def scan_category(
                 elif cat_id == "oversold_reversals" and (ret > 0 and c_range >= 9.0 and dist_52w <= -10.0):
                     trigger = round(close * 1.015, 2)
                     candidates.append({
+                        "universe": universe_or_watchlist,
                         "category_id": cat_id,
                         "category_name": cat_meta["name"],
+                        "category_badge": cat_meta["badge"],
                         "ticker": t,
                         "stock_name": name,
                         "current_price": close,
@@ -335,21 +362,190 @@ def scan_category(
             except Exception as e:
                 logger.debug("Scanner candidate error for %s: %s", t, e)
 
-    # Sort candidates by confidence score descending
     candidates.sort(key=lambda c: (c.get("confidence_score", 0), c.get("return_pct", 0)), reverse=True)
     return candidates[:limit]
+
+
+def compute_and_save_scanner_universe(
+    universe_or_watchlist: str = "NSE_TOP",
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Background Worker Task: Runs full universe scanner and persists results to SQLite DB."""
+    settings = settings or Settings()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    logger.info("[SCANNER-WORKER] Starting background sweep for universe '%s'...", universe_or_watchlist)
+
+    # 1. Trigger fresh news headlines sweep
+    try:
+        scan_watchlist_catalysts(watchlist_name=universe_or_watchlist, limit_per_stock=3, settings=settings)
+    except Exception as e:
+        logger.debug("[SCANNER-WORKER] News sweep warning: %s", e)
+
+    # 2. Compute candidates across each category
+    all_candidates: list[dict[str, Any]] = []
+    for cat_id in SCANNER_CATEGORIES:
+        try:
+            cand = _compute_category_candidates_live(cat_id, universe_or_watchlist=universe_or_watchlist, limit=35, settings=settings)
+            all_candidates.extend(cand)
+        except Exception as e:
+            logger.warning("[SCANNER-WORKER] Error sweeping category %s: %s", cat_id, e)
+
+    # 3. Persist to SQLite Database
+    with _connect_scanner_db(settings) as conn:
+        with conn:
+            # Upsert fresh candidates
+            for c in all_candidates:
+                conn.execute(
+                    """
+                    INSERT INTO scanner_candidates (
+                        universe, category_id, category_name, category_badge, ticker, stock_name,
+                        current_price, return_pct, volume_multiple, trigger_level,
+                        confidence_score, expected_horizon, volatility_est, headline,
+                        catalyst_summary, why_it_matches, published_at, link, scanned_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(universe, category_id, ticker) DO UPDATE SET
+                        category_name = excluded.category_name,
+                        category_badge = excluded.category_badge,
+                        stock_name = excluded.stock_name,
+                        current_price = excluded.current_price,
+                        return_pct = excluded.return_pct,
+                        volume_multiple = excluded.volume_multiple,
+                        trigger_level = excluded.trigger_level,
+                        confidence_score = excluded.confidence_score,
+                        expected_horizon = excluded.expected_horizon,
+                        volatility_est = excluded.volatility_est,
+                        headline = excluded.headline,
+                        catalyst_summary = excluded.catalyst_summary,
+                        why_it_matches = excluded.why_it_matches,
+                        published_at = excluded.published_at,
+                        link = excluded.link,
+                        scanned_at = excluded.scanned_at
+                    """,
+                    (
+                        universe_or_watchlist,
+                        c.get("category_id"),
+                        c.get("category_name"),
+                        c.get("category_badge"),
+                        c.get("ticker"),
+                        c.get("stock_name"),
+                        c.get("current_price"),
+                        c.get("return_pct"),
+                        c.get("volume_multiple"),
+                        c.get("trigger_level"),
+                        c.get("confidence_score"),
+                        c.get("expected_horizon"),
+                        c.get("volatility_est"),
+                        c.get("headline"),
+                        c.get("catalyst_summary"),
+                        c.get("why_it_matches"),
+                        c.get("published_at"),
+                        c.get("link"),
+                        now_iso,
+                    ),
+                )
+
+    logger.info(
+        "[SCANNER-WORKER] Background sweep completed. Saved %d candidates into database for universe '%s'.",
+        len(all_candidates),
+        universe_or_watchlist,
+    )
+    return {
+        "status": "success",
+        "universe": universe_or_watchlist,
+        "total_saved": len(all_candidates),
+        "scanned_at": now_iso,
+    }
+
+
+def scan_category(
+    category_id: str,
+    universe_or_watchlist: str = "NSE_TOP",
+    limit: int = 50,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Instant DB Query: Retrieve ranked candidates directly from SQLite database."""
+    settings = settings or Settings()
+    cat_id = category_id.lower().strip()
+
+    columns = [
+        "category_id", "category_name", "category_badge", "ticker", "stock_name",
+        "current_price", "return_pct", "volume_multiple", "trigger_level",
+        "confidence_score", "expected_horizon", "volatility_est", "headline",
+        "catalyst_summary", "why_it_matches", "published_at", "link", "scanned_at"
+    ]
+    col_str = ", ".join(columns)
+
+    with _connect_scanner_db(settings) as conn:
+        if cat_id in ("all", "all_categories", "all_setups"):
+            rows = conn.execute(
+                f"""
+                SELECT {col_str}
+                FROM scanner_candidates
+                WHERE universe = ?
+                ORDER BY confidence_score DESC, return_pct DESC
+                LIMIT ?
+                """,
+                (universe_or_watchlist, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"""
+                SELECT {col_str}
+                FROM scanner_candidates
+                WHERE universe = ? AND category_id = ?
+                ORDER BY confidence_score DESC, return_pct DESC
+                LIMIT ?
+                """,
+                (universe_or_watchlist, cat_id, limit),
+            ).fetchall()
+
+    # If DB is cold (first ever run before background worker finishes), compute and save once
+    if not rows:
+        compute_and_save_scanner_universe(universe_or_watchlist=universe_or_watchlist, settings=settings)
+        return scan_category(category_id=category_id, universe_or_watchlist=universe_or_watchlist, limit=limit, settings=settings)
+
+    candidates: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for r in rows:
+        d = dict(zip(columns, r))
+        t = d.get("ticker")
+        if cat_id in ("all", "all_categories", "all_setups"):
+            if t in seen:
+                continue
+            seen.add(t)
+        candidates.append(d)
+
+    return candidates
 
 
 def get_categories_overview(
     universe_or_watchlist: str = "NSE_TOP",
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Get all scanner categories with real-time candidate count badges."""
+    """Instant DB Query: Retrieve live candidate count badges per category directly from SQLite."""
     settings = settings or Settings()
-    results: list[dict[str, Any]] = []
 
+    with _connect_scanner_db(settings) as conn:
+        counts_map = dict(
+            conn.execute(
+                "SELECT category_id, COUNT(DISTINCT ticker) FROM scanner_candidates WHERE universe = ? GROUP BY category_id",
+                (universe_or_watchlist,),
+            ).fetchall()
+        )
+
+    # Cold start fallback if table is completely empty
+    if not counts_map:
+        compute_and_save_scanner_universe(universe_or_watchlist=universe_or_watchlist, settings=settings)
+        with _connect_scanner_db(settings) as conn:
+            counts_map = dict(
+                conn.execute(
+                    "SELECT category_id, COUNT(DISTINCT ticker) FROM scanner_candidates WHERE universe = ? GROUP BY category_id",
+                    (universe_or_watchlist,),
+                ).fetchall()
+            )
+
+    results: list[dict[str, Any]] = []
     for cat_id, meta in SCANNER_CATEGORIES.items():
-        candidates = scan_category(cat_id, universe_or_watchlist=universe_or_watchlist, limit=15, settings=settings)
         results.append({
             "id": cat_id,
             "name": meta["name"],
@@ -359,8 +555,7 @@ def get_categories_overview(
             "icon": meta["icon"],
             "color": meta["color"],
             "target_horizon": meta["target_horizon"],
-            "count": len(candidates),
-            "top_candidates": candidates[:3],
+            "count": counts_map.get(cat_id, 0),
         })
 
     return results
@@ -370,13 +565,9 @@ def deep_universe_sweep(
     universe_or_watchlist: str = "NSE_TOP",
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    """Execute a comprehensive sweep across all categories for the selected universe."""
+    """Execute a comprehensive sweep across all categories and persist to SQLite DB."""
     settings = settings or Settings()
-    
-    # 1. Trigger fresh news scan across watchlist tickers
-    scan_watchlist_catalysts(watchlist_name=universe_or_watchlist, limit_per_stock=3, settings=settings)
-
-    # 2. Gather candidates across all categories
+    save_result = compute_and_save_scanner_universe(universe_or_watchlist=universe_or_watchlist, settings=settings)
     categories_overview = get_categories_overview(universe_or_watchlist=universe_or_watchlist, settings=settings)
     total_candidates = sum(c["count"] for c in categories_overview)
 
@@ -385,5 +576,5 @@ def deep_universe_sweep(
         "total_categories": len(SCANNER_CATEGORIES),
         "total_candidates_found": total_candidates,
         "categories": categories_overview,
-        "swept_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "swept_at": save_result.get("scanned_at", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")),
     }

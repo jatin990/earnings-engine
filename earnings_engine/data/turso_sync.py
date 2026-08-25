@@ -36,6 +36,7 @@ SYNC_TABLES = [
     "user_sessions",
     "consensus_predictions",
     "breakout_radar",
+    "scanner_candidates",
     "swing_ranges",
     "swing_cycle_history",
 ]

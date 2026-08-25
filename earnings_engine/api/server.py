@@ -69,6 +69,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("[TURSO-SYNC] Could not schedule startup upstream sync: %s", e)
 
+    # Start the background category scanner sweep
+    try:
+        from earnings_engine.data.category_scanner import compute_and_save_scanner_universe
+
+        async def _run_startup_scanner_sweep():
+            try:
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, compute_and_save_scanner_universe, "NSE_TOP", _settings)
+                logger.info("[SCANNER] Startup background multi-category sweep finished.")
+            except Exception as scan_err:
+                logger.warning("[SCANNER] Startup sweep background task warning: %s", scan_err)
+
+        asyncio.create_task(_run_startup_scanner_sweep(), name="category_scanner_sweep")
+    except Exception as e:
+        logger.warning("[SCANNER] Could not schedule startup category sweep: %s", e)
+
     # Start the background breakout scanner loop
     try:
         _breakout_scanner_task = asyncio.create_task(

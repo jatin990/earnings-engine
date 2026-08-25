@@ -1503,8 +1503,24 @@ def sync_cmd() -> None:
     click.echo()
 
 
+@cli.command("scan")
+@click.option("--universe", default="NSE_TOP", help="Universe or watchlist to scan (e.g. NSE_TOP, NSE_ALL, swing)")
+def scan_cmd(universe: str) -> None:
+    """Execute background multi-category stock scan and persist setups to database."""
+    from earnings_engine.data.category_scanner import compute_and_save_scanner_universe, get_categories_overview
+    click.echo(f"\n[SCANNER] Sweeping all categories for universe '{universe}'...")
+    res = compute_and_save_scanner_universe(universe_or_watchlist=universe, settings=Settings())
+    overview = get_categories_overview(universe_or_watchlist=universe, settings=Settings())
+    total_found = sum(c["count"] for c in overview)
+    click.secho(f"[SUCCESS] Background sweep complete! Saved {res.get('total_saved', total_found)} candidate setups across {len(overview)} categories into database.", fg="green", bold=True)
+    for cat in overview:
+        click.echo(f"  - {cat['badge']:<22}: {cat['count']} stocks")
+    click.echo()
+
+
 if __name__ == "__main__":
     cli()
+
 
 
 
