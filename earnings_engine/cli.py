@@ -1488,6 +1488,21 @@ def consensus_stats_cmd() -> None:
     click.echo()
 
 
+@cli.command("sync")
+def sync_cmd() -> None:
+    """Synchronize state between local SQLite database and Upstream Turso Cloud."""
+    from earnings_engine.data.turso_sync import sync_local_to_upstream
+    click.echo("\n[TURSO-SYNC] Synchronizing local SQLite with upstream Turso Cloud...")
+    res = sync_local_to_upstream(Settings())
+    if res.get("status") == "success":
+        click.secho(f"[SUCCESS] Upstream Sync Complete! Pushed {res['total_pushed']} records, pulled {res['total_pulled']} records in {res['elapsed_seconds']}s.", fg="green", bold=True)
+    elif res.get("status") == "skipped":
+        click.secho(f"[SKIPPED] {res.get('reason')}", fg="yellow")
+    else:
+        click.secho(f"[ERROR] Sync failed: {res.get('error')}", fg="red")
+    click.echo()
+
+
 if __name__ == "__main__":
     cli()
 

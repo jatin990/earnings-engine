@@ -54,6 +54,21 @@ async def lifespan(app: FastAPI):
         logger.warning("Startup database migration check failed: %s", e)
     log_startup_diagnostics(logger)
 
+    # Sync local SQLite state with upstream Turso Cloud on startup
+    try:
+        from earnings_engine.data.turso_sync import sync_local_to_upstream
+
+        async def _run_startup_sync():
+            try:
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, sync_local_to_upstream, _settings)
+            except Exception as sync_err:
+                logger.warning("[TURSO-SYNC] Background startup sync encountered an issue: %s", sync_err)
+
+        asyncio.create_task(_run_startup_sync(), name="turso_upstream_sync")
+    except Exception as e:
+        logger.warning("[TURSO-SYNC] Could not schedule startup upstream sync: %s", e)
+
     # Start the background breakout scanner loop
     try:
         _breakout_scanner_task = asyncio.create_task(
@@ -3072,6 +3087,18 @@ async def dashboard_predict_run(request: dict):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error running {engine} prediction: {str(e)}")
+
+
+@app.post("/api/v1/admin/sync-upstream", tags=["Admin"])
+async def admin_sync_upstream():
+    """Manually trigger synchronization between local SQLite and Upstream Turso Cloud."""
+    from earnings_engine.data.turso_sync import sync_local_to_upstream
+    try:
+        loop = asyncio.get_running_loop()
+        res = await loop.run_in_executor(None, sync_local_to_upstream, _settings)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error syncing with upstream database: {str(e)}")
 
 
 # ---------------------------------------------------------------------------

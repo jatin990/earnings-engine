@@ -165,7 +165,13 @@ def log_startup_diagnostics(target_logger: logging.Logger | None = None) -> None
     turso_url = os.getenv("TURSO_DATABASE_URL", "").strip()
     turso_token = os.getenv("TURSO_AUTH_TOKEN", "").strip()
     is_cloud_db = bool(turso_url and turso_token)
-    db_mode_desc = f"☁️ LibSQL Cloud ({turso_url})" if is_cloud_db else "📁 Local SQLite (fallback mode)"
+    from earnings_engine.data.db import is_server_environment
+    if is_server_environment() and is_cloud_db:
+        db_mode_desc = f"LibSQL Cloud ({turso_url})"
+    elif is_cloud_db:
+        db_mode_desc = f"Local SQLite (Fast Local Execution + Upstream Turso Sync)"
+    else:
+        db_mode_desc = "Local SQLite (Pure offline mode)"
 
     # 2. Key Environment Variables Audit
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()

@@ -245,8 +245,8 @@ class TursoConnection:
         if not seq_of_parameters:
             return TursoCursor([])
 
-        # Batch in chunks of 50 for HTTP efficiency
-        batch_size = 50
+        # Batch in chunks of 500 for HTTP efficiency
+        batch_size = 500
         total_affected = 0
         for i in range(0, len(seq_of_parameters), batch_size):
             chunk = seq_of_parameters[i : i + batch_size]
@@ -365,10 +365,12 @@ def is_server_environment() -> bool:
     )
 
 
-def get_db_connection(settings: Settings | None = None) -> sqlite3.Connection | TursoConnection:
-    """Return a database connection (Turso Cloud if configured, otherwise local SQLite).
+def get_db_connection(settings: Settings | None = None, force_remote: bool = False) -> sqlite3.Connection | TursoConnection:
+    """Return a database connection.
 
-    If an isolated test directory is provided in settings, local SQLite is used for test isolation.
+    - Local Execution (default): Uses local SQLite database for zero-latency, reliable local execution.
+    - Cloud/Serverless (VERCEL, AWS Lambda, production, or force_remote=True): Uses Turso LibSQL cloud database.
+    - Testing: Isolated test directory automatically connects to local SQLite.
     """
     s = settings or Settings()
     default_dir = Settings().data_dirs.get("prices")
@@ -379,11 +381,12 @@ def get_db_connection(settings: Settings | None = None) -> sqlite3.Connection | 
     url = os.getenv("TURSO_DATABASE_URL", "").strip()
     token = os.getenv("TURSO_AUTH_TOKEN", "").strip()
 
-    if url and token:
+    # Use remote Turso if in cloud/serverless environment OR explicitly requested via force_remote
+    if (is_server_environment() or force_remote) and url and token:
         return TursoConnection(url, token)
 
     # If in a server environment without Turso credentials, log a high-visibility warning
-    if is_server_environment():
+    if is_server_environment() and not (url and token):
         logger.error(
             "[DB-SERVER-WARNING] Running on server (VERCEL=%s, ENV=%s) but TURSO_DATABASE_URL / TURSO_AUTH_TOKEN is missing! "
             "Falling back to local SQLite at %s (WARNING: data is ephemeral and will not persist across serverless invocations!)",
