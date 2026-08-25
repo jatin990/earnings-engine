@@ -1558,22 +1558,22 @@
                             '<div><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="font-weight:700;font-size:0.85rem;color:var(--light);text-decoration:none;">' + (c.stock_name || c.ticker) + '</a></div>' +
                             '<div style="font-size:0.72rem;color:var(--muted);"><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + c.ticker + '</a><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
                         '</td>' +
-                        '<td><strong>₹' + (c.current_price ? Number(c.current_price).toFixed(2) : '—') + '</strong></td>' +
-                        '<td><strong class="' + retClass + '" style="font-size:0.9rem;">' + retSign + ret.toFixed(2) + '%</strong></td>' +
-                        '<td><strong style="color:' + volColor + ';">' + volMult + 'x</strong> <span style="font-size:0.7rem;color:var(--muted);">20D Avg</span></td>' +
-                        '<td><strong style="color:#fbbf24;font-size:0.85rem;">' + triggerText + '</strong></td>' +
-                        '<td><span style="color:' + confColor + ';font-weight:700;font-size:0.85rem;">' + confScore + '%</span></td>' +
-                        '<td><span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;">' + (c.expected_horizon || '1-3 Days') + '</span></td>' +
-                        '<td style="max-width:320px;">' +
-                            '<div style="font-size:0.75rem;color:#cbd5e1;line-height:1.35;">' + (c.why_it_matches || c.catalyst_summary || '') + '</div>' +
+                        '<td style="text-align:right;"><strong style="font-family:var(--font-mono);">₹' + (c.current_price ? Number(c.current_price).toFixed(2) : '—') + '</strong></td>' +
+                        '<td style="text-align:right;"><strong class="' + retClass + '" style="font-size:0.88rem;font-family:var(--font-mono);">' + retSign + ret.toFixed(2) + '%</strong></td>' +
+                        '<td style="text-align:center;"><strong style="color:' + volColor + ';font-family:var(--font-mono);">' + volMult + 'x</strong> <span style="font-size:0.68rem;color:var(--muted);">20D Avg</span></td>' +
+                        '<td style="text-align:right;"><strong style="color:#fbbf24;font-size:0.85rem;font-family:var(--font-mono);">' + triggerText + '</strong></td>' +
+                        '<td style="text-align:center;"><span style="color:' + confColor + ';font-weight:700;font-size:0.85rem;font-family:var(--font-mono);">' + confScore + '%</span></td>' +
+                        '<td style="text-align:center;"><span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;">' + (c.expected_horizon || '1-3 Days') + '</span></td>' +
+                        '<td style="min-width:240px;max-width:380px;">' +
+                            '<div style="font-size:0.75rem;color:#cbd5e1;line-height:1.4;white-space:normal;word-break:break-word;">' + (c.why_it_matches || c.catalyst_summary || '') + '</div>' +
                         '</td>' +
-                        '<td>' + this.renderConsensusBadge(c.ticker, 'ALL') + '</td>' +
-                        '<td style="text-align:center;">' +
-                            '<div style="display:flex;gap:0.25rem;justify-content:center;align-items:center;flex-wrap:wrap;">' +
-                                '<button onclick="event.stopPropagation(); app.openAddToWatchlistModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.4rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐</button>' +
-                                '<button onclick="event.stopPropagation(); app.runConsensusForStock(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.4rem;font-size:0.72rem;background:rgba(99,102,241,0.2);color:#c7d2fe;border:1px solid rgba(99,102,241,0.4);border-radius:0.3rem;" title="Run AI Consensus">🧠</button>' +
-                                '<button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="14D OHLCV Benchmark">📊 Benchmark</button>' +
-                                '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Forecast">🔮 Predict</button>' +
+                        '<td style="text-align:center;white-space:nowrap;min-width:120px;">' + this.renderConsensusBadge(c.ticker, 'ALL') + '</td>' +
+                        '<td style="text-align:center;white-space:nowrap;min-width:125px;">' +
+                            '<div style="display:inline-flex;gap:0.3rem;justify-content:center;align-items:center;">' +
+                                '<button onclick="event.stopPropagation(); app.openAddToWatchlistModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐</button>' +
+                                '<button onclick="event.stopPropagation(); app.runConsensusForStock(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(99,102,241,0.2);color:#c7d2fe;border:1px solid rgba(99,102,241,0.4);border-radius:0.3rem;" title="Run AI Consensus">🧠</button>' +
+                                '<button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="14D OHLCV Benchmark">📊</button>' +
+                                '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Forecast">🔮</button>' +
                             '</div>' +
                         '</td>' +
                     '</tr>';
@@ -4864,15 +4864,15 @@
                         (action ? ' · Stance: ' + action : '') +
                         ' (Click to view full price action & 5-pillar targets)';
 
-                    return '<div id="' + domId + '" style="display:inline-flex;align-items:center;gap:0.35rem;">' +
-                        '<span class="signal-badge" style="background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';font-size:0.72rem;padding:0.18rem 0.5rem;font-weight:700;cursor:pointer;" onclick="event.stopPropagation(); app.openAiDetails(\'' + safeMarket + '\', \'' + safeSym + '\', event)" title="' + titleText.replace(/"/g, '&quot;') + '">' +
+                    return '<div id="' + domId + '" style="display:inline-flex;align-items:center;gap:0.35rem;white-space:nowrap;">' +
+                        '<span class="signal-badge" style="background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';font-size:0.72rem;padding:0.18rem 0.5rem;font-weight:700;cursor:pointer;white-space:nowrap;" onclick="event.stopPropagation(); app.openAiDetails(\'' + safeMarket + '\', \'' + safeSym + '\', event)" title="' + titleText.replace(/"/g, '&quot;') + '">' +
                         '🤖 ' + dir + (retStr ? ' ' + retStr : '') +
                         '</span>' +
                         '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(99,102,241,0.18);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);border-radius:0.3rem;" title="Re-run 4-Model AI Consensus for ' + safeSym + '">⚡</button>' +
                         '</div>';
                 } else {
-                    return '<div id="' + domId + '">' +
-                        '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.18rem 0.45rem;font-size:0.7rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:0.3rem;font-weight:600;" title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model consensus for ' + safeSym + '">⚡ AI Consensus</button>' +
+                    return '<div id="' + domId + '" style="white-space:nowrap;">' +
+                        '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.18rem 0.45rem;font-size:0.7rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:0.3rem;font-weight:600;white-space:nowrap;" title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model consensus for ' + safeSym + '">⚡ AI Consensus</button>' +
                         '</div>';
                 }
             },
