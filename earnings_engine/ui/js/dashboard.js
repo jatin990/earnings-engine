@@ -5039,6 +5039,105 @@
                 }
             },
 
+            async runAllKronos() {
+                const btn1 = document.getElementById('kronosRunAllBtn');
+                const btn2 = document.getElementById('kronosListRunAllBtn');
+                const setButtons = (running, text) => {
+                    if (btn1) { btn1.disabled = running; btn1.innerHTML = text; }
+                    if (btn2) { btn2.disabled = running; btn2.innerHTML = text; }
+                };
+
+                setButtons(true, '<span class="loading-spinner"></span> ⚡ Preparing All...');
+
+                let tickers = [];
+                const wl = document.getElementById('kronosWatchlist')?.value || localStorage.getItem('selectedGlobalWatchlist') || 'NSE_TOP';
+
+                try {
+                    let res = await fetch(API_BASE + '/api/v1/watchlist/' + encodeURIComponent(wl));
+                    if (!res.ok) res = await fetch(API_BASE + '/api/v1/watchlist?name=' + encodeURIComponent(wl));
+                    if (res.ok) {
+                        const data = await res.json();
+                        tickers = (data && data.tickers) || (Array.isArray(data) ? data : []);
+                    }
+                } catch (e) {
+                    console.warn('Watchlist fetch error:', e);
+                }
+
+                if (!tickers || !tickers.length) {
+                    try {
+                        const res = await fetch(API_BASE + '/api/v1/universe/symbols?market=' + encodeURIComponent(wl || 'NSE_TOP'));
+                        if (res.ok) {
+                            const data = await res.json();
+                            tickers = data.tickers || (Array.isArray(data) ? data : []);
+                        }
+                    } catch (e) {
+                        console.warn('Universe fetch error:', e);
+                    }
+                }
+
+                if (!tickers || !tickers.length) {
+                    tickers = ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'ICICIBANK.NS', 'BHARTIARTL.NS', 'SBIN.NS', 'LICI.NS', 'ITC.NS', 'HINDUNILVR.NS', 'LT.NS', 'BAJFINANCE.NS', 'MARUTI.NS', 'HCLTECH.NS', 'SUNPHARMA.NS', 'TATAMOTORS.NS', 'NTPC.NS', 'ONGC.NS', 'POWERGRID.NS', 'TITAN.NS'];
+                }
+
+                const total = tickers.length;
+                let allForecasts = [];
+                const chunkSize = 8;
+
+                const widgetsEl = document.getElementById('kronosWidgets');
+                if (widgetsEl) {
+                    widgetsEl.innerHTML = `<div class="card" style="grid-column:1/-1;margin:0;padding:1.2rem;text-align:center;">
+                        <div style="font-size:1.05rem;font-weight:700;color:#38bdf8;margin-bottom:0.35rem;">⚡ Running Kronos Neural AI Batch Inference</div>
+                        <div style="font-size:0.76rem;color:#94a3b8;margin-bottom:0.75rem;">Processing ${total} stocks in <strong>${wl || 'universe'}</strong> using local neural sequence acceleration...</div>
+                        <div style="background:rgba(255,255,255,0.06);border-radius:20px;height:8px;max-width:380px;margin:0 auto;overflow:hidden;">
+                            <div id="kronosBatchProgressBar" style="background:linear-gradient(90deg,#3b82f6,#10b981);height:100%;width:0%;transition:width 0.3s ease;"></div>
+                        </div>
+                        <div id="kronosBatchProgressText" style="font-size:0.72rem;color:#cbd5e1;margin-top:0.5rem;font-family:var(--font-mono);">0 / ${total} completed</div>
+                    </div>`;
+                }
+
+                for (let i = 0; i < total; i += chunkSize) {
+                    const chunk = tickers.slice(i, i + chunkSize);
+                    setButtons(true, `⚡ Running (${Math.min(i + chunkSize, total)}/${total})...`);
+                    
+                    const progBar = document.getElementById('kronosBatchProgressBar');
+                    const progText = document.getElementById('kronosBatchProgressText');
+                    if (progBar) progBar.style.width = Math.round((i / total) * 100) + '%';
+                    if (progText) progText.textContent = `${i} / ${total} completed (${chunk.slice(0, 3).join(', ')}${chunk.length > 3 ? '...' : ''})`;
+
+                    try {
+                        const res = await fetch(API_BASE + '/api/v1/dashboard/kronos/run', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({tickers: chunk, lookback: 120, pred_len: 14})
+                        });
+                        if (res.ok) {
+                            const chunkForecasts = await res.json();
+                            if (Array.isArray(chunkForecasts)) {
+                                allForecasts = allForecasts.concat(chunkForecasts);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Kronos batch chunk error:', e);
+                    }
+                }
+
+                const progBar = document.getElementById('kronosBatchProgressBar');
+                const progText = document.getElementById('kronosBatchProgressText');
+                if (progBar) progBar.style.width = '100%';
+                if (progText) progText.textContent = `✅ Completed ${allForecasts.length} / ${total} predictions!`;
+
+                if (allForecasts.length) {
+                    this.renderKronos(allForecasts);
+                }
+
+                setButtons(false, '⚡ Run All (Batch)');
+
+                try {
+                    await this.loadKronosList();
+                    await this.loadKronosSummaryCards();
+                } catch (e) {}
+            },
+
             renderKronos(forecasts) {
                 const el = document.getElementById('kronosWidgets');
                 if (!forecasts.length) {

@@ -45,6 +45,7 @@
                         </select>
                         <input type="text" id="kronosTickers" placeholder="Tickers (comma-separated)" style="min-width: 170px; height: 30px; padding:0 0.5rem; font-size:0.75rem; background:#000000; color:#ededed; border:1px solid rgba(255,255,255,0.15); border-radius:6px; font-family: var(--font-mono); outline:none;">
                         <button id="kronosRunBtn" onclick="app.runKronos()" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Run Predictions</button>
+                        <button id="kronosRunAllBtn" onclick="app.runAllKronos()" class="btn btn-sm" style="background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:700;" title="Run Kronos neural predictions in batch for all stocks in the selected universe/watchlist">⚡ Run All (Batch)</button>
                         <button onclick="app.refreshKronos()" class="btn btn-sm">🔄 Refresh Latest</button>
                     </div>
                 </div>
@@ -83,6 +84,7 @@
                                 <option value="FAILED">❌ Failed</option>
                                 <option value="PENDING">⏳ Pending / Flat</option>
                             </select>
+                            <button id="kronosListRunAllBtn" onclick="app.runAllKronos()" class="btn btn-sm" style="background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:700;padding:0.25rem 0.6rem;font-size:0.75rem;" title="Run Kronos batch predictions for all stocks in universe">⚡ Run All</button>
                             <button onclick="app.loadKronosList()" class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.75rem;">🔄 Refresh</button>
                         </div>
                     </div>
