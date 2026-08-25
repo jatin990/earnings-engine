@@ -276,6 +276,52 @@
             color: var(--text-tertiary);
             font-family: var(--font-mono);
         }
+        .badge-live {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--emerald);
+            background: var(--emerald-subtle);
+            border: 1px solid var(--emerald-border);
+            padding: 0.2rem 0.55rem;
+            border-radius: 9999px;
+            letter-spacing: 0.04em;
+        }
+        .pulse-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--emerald);
+            box-shadow: 0 0 8px var(--emerald);
+            animation: livePulse 1.8s infinite;
+        }
+        @keyframes livePulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.35; transform: scale(1.35); }
+        }
+        .btn-live-refresh {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: var(--radius-sm);
+            padding: 0.2rem 0.55rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s ease;
+        }
+        .btn-live-refresh:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            border-color: var(--border-hover);
+        }
 
         .hero-right {
             display: flex;
@@ -511,9 +557,16 @@
                 </div>
                 <div class="company-desc" id="lblCompanyName">Loading company profile...</div>
                 
-                <div class="price-row">
+                <div class="price-row" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                     <span class="price-main" id="valCurrentPrice">₹—</span>
                     <span class="change-pill up" id="pillDayChange">+0.00%</span>
+                    <span id="badgeLive" class="badge-live">
+                        <span class="pulse-dot"></span>
+                        LIVE
+                    </span>
+                    <button onclick="fetchStockDetails(true)" class="btn-live-refresh" id="btnRefreshQuote" title="Fetch latest live market price">
+                        ⚡ Refresh Live
+                    </button>
                     <span class="prev-close-text" id="lblPrevClose">Prev Close: ₹—</span>
                 </div>
             </div>
@@ -655,7 +708,12 @@
         const ACTIVE_SYM = "{{ ticker }}";
         let stockState = null;
 
-        async function fetchStockDetails() {
+        async function fetchStockDetails(isManualRefresh = false) {
+            const refreshBtn = document.getElementById('btnRefreshQuote');
+            if (isManualRefresh && refreshBtn) {
+                refreshBtn.disabled = true;
+                refreshBtn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Syncing...';
+            }
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/overview`);
                 if (!res.ok) throw new Error('Could not retrieve stock overview');
@@ -665,6 +723,11 @@
             } catch (err) {
                 console.error(err);
                 document.getElementById('lblCompanyName').textContent = 'Error loading stock: ' + err.message;
+            } finally {
+                if (isManualRefresh && refreshBtn) {
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = '⚡ Refresh Live';
+                }
             }
         }
 
@@ -673,25 +736,41 @@
             const q = data.quote || {};
             const t = data.technical || {};
             const c = data.consensus || {};
+            const currSym = p.currency || (ACTIVE_SYM.endsWith('.NS') ? '₹' : '$');
 
             // Header profile
             document.getElementById('lblCompanyName').textContent = p.name || p.ticker;
-            document.getElementById('tagMarket').textContent = p.market || 'NSE';
+            document.getElementById('tagMarket').textContent = p.market || (ACTIVE_SYM.endsWith('.NS') ? 'NSE' : 'US');
             document.getElementById('tagSector').textContent = p.sector || 'Equities';
 
             const curr = q.current_price || 0;
-            document.getElementById('valCurrentPrice').textContent = `₹${curr.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('valCurrentPrice').textContent = `${currSym}${curr.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 
             const chgPct = q.day_change_pct || 0;
             const chgEl = document.getElementById('pillDayChange');
-            chgEl.textContent = `${chgPct >= 0 ? '+' : ''}${chgPct.toFixed(2)}% (${q.day_change >= 0 ? '+' : ''}${q.day_change || 0})`;
+            chgEl.textContent = `${chgPct >= 0 ? '+' : ''}${chgPct.toFixed(2)}% (${q.day_change >= 0 ? '+' : ''}${q.day_change != null ? q.day_change : 0})`;
             chgEl.className = `change-pill ${chgPct >= 0 ? 'up' : 'down'}`;
 
-            document.getElementById('lblPrevClose').textContent = `Prev Close: ₹${q.previous_close || '—'}`;
-            document.getElementById('val52Low').textContent = `₹${q.week_52_low || '—'}`;
-            document.getElementById('val52High').textContent = `₹${q.week_52_high || '—'}`;
-            document.getElementById('valMarketCap').textContent = p.market_cap ? `₹${(p.market_cap / 10000000).toLocaleString(undefined, {maximumFractionDigits: 0})} Cr` : '—';
-            document.getElementById('valDayRange').textContent = (q.day_low && q.day_high) ? `₹${q.day_low} – ₹${q.day_high}` : '—';
+            // Live status badge
+            const badgeLive = document.getElementById('badgeLive');
+            if (badgeLive) {
+                if (q.is_live) {
+                    badgeLive.style.display = 'inline-flex';
+                    badgeLive.innerHTML = '<span class="pulse-dot"></span> LIVE MARKET';
+                    badgeLive.title = q.last_updated ? `Live data synced at ${new Date(q.last_updated).toLocaleTimeString()}` : 'Live data';
+                } else {
+                    badgeLive.innerHTML = '📊 CACHED FEED';
+                    badgeLive.style.background = 'rgba(255, 255, 255, 0.06)';
+                    badgeLive.style.color = 'var(--text-tertiary)';
+                    badgeLive.style.borderColor = 'var(--border)';
+                }
+            }
+
+            document.getElementById('lblPrevClose').textContent = `Prev Close: ${currSym}${q.previous_close || '—'}`;
+            document.getElementById('val52Low').textContent = `${currSym}${q.week_52_low || '—'}`;
+            document.getElementById('val52High').textContent = `${currSym}${q.week_52_high || '—'}`;
+            document.getElementById('valMarketCap').textContent = p.market_cap ? `${currSym}${(p.market_cap / 10000000).toLocaleString(undefined, {maximumFractionDigits: 0})} Cr` : '—';
+            document.getElementById('valDayRange').textContent = (q.day_low && q.day_high) ? `${currSym}${q.day_low} – ${currSym}${q.day_high}` : '—';
 
             if (q.week_52_low && q.week_52_high && curr) {
                 const ratio = Math.max(0, Math.min(100, ((curr - q.week_52_low) / (q.week_52_high - q.week_52_low)) * 100));
@@ -1000,7 +1079,7 @@
         async function runConsensus(force = true) {
             const btn = document.getElementById('btnConsensus');
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Running Consensus...';
+            btn.innerHTML = '<span class="spinner"></span> Evaluating Live Data across 4 AI Engines...';
             try {
                 const res = await fetch('/api/v1/consensus/predict', {
                     method: 'POST',

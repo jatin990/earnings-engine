@@ -13,7 +13,7 @@ import yfinance as yf
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
-from earnings_engine.data.prices import fetch_prices
+from earnings_engine.data.prices import fetch_prices, fetch_live_quote, load_prices
 from earnings_engine.data.market_context import _week_high_low_around, detect_swing_range
 from earnings_engine.data.swing_ranges import get_swing_range
 from earnings_engine.data.catalysts_news import get_short_term_catalysts
@@ -54,7 +54,7 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
     except Exception as e:
         logger.debug("Error querying ticker master for %s: %s", sym, e)
 
-    # 2. Quotes & Price Action
+    # 2. Quotes & Price Action (Live Authoritative Market Quote)
     quote: dict[str, Any] = {
         "current_price": None,
         "day_change": None,
@@ -68,55 +68,49 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
         "avg_volume": None,
         "pct_from_52w_high": None,
         "pct_from_52w_low": None,
+        "is_live": False,
+        "last_updated": None,
     }
 
+    # Fetch live quote and sync today's price bar with SQLite cache
+    try:
+        live_q = fetch_live_quote(sym, settings=settings, sync_db=True)
+        if live_q.get("current_price"):
+            quote.update(live_q)
+            if live_q.get("market_cap") and not profile.get("market_cap"):
+                profile["market_cap"] = float(live_q["market_cap"])
+    except Exception as e:
+        logger.debug("Error in fetch_live_quote for %s: %s", sym, e)
+
+    # Load price history (now containing today's live bar if market was open)
     prices_df = pd.DataFrame()
     try:
-        prices_df = fetch_prices(sym, settings, force=False)
+        prices_df = load_prices(sym, settings)
+        if prices_df.empty:
+            prices_df = fetch_prices(sym, settings, force=False)
     except Exception as e:
-        logger.debug("Error fetching cached prices for %s: %s", sym, e)
+        logger.debug("Error fetching price history for %s: %s", sym, e)
 
-    # Try live fast_info
-    try:
-        yf_obj = yf.Ticker(sym)
-        fast = yf_obj.fast_info or {}
-        last_p = fast.get("last_price")
-        prev_c = fast.get("previous_close")
-        if last_p is not None and last_p > 0:
-            quote["current_price"] = round(float(last_p), 2)
-            quote["previous_close"] = round(float(prev_c), 2) if prev_c else None
-            if prev_c and prev_c > 0:
-                quote["day_change"] = round(float(last_p - prev_c), 2)
-                quote["day_change_pct"] = round(float((last_p / prev_c - 1.0) * 100.0), 2)
-            quote["day_high"] = round(float(fast.get("day_high")), 2) if fast.get("day_high") else None
-            quote["day_low"] = round(float(fast.get("day_low")), 2) if fast.get("day_low") else None
-            quote["week_52_high"] = round(float(fast.get("year_high")), 2) if fast.get("year_high") else None
-            quote["week_52_low"] = round(float(fast.get("year_low")), 2) if fast.get("year_low") else None
-            if fast.get("market_cap") and not profile.get("market_cap"):
-                profile["market_cap"] = float(fast.get("market_cap"))
-    except Exception as e:
-        logger.debug("Error fetching yfinance fast_info for %s: %s", sym, e)
-
-    # Fallback to prices_df if fast_info missing
+    # Fallback to prices_df if live quote missed
     if not prices_df.empty and "close" in prices_df.columns:
         closes = pd.to_numeric(prices_df["close"], errors="coerce").dropna()
         if not closes.empty:
-            if quote["current_price"] is None:
+            if quote.get("current_price") is None:
                 quote["current_price"] = round(float(closes.iloc[-1]), 2)
                 if len(closes) >= 2:
                     p_close = float(closes.iloc[-2])
                     quote["previous_close"] = round(p_close, 2)
                     quote["day_change"] = round(float(quote["current_price"] - p_close), 2)
                     quote["day_change_pct"] = round(float((quote["current_price"] / p_close - 1.0) * 100.0), 2)
-            if quote["week_52_high"] is None and len(closes) >= 20:
+            if quote.get("week_52_high") is None and len(closes) >= 20:
                 quote["week_52_high"] = round(float(closes.tail(252).max()), 2)
-            if quote["week_52_low"] is None and len(closes) >= 20:
+            if quote.get("week_52_low") is None and len(closes) >= 20:
                 quote["week_52_low"] = round(float(closes.tail(252).min()), 2)
 
     # Compute 52W % distances
-    if quote["current_price"] and quote["week_52_high"] and quote["week_52_high"] > 0:
+    if quote.get("current_price") and quote.get("week_52_high") and quote["week_52_high"] > 0:
         quote["pct_from_52w_high"] = round((quote["current_price"] / quote["week_52_high"] - 1.0) * 100.0, 2)
-    if quote["current_price"] and quote["week_52_low"] and quote["week_52_low"] > 0:
+    if quote.get("current_price") and quote.get("week_52_low") and quote["week_52_low"] > 0:
         quote["pct_from_52w_low"] = round((quote["current_price"] / quote["week_52_low"] - 1.0) * 100.0, 2)
 
     # 3. Technical Swing Structure & Momentum

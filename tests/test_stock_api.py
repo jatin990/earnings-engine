@@ -77,3 +77,33 @@ def test_live_week_hl_endpoint(client):
     assert "high_pct" in data
     assert "low_pct" in data
 
+
+def test_fetch_live_quote_and_overview(client):
+    from earnings_engine.data.prices import fetch_live_quote
+    settings = Settings()
+    q = fetch_live_quote("SUNPHARMA.NS", settings=settings, sync_db=True)
+    assert q["ticker"] == "SUNPHARMA.NS"
+    assert q["current_price"] is not None
+    assert q["current_price"] > 0
+    assert "is_live" in q
+
+    overview = get_stock_overview("SUNPHARMA.NS", settings)
+    assert overview["success"] is True
+    assert overview["quote"]["current_price"] is not None
+    assert overview["quote"]["current_price"] > 0
+
+
+def test_consensus_context_uses_live_data():
+    from earnings_engine.consensus.context_builder import build_context, context_to_prompt
+    settings = Settings()
+    ctx = build_context("SUNPHARMA.NS", timeframe_days=14, settings=settings, fetch_live=True)
+    assert ctx["ticker"] == "SUNPHARMA.NS"
+    assert "price_action" in ctx
+    assert ctx["price_action"].get("current_price") is not None
+    assert ctx["price_action"]["current_price"] > 0
+
+    prompt = context_to_prompt(ctx)
+    assert "SUNPHARMA.NS" in prompt
+    assert "Current Live Price:" in prompt
+
+

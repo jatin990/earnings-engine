@@ -531,3 +531,157 @@ def ingest_prices(tickers: list[str], settings: Settings, force: bool = False) -
     ok = sum(1 for v in results.values() if v > 0)
     logger.info("prices ingest complete: %s/%s tickers with data", ok, total)
     return results
+
+
+def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: bool = True) -> dict[str, Any]:
+    """Fetch authoritative live real-time market quote for a single ticker.
+
+    Uses yfinance fast_info attribute access with fallbacks to intraday / daily
+    history bars. If sync_db=True and a valid price is obtained, upserts today's
+    live bar into price_history and updates tickers.market_cap so that all
+    downstream technical analysis (RSI, EMAs, 52W range, swing channels, and
+    AI consensus prompts) immediately run on real-time data.
+    """
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    fetch_sym = KNOWN_TICKER_ALIASES.get(sym, sym)
+
+    quote: dict[str, Any] = {
+        "ticker": sym,
+        "current_price": None,
+        "previous_close": None,
+        "day_change": None,
+        "day_change_pct": None,
+        "day_open": None,
+        "day_high": None,
+        "day_low": None,
+        "week_52_high": None,
+        "week_52_low": None,
+        "volume": None,
+        "avg_volume": None,
+        "market_cap": None,
+        "currency": "INR" if sym.endswith(".NS") else "USD",
+        "is_live": False,
+        "last_updated": datetime.now().isoformat(),
+    }
+
+    last_p: float | None = None
+    prev_c: float | None = None
+    open_p: float | None = None
+    day_h: float | None = None
+    day_l: float | None = None
+    yr_h: float | None = None
+    yr_l: float | None = None
+    vol: float | None = None
+    avg_vol: float | None = None
+    mcap: float | None = None
+
+    def _get_val(fast_obj: Any, key: str, fallback_keys: tuple[str, ...] = ()) -> Any:
+        if fast_obj is None:
+            return None
+        # Try attribute access first (if not callable)
+        val = getattr(fast_obj, key, None)
+        if val is not None and not callable(val):
+            return val
+        # Try dict lookup
+        if isinstance(fast_obj, dict):
+            if key in fast_obj and fast_obj[key] is not None:
+                return fast_obj[key]
+            for fb in fallback_keys:
+                if fb in fast_obj and fast_obj[fb] is not None:
+                    return fast_obj[fb]
+        return None
+
+    try:
+        yf_obj = yf.Ticker(fetch_sym)
+        fast = getattr(yf_obj, "fast_info", None)
+
+        if fast:
+            last_p = _get_val(fast, "last_price", ("lastPrice", "regularMarketPrice", "currentPrice"))
+            prev_c = _get_val(fast, "previous_close", ("regular_market_previous_close", "regularMarketPreviousClose", "prev_close"))
+            open_p = _get_val(fast, "open", ("regularMarketOpen", "day_open"))
+            day_h = _get_val(fast, "day_high", ("dayHigh", "regularMarketDayHigh"))
+            day_l = _get_val(fast, "day_low", ("dayLow", "regularMarketDayLow"))
+            yr_h = _get_val(fast, "year_high", ("yearHigh", "fiftyTwoWeekHigh", "week_52_high"))
+            yr_l = _get_val(fast, "year_low", ("yearLow", "fiftyTwoWeekLow", "week_52_low"))
+            vol = _get_val(fast, "last_volume", ("lastVolume", "regularMarketVolume", "volume"))
+            avg_vol = _get_val(fast, "three_month_average_volume", ("threeMonthAverageVolume", "ten_day_average_volume", "tenDayAverageVolume", "avg_volume"))
+            mcap = _get_val(fast, "market_cap", ("marketCap", "mcap"))
+
+        # Fallback to history if fast_info gave no last_price
+        if last_p is None or last_p <= 0:
+            hist = yf_obj.history(period="5d", interval="1d")
+            if hist is not None and not hist.empty:
+                last_row = hist.iloc[-1]
+                last_p = float(last_row.get("Close", 0))
+                open_p = float(last_row.get("Open", last_p))
+                day_h = float(last_row.get("High", last_p))
+                day_l = float(last_row.get("Low", last_p))
+                vol = float(last_row.get("Volume", 0))
+                if len(hist) >= 2:
+                    prev_c = float(hist.iloc[-2].get("Close", 0))
+
+    except Exception as e:
+        logger.debug("[LIVE-QUOTE] Failed fetching live quote for %s: %s", sym, e)
+
+    if last_p is not None and last_p > 0:
+        quote["current_price"] = round(float(last_p), 2)
+        quote["is_live"] = True
+        if prev_c is not None and prev_c > 0:
+            quote["previous_close"] = round(float(prev_c), 2)
+            quote["day_change"] = round(float(last_p - prev_c), 2)
+            quote["day_change_pct"] = round(float((last_p / prev_c - 1.0) * 100.0), 2)
+        if open_p is not None: quote["day_open"] = round(float(open_p), 2)
+        if day_h is not None: quote["day_high"] = round(float(day_h), 2)
+        if day_l is not None: quote["day_low"] = round(float(day_l), 2)
+        if yr_h is not None: quote["week_52_high"] = round(float(yr_h), 2)
+        if yr_l is not None: quote["week_52_low"] = round(float(yr_l), 2)
+        if vol is not None: quote["volume"] = int(vol)
+        if avg_vol is not None: quote["avg_volume"] = int(avg_vol)
+        if mcap is not None: quote["market_cap"] = float(mcap)
+
+        # Distance from 52W high/low
+        if quote["week_52_high"] and quote["week_52_high"] > 0:
+            quote["pct_from_52w_high"] = round((quote["current_price"] / quote["week_52_high"] - 1.0) * 100.0, 2)
+        if quote["week_52_low"] and quote["week_52_low"] > 0:
+            quote["pct_from_52w_low"] = round((quote["current_price"] / quote["week_52_low"] - 1.0) * 100.0, 2)
+
+        # Sync with SQLite cache
+        if sync_db:
+            try:
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                with _connect(settings) as conn:
+                    conn.execute(
+                        """INSERT INTO price_history (ticker, date, open, high, low, close, volume)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)
+                           ON CONFLICT(ticker, date) DO UPDATE SET
+                               high = MAX(COALESCE(price_history.high, excluded.high), excluded.high),
+                               low = MIN(COALESCE(price_history.low, excluded.low), excluded.low),
+                               close = excluded.close,
+                               volume = COALESCE(excluded.volume, price_history.volume)
+                        """,
+                        (
+                            sym,
+                            today_str,
+                            open_p if open_p is not None else last_p,
+                            day_h if day_h is not None else last_p,
+                            day_l if day_l is not None else last_p,
+                            last_p,
+                            vol if vol is not None else 0,
+                        ),
+                    )
+                    try:
+                        conn.execute(
+                            "UPDATE tickers SET market_cap = COALESCE(?, market_cap), market_cap_updated_at = ?, last_updated = ? WHERE ticker = ?",
+                            (mcap, datetime.now().isoformat(), datetime.now().isoformat(), sym),
+                        )
+                    except Exception:
+                        pass
+                    conn.commit()
+                clear_price_df_cache(sym)
+                _mark_fetched(sym, settings)
+            except Exception as e:
+                logger.debug("[LIVE-QUOTE] SQLite sync failed for %s: %s", sym, e)
+
+    return quote
+

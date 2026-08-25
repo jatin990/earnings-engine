@@ -18,23 +18,37 @@ from earnings_engine.data.db import get_db_connection
 logger = logging.getLogger("earnings_engine.consensus.context_builder")
 
 
-def build_context(ticker: str, timeframe_days: int = 14, settings: Settings | None = None) -> dict[str, Any]:
-    """Assemble a full context payload for a single ticker.
+def build_context(ticker: str, timeframe_days: int = 14, settings: Settings | None = None, fetch_live: bool = True) -> dict[str, Any]:
+    """Assemble a full context payload for a single ticker on live market data.
 
     Returns a dict with keys: ticker, price_action, swing_channel, earnings,
     catalysts, and metadata — ready for serialization into an LLM prompt.
     """
     settings = settings or Settings()
+    sym = ticker.strip().upper()
     ctx: dict[str, Any] = {
-        "ticker": ticker,
+        "ticker": sym,
         "timeframe_days": timeframe_days,
         "generated_at": datetime.now().isoformat(),
+        "is_live": False,
     }
 
-    ctx["price_action"] = _build_price_action(ticker, settings)
-    ctx["swing_channel"] = _build_swing_channel(ticker, settings)
-    ctx["earnings"] = _build_earnings_context(ticker, settings)
-    ctx["catalysts"] = _build_catalysts(ticker, settings)
+    # 1. Fetch and sync real-time authoritative market quote
+    live_q: dict[str, Any] = {}
+    if fetch_live:
+        try:
+            from earnings_engine.data.prices import fetch_live_quote
+            live_q = fetch_live_quote(sym, settings=settings, sync_db=True)
+            if live_q.get("current_price"):
+                ctx["is_live"] = True
+                ctx["live_quote"] = live_q
+        except Exception as e:
+            logger.debug("[CONSENSUS-CTX] Live quote fetch skipped/failed for %s: %s", sym, e)
+
+    ctx["price_action"] = _build_price_action(sym, settings, live_quote=live_q)
+    ctx["swing_channel"] = _build_swing_channel(sym, settings)
+    ctx["earnings"] = _build_earnings_context(sym, settings)
+    ctx["catalysts"] = _build_catalysts(sym, settings)
 
     return ctx
 
@@ -47,26 +61,29 @@ def context_to_prompt(ctx: dict[str, Any]) -> str:
     sw = ctx.get("swing_channel", {})
     ea = ctx.get("earnings", {})
     cat = ctx.get("catalysts", [])
+    is_live = ctx.get("is_live", False)
+    curr_sym = "$" if not ticker.endswith(".NS") else "₹"
 
     lines = [
         f"# Stock Analysis Context: {ticker}",
         f"**Analysis Date:** {ctx.get('generated_at', 'N/A')}",
         f"**Prediction Timeframe:** {timeframe} days",
+        f"**Data Status:** {'🟢 Live Real-Time Market Feed' if is_live else '📊 Cached Daily Historical Feed'}",
         "",
         "## Price Action & Momentum",
     ]
 
     if pa:
         lines.extend([
-            f"- **Current Price:** ₹{pa.get('current_price', 'N/A')}",
+            f"- **Current Live Price:** {curr_sym}{pa.get('current_price', 'N/A')}",
             f"- **7-Day Return:** {_fmt_pct(pa.get('return_7d'))}",
             f"- **30-Day Return:** {_fmt_pct(pa.get('return_30d'))}",
-            f"- **52-Week High:** ₹{pa.get('high_52w', 'N/A')} ({_fmt_pct(pa.get('pct_from_52w_high'))} from current)",
-            f"- **52-Week Low:** ₹{pa.get('low_52w', 'N/A')} ({_fmt_pct(pa.get('pct_from_52w_low'))} from current)",
+            f"- **52-Week High:** {curr_sym}{pa.get('high_52w', 'N/A')} ({_fmt_pct(pa.get('pct_from_52w_high'))} from current)",
+            f"- **52-Week Low:** {curr_sym}{pa.get('low_52w', 'N/A')} ({_fmt_pct(pa.get('pct_from_52w_low'))} from current)",
             f"- **RSI-14:** {pa.get('rsi_14', 'N/A')}",
-            f"- **EMA-20:** ₹{pa.get('ema_20', 'N/A')}",
-            f"- **EMA-50:** ₹{pa.get('ema_50', 'N/A')}",
-            f"- **EMA-200:** ₹{pa.get('ema_200', 'N/A')}",
+            f"- **EMA-20:** {curr_sym}{pa.get('ema_20', 'N/A')}",
+            f"- **EMA-50:** {curr_sym}{pa.get('ema_50', 'N/A')}",
+            f"- **EMA-200:** {curr_sym}{pa.get('ema_200', 'N/A')}",
             f"- **Avg Volume (20D):** {pa.get('avg_volume_20d', 'N/A')}",
         ])
     else:
@@ -75,8 +92,8 @@ def context_to_prompt(ctx: dict[str, Any]) -> str:
     lines.extend(["", "## Swing Channel & Structure"])
     if sw and sw.get("lower") is not None:
         lines.extend([
-            f"- **20-Day Channel:** ₹{sw.get('lower', 'N/A')} – ₹{sw.get('upper', 'N/A')}",
-            f"- **3-Month Channel:** ₹{sw.get('three_month_lower', 'N/A')} – ₹{sw.get('three_month_upper', 'N/A')}",
+            f"- **20-Day Channel:** {curr_sym}{sw.get('lower', 'N/A')} – {curr_sym}{sw.get('upper', 'N/A')}",
+            f"- **3-Month Channel:** {curr_sym}{sw.get('three_month_lower', 'N/A')} – {curr_sym}{sw.get('three_month_upper', 'N/A')}",
             f"- **Swing Cycles (3M):** {sw.get('cycles', 0)} cycles, avg {sw.get('avg_cycle_days', 0)} days",
         ])
         pos = sw.get("position_in_channel")
@@ -125,7 +142,7 @@ def _fmt_pct(val: float | None) -> str:
 # Private data-fetching helpers
 # ---------------------------------------------------------------------------
 
-def _build_price_action(ticker: str, settings: Settings) -> dict[str, Any]:
+def _build_price_action(ticker: str, settings: Settings, live_quote: dict[str, Any] | None = None) -> dict[str, Any]:
     """Fetch current price, returns, RSI, EMAs from price history."""
     try:
         conn = get_db_connection(settings)
@@ -137,6 +154,8 @@ def _build_price_action(ticker: str, settings: Settings) -> dict[str, Any]:
         conn.close()
 
         if not rows:
+            if live_quote and live_quote.get("current_price"):
+                return {"current_price": live_quote["current_price"]}
             return {}
 
         # Build DataFrame (rows come newest-first, reverse for chronological)
@@ -147,9 +166,12 @@ def _build_price_action(ticker: str, settings: Settings) -> dict[str, Any]:
 
         closes = df["close"].dropna()
         if closes.empty:
+            if live_quote and live_quote.get("current_price"):
+                return {"current_price": live_quote["current_price"]}
             return {}
 
-        current = float(closes.iloc[-1])
+        # Prioritize live price if provided
+        current = float(live_quote.get("current_price")) if (live_quote and live_quote.get("current_price")) else float(closes.iloc[-1])
         result: dict[str, Any] = {"current_price": round(current, 2)}
 
         # Returns
