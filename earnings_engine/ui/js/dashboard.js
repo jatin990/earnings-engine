@@ -825,7 +825,7 @@
                 // 3. Check LocalStorage
                 const storedTab = localStorage.getItem('dashboard_active_tab');
 
-                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 
                 if (hash && validTabs.includes(hash.toLowerCase())) return hash.toLowerCase();
                 if (queryTab && validTabs.includes(queryTab.toLowerCase())) return queryTab.toLowerCase();
@@ -1543,8 +1543,8 @@
                     return '<tr>' +
                         '<td style="text-align:center;color:var(--muted);font-weight:700;">' + rank + '</td>' +
                         '<td>' +
-                            '<div style="font-weight:700;font-size:0.85rem;color:var(--light);">' + (c.stock_name || c.ticker) + '</div>' +
-                            '<div style="font-size:0.72rem;color:var(--muted);">' + c.ticker + '<a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
+                            '<div><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="font-weight:700;font-size:0.85rem;color:var(--light);text-decoration:none;">' + (c.stock_name || c.ticker) + '</a></div>' +
+                            '<div style="font-size:0.72rem;color:var(--muted);"><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + c.ticker + '</a><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
                         '</td>' +
                         '<td><strong>₹' + (c.current_price ? Number(c.current_price).toFixed(2) : '—') + '</strong></td>' +
                         '<td><strong class="' + retClass + '" style="font-size:0.9rem;">' + retSign + ret.toFixed(2) + '%</strong></td>' +
@@ -2175,8 +2175,8 @@
                     return '<tr>' +
                         '<td style="text-align:center;"><span style="background:' + rankBadgeBg + ';color:' + rankColor + ';width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:0.75rem;">' + rank + '</span></td>' +
                         '<td>' +
-                            '<div style="font-weight:700;font-size:0.85rem;color:var(--light);">' + (g.stock_name || g.ticker) + '</div>' +
-                            '<div style="font-size:0.72rem;color:var(--muted);">' + g.ticker + '<a href="/stock/' + encodeURIComponent(g.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
+                            '<div><a href="/stock/' + encodeURIComponent(g.ticker) + '" target="_blank" style="font-weight:700;font-size:0.85rem;color:var(--light);text-decoration:none;">' + (g.stock_name || g.ticker) + '</a></div>' +
+                            '<div style="font-size:0.72rem;color:var(--muted);"><a href="/stock/' + encodeURIComponent(g.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + g.ticker + '</a><a href="/stock/' + encodeURIComponent(g.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
                         '</td>' +
                         '<td><strong>' + currSym + (g.close_price ? Number(g.close_price).toFixed(2) : '—') + '</strong></td>' +
                         '<td><strong class="price-positive" style="font-size:0.95rem;">+' + Number(g.return_pct).toFixed(2) + '%</strong></td>' +
@@ -2272,8 +2272,8 @@
                     const currSym = (s.ticker.endsWith('.NS') || s.ticker.endsWith('.BO')) ? '₹' : '$';
                     return '<tr>' +
                         '<td>' +
-                            '<div style="font-weight:700;font-size:0.85rem;color:var(--light);">' + (s.stock_name || s.ticker) + '</div>' +
-                            '<div style="font-size:0.72rem;color:var(--muted);">' + s.ticker + '</div>' +
+                            '<div><a href="/stock/' + encodeURIComponent(s.ticker) + '" target="_blank" style="font-weight:700;font-size:0.85rem;color:var(--light);text-decoration:none;">' + (s.stock_name || s.ticker) + '</a></div>' +
+                            '<div style="font-size:0.72rem;color:var(--muted);"><a href="/stock/' + encodeURIComponent(s.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + s.ticker + '</a><a href="/stock/' + encodeURIComponent(s.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
                         '</td>' +
                         '<td><strong>' + currSym + (s.current_price ? Number(s.current_price).toFixed(2) : '—') + '</strong></td>' +
                         '<td><span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:0.2rem 0.5rem;border-radius:0.3rem;font-size:0.72rem;font-weight:600;">' + s.matching_pattern + '</span></td>' +
@@ -7184,7 +7184,7 @@
                 const changePct = r.change_pct;
                 const changeCls = (changePct !== null && changePct !== undefined && changePct >= 0) ? 'price-positive' : 'price-negative';
                 return '<tr' + rowStyle + '>' +
-                    '<td><strong>' + r.ticker + '</strong></td>' +
+                    '<td><strong><a href="/stock/' + encodeURIComponent(r.ticker) + '" target="_blank" style="color:var(--light);text-decoration:none;">' + r.ticker + '</a></strong><a href="/stock/' + encodeURIComponent(r.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></td>' +
                     '<td><span style="font-size:0.7rem;color:var(--muted)">' + (r.earnings_time || (r.day_label || '')) + '</span></td>' +
                     '<td>' + fmt(r.current_price) + '</td>' +
                     '<td class="' + changeCls + '">' + pct(changePct) + '</td>' +
@@ -7364,7 +7364,7 @@
                 };
                 tbody.innerHTML = sorted.map(r =>
                     '<tr>' +
-                    '<td><strong>' + (r.ticker || '—') + '</strong></td>' +
+                    '<td><strong><a href="/stock/' + encodeURIComponent(r.ticker) + '" target="_blank" style="color:var(--light);text-decoration:none;">' + (r.ticker || '—') + '</a></strong><a href="/stock/' + encodeURIComponent(r.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></td>' +
                     '<td>' + (r.industry || '—') + '</td>' +
                     '<td>' + resultBadge(r.result_class) + '</td>' +
                     '<td class="' + cls(r.reaction_return_pct, true) + '">' + (r.reaction_return_pct !== null && r.reaction_return_pct !== undefined ? r.reaction_return_pct.toFixed(2) + '%' : '—') + '</td>' +
@@ -10766,7 +10766,7 @@
                     <td style="padding:0.55rem 0.75rem;">
                         <div style="display:flex;flex-direction:column;gap:0.05rem;">
                             <div style="display:flex;align-items:center;gap:0.25rem;">
-                                <span style="font-weight:700;color:#f1f5f9;font-family:var(--font-mono);font-size:0.78rem;cursor:pointer;" onclick="app.switchTab('results');" title="View ${ticker} in Results">${ticker}</span>
+                                <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="font-weight:700;color:#f1f5f9;font-family:var(--font-mono);font-size:0.78rem;text-decoration:none;" title="Open ${ticker} stock intelligence in new tab">${ticker}</a>
                                 <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-size:0.75rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
                             </div>
                             <span style="font-size:0.65rem;color:#475569;" title="${c.company_name || ticker}">${company}</span>
