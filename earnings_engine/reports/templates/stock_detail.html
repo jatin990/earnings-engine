@@ -1432,14 +1432,18 @@
                 if (!patterns.length) {
                     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-tertiary);">No historical shareholding patterns</td></tr>';
                 } else {
-                    tbody.innerHTML = patterns.map(p => `<tr>
-                        <td><strong>${p.quarter || '—'}</strong></td>
-                        <td>${p.promoter_pct != null ? p.promoter_pct.toFixed(1) + '%' : '—'}</td>
-                        <td>${p.fii_pct != null ? p.fii_pct.toFixed(1) + '%' : '—'}</td>
-                        <td>${p.dii_pct != null ? p.dii_pct.toFixed(1) + '%' : '—'}</td>
-                        <td>${p.public_pct != null ? p.public_pct.toFixed(1) + '%' : '—'}</td>
-                        <td>${p.other_pct != null ? p.other_pct.toFixed(1) + '%' : '—'}</td>
-                    </tr>`).join('');
+                    tbody.innerHTML = patterns.map(p => {
+                        const dii = p.dii_pct != null ? p.dii_pct : p.dii_mf_pct;
+                        const pub = p.public_pct != null ? p.public_pct : p.public_retail_pct;
+                        return `<tr>
+                            <td><strong>${p.quarter || '—'}</strong></td>
+                            <td>${p.promoter_pct != null ? p.promoter_pct.toFixed(1) + '%' : '—'}</td>
+                            <td>${p.fii_pct != null ? p.fii_pct.toFixed(1) + '%' : '—'}</td>
+                            <td>${dii != null ? dii.toFixed(1) + '%' : '—'}</td>
+                            <td>${pub != null ? pub.toFixed(1) + '%' : '—'}</td>
+                            <td>${p.other_pct != null ? p.other_pct.toFixed(1) + '%' : '—'}</td>
+                        </tr>`;
+                    }).join('');
                 }
             }
 

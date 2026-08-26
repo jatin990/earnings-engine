@@ -385,12 +385,16 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
 
         patterns: list[dict[str, Any]] = []
         for p in p_rows:
+            dii_val = round(float(p[3]), 2)
+            pub_val = round(float(p[4]), 2)
             patterns.append({
                 "quarter": p[0],
                 "promoter_pct": round(float(p[1]), 2),
                 "fii_pct": round(float(p[2]), 2),
-                "dii_mf_pct": round(float(p[3]), 2),
-                "public_retail_pct": round(float(p[4]), 2),
+                "dii_mf_pct": dii_val,
+                "dii_pct": dii_val,
+                "public_retail_pct": pub_val,
+                "public_pct": pub_val,
                 "other_pct": round(float(p[5]), 2),
             })
 
