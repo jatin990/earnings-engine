@@ -2747,7 +2747,7 @@
             },
 
             async loadResultsReport() {
-                const preset = document.getElementById('resultsRangePreset')?.value || 'pm60';
+                const preset = document.getElementById('resultsRangePreset')?.value || 'recent';
                 const details = this.getResultsPresetDetails(preset);
                 const pastDays = details.pastDays;
                 const days = details.days;

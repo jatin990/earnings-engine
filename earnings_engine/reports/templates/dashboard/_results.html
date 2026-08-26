@@ -47,8 +47,8 @@
                     <!-- Right Controls -->
                     <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
                         <select id="resultsRangePreset" onchange="app.onResultsPresetChange(this.value)" style="height: 30px; padding: 0 0.55rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; background: #000000; color: #ededed; font-size: 0.75rem; font-weight: 500; font-family: var(--font-sans); outline: none;">
-                            <option value="recent">⚡ Recent (-4D to +7D)</option>
-                            <option value="pm60" selected>⚡ ±2 Months (Past 60D & Next 60D)</option>
+                            <option value="recent" selected>⚡ Recent (-4D to +7D)</option>
+                            <option value="pm60">⚡ ±2 Months (Past 60D & Next 60D)</option>
                             <option value="pm30">📅 ±1 Month (Past 30D & Next 30D)</option>
                             <option value="next14">🔮 Upcoming 14 Days</option>
                             <option value="next30">🔮 Upcoming 30 Days</option>
@@ -57,9 +57,9 @@
                             <option value="custom">⚙️ Custom Range</option>
                         </select>
                         <span id="resultsCustomInputs" style="display: none; align-items: center; gap: 0.25rem;">
-                            <input type="number" id="resultsPastDays" value="60" min="0" max="180" style="width: 55px; height: 30px; padding: 0 0.35rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; background: #000000; color: #ededed; font-size: 0.75rem;" title="Days in past (lookback)">
+                            <input type="number" id="resultsPastDays" value="4" min="0" max="180" style="width: 55px; height: 30px; padding: 0 0.35rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; background: #000000; color: #ededed; font-size: 0.75rem;" title="Days in past (lookback)">
                             <span style="font-size:0.68rem;color:var(--text-muted);">/</span>
-                            <input type="number" id="resultsDays" value="60" min="1" max="180" style="width: 55px; height: 30px; padding: 0 0.35rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; background: #000000; color: #ededed; font-size: 0.75rem;" title="Days ahead (lookahead)">
+                            <input type="number" id="resultsDays" value="7" min="1" max="180" style="width: 55px; height: 30px; padding: 0 0.35rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; background: #000000; color: #ededed; font-size: 0.75rem;" title="Days ahead (lookahead)">
                         </span>
                         {{ comps.market_dropdown('resultsMarket', 'ALL', 'app.onResultsMarketChange(this.value)') }}
                         <button type="button" onclick="app.loadResultsReport()" id="resultsLoadBtn" class="btn btn-primary btn-sm">▶ Load Report</button>

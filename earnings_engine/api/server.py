@@ -2643,8 +2643,8 @@ async def dashboard_results(
 
 @app.get("/api/v1/dashboard/results/report", tags=["Dashboard"])
 async def dashboard_results_report(
-    days: int = Query(60, description="Look-ahead window in days", ge=0, le=180),
-    past_days: int = Query(60, description="Look-back window in days", ge=0, le=180),
+    days: int = Query(7, description="Look-ahead window in days", ge=0, le=180),
+    past_days: int = Query(4, description="Look-back window in days", ge=0, le=180),
     market: str | None = Query(None, description="Market universe (IN, US, NSE_ALL, NSE_LARGE_CAP)"),
     start_date: str | None = Query(None, description="Explicit start date YYYY-MM-DD"),
 ):
