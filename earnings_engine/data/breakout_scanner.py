@@ -33,6 +33,7 @@ Minimum score to appear in API results: BREAKOUT_MIN_SCORE (default 35).
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import time
 from datetime import datetime, timezone
@@ -42,6 +43,7 @@ import numpy as np
 import pandas as pd
 
 from earnings_engine.config import Settings
+from earnings_engine.data.db import get_db_connection
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.breakout_scanner")
@@ -103,6 +105,259 @@ def _rebuild_candidates() -> None:
     _pool["candidates"] = candidates[:BREAKOUT_MAX_CANDIDATES]
     _pool["hot_count"] = len(_pool["hot"])
     _pool["warm_count"] = len(_pool["warm"])
+
+
+def _init_breakout_db(conn: Any) -> None:
+    """Ensure breakout_radar table and performance indices exist."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS breakout_radar (
+            ticker TEXT PRIMARY KEY,
+            tier TEXT NOT NULL DEFAULT 'WARM',
+            company_name TEXT,
+            industry TEXT,
+            composite_score REAL DEFAULT 0,
+            resistance_score REAL DEFAULT 0,
+            volume_score REAL DEFAULT 0,
+            compression_score REAL DEFAULT 0,
+            momentum_score REAL DEFAULT 0,
+            fundamental_score REAL DEFAULT 0,
+            signal_date TEXT,
+            signal_price REAL,
+            predicted_value REAL,
+            breakout_trigger REAL,
+            target_price REAL,
+            stop_loss REAL,
+            risk_reward_ratio REAL,
+            current_price REAL,
+            current_date TEXT,
+            realized_return_pct REAL,
+            max_gain_pct REAL,
+            breakout_happened INTEGER DEFAULT 0,
+            outcome TEXT DEFAULT 'ACTIVE',
+            outcome_label TEXT,
+            outcome_badge TEXT,
+            days_elapsed INTEGER DEFAULT 0,
+            setup_archetype TEXT,
+            volume_ratio REAL,
+            atr_pct REAL,
+            pct_from_high REAL,
+            avg_quality_score REAL,
+            scanned_at TEXT,
+            data_json TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )
+        """
+    )
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_tier ON breakout_radar(tier)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_score ON breakout_radar(composite_score DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_scanned_at ON breakout_radar(scanned_at DESC)")
+    except Exception:
+        pass
+
+
+def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
+    """Persist current in-memory Hot, Warm, and candidate breakout setups into SQLite & Turso."""
+    settings = settings or Settings()
+    try:
+        conn = get_db_connection(settings)
+        _init_breakout_db(conn)
+
+        records: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        # 1. Hot pool
+        for sym, entry in _pool.get("hot", {}).items():
+            r = entry.get("result", {})
+            if r and sym not in seen:
+                seen.add(sym)
+                records.append({**r, "tier": "HOT"})
+
+        # 2. Warm pool
+        for sym, entry in _pool.get("warm", {}).items():
+            r = entry.get("result", {})
+            if r and sym not in seen:
+                seen.add(sym)
+                records.append({**r, "tier": "WARM"})
+
+        # 3. Candidates
+        for r in _pool.get("candidates", []):
+            sym = r.get("ticker")
+            if sym and sym not in seen:
+                seen.add(sym)
+                records.append({**r, "tier": r.get("tier", "WARM")})
+
+        if not records:
+            return
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        rows_to_insert = []
+        for r in records:
+            ticker = r.get("ticker")
+            if not ticker:
+                continue
+            rows_to_insert.append((
+                ticker,
+                r.get("tier", "WARM"),
+                r.get("company_name") or ticker,
+                r.get("industry") or "—",
+                float(r.get("composite_score", 0) or 0),
+                float(r.get("resistance_score", 0) or 0),
+                float(r.get("volume_score", 0) or 0),
+                float(r.get("compression_score", 0) or 0),
+                float(r.get("momentum_score", 0) or 0),
+                float(r.get("fundamental_score", 0) or 0),
+                str(r.get("signal_date") or ""),
+                float(r.get("signal_price")) if r.get("signal_price") is not None else None,
+                float(r.get("predicted_value") or r.get("signal_price")) if (r.get("predicted_value") or r.get("signal_price")) is not None else None,
+                float(r.get("breakout_trigger")) if r.get("breakout_trigger") is not None else None,
+                float(r.get("target_price")) if r.get("target_price") is not None else None,
+                float(r.get("stop_loss")) if r.get("stop_loss") is not None else None,
+                float(r.get("risk_reward_ratio")) if r.get("risk_reward_ratio") is not None else 2.0,
+                float(r.get("current_price")) if r.get("current_price") is not None else None,
+                str(r.get("current_date") or ""),
+                float(r.get("realized_return_pct")) if r.get("realized_return_pct") is not None else 0.0,
+                float(r.get("max_gain_pct")) if r.get("max_gain_pct") is not None else 0.0,
+                1 if r.get("breakout_happened") else 0,
+                str(r.get("outcome") or "ACTIVE"),
+                str(r.get("outcome_label") or ""),
+                str(r.get("outcome_badge") or ""),
+                int(r.get("days_elapsed", 0) or 0),
+                str(r.get("setup_archetype") or "Breakout Setup"),
+                float(r.get("volume_ratio")) if r.get("volume_ratio") is not None else None,
+                float(r.get("atr_pct")) if r.get("atr_pct") is not None else None,
+                float(r.get("pct_from_high")) if r.get("pct_from_high") is not None else None,
+                float(r.get("avg_quality_score")) if r.get("avg_quality_score") is not None else None,
+                str(r.get("scanned_at") or now_iso),
+                json.dumps(r, default=str),
+                now_iso,
+            ))
+
+        upsert_sql = """
+        INSERT INTO breakout_radar (
+            ticker, tier, company_name, industry, composite_score,
+            resistance_score, volume_score, compression_score, momentum_score, fundamental_score,
+            signal_date, signal_price, predicted_value, breakout_trigger, target_price,
+            stop_loss, risk_reward_ratio, current_price, current_date, realized_return_pct,
+            max_gain_pct, breakout_happened, outcome, outcome_label, outcome_badge,
+            days_elapsed, setup_archetype, volume_ratio, atr_pct, pct_from_high,
+            avg_quality_score, scanned_at, data_json, updated_at
+        ) VALUES (
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?
+        )
+        ON CONFLICT(ticker) DO UPDATE SET
+            tier = excluded.tier,
+            company_name = excluded.company_name,
+            industry = excluded.industry,
+            composite_score = excluded.composite_score,
+            resistance_score = excluded.resistance_score,
+            volume_score = excluded.volume_score,
+            compression_score = excluded.compression_score,
+            momentum_score = excluded.momentum_score,
+            fundamental_score = excluded.fundamental_score,
+            signal_date = excluded.signal_date,
+            signal_price = excluded.signal_price,
+            predicted_value = excluded.predicted_value,
+            breakout_trigger = excluded.breakout_trigger,
+            target_price = excluded.target_price,
+            stop_loss = excluded.stop_loss,
+            risk_reward_ratio = excluded.risk_reward_ratio,
+            current_price = excluded.current_price,
+            current_date = excluded.current_date,
+            realized_return_pct = excluded.realized_return_pct,
+            max_gain_pct = excluded.max_gain_pct,
+            breakout_happened = excluded.breakout_happened,
+            outcome = excluded.outcome,
+            outcome_label = excluded.outcome_label,
+            outcome_badge = excluded.outcome_badge,
+            days_elapsed = excluded.days_elapsed,
+            setup_archetype = excluded.setup_archetype,
+            volume_ratio = excluded.volume_ratio,
+            atr_pct = excluded.atr_pct,
+            pct_from_high = excluded.pct_from_high,
+            avg_quality_score = excluded.avg_quality_score,
+            scanned_at = excluded.scanned_at,
+            data_json = excluded.data_json,
+            updated_at = excluded.updated_at
+        """
+
+        if hasattr(conn, "executemany"):
+            conn.executemany(upsert_sql, rows_to_insert)
+        if hasattr(conn, "commit"):
+            conn.commit()
+
+        logger.debug("[BREAKOUT-DB] Persisted %d candidates to breakout_radar table.", len(rows_to_insert))
+    except Exception as e:
+        logger.warning("[BREAKOUT-DB] Failed to persist breakout pool to DB: %s", e)
+
+
+def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
+    """Load persisted breakout pool and candidates from SQLite / Turso database into in-memory pool."""
+    settings = settings or Settings()
+    try:
+        conn = get_db_connection(settings)
+        _init_breakout_db(conn)
+
+        cur = conn.execute("SELECT * FROM breakout_radar ORDER BY composite_score DESC")
+        rows = cur.fetchall()
+        if not rows:
+            return False
+
+        hot_count = 0
+        warm_count = 0
+        for row in rows:
+            data = None
+            tier = "WARM"
+            ticker = ""
+
+            if hasattr(row, "get"):
+                ticker = row.get("ticker", "")
+                tier = (row.get("tier") or "WARM").upper()
+                raw_json = row.get("data_json")
+                if raw_json:
+                    try:
+                        data = json.loads(raw_json)
+                    except Exception:
+                        pass
+                if not data:
+                    data = dict(row)
+            elif isinstance(row, (tuple, list)) and len(row) > 0:
+                ticker = str(row[0])
+                tier = str(row[1]).upper()
+                if len(row) >= 33 and row[32]:
+                    try:
+                        data = json.loads(row[32])
+                    except Exception:
+                        pass
+                if not data:
+                    data = {"ticker": ticker, "tier": tier}
+
+            if not data or not ticker:
+                continue
+
+            data["tier"] = tier
+            if tier == "HOT":
+                _pool["hot"][ticker] = {"result": data, "consecutive_low": 0}
+                hot_count += 1
+            else:
+                _pool["warm"][ticker] = {"result": data, "consecutive_low": 0}
+                warm_count += 1
+
+        _rebuild_candidates()
+        _pool["status"] = "done"
+        logger.info("[BREAKOUT-DB] Loaded %d hot and %d warm candidates from database.", hot_count, warm_count)
+        return True
+    except Exception as e:
+        logger.warning("[BREAKOUT-DB] Failed to load breakout pool from DB: %s", e)
+        return False
 
 
 def _should_be_hot(result: dict) -> bool:
@@ -170,6 +425,9 @@ def get_cached_scan_results(
     settings = settings or Settings()
     if asof_date:
         return run_breakout_scan(settings, universe=universe, asof_date=asof_date)
+
+    if not _pool.get("candidates"):
+        load_breakout_pool_from_db(settings)
 
     all_candidates = list(_pool["candidates"])
     if not universe or universe.lower() in ("all", "any", "global", "monitored"):
@@ -863,6 +1121,7 @@ def run_cold_scan(settings: Settings, universe: str | None = None) -> None:
             promoted_warm += 1
 
     _rebuild_candidates()
+    save_breakout_pool_to_db(settings)
 
     elapsed = round(time.perf_counter() - t0, 2)
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -917,6 +1176,7 @@ def run_warm_rescore(settings: Settings) -> None:
                 _pool["warm"][ticker]["result"] = result
 
     _rebuild_candidates()
+    save_breakout_pool_to_db(settings)
 
     elapsed = round(time.perf_counter() - t0, 2)
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -965,6 +1225,7 @@ def run_hot_rescore(settings: Settings) -> None:
                 _pool["hot"][ticker]["consecutive_low"] = 0
 
     _rebuild_candidates()
+    save_breakout_pool_to_db(settings)
 
     elapsed = round(time.perf_counter() - t0, 2)
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -1201,6 +1462,7 @@ def evaluate_stock_breakout(
         _pool["warm"][sym]["consecutive_low"] = 0
         _rebuild_candidates()
 
+    save_breakout_pool_to_db(settings)
     return scored
 
 
@@ -1238,6 +1500,7 @@ def set_ticker_tier(
         return {"success": False, "error": f"Invalid tier '{tier}'. Must be 'hot', 'warm', or 'cold'."}
 
     _rebuild_candidates()
+    save_breakout_pool_to_db(settings)
     return {
         "success": True,
         "ticker": sym,
