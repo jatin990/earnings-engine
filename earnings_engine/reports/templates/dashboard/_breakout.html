@@ -83,6 +83,11 @@
                     </select>
                     <button type="button" id="breakoutFetchLiveBtn" onclick="app.fetchLiveBreakoutQuotes()" class="btn btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-weight:600;display:flex;align-items:center;gap:0.3rem;" title="Fetch latest intraday breakout prices once">⚡ Refresh Live</button>
 
+                    <!-- Reset Columns Button -->
+                    <button type="button" onclick="app.resetBreakoutColumnOrder()" class="btn btn-secondary btn-sm" style="padding:0.35rem 0.65rem;font-size:0.72rem;display:flex;align-items:center;gap:0.25rem;" title="Reset columns to default layout (Current Price next to Signal Price)">
+                        <span>🔄</span> Reset Cols
+                    </button>
+
                     <!-- Formula breakdown toggle -->
                     <button type="button" onclick="app.toggleBreakoutExplainer()" class="btn btn-secondary" style="padding:0.35rem 0.65rem;font-size:0.74rem;display:flex;align-items:center;gap:0.25rem;">
                         <span>📐</span> Formula & Logic
@@ -233,19 +238,15 @@
             </div>
 
             <!-- Candidates Table -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;font-size:0.68rem;color:#64748b;">
+                <span>💡 <strong>Moveable Columns:</strong> Drag & drop column headers to reorder • Click headers to sort</span>
+                <span id="breakoutColOrderNotice" style="color:#38bdf8;font-weight:600;display:none;">Custom Layout Saved</span>
+            </div>
             <div style="overflow-x:auto;border-radius:0.6rem;border:1px solid rgba(255,255,255,0.07);">
                 <table id="breakoutTable" style="width:100%;border-collapse:collapse;font-size:0.74rem;">
                     <thead>
-                        <tr style="background:#0a0f1e;border-bottom:1px solid rgba(255,255,255,0.1);">
-                            <th onclick="app.sortBreakoutTable('ticker')" style="padding:0.6rem 0.75rem;text-align:left;color:#64748b;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;white-space:nowrap;">Stock ↕</th>
-                            <th onclick="app.sortBreakoutTable('predicted_value')" style="padding:0.6rem 0.75rem;text-align:right;color:#60a5fa;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;white-space:nowrap;">Signal Price ↕</th>
-                            <th onclick="app.sortBreakoutTable('breakout_trigger')" style="padding:0.6rem 0.75rem;text-align:right;color:#f87171;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;white-space:nowrap;">Trigger (Res) ↕</th>
-                            <th style="padding:0.6rem 0.75rem;text-align:right;color:#38bdf8;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Target / Stop</th>
-                            <th onclick="app.sortBreakoutTable('current_price')" style="padding:0.6rem 0.75rem;text-align:right;color:#e2e8f0;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;white-space:nowrap;">Current Price ↕</th>
-                            <th onclick="app.sortBreakoutTable('realized_return_pct')" style="padding:0.6rem 0.75rem;text-align:right;color:#34d399;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;white-space:nowrap;">Return % ↕</th>
-                            <th style="padding:0.6rem 0.75rem;text-align:center;color:#fbbf24;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Breakout Outcome</th>
-                            <th onclick="app.sortBreakoutTable('composite_score')" style="padding:0.6rem 0.75rem;text-align:right;color:#f1f5f9;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;white-space:nowrap;">⚡ Score ↕</th>
-                            <th style="padding:0.6rem 0.75rem;text-align:center;color:#64748b;font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;">Actions</th>
+                        <tr id="breakoutTableHeaderRow" style="background:#0a0f1e;border-bottom:1px solid rgba(255,255,255,0.1);">
+                            <!-- Rendered dynamically by app.renderBreakoutTableHeader() -->
                         </tr>
                     </thead>
                     <tbody id="breakoutTableBody">
