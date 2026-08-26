@@ -11432,6 +11432,9 @@
                 render: (c, ctx) => `
                     <td style="padding:0.55rem 0.75rem;text-align:center;white-space:nowrap;">
                         <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">
+                            <button id="btnReeval-${ctx.ticker.replace(/[^a-zA-Z0-9]/g, '_')}" onclick="app.reevaluateBreakoutStock('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(234,179,8,0.15);color:#fbbf24;border:1px solid rgba(234,179,8,0.35);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:5px;cursor:pointer;" title="Re-evaluate with fresh market prices and recalculate conviction">
+                                ⚡ Re-eval
+                            </button>
                             <button onclick="app.openBreakoutNotesModal('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-size:0.68rem;padding:0.2rem 0.5rem;border-radius:5px;cursor:pointer;" title="View Mathematical Calculation Notes & Ollama AI Reasoning">
                                 🧠 Reasoning
                             </button>
@@ -11880,6 +11883,191 @@
                     bodyEl.innerHTML = `<div style="color:#f87171;">AI reasoning call failed: ${e.message}. Using rule-based calculation notes above.</div>`;
                 }
             }
+        };
+
+        app.reevaluateBreakoutStock = async function(ticker, forceTier = null) {
+            const safeId = ticker.replace(/[^a-zA-Z0-9]/g, '_');
+            const btn = document.getElementById(`btnReeval-${safeId}`);
+            let oldText = '';
+            if (btn) {
+                oldText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span>';
+            }
+            try {
+                let url = `/api/v1/breakout-radar/evaluate/${encodeURIComponent(ticker)}`;
+                if (forceTier) url += `?force_tier=${encodeURIComponent(forceTier)}`;
+                const res = await fetch(url);
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Evaluation failed');
+                }
+                const data = await res.json();
+                
+                // Update in-memory data
+                if (app._breakoutData) {
+                    const idx = app._breakoutData.findIndex(x => x.ticker === ticker || x.ticker === data.ticker);
+                    if (idx > -1) {
+                        app._breakoutData[idx] = data;
+                    } else {
+                        app._breakoutData.unshift(data);
+                    }
+                    const limitVal = document.getElementById('breakoutLimitSelect')?.value || '10';
+                    const limitNum = limitVal === 'all' ? app._breakoutData.length : parseInt(limitVal, 10);
+                    app.renderBreakoutTable(app._breakoutData.slice(0, limitNum));
+                }
+
+                // Show notification / evaluated card
+                app.renderBreakoutEvaluatedCard(data);
+            } catch (e) {
+                console.error('Re-evaluate error:', e);
+                alert(`Failed to re-evaluate ${ticker}: ${e.message || e}`);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = oldText;
+                }
+            }
+        };
+
+        app.setBreakoutStockTier = async function(ticker, tier) {
+            try {
+                const res = await fetch(`/api/v1/breakout-radar/set-tier/${encodeURIComponent(ticker)}?tier=${encodeURIComponent(tier)}`, { method: 'POST' });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Failed to update tier');
+                }
+                const data = await res.json();
+                alert(`✅ ${ticker} moved to ${tier.toUpperCase()} tier!`);
+                await app.loadBreakoutRadar(false);
+            } catch (e) {
+                console.error('Set tier error:', e);
+                alert(`Failed to set tier: ${e.message || e}`);
+            }
+        };
+
+        app.evaluateCurrentBreakoutInput = async function() {
+            const input = document.getElementById('breakoutTickerInput');
+            const ticker = (input?.value || '').trim().toUpperCase();
+            if (!ticker) {
+                alert('Please enter a stock ticker or company name.');
+                return;
+            }
+            const btn = document.getElementById('breakoutEvaluateBtn');
+            let prevText = '';
+            if (btn) {
+                prevText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Evaluating...';
+            }
+
+            try {
+                const res = await fetch(`/api/v1/breakout-radar/evaluate/${encodeURIComponent(ticker)}`);
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Evaluation failed');
+                }
+                const data = await res.json();
+                app.renderBreakoutEvaluatedCard(data);
+
+                // Add to table if not present
+                if (app._breakoutData) {
+                    const idx = app._breakoutData.findIndex(x => x.ticker === data.ticker || x.ticker === ticker);
+                    if (idx > -1) {
+                        app._breakoutData[idx] = data;
+                    } else {
+                        app._breakoutData.unshift(data);
+                    }
+                    const limitVal = document.getElementById('breakoutLimitSelect')?.value || '10';
+                    const limitNum = limitVal === 'all' ? app._breakoutData.length : parseInt(limitVal, 10);
+                    app.renderBreakoutTable(app._breakoutData.slice(0, limitNum));
+                }
+            } catch (e) {
+                console.error('Evaluator error:', e);
+                alert(`Failed to evaluate ${ticker}: ${e.message || e}`);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = prevText;
+                }
+            }
+        };
+
+        app.clearBreakoutEvaluator = function() {
+            const input = document.getElementById('breakoutTickerInput');
+            const card = document.getElementById('breakoutEvaluatedStockCard');
+            const clearBtn = document.getElementById('breakoutClearInputBtn');
+            if (input) input.value = '';
+            if (card) card.style.display = 'none';
+            if (clearBtn) clearBtn.style.display = 'none';
+        };
+
+        app.renderBreakoutEvaluatedCard = function(c) {
+            const card = document.getElementById('breakoutEvaluatedStockCard');
+            if (!card) return;
+
+            const score = c.composite_score || 0;
+            const scoreColor = score >= 75 ? '#fde68a' : score >= 55 ? '#34d399' : '#60a5fa';
+            const tier = c.tier || 'WARM';
+            const tierBadgeColor = tier === 'HOT' ? '#f87171' : (tier === 'WARM' ? '#fbbf24' : '#94a3b8');
+            const tierBg = tier === 'HOT' ? 'rgba(239,68,68,0.2)' : (tier === 'WARM' ? 'rgba(234,179,8,0.2)' : 'rgba(148,163,184,0.15)');
+
+            const curPriceStr = c.current_price != null ? `₹${Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits:2})}` : '—';
+            const trigStr = c.breakout_trigger != null ? `₹${Number(c.breakout_trigger).toLocaleString('en-IN', {minimumFractionDigits:2})}` : '—';
+            const targetStr = c.target_price != null ? `₹${Number(c.target_price).toLocaleString('en-IN', {minimumFractionDigits:2})}` : '—';
+            const stopStr = c.stop_loss != null ? `₹${Number(c.stop_loss).toLocaleString('en-IN', {minimumFractionDigits:2})}` : '—';
+
+            card.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.75rem;margin-bottom:0.75rem;">
+                    <div style="display:flex;align-items:center;gap:0.6rem;">
+                        <span style="font-size:1.4rem;">🎯</span>
+                        <div>
+                            <div style="font-size:1.1rem;font-weight:800;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+                                <span>${c.ticker}</span>
+                                <span style="font-size:0.72rem;background:${tierBg};color:${tierBadgeColor};border:1px solid ${tierBadgeColor}44;padding:0.12rem 0.45rem;border-radius:4px;font-weight:700;">${c.tier_label || tier}</span>
+                                <span style="font-size:0.75rem;background:rgba(59,130,246,0.2);color:${scoreColor};padding:0.12rem 0.45rem;border-radius:4px;font-family:var(--font-mono);font-weight:800;">Score ${score}/100</span>
+                            </div>
+                            <div style="font-size:0.75rem;color:#94a3b8;">${c.company_name || c.ticker} &middot; Sector: ${c.industry || 'Equities'}</div>
+                        </div>
+                    </div>
+
+                    <!-- User Tier Decision & Re-evaluate Buttons -->
+                    <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                        <button type="button" onclick="app.setBreakoutStockTier('${c.ticker}', 'hot')" class="btn btn-sm" style="background:rgba(239,68,68,0.2);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-size:0.72rem;font-weight:700;" title="Pin or promote to Hot Tier (scanned every 30s)">
+                            🔥 Move to Hot
+                        </button>
+                        <button type="button" onclick="app.setBreakoutStockTier('${c.ticker}', 'warm')" class="btn btn-sm" style="background:rgba(234,179,8,0.2);color:#fbbf24;border:1px solid rgba(234,179,8,0.4);font-size:0.72rem;font-weight:700;" title="Keep in Warm Tier (scanned every 5 min)">
+                            🟡 Move to Warm
+                        </button>
+                        <button type="button" onclick="app.reevaluateBreakoutStock('${c.ticker}')" class="btn btn-sm" style="background:linear-gradient(135deg, #2563eb, #3b82f6);color:#fff;border:none;font-size:0.72rem;font-weight:700;" title="Re-evaluate with fresh market prices">
+                            ⚡ Re-evaluate Now
+                        </button>
+                        <button type="button" onclick="document.getElementById('breakoutEvaluatedStockCard').style.display='none'" style="background:transparent;border:none;color:#64748b;font-size:1.1rem;cursor:pointer;padding:0.2rem 0.4rem;">✕</button>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.6rem;font-size:0.78rem;">
+                    <div style="background:#030712;padding:0.5rem 0.7rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                        <div style="color:#94a3b8;font-size:0.68rem;">Current Price</div>
+                        <div style="color:#e2e8f0;font-weight:700;font-size:0.95rem;font-family:var(--font-mono);">${curPriceStr}</div>
+                    </div>
+                    <div style="background:#030712;padding:0.5rem 0.7rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                        <div style="color:#94a3b8;font-size:0.68rem;">Breakout Trigger</div>
+                        <div style="color:#f87171;font-weight:700;font-size:0.95rem;font-family:var(--font-mono);">${trigStr}</div>
+                    </div>
+                    <div style="background:#030712;padding:0.5rem 0.7rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                        <div style="color:#94a3b8;font-size:0.68rem;">Upside Target</div>
+                        <div style="color:#34d399;font-weight:700;font-size:0.95rem;font-family:var(--font-mono);">${targetStr}</div>
+                    </div>
+                    <div style="background:#030712;padding:0.5rem 0.7rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                        <div style="color:#94a3b8;font-size:0.68rem;">Stop Loss</div>
+                        <div style="color:#fca5a5;font-weight:700;font-size:0.95rem;font-family:var(--font-mono);">${stopStr}</div>
+                    </div>
+                </div>
+            `;
+            card.style.display = 'block';
+            const clearBtn = document.getElementById('breakoutClearInputBtn');
+            if (clearBtn) clearBtn.style.display = 'block';
         };
 
         app.refreshBreakoutScan = async function() {

@@ -4770,6 +4770,7 @@ async def search_breakout_stocks(
 async def evaluate_breakout_stock(
     ticker: str,
     asof_date: str | None = Query(None, description="Point-in-time evaluation date in YYYY-MM-DD format"),
+    force_tier: str | None = Query(None, description="Force promotion into 'hot' or 'warm' tier pool"),
 ):
     """Evaluate a specific stock on-demand for Breakout Radar setup conviction, key levels, and sub-score metrics."""
     sym = ticker.strip().upper()
@@ -4778,6 +4779,7 @@ async def evaluate_breakout_stock(
             breakout_scanner_mod.evaluate_stock_breakout,
             ticker=sym,
             asof_date=asof_date,
+            force_tier=force_tier,
             settings=_settings,
         )
         if not result or not result.get("success"):
@@ -4789,6 +4791,31 @@ async def evaluate_breakout_stock(
     except Exception as e:
         logger.error("[BREAKOUT-API] Stock evaluation error for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Breakout evaluation failed: {str(e)}")
+
+
+@app.post("/api/v1/breakout-radar/set-tier/{ticker}", tags=["Breakout Radar"])
+async def set_breakout_tier(
+    ticker: str,
+    tier: str = Query(..., description="Target tier: 'hot', 'warm', or 'cold'"),
+):
+    """Manually assign or promote a stock into Hot, Warm, or Cold breakout tier."""
+    sym = ticker.strip().upper()
+    try:
+        result = await asyncio.to_thread(
+            breakout_scanner_mod.set_ticker_tier,
+            ticker=sym,
+            tier=tier,
+            settings=_settings,
+        )
+        if not result or not result.get("success"):
+            error_msg = result.get("error", "Failed to set tier") if result else "No data returned"
+            raise HTTPException(status_code=400, detail=error_msg)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("[BREAKOUT-API] Set tier error for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Failed to set breakout tier: {str(e)}")
 
 
 @app.post("/api/v1/breakout-radar/ai-reasoning/{ticker}", tags=["Breakout Radar"])

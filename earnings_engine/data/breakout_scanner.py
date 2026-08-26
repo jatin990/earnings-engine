@@ -1109,6 +1109,7 @@ async def tiered_scanner_loop(settings: Settings) -> None:
 def evaluate_stock_breakout(
     ticker: str,
     asof_date: str | None = None,
+    force_tier: str | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Evaluate a single stock on-demand for Breakout Radar setup conviction, key levels, and sub-score metrics."""
@@ -1182,7 +1183,69 @@ def evaluate_stock_breakout(
     scored["tier_label"] = tier_label
     scored["tier_badge"] = tier_badge
 
+    # Update active scan pools with freshest calculation
+    if force_tier and force_tier.lower() == "hot":
+        _pool["hot"][sym] = {"result": scored, "consecutive_low": 0}
+        _pool["warm"].pop(sym, None)
+        _rebuild_candidates()
+    elif force_tier and force_tier.lower() == "warm":
+        _pool["warm"][sym] = {"result": scored, "consecutive_low": 0}
+        _pool["hot"].pop(sym, None)
+        _rebuild_candidates()
+    elif sym in _pool["hot"]:
+        _pool["hot"][sym]["result"] = scored
+        _pool["hot"][sym]["consecutive_low"] = 0
+        _rebuild_candidates()
+    elif sym in _pool["warm"]:
+        _pool["warm"][sym]["result"] = scored
+        _pool["warm"][sym]["consecutive_low"] = 0
+        _rebuild_candidates()
+
     return scored
+
+
+def set_ticker_tier(
+    ticker: str,
+    tier: str,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Manually assign or promote a ticker into Hot, Warm, or Cold pool."""
+    settings = settings or Settings()
+    sym = (ticker or "").strip().upper()
+    if not (sym.endswith(".NS") or sym.endswith(".BO") or "." in sym):
+        sym = f"{sym}.NS"
+    target_tier = tier.strip().lower()
+
+    entry = _pool["hot"].get(sym) or _pool["warm"].get(sym)
+    if entry:
+        result = entry["result"]
+    else:
+        eval_res = evaluate_stock_breakout(sym, settings=settings)
+        if not eval_res.get("success"):
+            return {"success": False, "error": eval_res.get("error", "Failed to evaluate ticker")}
+        result = eval_res
+
+    if target_tier == "hot":
+        _pool["hot"][sym] = {"result": result, "consecutive_low": 0}
+        _pool["warm"].pop(sym, None)
+    elif target_tier == "warm":
+        _pool["warm"][sym] = {"result": result, "consecutive_low": 0}
+        _pool["hot"].pop(sym, None)
+    elif target_tier == "cold":
+        _pool["hot"].pop(sym, None)
+        _pool["warm"].pop(sym, None)
+    else:
+        return {"success": False, "error": f"Invalid tier '{tier}'. Must be 'hot', 'warm', or 'cold'."}
+
+    _rebuild_candidates()
+    return {
+        "success": True,
+        "ticker": sym,
+        "tier": target_tier.upper(),
+        "hot_count": len(_pool["hot"]),
+        "warm_count": len(_pool["warm"]),
+        "candidate": result,
+    }
 
 
 def search_breakout_tickers(
