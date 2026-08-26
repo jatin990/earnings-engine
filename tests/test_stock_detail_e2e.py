@@ -59,3 +59,12 @@ def test_kronos_predict_endpoint(client):
     assert res.status_code == 200
     json_data = res.json()
     assert "success" in json_data
+
+
+def test_local_models_endpoint(client):
+    res = client.get("/api/v1/consensus/local-models?host=http%3A%2F%2Flocalhost%3A11434")
+    assert res.status_code == 200
+    data = res.json()
+    assert data.get("success") is True
+    assert "status" in data
+    assert "models" in data
