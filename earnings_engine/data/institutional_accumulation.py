@@ -17,176 +17,12 @@ from earnings_engine.data.db import get_db_connection
 
 logger = logging.getLogger(__name__)
 
-# Comprehensive institutional baseline dataset for 35+ key equities across Nifty 50, Next 50, Midcap & Smallcap
-SEEDED_INSTITUTIONAL_DATA: list[dict[str, Any]] = [
-    # 1. ALLCARGO.NS
-    {"ticker": "ALLCARGO.NS", "fund_name": "Nippon India Small Cap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 28450000, "stake_pct": 2.89, "prev_stake_pct": 1.44, "holding_value_cr": 223.3, "action": "ACCUMULATED", "change_shares": 14250000, "change_pct": 1.45, "reported_date": "2025-01-15"},
-    {"ticker": "ALLCARGO.NS", "fund_name": "Quant Small Cap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 17800000, "stake_pct": 1.81, "prev_stake_pct": 0.0, "holding_value_cr": 139.7, "action": "NEW BUY", "change_shares": 17800000, "change_pct": 1.81, "reported_date": "2025-01-18"},
-    {"ticker": "ALLCARGO.NS", "fund_name": "Ashish Kacholia", "fund_type": "Super Investor", "quarter": "Q3 FY25", "shares_held": 14200000, "stake_pct": 1.44, "prev_stake_pct": 0.69, "holding_value_cr": 111.5, "action": "ACCUMULATED", "change_shares": 7400000, "change_pct": 0.75, "reported_date": "2025-01-10"},
-    {"ticker": "ALLCARGO.NS", "fund_name": "Government Pension Fund Global (Norway)", "fund_type": "Foreign Sovereign / FII", "quarter": "Q3 FY25", "shares_held": 11500000, "stake_pct": 1.17, "prev_stake_pct": 0.77, "holding_value_cr": 90.3, "action": "ACCUMULATED", "change_shares": 3900000, "change_pct": 0.40, "reported_date": "2025-01-20"},
-    {"ticker": "ALLCARGO.NS", "fund_name": "HDFC Flexi Cap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q2 FY25", "shares_held": 8500000, "stake_pct": 0.86, "prev_stake_pct": 1.46, "holding_value_cr": 66.7, "action": "TRIMMED", "change_shares": -5900000, "change_pct": -0.60, "reported_date": "2024-10-18"},
-    {"ticker": "ALLCARGO.NS", "fund_name": "Vanguard Emerging Markets Fund", "fund_type": "Foreign Institutional (FII)", "quarter": "Q2 FY25", "shares_held": 0, "stake_pct": 0.0, "prev_stake_pct": 1.15, "holding_value_cr": 0.0, "action": "SOLD OUT", "change_shares": -11300000, "change_pct": -1.15, "reported_date": "2024-10-12"},
-    {"ticker": "ALLCARGO.NS", "fund_name": "Nippon India Small Cap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q2 FY25", "shares_held": 14200000, "stake_pct": 1.44, "prev_stake_pct": 0.95, "holding_value_cr": 105.0, "action": "ACCUMULATED", "change_shares": 4800000, "change_pct": 0.49, "reported_date": "2024-10-15"},
-    {"ticker": "ALLCARGO.NS", "fund_name": "Ashish Kacholia", "fund_type": "Super Investor", "quarter": "Q1 FY25", "shares_held": 6800000, "stake_pct": 0.69, "prev_stake_pct": 0.0, "holding_value_cr": 48.2, "action": "NEW BUY", "change_shares": 6800000, "change_pct": 0.69, "reported_date": "2024-07-16"},
-
-    # 2. DIXON.NS
-    {"ticker": "DIXON.NS", "fund_name": "Nippon India Growth Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 2450000, "stake_pct": 4.10, "prev_stake_pct": 2.80, "holding_value_cr": 3185.0, "action": "ACCUMULATED", "change_shares": 777000, "change_pct": 1.30, "reported_date": "2025-01-14"},
-    {"ticker": "DIXON.NS", "fund_name": "Kotak Emerging Equity Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 1820000, "stake_pct": 3.04, "prev_stake_pct": 1.95, "holding_value_cr": 2366.0, "action": "ACCUMULATED", "change_shares": 652000, "change_pct": 1.09, "reported_date": "2025-01-16"},
-    {"ticker": "DIXON.NS", "fund_name": "GQG Partners Emerging Markets", "fund_type": "Foreign Institutional (FII)", "quarter": "Q3 FY25", "shares_held": 1500000, "stake_pct": 2.51, "prev_stake_pct": 0.0, "holding_value_cr": 1950.0, "action": "NEW BUY", "change_shares": 1500000, "change_pct": 2.51, "reported_date": "2025-01-20"},
-    {"ticker": "DIXON.NS", "fund_name": "SBI Focused Equity Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q2 FY25", "shares_held": 1200000, "stake_pct": 2.01, "prev_stake_pct": 1.45, "holding_value_cr": 1440.0, "action": "ACCUMULATED", "change_shares": 334000, "change_pct": 0.56, "reported_date": "2024-10-18"},
-    {"ticker": "DIXON.NS", "fund_name": "Vanguard International Growth", "fund_type": "Foreign Institutional (FII)", "quarter": "Q1 FY25", "shares_held": 850000, "stake_pct": 1.42, "prev_stake_pct": 0.85, "holding_value_cr": 892.5, "action": "ACCUMULATED", "change_shares": 341000, "change_pct": 0.57, "reported_date": "2024-07-15"},
-
-    # 3. KAYNES.NS
-    {"ticker": "KAYNES.NS", "fund_name": "Quant Active Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 2650000, "stake_pct": 4.14, "prev_stake_pct": 1.85, "holding_value_cr": 1378.0, "action": "ACCUMULATED", "change_shares": 1465000, "change_pct": 2.29, "reported_date": "2025-01-12"},
-    {"ticker": "KAYNES.NS", "fund_name": "Ashish Kacholia", "fund_type": "Super Investor", "quarter": "Q3 FY25", "shares_held": 1200000, "stake_pct": 1.87, "prev_stake_pct": 1.22, "holding_value_cr": 624.0, "action": "ACCUMULATED", "change_shares": 416000, "change_pct": 0.65, "reported_date": "2025-01-18"},
-    {"ticker": "KAYNES.NS", "fund_name": "Goldman Sachs India Equity", "fund_type": "Foreign Institutional (FII)", "quarter": "Q3 FY25", "shares_held": 950000, "stake_pct": 1.48, "prev_stake_pct": 0.0, "holding_value_cr": 494.0, "action": "NEW BUY", "change_shares": 950000, "change_pct": 1.48, "reported_date": "2025-01-22"},
-    {"ticker": "KAYNES.NS", "fund_name": "HDFC Mid-Cap Opportunities", "fund_type": "Mutual Fund (DII)", "quarter": "Q2 FY25", "shares_held": 1450000, "stake_pct": 2.26, "prev_stake_pct": 1.10, "holding_value_cr": 652.5, "action": "ACCUMULATED", "change_shares": 742000, "change_pct": 1.16, "reported_date": "2024-10-14"},
-
-    # 4. MAZDOCK.NS
-    {"ticker": "MAZDOCK.NS", "fund_name": "HDFC Defence Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 8450000, "stake_pct": 4.19, "prev_stake_pct": 2.45, "holding_value_cr": 3549.0, "action": "ACCUMULATED", "change_shares": 3510000, "change_pct": 1.74, "reported_date": "2025-01-11"},
-    {"ticker": "MAZDOCK.NS", "fund_name": "Government Pension Fund Global (Norway)", "fund_type": "Foreign Sovereign / FII", "quarter": "Q3 FY25", "shares_held": 3800000, "stake_pct": 1.88, "prev_stake_pct": 0.92, "holding_value_cr": 1596.0, "action": "ACCUMULATED", "change_shares": 1936000, "change_pct": 0.96, "reported_date": "2025-01-17"},
-    {"ticker": "MAZDOCK.NS", "fund_name": "Mukul Agrawal", "fund_type": "Super Investor", "quarter": "Q3 FY25", "shares_held": 2500000, "stake_pct": 1.24, "prev_stake_pct": 0.0, "holding_value_cr": 1050.0, "action": "NEW BUY", "change_shares": 2500000, "change_pct": 1.24, "reported_date": "2025-01-19"},
-    {"ticker": "MAZDOCK.NS", "fund_name": "Nippon India Multi Cap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q2 FY25", "shares_held": 4100000, "stake_pct": 2.03, "prev_stake_pct": 1.15, "holding_value_cr": 1476.0, "action": "ACCUMULATED", "change_shares": 1775000, "change_pct": 0.88, "reported_date": "2024-10-16"},
-
-    # 5. COCHINSHIP.NS
-    {"ticker": "COCHINSHIP.NS", "fund_name": "ICICI Prudential Manufacturing", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 4200000, "stake_pct": 3.19, "prev_stake_pct": 1.65, "holding_value_cr": 714.0, "action": "ACCUMULATED", "change_shares": 2027000, "change_pct": 1.54, "reported_date": "2025-01-15"},
-    {"ticker": "COCHINSHIP.NS", "fund_name": "Quant Small Cap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 2800000, "stake_pct": 2.13, "prev_stake_pct": 0.0, "holding_value_cr": 476.0, "action": "NEW BUY", "change_shares": 2800000, "change_pct": 2.13, "reported_date": "2025-01-19"},
-    {"ticker": "COCHINSHIP.NS", "fund_name": "Vijay Kedia", "fund_type": "Super Investor", "quarter": "Q3 FY25", "shares_held": 1500000, "stake_pct": 1.14, "prev_stake_pct": 0.50, "holding_value_cr": 255.0, "action": "ACCUMULATED", "change_shares": 842000, "change_pct": 0.64, "reported_date": "2025-01-14"},
-
-    # 6. TRENT.NS
-    {"ticker": "TRENT.NS", "fund_name": "SBI Bluechip Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 8500000, "stake_pct": 2.39, "prev_stake_pct": 1.45, "holding_value_cr": 5525.0, "action": "ACCUMULATED", "change_shares": 3340000, "change_pct": 0.94, "reported_date": "2025-01-16"},
-    {"ticker": "TRENT.NS", "fund_name": "Radhakishan Damani", "fund_type": "Super Investor", "quarter": "Q3 FY25", "shares_held": 5200000, "stake_pct": 1.46, "prev_stake_pct": 1.46, "holding_value_cr": 3380.0, "action": "HOLD", "change_shares": 0, "change_pct": 0.0, "reported_date": "2025-01-10"},
-    {"ticker": "TRENT.NS", "fund_name": "Capital Group Emerging Markets", "fund_type": "Foreign Institutional (FII)", "quarter": "Q3 FY25", "shares_held": 4800000, "stake_pct": 1.35, "prev_stake_pct": 0.0, "holding_value_cr": 3120.0, "action": "NEW BUY", "change_shares": 4800000, "change_pct": 1.35, "reported_date": "2025-01-21"},
-
-    # 7. CDSL.NS
-    {"ticker": "CDSL.NS", "fund_name": "Parag Parikh Flexi Cap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 5400000, "stake_pct": 5.16, "prev_stake_pct": 3.80, "holding_value_cr": 972.0, "action": "ACCUMULATED", "change_shares": 1422000, "change_pct": 1.36, "reported_date": "2025-01-13"},
-    {"ticker": "CDSL.NS", "fund_name": "Mirae Asset Large & Midcap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 3200000, "stake_pct": 3.06, "prev_stake_pct": 1.90, "holding_value_cr": 576.0, "action": "ACCUMULATED", "change_shares": 1213000, "change_pct": 1.16, "reported_date": "2025-01-17"},
-    {"ticker": "CDSL.NS", "fund_name": "GQG Partners Emerging Markets", "fund_type": "Foreign Institutional (FII)", "quarter": "Q3 FY25", "shares_held": 2100000, "stake_pct": 2.01, "prev_stake_pct": 0.0, "holding_value_cr": 378.0, "action": "NEW BUY", "change_shares": 2100000, "change_pct": 2.01, "reported_date": "2025-01-22"},
-
-    # 8. SUZLON.NS
-    {"ticker": "SUZLON.NS", "fund_name": "BlackRock Global Clean Energy", "fund_type": "Foreign Institutional (FII)", "quarter": "Q3 FY25", "shares_held": 320000000, "stake_pct": 2.35, "prev_stake_pct": 1.10, "holding_value_cr": 2080.0, "action": "ACCUMULATED", "change_shares": 170100000, "change_pct": 1.25, "reported_date": "2025-01-18"},
-    {"ticker": "SUZLON.NS", "fund_name": "Quant Small Cap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 250000000, "stake_pct": 1.83, "prev_stake_pct": 0.0, "holding_value_cr": 1625.0, "action": "NEW BUY", "change_shares": 250000000, "change_pct": 1.83, "reported_date": "2025-01-20"},
-    {"ticker": "SUZLON.NS", "fund_name": "Mukul Agrawal", "fund_type": "Super Investor", "quarter": "Q3 FY25", "shares_held": 150000000, "stake_pct": 1.10, "prev_stake_pct": 0.45, "holding_value_cr": 975.0, "action": "ACCUMULATED", "change_shares": 88400000, "change_pct": 0.65, "reported_date": "2025-01-15"},
-
-    # 9. KPITTECH.NS
-    {"ticker": "KPITTECH.NS", "fund_name": "Kotak Emerging Equity Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 8900000, "stake_pct": 3.25, "prev_stake_pct": 1.90, "holding_value_cr": 1335.0, "action": "ACCUMULATED", "change_shares": 3698000, "change_pct": 1.35, "reported_date": "2025-01-14"},
-    {"ticker": "KPITTECH.NS", "fund_name": "Morgan Stanley Asia Fund", "fund_type": "Foreign Institutional (FII)", "quarter": "Q3 FY25", "shares_held": 5800000, "stake_pct": 2.12, "prev_stake_pct": 0.0, "holding_value_cr": 870.0, "action": "NEW BUY", "change_shares": 5800000, "change_pct": 2.12, "reported_date": "2025-01-19"},
-
-    # 10. BEL.NS
-    {"ticker": "BEL.NS", "fund_name": "SBI Equity Hybrid Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 145000000, "stake_pct": 1.98, "prev_stake_pct": 1.25, "holding_value_cr": 4350.0, "action": "ACCUMULATED", "change_shares": 53360000, "change_pct": 0.73, "reported_date": "2025-01-12"},
-    {"ticker": "BEL.NS", "fund_name": "Government Pension Fund Global (Norway)", "fund_type": "Foreign Sovereign / FII", "quarter": "Q3 FY25", "shares_held": 110000000, "stake_pct": 1.50, "prev_stake_pct": 0.90, "holding_value_cr": 3300.0, "action": "ACCUMULATED", "change_shares": 43860000, "change_pct": 0.60, "reported_date": "2025-01-16"},
-
-    # 11. HAL.NS
-    {"ticker": "HAL.NS", "fund_name": "HDFC Defence Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 16500000, "stake_pct": 2.47, "prev_stake_pct": 1.35, "holding_value_cr": 7425.0, "action": "ACCUMULATED", "change_shares": 7482000, "change_pct": 1.12, "reported_date": "2025-01-15"},
-    {"ticker": "HAL.NS", "fund_name": "Vanguard Emerging Markets", "fund_type": "Foreign Institutional (FII)", "quarter": "Q3 FY25", "shares_held": 12800000, "stake_pct": 1.91, "prev_stake_pct": 1.10, "holding_value_cr": 5760.0, "action": "ACCUMULATED", "change_shares": 5419000, "change_pct": 0.81, "reported_date": "2025-01-18"},
-
-    # 12. FORCEMOT.NS
-    {"ticker": "FORCEMOT.NS", "fund_name": "Mukul Agrawal", "fund_type": "Super Investor", "quarter": "Q3 FY25", "shares_held": 580000, "stake_pct": 4.40, "prev_stake_pct": 3.20, "holding_value_cr": 493.0, "action": "ACCUMULATED", "change_shares": 158000, "change_pct": 1.20, "reported_date": "2025-01-11"},
-    {"ticker": "FORCEMOT.NS", "fund_name": "DSP Midcap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 320000, "stake_pct": 2.43, "prev_stake_pct": 0.0, "holding_value_cr": 272.0, "action": "NEW BUY", "change_shares": 320000, "change_pct": 2.43, "reported_date": "2025-01-19"},
-    {"ticker": "FORCEMOT.NS", "fund_name": "Mukul Agrawal", "fund_type": "Super Investor", "quarter": "Q2 FY25", "shares_held": 422000, "stake_pct": 3.20, "prev_stake_pct": 2.10, "holding_value_cr": 316.5, "action": "ACCUMULATED", "change_shares": 144900, "change_pct": 1.10, "reported_date": "2024-10-14"},
-
-    # 13. PCJEWELLER.NS
-    {"ticker": "PCJEWELLER.NS", "fund_name": "Quant Active Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 11200000, "stake_pct": 2.41, "prev_stake_pct": 0.0, "holding_value_cr": 196.0, "action": "NEW BUY", "change_shares": 11200000, "change_pct": 2.41, "reported_date": "2025-01-22"},
-    {"ticker": "PCJEWELLER.NS", "fund_name": "Dolly Khanna", "fund_type": "Super Investor", "quarter": "Q3 FY25", "shares_held": 5800000, "stake_pct": 1.25, "prev_stake_pct": 0.60, "holding_value_cr": 101.5, "action": "ACCUMULATED", "change_shares": 3010000, "change_pct": 0.65, "reported_date": "2025-01-17"},
-
-    # 14. TCS.NS
-    {"ticker": "TCS.NS", "fund_name": "SBI Bluechip Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 12500000, "stake_pct": 0.35, "prev_stake_pct": 0.28, "holding_value_cr": 5250.0, "action": "ACCUMULATED", "change_shares": 2500000, "change_pct": 0.07, "reported_date": "2025-01-14"},
-    {"ticker": "TCS.NS", "fund_name": "GQG Partners Emerging Markets", "fund_type": "Foreign Institutional (FII)", "quarter": "Q3 FY25", "shares_held": 18200000, "stake_pct": 0.50, "prev_stake_pct": 0.0, "holding_value_cr": 7644.0, "action": "NEW BUY", "change_shares": 18200000, "change_pct": 0.50, "reported_date": "2025-01-16"},
-
-    # 15. RELIANCE.NS
-    {"ticker": "RELIANCE.NS", "fund_name": "HDFC Top 100 Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 48000000, "stake_pct": 0.71, "prev_stake_pct": 0.55, "holding_value_cr": 6240.0, "action": "ACCUMULATED", "change_shares": 10800000, "change_pct": 0.16, "reported_date": "2025-01-15"},
-    {"ticker": "RELIANCE.NS", "fund_name": "Government of Singapore (GIC)", "fund_type": "Foreign Sovereign / FII", "quarter": "Q3 FY25", "shares_held": 85000000, "stake_pct": 1.26, "prev_stake_pct": 1.26, "holding_value_cr": 11050.0, "action": "HOLD", "change_shares": 0, "change_pct": 0.0, "reported_date": "2025-01-12"},
-
-    # 16. HDFCBANK.NS
-    {"ticker": "HDFCBANK.NS", "fund_name": "SBI Nifty 50 ETF", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 92000000, "stake_pct": 1.21, "prev_stake_pct": 0.95, "holding_value_cr": 15640.0, "action": "ACCUMULATED", "change_shares": 19760000, "change_pct": 0.26, "reported_date": "2025-01-16"},
-    {"ticker": "HDFCBANK.NS", "fund_name": "Morgan Stanley Mauritius", "fund_type": "Foreign Institutional (FII)", "quarter": "Q3 FY25", "shares_held": 64000000, "stake_pct": 0.84, "prev_stake_pct": 0.0, "holding_value_cr": 10880.0, "action": "NEW BUY", "change_shares": 64000000, "change_pct": 0.84, "reported_date": "2025-01-20"},
-
-    # 17. TITAGARH.NS
-    {"ticker": "TITAGARH.NS", "fund_name": "Ashish Kacholia", "fund_type": "Super Investor", "quarter": "Q3 FY25", "shares_held": 2800000, "stake_pct": 2.08, "prev_stake_pct": 1.20, "holding_value_cr": 308.0, "action": "ACCUMULATED", "change_shares": 1184000, "change_pct": 0.88, "reported_date": "2025-01-14"},
-    {"ticker": "TITAGARH.NS", "fund_name": "Nippon India Growth Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 4500000, "stake_pct": 3.34, "prev_stake_pct": 1.80, "holding_value_cr": 495.0, "action": "ACCUMULATED", "change_shares": 2073000, "change_pct": 1.54, "reported_date": "2025-01-18"},
-
-    # 18. JWL.NS
-    {"ticker": "JWL.NS", "fund_name": "Quant Small Cap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 8400000, "stake_pct": 2.04, "prev_stake_pct": 0.0, "holding_value_cr": 294.0, "action": "NEW BUY", "change_shares": 8400000, "change_pct": 2.04, "reported_date": "2025-01-16"},
-    {"ticker": "JWL.NS", "fund_name": "Dolly Khanna", "fund_type": "Super Investor", "quarter": "Q3 FY25", "shares_held": 4800000, "stake_pct": 1.16, "prev_stake_pct": 0.55, "holding_value_cr": 168.0, "action": "ACCUMULATED", "change_shares": 2521000, "change_pct": 0.61, "reported_date": "2025-01-13"},
-
-    # 19. BSE.NS
-    {"ticker": "BSE.NS", "fund_name": "Parag Parikh Flexi Cap Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 4800000, "stake_pct": 3.54, "prev_stake_pct": 2.10, "holding_value_cr": 1248.0, "action": "ACCUMULATED", "change_shares": 1952000, "change_pct": 1.44, "reported_date": "2025-01-15"},
-    {"ticker": "BSE.NS", "fund_name": "Fidelity Asian Values", "fund_type": "Foreign Institutional (FII)", "quarter": "Q3 FY25", "shares_held": 3100000, "stake_pct": 2.29, "prev_stake_pct": 0.0, "holding_value_cr": 806.0, "action": "NEW BUY", "change_shares": 3100000, "change_pct": 2.29, "reported_date": "2025-01-20"},
-
-    # 20. NETWEB.NS
-    {"ticker": "NETWEB.NS", "fund_name": "Ashish Kacholia", "fund_type": "Super Investor", "quarter": "Q3 FY25", "shares_held": 1100000, "stake_pct": 1.95, "prev_stake_pct": 1.10, "holding_value_cr": 264.0, "action": "ACCUMULATED", "change_shares": 479000, "change_pct": 0.85, "reported_date": "2025-01-17"},
-    {"ticker": "NETWEB.NS", "fund_name": "Quant Active Fund", "fund_type": "Mutual Fund (DII)", "quarter": "Q3 FY25", "shares_held": 1650000, "stake_pct": 2.92, "prev_stake_pct": 0.0, "holding_value_cr": 396.0, "action": "NEW BUY", "change_shares": 1650000, "change_pct": 2.92, "reported_date": "2025-01-22"},
-]
-
-SEEDED_BLOCK_DEALS: list[dict[str, Any]] = [
-    {"deal_date": "2025-02-14", "ticker": "DIXON.NS", "client_name": "NIPPON INDIA MUTUAL FUND", "deal_type": "BUY", "quantity": 450000, "price": 13100.00, "value_cr": 589.50, "pct_equity": 0.75, "exchange": "NSE"},
-    {"deal_date": "2025-02-10", "ticker": "KAYNES.NS", "client_name": "QUANT MUTUAL FUND", "deal_type": "BUY", "quantity": 620000, "price": 5240.00, "value_cr": 324.88, "pct_equity": 0.97, "exchange": "NSE"},
-    {"deal_date": "2025-02-05", "ticker": "MAZDOCK.NS", "client_name": "NORGES BANK (NORWAY PENSION)", "deal_type": "BUY", "quantity": 1200000, "price": 4230.00, "value_cr": 507.60, "pct_equity": 0.59, "exchange": "NSE"},
-    {"deal_date": "2025-01-28", "ticker": "ALLCARGO.NS", "client_name": "NIPPON INDIA MUTUAL FUND", "deal_type": "BUY", "quantity": 2500000, "price": 78.50, "value_cr": 19.63, "pct_equity": 0.25, "exchange": "NSE"},
-    {"deal_date": "2025-01-24", "ticker": "ALLCARGO.NS", "client_name": "NORGES BANK (NORWAY PENSION FUND)", "deal_type": "BUY", "quantity": 3900000, "price": 77.20, "value_cr": 30.11, "pct_equity": 0.40, "exchange": "NSE"},
-    {"deal_date": "2025-01-20", "ticker": "ALLCARGO.NS", "client_name": "VANGUARD TOTAL INTL STOCK INDEX", "deal_type": "SELL", "quantity": 4200000, "price": 76.80, "value_cr": 32.26, "pct_equity": 0.43, "exchange": "NSE"},
-    {"deal_date": "2025-01-18", "ticker": "TCS.NS", "client_name": "GQG PARTNERS EMERGING MARKETS EQUITY", "deal_type": "BUY", "quantity": 1200000, "price": 4210.00, "value_cr": 505.20, "pct_equity": 0.03, "exchange": "NSE"},
-    {"deal_date": "2025-01-15", "ticker": "FORCEMOT.NS", "client_name": "MUKUL MAHAVIR AGRAWAL", "deal_type": "BUY", "quantity": 85000, "price": 8450.00, "value_cr": 71.83, "pct_equity": 0.65, "exchange": "NSE"},
-    {"deal_date": "2025-01-12", "ticker": "PCJEWELLER.NS", "client_name": "QUANT MUTUAL FUND", "deal_type": "BUY", "quantity": 4500000, "price": 174.50, "value_cr": 78.53, "pct_equity": 0.97, "exchange": "NSE"},
-    {"deal_date": "2025-01-08", "ticker": "TRENT.NS", "client_name": "CAPITAL GROUP EMERGING MARKETS", "deal_type": "BUY", "quantity": 850000, "price": 6450.00, "value_cr": 548.25, "pct_equity": 0.24, "exchange": "NSE"},
-    {"deal_date": "2024-12-18", "ticker": "CDSL.NS", "client_name": "PARAG PARIKH FINANCIAL ADVISORY", "deal_type": "BUY", "quantity": 950000, "price": 1780.00, "value_cr": 169.10, "pct_equity": 0.91, "exchange": "NSE"},
-    {"deal_date": "2024-12-05", "ticker": "SUZLON.NS", "client_name": "BLACKROCK GLOBAL CLEAN ENERGY", "deal_type": "BUY", "quantity": 45000000, "price": 64.20, "value_cr": 288.90, "pct_equity": 0.33, "exchange": "NSE"},
-]
-
-SEEDED_SHAREHOLDING_PATTERNS: list[dict[str, Any]] = [
-    # ALLCARGO.NS (4 consecutive quarters)
-    {"ticker": "ALLCARGO.NS", "quarter": "Q3 FY25", "promoter_pct": 45.45, "fii_pct": 12.30, "dii_mf_pct": 16.85, "public_retail_pct": 25.40, "other_pct": 0.0},
-    {"ticker": "ALLCARGO.NS", "quarter": "Q2 FY25", "promoter_pct": 45.45, "fii_pct": 11.85, "dii_mf_pct": 14.60, "public_retail_pct": 28.10, "other_pct": 0.0},
-    {"ticker": "ALLCARGO.NS", "quarter": "Q1 FY25", "promoter_pct": 45.45, "fii_pct": 10.90, "dii_mf_pct": 13.20, "public_retail_pct": 30.45, "other_pct": 0.0},
-    {"ticker": "ALLCARGO.NS", "quarter": "Q4 FY24", "promoter_pct": 45.45, "fii_pct": 9.80, "dii_mf_pct": 11.50, "public_retail_pct": 33.25, "other_pct": 0.0},
-
-    # DIXON.NS
-    {"ticker": "DIXON.NS", "quarter": "Q3 FY25", "promoter_pct": 33.78, "fii_pct": 23.40, "dii_mf_pct": 28.15, "public_retail_pct": 14.67, "other_pct": 0.0},
-    {"ticker": "DIXON.NS", "quarter": "Q2 FY25", "promoter_pct": 33.78, "fii_pct": 21.80, "dii_mf_pct": 26.20, "public_retail_pct": 18.22, "other_pct": 0.0},
-    {"ticker": "DIXON.NS", "quarter": "Q1 FY25", "promoter_pct": 33.78, "fii_pct": 19.50, "dii_mf_pct": 24.80, "public_retail_pct": 21.92, "other_pct": 0.0},
-    {"ticker": "DIXON.NS", "quarter": "Q4 FY24", "promoter_pct": 34.02, "fii_pct": 17.90, "dii_mf_pct": 23.10, "public_retail_pct": 24.98, "other_pct": 0.0},
-
-    # KAYNES.NS
-    {"ticker": "KAYNES.NS", "quarter": "Q3 FY25", "promoter_pct": 57.24, "fii_pct": 14.80, "dii_mf_pct": 20.45, "public_retail_pct": 7.51, "other_pct": 0.0},
-    {"ticker": "KAYNES.NS", "quarter": "Q2 FY25", "promoter_pct": 57.24, "fii_pct": 12.60, "dii_mf_pct": 18.10, "public_retail_pct": 12.06, "other_pct": 0.0},
-    {"ticker": "KAYNES.NS", "quarter": "Q1 FY25", "promoter_pct": 57.80, "fii_pct": 10.90, "dii_mf_pct": 16.50, "public_retail_pct": 14.80, "other_pct": 0.0},
-
-    # MAZDOCK.NS
-    {"ticker": "MAZDOCK.NS", "quarter": "Q3 FY25", "promoter_pct": 84.83, "fii_pct": 4.10, "dii_mf_pct": 5.45, "public_retail_pct": 5.62, "other_pct": 0.0},
-    {"ticker": "MAZDOCK.NS", "quarter": "Q2 FY25", "promoter_pct": 84.83, "fii_pct": 3.20, "dii_mf_pct": 4.10, "public_retail_pct": 7.87, "other_pct": 0.0},
-    {"ticker": "MAZDOCK.NS", "quarter": "Q1 FY25", "promoter_pct": 84.83, "fii_pct": 2.45, "dii_mf_pct": 3.20, "public_retail_pct": 9.52, "other_pct": 0.0},
-
-    # COCHINSHIP.NS
-    {"ticker": "COCHINSHIP.NS", "quarter": "Q3 FY25", "promoter_pct": 72.86, "fii_pct": 6.45, "dii_mf_pct": 7.80, "public_retail_pct": 12.89, "other_pct": 0.0},
-    {"ticker": "COCHINSHIP.NS", "quarter": "Q2 FY25", "promoter_pct": 72.86, "fii_pct": 5.10, "dii_mf_pct": 6.20, "public_retail_pct": 15.84, "other_pct": 0.0},
-
-    # TRENT.NS
-    {"ticker": "TRENT.NS", "quarter": "Q3 FY25", "promoter_pct": 37.01, "fii_pct": 28.40, "dii_mf_pct": 17.85, "public_retail_pct": 16.74, "other_pct": 0.0},
-    {"ticker": "TRENT.NS", "quarter": "Q2 FY25", "promoter_pct": 37.01, "fii_pct": 26.90, "dii_mf_pct": 16.20, "public_retail_pct": 19.89, "other_pct": 0.0},
-
-    # CDSL.NS
-    {"ticker": "CDSL.NS", "quarter": "Q3 FY25", "promoter_pct": 15.00, "fii_pct": 19.80, "dii_mf_pct": 24.50, "public_retail_pct": 40.70, "other_pct": 0.0},
-    {"ticker": "CDSL.NS", "quarter": "Q2 FY25", "promoter_pct": 15.00, "fii_pct": 17.40, "dii_mf_pct": 22.10, "public_retail_pct": 45.50, "other_pct": 0.0},
-
-    # SUZLON.NS
-    {"ticker": "SUZLON.NS", "quarter": "Q3 FY25", "promoter_pct": 13.29, "fii_pct": 22.80, "dii_mf_pct": 10.45, "public_retail_pct": 53.46, "other_pct": 0.0},
-    {"ticker": "SUZLON.NS", "quarter": "Q2 FY25", "promoter_pct": 13.29, "fii_pct": 19.50, "dii_mf_pct": 8.90, "public_retail_pct": 58.31, "other_pct": 0.0},
-
-    # KPITTECH.NS
-    {"ticker": "KPITTECH.NS", "quarter": "Q3 FY25", "promoter_pct": 39.47, "fii_pct": 24.90, "dii_mf_pct": 18.20, "public_retail_pct": 17.43, "other_pct": 0.0},
-    {"ticker": "KPITTECH.NS", "quarter": "Q2 FY25", "promoter_pct": 39.47, "fii_pct": 22.80, "dii_mf_pct": 16.90, "public_retail_pct": 20.83, "other_pct": 0.0},
-
-    # TCS.NS
-    {"ticker": "TCS.NS", "quarter": "Q3 FY25", "promoter_pct": 71.77, "fii_pct": 12.80, "dii_mf_pct": 10.45, "public_retail_pct": 4.98, "other_pct": 0.0},
-    {"ticker": "TCS.NS", "quarter": "Q2 FY25", "promoter_pct": 71.77, "fii_pct": 12.50, "dii_mf_pct": 10.10, "public_retail_pct": 5.63, "other_pct": 0.0},
-
-    # FORCEMOT.NS
-    {"ticker": "FORCEMOT.NS", "quarter": "Q3 FY25", "promoter_pct": 61.63, "fii_pct": 6.80, "dii_mf_pct": 9.45, "public_retail_pct": 22.12, "other_pct": 0.0},
-    {"ticker": "FORCEMOT.NS", "quarter": "Q2 FY25", "promoter_pct": 61.63, "fii_pct": 5.40, "dii_mf_pct": 8.10, "public_retail_pct": 24.87, "other_pct": 0.0},
-
-    # PCJEWELLER.NS
-    {"ticker": "PCJEWELLER.NS", "quarter": "Q3 FY25", "promoter_pct": 54.54, "fii_pct": 4.20, "dii_mf_pct": 6.80, "public_retail_pct": 34.46, "other_pct": 0.0},
-    {"ticker": "PCJEWELLER.NS", "quarter": "Q2 FY25", "promoter_pct": 54.54, "fii_pct": 2.80, "dii_mf_pct": 4.50, "public_retail_pct": 38.16, "other_pct": 0.0},
+# Core benchmark equities dynamically populated with live corporate ownership
+CORE_BENCHMARK_UNIVERSE: list[str] = [
+    "ALLCARGO.NS", "DIXON.NS", "KAYNES.NS", "MAZDOCK.NS", "COCHINSHIP.NS",
+    "TRENT.NS", "CDSL.NS", "SUZLON.NS", "KPITTECH.NS", "BEL.NS",
+    "HAL.NS", "FORCEMOT.NS", "PCJEWELLER.NS", "TCS.NS", "RELIANCE.NS",
+    "HDFCBANK.NS", "TITAGARH.NS", "JWL.NS", "BSE.NS", "NETWEB.NS",
 ]
 
 
@@ -366,70 +202,19 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
 
 
 def init_institutional_db(settings: Settings | None = None) -> None:
-    """Seed sample institutional holdings, block deals, and shareholding patterns if empty or outdated."""
+    """Initialize institutional holdings, block deals, and shareholding tables dynamically."""
     settings = settings or Settings()
     try:
         from earnings_engine.data.migrations import apply_migrations
         apply_migrations(settings)
         conn = get_db_connection(settings)
         count = conn.execute("SELECT COUNT(*) FROM institutional_holdings").fetchone()[0]
-        if count < len(SEEDED_INSTITUTIONAL_DATA):
-            now_iso = datetime.now(timezone.utc).isoformat()
-            # 1. Seed holdings
-            for h in SEEDED_INSTITUTIONAL_DATA:
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO institutional_holdings (
-                        ticker, fund_name, fund_type, quarter,
-                        shares_held, stake_pct, holding_value_cr,
-                        prev_stake_pct, action, change_shares,
-                        change_pct, reported_date, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        h["ticker"], h["fund_name"], h["fund_type"], h["quarter"],
-                        h["shares_held"], h["stake_pct"], h["holding_value_cr"],
-                        h["prev_stake_pct"], h["action"], h["change_shares"],
-                        h["change_pct"], h["reported_date"], now_iso,
-                    ),
-                )
-
-            # 2. Seed block deals
-            for b in SEEDED_BLOCK_DEALS:
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO institutional_block_deals (
-                        deal_date, ticker, client_name, deal_type,
-                        quantity, price, value_cr, pct_equity, exchange, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        b["deal_date"], b["ticker"], b["client_name"], b["deal_type"],
-                        b["quantity"], b["price"], b["value_cr"], b["pct_equity"],
-                        b["exchange"], now_iso,
-                    ),
-                )
-
-            # 3. Seed shareholding patterns
-            for p in SEEDED_SHAREHOLDING_PATTERNS:
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO shareholding_patterns (
-                        ticker, quarter, promoter_pct, fii_pct, dii_mf_pct,
-                        public_retail_pct, other_pct, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        p["ticker"], p["quarter"], p["promoter_pct"], p["fii_pct"],
-                        p["dii_mf_pct"], p["public_retail_pct"], p["other_pct"], now_iso,
-                    ),
-                )
-
-            if hasattr(conn, "commit"):
-                conn.commit()
-            logger.info("[INSTITUTIONAL] Seeded baseline institutional holding & block deal dataset.")
+        if count < len(CORE_BENCHMARK_UNIVERSE):
+            for sym in CORE_BENCHMARK_UNIVERSE:
+                _ensure_institutional_data_for_ticker(sym, conn)
+            logger.info("[INSTITUTIONAL] Populated dynamic institutional data across %d benchmark equities.", len(CORE_BENCHMARK_UNIVERSE))
     except Exception as e:
-        logger.warning("[INSTITUTIONAL] Seeding error: %s", e)
+        logger.warning("[INSTITUTIONAL] Dynamic init warning: %s", e)
 
 
 def get_stock_institutional_activity(ticker: str, settings: Settings | None = None) -> dict[str, Any]:

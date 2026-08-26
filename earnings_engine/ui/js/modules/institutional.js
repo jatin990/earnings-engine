@@ -10,29 +10,69 @@
             distributing: [],
             funds: []
         },
+        _currentInvestorFilter: 'ALL',
         _institutionalLoaded: false,
 
-        switchInstitutionalView(view) {
-            const views = ['accumulating', 'distributing', 'funds', 'stock'];
-            views.forEach(v => {
-                const el = document.getElementById('instView-' + v);
-                if (el) el.style.display = (v === view) ? 'block' : 'none';
+        switchInstitutionalPage(page) {
+            const pages = ['equities', 'investors'];
+            pages.forEach(p => {
+                const el = document.getElementById('instPage-' + p);
+                if (el) el.style.display = (p === page) ? 'block' : 'none';
 
-                const btn = document.getElementById('instBtn-' + v);
+                const btn = document.getElementById('btnInstPage-' + p);
                 if (btn) {
-                    if (v === view) {
-                        btn.style.background = 'rgba(59,130,246,0.2)';
-                        btn.style.color = '#60a5fa';
-                        btn.style.borderColor = 'rgba(59,130,246,0.4)';
+                    if (p === page) {
+                        btn.style.background = '#1e293b';
+                        btn.style.color = '#38bdf8';
+                        btn.style.borderColor = 'rgba(56,189,248,0.4)';
                         btn.style.fontWeight = '700';
                     } else {
                         btn.style.background = 'transparent';
                         btn.style.color = '#94a3b8';
-                        btn.style.borderColor = 'rgba(255,255,255,0.1)';
+                        btn.style.borderColor = 'transparent';
                         btn.style.fontWeight = '500';
                     }
                 }
             });
+        },
+
+        switchEquitiesFlowView(flow) {
+            const accEl = document.getElementById('instEquitiesFlow-accumulating');
+            const distEl = document.getElementById('instEquitiesFlow-distributing');
+            const btnAcc = document.getElementById('btnInstFlowToggle-acc');
+            const btnDist = document.getElementById('btnInstFlowToggle-dist');
+
+            if (flow === 'accumulating') {
+                if (accEl) accEl.style.display = 'block';
+                if (distEl) distEl.style.display = 'none';
+                if (btnAcc) {
+                    btnAcc.style.background = '#1e293b';
+                    btnAcc.style.color = '#34d399';
+                    btnAcc.style.borderColor = 'rgba(16,185,129,0.4)';
+                    btnAcc.style.fontWeight = '700';
+                }
+                if (btnDist) {
+                    btnDist.style.background = 'transparent';
+                    btnDist.style.color = '#94a3b8';
+                    btnDist.style.borderColor = 'rgba(255,255,255,0.1)';
+                    btnDist.style.fontWeight = '500';
+                }
+            } else {
+                if (accEl) accEl.style.display = 'none';
+                if (distEl) distEl.style.display = 'block';
+                if (btnDist) {
+                    btnDist.style.background = '#180d14';
+                    btnDist.style.color = '#f87171';
+                    btnDist.style.borderColor = 'rgba(239,68,68,0.4)';
+                    btnDist.style.fontWeight = '700';
+                }
+                if (btnAcc) {
+                    btnAcc.style.background = 'transparent';
+                    btnAcc.style.color = '#94a3b8';
+                    btnAcc.style.borderColor = 'rgba(255,255,255,0.1)';
+                    btnAcc.style.fontWeight = '500';
+                }
+            }
         },
 
         async loadInstitutionalData() {
@@ -62,17 +102,50 @@
                 }
 
                 // Initial inspect ALLCARGO as default benchmark drilldown
-                this.searchInstitutionalStock('ALLCARGO.NS', false);
+                this.searchInstitutionalStock('ALLCARGO.NS');
 
             } catch (e) {
                 console.error('[INSTITUTIONAL] Failed loading institutional flows:', e);
             }
         },
 
+        filterInvestors(category) {
+            this._currentInvestorFilter = category;
+            const catMap = {
+                'ALL': 'btnInvCat-ALL',
+                'Mutual Fund': 'btnInvCat-MF',
+                'Super Investor': 'btnInvCat-SI',
+                'Foreign': 'btnInvCat-FII'
+            };
+
+            Object.entries(catMap).forEach(([k, btnId]) => {
+                const btn = document.getElementById(btnId);
+                if (btn) {
+                    if (k === category) {
+                        btn.style.background = '#1e293b';
+                        btn.style.color = '#38bdf8';
+                        btn.style.borderColor = 'rgba(56,189,248,0.4)';
+                        btn.style.fontWeight = '700';
+                    } else {
+                        btn.style.background = 'transparent';
+                        btn.style.color = '#94a3b8';
+                        btn.style.borderColor = 'rgba(255,255,255,0.1)';
+                        btn.style.fontWeight = '500';
+                    }
+                }
+            });
+
+            const allFunds = this.institutionalData.funds || [];
+            if (category === 'ALL') {
+                this.renderInstitutionalFundsTable(allFunds);
+            } else {
+                const filtered = allFunds.filter(f => (f.fund_type || '').toLowerCase().includes(category.toLowerCase()));
+                this.renderInstitutionalFundsTable(filtered);
+            }
+        },
+
         renderInstitutionalAccumulatingTable(items) {
             const tbody = document.getElementById('instAccumulatingTableBody');
-            const countEl = document.getElementById('instAccumulatingCount');
-            if (countEl) countEl.textContent = items ? items.length : '0';
             if (!tbody) return;
 
             if (!items || !items.length) {
@@ -107,8 +180,6 @@
 
         renderInstitutionalDistributingTable(items) {
             const tbody = document.getElementById('instDistributingTableBody');
-            const countEl = document.getElementById('instDistributingCount');
-            if (countEl) countEl.textContent = items ? items.length : '0';
             if (!tbody) return;
 
             if (!items || !items.length) {
@@ -138,12 +209,10 @@
 
         renderInstitutionalFundsTable(funds) {
             const tbody = document.getElementById('instFundsTableBody');
-            const countEl = document.getElementById('instFundsTrackedCount');
-            if (countEl) countEl.textContent = funds ? funds.length + '+' : '50+';
             if (!tbody) return;
 
             if (!funds || !funds.length) {
-                tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#64748b;">No fund profiles loaded.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#64748b;">No fund profiles match the selected filter.</td></tr>';
                 return;
             }
 
@@ -159,14 +228,14 @@
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#f87171;font-weight:700;">-${f.selling_actions}</td>
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">₹${(f.total_aum_tracked_cr || 0).toLocaleString()} Cr</td>
                         <td style="padding:0.65rem 0.8rem;text-align:center;">
-                            <button type="button" onclick="app.inspectFundPortfolio('${f.fund_name.replace(/'/g, "\\'")}')" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.55rem;background:rgba(59,130,246,0.1);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">💼 View Holdings</button>
+                            <button type="button" onclick="app.inspectFundPortfolio('${f.fund_name.replace(/'/g, "\\'")}')" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.55rem;background:rgba(59,130,246,0.1);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">💼 View Portfolio</button>
                         </td>
                     </tr>
                 `;
             }).join('');
         },
 
-        async searchInstitutionalStock(ticker, autoSwitch = true) {
+        async searchInstitutionalStock(ticker) {
             if (!ticker) return;
             const cleanTicker = ticker.trim().toUpperCase();
             try {
@@ -174,9 +243,6 @@
                 if (res.ok) {
                     const data = await res.json();
                     this.renderStockInstitutionalDetails(data);
-                    if (autoSwitch) {
-                        this.switchInstitutionalView('stock');
-                    }
                 } else {
                     console.warn('Failed finding institutional data for ' + cleanTicker);
                 }
@@ -232,11 +298,11 @@
 
                                     return `
                                         <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
-                                            <td style="padding:0.4rem 0.5rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${p.quarter}</td>
-                                            <td style="padding:0.4rem 0.5rem;color:#cbd5e1;font-family:var(--font-mono);">${p.promoter_pct}%</td>
-                                            <td style="padding:0.4rem 0.5rem;color:#38bdf8;font-weight:700;font-family:var(--font-mono);">${p.fii_pct}% ${fiiDeltaStr}</td>
-                                            <td style="padding:0.4rem 0.5rem;color:#34d399;font-weight:700;font-family:var(--font-mono);">${p.dii_mf_pct}% ${diiDeltaStr}</td>
-                                            <td style="padding:0.4rem 0.5rem;color:#94a3b8;font-family:var(--font-mono);">${p.public_retail_pct}%</td>
+                                             <td style="padding:0.4rem 0.5rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${p.quarter}</td>
+                                             <td style="padding:0.4rem 0.5rem;color:#cbd5e1;font-family:var(--font-mono);">${p.promoter_pct}%</td>
+                                             <td style="padding:0.4rem 0.5rem;color:#38bdf8;font-weight:700;font-family:var(--font-mono);">${p.fii_pct}% ${fiiDeltaStr}</td>
+                                             <td style="padding:0.4rem 0.5rem;color:#34d399;font-weight:700;font-family:var(--font-mono);">${p.dii_mf_pct}% ${diiDeltaStr}</td>
+                                             <td style="padding:0.4rem 0.5rem;color:#94a3b8;font-family:var(--font-mono);">${p.public_retail_pct}%</td>
                                         </tr>
                                     `;
                                 }).join('')}
@@ -251,21 +317,21 @@
             if (dealsContainer) {
                 const deals = data.block_deals || [];
                 if (!deals.length) {
-                    dealsContainer.innerHTML = '<div style="color:#64748b;font-size:0.72rem;padding:0.5rem;">No recent bulk or block deals recorded for this ticker.</div>';
+                    dealsContainer.innerHTML = '<div style="color:#64748b;font-size:0.72rem;padding:0.5rem;">No recent block/bulk deals recorded.</div>';
                 } else {
                     dealsContainer.innerHTML = deals.map(d => {
                         const isBuy = d.deal_type === 'BUY';
-                        const bg = isBuy ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
                         const col = isBuy ? '#34d399' : '#f87171';
+                        const bg = isBuy ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
                         return `
-                            <div style="background:${bg};border:1px solid ${isBuy ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'};border-radius:6px;padding:0.45rem 0.65rem;margin-bottom:0.4rem;display:flex;justify-content:space-between;align-items:center;font-size:0.72rem;">
+                            <div style="background:${bg};border:1px solid ${isBuy ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'};border-radius:6px;padding:0.45rem 0.65rem;margin-bottom:0.35rem;display:flex;justify-content:space-between;align-items:center;">
                                 <div>
-                                    <span style="font-weight:700;color:${col};font-family:var(--font-mono);margin-right:0.35rem;">[${d.deal_type}]</span>
-                                    <strong style="color:#f8fafc;">${d.client_name}</strong>
-                                    <span style="font-size:0.65rem;background:rgba(255,255,255,0.06);color:#94a3b8;padding:0.1rem 0.35rem;border-radius:3px;margin-left:0.35rem;">${d.exchange || 'NSE'}</span>
+                                    <div style="font-size:0.72rem;font-weight:700;color:#f8fafc;">${d.client_name}</div>
+                                    <div style="font-size:0.65rem;color:#94a3b8;font-family:var(--font-mono);">${d.deal_date} · ${(d.quantity || 0).toLocaleString()} shares @ ₹${d.price}</div>
                                 </div>
-                                <div style="font-family:var(--font-mono);color:#cbd5e1;text-align:right;">
-                                    ${d.quantity.toLocaleString()} shares @ ₹${d.price} (<strong style="color:#38bdf8;">₹${d.value_cr} Cr</strong>) | <span style="color:#94a3b8;">📅 ${d.deal_date}</span>
+                                <div style="text-align:right;">
+                                    <div style="font-size:0.72rem;font-weight:800;color:${col};font-family:var(--font-mono);">${d.deal_type} ₹${d.value_cr} Cr</div>
+                                    <div style="font-size:0.65rem;color:#cbd5e1;">${d.pct_equity}% equity</div>
                                 </div>
                             </div>
                         `;
@@ -273,100 +339,93 @@
                 }
             }
 
-            // 3. Fund-by-Fund Table with exact dates
-            const tbody = document.getElementById('instStockHoldingsTableBody');
-            if (tbody) {
+            // 3. Fund Holdings Table
+            const hBody = document.getElementById('instStockHoldingsTableBody');
+            if (hBody) {
                 const holdings = data.holdings || [];
                 if (!holdings.length) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">No fund positions recorded for this ticker yet.</td></tr>';
-                    return;
+                    hBody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">No individual fund positions reported.</td></tr>';
+                } else {
+                    hBody.innerHTML = holdings.map(h => {
+                        const isBuy = h.action === 'ACCUMULATED' || h.action === 'NEW BUY';
+                        const actCol = isBuy ? '#34d399' : h.action === 'TRIMMED' || h.action === 'SOLD OUT' ? '#f87171' : '#cbd5e1';
+                        const actBg = isBuy ? 'rgba(16,185,129,0.15)' : h.action === 'TRIMMED' || h.action === 'SOLD OUT' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)';
+                        const chgSign = (h.change_pct || 0) > 0 ? `+${h.change_pct}%` : (h.change_pct || 0) < 0 ? `${h.change_pct}%` : '0.00%';
+
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                                <td style="padding:0.55rem 0.8rem;font-weight:700;color:#f8fafc;">
+                                    <a href="javascript:void(0)" onclick="app.inspectFundPortfolio('${h.fund_name.replace(/'/g, "\\'")}')" style="color:#f8fafc;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,0.3);">${h.fund_name}</a>
+                                </td>
+                                <td style="padding:0.55rem 0.8rem;color:#94a3b8;font-size:0.72rem;">${h.fund_type}</td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">${h.quarter}</td>
+                                <td style="padding:0.55rem 0.8rem;">
+                                    <span class="signal-badge" style="background:${actBg};color:${actCol};font-size:0.65rem;padding:0.1rem 0.4rem;">${h.action}</span>
+                                </td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${h.stake_pct}%</td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:${actCol};font-weight:700;">${chgSign}</td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">₹${(h.holding_value_cr || 0).toLocaleString()} Cr</td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#94a3b8;font-size:0.72rem;">${h.reported_date || '—'}</td>
+                            </tr>
+                        `;
+                    }).join('');
                 }
-
-                tbody.innerHTML = holdings.map(h => {
-                    const act = h.action;
-                    const isBuy = act === 'NEW BUY';
-                    const isAcc = act === 'ACCUMULATED';
-                    const isTrim = act === 'TRIMMED';
-                    const isSold = act === 'SOLD OUT';
-
-                    const actBg = isBuy ? 'rgba(56,189,248,0.15)' : isAcc ? 'rgba(16,185,129,0.15)' : isTrim ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)';
-                    const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : '#f87171';
-                    const changeStr = h.change_pct > 0 ? `+${h.change_pct}%` : `${h.change_pct}%`;
-
-                    return `
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-                            <td style="padding:0.6rem 0.8rem;font-weight:700;color:#f8fafc;">
-                                <a href="javascript:void(0)" onclick="app.inspectFundPortfolio('${h.fund_name.replace(/'/g, "\\'")}')" style="color:#f8fafc;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,0.3);">${h.fund_name}</a>
-                            </td>
-                            <td style="padding:0.6rem 0.8rem;color:#94a3b8;font-size:0.72rem;">${h.fund_type}</td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">${h.quarter}</td>
-                            <td style="padding:0.6rem 0.8rem;">
-                                <span class="signal-badge" style="background:${actBg};color:${actCol};font-size:0.68rem;padding:0.12rem 0.4rem;">${h.action}</span>
-                            </td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${h.stake_pct}%</td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:${actCol};">${changeStr}</td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#38bdf8;">₹${h.holding_value_cr} Cr</td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#94a3b8;font-size:0.7rem;">📅 ${h.reported_date || '—'}</td>
-                        </tr>
-                    `;
-                }).join('');
             }
         },
 
         async inspectFundPortfolio(fundName) {
             if (!fundName) return;
+            const modal = document.getElementById('instFundModal');
+            const titleEl = document.getElementById('instFundModalTitle');
+            const subEl = document.getElementById('instFundModalSubtitle');
+            const tbody = document.getElementById('instFundModalTableBody');
+
+            if (titleEl) titleEl.textContent = fundName;
+            if (subEl) subEl.textContent = 'Loading equity portfolio disclosures...';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#64748b;"><div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Fetching portfolio holdings...</td></tr>';
+            if (modal) modal.style.display = 'flex';
+
             try {
                 const res = await fetch(API_BASE + `/api/v1/institutional/fund/${encodeURIComponent(fundName)}`);
                 if (res.ok) {
                     const data = await res.json();
                     const holdings = data.holdings || [];
-                    
-                    const modal = document.getElementById('instFundModal');
-                    const titleEl = document.getElementById('instFundModalTitle');
-                    const subEl = document.getElementById('instFundModalSubtitle');
-                    const tbody = document.getElementById('instFundModalTableBody');
+                    if (subEl) subEl.textContent = `${holdings.length} tracked equity positions · Category: ${holdings[0]?.fund_type || 'Institutional'}`;
 
-                    if (titleEl) titleEl.textContent = `💼 ${fundName}`;
-                    if (subEl) subEl.textContent = `Tracked Equities: ${holdings.length} Positions | Total Portfolio Disclosures`;
-                    
-                    if (tbody) {
-                        if (!holdings.length) {
-                            tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#64748b;">No holdings recorded for this fund.</td></tr>';
-                        } else {
-                            tbody.innerHTML = holdings.map(h => {
-                                const act = h.action;
-                                const isBuy = act === 'NEW BUY';
-                                const isAcc = act === 'ACCUMULATED';
-                                const isTrim = act === 'TRIMMED';
-                                const actBg = isBuy ? 'rgba(56,189,248,0.15)' : isAcc ? 'rgba(16,185,129,0.15)' : isTrim ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)';
-                                const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : '#f87171';
-                                return `
-                                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;">
-                                            <a href="javascript:void(0)" onclick="app.closeFundModal(); app.searchInstitutionalStock('${h.ticker}');" style="color:#38bdf8;text-decoration:none;">${h.ticker}</a>
-                                        </td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">${h.quarter}</td>
-                                        <td style="padding:0.6rem 0.8rem;">
-                                            <span class="signal-badge" style="background:${actBg};color:${actCol};font-size:0.68rem;padding:0.12rem 0.4rem;">${h.action}</span>
-                                        </td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${h.stake_pct}%</td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#38bdf8;">₹${h.holding_value_cr} Cr</td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#94a3b8;font-size:0.7rem;">📅 ${h.reported_date || '—'}</td>
-                                        <td style="padding:0.6rem 0.8rem;text-align:center;">
-                                            <button type="button" onclick="app.closeFundModal(); app.searchInstitutionalStock('${h.ticker}');" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.15rem 0.45rem;">View Stock</button>
-                                        </td>
-                                    </tr>
-                                `;
-                            }).join('');
-                        }
+                    if (!holdings.length) {
+                        tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#64748b;">No recent holdings filed for this fund.</td></tr>';
+                        return;
                     }
 
-                    if (modal) {
-                        modal.style.display = 'flex';
-                    }
+                    tbody.innerHTML = holdings.map(h => {
+                        const isBuy = h.action === 'ACCUMULATED' || h.action === 'NEW BUY';
+                        const actCol = isBuy ? '#34d399' : h.action === 'TRIMMED' || h.action === 'SOLD OUT' ? '#f87171' : '#cbd5e1';
+                        const actBg = isBuy ? 'rgba(16,185,129,0.15)' : h.action === 'TRIMMED' || h.action === 'SOLD OUT' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)';
+
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);font-weight:700;">
+                                    <a href="javascript:void(0)" onclick="app.closeFundModal(); app.searchInstitutionalStock('${h.ticker}')" style="color:#38bdf8;text-decoration:none;">${h.ticker}</a>
+                                </td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">${h.quarter}</td>
+                                <td style="padding:0.55rem 0.8rem;">
+                                    <span class="signal-badge" style="background:${actBg};color:${actCol};font-size:0.65rem;padding:0.1rem 0.4rem;">${h.action}</span>
+                                </td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${h.stake_pct}%</td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">₹${(h.holding_value_cr || 0).toLocaleString()} Cr</td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#94a3b8;font-size:0.72rem;">${h.reported_date || '—'}</td>
+                                <td style="padding:0.55rem 0.8rem;text-align:center;">
+                                    <button type="button" onclick="app.closeFundModal(); app.searchInstitutionalStock('${h.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);">🔍 Analyze Stock</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                } else {
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#f87171;">Failed fetching fund details.</td></tr>';
                 }
             } catch (e) {
-                console.error('Error fetching fund portfolio:', e);
+                console.error('Error inspecting fund:', e);
+                if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:2rem;text-align:center;color:#f87171;">Error: ${e.message}</td></tr>`;
             }
         },
 
@@ -376,9 +435,14 @@
         }
     };
 
-    // Export module
-    window.InstitutionalModule = institutionalModule;
+    window.institutionalModule = institutionalModule;
+
+    // Attach methods onto window.app namespace so onclick handlers work seamlessly
     if (window.app) {
         Object.assign(window.app, institutionalModule);
+    } else {
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.app) Object.assign(window.app, institutionalModule);
+        });
     }
 })();
