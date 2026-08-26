@@ -672,6 +672,62 @@
             margin: 0;
         }
 
+        /* AI Command Center & Launcher Hub */
+        .ai-command-card {
+            border: 1px solid rgba(99, 102, 241, 0.28);
+            background: linear-gradient(180deg, #0d111d 0%, #06080e 100%);
+            border-radius: var(--radius-lg);
+            padding: 1.35rem;
+            box-shadow: 0 12px 35px -10px rgba(0,0,0,0.6);
+            margin-top: 1.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .ai-launcher-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.85rem;
+            margin: 1.15rem 0;
+        }
+        .ai-launcher-item {
+            background: #0a0d16;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 0.9rem 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 0.65rem;
+            transition: all 0.2s ease;
+        }
+        .ai-launcher-item:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+            transform: translateY(-2px);
+            background: #0e1320;
+        }
+        .ai-step-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.65rem 0.9rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            font-size: 0.78rem;
+            color: #cbd5e1;
+        }
+        .ai-step-indicator.active {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(59, 130, 246, 0.35);
+            color: #93c5fd;
+            font-weight: 600;
+        }
+        .ai-step-indicator.done {
+            background: rgba(16, 185, 129, 0.08);
+            border-color: rgba(16, 185, 129, 0.25);
+            color: #6ee7b7;
+        }
+
         /* Tables */
         .clean-table {
             width: 100%;
@@ -1112,75 +1168,235 @@
 
         </div>
 
-        <!-- ━━━ BOTTOM: AI CONSENSUS TRADE SETUP & STRATEGIC VERDICT (CONDITIONAL) ━━━ -->
-        <section class="card" id="cardTradeSetup" style="display: none; border: 1px solid rgba(99, 102, 241, 0.25); background: linear-gradient(180deg, #0e111a 0%, #08090f 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
-            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #ffffff;">
-                    <span style="color: #6366f1;">⚡</span>
-                    <span>AI Consensus Trade Setup & Strategic Verdict</span>
-                    <span id="lblConsensusAsOf" style="font-size: 0.72rem; color: #94a3b8; font-weight: 500; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.12rem 0.45rem; border-radius: 4px; display: none;"></span>
+        <!-- ━━━ MULTI-MODEL AI CONSENSUS COMMAND CENTER (ON-DEMAND) ━━━ -->
+        <section class="ai-command-card" id="cardAICommandCenter">
+            
+            <!-- Command Center Header & Toolbar -->
+            <div style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.85rem; margin-bottom: 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.55rem;">
+                        <span style="font-size: 1.25rem;">🧠</span>
+                        <h2 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: #ffffff; letter-spacing: -0.01em;">Multi-Model AI Consensus Engine</h2>
+                        <span id="lblConsensusHorizon" style="font-size: 0.68rem; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.15rem 0.45rem; border-radius: 4px;">14D HORIZON</span>
+                        <span id="lblConsensusAsOf" style="font-size: 0.7rem; color: #94a3b8; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.12rem 0.45rem; border-radius: 4px; display: none;"></span>
+                    </div>
+                    <div style="font-size: 0.74rem; color: var(--text-tertiary); margin-top: 0.2rem;">
+                        Multi-agent quantitative reasoning across 6 Frontier LLMs + Zero-Quota Offline Local Models
+                    </div>
                 </div>
-                <div id="verdictPill" style="font-size: 0.76rem; font-weight: 800; padding: 0.28rem 0.85rem; border-radius: var(--radius-sm); font-family: var(--font-mono); background: var(--emerald-subtle); color: var(--emerald); border: 1px solid var(--emerald-border); letter-spacing: 0.03em;">
-                    ANALYZING SETUP...
+
+                <!-- Action Controls Group -->
+                <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                    <div class="timeframe-pill-group" title="Select prediction horizon">
+                        <button type="button" class="tf-pill-btn" onclick="setTimeframe(7)" id="aiTfBtn-7">7D</button>
+                        <button type="button" class="tf-pill-btn active" onclick="setTimeframe(14)" id="aiTfBtn-14">14D</button>
+                        <button type="button" class="tf-pill-btn" onclick="setTimeframe(30)" id="aiTfBtn-30">30D</button>
+                        <button type="button" class="tf-pill-btn" onclick="setTimeframe(90)" id="aiTfBtn-90">90D</button>
+                    </div>
+                    <button type="button" id="btnConsensusMain" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.38rem 0.95rem; font-size: 0.78rem; font-weight: 800; background: linear-gradient(135deg, #2563eb, #6366f1); border: none; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);" title="Run all AI engines in parallel on-demand">
+                        ⚡ Run All Consensus
+                    </button>
                 </div>
             </div>
 
-            <!-- 6 KPI BLOCKS -->
-            <div class="kpi-grid" style="margin-bottom: 1.15rem; gap: 0.75rem;">
-                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
-                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Worth Entering</div>
-                    <div class="kpi-number" id="kpiWorth" style="color: var(--emerald); font-size: 1.05rem; line-height: 1.3; font-weight: 800;">—</div>
-                    <div class="kpi-subtext" style="font-size: 0.7rem; color: #64748b;">Actionable Rating</div>
-                </div>
-                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
-                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Optimal Entry Zone</div>
-                    <div class="kpi-number" id="kpiEntry" style="color: #38bdf8; font-size: 1rem; font-family: var(--font-mono); font-weight: 700;">₹— – ₹—</div>
-                    <div class="kpi-subtext" style="font-size: 0.7rem; color: #64748b;">Pullback Buy Range</div>
-                </div>
-                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
-                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Consensus Target</div>
-                    <div class="kpi-number" id="kpiTarget" style="color: #ffffff; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">₹—</div>
-                    <div class="kpi-subtext" id="kpiTargetSub" style="font-size: 0.7rem; color: var(--emerald); font-weight: 600;">+0.0% upside</div>
-                </div>
-                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
-                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Stop Loss Level</div>
-                    <div class="kpi-number" id="kpiSL" style="color: #fca5a5; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">₹—</div>
-                    <div class="kpi-subtext" id="kpiSLSub" style="font-size: 0.7rem; color: var(--rose); font-weight: 600;">-0.0% risk cut</div>
-                </div>
-                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
-                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Risk-to-Reward</div>
-                    <div class="kpi-number" id="kpiRR" style="color: #93c5fd; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">1 : —</div>
-                    <div class="kpi-subtext" style="font-size: 0.7rem; color: #64748b;">Reward vs Invalidation</div>
-                </div>
-                <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
-                    <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Consensus Strength</div>
-                    <div class="kpi-number" id="kpiStrength" style="color: #fbbf24; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">—%</div>
-                    <div class="kpi-subtext" id="kpiAgreeCount" style="font-size: 0.7rem; color: #64748b;">AI Models Agreeing</div>
+            <!-- STATE 1: ON-DEMAND LAUNCHER HUB (When no predictions or ready to start) -->
+            <div id="aiEmptyLauncher" style="display: none;">
+                <div style="background: rgba(99, 102, 241, 0.05); border: 1px dashed rgba(99, 102, 241, 0.25); border-radius: 12px; padding: 1.5rem; text-align: center;">
+                    <div style="font-size: 2.2rem; margin-bottom: 0.35rem;">⚡</div>
+                    <h3 style="margin: 0 0 0.4rem 0; font-size: 1.15rem; color: #ffffff; font-weight: 800;">On-Demand AI Ensemble Ready</h3>
+                    <p style="max-width: 580px; margin: 0 auto 1.25rem auto; font-size: 0.82rem; line-height: 1.5; color: #94a3b8;">
+                        Synthesize multi-agent trade setup, optimal entry zones, stop losses, and directional conviction across 6 frontier LLMs in parallel.
+                    </p>
+
+                    <!-- Interactive Launcher Grid of Available Models -->
+                    <div class="ai-launcher-grid">
+                        <div class="ai-launcher-item">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">🤖 DeepSeek-R1</span>
+                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(99, 102, 241, 0.2); color: #c7d2fe; padding: 0.15rem 0.4rem; border-radius: 4px;">671B MoE</span>
+                                </div>
+                                <div style="font-size: 0.72rem; color: #94a3b8;">Chain-of-thought deep reasoning & quantitative validation</div>
+                            </div>
+                            <button type="button" onclick="runConsensus(true, 'deepseek/deepseek-r1')" class="btn-tile-run" style="border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;">⚡ Run DeepSeek</button>
+                        </div>
+
+                        <div class="ai-launcher-item">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">🦙 Llama-3.3-70B</span>
+                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(56, 189, 248, 0.2); color: #bae6fd; padding: 0.15rem 0.4rem; border-radius: 4px;">70B Dense</span>
+                                </div>
+                                <div style="font-size: 0.72rem; color: #94a3b8;">Institutional structure, supply-demand & risk alignment</div>
+                            </div>
+                            <button type="button" onclick="runConsensus(true, 'meta-llama/llama-3.3-70b-instruct')" class="btn-tile-run" style="border-color: rgba(56, 189, 248, 0.4); color: #bae6fd;">⚡ Run Llama</button>
+                        </div>
+
+                        <div class="ai-launcher-item">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">🌐 Qwen-2.5-72B</span>
+                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(168, 85, 247, 0.2); color: #e9d5ff; padding: 0.15rem 0.4rem; border-radius: 4px;">72B Arch</span>
+                                </div>
+                                <div style="font-size: 0.72rem; color: #94a3b8;">Algorithmic price action, volume ratio & swing momentum</div>
+                            </div>
+                            <button type="button" onclick="runConsensus(true, 'qwen/qwen-2.5-72b-instruct')" class="btn-tile-run" style="border-color: rgba(168, 85, 247, 0.4); color: #e9d5ff;">⚡ Run Qwen</button>
+                        </div>
+
+                        <div class="ai-launcher-item">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">⚡ Mistral-Large</span>
+                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(245, 158, 11, 0.2); color: #fde68a; padding: 0.15rem 0.4rem; border-radius: 4px;">123B Large</span>
+                                </div>
+                                <div style="font-size: 0.72rem; color: #94a3b8;">Corporate filing catalysts, earnings surprise & news sentiment</div>
+                            </div>
+                            <button type="button" onclick="runConsensus(true, 'mistralai/mistral-large')" class="btn-tile-run" style="border-color: rgba(245, 158, 11, 0.4); color: #fde68a;">⚡ Run Mistral</button>
+                        </div>
+
+                        <div class="ai-launcher-item">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">💎 Gemma-4-31B</span>
+                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(6, 182, 212, 0.2); color: #a5f3fc; padding: 0.15rem 0.4rem; border-radius: 4px;">Free 31B</span>
+                                </div>
+                                <div style="font-size: 0.72rem; color: #94a3b8;">Mathematical precision & multi-factor validation (Free tier)</div>
+                            </div>
+                            <button type="button" onclick="runConsensus(true, 'google/gemma-4-31b-it:free')" class="btn-tile-run" style="border-color: rgba(6, 182, 212, 0.4); color: #a5f3fc;">⚡ Run Gemma</button>
+                        </div>
+
+                        <div class="ai-launcher-item">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">🐉 GLM-5.2</span>
+                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(236, 72, 153, 0.2); color: #fbcfe8; padding: 0.15rem 0.4rem; border-radius: 4px;">753B Flagship</span>
+                                </div>
+                                <div style="font-size: 0.72rem; color: #94a3b8;">Z.ai long-horizon deep financial reasoning & volatility bounds</div>
+                            </div>
+                            <button type="button" onclick="runConsensus(true, 'z-ai/glm-5.2')" class="btn-tile-run" style="border-color: rgba(236, 72, 153, 0.4); color: #fbcfe8;">⚡ Run GLM-5.2</button>
+                        </div>
+
+                        <div class="ai-launcher-item">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">💻 Local Models</span>
+                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(16, 185, 129, 0.2); color: #a7f3d0; padding: 0.15rem 0.4rem; border-radius: 4px;">Zero Quota</span>
+                                </div>
+                                <div style="font-size: 0.72rem; color: #94a3b8;">Ollama offline inference (DeepSeek-R1 8B, Llama-3.2, Qwen)</div>
+                            </div>
+                            <button type="button" onclick="openLocalModelModal()" class="btn-tile-run" style="border-color: rgba(16, 185, 129, 0.4); color: #a7f3d0;">⚙️ Configure & Run</button>
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.55rem 1.75rem; font-size: 0.9rem; font-weight: 800; background: linear-gradient(135deg, #2563eb, #7c3aed); border: none; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);">
+                        ▶ Synthesize Full Multi-Model AI Consensus
+                    </button>
                 </div>
             </div>
 
-            <!-- SYNTHESIZED QUANT THESIS -->
-            <div id="thesisCardContainer" style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.65rem;">
-                <div id="txtThesis" style="font-size: 0.85rem; color: #e2e8f0; line-height: 1.55;">
-                    Loading AI thesis and strategic rationale...
+            <!-- STATE 2: ACTIVE LOADING PROGRESS STATE -->
+            <div id="aiLoadingState" style="display: none; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                    <span class="spinner" style="width: 20px; height: 20px; border-width: 3px;"></span>
+                    <div>
+                        <div id="lblAiProgressTitle" style="font-weight: 800; font-size: 0.95rem; color: #ffffff;">Querying Multi-Model AI Ensemble in Parallel...</div>
+                        <div id="lblAiProgressSub" style="font-size: 0.74rem; color: #94a3b8;">Point-in-Time quantitative context loaded. Awaiting model stream responses.</div>
+                    </div>
                 </div>
-                <div id="thesisBadgesRow" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.15rem;">
-                    <span id="badgePattern" style="display: none; font-size: 0.7rem; font-weight: 600; background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); padding: 0.2rem 0.6rem; border-radius: 4px;"></span>
-                    <span id="badgeVolume" style="display: none; font-size: 0.7rem; font-weight: 600; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.2rem 0.6rem; border-radius: 4px;"></span>
-                    <span id="badgeRisk" style="display: none; font-size: 0.7rem; font-weight: 600; background: rgba(244, 63, 94, 0.12); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.25); padding: 0.2rem 0.6rem; border-radius: 4px;"></span>
+                <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+                    <div class="ai-step-indicator done">
+                        <span>✓</span> <strong>Step 1: Point-in-Time Context Aggregated</strong> — Technical DMAs, Deliverable Volume Spikes, 3Q Surprise Quality
+                    </div>
+                    <div class="ai-step-indicator active">
+                        <span class="pulse-dot"></span> <strong>Step 2: Parallel Model Inference</strong> — Querying DeepSeek-R1, Llama-70B, Qwen-72B, Mistral, Gemma-31B, GLM-5.2
+                    </div>
+                    <div class="ai-step-indicator">
+                        <span>⏳</span> <strong>Step 3: Directional Voting & Target Synthesis</strong> — Risk/Reward calculation, invalidation stop loss, confidence weighting
+                    </div>
                 </div>
             </div>
-        </section>
 
-        <!-- 4-MODEL AI MATRIX (BOTTOM) -->
-        <section class="card" id="cardAIModelsMatrix">
-            <div class="card-header">
-                <div class="card-title">🤖 4-Model AI Engine Breakdown</div>
-                <span style="font-size: 0.75rem; color: var(--text-tertiary);">DeepSeek-R1 · Llama-3.3-70B · Qwen-2.5-72B · Mistral-Large</span>
+            <!-- STATE 3: LIVE CONSENSUS RESULTS & ACTIONABLE TRADE SETUP -->
+            <div id="aiConsensusResults" style="display: none;">
+                
+                <!-- Consensus Verdict Banner -->
+                <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 1rem 1.15rem; margin-bottom: 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
+                        <div id="verdictPill" style="font-size: 0.85rem; font-weight: 800; padding: 0.35rem 0.95rem; border-radius: 6px; font-family: var(--font-mono); background: var(--emerald-subtle); color: var(--emerald); border: 1px solid var(--emerald-border); letter-spacing: 0.02em;">
+                            BULLISH (85%)
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <span id="lblVerdictSummary" style="font-size: 0.95rem; font-weight: 800; color: #ffffff;">Actionable Setup Identified</span>
+                            <span id="lblVerdictSub" style="font-size: 0.72rem; color: #94a3b8;">High-conviction consensus across quantitative engines</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <button type="button" onclick="runConsensus(true, null)" class="btn btn-secondary" style="font-size: 0.74rem; padding: 0.3rem 0.7rem;" title="Re-synthesize consensus prediction">
+                            🔄 Re-synthesize
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 6 Strategic KPI Blocks -->
+                <div class="kpi-grid" style="margin-bottom: 1.15rem; gap: 0.75rem;">
+                    <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                        <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Worth Entering</div>
+                        <div class="kpi-number" id="kpiWorth" style="color: var(--emerald); font-size: 1.05rem; line-height: 1.3; font-weight: 800;">—</div>
+                        <div class="kpi-subtext" style="font-size: 0.7rem; color: #64748b;">Actionable Rating</div>
+                    </div>
+                    <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                        <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Optimal Entry Zone</div>
+                        <div class="kpi-number" id="kpiEntry" style="color: #38bdf8; font-size: 1rem; font-family: var(--font-mono); font-weight: 700;">₹— – ₹—</div>
+                        <div class="kpi-subtext" style="font-size: 0.7rem; color: #64748b;">Pullback Buy Range</div>
+                    </div>
+                    <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                        <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Consensus Target</div>
+                        <div class="kpi-number" id="kpiTarget" style="color: #ffffff; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">₹—</div>
+                        <div class="kpi-subtext" id="kpiTargetSub" style="font-size: 0.7rem; color: var(--emerald); font-weight: 600;">+0.0% upside</div>
+                    </div>
+                    <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                        <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Stop Loss Level</div>
+                        <div class="kpi-number" id="kpiSL" style="color: #fca5a5; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">₹—</div>
+                        <div class="kpi-subtext" id="kpiSLSub" style="font-size: 0.7rem; color: var(--rose); font-weight: 600;">-0.0% risk cut</div>
+                    </div>
+                    <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                        <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Risk-to-Reward</div>
+                        <div class="kpi-number" id="kpiRR" style="color: #93c5fd; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">1 : —</div>
+                        <div class="kpi-subtext" style="font-size: 0.7rem; color: #64748b;">Reward vs Invalidation</div>
+                    </div>
+                    <div class="kpi-box" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.9rem 1rem;">
+                        <div class="kpi-tag" style="font-size: 0.65rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Consensus Strength</div>
+                        <div class="kpi-number" id="kpiStrength" style="color: #fbbf24; font-size: 1.15rem; font-family: var(--font-mono); font-weight: 800;">—%</div>
+                        <div class="kpi-subtext" id="kpiAgreeCount" style="font-size: 0.7rem; color: #64748b;">AI Models Agreeing</div>
+                    </div>
+                </div>
+
+                <!-- Synthesized Quant Thesis & Catalytic Drivers -->
+                <div id="thesisCardContainer" style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 1.35rem;">
+                    <div id="txtThesis" style="font-size: 0.85rem; color: #e2e8f0; line-height: 1.55;">
+                        Loading AI thesis and strategic rationale...
+                    </div>
+                    <div id="thesisBadgesRow" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.15rem;">
+                        <span id="badgePattern" style="display: none; font-size: 0.7rem; font-weight: 600; background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); padding: 0.2rem 0.6rem; border-radius: 4px;"></span>
+                        <span id="badgeVolume" style="display: none; font-size: 0.7rem; font-weight: 600; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.2rem 0.6rem; border-radius: 4px;"></span>
+                        <span id="badgeRisk" style="display: none; font-size: 0.7rem; font-weight: 600; background: rgba(244, 63, 94, 0.12); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.25); padding: 0.2rem 0.6rem; border-radius: 4px;"></span>
+                    </div>
+                </div>
+
+                <!-- Individual Multi-Model Prediction Breakdown Matrix -->
+                <div style="margin-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <div style="font-size: 0.92rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 0.4rem;">
+                            <span>📊 Individual Model Outputs & Rationales</span>
+                        </div>
+                        <span style="font-size: 0.72rem; color: var(--text-tertiary);">DeepSeek-R1 · Llama-70B · Qwen-72B · Mistral · Gemma-31B · GLM-5.2 · Local</span>
+                    </div>
+                    <div class="models-matrix" id="modelsContainer">
+                        <div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 2rem;">Loading model outputs...</div>
+                    </div>
+                </div>
             </div>
-            <div class="models-matrix" id="modelsContainer">
-                <div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 2rem;">Loading model outputs...</div>
-            </div>
+
         </section>
 
     </main>
@@ -1644,8 +1860,9 @@
         }
 
         function renderConsensus(c, curr) {
-            const cardSetup = document.getElementById('cardTradeSetup');
-            const cardMatrix = document.getElementById('cardAIModelsMatrix');
+            const emptyLauncher = document.getElementById('aiEmptyLauncher');
+            const loadingState = document.getElementById('aiLoadingState');
+            const resultsState = document.getElementById('aiConsensusResults');
             const vPill = document.getElementById('verdictPill');
             const wEl = document.getElementById('kpiWorth');
             const eEl = document.getElementById('kpiEntry');
@@ -1657,19 +1874,26 @@
             const stEl = document.getElementById('kpiStrength');
             const thEl = document.getElementById('txtThesis');
             const cAsOfEl = document.getElementById('lblConsensusAsOf');
+            const horizonEl = document.getElementById('lblConsensusHorizon');
 
             const dir = (c && (c.consensus_direction || c.direction || '')).toUpperCase();
-            const hasAiPredictions = !!(c && dir && dir !== 'NO_PREDICTION' && (c.valid_count > 0 || (c.predictions && c.predictions.length > 0) || c.consensus_direction));
+            const hasAiPredictions = !!(c && dir && dir !== 'NO_PREDICTION' && (c.valid_count > 0 || (c.predictions && c.predictions.length > 0) || (c.models_breakdown && c.models_breakdown.length > 0) || c.consensus_direction));
 
-            // Only show AI Consensus Trade Setup & Strategic Verdict if at least one AI prediction is present
-            if (cardSetup) {
-                cardSetup.style.display = hasAiPredictions ? 'block' : 'none';
-            }
+            if (loadingState) loadingState.style.display = 'none';
 
             if (!hasAiPredictions) {
+                if (emptyLauncher) emptyLauncher.style.display = 'block';
+                if (resultsState) resultsState.style.display = 'none';
                 if (cAsOfEl) cAsOfEl.style.display = 'none';
                 renderModelsMatrix(c && c.predictions ? c.predictions : []);
                 return;
+            }
+
+            if (emptyLauncher) emptyLauncher.style.display = 'none';
+            if (resultsState) resultsState.style.display = 'block';
+
+            if (horizonEl) {
+                horizonEl.textContent = `${currentSelectedTimeframe || 14}D HORIZON`;
             }
 
             // Render consensus prediction as-of timestamp
@@ -1690,9 +1914,18 @@
             const str = Number(c.consensus_strength != null ? c.consensus_strength : (c.strength_pct || 80));
             if (vPill) {
                 vPill.textContent = `${dir} (${str.toFixed(0)}%)`;
-                vPill.style.background = isBull ? 'var(--emerald-subtle)' : 'var(--rose-subtle)';
-                vPill.style.borderColor = isBull ? 'var(--emerald-border)' : 'var(--rose-border)';
-                vPill.style.color = isBull ? 'var(--emerald)' : 'var(--rose)';
+                vPill.style.background = isBull ? 'var(--emerald-subtle)' : (dir === 'BEARISH' ? 'var(--rose-subtle)' : 'rgba(245,158,11,0.15)');
+                vPill.style.borderColor = isBull ? 'var(--emerald-border)' : (dir === 'BEARISH' ? 'var(--rose-border)' : 'rgba(245,158,11,0.3)');
+                vPill.style.color = isBull ? 'var(--emerald)' : (dir === 'BEARISH' ? 'var(--rose)' : '#fbbf24');
+            }
+
+            const summaryEl = document.getElementById('lblVerdictSummary');
+            const subEl = document.getElementById('lblVerdictSub');
+            if (summaryEl) {
+                summaryEl.textContent = isBull ? '🚀 High-Conviction Bullish Setup' : (dir === 'BEARISH' ? '🔻 Bearish Breakdown Warning' : '⚖️ Range-Bound Tactical Setup');
+            }
+            if (subEl) {
+                subEl.textContent = `${c.model_count || 6} AI Models evaluated for ${currentSelectedTimeframe || 14}-day tactical swing horizon`;
             }
 
             if (wEl) {
@@ -1715,7 +1948,7 @@
             const targetP = Number(c.consensus_target_price || c.target_price || 0);
             tgEl.textContent = targetP ? `₹${targetP.toFixed(2)}` : '—';
             const gainPct = (targetP && curr) ? ((targetP / curr - 1.0) * 100).toFixed(1) : (c.consensus_return_pct ? Number(c.consensus_return_pct).toFixed(1) : '0.0');
-            tgSub.textContent = `+${gainPct}% upside target`;
+            tgSub.textContent = `+${gainPct}% upside target (${currentSelectedTimeframe || 14}D)`;
 
             const slP = Number(c.consensus_stop_loss || (supportP && supportP < curr ? supportP : (curr * 0.94)));
             slEl.textContent = slP ? `₹${slP.toFixed(2)}` : '—';
@@ -1726,8 +1959,8 @@
             rrEl.textContent = `1 : ${rrVal}`;
             stEl.textContent = `${str.toFixed(0)}%`;
 
-            const agreeRatio = c.agreement_ratio != null ? c.agreement_ratio : (c.agreeing_models ? c.agreeing_models / (c.total_models || 4) : 1.0);
-            const modelCnt = c.model_count || c.total_models || 4;
+            const agreeRatio = c.agreement_ratio != null ? c.agreement_ratio : (c.agreeing_models ? c.agreeing_models / (c.total_models || 6) : 1.0);
+            const modelCnt = c.model_count || c.total_models || 6;
             const agreeCnt = Math.round(agreeRatio * modelCnt);
             document.getElementById('kpiAgreeCount').textContent = `${agreeCnt} / ${modelCnt} AI Models Agree`;
 
@@ -1812,7 +2045,7 @@
             window.currentModelsBreakdown = models || [];
             const container = document.getElementById('modelsContainer');
             if (!models || !models.length) {
-                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 1.5rem;">Click any AI Model button above or "🧠 All Consensus" to generate trade predictions.</div>';
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 1.5rem;">Click any AI Model button or "⚡ Run All Consensus" to generate quantitative predictions.</div>';
                 return;
             }
 
@@ -1827,12 +2060,15 @@
                 const safeMid = mid.replace(/[^a-zA-Z0-9]/g, '_') || mName.replace(/[^a-zA-Z0-9]/g, '_');
                 
                 let icon = '🤖';
-                if (mid.includes('llama') || mName.includes('Llama')) icon = '🦙';
-                else if (mid.includes('qwen') || mName.includes('Qwen')) icon = '🌐';
-                else if (mid.includes('mistral') || mName.includes('Mistral')) icon = '⚡';
-                else if (mid.includes('gemini') || mName.includes('Gemini')) icon = '✨';
-                else if (mid.includes('gemma') || mName.includes('Gemma')) icon = '💎';
-                else if (mid.includes('glm') || mName.includes('GLM')) icon = '🐉';
+                let archBadge = 'LLM';
+                if (mid.includes('llama') || mName.includes('Llama')) { icon = '🦙'; archBadge = '70B Dense'; }
+                else if (mid.includes('qwen') || mName.includes('Qwen')) { icon = '🌐'; archBadge = '72B Arch'; }
+                else if (mid.includes('mistral') || mName.includes('Mistral')) { icon = '⚡'; archBadge = '123B Large'; }
+                else if (mid.includes('gemini') || mName.includes('Gemini')) { icon = '✨'; archBadge = 'Multimodal'; }
+                else if (mid.includes('gemma') || mName.includes('Gemma')) { icon = '💎'; archBadge = 'Free 31B'; }
+                else if (mid.includes('glm') || mName.includes('GLM')) { icon = '🐉'; archBadge = '753B Flagship'; }
+                else if (mid.includes('deepseek') || mName.includes('DeepSeek')) { icon = '🤖'; archBadge = '671B MoE'; }
+                else if (mid.includes('local') || mName.includes('Local') || m.is_local) { icon = '💻'; archBadge = 'Zero Quota'; }
 
                 const stats = (window._aiModelsStats || []).find(x => x.id === mid || x.name === mName || (x.name || '').toLowerCase() === (mName || '').toLowerCase()) || {};
                 const genStats = stats.generation_stats || {};
@@ -1847,7 +2083,10 @@
                             <div style="display:flex; align-items:center; gap:0.4rem;">
                                 <span style="font-size:1.1rem;">${icon}</span>
                                 <div>
-                                    <span class="model-label">${mName}</span>
+                                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                        <span class="model-label">${mName}</span>
+                                        <span style="font-size: 0.6rem; font-weight: 700; background: rgba(255,255,255,0.06); color: #94a3b8; padding: 0.1rem 0.35rem; border-radius: 3px;">${archBadge}</span>
+                                    </div>
                                 </div>
                             </div>
                             <span class="model-vote" style="background: ${dirBg}; color: ${dirCol};">${m.direction || 'NEUTRAL'} (${m.confidence_pct || 80}%)</span>
@@ -2175,16 +2414,22 @@
 
         function setTimeframe(days) {
             currentSelectedTimeframe = parseInt(days, 10) || 14;
-            [3, 7, 14, 30, 90].forEach(d => {
+            [3, 7, 14, 30, 60, 90].forEach(d => {
                 const btn = document.getElementById(`tfBtn-${d}`);
+                const aiBtn = document.getElementById(`aiTfBtn-${d}`);
                 if (btn) {
-                    if (d === currentSelectedTimeframe) {
-                        btn.classList.add('active');
-                    } else {
-                        btn.classList.remove('active');
-                    }
+                    if (d === currentSelectedTimeframe) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                }
+                if (aiBtn) {
+                    if (d === currentSelectedTimeframe) aiBtn.classList.add('active');
+                    else aiBtn.classList.remove('active');
                 }
             });
+            const horizonEl = document.getElementById('lblConsensusHorizon');
+            if (horizonEl) {
+                horizonEl.textContent = `${currentSelectedTimeframe}D HORIZON`;
+            }
             // Update labels in consensus cards
             const tgSub = document.getElementById('kpiTargetSub');
             if (tgSub && tgSub.textContent.includes('upside target')) {
@@ -2373,7 +2618,7 @@
         }
 
         async function runConsensus(force = true, modelId = null) {
-            const allBtn = document.getElementById('btnConsensus');
+            const allBtn = document.getElementById('btnConsensus') || document.getElementById('btnConsensusMain');
             let targetBtn = allBtn;
             let prevHtml = '';
 
@@ -2385,12 +2630,32 @@
                 else if (mKey.includes('llama')) targetBtn = document.getElementById('btnModel-llama-70b') || allBtn;
                 else if (mKey.includes('qwen')) targetBtn = document.getElementById('btnModel-qwen-72b') || allBtn;
                 else if (mKey.includes('mistral')) targetBtn = document.getElementById('btnModel-mistral-large') || allBtn;
+                else if (mKey.includes('gemma')) targetBtn = document.getElementById('btnModel-gemma-31b') || allBtn;
+                else if (mKey.includes('glm')) targetBtn = document.getElementById('btnModel-glm-52') || allBtn;
             }
 
             if (targetBtn) {
                 prevHtml = targetBtn.innerHTML;
                 targetBtn.disabled = true;
-                targetBtn.innerHTML = `<span class="spinner"></span> ${modelId ? (modelId.includes('local') ? 'Running Local AI...' : 'Running Model...') : 'Running All 4 AI Engines...'}`;
+                targetBtn.innerHTML = `<span class="spinner"></span> ${modelId ? 'Running Model...' : 'Running All Engines...'}`;
+            }
+
+            // Show active loading state in AI Command Center
+            const loadingState = document.getElementById('aiLoadingState');
+            const emptyLauncher = document.getElementById('aiEmptyLauncher');
+            const resultsState = document.getElementById('aiConsensusResults');
+            const progressTitle = document.getElementById('lblAiProgressTitle');
+            const progressSub = document.getElementById('lblAiProgressSub');
+
+            if (loadingState) loadingState.style.display = 'block';
+            if (emptyLauncher) emptyLauncher.style.display = 'none';
+            if (resultsState) resultsState.style.opacity = '0.4';
+
+            if (progressTitle) {
+                progressTitle.textContent = modelId ? `Running ${modelId.split('/').pop()} on ${ACTIVE_SYM}...` : `Querying Multi-Model AI Ensemble in Parallel on ${ACTIVE_SYM}...`;
+            }
+            if (progressSub) {
+                progressSub.textContent = `Analyzing ${currentSelectedTimeframe || 14}-day price paths, volume surges, and 3Q surprise quality...`;
             }
 
             try {
@@ -2419,11 +2684,14 @@
                 await fetchRateLimits();
             } catch (e) {
                 alert('Error computing AI consensus: ' + e.message);
+                if (loadingState) loadingState.style.display = 'none';
+                if (resultsState) resultsState.style.opacity = '1';
             } finally {
                 if (targetBtn) {
                     targetBtn.disabled = false;
                     targetBtn.innerHTML = prevHtml;
                 }
+                if (resultsState) resultsState.style.opacity = '1';
             }
         }
 
@@ -2439,6 +2707,9 @@
             else if (mid.includes('qwen') || mName.includes('Qwen')) icon = '🌐';
             else if (mid.includes('mistral') || mName.includes('Mistral')) icon = '⚡';
             else if (mid.includes('gemini') || mName.includes('Gemini')) icon = '✨';
+            else if (mid.includes('gemma') || mName.includes('Gemma')) icon = '💎';
+            else if (mid.includes('glm') || mName.includes('GLM')) icon = '🐉';
+            else if (mid.includes('deepseek') || mName.includes('DeepSeek')) icon = '🤖';
 
             document.getElementById('rawModalIcon').textContent = icon;
             document.getElementById('rawModalTitle').textContent = `${mName} — Raw Model Output`;
@@ -2523,34 +2794,6 @@
             }
         }
 
-        async function autoRunLocalModels() {
-            try {
-                // Auto-execute local AI models in background upon opening stock page
-                const modelToRun = (activeLocalModels && activeLocalModels.length > 0) ? activeLocalModels[0] : 'deepseek-r1:8b';
-                fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/intelligence-note?model_name=${encodeURIComponent(modelToRun)}&provider=ollama`, {
-                    method: 'POST'
-                }).then(async (res) => {
-                    if (res.ok) {
-                        const note = await res.json();
-                        console.debug('[LOCAL-AI] Local Ollama intelligence note generated:', note);
-                    }
-                }).catch(err => console.debug('[LOCAL-AI] Background local note skipped:', err));
-
-                // Auto-run Kronos AI 14-day price prediction if missing
-                fetch(`/api/v1/kronos/predict/${encodeURIComponent(ACTIVE_SYM)}`, {
-                    method: 'POST'
-                }).then(async (res) => {
-                    if (res.ok) {
-                        const kronosRes = await res.json();
-                        console.debug('[LOCAL-AI] Kronos sequence forecast updated:', kronosRes);
-                        await fetchStockDetails();
-                    }
-                }).catch(err => console.debug('[LOCAL-AI] Background Kronos prediction skipped:', err));
-            } catch (e) {
-                console.debug('[LOCAL-AI] Auto-run error:', e);
-            }
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
             const stockIntSel = document.getElementById('stockLiveIntervalSelect');
             if (stockIntSel) stockIntSel.value = String(stockLiveIntervalMs);
@@ -2560,7 +2803,6 @@
             detectLocalModels();
             fetchStockDetails();
             fetchRateLimits();
-            autoRunLocalModels();
         });
     </script>
 

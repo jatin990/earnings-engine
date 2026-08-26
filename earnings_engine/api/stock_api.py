@@ -268,15 +268,15 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
     preds = get_predictions(settings, ticker=sym, limit=1)
     consensus_data = preds[0] if preds else None
 
-    # 6. Live Short-Term News Catalysts (auto-fetch delta if empty)
+    # 6. Live Short-Term News Catalysts (cached lookup)
     catalysts_data = get_short_term_catalysts(watchlist_or_universe="ALL", search_query=sym, limit=15, settings=settings)
     if not catalysts_data:
         try:
+            import threading
             from earnings_engine.data.catalysts_news import fetch_ticker_catalysts
-            fetch_ticker_catalysts(sym, limit=15, force=False, settings=settings)
-            catalysts_data = get_short_term_catalysts(watchlist_or_universe="ALL", search_query=sym, limit=15, settings=settings)
+            threading.Thread(target=fetch_ticker_catalysts, args=(sym, 15, False, settings), daemon=True).start()
         except Exception as e:
-            logger.debug("Auto-fetch catalysts error for %s: %s", sym, e)
+            logger.debug("Async catalysts fetch spawn error for %s: %s", sym, e)
 
     # 7. Standardized 6-Pillar Factor Evaluation Matrix
     factor_eval = {}

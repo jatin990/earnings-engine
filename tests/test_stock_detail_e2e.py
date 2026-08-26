@@ -29,7 +29,7 @@ def test_stock_page_html_endpoint(client):
     assert res.status_code == 200
     assert "TCS.NS" in res.text
     assert "valListingDate" in res.text
-    assert "cardTradeSetup" in res.text
+    assert "cardAICommandCenter" in res.text
     assert "btnFetchNewsDelta" in res.text
 
 
