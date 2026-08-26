@@ -1574,6 +1574,112 @@
             }
         }
 
+        function renderFactorEvaluation(fe) {
+            const card = document.getElementById('cardFactorEvaluation');
+            const pill = document.getElementById('factorCompositePill');
+            const grid = document.getElementById('factorPillarsGrid');
+            if (!grid) return;
+
+            if (!fe || !fe.pillars) {
+                if (card) card.style.display = 'none';
+                return;
+            }
+            if (card) card.style.display = 'block';
+
+            const comp = fe.composite_score || 50;
+            const isBull = fe.verdict_badge === 'emerald';
+            const isWarn = fe.verdict_badge === 'amber';
+            const badgeBg = isBull ? 'rgba(16,185,129,0.15)' : (isWarn ? 'rgba(245,158,11,0.15)' : 'rgba(244,63,94,0.15)');
+            const badgeColor = isBull ? '#34d399' : (isWarn ? '#fbbf24' : '#f87171');
+            const badgeBorder = isBull ? 'rgba(16,185,129,0.3)' : (isWarn ? 'rgba(245,158,11,0.3)' : 'rgba(244,63,94,0.3)');
+
+            if (pill) {
+                pill.innerHTML = `<span>${fe.verdict_icon || '⚖️'}</span> <strong>${fe.verdict || 'EVALUATED'} (${comp}/100)</strong>`;
+                pill.style.background = badgeBg;
+                pill.style.color = badgeColor;
+                pill.style.borderColor = badgeBorder;
+            }
+
+            const pillars = Object.values(fe.pillars || {});
+            grid.innerHTML = pillars.map(p => {
+                const sc = p.score || 50;
+                const barCol = sc >= 70 ? '#34d399' : (sc >= 45 ? '#38bdf8' : '#f87171');
+                return `
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.45rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:0.75rem;font-weight:700;color:#f8fafc;">${p.name}</span>
+                            <span style="font-size:0.65rem;font-family:var(--font-mono);background:rgba(255,255,255,0.06);color:#94a3b8;padding:0.1rem 0.35rem;border-radius:4px;">${p.weight_pct}% Wgt</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:0.15rem;">
+                            <div style="font-family:var(--font-mono);font-size:1.15rem;font-weight:800;color:${barCol};">${sc.toFixed(0)} <span style="font-size:0.7rem;color:#64748b;font-weight:500;">/ 100</span></div>
+                            <span style="font-size:0.7rem;font-weight:700;color:#e2e8f0;background:rgba(255,255,255,0.05);padding:0.15rem 0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);">${p.badge}</span>
+                        </div>
+                        <div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;margin:0.2rem 0;">
+                            <div style="height:100%;width:${Math.max(5, Math.min(100, sc))}%;background:${barCol};border-radius:2px;"></div>
+                        </div>
+                        <div style="font-size:0.7rem;color:#94a3b8;line-height:1.35;">${p.detail}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderConsensus(c, curr) {
+            const cardSetup = document.getElementById('cardTradeSetup');
+            const cardMatrix = document.getElementById('cardAIModelsMatrix');
+            const vPill = document.getElementById('verdictPill');
+            const wEl = document.getElementById('kpiWorth');
+            const eEl = document.getElementById('kpiEntry');
+            const tgEl = document.getElementById('kpiTarget');
+            const tgSub = document.getElementById('kpiTargetSub');
+            const slEl = document.getElementById('kpiSL');
+            const slSub = document.getElementById('kpiSLSub');
+            const rrEl = document.getElementById('kpiRR');
+            const stEl = document.getElementById('kpiStrength');
+            const thEl = document.getElementById('txtThesis');
+            const cAsOfEl = document.getElementById('lblConsensusAsOf');
+
+            const dir = (c && (c.consensus_direction || c.direction || '')).toUpperCase();
+            const hasAiPredictions = !!(c && dir && dir !== 'NO_PREDICTION' && (c.valid_count > 0 || (c.predictions && c.predictions.length > 0) || c.consensus_direction));
+
+            // Only show AI Consensus Trade Setup & Strategic Verdict if at least one AI prediction is present
+            if (cardSetup) {
+                cardSetup.style.display = hasAiPredictions ? 'block' : 'none';
+            }
+
+            if (!hasAiPredictions) {
+                if (cAsOfEl) cAsOfEl.style.display = 'none';
+                renderModelsMatrix(c && c.predictions ? c.predictions : []);
+                return;
+            }
+
+            // Render consensus prediction as-of timestamp
+            const predDate = c.event_date || c.asof_date || c.created_at || c.run_at;
+            if (cAsOfEl) {
+                if (predDate) {
+                    const formattedPred = (typeof predDate === 'string' && predDate.includes('T')) 
+                        ? new Date(predDate).toLocaleString() 
+                        : predDate;
+                    cAsOfEl.textContent = `🕒 Evaluated: ${formattedPred}`;
+                    cAsOfEl.style.display = 'inline-block';
+                } else {
+                    cAsOfEl.style.display = 'none';
+                }
+            }
+
+            const isBull = dir === 'BULLISH';
+            const str = Number(c.consensus_strength != null ? c.consensus_strength : (c.strength_pct || 80));
+            if (vPill) {
+                vPill.textContent = `${dir} (${str.toFixed(0)}%)`;
+                vPill.style.background = isBull ? 'var(--emerald-subtle)' : 'var(--rose-subtle)';
+                vPill.style.borderColor = isBull ? 'var(--emerald-border)' : 'var(--rose-border)';
+                vPill.style.color = isBull ? 'var(--emerald)' : 'var(--rose)';
+            }
+
+            if (wEl) {
+                wEl.textContent = c.is_worth_entering || (dir === 'BULLISH' && str >= 75 ? 'YES - HIGH CONVICTION' : (dir === 'BULLISH' ? 'YES - ACCUMULATE ON DIPS' : (dir === 'BEARISH' ? 'NO - HIGH RISK' : 'WAIT FOR BREAKOUT')));
+                wEl.style.color = (c.is_worth_entering && c.is_worth_entering.includes('HIGH')) ? 'var(--emerald)' : (isBull ? 'var(--sky)' : 'var(--rose)');
+            }
+
             const supportP = Number(c.consensus_support || 0);
             if (eEl) {
                 if (c.consensus_entry_zone) {
