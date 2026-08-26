@@ -12823,9 +12823,9 @@
         // =========================================================================
         app._repeatersData = [];
 
-        app.loadQuarterRepeaters = async function() {
+        app.loadQuarterRepeaters = async function(silent = false) {
             const tbody = document.getElementById('repeatersTableBody');
-            if (tbody) {
+            if (tbody && !silent) {
                 tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2.5rem;color:#64748b;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Screening quarter repeaters & loading AI forward predictions...</td></tr>`;
             }
 
@@ -12856,7 +12856,7 @@
                 app.renderQuarterRepeaters(app._repeatersData);
             } catch (e) {
                 console.error('[REPEATERS] Load error:', e);
-                if (tbody) {
+                if (tbody && !silent) {
                     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#f87171;">Failed to load quarter repeaters: ${e.message}</td></tr>`;
                 }
             }
@@ -13207,7 +13207,11 @@
         };
 
         app.runSingleRepeaterAi = async function(ticker, btnEl, modelName = null) {
-            if (btnEl) btnEl.innerHTML = `<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span>`;
+            const originalContent = btnEl ? btnEl.innerHTML : '⚡';
+            if (btnEl) {
+                btnEl.disabled = true;
+                btnEl.innerHTML = `<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Running...`;
+            }
             try {
                 let url = API_BASE + '/api/v1/earnings-radar/repeaters/forecast/' + encodeURIComponent(ticker);
                 if (modelName) {
@@ -13218,7 +13222,8 @@
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 
-                await app.loadQuarterRepeaters();
+                // Silently refresh background table without resetting scroll or replacing table with full loading spinner
+                await app.loadQuarterRepeaters(true);
                 
                 // If modal is currently open for this ticker, refresh its view with updated forecast
                 const modal = document.getElementById('repeatersAiModal');
@@ -13229,7 +13234,10 @@
                 console.error('[REPEATERS] Forecast error for ' + ticker, e);
                 alert('AI Forecast failed: ' + e.message);
             } finally {
-                if (btnEl) btnEl.textContent = '⚡';
+                if (btnEl) {
+                    btnEl.disabled = false;
+                    btnEl.innerHTML = originalContent;
+                }
             }
         };
 
@@ -13244,9 +13252,9 @@
                 const res = await fetch(API_BASE + '/api/v1/earnings-radar/repeaters/batch-forecast?universe=' + encodeURIComponent(universe) + '&limit=15', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
-                    alert('Batch AI Forward forecasting started in background. Refreshing candidate table in 5 seconds.');
-                    setTimeout(() => app.loadQuarterRepeaters(), 5000);
-                    setTimeout(() => app.loadQuarterRepeaters(), 15000);
+                    alert('Batch AI Forward forecasting started in background. Refreshing candidate table silently.');
+                    setTimeout(() => app.loadQuarterRepeaters(true), 5000);
+                    setTimeout(() => app.loadQuarterRepeaters(true), 15000);
                 }
             } catch (e) {
                 console.error('[REPEATERS] Batch forecast error:', e);
