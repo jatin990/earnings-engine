@@ -6542,6 +6542,8 @@
                     setEl('srModalCurrentPrice', 'textContent', curPrice !== null && curPrice !== undefined
                         ? ('₹' + Number(curPrice).toFixed(2))
                         : 'N/A');
+                    const priceAsOf = data.price_as_of || data.asof_date || (new Date()).toLocaleDateString();
+                    setEl('srModalPriceAsOf', 'textContent', priceAsOf ? ('🕒 As of: ' + priceAsOf) : '');
 
                     // Found / Auto-detected Range (20D)
                     const autoLower = autoRng.lower != null ? Number(autoRng.lower) : (rng.source === 'auto' ? rng.lower_bound : null);
@@ -11338,8 +11340,8 @@
                 headerStyle: 'color:#60a5fa;',
                 render: (c, ctx) => `
                     <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);color:#93c5fd;font-size:0.74rem;white-space:nowrap;">
-                        <div>${ctx.sigPriceStr}</div>
-                        <div style="font-size:0.6rem;color:#475569;">${c.signal_date || ''}</div>
+                        <div style="font-weight:700;">${ctx.sigPriceStr}</div>
+                        <div style="font-size:0.62rem;color:#64748b;margin-top:1px;" title="Signal detection date">📅 ${c.signal_date || c.entry_date || 'Signal'}</div>
                     </td>
                 `
             },
@@ -11349,14 +11351,20 @@
                 sortKey: 'current_price',
                 align: 'right',
                 headerStyle: 'color:#e2e8f0;',
-                render: (c, ctx) => `
+                render: (c, ctx) => {
+                    const asOfDate = c.current_date || c.asof_date || ctx.asofDate || '';
+                    const timeStr = c.scanned_at ? new Date(c.scanned_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+                    const asOfLabel = asOfDate ? `as of ${asOfDate}` : (timeStr ? `as of ${timeStr}` : 'Today');
+                    return `
                     <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);font-size:0.74rem;white-space:nowrap;">
                         <div style="font-weight:800;color:${ctx.curPriceColor};font-size:0.82rem;">${ctx.curPriceStr}</div>
+                        <div style="font-size:0.62rem;color:#94a3b8;font-weight:500;margin-top:1px;" title="Price as of date/time">🕒 ${asOfLabel}</div>
                         <div style="margin-top:0.15rem;">
                             <span class="signal-badge" style="background:${ctx.curPriceBadgeBg};border:1px solid ${ctx.curPriceBadgeBorder};color:${ctx.curPriceBadgeText};font-size:0.62rem;font-weight:700;padding:0.08rem 0.35rem;border-radius:3px;">${ctx.curPriceBadgeLabel}</span>
                         </div>
                     </td>
-                `
+                    `;
+                }
             },
             trigger: {
                 id: 'trigger',
@@ -12048,7 +12056,10 @@
 
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.6rem;font-size:0.78rem;">
                     <div style="background:#030712;padding:0.5rem 0.7rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
-                        <div style="color:#94a3b8;font-size:0.68rem;">Current Price</div>
+                        <div style="color:#94a3b8;font-size:0.68rem;display:flex;justify-content:space-between;align-items:center;">
+                            <span>Current Price</span>
+                            <span style="color:#64748b;font-family:var(--font-mono);font-size:0.62rem;">🕒 ${c.current_date || c.asof_date || 'Today'}</span>
+                        </div>
                         <div style="color:#e2e8f0;font-weight:700;font-size:0.95rem;font-family:var(--font-mono);">${curPriceStr}</div>
                     </div>
                     <div style="background:#030712;padding:0.5rem 0.7rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">

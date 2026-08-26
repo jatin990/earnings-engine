@@ -107,7 +107,16 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
             if quote.get("week_52_low") is None and len(closes) >= 20:
                 quote["week_52_low"] = round(float(closes.tail(252).min()), 2)
 
-    # Compute 52W % distances
+    # Compute 52W % distances and date timestamps
+    if not prices_df.empty:
+        try:
+            last_dt = prices_df.index[-1]
+            quote["price_date"] = last_dt.strftime("%Y-%m-%d") if hasattr(last_dt, "strftime") else str(last_dt)[:10]
+            if not quote.get("asof_date"):
+                quote["asof_date"] = quote["price_date"]
+        except Exception:
+            pass
+
     if quote.get("current_price") and quote.get("week_52_high") and quote["week_52_high"] > 0:
         quote["pct_from_52w_high"] = round((quote["current_price"] / quote["week_52_high"] - 1.0) * 100.0, 2)
     if quote.get("current_price") and quote.get("week_52_low") and quote["week_52_low"] > 0:

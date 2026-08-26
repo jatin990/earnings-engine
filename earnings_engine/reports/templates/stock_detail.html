@@ -792,6 +792,9 @@
                         <span class="pulse-dot"></span>
                         LIVE
                     </span>
+                    <span id="lblPriceAsOf" style="font-size: 0.75rem; color: #94a3b8; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.18rem 0.55rem; border-radius: 4px;">
+                        🕒 As of: —
+                    </span>
                     <button onclick="fetchStockDetails(true)" class="btn-live-refresh" id="btnRefreshQuote" title="Fetch latest live market price">
                         ⚡ Refresh Live
                     </button>
@@ -821,10 +824,11 @@
 
         <!-- TRADE SETUP & STRATEGIC VERDICT CARD -->
         <section class="card" style="border: 1px solid rgba(99, 102, 241, 0.25); background: linear-gradient(180deg, #0e111a 0%, #08090f 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
-            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center;">
+            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                 <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #ffffff;">
                     <span style="color: #6366f1;">⚡</span>
                     <span>AI Consensus Trade Setup & Strategic Verdict</span>
+                    <span id="lblConsensusAsOf" style="font-size: 0.72rem; color: #94a3b8; font-weight: 500; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.12rem 0.45rem; border-radius: 4px; display: none;"></span>
                 </div>
                 <div id="verdictPill" style="font-size: 0.76rem; font-weight: 800; padding: 0.28rem 0.85rem; border-radius: var(--radius-sm); font-family: var(--font-mono); background: var(--emerald-subtle); color: var(--emerald); border: 1px solid var(--emerald-border); letter-spacing: 0.03em;">
                     ANALYZING SETUP...
@@ -995,6 +999,22 @@
                 }
             }
 
+            // Render price As-Of timestamp
+            const quoteDate = q.asof_date || q.price_date || q.last_updated;
+            const asOfEl = document.getElementById('lblPriceAsOf');
+            if (asOfEl) {
+                if (quoteDate) {
+                    const formattedDate = (typeof quoteDate === 'string' && quoteDate.includes('T')) 
+                        ? new Date(quoteDate).toLocaleString() 
+                        : quoteDate;
+                    asOfEl.textContent = `🕒 As of: ${formattedDate}`;
+                    asOfEl.style.display = 'inline-block';
+                } else {
+                    asOfEl.textContent = `🕒 As of: Today (EOD)`;
+                    asOfEl.style.display = 'inline-block';
+                }
+            }
+
             document.getElementById('lblPrevClose').textContent = `Prev Close: ${currSym}${q.previous_close || '—'}`;
             document.getElementById('val52Low').textContent = `${currSym}${q.week_52_low || '—'}`;
             document.getElementById('val52High').textContent = `${currSym}${q.week_52_high || '—'}`;
@@ -1041,10 +1061,12 @@
             const rrEl = document.getElementById('kpiRR');
             const stEl = document.getElementById('kpiStrength');
             const thEl = document.getElementById('txtThesis');
+            const cAsOfEl = document.getElementById('lblConsensusAsOf');
 
             const dir = (c && (c.consensus_direction || c.direction || '')).toUpperCase();
 
             if (!c || !dir) {
+                if (cAsOfEl) cAsOfEl.style.display = 'none';
                 vPill.textContent = 'NO RECENT PREDICTION';
                 vPill.style.background = 'rgba(255, 255, 255, 0.05)';
                 vPill.style.borderColor = 'var(--border)';
@@ -1053,6 +1075,20 @@
                 thEl.textContent = 'No multi-model consensus prediction has been computed yet. Click the "🧠 Run AI Consensus" button above to evaluate DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large.';
                 renderModelsMatrix([]);
                 return;
+            }
+
+            // Render consensus prediction as-of timestamp
+            const predDate = c.event_date || c.asof_date || c.created_at || c.run_at;
+            if (cAsOfEl) {
+                if (predDate) {
+                    const formattedPred = (typeof predDate === 'string' && predDate.includes('T')) 
+                        ? new Date(predDate).toLocaleString() 
+                        : predDate;
+                    cAsOfEl.textContent = `🕒 Evaluated: ${formattedPred}`;
+                    cAsOfEl.style.display = 'inline-block';
+                } else {
+                    cAsOfEl.style.display = 'none';
+                }
             }
 
             const isBull = dir === 'BULLISH';
