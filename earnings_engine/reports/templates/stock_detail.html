@@ -728,15 +728,15 @@
                 <span id="txtRatelimit">AI Quota: 20/20 RPM</span>
             </div>
 
-            <!-- Local Model Button & Settings Trigger -->
+            <!-- Local Models Group -->
             <div style="display: inline-flex; align-items: center; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); padding: 1px 2px; gap: 2px;">
-                <button id="btnModel-local" onclick="runLocalConsensus()" class="btn-model-opt local" style="border: none; background: transparent; padding: 0.28rem 0.45rem; color: #34d399; font-weight: 700; font-size: 0.74rem;" title="Run active Local Model (Zero API Quota)">
-                    <span>💻</span> <span id="lblLocalModel">Local AI</span>
+                <button id="btnModel-local" onclick="openLocalModelModal()" class="btn-model-opt local" style="border: none; background: transparent; padding: 0.28rem 0.45rem; color: #34d399; font-weight: 700; font-size: 0.74rem;" title="Open Local Models hub (choose active models & run individually or in parallel)">
+                    <span>💻</span> <span id="lblLocalModel">Local Models</span>
                 </button>
-                <button id="btnModel-local-all" onclick="runAllLocalConsensus()" class="btn-model-opt local" style="border: none; background: rgba(16, 185, 129, 0.15); padding: 0.28rem 0.45rem; color: #a7f3d0; font-weight: 700; font-size: 0.72rem; border-radius: 3px;" title="Dispatch prediction across ALL installed local models in parallel">
-                    <span>⚡</span> All Local
+                <button id="btnModel-local-all" onclick="runAllActiveLocalConsensus()" class="btn-model-opt local" style="border: none; background: rgba(16, 185, 129, 0.18); padding: 0.28rem 0.5rem; color: #a7f3d0; font-weight: 700; font-size: 0.72rem; border-radius: 3px;" title="Dispatch prediction in parallel to ALL checked active local models">
+                    <span>⚡</span> Run Active Local
                 </button>
-                <button type="button" onclick="openLocalModelModal()" style="background: transparent; border: none; color: #6ee7b7; font-size: 0.72rem; padding: 0.25rem 0.35rem; cursor: pointer;" title="Configure local models, host & parallel ensemble">⚙️</button>
+                <button type="button" onclick="openLocalModelModal()" style="background: transparent; border: none; color: #6ee7b7; font-size: 0.72rem; padding: 0.25rem 0.35rem; cursor: pointer;" title="Configure local models, host & active list">⚙️</button>
             </div>
 
             <!-- Per-Model Action Buttons -->
@@ -1440,7 +1440,16 @@
 
         let currentSelectedTimeframe = 14;
         let currentLocalHost = localStorage.getItem('nexus_local_llm_host') || 'http://localhost:11434';
-        let currentLocalModel = localStorage.getItem('nexus_local_llm_model') || 'deepseek-r1:8b';
+        let activeLocalModels = JSON.parse(localStorage.getItem('nexus_active_local_models') || '["deepseek-r1:8b"]');
+        let availableLocalModelsList = [];
+
+        function updateLocalModelBadge() {
+            const lbl = document.getElementById('lblLocalModel');
+            if (lbl) {
+                const count = activeLocalModels.length;
+                lbl.textContent = count === 1 ? activeLocalModels[0] : `Local AI (${count})`;
+            }
+        }
 
         function setTimeframe(days) {
             currentSelectedTimeframe = parseInt(days, 10) || 14;
@@ -1464,19 +1473,6 @@
 
         function openLocalModelModal() {
             document.getElementById('cfgLocalHost').value = currentLocalHost;
-            document.getElementById('cfgLocalModel').value = currentLocalModel;
-            const sel = document.getElementById('cfgLocalModelSelect');
-            if (sel) {
-                let matched = false;
-                for (let i = 0; i < sel.options.length; i++) {
-                    if (sel.options[i].value === currentLocalModel) {
-                        sel.selectedIndex = i;
-                        matched = true;
-                        break;
-                    }
-                }
-                if (!matched) sel.value = 'custom';
-            }
             document.getElementById('modalLocalModel').style.display = 'flex';
             detectLocalModels();
         }
@@ -1485,47 +1481,29 @@
             document.getElementById('modalLocalModel').style.display = 'none';
         }
 
-        function saveLocalModelConfig() {
+        function saveLocalHostConfig() {
             const host = document.getElementById('cfgLocalHost').value.trim() || 'http://localhost:11434';
-            const model = document.getElementById('cfgLocalModel').value.trim() || 'deepseek-r1:8b';
             currentLocalHost = host;
-            currentLocalModel = model;
             localStorage.setItem('nexus_local_llm_host', host);
-            localStorage.setItem('nexus_local_llm_model', model);
-            const lbl = document.getElementById('lblLocalModel');
-            if (lbl) lbl.textContent = model.length > 14 ? model.slice(0, 12) + '…' : model;
-            closeLocalModelModal();
+            detectLocalModels();
         }
-
-        let availableLocalModelsList = [];
 
         async function detectLocalModels() {
             const host = document.getElementById('cfgLocalHost').value.trim() || currentLocalHost;
             const statusEl = document.getElementById('lblLocalStatus');
-            const listContainer = document.getElementById('localModelsChecklist');
             if (statusEl) statusEl.innerHTML = '<span class="spinner"></span> Scanning local models...';
             try {
                 const res = await fetch(`/api/v1/consensus/local-models?host=${encodeURIComponent(host)}`);
                 const data = await res.json();
                 availableLocalModelsList = data.models || [];
-                const sel = document.getElementById('cfgLocalModelSelect');
-                if (data.models && data.models.length && sel) {
-                    sel.innerHTML = data.models.map(m => `
-                        <option value="${m.name}" ${m.name === currentLocalModel ? 'selected' : ''}>
-                            ${m.name} ${m.size ? `(${(m.size/1e9).toFixed(1)}GB)` : ''} [${m.provider}]
-                        </option>
-                    `).join('') + '<option value="custom">Custom Tag / Path...</option>';
+
+                // If activeLocalModels is empty, select all detected by default
+                if (activeLocalModels.length === 0 && availableLocalModelsList.length > 0) {
+                    activeLocalModels = availableLocalModelsList.map(m => m.name);
+                    localStorage.setItem('nexus_active_local_models', JSON.stringify(activeLocalModels));
                 }
 
-                if (listContainer && data.models && data.models.length) {
-                    listContainer.innerHTML = data.models.map((m, idx) => `
-                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; background: rgba(255,255,255,0.03); padding: 0.35rem 0.6rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); cursor: pointer;">
-                            <input type="checkbox" class="chk-local-model" value="${m.name}" checked style="accent-color: #10b981;">
-                            <span style="font-weight: 600; color: #ffffff;">${m.name}</span>
-                            <span style="color: var(--text-tertiary); font-size: 0.72rem; margin-left: auto;">${m.size ? (m.size/1e9).toFixed(1) + 'GB' : m.provider}</span>
-                        </label>
-                    `).join('');
-                }
+                renderLocalModelsList();
 
                 if (statusEl) {
                     if (data.status === 'online') {
@@ -1539,30 +1517,97 @@
             }
         }
 
+        function renderLocalModelsList() {
+            const listContainer = document.getElementById('localModelsChecklist');
+            const countEl = document.getElementById('activeLocalModelsCount');
+            if (countEl) countEl.textContent = activeLocalModels.length;
+            updateLocalModelBadge();
+
+            if (!listContainer) return;
+
+            const modelsToRender = availableLocalModelsList.length > 0 ? availableLocalModelsList.map(m => ({...m})) : [
+                { name: 'deepseek-r1:8b', size: 4700000000, provider: 'ollama' },
+                { name: 'llama3.2:3b', size: 2000000000, provider: 'ollama' },
+                { name: 'qwen2.5:7b', size: 4500000000, provider: 'ollama' },
+                { name: 'mistral:7b', size: 4100000000, provider: 'ollama' }
+            ];
+
+            // Make sure any active custom model not in modelsToRender is also included
+            activeLocalModels.forEach(act => {
+                if (!modelsToRender.some(m => m.name === act)) {
+                    modelsToRender.push({ name: act, size: 0, provider: 'custom' });
+                }
+            });
+
+            listContainer.innerHTML = modelsToRender.map(m => {
+                const isActive = activeLocalModels.includes(m.name);
+                const sizeStr = m.size ? `${(m.size/1e9).toFixed(1)}GB` : (m.provider || 'local');
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: ${isActive ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.02)'}; border: 1px solid ${isActive ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.08)'}; padding: 0.45rem 0.75rem; border-radius: 6px; gap: 0.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; flex: 1;">
+                            <input type="checkbox" onchange="toggleLocalModelActive('${m.name}', this.checked)" ${isActive ? 'checked' : ''} style="accent-color: #10b981; cursor: pointer; width: 16px; height: 16px;">
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.85rem; color: #ffffff;">${m.name}</div>
+                                <div style="font-size: 0.7rem; color: var(--text-tertiary);">${sizeStr}</div>
+                            </div>
+                        </label>
+                        <button type="button" onclick="runSingleLocalModel('${m.name}')" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.65rem; color: #34d399; border-color: rgba(16,185,129,0.4);" title="Run ${m.name} immediately">
+                            ⚡ Run This
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleLocalModelActive(name, checked) {
+            if (checked) {
+                if (!activeLocalModels.includes(name)) activeLocalModels.push(name);
+            } else {
+                activeLocalModels = activeLocalModels.filter(m => m !== name);
+            }
+            localStorage.setItem('nexus_active_local_models', JSON.stringify(activeLocalModels));
+            renderLocalModelsList();
+        }
+
         function toggleAllLocalCheckboxes(checkAll) {
-            const chks = document.querySelectorAll('.chk-local-model');
-            chks.forEach(c => { c.checked = checkAll; });
+            if (checkAll) {
+                const models = availableLocalModelsList.length > 0 ? availableLocalModelsList.map(m => m.name) : ['deepseek-r1:8b', 'llama3.2:3b', 'qwen2.5:7b', 'mistral:7b'];
+                activeLocalModels = [...new Set([...activeLocalModels, ...models])];
+            } else {
+                activeLocalModels = [];
+            }
+            localStorage.setItem('nexus_active_local_models', JSON.stringify(activeLocalModels));
+            renderLocalModelsList();
         }
 
-        async function testLocalConnection() {
-            await detectLocalModels();
+        function addCustomLocalModel() {
+            const input = document.getElementById('cfgCustomModelInput');
+            if (!input) return;
+            const val = input.value.trim();
+            if (!val) return;
+            if (!activeLocalModels.includes(val)) {
+                activeLocalModels.push(val);
+                localStorage.setItem('nexus_active_local_models', JSON.stringify(activeLocalModels));
+            }
+            input.value = '';
+            renderLocalModelsList();
         }
 
-        async function runLocalConsensus() {
-            const localId = `local/${currentLocalModel}`;
+        async function runSingleLocalModel(modelName) {
+            closeLocalModelModal();
+            const localId = `local/${modelName}`;
             await runConsensus(true, localId);
         }
 
-        async function runAllLocalConsensus() {
-            const chks = document.querySelectorAll('.chk-local-model:checked');
-            let modelIds = [];
-            if (chks.length > 0) {
-                modelIds = Array.from(chks).map(c => `local/${c.value}`);
-            } else {
-                modelIds = ['local_all'];
+        async function runAllActiveLocalConsensus() {
+            if (activeLocalModels.length === 0) {
+                openLocalModelModal();
+                alert('Please select at least one active local model to run.');
+                return;
             }
             closeLocalModelModal();
-            
+
+            const modelIds = activeLocalModels.map(m => `local/${m}`);
             const btn = document.getElementById('btnModel-local-all') || document.getElementById('btnModel-local');
             let prevHtml = '';
             if (btn) {
@@ -1728,7 +1773,8 @@
         async function autoRunLocalModels() {
             try {
                 // Auto-execute local AI models in background upon opening stock page
-                fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/intelligence-note?model_name=${encodeURIComponent(currentLocalModel)}&provider=ollama`, {
+                const modelToRun = (activeLocalModels && activeLocalModels.length > 0) ? activeLocalModels[0] : 'deepseek-r1:8b';
+                fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/intelligence-note?model_name=${encodeURIComponent(modelToRun)}&provider=ollama`, {
                     method: 'POST'
                 }).then(async (res) => {
                     if (res.ok) {
@@ -1753,10 +1799,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const lbl = document.getElementById('lblLocalModel');
-            if (lbl && currentLocalModel) {
-                lbl.textContent = currentLocalModel.length > 14 ? currentLocalModel.slice(0, 12) + '…' : currentLocalModel;
-            }
+            updateLocalModelBadge();
             fetchStockDetails();
             fetchRateLimits();
             autoRunLocalModels();
@@ -1800,78 +1843,61 @@
         </div>
     </div>
 
-    <!-- MODAL: CONFIGURE LOCAL MODEL (OLLAMA / LM STUDIO) -->
+    <!-- MODAL: CONFIGURE LOCAL MODELS HUB -->
     <div id="modalLocalModel" onclick="if(event.target === this) closeLocalModelModal();" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, 0.84); backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 1.25rem;">
-        <div style="background: var(--bg-surface); border: 1px solid var(--border); width: 100%; max-width: 540px; border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); display: flex; flex-direction: column; gap: 1rem; max-height: 92vh; overflow-y: auto;">
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); width: 100%; max-width: 560px; border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); display: flex; flex-direction: column; gap: 1rem; max-height: 92vh; overflow-y: auto;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-size: 1.3rem;">💻</span>
                     <div>
-                        <div style="font-weight: 700; font-size: 1.05rem; color: #ffffff;">Local AI Model & Parallel Ensemble</div>
-                        <div style="font-size: 0.75rem; color: var(--text-tertiary);">Zero-quota offline inference · Single model or Parallel Local Ensemble</div>
+                        <div style="font-weight: 700; font-size: 1.05rem; color: #ffffff;">Local AI Models Hub</div>
+                        <div style="font-size: 0.75rem; color: var(--text-tertiary);">Zero-quota offline inference · Choose active models & run individually or all in parallel</div>
                     </div>
                 </div>
                 <button onclick="closeLocalModelModal()" style="background: none; border: none; color: var(--text-tertiary); font-size: 1.3rem; cursor: pointer; padding: 0.2rem 0.5rem;">✕</button>
             </div>
 
-            <form onsubmit="event.preventDefault(); saveLocalModelConfig();" style="display: flex; flex-direction: column; gap: 0.9rem;">
-                <div>
-                    <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Local Inference Host URL</label>
-                    <input type="text" id="cfgLocalHost" placeholder="http://localhost:11434" value="http://localhost:11434" style="width: 100%; padding: 0.5rem 0.75rem; background: #000000; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #ffffff; font-family: var(--font-mono); font-size: 0.85rem;">
-                    <div style="font-size: 0.7rem; color: var(--text-tertiary); margin-top: 0.25rem;">Default: <code>http://localhost:11434</code> (Ollama) or <code>http://localhost:1234</code> (LM Studio)</div>
+            <!-- Host configuration -->
+            <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: 0.76rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.25rem;">Local Inference Host URL</label>
+                    <input type="text" id="cfgLocalHost" placeholder="http://localhost:11434" value="http://localhost:11434" style="width: 100%; padding: 0.45rem 0.65rem; background: #000000; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #ffffff; font-family: var(--font-mono); font-size: 0.82rem;">
                 </div>
+                <button type="button" onclick="saveLocalHostConfig()" class="btn btn-secondary" style="font-size: 0.76rem; padding: 0.45rem 0.75rem;">🔄 Scan Models</button>
+            </div>
 
-                <div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                        <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);">Primary Active Model</label>
-                        <button type="button" onclick="detectLocalModels()" style="background: transparent; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; font-weight: 600;">🔄 Scan Installed Models</button>
-                    </div>
-                    <select id="cfgLocalModelSelect" onchange="if(this.value!=='custom') document.getElementById('cfgLocalModel').value=this.value;" style="width: 100%; padding: 0.5rem 0.75rem; background: #000000; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #ffffff; font-size: 0.85rem; margin-bottom: 0.4rem;">
-                        <option value="deepseek-r1:8b">deepseek-r1:8b (Recommended)</option>
-                        <option value="deepseek-r1:14b">deepseek-r1:14b</option>
-                        <option value="llama3.2:3b">llama3.2:3b</option>
-                        <option value="llama3.1:8b">llama3.1:8b</option>
-                        <option value="qwen2.5:7b">qwen2.5:7b</option>
-                        <option value="mistral:7b">mistral:7b</option>
-                        <option value="custom">Custom Tag / Path...</option>
-                    </select>
-                    <input type="text" id="cfgLocalModel" placeholder="deepseek-r1:8b" value="deepseek-r1:8b" style="width: 100%; padding: 0.5rem 0.75rem; background: #000000; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #ffffff; font-family: var(--font-mono); font-size: 0.85rem;">
-                </div>
+            <div id="localStatusBox" style="font-size: 0.75rem; padding: 0.4rem 0.7rem; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-tertiary);">
+                Status: <span id="lblLocalStatus">Ready to scan</span>
+            </div>
 
-                <!-- Parallel Ensemble Checkbox Matrix -->
-                <div style="background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.2); border-radius: 6px; padding: 0.75rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <span style="font-size: 0.78rem; font-weight: 700; color: #6ee7b7;">⚡ Parallel Local Ensemble Models</span>
-                        <div style="display: flex; gap: 0.4rem;">
-                            <button type="button" onclick="toggleAllLocalCheckboxes(true)" style="background: transparent; border: none; color: #38bdf8; font-size: 0.7rem; cursor: pointer;">All</button>
-                            <span style="color: var(--border);">|</span>
-                            <button type="button" onclick="toggleAllLocalCheckboxes(false)" style="background: transparent; border: none; color: var(--text-tertiary); font-size: 0.7rem; cursor: pointer;">None</button>
-                        </div>
-                    </div>
-                    <div id="localModelsChecklist" style="display: flex; flex-direction: column; gap: 0.35rem; max-height: 140px; overflow-y: auto; padding-right: 0.25rem;">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; background: rgba(255,255,255,0.03); padding: 0.35rem 0.6rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); cursor: pointer;">
-                            <input type="checkbox" class="chk-local-model" value="deepseek-r1:8b" checked style="accent-color: #10b981;">
-                            <span style="font-weight: 600; color: #ffffff;">deepseek-r1:8b</span>
-                            <span style="color: var(--text-tertiary); font-size: 0.72rem; margin-left: auto;">Recommended</span>
-                        </label>
-                    </div>
-                    <div style="font-size: 0.68rem; color: #a7f3d0; margin-top: 0.4rem;">
-                        ⚡ Dispatching runs all checked local models in parallel using multi-threaded execution with zero cloud rate limits.
+            <!-- Active Models Matrix -->
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.8rem; font-weight: 700; color: #6ee7b7;">Available Models (<span id="activeLocalModelsCount">0</span> Active)</span>
+                    <div style="display: flex; gap: 0.4rem; font-size: 0.72rem;">
+                        <button type="button" onclick="toggleAllLocalCheckboxes(true)" style="background: transparent; border: none; color: #38bdf8; cursor: pointer;">Select All</button>
+                        <span style="color: var(--border);">|</span>
+                        <button type="button" onclick="toggleAllLocalCheckboxes(false)" style="background: transparent; border: none; color: var(--text-tertiary); cursor: pointer;">Deselect All</button>
                     </div>
                 </div>
+                <div id="localModelsChecklist" style="display: flex; flex-direction: column; gap: 0.45rem; max-height: 220px; overflow-y: auto; padding-right: 0.25rem;">
+                    <!-- Dynamically populated rows -->
+                </div>
+            </div>
 
-                <div id="localStatusBox" style="font-size: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-tertiary);">
-                    Status: <span id="lblLocalStatus">Ready to test</span>
-                </div>
+            <!-- Custom Model Input -->
+            <div style="display: flex; gap: 0.5rem; align-items: center; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.12);">
+                <input type="text" id="cfgCustomModelInput" placeholder="Add custom tag (e.g. dolphin-mixtral:8x7b)..." style="flex: 1; padding: 0.4rem 0.6rem; background: #000000; border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #ffffff; font-size: 0.8rem; font-family: var(--font-mono);">
+                <button type="button" onclick="addCustomLocalModel()" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.4rem 0.75rem;">＋ Add</button>
+            </div>
 
-                <div style="display: flex; gap: 0.5rem; justify-content: space-between; align-items: center; margin-top: 0.5rem; flex-wrap: wrap;">
-                    <button type="button" onclick="testLocalConnection()" class="btn btn-secondary" style="font-size: 0.78rem;">🔌 Test Connection</button>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" onclick="runAllLocalConsensus()" class="btn btn-primary" style="font-size: 0.78rem; background: #059669; border-color: #10b981;" title="Run all checked models simultaneously in parallel">⚡ Run All Local (Parallel)</button>
-                        <button type="submit" class="btn btn-secondary" style="font-size: 0.78rem;">💾 Save Active</button>
-                    </div>
-                </div>
-            </form>
+            <!-- Modal Footer -->
+            <div style="display: flex; gap: 0.5rem; justify-content: space-between; align-items: center; margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+                <button type="button" onclick="closeLocalModelModal()" class="btn btn-secondary" style="font-size: 0.78rem;">Close</button>
+                <button type="button" onclick="runAllActiveLocalConsensus()" class="btn btn-primary" style="font-size: 0.8rem; background: #059669; border-color: #10b981;" title="Dispatch prediction across all checked active local models in parallel">
+                    ⚡ Run All Active Models in Parallel
+                </button>
+            </div>
         </div>
     </div>
 
