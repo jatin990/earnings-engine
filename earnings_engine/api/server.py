@@ -2987,6 +2987,22 @@ async def dashboard_kronos_run(request: dict):
         raise HTTPException(status_code=500, detail=f"Error running Kronos predictions: {str(e)}")
 
 
+@app.post("/api/v1/kronos/predict/{ticker}", tags=["Stock Intelligence & Ratings"])
+async def kronos_predict_single(
+    ticker: str,
+    lookback: int = 120,
+    pred_len: int = 14,
+    device: str | None = None,
+):
+    """Run on-demand Kronos AI 14-day sequence prediction for a single ticker."""
+    try:
+        forecasts = get_kronos_predictions(tickers=[ticker], lookback=lookback, pred_len=pred_len, device=device)
+        pred = forecasts[0] if forecasts else None
+        return {"success": bool(pred), "prediction": pred}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running Kronos prediction for {ticker}: {str(e)}")
+
+
 @app.get("/api/v1/dashboard/system/gpu", tags=["System"])
 @app.get("/api/v1/dashboard/system/device", tags=["System"])
 async def dashboard_system_device():

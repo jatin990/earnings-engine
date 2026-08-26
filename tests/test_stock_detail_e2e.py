@@ -52,3 +52,10 @@ def test_watchlist_add_and_remove_endpoints(client):
     res_rem = client.post("/api/v1/watchlist/remove", json={"ticker": "TCS.NS"})
     assert res_rem.status_code == 200
     assert res_rem.json().get("success") is True
+
+
+def test_kronos_predict_endpoint(client):
+    res = client.post("/api/v1/kronos/predict/TCS.NS")
+    assert res.status_code == 200
+    json_data = res.json()
+    assert "success" in json_data
