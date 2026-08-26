@@ -540,6 +540,16 @@
             color: #fde68a;
             background: rgba(245, 158, 11, 0.18);
         }
+        .btn-model-opt.gemma:hover:not(:disabled) {
+            border-color: rgba(6, 182, 212, 0.6);
+            color: #a5f3fc;
+            background: rgba(6, 182, 212, 0.18);
+        }
+        .btn-model-opt.glm:hover:not(:disabled) {
+            border-color: rgba(236, 72, 153, 0.6);
+            color: #fbcfe8;
+            background: rgba(236, 72, 153, 0.18);
+        }
         .btn-model-opt.local:hover:not(:disabled) {
             border-color: rgba(16, 185, 129, 0.6);
             color: #a7f3d0;
@@ -799,6 +809,12 @@
             </button>
             <button type="button" id="btnModel-mistral-large" onclick="runConsensus(true, 'mistralai/mistral-large')" class="btn-model-opt mistral" title="Run Mistral-Large catalyst model">
                 <span>⚡</span> Mistral
+            </button>
+            <button type="button" id="btnModel-gemma-31b" onclick="runConsensus(true, 'google/gemma-4-31b-it:free')" class="btn-model-opt gemma" title="Run Google Gemma-4-31B multimodal reasoning model (Free tier)">
+                <span>💎</span> Gemma-31B
+            </button>
+            <button type="button" id="btnModel-glm-52" onclick="runConsensus(true, 'z-ai/glm-5.2')" class="btn-model-opt glm" title="Run Z.ai GLM-5.2 flagship 753B long-horizon reasoning model">
+                <span>🐉</span> GLM-5.2
             </button>
 
             <!-- Run All Consensus Button -->
@@ -1815,6 +1831,8 @@
                 else if (mid.includes('qwen') || mName.includes('Qwen')) icon = '🌐';
                 else if (mid.includes('mistral') || mName.includes('Mistral')) icon = '⚡';
                 else if (mid.includes('gemini') || mName.includes('Gemini')) icon = '✨';
+                else if (mid.includes('gemma') || mName.includes('Gemma')) icon = '💎';
+                else if (mid.includes('glm') || mName.includes('GLM')) icon = '🐉';
 
                 const stats = (window._aiModelsStats || []).find(x => x.id === mid || x.name === mName || (x.name || '').toLowerCase() === (mName || '').toLowerCase()) || {};
                 const genStats = stats.generation_stats || {};
@@ -2095,8 +2113,16 @@
                 // Update individual model button tooltips and states
                 const models = data.models || [];
                 models.forEach(m => {
-                    const btnId = 'btnModel-' + (m.name ? m.name.toLowerCase().replace(/[^a-z0-9]/g, '-') : '');
-                    const btn = document.getElementById(btnId);
+                    const slug = m.name ? m.name.toLowerCase().replace(/[^a-z0-9]/g, '-') : '';
+                    const idSlug = m.id ? m.id.toLowerCase().replace(/[^a-z0-9]/g, '-') : '';
+                    const btn = document.getElementById('btnModel-' + slug) ||
+                                document.getElementById('btnModel-' + idSlug) ||
+                                document.getElementById('btnModel-' + slug.replace('-3-3', '')) ||
+                                document.getElementById('btnModel-' + slug.replace('-2-5', '')) ||
+                                document.getElementById('btnModel-' + slug.replace('-4', '')) ||
+                                document.getElementById('btnModel-' + slug.replace('-5-2', '-52')) ||
+                                document.getElementById('btnModel-' + slug.replace('-5-2', '52')) ||
+                                document.getElementById('btnModel-' + slug.replace('-4-31b', '-31b'));
                     if (btn) {
                         const gStats = m.generation_stats || {};
                         const g1h = gStats['1h']?.avg_s ? ` · Avg: ${gStats['1h'].avg_s}s (1h)` : '';

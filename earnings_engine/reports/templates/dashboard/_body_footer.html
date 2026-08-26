@@ -120,6 +120,12 @@
                         <button type="button" id="btnModalModel-mistral" onclick="app.runModalConsensus('mistralai/mistral-large')" class="btn-model-opt mistral" title="Run Mistral-Large catalyst model">
                             <span>⚡</span> Mistral
                         </button>
+                        <button type="button" id="btnModalModel-gemma" onclick="app.runModalConsensus('google/gemma-4-31b-it:free')" class="btn-model-opt gemma" title="Run Google Gemma-4-31B multimodal reasoning model (Free tier)">
+                            <span>💎</span> Gemma-31B
+                        </button>
+                        <button type="button" id="btnModalModel-glm" onclick="app.runModalConsensus('z-ai/glm-5.2')" class="btn-model-opt glm" title="Run Z.ai GLM-5.2 flagship 753B long-horizon reasoning model">
+                            <span>🐉</span> GLM-5.2
+                        </button>
 
                         <!-- Master Run All Consensus Button -->
                         <button type="button" id="srModalConsensusRunBtn" onclick="app.runModalConsensus(null)" class="btn btn-sm" style="background:linear-gradient(135deg, #2563eb, #3b82f6);color:#fff;border:none;font-size:0.75rem;font-weight:700;display:flex;align-items:center;gap:0.3rem;box-shadow:0 2px 8px rgba(37,99,235,0.3);" title="Run all AI engines in parallel and synthesize consensus">
@@ -128,7 +134,7 @@
                     </div>
                 </div>
                 <div id="srModalConsensusContent">
-                    <p class="timestamp" style="margin:0;font-size:0.8rem;">Click any AI Model button above or "🧠 All Consensus" to trigger multi-model ensemble reasoning across DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, Mistral, and Local Models.</p>
+                    <p class="timestamp" style="margin:0;font-size:0.8rem;">Click any AI Model button above or "🧠 All Consensus" to trigger multi-model ensemble reasoning across DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, Mistral, Gemma-4-31B, GLM-5.2, and Local Models.</p>
                 </div>
             </div>
 
@@ -338,7 +344,9 @@
                     <button type="button" id="modalBtn-llama" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['meta-llama/llama-3.3-70b-instruct'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.35);color:#bae6fd;" title="Run Llama-3.3-70B only">🦙 Llama-70B</button>
                     <button type="button" id="modalBtn-qwen" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['qwen/qwen-2.5-72b-instruct'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.35);color:#e9d5ff;" title="Run Qwen-2.5-72B only">🌐 Qwen-72B</button>
                     <button type="button" id="modalBtn-mistral" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['mistralai/mistral-large'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.35);color:#fde68a;" title="Run Mistral-Large only">⚡ Mistral</button>
-                    <button type="button" id="modalBtn-all" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, null, true)" class="btn btn-primary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.6rem;" title="Run all 4 AI engines in parallel">🧠 All 4 Engines</button>
+                    <button type="button" id="modalBtn-gemma" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['google/gemma-4-31b-it:free'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.35);color:#a5f3fc;" title="Run Gemma-4-31B Free only">💎 Gemma-31B</button>
+                    <button type="button" id="modalBtn-glm" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['z-ai/glm-5.2'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(236,72,153,0.15);border:1px solid rgba(236,72,153,0.35);color:#fbcfe8;" title="Run Z.ai GLM-5.2 only">🐉 GLM-5.2</button>
+                    <button type="button" id="modalBtn-all" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, null, true)" class="btn btn-primary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.6rem;" title="Run all AI consensus engines in parallel">🧠 All AI Suite</button>
                 </div>
                 <div id="modalRatelimitStatus" style="font-size:0.68rem;font-family:var(--font-mono);color:#34d399;background:rgba(16,185,129,0.1);padding:0.2rem 0.5rem;border-radius:4px;border:1px solid rgba(16,185,129,0.3);" title="Real-time OpenRouter & model rate limits tracking">
                     🟢 AI Quota: 20/20 RPM

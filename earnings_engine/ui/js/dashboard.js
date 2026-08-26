@@ -10521,7 +10521,9 @@
                     { model_name: 'DeepSeek-R1', model_id: 'deepseek/deepseek-r1', direction: dir, confidence_pct: 88, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 3.1, recommended_action: 'STRONG BUY' },
                     { model_name: 'Llama-3.3-70B', model_id: 'meta-llama/llama-3.3-70b-instruct', direction: dir, confidence_pct: 85, target_price: targetP ? targetP * 1.01 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.8, recommended_action: 'ACCUMULATE' },
                     { model_name: 'Qwen-2.5-72B', model_id: 'qwen/qwen-2.5-72b-instruct', direction: dir, confidence_pct: 82, target_price: targetP ? targetP * 0.99 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.5, recommended_action: 'ACCUMULATE' },
-                    { model_name: 'Mistral-Large', model_id: 'mistralai/mistral-large', direction: dir, confidence_pct: 84, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.7, recommended_action: 'BUY ON DIPS' }
+                    { model_name: 'Mistral-Large', model_id: 'mistralai/mistral-large', direction: dir, confidence_pct: 84, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.7, recommended_action: 'BUY ON DIPS' },
+                    { model_name: 'Gemma-4-31B', model_id: 'google/gemma-4-31b-it:free', direction: dir, confidence_pct: 86, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.9, recommended_action: 'STRONG BUY' },
+                    { model_name: 'GLM-5.2', model_id: 'z-ai/glm-5.2', direction: dir, confidence_pct: 87, target_price: targetP ? targetP * 1.02 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 3.0, recommended_action: 'ACCUMULATE ON DIPS' }
                 ];
                 app.activeConsensusModels = models;
 
@@ -13099,7 +13101,7 @@
                             </div>
                             <div style="background:#090d16;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.45rem 0.6rem;">
                                 <div style="font-size:0.62rem;color:#94a3b8;text-transform:uppercase;">Week Peak High</div>
-                                <div style="font-size:0.82rem;font-weight:700;color:#4ade80;font-family:var(--font-mono);">${wkHighStr} Peak</div>
+                        <div style="font-size:0.82rem;font-weight:700;color:#4ade80;font-family:var(--font-mono);">${wkHighStr} Peak</div>
                                 <div style="font-size:0.62rem;color:#64748b;">Rally Magnitude</div>
                             </div>
                             <div style="background:#090d16;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.45rem 0.6rem;">
@@ -13134,6 +13136,8 @@
                                     </optgroup>
                                     <optgroup label="☁️ Online Models (OpenRouter)">
                                         <option value="deepseek/deepseek-r1:free">DeepSeek-R1 (Free Cloud)</option>
+                                        <option value="google/gemma-4-31b-it:free">Gemma-4-31B (Free Multimodal)</option>
+                                        <option value="z-ai/glm-5.2">GLM-5.2 (Z.ai Flagship 753B)</option>
                                         <option value="meta-llama/llama-3.3-70b-instruct">Llama-3.3 70B Instruct</option>
                                         <option value="mistralai/mistral-large">Mistral Large</option>
                                         <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
@@ -13428,6 +13432,8 @@
                             </optgroup>
                             <optgroup label="☁️ Online Models (OpenRouter)">
                                 <option value="deepseek/deepseek-r1:free">DeepSeek-R1 (Free Cloud)</option>
+                                <option value="google/gemma-4-31b-it:free">Gemma-4-31B (Free Multimodal)</option>
+                                <option value="z-ai/glm-5.2">GLM-5.2 (Z.ai Flagship 753B)</option>
                                 <option value="meta-llama/llama-3.3-70b-instruct">Llama-3.3 70B Instruct</option>
                                 <option value="mistralai/mistral-large">Mistral Large</option>
                                 <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>

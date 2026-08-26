@@ -25,6 +25,8 @@ DEFAULT_MODELS = [
     "meta-llama/llama-3.3-70b-instruct",
     "qwen/qwen-2.5-72b-instruct",
     "mistralai/mistral-large",
+    "google/gemma-4-31b-it:free",
+    "z-ai/glm-5.2",
 ]
 
 # Fallback models when primary model encounters 429 rate limit or 404 endpoint deprecation
@@ -34,6 +36,10 @@ MODEL_FALLBACKS: dict[str, str] = {
     "mistralai/mistral-large-2407": "mistralai/mistral-large",
     "qwen/qwen-2.5-72b-instruct": "meta-llama/llama-3.3-70b-instruct",
     "deepseek/deepseek-r1": "deepseek/deepseek-chat",
+    "google/gemma-4-31b-it:free": "google/gemma-4-31b-it",
+    "google/gemma-4-31b-it": "google/gemini-2.0-flash-001",
+    "z-ai/glm-5.2": "z-ai/glm-5.3-flash",
+    "z-ai/glm-5.3-flash": "thudm/glm-4-9b-chat",
 }
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -75,6 +81,12 @@ MODEL_DISPLAY_NAMES: dict[str, str] = {
     "mistralai/mistral-large-2411": "Mistral-Large",
     "mistralai/mistral-large-2407": "Mistral-Large",
     "google/gemini-2.0-flash-001": "Gemini-2.0-Flash",
+    "google/gemma-4-31b-it:free": "Gemma-4-31B",
+    "google/gemma-4-31b-it": "Gemma-4-31B",
+    "google/gemma-4-31b": "Gemma-4-31B",
+    "z-ai/glm-5.2": "GLM-5.2",
+    "z-ai/glm-5.3-flash": "GLM-5.3-Flash",
+    "thudm/glm-4-9b-chat": "GLM-4-9B",
     "local/deepseek-r1:8b": "Local (DeepSeek-R1 8B)",
     "local/llama3.2:3b": "Local (Llama-3.2 3B)",
     "local/llama3.1:8b": "Local (Llama-3.1 8B)",
