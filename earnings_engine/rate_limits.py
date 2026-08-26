@@ -172,6 +172,17 @@ AVAILABLE_AI_MODELS: list[dict[str, Any]] = [
         "default_limit_1h": 100,
         "default_limit_24h": 200,
     },
+    {
+        "id": "local/deepseek-r1:8b",
+        "name": "Local-AI",
+        "icon": "💻",
+        "badge": "Local GPU/CPU",
+        "description": "Local offline LLM (Ollama / LM Studio / DeepSeek-R1 / Llama-3). Zero API quota consumed.",
+        "color": "#10b981",
+        "default_limit_1m": 9999,
+        "default_limit_1h": 9999,
+        "default_limit_24h": 9999,
+    },
 ]
 
 

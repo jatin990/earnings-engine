@@ -75,18 +75,210 @@ MODEL_DISPLAY_NAMES: dict[str, str] = {
     "mistralai/mistral-large-2411": "Mistral-Large",
     "mistralai/mistral-large-2407": "Mistral-Large",
     "google/gemini-2.0-flash-001": "Gemini-2.0-Flash",
+    "local/deepseek-r1:8b": "Local (DeepSeek-R1 8B)",
+    "local/llama3.2:3b": "Local (Llama-3.2 3B)",
+    "local/llama3.1:8b": "Local (Llama-3.1 8B)",
+    "local/qwen2.5:7b": "Local (Qwen-2.5 7B)",
+    "local/mistral:7b": "Local (Mistral 7B)",
+    "local": "Local AI Model",
 }
 
 
-def _get_api_key() -> str:
+def _get_api_key(required: bool = True) -> str:
     """Retrieve OpenRouter API key from environment."""
     key = os.getenv("OPENROUTER_API_KEY", "").strip()
-    if not key:
+    if not key and required:
         raise ValueError(
             "OPENROUTER_API_KEY not set. Add it to your .env file. "
             "Get one at https://openrouter.ai/keys"
         )
     return key
+
+
+def _query_local_model(
+    model_id: str,
+    prompt: str,
+    timeout: int = 60,
+    local_url: str | None = None,
+) -> dict[str, Any]:
+    """Execute a local LLM prompt via Ollama (http://localhost:11434) or LM Studio (http://localhost:1234)."""
+    start = time.perf_counter()
+    
+    # Extract clean model tag, e.g. "local/deepseek-r1:8b" -> "deepseek-r1:8b"
+    raw_name = model_id.replace("local/", "").replace("ollama/", "").replace("lmstudio/", "").strip()
+    local_model = raw_name if raw_name and raw_name != "local" else os.getenv("OLLAMA_MODEL", "deepseek-r1:8b")
+    display_name = f"Local ({local_model})"
+    
+    base_host = (local_url or os.getenv("LOCAL_LLM_URL") or os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
+    
+    logger.info("[CONSENSUS-LOCAL] Querying local model %s at %s...", local_model, base_host)
+    
+    v1_url = f"{base_host}/v1/chat/completions" if not base_host.endswith("/v1") else f"{base_host}/chat/completions"
+    
+    resp_text = ""
+    total_tokens = 0
+    success = False
+    
+    # Attempt 1: OpenAI-compatible endpoint ({base_host}/v1/chat/completions)
+    try:
+        resp = requests.post(
+            v1_url,
+            headers={"Content-Type": "application/json"},
+            json={
+                "model": local_model,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.3,
+                "max_tokens": 4096,
+            },
+            timeout=timeout,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            total_tokens = data.get("usage", {}).get("total_tokens", 0)
+            choice = (data.get("choices") or [{}])[0]
+            msg = choice.get("message") or {}
+            content = msg.get("content") or ""
+            reasoning = msg.get("reasoning") or ""
+            resp_text = (content or reasoning or "").strip()
+            success = True
+    except Exception as e1:
+        logger.debug("[CONSENSUS-LOCAL] /v1/chat/completions attempt failed: %s. Trying native /api/chat...", e1)
+
+    # Attempt 2: Native Ollama /api/chat if v1 endpoint was not available
+    if not success:
+        try:
+            native_chat_url = f"{base_host}/api/chat"
+            resp = requests.post(
+                native_chat_url,
+                headers={"Content-Type": "application/json"},
+                json={
+                    "model": local_model,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "format": "json",
+                    "stream": False,
+                    "options": {"temperature": 0.3},
+                },
+                timeout=timeout,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                msg = data.get("message") or {}
+                resp_text = (msg.get("content") or "").strip()
+                total_tokens = data.get("eval_count", 0)
+                success = True
+        except Exception as e2:
+            logger.debug("[CONSENSUS-LOCAL] /api/chat attempt failed: %s. Trying native /api/generate...", e2)
+
+    # Attempt 3: Native Ollama /api/generate
+    if not success:
+        try:
+            native_gen_url = f"{base_host}/api/generate"
+            full_user_prompt = f"{SYSTEM_PROMPT}\n\nUser Context:\n{prompt}"
+            resp = requests.post(
+                native_gen_url,
+                headers={"Content-Type": "application/json"},
+                json={
+                    "model": local_model,
+                    "prompt": full_user_prompt,
+                    "format": "json",
+                    "stream": False,
+                },
+                timeout=timeout,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                resp_text = (data.get("response") or "").strip()
+                total_tokens = data.get("eval_count", 0)
+                success = True
+            else:
+                resp_text = resp.text
+        except Exception as e3:
+            logger.warning("[CONSENSUS-LOCAL] All local inference attempts failed for %s: %s", local_model, e3)
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            return {
+                "model_name": display_name,
+                "model_id": model_id,
+                "error": f"Local model unavailable at {base_host} ({str(e3)})",
+                "direction": "NEUTRAL",
+                "confidence_pct": 50,
+                "target_price": None,
+                "support_level": None,
+                "resistance_level": None,
+                "stop_loss_price": None,
+                "risk_reward_ratio": None,
+                "recommended_action": "LOCAL OFFLINE",
+                "raw_response": f"Connection failed to local endpoint {base_host}. Ensure Ollama or LM Studio is running.",
+                "latency_ms": round(elapsed_ms, 1),
+                "is_local": True,
+            }
+
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    prediction = _parse_model_json(resp_text)
+    
+    if prediction is None:
+        return {
+            "model_name": display_name,
+            "model_id": model_id,
+            "error": "Unparseable Local JSON",
+            "direction": "NEUTRAL",
+            "confidence_pct": 50,
+            "target_price": None,
+            "support_level": None,
+            "resistance_level": None,
+            "stop_loss_price": None,
+            "risk_reward_ratio": None,
+            "recommended_action": "HOLD / WAIT",
+            "raw_response": resp_text,
+            "latency_ms": round(elapsed_ms, 1),
+            "tokens_used": total_tokens,
+            "is_local": True,
+        }
+
+    direction = str(prediction.get("direction", "NEUTRAL")).upper()
+    if direction not in ("BULLISH", "BEARISH", "NEUTRAL"):
+        direction = "NEUTRAL"
+
+    conf_pct = int(prediction.get("confidence_pct", 75))
+    target_p = float(prediction.get("target_price", 0.0)) if prediction.get("target_price") else None
+    support_p = float(prediction.get("support_level", 0.0)) if prediction.get("support_level") else None
+    resist_p = float(prediction.get("resistance_level", 0.0)) if prediction.get("resistance_level") else None
+    sl_p = float(prediction.get("stop_loss_price", 0.0)) if prediction.get("stop_loss_price") else None
+    rr = float(prediction.get("risk_reward_ratio", 0.0)) if prediction.get("risk_reward_ratio") else None
+
+    if target_p and support_p and not sl_p and direction == "BULLISH":
+        sl_p = round(support_p * 0.98, 2)
+    if not rr and target_p and sl_p and support_p and (target_p - support_p) > 0 and (support_p - sl_p) > 0:
+        rr = round((target_p - support_p) / (support_p - sl_p), 1)
+
+    rec_action = str(prediction.get("recommended_action") or ("STRONG BUY" if direction == "BULLISH" and conf_pct >= 80 else ("ACCUMULATE ON DIPS" if direction == "BULLISH" else ("AVOID / CAUTION" if direction == "BEARISH" else "HOLD / WAIT")))).upper()
+
+    return {
+        "model_name": display_name,
+        "model_id": model_id,
+        "direction": direction,
+        "confidence_pct": conf_pct,
+        "target_return_pct": float(prediction.get("target_return_pct", 0.0)) if prediction.get("target_return_pct") is not None else None,
+        "target_price": target_p,
+        "support_level": support_p,
+        "resistance_level": resist_p,
+        "stop_loss_price": sl_p,
+        "risk_reward_ratio": rr,
+        "chart_pattern": prediction.get("chart_pattern"),
+        "volume_profile_insight": prediction.get("volume_profile_insight"),
+        "recommended_action": rec_action,
+        "key_drivers": prediction.get("key_drivers", []),
+        "primary_risk": prediction.get("primary_risk"),
+        "latency_ms": round(elapsed_ms, 1),
+        "tokens_used": total_tokens,
+        "raw_response": resp_text,
+        "is_local": True,
+    }
 
 
 def _query_single_model(
@@ -95,12 +287,21 @@ def _query_single_model(
     api_key: str,
     timeout: int = 60,
     max_retries: int = 2,
+    local_url: str | None = None,
 ) -> dict[str, Any]:
-    """Send a prediction request to a single model via OpenRouter with rate limit retry & fallback.
+    """Send a prediction request to a single model (local or via OpenRouter) with rate limit retry & fallback.
 
     Returns a dict with model_name, the parsed prediction fields,
     or an error entry if the call fails.
     """
+    if (
+        model_id.startswith("local/")
+        or model_id.startswith("ollama/")
+        or model_id.startswith("lmstudio/")
+        or model_id == "local"
+    ):
+        return _query_local_model(model_id, prompt, timeout=timeout, local_url=local_url)
+
     display_name = MODEL_DISPLAY_NAMES.get(model_id, model_id.split("/")[-1])
     current_model = model_id
 
@@ -412,19 +613,25 @@ def run_consensus_models(
     context: dict[str, Any],
     models: list[str] | None = None,
     timeout: int = 60,
+    local_url: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Run prediction prompts across multiple LLMs in parallel.
+    """Run prediction prompts across multiple LLMs (cloud and/or local) in parallel.
 
     Args:
         context: The assembled context dict from context_builder.build_context().
-        models: List of OpenRouter model IDs. Defaults to DEFAULT_MODELS.
+        models: List of model IDs (e.g. OpenRouter or local/*). Defaults to DEFAULT_MODELS.
         timeout: Per-model timeout in seconds.
+        local_url: Optional override URL for local model (e.g. http://localhost:11434).
 
     Returns:
         List of prediction dicts, one per model (including errored ones).
     """
     models = models or DEFAULT_MODELS
-    api_key = _get_api_key()
+    has_remote_models = any(
+        not (m.startswith("local/") or m.startswith("ollama/") or m.startswith("lmstudio/") or m == "local")
+        for m in models
+    )
+    api_key = _get_api_key(required=has_remote_models)
     prompt = context_to_prompt(context)
     ticker = context.get("ticker", "UNKNOWN")
     timeframe = context.get("timeframe_days", 14)
@@ -434,13 +641,13 @@ def run_consensus_models(
 
     t_start = time.perf_counter()
     model_names_str = ", ".join(MODEL_DISPLAY_NAMES.get(m, m.split('/')[-1]) for m in models)
-    logger.info("[CONSENSUS] Dispatching %s to %d models (%s)...", ticker, len(models), model_names_str)
+    logger.info("[CONSENSUS] Dispatching %s to %d models (%s, timeframe=%dd)...", ticker, len(models), model_names_str, timeframe)
 
     results: list[dict[str, Any]] = []
 
     with ThreadPoolExecutor(max_workers=len(models)) as executor:
         futures = {
-            executor.submit(_query_single_model, model_id, full_prompt, api_key, timeout): model_id
+            executor.submit(_query_single_model, model_id, full_prompt, api_key, timeout, 2, local_url): model_id
             for model_id in models
         }
         for future in as_completed(futures):
