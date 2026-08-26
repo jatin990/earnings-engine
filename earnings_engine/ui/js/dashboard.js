@@ -11466,6 +11466,9 @@
                             </button>
                         </div>
                     </td>
+                </tr>`;
+            });
+
             tbody.innerHTML = rows.join('');
         };
 
