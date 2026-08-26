@@ -2670,19 +2670,31 @@
             // If a specific model was chosen, locate its button
             if (modelId) {
                 const mKey = modelId.toLowerCase();
-                if (mKey.includes('local') || mKey.includes('ollama')) targetBtn = document.getElementById('btnModel-local') || allBtn;
-                else if (mKey.includes('deepseek')) targetBtn = document.getElementById('btnModel-deepseek-r1') || allBtn;
-                else if (mKey.includes('llama')) targetBtn = document.getElementById('btnModel-llama-70b') || allBtn;
-                else if (mKey.includes('qwen')) targetBtn = document.getElementById('btnModel-qwen-72b') || allBtn;
-                else if (mKey.includes('mistral')) targetBtn = document.getElementById('btnModel-mistral-large') || allBtn;
-                else if (mKey.includes('gemma')) targetBtn = document.getElementById('btnModel-gemma-31b') || allBtn;
-                else if (mKey.includes('glm')) targetBtn = document.getElementById('btnModel-glm-52') || allBtn;
+                const safeMid = modelId.replace(/[^a-zA-Z0-9]/g, '_');
+                targetBtn = document.getElementById(`tileBtn-${safeMid}`) ||
+                            document.getElementById(`btnModel-${safeMid}`) ||
+                            document.getElementById(
+                                mKey.includes('deepseek') ? 'btnModel-deepseek-r1' :
+                                mKey.includes('llama') ? 'btnModel-llama-3-3-70b-instruct' :
+                                mKey.includes('qwen') ? 'btnModel-qwen-2-5-72b-instruct' :
+                                mKey.includes('mistral') ? 'btnModel-mistral-large' :
+                                mKey.includes('gemma') ? 'btnModel-gemma-4-31b-it-free' :
+                                mKey.includes('glm') ? 'btnModel-glm-5-2' :
+                                mKey.includes('local') ? 'btnModel-local' : ''
+                            ) ||
+                            document.getElementById(
+                                mKey.includes('llama') ? 'btnModel-llama-70b' :
+                                mKey.includes('qwen') ? 'btnModel-qwen-72b' :
+                                mKey.includes('gemma') ? 'btnModel-gemma-31b' :
+                                mKey.includes('glm') ? 'btnModel-glm-52' : ''
+                            ) ||
+                            allBtn;
             }
 
             if (targetBtn) {
                 prevHtml = targetBtn.innerHTML;
                 targetBtn.disabled = true;
-                targetBtn.innerHTML = `<span class="spinner"></span> ${modelId ? 'Running Model...' : 'Running All Engines...'}`;
+                targetBtn.innerHTML = `<span class="spinner"></span> ${modelId ? 'Running ' + (modelId.split('/').pop()) + '...' : 'Running All Engines...'}`;
             }
 
             // Show active loading state in AI Command Center
