@@ -424,6 +424,42 @@
             justify-content: space-between;
             align-items: center;
         }
+
+        /* Clean Tables & Universal Sticky Headers */
+        .clean-table,
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .clean-table thead th,
+        .clean-table th,
+        table thead th,
+        table th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 10 !important;
+            background: var(--bg-card) !important;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 1px 0 var(--border);
+            text-align: left;
+        }
+        .clean-table td,
+        table td {
+            padding: 0.65rem 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: var(--text-primary);
+        }
+        .clean-table tbody tr:hover,
+        table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
         .model-label {
             font-weight: 700;
             font-size: 0.875rem;

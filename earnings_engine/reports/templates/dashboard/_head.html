@@ -526,7 +526,15 @@
             white-space: nowrap;
         }
 
-        .results-table th {
+        /* Universal Sticky Table Headers across all Dashboard Tables */
+        table thead th,
+        table thead tr th,
+        .results-table thead th,
+        .results-table th,
+        .table thead th,
+        .table th,
+        #breakoutTable thead th,
+        #breakoutTable th {
             color: #94a3b8;
             font-size: 0.68rem;
             font-weight: 700;
@@ -534,25 +542,29 @@
             letter-spacing: 0.05em;
             cursor: pointer;
             user-select: none;
-            background: #09090f;
+            background: #09090f !important;
             border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-            position: sticky;
-            top: 0;
-            z-index: 10;
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 10 !important;
             line-height: 1.2;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12);
         }
 
+        table thead th:hover,
         .results-table th:hover {
             color: #38bdf8;
-            background: #10101a;
+            background: #10101a !important;
         }
 
+        table thead th.sort-asc::after,
         .results-table th.sort-asc::after {
             content: " ▲";
             color: #38bdf8;
             font-size: 0.6rem;
         }
 
+        table thead th.sort-desc::after,
         .results-table th.sort-desc::after {
             content: " ▼";
             color: #38bdf8;

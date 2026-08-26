@@ -68,7 +68,19 @@
         .card.day-6 { border-top: 3px solid #2dd4bf !important; }
         .card.day-7 { border-top: 3px solid #f87171 !important; }
         .results-table th, .results-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; white-space: normal; word-wrap: break-word; }
-        .results-table th { color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        .results-table th,
+        table thead th,
+        table th {
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 10 !important;
+            background: #0f172a !important;
+            box-shadow: 0 1px 0 rgba(255,255,255,0.08);
+        }
         .results-table th:nth-child(1) { width: 7%; }
         .results-table th:nth-child(2) { width: 7%; }
         .results-table th:nth-child(3) { width: 8%; }

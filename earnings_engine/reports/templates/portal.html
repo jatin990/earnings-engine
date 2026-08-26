@@ -159,6 +159,16 @@
             border-style: dashed;
         }
 
+        /* Universal Sticky Table Headers */
+        table thead th,
+        table th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 10 !important;
+            background: #0b1329 !important;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12);
+        }
+
         .shake {
             animation: shakeAnim 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
         }
