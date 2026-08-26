@@ -39,6 +39,11 @@ SYNC_TABLES = [
     "scanner_candidates",
     "swing_ranges",
     "swing_cycle_history",
+    "trips",
+    "trip_activities",
+    "trip_groups",
+    "trip_group_members",
+    "trip_group_trips",
 ]
 
 

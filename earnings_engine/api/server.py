@@ -1118,6 +1118,34 @@ class SuggestTripActivityRequest(BaseModel):
     approx_cost: float = 0.0
 
 
+class CreateTripGroupRequest(BaseModel):
+    name: str
+    description: str = ""
+    color: str = "#0284c7"
+    icon: str = "🌴"
+    trip_ids: list[str] = []
+    members: list[dict[str, Any]] = []
+
+
+class UpdateTripGroupRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    color: str | None = None
+    icon: str | None = None
+
+
+class AddGroupMemberRequest(BaseModel):
+    name: str
+    email: str
+    role: str = "member"
+    custom_passcode: str | None = None
+    send_email: bool = True
+
+
+class AttachGroupTripsRequest(BaseModel):
+    trip_ids: list[str]
+
+
 class CreateNetWorthSnapshotRequest(BaseModel):
     as_of_date: str
     total_net_worth_band: str
@@ -1260,16 +1288,22 @@ async def verify_portal_code(req: VerifyCodeRequest, response: Response):
         raise HTTPException(status_code=401, detail=result.get("error", "Invalid access passcode."))
     
     is_owner = result.get("role") == "owner" or result.get("is_admin")
+    role = result.get("role") or ("owner" if is_owner else "friend")
     scopes = result.get("scopes") or (
         ["can_view_trips", "can_view_cards", "can_view_net_worth", "admin", "dashboard", "credit_card"]
         if is_owner else ["can_view_trips"]
     )
+    email = result.get("email") or ("owner@nexus.local" if is_owner else "friend@nexus.local")
+    name = result.get("name") or result.get("label", "Nexus User")
+    group_id = result.get("group_id")
     token = create_session_token(
         user_id=1 if is_owner else 2,
-        role="owner" if is_owner else "friend",
-        email="owner@nexus.local" if is_owner else "friend@nexus.local",
-        name=result.get("label", "Nexus User"),
+        role=role,
+        email=email,
+        name=name,
         scopes=scopes,
+        group_id=group_id,
+        passcode=req.code.strip().upper(),
     )
     result["session_token"] = token
     response.set_cookie(
@@ -1485,49 +1519,238 @@ async def create_invite_endpoint(req: CreateInviteRequest, request: Request):
 
 @app.get("/api/v1/trips", tags=["Scoped Hubs"])
 async def get_trips_endpoint(session: dict = Depends(require_scope("can_view_trips"))):
-    """Retrieve personal travel plans and upcoming trip itineraries."""
+    """Retrieve travel plans and upcoming trip itineraries with hierarchical group access."""
+    from earnings_engine.data.trips import resolve_user_accessible_trips
     role = session.get("role")
     scopes = session.get("scopes", [])
     is_owner = bool(role == "owner" or "admin" in scopes)
 
+    trips = resolve_user_accessible_trips(session, _settings)
+    return {"success": True, "count": len(trips), "trips": trips, "is_owner": is_owner}
+
+
+@app.get("/api/v1/trips/groups", tags=["Scoped Hubs"])
+async def get_trip_groups_endpoint(session: dict = Depends(require_scope("can_view_trips"))):
+    """Retrieve all trip groups, member rosters, and attached itineraries."""
+    from earnings_engine.data.trips import get_trip_groups
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    is_owner = bool(role == "owner" or "admin" in scopes)
+    user_email = session.get("email")
+    passcode = session.get("passcode")
+
+    groups = get_trip_groups(
+        settings=_settings,
+        filter_user_email=user_email,
+        filter_passcode=passcode,
+        is_owner=is_owner,
+    )
+    return {"success": True, "count": len(groups), "groups": groups, "is_owner": is_owner}
+
+
+@app.post("/api/v1/trips/groups", tags=["Scoped Hubs"])
+async def create_trip_group_endpoint(
+    req: CreateTripGroupRequest,
+    request: Request,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Create a new trip group, auto-generate invite code, add members and attach trips."""
+    from earnings_engine.data.trips import create_trip_group, add_group_member
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    if role != "owner" and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Only the vault owner can create new trip groups.")
+
+    base_url = str(request.base_url).rstrip("/")
+    grp = create_trip_group(
+        name=req.name,
+        description=req.description,
+        color=req.color,
+        icon=req.icon,
+        trip_ids=req.trip_ids,
+        settings=_settings,
+    )
+
+    added_members = []
+    if req.members:
+        for m in req.members:
+            m_name = m.get("name", "")
+            m_email = m.get("email", "")
+            if m_email:
+                try:
+                    mem_res = add_group_member(
+                        group_id=grp["id"],
+                        name=m_name,
+                        email=m_email,
+                        role=m.get("role", "member"),
+                        send_email=True,
+                        base_url=base_url,
+                        settings=_settings,
+                    )
+                    added_members.append(mem_res)
+                except Exception as e:
+                    logger.warning("[TRIPS-API] Failed adding member %s: %s", m_email, e)
+
+    grp["members"] = added_members
+    return {"success": True, "group": grp, "message": f"Group '{req.name}' created successfully."}
+
+
+@app.put("/api/v1/trips/groups/{group_id}", tags=["Scoped Hubs"])
+async def update_trip_group_endpoint(
+    group_id: str,
+    req: UpdateTripGroupRequest,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Update trip group details (Owner only)."""
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    if role != "owner" and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Only the vault owner can update trip groups.")
+
     conn = get_db_connection(_settings)
     with conn:
-        if is_owner:
-            rows = conn.execute("""
-                SELECT id, title, destination, start_date, end_date, status, notes, created_at,
-                       cover_image, estimated_budget, is_shared_with_friends, flight_details, hotel_details, packing_list
-                FROM trips ORDER BY start_date ASC
-            """).fetchall()
-        else:
-            rows = conn.execute("""
-                SELECT id, title, destination, start_date, end_date, status, notes, created_at,
-                       cover_image, estimated_budget, is_shared_with_friends, flight_details, hotel_details, packing_list
-                FROM trips WHERE is_shared_with_friends = 1 ORDER BY start_date ASC
-            """).fetchall()
+        grp = conn.execute("SELECT id FROM trip_groups WHERE id = ?", (group_id,)).fetchone()
+        if not grp:
+            raise HTTPException(status_code=404, detail="Trip group not found.")
 
-    trips = []
-    for r in rows:
-        try:
-            packing = json.loads(r[13]) if r[13] else []
-        except Exception:
-            packing = []
-        trips.append({
-            "id": r[0],
-            "title": r[1],
-            "destination": r[2],
-            "start_date": r[3],
-            "end_date": r[4],
-            "status": r[5],
-            "notes": r[6],
-            "created_at": r[7],
-            "cover_image": r[8] or "japan",
-            "estimated_budget": float(r[9] or 0.0),
-            "is_shared_with_friends": bool(r[10]),
-            "flight_details": r[11],
-            "hotel_details": r[12],
-            "packing_list": packing,
-        })
-    return {"success": True, "count": len(trips), "trips": trips, "is_owner": is_owner}
+        updates = []
+        params = []
+        if req.name is not None:
+            updates.append("name = ?")
+            params.append(req.name.strip())
+        if req.description is not None:
+            updates.append("description = ?")
+            params.append(req.description.strip())
+        if req.color is not None:
+            updates.append("color = ?")
+            params.append(req.color)
+        if req.icon is not None:
+            updates.append("icon = ?")
+            params.append(req.icon)
+
+        if updates:
+            params.append(group_id)
+            conn.execute(f"UPDATE trip_groups SET {', '.join(updates)} WHERE id = ?", params)
+            conn.commit()
+
+    return {"success": True, "message": "Group updated successfully."}
+
+
+@app.delete("/api/v1/trips/groups/{group_id}", tags=["Scoped Hubs"])
+async def delete_trip_group_endpoint(
+    group_id: str,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Delete a trip group (Owner only)."""
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    if role != "owner" and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Only the vault owner can delete trip groups.")
+
+    conn = get_db_connection(_settings)
+    with conn:
+        conn.execute("DELETE FROM trip_groups WHERE id = ?", (group_id,))
+        conn.execute("DELETE FROM trip_group_members WHERE group_id = ?", (group_id,))
+        conn.execute("DELETE FROM trip_group_trips WHERE group_id = ?", (group_id,))
+        conn.commit()
+
+    logger.info("[TRIPS-API] Deleted group %s", group_id)
+    return {"success": True, "message": f"Group {group_id} deleted."}
+
+
+@app.post("/api/v1/trips/groups/{group_id}/members", tags=["Scoped Hubs"])
+async def add_group_member_endpoint(
+    group_id: str,
+    req: AddGroupMemberRequest,
+    request: Request,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Add a friend to a trip group and send direct email invite."""
+    from earnings_engine.data.trips import add_group_member
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    if role != "owner" and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Only the vault owner can add members to groups.")
+
+    base_url = str(request.base_url).rstrip("/")
+    res = add_group_member(
+        group_id=group_id,
+        name=req.name,
+        email=req.email,
+        role=req.role,
+        custom_passcode=req.custom_passcode,
+        send_email=req.send_email,
+        base_url=base_url,
+        settings=_settings,
+    )
+    return {"success": True, "member": res, "message": f"Added {req.name} to group."}
+
+
+@app.delete("/api/v1/trips/groups/{group_id}/members/{member_id_or_email}", tags=["Scoped Hubs"])
+async def remove_group_member_endpoint(
+    group_id: str,
+    member_id_or_email: str,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Remove a friend from a trip group."""
+    from earnings_engine.data.trips import remove_group_member
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    if role != "owner" and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Only the vault owner can remove members.")
+
+    success = remove_group_member(group_id=group_id, email_or_id=member_id_or_email, settings=_settings)
+    return {"success": success, "message": "Member removed from group."}
+
+
+@app.post("/api/v1/trips/groups/{group_id}/attach-trips", tags=["Scoped Hubs"])
+async def attach_trips_endpoint(
+    group_id: str,
+    req: AttachGroupTripsRequest,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Attach trips to a group."""
+    from earnings_engine.data.trips import attach_trips_to_group
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    if role != "owner" and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Only the vault owner can attach trips.")
+
+    count = attach_trips_to_group(group_id=group_id, trip_ids=req.trip_ids, settings=_settings)
+    return {"success": True, "attached_count": count, "message": f"Attached {count} trip(s) to group."}
+
+
+@app.delete("/api/v1/trips/groups/{group_id}/trips/{trip_id}", tags=["Scoped Hubs"])
+async def detach_trip_endpoint(
+    group_id: str,
+    trip_id: str,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Detach a trip from a group."""
+    from earnings_engine.data.trips import detach_trip_from_group
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    if role != "owner" and "admin" not in scopes:
+        raise HTTPException(status_code=403, detail="Only the vault owner can detach trips.")
+
+    success = detach_trip_from_group(group_id=group_id, trip_id=trip_id, settings=_settings)
+    return {"success": success, "message": "Trip detached from group."}
+
+
+@app.get("/api/v1/trips/friends/lookup", tags=["Scoped Hubs"])
+async def lookup_friend_endpoint(
+    email: str = Query(..., description="Friend email to check"),
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Lookup if a friend's email already has an existing name or passcode in the system."""
+    from earnings_engine.data.trips import find_existing_friend_passcode
+    passcode, name = find_existing_friend_passcode(email, _settings)
+    return {
+        "exists": bool(passcode is not None),
+        "email": email,
+        "name": name,
+        "passcode": passcode,
+    }
 
 
 @app.post("/api/v1/trips", tags=["Scoped Hubs"])

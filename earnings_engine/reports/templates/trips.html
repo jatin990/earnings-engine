@@ -220,14 +220,39 @@
             </div>
         </div>
 
+        <!-- Travel Groups & Circles Toolbar -->
+        <div class="soft-card p-4 rounded-2xl space-y-3">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">👥</span>
+                    <div>
+                        <h3 class="heading-title text-sm font-bold text-slate-900">Travel Groups & Circles</h3>
+                        <p class="text-[11px] text-slate-500">Collaborative travel pods, member directories, and scoped group itineraries</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="manageGroupBtn" onclick="openManageCurrentGroupModal()" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition shadow-sm">
+                        <span>⚙️ Manage Group & Roster</span>
+                    </button>
+                    <button id="createGroupBtn" onclick="openCreateGroupModal()" class="hidden items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition shadow-sm shadow-sky-500/20">
+                        <span>+ Create Group</span>
+                    </button>
+                </div>
+            </div>
+            <div id="groupTabsContainer" class="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                <!-- Group tabs rendered via JS -->
+            </div>
+        </div>
+
         <!-- Trips List & Itineraries -->
         <section class="space-y-4">
             <div class="flex items-center justify-between">
                 <div>
                     <h2 class="heading-title text-lg font-bold text-slate-900 flex items-center gap-2">
-                        <span>🗺️ All Expeditions & Itineraries</span>
+                        <span id="tripsSectionIcon">🗺️</span>
+                        <span id="tripsSectionTitle">All Expeditions & Itineraries</span>
                     </h2>
-                    <p class="text-xs text-slate-500">Upcoming travel schedules and destinations</p>
+                    <p class="text-xs text-slate-500" id="tripsSectionSubtitle">Upcoming travel schedules and destinations</p>
                 </div>
                 <div class="text-xs text-slate-500 font-semibold" id="tripsCountLabel">Loading trips...</div>
             </div>
@@ -256,6 +281,167 @@
             </div>
         </section>
 
+    </div>
+
+    <!-- ================= MODAL: CREATE GROUP (Owner) ================= -->
+    <div id="createGroupModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-white border border-slate-200 w-full max-w-xl rounded-2xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🌴</span>
+                    <h3 class="heading-title text-base font-bold text-slate-900">Create New Travel Group</h3>
+                </div>
+                <button onclick="closeCreateGroupModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
+            </div>
+
+            <form id="createGroupForm" onsubmit="submitNewGroup(event)" class="space-y-4">
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Group Name</label>
+                        <input type="text" id="grpName" required placeholder="e.g. Bali Expedition 2026" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Icon</label>
+                        <select id="grpIcon" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500">
+                            <option value="🌴">🌴 Tropical</option>
+                            <option value="⛰️">⛰️ Mountains</option>
+                            <option value="✈️">✈️ Global</option>
+                            <option value="⛵">⛵ Sailing</option>
+                            <option value="🌸">🌸 Japan</option>
+                            <option value="🍷">🍷 Europe</option>
+                            <option value="🌌">🌌 Arctic</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Description</label>
+                    <textarea id="grpDescription" rows="2" placeholder="Brief note about this group or travel circle..." class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-sky-500"></textarea>
+                </div>
+
+                <!-- Add Friends Section -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider">👥 Add Friends & Dispatch Invites</label>
+                        <span class="text-[10px] text-slate-500 font-semibold">Auto-links existing friend codes</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="memberInputName" placeholder="Friend Name (e.g. Alice)" class="bg-white border border-slate-300 px-3 py-1.5 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-sky-500">
+                        <input type="email" id="memberInputEmail" oninput="checkFriendEmailLookup(this.value)" placeholder="Friend Email (e.g. alice@...)" class="bg-white border border-slate-300 px-3 py-1.5 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-sky-500">
+                    </div>
+
+                    <div id="emailLookupStatus" class="hidden text-[11px] font-semibold px-2 py-1 rounded-lg"></div>
+
+                    <button type="button" onclick="addMemberToStaging()" class="w-full py-1.5 bg-sky-50 border border-sky-200 text-sky-700 hover:bg-sky-100 rounded-xl text-xs font-bold transition">
+                        + Add Friend to Group Roster
+                    </button>
+
+                    <!-- Staged members list -->
+                    <div id="stagedMembersList" class="space-y-1.5 pt-1"></div>
+                </div>
+
+                <!-- Attach Trips Section -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                    <label class="block text-xs font-bold text-slate-800 uppercase tracking-wider">🗺️ Attach Existing Trips</label>
+                    <div id="tripCheckboxesContainer" class="space-y-1.5 max-h-32 overflow-y-auto text-xs">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                    <button type="button" onclick="closeCreateGroupModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-md">Create Group & Dispatch Invites</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL: MANAGE GROUP & MEMBER ROSTER ================= -->
+    <div id="manageGroupModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-white border border-slate-200 w-full max-w-2xl rounded-2xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div class="flex items-center gap-2">
+                    <span id="manageGroupIcon" class="text-xl">🌴</span>
+                    <div>
+                        <h3 id="manageGroupName" class="heading-title text-base font-bold text-slate-900">Group Management</h3>
+                        <p id="manageGroupDesc" class="text-xs text-slate-500"></p>
+                    </div>
+                </div>
+                <button onclick="closeManageGroupModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
+            </div>
+
+            <!-- Group Invite Link & Share Card -->
+            <div class="bg-gradient-to-r from-sky-50 to-indigo-50 p-4 rounded-xl border border-sky-200/80 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-sky-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>🔗 Personalized Group Invite Link</span>
+                    </span>
+                    <span id="manageGroupCodeBadge" class="text-xs font-mono font-bold bg-white px-2 py-0.5 rounded border border-sky-300 text-sky-800">NEXUS-GRP-XXXX</span>
+                </div>
+                <p class="text-xs text-slate-600">
+                    Friends using this link or code land directly on this group's trip page with scoped access.
+                </p>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="manageGroupInviteUrl" readonly class="flex-1 bg-white border border-slate-300 px-3 py-1.5 rounded-xl text-xs font-mono text-slate-700 select-all">
+                    <button onclick="copyGroupInviteUrl()" class="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                        Copy Link
+                    </button>
+                    <button onclick="shareGroupOnWhatsApp()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                        WhatsApp
+                    </button>
+                </div>
+            </div>
+
+            <!-- Members Directory & Personal Passcodes -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>👥 Member Directory & Personal Passcodes</span>
+                    </h4>
+                    <span id="manageMemberCount" class="text-xs font-semibold text-slate-500">0 members</span>
+                </div>
+
+                <div id="manageMembersContainer" class="space-y-2 max-h-56 overflow-y-auto">
+                    <!-- Member items rendered via JS -->
+                </div>
+
+                <!-- Add Member Form inside Manage Modal (Owner only) -->
+                <div id="manageAddMemberForm" class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                    <span class="text-xs font-bold text-slate-700 block">Add Friend to Group</span>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="quickAddName" placeholder="Name (e.g. Bob)" class="bg-white border border-slate-300 px-3 py-1.5 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-sky-500">
+                        <input type="email" id="quickAddEmail" oninput="checkQuickFriendEmailLookup(this.value)" placeholder="Email (e.g. bob@...)" class="bg-white border border-slate-300 px-3 py-1.5 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div id="quickLookupStatus" class="hidden text-[11px] font-semibold px-2 py-1 rounded-lg"></div>
+                    <button type="button" onclick="submitQuickAddMember()" class="w-full py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                        + Add Member & Send Email Invite
+                    </button>
+                </div>
+            </div>
+
+            <!-- Attached Trips in Manage Modal -->
+            <div class="space-y-2 pt-2 border-t border-slate-200">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">🗺️ Attached Trips</h4>
+                    <button id="btnSaveAttachedTrips" onclick="saveAttachedTripsForCurrentGroup()" class="text-xs text-sky-600 hover:text-sky-800 font-bold">
+                        Save Attached Trips
+                    </button>
+                </div>
+                <div id="manageGroupTripsChecklist" class="space-y-1.5 max-h-36 overflow-y-auto text-xs">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-3 border-t border-slate-200">
+                <button id="btnDeleteCurrentGroup" onclick="deleteCurrentGroup()" class="text-xs text-rose-500 hover:text-rose-700 font-semibold">
+                    Delete Group
+                </button>
+                <button onclick="closeManageGroupModal()" class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
+                    Done
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- ================= MODAL: ADD TRIP (Owner) ================= -->
@@ -401,29 +587,47 @@
     <!-- JS Logic -->
     <script>
         let allTrips = [];
+        let allGroups = [];
+        let activeGroupId = 'all';
         let isOwner = false;
+        let stagedMembers = [];
 
         async function fetchTripsData() {
             try {
-                const res = await fetch('/api/v1/trips');
-                if (!res.ok) throw new Error('Failed loading trips');
-                const data = await res.json();
+                // Fetch trips and groups in parallel
+                const [tripsRes, groupsRes] = await Promise.all([
+                    fetch('/api/v1/trips'),
+                    fetch('/api/v1/trips/groups')
+                ]);
+
+                if (!tripsRes.ok) throw new Error('Failed loading trips');
+                const data = await tripsRes.json();
                 allTrips = data.trips || [];
                 isOwner = Boolean(data.is_owner);
 
-                // Update UI badges
+                if (groupsRes.ok) {
+                    const grpData = await groupsRes.json();
+                    allGroups = grpData.groups || [];
+                }
+
+                // Update UI badges & action buttons
                 const userBadge = document.getElementById('userNameLabel');
                 const addBtn = document.getElementById('addTripBtn');
+                const createGrpBtn = document.getElementById('createGroupBtn');
+
                 if (isOwner) {
                     userBadge.textContent = 'Vault Owner (Full Admin)';
                     userBadge.className = 'text-emerald-700 font-bold';
                     addBtn.classList.remove('hidden');
                     addBtn.classList.add('flex');
+                    createGrpBtn.classList.remove('hidden');
+                    createGrpBtn.classList.add('flex');
                 } else {
                     userBadge.textContent = 'Friend Access (Shared Trips)';
                     userBadge.className = 'text-sky-700 font-bold';
                 }
 
+                renderGroupTabs();
                 renderStats();
                 renderFeaturedHero();
                 renderTripsGrid();
@@ -435,6 +639,61 @@
                         Failed to fetch trips. Please ensure your access passcode is active.
                     </div>
                 `;
+            }
+        }
+
+        function renderGroupTabs() {
+            const container = document.getElementById('groupTabsContainer');
+            const manageBtn = document.getElementById('manageGroupBtn');
+
+            if (activeGroupId !== 'all') {
+                manageBtn.classList.remove('hidden');
+                manageBtn.classList.add('flex');
+            } else {
+                manageBtn.classList.add('hidden');
+                manageBtn.classList.remove('flex');
+            }
+
+            let tabsHtml = `
+                <button onclick="selectGroupTab('all')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${activeGroupId === 'all' ? 'bg-slate-900 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}">
+                    <span>🌟 All Expeditions</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full ${activeGroupId === 'all' ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-500'}">${allTrips.length}</span>
+                </button>
+            `;
+
+            tabsHtml += allGroups.map(g => {
+                const isActive = activeGroupId === g.id;
+                return `
+                    <button onclick="selectGroupTab('${g.id}')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 whitespace-nowrap ${isActive ? 'bg-sky-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}">
+                        <span>${g.icon || '🌴'} ${g.name}</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-sky-700 text-sky-100' : 'bg-slate-100 text-slate-500'}">${g.trip_count || 0}</span>
+                    </button>
+                `;
+            }).join('');
+
+            container.innerHTML = tabsHtml;
+        }
+
+        function selectGroupTab(groupId) {
+            activeGroupId = groupId;
+            renderGroupTabs();
+            renderTripsGrid();
+
+            const secTitle = document.getElementById('tripsSectionTitle');
+            const secIcon = document.getElementById('tripsSectionIcon');
+            const secSub = document.getElementById('tripsSectionSubtitle');
+
+            if (groupId === 'all') {
+                secIcon.textContent = '🗺️';
+                secTitle.textContent = 'All Expeditions & Itineraries';
+                secSub.textContent = 'Upcoming travel schedules and destinations';
+            } else {
+                const grp = allGroups.find(g => g.id === groupId);
+                if (grp) {
+                    secIcon.textContent = grp.icon || '🌴';
+                    secTitle.textContent = `${grp.name} Itineraries`;
+                    secSub.textContent = grp.description || `Attached itineraries for ${grp.name} (${grp.member_count} members)`;
+                }
             }
         }
 
@@ -465,29 +724,48 @@
 
         function renderTripsGrid() {
             const container = document.getElementById('tripsGrid');
-            document.getElementById('tripsCountLabel').textContent = `${allTrips.length} active itineraries`;
+            
+            // Filter trips based on active group tab
+            let displayTrips = allTrips;
+            if (activeGroupId !== 'all') {
+                const grp = allGroups.find(g => g.id === activeGroupId);
+                const attachedIds = grp ? grp.attached_trips.map(at => at.id) : [];
+                displayTrips = allTrips.filter(t => attachedIds.includes(t.id));
+            }
 
-            if (!allTrips.length) {
+            document.getElementById('tripsCountLabel').textContent = `${displayTrips.length} active itineraries`;
+
+            if (!displayTrips.length) {
                 container.innerHTML = `
                     <div class="col-span-3 text-center py-12 text-slate-400 text-xs font-semibold">
-                        No scheduled trips found.
+                        No scheduled trips found ${activeGroupId !== 'all' ? 'in this group' : ''}.
                     </div>
                 `;
                 return;
             }
 
-            container.innerHTML = allTrips.map(t => {
+            container.innerHTML = displayTrips.map(t => {
                 const statusBg = t.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                                  t.status === 'completed' ? 'bg-slate-100 text-slate-700 border-slate-200' :
                                  'bg-amber-50 text-amber-700 border-amber-200';
 
+                // Group badge chips
+                const groupChips = (t.groups || []).map(g => `
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                        ${g.icon || '🌴'} ${g.name}
+                    </span>
+                `).join('');
+
                 return `
                     <div class="soft-card rounded-2xl p-5 flex flex-col justify-between space-y-4">
                         <div class="space-y-3">
-                            <div class="flex items-center justify-between">
-                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${statusBg}">
-                                    ${t.status}
-                                </span>
+                            <div class="flex items-center justify-between flex-wrap gap-2">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${statusBg}">
+                                        ${t.status}
+                                    </span>
+                                    ${groupChips}
+                                </div>
                                 <span class="text-xs text-slate-400 font-mono">₹${((t.estimated_budget || 0) / 1000).toLocaleString('en-IN')}k</span>
                             </div>
 
@@ -579,7 +857,329 @@
             `).join('');
         }
 
-        // Modals & Handlers
+        // ================= GROUP MANAGEMENT MODALS & LOGIC =================
+        function openCreateGroupModal() {
+            stagedMembers = [];
+            renderStagedMembers();
+            populateTripsCheckboxes('tripCheckboxesContainer');
+            document.getElementById('createGroupModal').style.display = 'flex';
+        }
+        function closeCreateGroupModal() {
+            document.getElementById('createGroupModal').style.display = 'none';
+        }
+
+        function populateTripsCheckboxes(containerId, checkedTripIds = []) {
+            const container = document.getElementById(containerId);
+            if (!allTrips.length) {
+                container.innerHTML = `<span class="text-slate-400">No trips available to attach.</span>`;
+                return;
+            }
+            container.innerHTML = allTrips.map(t => `
+                <label class="flex items-center gap-2 p-1.5 rounded-lg hover:bg-white cursor-pointer">
+                    <input type="checkbox" value="${t.id}" ${checkedTripIds.includes(t.id) ? 'checked' : ''} class="trip-checkbox rounded text-sky-600 focus:ring-0">
+                    <span class="font-medium text-slate-700">${t.title} (${t.destination})</span>
+                </label>
+            `).join('');
+        }
+
+        let lookupTimeout = null;
+        async function checkFriendEmailLookup(email) {
+            clearTimeout(lookupTimeout);
+            const statusEl = document.getElementById('emailLookupStatus');
+            if (!email || !email.includes('@')) {
+                statusEl.classList.add('hidden');
+                return;
+            }
+            lookupTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/v1/trips/friends/lookup?email=${encodeURIComponent(email.trim())}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        statusEl.classList.remove('hidden');
+                        if (data.exists) {
+                            statusEl.className = 'text-[11px] font-semibold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200';
+                            statusEl.textContent = `✨ Existing Friend Code: ${data.passcode} (${data.name || 'Friend'})`;
+                        } else {
+                            statusEl.className = 'text-[11px] font-semibold px-2 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200';
+                            statusEl.textContent = `⚡ New personal passcode will be generated automatically on invite`;
+                        }
+                    }
+                } catch(e) {}
+            }, 300);
+        }
+
+        async function checkQuickFriendEmailLookup(email) {
+            clearTimeout(lookupTimeout);
+            const statusEl = document.getElementById('quickLookupStatus');
+            if (!email || !email.includes('@')) {
+                statusEl.classList.add('hidden');
+                return;
+            }
+            lookupTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/v1/trips/friends/lookup?email=${encodeURIComponent(email.trim())}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        statusEl.classList.remove('hidden');
+                        if (data.exists) {
+                            statusEl.className = 'text-[11px] font-semibold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200';
+                            statusEl.textContent = `✨ Existing Friend Code: ${data.passcode} (${data.name || 'Friend'})`;
+                        } else {
+                            statusEl.className = 'text-[11px] font-semibold px-2 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200';
+                            statusEl.textContent = `⚡ New personal passcode will be generated automatically on invite`;
+                        }
+                    }
+                } catch(e) {}
+            }, 300);
+        }
+
+        function addMemberToStaging() {
+            const name = document.getElementById('memberInputName').value.trim();
+            const email = document.getElementById('memberInputEmail').value.trim();
+            if (!email) {
+                alert('Please enter friend email');
+                return;
+            }
+            stagedMembers.push({ name: name || email.split('@')[0], email: email, role: 'member' });
+            document.getElementById('memberInputName').value = '';
+            document.getElementById('memberInputEmail').value = '';
+            document.getElementById('emailLookupStatus').classList.add('hidden');
+            renderStagedMembers();
+        }
+
+        function removeStagedMember(index) {
+            stagedMembers.splice(index, 1);
+            renderStagedMembers();
+        }
+
+        function renderStagedMembers() {
+            const container = document.getElementById('stagedMembersList');
+            if (!stagedMembers.length) {
+                container.innerHTML = `<span class="text-[11px] text-slate-400">No friends added to roster yet.</span>`;
+                return;
+            }
+            container.innerHTML = stagedMembers.map((m, idx) => `
+                <div class="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200 text-xs">
+                    <div>
+                        <span class="font-bold text-slate-800">${m.name}</span>
+                        <span class="text-slate-400 font-mono ml-1">&lt;${m.email}&gt;</span>
+                    </div>
+                    <button type="button" onclick="removeStagedMember(${idx})" class="text-rose-500 hover:text-rose-700 font-bold px-1.5">✕</button>
+                </div>
+            `).join('');
+        }
+
+        async function submitNewGroup(e) {
+            e.preventDefault();
+            const selectedTrips = Array.from(document.querySelectorAll('#tripCheckboxesContainer input[type="checkbox"]:checked')).map(cb => cb.value);
+
+            const payload = {
+                name: document.getElementById('grpName').value.trim(),
+                description: document.getElementById('grpDescription').value.trim(),
+                icon: document.getElementById('grpIcon').value,
+                trip_ids: selectedTrips,
+                members: stagedMembers
+            };
+
+            try {
+                const res = await fetch('/api/v1/trips/groups', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed creating group');
+                closeCreateGroupModal();
+                await fetchTripsData();
+                selectGroupTab(data.group.id);
+            } catch(err) {
+                alert('Error creating group: ' + err.message);
+            }
+        }
+
+        // Manage Current Group Modal
+        function openManageCurrentGroupModal() {
+            if (activeGroupId === 'all') return;
+            const grp = allGroups.find(g => g.id === activeGroupId);
+            if (!grp) return;
+
+            document.getElementById('manageGroupIcon').textContent = grp.icon || '🌴';
+            document.getElementById('manageGroupName').textContent = grp.name;
+            document.getElementById('manageGroupDesc').textContent = grp.description || 'Collaborative Travel Group';
+            document.getElementById('manageGroupCodeBadge').textContent = grp.group_invite_code;
+
+            // Direct 1-click URL
+            const inviteUrl = `${window.location.origin}/portal?code=${grp.group_invite_code}&redirect=/trips`;
+            document.getElementById('manageGroupInviteUrl').value = inviteUrl;
+
+            // Render members
+            renderManageGroupMembers(grp);
+
+            // Populate trips checklist
+            const attachedTripIds = grp.attached_trips.map(at => at.id);
+            populateTripsCheckboxes('manageGroupTripsChecklist', attachedTripIds);
+
+            // Hide add member form for non-owners
+            const addForm = document.getElementById('manageAddMemberForm');
+            const delBtn = document.getElementById('btnDeleteCurrentGroup');
+            const saveTripsBtn = document.getElementById('btnSaveAttachedTrips');
+
+            if (!isOwner) {
+                addForm.classList.add('hidden');
+                delBtn.classList.add('hidden');
+                saveTripsBtn.classList.add('hidden');
+            } else {
+                addForm.classList.remove('hidden');
+                delBtn.classList.remove('hidden');
+                saveTripsBtn.classList.remove('hidden');
+            }
+
+            document.getElementById('manageGroupModal').style.display = 'flex';
+        }
+
+        function closeManageGroupModal() {
+            document.getElementById('manageGroupModal').style.display = 'none';
+        }
+
+        function renderManageGroupMembers(grp) {
+            const container = document.getElementById('manageMembersContainer');
+            const countEl = document.getElementById('manageMemberCount');
+            countEl.textContent = `${(grp.members || []).length} members`;
+
+            if (!grp.members || !grp.members.length) {
+                container.innerHTML = `<div class="text-xs text-slate-400 py-3 text-center">No members in this group yet. Add friends below.</div>`;
+                return;
+            }
+
+            container.innerHTML = grp.members.map(m => `
+                <div class="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
+                    <div class="space-y-0.5">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-slate-800">${m.name}</span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${m.role === 'owner' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}">${m.role}</span>
+                        </div>
+                        <div class="text-[11px] text-slate-500 font-mono">${m.email}</div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1 rounded-lg">
+                            <span class="text-[10px] text-slate-400 font-bold uppercase">Code:</span>
+                            <span class="text-xs font-mono font-bold text-slate-800">${m.passcode}</span>
+                            <button onclick="copyText('${m.passcode}')" class="text-slate-400 hover:text-sky-600 ml-1" title="Copy Passcode">📋</button>
+                        </div>
+
+                        ${isOwner ? `
+                            <button onclick="removeGroupMember('${grp.id}', '${m.id}')" class="text-xs text-rose-500 hover:text-rose-700 font-bold px-1.5 py-1" title="Remove Member">✕</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function submitQuickAddMember() {
+            const name = document.getElementById('quickAddName').value.trim();
+            const email = document.getElementById('quickAddEmail').value.trim();
+            if (!email) {
+                alert('Please enter friend email');
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/v1/trips/groups/${activeGroupId}/members`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name || email.split('@')[0],
+                        email: email,
+                        role: 'member',
+                        send_email: true
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed adding member');
+
+                document.getElementById('quickAddName').value = '';
+                document.getElementById('quickAddEmail').value = '';
+                document.getElementById('quickLookupStatus').classList.add('hidden');
+
+                await fetchTripsData();
+                const grp = allGroups.find(g => g.id === activeGroupId);
+                if (grp) renderManageGroupMembers(grp);
+                alert(`Friend added! Direct email invite sent to ${email} with passcode ${data.member.passcode}.`);
+            } catch(err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function removeGroupMember(groupId, memberId) {
+            if (!confirm('Are you sure you want to remove this member from the group?')) return;
+            try {
+                const res = await fetch(`/api/v1/trips/groups/${groupId}/members/${memberId}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed removing member');
+                await fetchTripsData();
+                const grp = allGroups.find(g => g.id === activeGroupId);
+                if (grp) renderManageGroupMembers(grp);
+            } catch(err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function saveAttachedTripsForCurrentGroup() {
+            const selectedTrips = Array.from(document.querySelectorAll('#manageGroupTripsChecklist input[type="checkbox"]:checked')).map(cb => cb.value);
+            try {
+                const res = await fetch(`/api/v1/trips/groups/${activeGroupId}/attach-trips`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trip_ids: selectedTrips })
+                });
+                if (!res.ok) throw new Error('Failed updating attached trips');
+                await fetchTripsData();
+                selectGroupTab(activeGroupId);
+                alert('Attached trips updated successfully!');
+            } catch(err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function deleteCurrentGroup() {
+            if (!confirm('Are you sure you want to delete this group? (Trips will not be deleted)')) return;
+            try {
+                const res = await fetch(`/api/v1/trips/groups/${activeGroupId}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed deleting group');
+                closeManageGroupModal();
+                activeGroupId = 'all';
+                await fetchTripsData();
+            } catch(err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        function copyGroupInviteUrl() {
+            const input = document.getElementById('manageGroupInviteUrl');
+            copyText(input.value);
+            alert('Group Invite Link copied to clipboard!');
+        }
+
+        function shareGroupOnWhatsApp() {
+            const grp = allGroups.find(g => g.id === activeGroupId);
+            const name = grp ? grp.name : 'Travel Group';
+            const url = document.getElementById('manageGroupInviteUrl').value;
+            const text = `Hey! Join our travel group "${name}" on Nexus Trips & Expeditions. View flight manifests, luxury stays, and itinerary here: ${url}`;
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        function copyText(text) {
+            navigator.clipboard.writeText(text).catch(() => {
+                const temp = document.createElement('textarea');
+                temp.value = text;
+                document.body.appendChild(temp);
+                temp.select();
+                document.execCommand('copy');
+                document.body.removeChild(temp);
+            });
+        }
+
+        // ================= BASE TRIP MODALS & HANDLERS =================
         function openAddTripModal() {
             document.getElementById('addTripModal').style.display = 'flex';
         }
@@ -632,9 +1232,20 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                if (!res.ok) throw new Error((await res.json()).detail || 'Failed creating trip');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed creating trip');
+
+                // If created inside an active group, auto-attach it to that group
+                if (activeGroupId !== 'all') {
+                    await fetch(`/api/v1/trips/groups/${activeGroupId}/attach-trips`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ trip_ids: [data.trip_id] })
+                    });
+                }
+
                 closeAddTripModal();
-                fetchTripsData();
+                await fetchTripsData();
             } catch(err) {
                 alert('Error creating trip: ' + err.message);
             }

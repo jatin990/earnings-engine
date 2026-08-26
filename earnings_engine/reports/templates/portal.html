@@ -563,6 +563,17 @@
                     localStorage.setItem('ee_passcode', code);
                     localStorage.setItem('ee_friend_name', this.session.name || this.session.label || 'Nexus User');
 
+                    // Check for direct redirect (e.g. /portal?code=...&redirect=/trips or group invite)
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const redirectUrl = urlParams.get('redirect');
+                    if (redirectUrl && (redirectUrl.startsWith('/') || redirectUrl.startsWith(window.location.origin))) {
+                        window.location.href = redirectUrl;
+                        return;
+                    } else if (this.session.is_group_invite || (this.session.allowed_routes && this.session.allowed_routes.length === 1 && this.session.allowed_routes[0] === 'trips')) {
+                        window.location.href = '/trips';
+                        return;
+                    }
+
                     this.renderDeck(this.session);
                 } catch (err) {
                     if (!silent) {

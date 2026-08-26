@@ -69,6 +69,28 @@ AVAILABLE_ROUTES: dict[str, dict[str, Any]] = {
             "/api/v1/trips",
         ],
     },
+    "trips": {
+        "id": "trips",
+        "name": "Trips & Expeditions Hub",
+        "icon": "✈️",
+        "description": "Collaborative travel itineraries, flight manifests, hotel vouchers & group activities.",
+        "path": "/trips",
+        "badge": "Travel Hub",
+        "api_prefixes": [
+            "/api/v1/trips",
+        ],
+    },
+    "net_worth": {
+        "id": "net_worth",
+        "name": "Net Worth & Asset Allocation",
+        "icon": "🏛️",
+        "description": "Consolidated wealth tracking across equities, mutual funds, EPF/PPF, and liquid cash.",
+        "path": "/net-worth",
+        "badge": "Wealth Vault",
+        "api_prefixes": [
+            "/api/v1/net-worth",
+        ],
+    },
     "playground": {
         "id": "playground",
         "name": "NSE Market & Data Sandbox",
@@ -298,10 +320,66 @@ def verify_passcode(code: str, settings: Settings | None = None) -> dict[str, An
 
         is_admin = "admin" in allowed_routes or "*" in allowed_routes
 
+        # Check if code matches a Trip Group invite code
+        group_id = None
+        group_name = None
+        is_group_invite = False
+        member_email = None
+        member_name = None
+
+        try:
+            grp_row = conn.execute(
+                "SELECT id, name FROM trip_groups WHERE UPPER(group_invite_code) = ?",
+                (p_code.upper(),),
+            ).fetchone()
+            if grp_row:
+                group_id = grp_row[0]
+                group_name = grp_row[1]
+                is_group_invite = True
+                if "trips" not in allowed_routes:
+                    allowed_routes.append("trips")
+        except Exception:
+            pass
+
+        # Check if code is assigned to a specific friend in trip_group_members
+        try:
+            mem_row = conn.execute(
+                "SELECT group_id, name, email FROM trip_group_members WHERE UPPER(passcode) = ? LIMIT 1",
+                (p_code.upper(),),
+            ).fetchone()
+            if mem_row:
+                member_name = mem_row[1]
+                member_email = mem_row[2]
+                if not group_id:
+                    group_id = mem_row[0]
+                if "trips" not in allowed_routes:
+                    allowed_routes.append("trips")
+        except Exception:
+            pass
+
+        # Determine scopes
+        scopes = []
+        if is_admin:
+            scopes = ["admin", "dashboard", "can_view_cards", "can_view_trips", "can_view_net_worth", "credit_card"]
+            role = "owner"
+        elif is_group_invite:
+            scopes = ["can_view_trips"]
+            role = "group_guest"
+        else:
+            role = "friend"
+            if "dashboard" in allowed_routes:
+                scopes.append("dashboard")
+            if "credit_card" in allowed_routes or "can_view_cards" in allowed_routes:
+                scopes.extend(["can_view_cards", "credit_card"])
+            if "trips" in allowed_routes or "can_view_trips" in allowed_routes:
+                scopes.append("can_view_trips")
+            if "net_worth" in allowed_routes or "can_view_net_worth" in allowed_routes:
+                scopes.append("can_view_net_worth")
+
         # Build authorized apps payload
         authorized_apps = []
         for r_id, r_info in AVAILABLE_ROUTES.items():
-            has_access = (r_id in allowed_routes) or ("*" in allowed_routes)
+            has_access = (r_id in allowed_routes) or ("*" in allowed_routes) or (r_id == "trips" and "can_view_trips" in scopes)
             authorized_apps.append({
                 **r_info,
                 "has_access": has_access,
@@ -311,8 +389,15 @@ def verify_passcode(code: str, settings: Settings | None = None) -> dict[str, An
             "valid": True,
             "code": p_code,
             "label": label,
+            "role": role,
+            "scopes": scopes,
             "allowed_routes": allowed_routes,
             "is_admin": is_admin,
+            "is_group_invite": is_group_invite,
+            "group_id": group_id,
+            "group_name": group_name,
+            "email": member_email,
+            "name": member_name,
             "use_count": use_count + 1,
             "max_uses": max_uses,
             "expires_at": expires_at,

@@ -44,18 +44,20 @@ def hash_otp(otp: str, email: str) -> str:
 
 
 def create_session_token(
-    user_id: str,
+    user_id: str | int,
     role: str,
     email: str,
     name: str,
     scopes: list[str],
     expires_in_days: int = 14,
+    group_id: str | None = None,
+    passcode: str | None = None,
 ) -> str:
     """Generate an HMAC-SHA256 signed stateless session token."""
     now = int(time.time())
     exp = now + (expires_in_days * 86400)
     payload = {
-        "sub": user_id,
+        "sub": str(user_id),
         "role": role,
         "email": email,
         "name": name,
@@ -63,6 +65,10 @@ def create_session_token(
         "iat": now,
         "exp": exp,
     }
+    if group_id:
+        payload["group_id"] = group_id
+    if passcode:
+        payload["passcode"] = passcode
     payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode("utf-8").rstrip("=")
     signature = hmac.new(AUTH_SECRET_KEY.encode("utf-8"), payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{payload_b64}.{signature}"
