@@ -106,14 +106,18 @@
                     const otherUnis = this.universes.filter(u => !benchmarkKeys.includes(u.name.toLowerCase()) && !capKeys.includes(u.name.toLowerCase()) && !usKeys.includes(u.name.toLowerCase()));
 
                     let benchHtml = benchUnis.map(u => '<option value="' + u.name + '">' + (u.display_name || u.name) + ' (' + (u.tickers ? u.tickers.length : 0) + ')</option>').join('');
-                    let capHtml = capUnis.map(u => '<option value="' + u.name + '">' + (u.display_name || u.name) + ' (' + (u.tickers ? u.tickers.length : 0) + ')</option>').join('');
+                    let capHtml = capUnis.map(u => '<option value="' + u.name + '">' + (u.name.toLowerCase() === 'nse_large_cap' ? '🏛️ Large Cap (>₹1,000 Cr Market Cap)' : (u.display_name || u.name)) + ' (' + (u.tickers ? u.tickers.length : 0) + ')</option>').join('');
                     let usHtml = usUnis.map(u => '<option value="' + u.name + '">' + (u.display_name || u.name) + ' (' + (u.tickers ? u.tickers.length : 0) + ')</option>').join('');
                     let otherHtml = otherUnis.map(u => '<option value="' + u.name + '">🏛️ ' + (u.display_name || u.name) + ' (' + (u.tickers ? u.tickers.length : 0) + ')</option>').join('');
 
                     let html = '';
-                    if (benchHtml) html += '<optgroup label="🇮🇳 Groww Benchmark Indices">' + benchHtml + '</optgroup>';
-                    if (capHtml) html += '<optgroup label="🚀 Market Cap Segments">' + capHtml + '</optgroup>';
+                    // 1. Custom User Watchlists FIRST & Primary
                     html += '<optgroup label="⭐ Custom Watchlists">' + (customOpts || '<option value="my_watchlist">⭐ my_watchlist (0)</option>') + '</optgroup>';
+                    // 2. Large Cap (>1000 Cr) & Market Cap Segments
+                    if (capHtml) html += '<optgroup label="🏛️ Stocks > ₹1,000 Cr & Market Caps">' + capHtml + '</optgroup>';
+                    // 3. Groww Benchmark Indices
+                    if (benchHtml) html += '<optgroup label="🇮🇳 Groww Benchmark Indices">' + benchHtml + '</optgroup>';
+                    // 4. US Mega-Caps
                     if (usHtml) html += '<optgroup label="🇺🇸 US Mega-Caps">' + usHtml + '</optgroup>';
                     if (otherHtml) html += '<optgroup label="🏛️ Other Universes">' + otherHtml + '</optgroup>';
 
@@ -623,20 +627,20 @@
 
                     let html = '';
 
-                    // 1. Built-in Universes (if any match filter)
-                    if (filteredUniverses.length) {
-                        html += '<div style="margin-top:0.25rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;">' +
-                            '<h4 style="margin:0;font-size:0.95rem;color:#c7d2fe;display:flex;align-items:center;gap:0.35rem;">🏛️ Built-in Universes & Indices <span style="font-size:0.75rem;background:rgba(99,102,241,0.2);padding:0.1rem 0.4rem;border-radius:9999px;">' + filteredUniverses.length + '</span></h4>' +
-                            '</div>';
-                        html += filteredUniverses.map((u, ui) => this._universeCard(u, ui)).join('');
-                    }
-
-                    // 2. Custom User Watchlists (if any match filter)
+                    // 1. Custom User Watchlists (Rendered FIRST & Primary)
                     if (filteredCustom.length) {
-                        html += '<div style="margin-top:1rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;">' +
+                        html += '<div style="margin-top:0.25rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;">' +
                             '<h4 style="margin:0;font-size:0.95rem;color:#60a5fa;display:flex;align-items:center;gap:0.35rem;">⭐ Custom User Watchlists <span style="font-size:0.75rem;background:rgba(59,130,246,0.2);padding:0.1rem 0.4rem;border-radius:9999px;">' + filteredCustom.length + '</span></h4>' +
                             '</div>';
                         html += filteredCustom.map((w, wi) => this._customCard(w, wi)).join('');
+                    }
+
+                    // 2. Built-in Universes & Indices
+                    if (filteredUniverses.length) {
+                        html += '<div style="margin-top:' + (filteredCustom.length ? '1rem' : '0.25rem') + ';margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;">' +
+                            '<h4 style="margin:0;font-size:0.95rem;color:#c7d2fe;display:flex;align-items:center;gap:0.35rem;">🏛️ Built-in Universes & Indices <span style="font-size:0.75rem;background:rgba(99,102,241,0.2);padding:0.1rem 0.4rem;border-radius:9999px;">' + filteredUniverses.length + '</span></h4>' +
+                            '</div>';
+                        html += filteredUniverses.map((u, ui) => this._universeCard(u, ui)).join('');
                     }
 
                     el.innerHTML = html;
