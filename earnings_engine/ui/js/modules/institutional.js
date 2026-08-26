@@ -315,7 +315,7 @@
                     &nbsp;·&nbsp; Net: <strong style="color:${netCol};">${netSign}₹${Math.abs(data.net_flow_cr || 0).toLocaleString()} Cr</strong>
                     &nbsp;·&nbsp; 7D: ${ret7dStr}
                     &nbsp;·&nbsp; 30D: ${ret30dStr}
-                    &nbsp;·&nbsp; Funds: <strong style="color:#34d399;">+${data.funds_accumulating_count}</strong> / <strong style="color:#f87171;">-${data.funds_selling_count}</strong>
+                    &nbsp;·&nbsp; Funds (QoQ): <strong style="color:#34d399;">+${data.funds_accumulating_count}</strong> / <strong style="color:#f87171;">-${data.funds_selling_count}</strong>
                 `;
             }
 

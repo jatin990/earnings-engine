@@ -14271,7 +14271,7 @@
                     badgeEl.style.color = data.verdict_badge === 'emerald' ? '#34d399' : '#60a5fa';
                 }
                 if (scoreTextEl) {
-                    scoreTextEl.innerHTML = `Accumulation Score: <strong style="color:#38bdf8;">${data.accumulation_score} / 100</strong> | Net Tracked Flow: <strong style="color:#34d399;">+₹${data.net_flow_cr} Cr</strong> | Funds In/Out: <strong style="color:#34d399;">+${data.funds_accumulating_count}</strong> / <strong style="color:#f87171;">-${data.funds_selling_count}</strong>`;
+                    scoreTextEl.innerHTML = `Accumulation Score: <strong style="color:#38bdf8;">${data.accumulation_score} / 100</strong> | Net Tracked Flow: <strong style="color:#34d399;">+₹${data.net_flow_cr} Cr</strong> | Funds In/Out (QoQ): <strong style="color:#34d399;">+${data.funds_accumulating_count}</strong> / <strong style="color:#f87171;">-${data.funds_selling_count}</strong>`;
                 }
 
                 // 1. Shareholding pattern history

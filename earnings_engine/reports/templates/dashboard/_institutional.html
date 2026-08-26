@@ -64,7 +64,7 @@
             <!-- Legend & Layout Toggle -->
             <div style="display:flex;align-items:center;gap:0.75rem;">
                 <div style="font-size:0.66rem;color:#94a3b8;font-family:var(--font-mono);background:rgba(255,255,255,0.03);padding:0.25rem 0.5rem;border-radius:4px;border:1px solid rgba(255,255,255,0.06);">
-                    <strong style="color:#cbd5e1;">SCORE:</strong> 0-100 · <strong style="color:#cbd5e1;">7D/30D:</strong> Return · <strong style="color:#cbd5e1;">FUNDS:</strong> Net Count · <strong style="color:#cbd5e1;">STAKE:</strong> Total Inst %
+                    <strong style="color:#cbd5e1;">SCORE:</strong> 0-100 · <strong style="color:#cbd5e1;">7D/30D:</strong> Momentum · <strong style="color:#cbd5e1;">FUNDS:</strong> Net Count (QoQ) · <strong style="color:#cbd5e1;">STAKE:</strong> Latest Inst %
                 </div>
                 <button type="button" id="btnToggleInstSplit" onclick="app.toggleInstitutionalSplitLayout()" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;color:#cbd5e1;" title="Toggle 50-50 split vs full width">
                     ◫ 50-50 Split
@@ -86,10 +86,10 @@
                                 <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.66rem;">
                                     <th style="padding:0.45rem 0.6rem;">TICKER</th>
                                     <th style="padding:0.45rem 0.5rem;">SCORE</th>
-                                    <th style="padding:0.45rem 0.5rem;">7D</th>
-                                    <th style="padding:0.45rem 0.5rem;">30D</th>
-                                    <th style="padding:0.45rem 0.5rem;">FUNDS</th>
-                                    <th style="padding:0.45rem 0.5rem;">STAKE</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Buying Funds">FUNDS (QoQ)</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
                                     <th style="padding:0.45rem 0.4rem;text-align:center;">🔍</th>
                                 </tr>
                             </thead>
@@ -112,10 +112,10 @@
                                 <tr style="background:#180d14;color:#fca5a5;border-bottom:1px solid rgba(239,68,68,0.15);font-family:var(--font-mono);font-size:0.66rem;">
                                     <th style="padding:0.45rem 0.6rem;">TICKER</th>
                                     <th style="padding:0.45rem 0.5rem;">SCORE</th>
-                                    <th style="padding:0.45rem 0.5rem;">7D</th>
-                                    <th style="padding:0.45rem 0.5rem;">30D</th>
-                                    <th style="padding:0.45rem 0.5rem;">FUNDS</th>
-                                    <th style="padding:0.45rem 0.5rem;">STAKE</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Selling Funds">FUNDS (QoQ)</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
                                     <th style="padding:0.45rem 0.4rem;text-align:center;">🔍</th>
                                 </tr>
                             </thead>

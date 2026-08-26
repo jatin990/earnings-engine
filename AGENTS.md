@@ -30,6 +30,16 @@ Whenever you work on this repository, you must maintain zero-error hygiene using
 - **OS**: Windows (PowerShell / pwsh)
 - **Python Virtual Environment**: `.\.venv\Scripts\python.exe` (always invoke through `.venv` or ensure virtualenv is activated)
 
+### 1.4 Universal Timeframe & Temporal Association Protocol
+**Mandatory Rule Across the Hub, Backend APIs, UI Dashboards, and Reports**:
+Every metric, delta, signal, accumulation flow, momentum score, and forecast **MUST ALWAYS explicitly state and display its associated timeframe, period, or comparison horizon**.
+- **Institutional Flows & Funds**: Always specify the reporting window (e.g., `Funds: +4 / -0 (QoQ / ~90d)`, `Latest Filing: Q1 FY27 vs Q4 FY26`). Never display bare fund counts or stake changes without the quarterly/temporal baseline.
+- **Price Returns & Momentum**: Always label the exact interval (e.g., `7D Return: +4.2%`, `30D Return: -1.8%`, `52W High / Low`). Never display standalone "+X%" without the timeframe.
+- **Volume & Volatility Surges**: Always state the comparison window (e.g., `Volume Surge: 2.4x (5D avg vs 63D baseline)`, `21-Day Annualized Volatility`).
+- **AI Forecasting & Consensus**: Always display the explicit prediction timeframe (e.g., `Forecast Horizon: 14 Trading Days`, `Kronos 14-Day Trajectory`, `Quarter Repeater: Q2 FY27 Target`).
+- **Catalysts & Scanner Setups**: Always include both publication recency (`Published 4h ago / 2026-08-26`) and expected catalyst impact horizon (`Impact Window: 1–3 Days`).
+- **Timestamps & Freshness**: Every table, card, drawer, and modal MUST present its last-updated timestamp or data freshness indicator (e.g., `As of 2026-08-26 15:30 IST`, `Market Feed: 🟢 Live Quote` or `📊 EOD Snapshot`).
+
 ---
 
 ## 2. Project Architecture & Directory Layout
