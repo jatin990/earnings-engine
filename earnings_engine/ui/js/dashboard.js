@@ -1030,12 +1030,12 @@
                 // 3. Check LocalStorage
                 const storedTab = localStorage.getItem('dashboard_active_tab');
 
-                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 
                 if (hash && validTabs.includes(hash.toLowerCase())) return hash.toLowerCase();
                 if (queryTab && validTabs.includes(queryTab.toLowerCase())) return queryTab.toLowerCase();
                 if (storedTab && validTabs.includes(storedTab.toLowerCase())) return storedTab.toLowerCase();
-                return 'results';
+                return 'home';
             },
 
             isMaster: null,
@@ -1485,9 +1485,9 @@
             },
 
             switchTab(name, updateUrl = true, isInitialLoad = false) {
-                name = (name || 'results').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
-                if (!validTabs.includes(name)) name = 'results';
+                name = (name || 'home').toLowerCase().replace('#', '').replace('tab=', '');
+                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                if (!validTabs.includes(name)) name = 'home';
 
                 // Abort any pending fetch requests when switching tabs
                 this.cancelAllPendingRequests('Tab switched to ' + name);
@@ -1517,6 +1517,7 @@
                 const bcEl = document.getElementById('topbarBreadcrumbTab');
                 if (bcEl) {
                     const titles = {
+                        'home': '🌐 Market Pulse',
                         'results': 'Results Ledger',
                         'monthfilter': 'Month Filter',
                         'scanner': 'Scanner',
@@ -1574,6 +1575,12 @@
                 }
 
                 // Lazy-initialize client UI components on first visit without firing heavy backend scans
+                if (name === 'home') {
+                    if (typeof this.loadMarketPulseData === 'function') this.loadMarketPulseData();
+                }
+                if (name === 'institutional') {
+                    if (typeof this.loadInstitutionalData === 'function') this.loadInstitutionalData();
+                }
                 if (name === 'results') {
                     this.updateResultsMonthSummaryCards();
                 }

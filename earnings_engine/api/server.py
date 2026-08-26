@@ -921,6 +921,18 @@ async def get_upcoming_earnings(
         raise HTTPException(status_code=500, detail=f"Error fetching upcoming earnings: {str(e)}")
 
 
+@app.get("/api/v1/market/pulse", tags=["Market Data"])
+async def api_get_market_pulse(
+    force_refresh: bool = Query(False, description="Force refresh cache"),
+):
+    """Retrieve full macro market pulse, fear & greed index, VIX, prediction, and sector heatmap."""
+    try:
+        from earnings_engine.data.market_pulse import get_market_pulse_data
+        return get_market_pulse_data(settings=_settings, force_refresh=force_refresh)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving market pulse: {e}")
+
+
 @app.get("/api/v1/market/recent-additions", tags=["Market Data"])
 async def api_get_recent_market_additions(
     days: int = Query(180, description="Lookback window in days for newly listed stocks", ge=1, le=730),
