@@ -1279,6 +1279,9 @@
 
                 // Refresh stock details
                 await fetchStockDetails();
+                if (data.has_changes && data.changes_summary && data.changes_summary.length) {
+                    console.info('[AUDIT] Recalculated metrics diff:', data.changes_summary);
+                }
             } catch (err) {
                 alert('Error calculating EPS: ' + err.message);
                 if (row) row.style.opacity = '1';
@@ -1289,7 +1292,7 @@
             const btn = document.getElementById('btnCalcAllEps');
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<span class="spinner"></span> Calculating...';
+                btn.innerHTML = '<span class="spinner"></span> Calculating & Auditing...';
             }
 
             try {
@@ -1301,6 +1304,9 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || 'Failed to calculate EPS');
                 await fetchStockDetails();
+                if (data.has_changes && data.changes_summary && data.changes_summary.length) {
+                    alert(`✅ EPS Recalculated & Audited:\n• ${data.changes_summary.slice(0, 5).join('\n• ')}`);
+                }
             } catch (err) {
                 alert('Error: ' + err.message);
             } finally {
@@ -1337,7 +1343,7 @@
 
             const submitBtn = document.getElementById('btnSubmitEps');
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Saving...';
+            submitBtn.textContent = 'Saving & Auditing...';
 
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/calculate-eps`, {

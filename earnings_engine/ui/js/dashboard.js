@@ -377,46 +377,47 @@
                         // Swing Support / Resistance with explicit cursor:pointer and interactive Auto Detect button
                         const s = it.support != null ? currSymbol + Number(it.support).toFixed(2) : '—';
                         const r = it.resistance != null ? currSymbol + Number(it.resistance).toFixed(2) : '—';
+                        const activeWl = (this.activeWatchlist || '').replace(/'/g, "\\'");
                         const rangeStr = (it.support != null && it.resistance != null)
-                            ? '<button type="button" onclick="app.openSwingRangeModal(\'' + this.activeWatchlist.replace(/'/g, "\\'") + '\',\'' + it.ticker + '\')" class="btn-micro" style="font-size:0.75rem;font-family:var(--font-mono);cursor:pointer;color:#38bdf8;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);border-radius:4px;padding:0.12rem 0.4rem;" title="Inspect & edit swing range">' + s + ' – ' + r + '</button>'
-                            : '<button type="button" onclick="app.watchlistTab.autoDetectRowRange(\'' + it.ticker + '\', this)" class="btn-micro" style="font-size:0.7rem;font-weight:700;cursor:pointer;color:#fbbf24;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:0.15rem 0.45rem;display:inline-flex;align-items:center;gap:0.2rem;" title="Auto-detect support & resistance range"><span>⚡</span> Auto Detect</button>';
+                            ? `<button type="button" onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="font-size:0.75rem;font-family:var(--font-mono);cursor:pointer;color:#38bdf8;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);border-radius:4px;padding:0.12rem 0.4rem;" title="Inspect & edit swing range">${s} – ${r}</button>`
+                            : `<button type="button" onclick="app.watchlistTab.autoDetectRowRange('${it.ticker}', this)" class="btn-micro" style="font-size:0.7rem;font-weight:700;cursor:pointer;color:#fbbf24;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:0.15rem 0.45rem;display:inline-flex;align-items:center;gap:0.2rem;" title="Auto-detect support & resistance range"><span>⚡</span> Auto Detect</button>`;
 
-                        return '<tr class="interactive-row">' +
-                            '<td>' +
-                                '<div style="display:flex;align-items:center;gap:0.4rem;">' +
-                                    '<button onclick="app.openAddToWatchlistModal(\'' + it.ticker + '\')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.85rem;cursor:pointer;" title="Manage Watchlists">⭐</button>' +
-                                    '<div>' +
-                                        '<strong onclick="app.openSwingRangeModal(\'' + this.activeWatchlist.replace(/'/g, "\\'") + '\',\'' + it.ticker + '\')" style="color:#ffffff;font-size:0.85rem;cursor:pointer;" class="hover-underline" title="Inspect & edit swing range">' + it.ticker + '</strong>' +
-                                        '<a href="/stock/' + encodeURIComponent(it.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;cursor:pointer;" title="Open profile in new tab">↗</a>' +
-                                        '<div style="font-size:0.7rem;color:#a1a1aa;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (it.company_name || it.ticker) + '</div>' +
-                                    </div>' +
-                                '</div>' +
-                            '</td>' +
-                            '<td style="text-align:right;"><strong style="font-size:0.88rem;color:#ffffff;font-family:var(--font-mono);">' + p + '</strong></td>' +
-                            '<td style="text-align:right;"><span style="background:' + chgBadgeBg + ';color:' + chgColor + ';padding:0.15rem 0.45rem;border-radius:4px;font-size:0.75rem;font-weight:700;font-family:var(--font-mono);">' + chgStr + '</span></td>' +
-                            '<td style="text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#cbd5e1;">' + openStr + '</td>' +
-                            '<td style="text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#34d399;">' + highStr + '</td>' +
-                            '<td style="text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#f87171;">' + lowStr + '</td>' +
-                            '<td style="text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#93c5fd;font-weight:600;">' + volStr + '</td>' +
-                            '<td style="text-align:right;font-size:0.72rem;font-family:var(--font-mono);">' +
-                                '<div style="color:#cbd5e1;">' + yL + ' – ' + yH + '</div>' +
-                                (pctH ? '<div style="font-size:0.68rem;color:' + pctHColor + ';font-weight:600;">' + pctH + ' from 52W H</div>' : '') +
-                            '</td>' +
-                            '<td style="text-align:right;font-size:0.75rem;font-family:var(--font-mono);color:#94a3b8;">' + mcStr + '</td>' +
-                            '<td style="text-align:center;">' +
-                                '<div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">' +
-                                    rangeStr +
-                                    '<button onclick="app.openSwingRangeModal(\'' + this.activeWatchlist.replace(/'/g, "\\'") + '\',\'' + it.ticker + '\')" class="btn-micro" style="color:var(--muted);padding:0 0.15rem;font-size:0.75rem;border:none;background:transparent;cursor:pointer;" title="Edit Swing Range">⚙</button>' +
-                                '</div>' +
-                            '</td>' +
-                            '<td style="text-align:center;">' +
-                                '<div style="display:flex;gap:0.25rem;align-items:center;justify-content:center;">' +
-                                    '<button type="button" onclick="app.runConsensusForStock(\'' + it.ticker + '\')" class="btn btn-sm" style="padding:0.12rem 0.4rem;font-size:0.68rem;background:rgba(99,102,241,0.2);color:#c7d2fe;border:1px solid rgba(99,102,241,0.4);border-radius:3px;cursor:pointer;" title="Run AI Consensus">🧠</button>' +
-                                    '<button type="button" onclick="app.runPredictionForTickerSingle(\'' + it.ticker + '\')" class="btn btn-sm" style="padding:0.12rem 0.4rem;font-size:0.68rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:3px;cursor:pointer;" title="Run Kronos AI">🔮</button>' +
-                                    '<button type="button" onclick="app.watchlistTab.removeQuoteTicker(\'' + it.ticker + '\')" class="btn btn-sm btn-danger" style="padding:0.12rem 0.35rem;font-size:0.72rem;border-radius:3px;cursor:pointer;" title="Remove from this watchlist">🗑</button>' +
-                                '</div>' +
-                            '</td>' +
-                        '</tr>';
+                        return `<tr class="interactive-row">
+                            <td>
+                                <div style="display:flex;align-items:center;gap:0.4rem;">
+                                    <button onclick="app.openAddToWatchlistModal('${it.ticker}')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.85rem;cursor:pointer;" title="Manage Watchlists">⭐</button>
+                                    <div>
+                                        <strong onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" style="color:#ffffff;font-size:0.85rem;cursor:pointer;" class="hover-underline" title="Inspect & edit swing range">${it.ticker}</strong>
+                                        <a href="/stock/${encodeURIComponent(it.ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;cursor:pointer;" title="Open profile in new tab">↗</a>
+                                        <div style="font-size:0.7rem;color:#a1a1aa;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.company_name || it.ticker}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="text-align:right;"><strong style="font-size:0.88rem;color:#ffffff;font-family:var(--font-mono);">${p}</strong></td>
+                            <td style="text-align:right;"><span style="background:${chgBadgeBg};color:${chgColor};padding:0.15rem 0.45rem;border-radius:4px;font-size:0.75rem;font-weight:700;font-family:var(--font-mono);">${chgStr}</span></td>
+                            <td style="text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#cbd5e1;">${openStr}</td>
+                            <td style="text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#34d399;">${highStr}</td>
+                            <td style="text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#f87171;">${lowStr}</td>
+                            <td style="text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#93c5fd;font-weight:600;">${volStr}</td>
+                            <td style="text-align:right;font-size:0.72rem;font-family:var(--font-mono);">
+                                <div style="color:#cbd5e1;">${yL} – ${yH}</div>
+                                ${pctH ? `<div style="font-size:0.68rem;color:${pctHColor};font-weight:600;">${pctH} from 52W H</div>` : ''}
+                            </td>
+                            <td style="text-align:right;font-size:0.75rem;font-family:var(--font-mono);color:#94a3b8;">${mcStr}</td>
+                            <td style="text-align:center;">
+                                <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">
+                                    ${rangeStr}
+                                    <button onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="color:var(--muted);padding:0 0.15rem;font-size:0.75rem;border:none;background:transparent;cursor:pointer;" title="Edit Swing Range">⚙</button>
+                                </div>
+                            </td>
+                            <td style="text-align:center;">
+                                <div style="display:flex;gap:0.25rem;align-items:center;justify-content:center;">
+                                    <button type="button" onclick="app.runConsensusForStock('${it.ticker}')" class="btn btn-sm" style="padding:0.12rem 0.4rem;font-size:0.68rem;background:rgba(99,102,241,0.2);color:#c7d2fe;border:1px solid rgba(99,102,241,0.4);border-radius:3px;cursor:pointer;" title="Run AI Consensus">🧠</button>
+                                    <button type="button" onclick="app.runPredictionForTickerSingle('${it.ticker}')" class="btn btn-sm" style="padding:0.12rem 0.4rem;font-size:0.68rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:3px;cursor:pointer;" title="Run Kronos AI">🔮</button>
+                                    <button type="button" onclick="app.watchlistTab.removeQuoteTicker('${it.ticker}')" class="btn btn-sm btn-danger" style="padding:0.12rem 0.35rem;font-size:0.72rem;border-radius:3px;cursor:pointer;" title="Remove from this watchlist">🗑</button>
+                                </div>
+                            </td>
+                        </tr>`;
                     }).join('');
                 },
 
