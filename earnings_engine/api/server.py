@@ -41,6 +41,67 @@ logger = get_logger("earnings_engine.api.server")
 # Background task handles (kept so we can cancel on shutdown)
 _breakout_scanner_task: asyncio.Task | None = None
 _news_catalyst_task: asyncio.Task | None = None
+_CACHED_LOCAL_MODELS: dict[str, Any] = {}
+
+
+def _scan_and_cache_local_models(host: str | None = None) -> dict[str, Any]:
+    """Scan running local model endpoints (Ollama / LM Studio) and cache the result."""
+    import os, requests
+    ollama_host = (host or os.getenv("LOCAL_LLM_URL") or os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
+    models = []
+    status = "offline"
+    try:
+        resp = requests.get(f"{ollama_host}/api/tags", timeout=1.5)
+        if resp.status_code == 200:
+            status = "online"
+            data = resp.json()
+            for m in data.get("models", []):
+                models.append({
+                    "name": m.get("name"),
+                    "size": m.get("size"),
+                    "modified_at": m.get("modified_at"),
+                    "provider": "ollama",
+                })
+    except Exception:
+        pass
+
+    if not models:
+        try:
+            resp = requests.get(f"{ollama_host}/v1/models", timeout=1.5)
+            if resp.status_code == 200:
+                status = "online"
+                data = resp.json()
+                for m in data.get("data", []):
+                    models.append({
+                        "name": m.get("id"),
+                        "provider": "openai-compatible",
+                    })
+        except Exception:
+            pass
+
+    if not models:
+        models = [
+            {"name": "deepseek-r1:8b", "provider": "ollama", "recommended": True},
+            {"name": "deepseek-r1:14b", "provider": "ollama"},
+            {"name": "llama3.2:3b", "provider": "ollama"},
+            {"name": "llama3.1:8b", "provider": "ollama"},
+            {"name": "qwen2.5:7b", "provider": "ollama"},
+            {"name": "mistral:7b", "provider": "ollama"},
+        ]
+
+    result = {
+        "success": True,
+        "status": status,
+        "host": ollama_host,
+        "models": models,
+        "default_model": os.getenv("OLLAMA_MODEL", "deepseek-r1:8b"),
+        "scanned_at": datetime.now(timezone.utc).isoformat(),
+    }
+    global _CACHED_LOCAL_MODELS
+    if not host or host == ollama_host:
+        _CACHED_LOCAL_MODELS = result
+    logger.info("[LOCAL-MODELS] Scanned %s (status: %s, models: %d)", ollama_host, status, len(models))
+    return result
 
 
 @asynccontextmanager
@@ -120,6 +181,19 @@ async def lifespan(app: FastAPI):
         logger.info("[NEWS-HARVESTER] Background news harvester task started.")
     except Exception as e:
         logger.warning("[NEWS-HARVESTER] Could not start news harvester task: %s", e)
+
+    # Pre-scan and cache available local LLM models (Ollama / LM Studio) on startup
+    try:
+        async def _run_startup_local_model_scan():
+            try:
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, _scan_and_cache_local_models)
+            except Exception as scan_err:
+                logger.warning("[LOCAL-MODELS] Startup model scan warning: %s", scan_err)
+
+        asyncio.create_task(_run_startup_local_model_scan(), name="local_model_startup_scan")
+    except Exception as e:
+        logger.warning("[LOCAL-MODELS] Could not schedule startup local model scan: %s", e)
 
     yield
 
@@ -4197,60 +4271,12 @@ class ConsensusSettleRequest(BaseModel):
 
 @app.get("/api/v1/consensus/local-models", tags=["AI Consensus Engine"])
 @app.get("/api/v1/local-models", tags=["AI Consensus Engine"])
-async def list_local_models_endpoint(host: str | None = Query(None)):
-    """Discover available local models from running Ollama or LM Studio instances."""
-    import os, requests
-    ollama_host = (host or os.getenv("LOCAL_LLM_URL") or os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
-    models = []
-    status = "offline"
-    try:
-        resp = requests.get(f"{ollama_host}/api/tags", timeout=2)
-        if resp.status_code == 200:
-            status = "online"
-            data = resp.json()
-            for m in data.get("models", []):
-                models.append({
-                    "name": m.get("name"),
-                    "size": m.get("size"),
-                    "modified_at": m.get("modified_at"),
-                    "provider": "ollama",
-                })
-    except Exception:
-        pass
-
-    # If /api/tags failed, try /v1/models (LM Studio / vLLM / OpenAI-compatible)
-    if not models:
-        try:
-            resp = requests.get(f"{ollama_host}/v1/models", timeout=2)
-            if resp.status_code == 200:
-                status = "online"
-                data = resp.json()
-                for m in data.get("data", []):
-                    models.append({
-                        "name": m.get("id"),
-                        "provider": "openai-compatible",
-                    })
-        except Exception:
-            pass
-
-    # Default fallback models if offline or empty
-    if not models:
-        models = [
-            {"name": "deepseek-r1:8b", "provider": "ollama", "recommended": True},
-            {"name": "deepseek-r1:14b", "provider": "ollama"},
-            {"name": "llama3.2:3b", "provider": "ollama"},
-            {"name": "llama3.1:8b", "provider": "ollama"},
-            {"name": "qwen2.5:7b", "provider": "ollama"},
-            {"name": "mistral:7b", "provider": "ollama"},
-        ]
-
-    return {
-        "success": True,
-        "status": status,
-        "host": ollama_host,
-        "models": models,
-        "default_model": os.getenv("OLLAMA_MODEL", "deepseek-r1:8b"),
-    }
+async def list_local_models_endpoint(host: str | None = Query(None), refresh: bool = Query(False)):
+    """Discover available local models from running Ollama or LM Studio instances (pre-scanned at startup)."""
+    global _CACHED_LOCAL_MODELS
+    if not refresh and not host and _CACHED_LOCAL_MODELS:
+        return _CACHED_LOCAL_MODELS
+    return await asyncio.to_thread(_scan_and_cache_local_models, host=host)
 
 
 @app.post("/api/v1/consensus/predict", tags=["AI Consensus Engine"])

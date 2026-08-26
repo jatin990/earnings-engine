@@ -1580,6 +1580,9 @@
         let stockLiveIntervalTimer = null;
         let stockLiveIntervalMs = parseInt(localStorage.getItem('nexus_stock_refresh_interval') || '300000', 10);
 
+        // Pre-detect local models on load (instant via server startup cache)
+        detectLocalModels();
+
         function setStockLiveInterval(ms) {
             stockLiveIntervalMs = parseInt(ms, 10);
             localStorage.setItem('nexus_stock_refresh_interval', stockLiveIntervalMs);
