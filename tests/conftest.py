@@ -12,10 +12,13 @@ def force_local_sqlite_in_tests(monkeypatch, tmp_path):
     """Force local isolated SQLite and disable Turso Cloud WAN calls during test execution.
     
     This ensures tests run locally at in-memory speeds (< 1 second) rather than making
-    remote WAN network round-trips over HTTPS to cloud databases.
+    remote WAN network round-trips over HTTPS to cloud databases, and prevents tests
+    from polluting the production database.
     """
     monkeypatch.setenv("TURSO_DATABASE_URL", "")
     monkeypatch.setenv("TURSO_AUTH_TOKEN", "")
+    test_db_file = f"test_suite_{os.getpid()}.sqlite3"
+    monkeypatch.setenv("EARNINGS_ENGINE_DB_NAME", test_db_file)
 
 
 from unittest.mock import MagicMock
