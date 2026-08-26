@@ -246,17 +246,18 @@ def _query_local_model(
             }
 
     elapsed_ms = (time.perf_counter() - start) * 1000
+    prediction = _parse_model_json(resp_text)
+    is_success = prediction is not None
+
     try:
         from earnings_engine.rate_limits import record_generation
-        record_generation("local/deepseek-r1:8b", elapsed_ms, tokens=total_tokens, is_local=True)
-        record_generation(model_id, elapsed_ms, tokens=total_tokens, is_local=True)
-        record_generation(display_name, elapsed_ms, tokens=total_tokens, is_local=True)
+        record_generation("local/deepseek-r1:8b", elapsed_ms, tokens=total_tokens, is_local=True, success=is_success)
+        record_generation(model_id, elapsed_ms, tokens=total_tokens, is_local=True, success=is_success)
+        record_generation(display_name, elapsed_ms, tokens=total_tokens, is_local=True, success=is_success)
     except Exception:
         pass
-
-    prediction = _parse_model_json(resp_text)
     
-    if prediction is None:
+    if not is_success:
         return {
             "model_name": display_name,
             "model_id": model_id,
@@ -483,9 +484,9 @@ def _query_single_model(
 
             try:
                 from earnings_engine.rate_limits import record_generation
-                record_generation("openrouter", elapsed_ms, tokens=total_tokens)
-                record_generation(current_model, elapsed_ms, tokens=total_tokens)
-                record_generation(display_name, elapsed_ms, tokens=total_tokens)
+                record_generation("openrouter", elapsed_ms, tokens=total_tokens, success=True)
+                record_generation(current_model, elapsed_ms, tokens=total_tokens, success=True)
+                record_generation(display_name, elapsed_ms, tokens=total_tokens, success=True)
             except Exception:
                 pass
 
@@ -515,6 +516,12 @@ def _query_single_model(
                 time.sleep(1.0)
                 continue
             logger.warning("[CONSENSUS] %s timed out after %ds", display_name, timeout)
+            try:
+                from earnings_engine.rate_limits import record_generation
+                record_generation(current_model, timeout * 1000, tokens=0, success=False)
+                record_generation(display_name, timeout * 1000, tokens=0, success=False)
+            except Exception:
+                pass
             return {
                 "model_name": display_name,
                 "model_id": current_model,
@@ -534,6 +541,12 @@ def _query_single_model(
                 time.sleep(1.0)
                 continue
             logger.error("[CONSENSUS] %s unexpected error: %s", display_name, e)
+            try:
+                from earnings_engine.rate_limits import record_generation
+                record_generation(current_model, (time.perf_counter() - start) * 1000, tokens=0, success=False)
+                record_generation(display_name, (time.perf_counter() - start) * 1000, tokens=0, success=False)
+            except Exception:
+                pass
             return {
                 "model_name": display_name,
                 "model_id": current_model,
