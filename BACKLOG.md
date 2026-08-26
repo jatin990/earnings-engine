@@ -17,8 +17,9 @@
 - [ ] **Client-side IndexedDB Caching**: Cache heavy quote and pattern responses for instant offline tab switching.
 - [ ] **Virtualized Table Rendering**: Implement windowed virtual scrolling for tables exceeding 500 rows.
 
-## 5. Verification & Test Suite Runs (Deferred)
-- [ ] **Full Regression Suite**: Run `pytest` across all test suites (`tests/test_institutional_flows.py`, `tests/test_market_pulse.py`, `tests/test_swing_ranges.py`, `tests/test_recalculate_audit.py`).
-- [ ] **Stock Detail E2E Verification**: Validate `/stock/{ticker}` end-to-end for new listings (`LEAPIND.NS`), news delta fetching (`JNPR.NS`), and individual AI model partial runs.
-- [ ] **Git Push Batching**: Push accumulated commits to remote `origin/new_report` at the next 5-commit milestone.
+## 5. Verification & Test Suite Runs
+- [x] **Full Regression Suite**: Run `pytest` across test suites (`tests/test_institutional_flows.py`, `tests/test_market_pulse.py`, `tests/test_swing_ranges.py`, `tests/test_recalculate_audit.py`) — **18/18 tests passing**.
+- [x] **Stock Detail E2E Verification**: Validated `/stock/{ticker}` end-to-end for new listings (`LEAPIND.NS`), news delta fetching (`JNPR.NS`), and individual AI model partial runs via [`test_stock_detail_e2e.py`](file:///d:/earnings-engine/tests/test_stock_detail_e2e.py).
+- [x] **Error Ledger Cleaned**: Resolved outstanding background harvester errors.
+- [ ] **Git Push Batching**: Push accumulated commits to remote `origin/new_report` at next milestone.
 
