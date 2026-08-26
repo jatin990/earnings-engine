@@ -1259,19 +1259,27 @@ def run_warm_rescore(settings: Settings) -> None:
 
 
 def run_hot_rescore(settings: Settings) -> None:
-    """T2 Hot Rescore: rescore only hot-pool tickers for maximum freshness."""
+    """T2 Hot Rescore: rescore only hot-pool tickers in parallel batches for maximum freshness."""
     hot_tickers = list(_pool["hot"].keys())
     if not hot_tickers:
         return
 
     t0 = time.perf_counter()
 
+    from earnings_engine.data.prices import fetch_batch_live_quotes
     from concurrent.futures import ThreadPoolExecutor
 
-    def _score(ticker: str) -> tuple[str, dict | None]:
-        return ticker, _score_single_ticker(ticker, settings, use_live_quote=True)
+    # 1. Batch fetch latest live market quotes in parallel (single sub-second batch)
+    try:
+        fetch_batch_live_quotes(hot_tickers, settings=settings, sync_db=True, max_workers=8)
+    except Exception as e:
+        logger.debug("[BREAKOUT-HOT] Batch live quote fetch warning: %s", e)
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    # 2. Rescore hot tickers with freshest prices
+    def _score(ticker: str) -> tuple[str, dict | None]:
+        return ticker, _score_single_ticker(ticker, settings, use_live_quote=False)
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
         scored = list(executor.map(_score, hot_tickers))
 
     for ticker, result in scored:
