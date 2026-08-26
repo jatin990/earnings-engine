@@ -352,17 +352,23 @@ def fetch_ticker_catalysts(
     def _get_google():
         return fetch_google_news_rss(ticker, market=market)
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    executor = ThreadPoolExecutor(max_workers=3)
+    try:
         futures = [executor.submit(_get_yahoo), executor.submit(_get_yf), executor.submit(_get_google)]
         try:
-            for f in as_completed(futures, timeout=4.0):
+            for f in as_completed(futures, timeout=4.5):
                 try:
                     res = f.result()
                     if res:
                         raw_items.extend(res)
                 except Exception:
                     pass
-        except (TimeoutError, Exception):
+        except BaseException:
+            pass
+    finally:
+        try:
+            executor.shutdown(wait=False, cancel_futures=True)
+        except Exception:
             pass
 
     articles: list[dict[str, Any]] = []

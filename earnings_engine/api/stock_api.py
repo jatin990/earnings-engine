@@ -1028,7 +1028,12 @@ def refresh_stock_news(
         return {"success": False, "error": "Ticker symbol is required"}
     try:
         from earnings_engine.data.catalysts_news import fetch_ticker_catalysts, get_short_term_catalysts
-        fetched = fetch_ticker_catalysts(sym, limit=20, force=True, settings=settings)
+        fetched = []
+        try:
+            fetched = fetch_ticker_catalysts(sym, limit=20, force=True, settings=settings)
+        except Exception as fe:
+            logger.debug("Incremental news fetch partial warning for %s: %s", sym, fe)
+
         catalysts = get_short_term_catalysts(watchlist_or_universe="ALL", search_query=sym, limit=25, settings=settings)
         return {
             "success": True,
