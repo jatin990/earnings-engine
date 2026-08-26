@@ -4612,6 +4612,46 @@ async def refresh_breakout_radar(
     return {"success": True, "message": f"Breakout scan triggered for {universe or 'all universes'} in background. Check /api/v1/breakout-radar shortly."}
 
 
+@app.get("/api/v1/breakout-radar/search", tags=["Breakout Radar"])
+async def search_breakout_stocks(
+    q: str = Query(..., min_length=1, description="Ticker or company name search query"),
+    limit: int = Query(15, ge=1, le=50, description="Max autocomplete matches"),
+):
+    """Fast auto-complete search for stocks across price cache and universe registry."""
+    matches = await asyncio.to_thread(
+        breakout_scanner_mod.search_breakout_tickers,
+        query=q,
+        limit=limit,
+        settings=_settings,
+    )
+    return {"success": True, "query": q, "matches": matches}
+
+
+@app.get("/api/v1/breakout-radar/evaluate/{ticker}", tags=["Breakout Radar"])
+async def evaluate_breakout_stock(
+    ticker: str,
+    asof_date: str | None = Query(None, description="Point-in-time evaluation date in YYYY-MM-DD format"),
+):
+    """Evaluate a specific stock on-demand for Breakout Radar setup conviction, key levels, and sub-score metrics."""
+    sym = ticker.strip().upper()
+    try:
+        result = await asyncio.to_thread(
+            breakout_scanner_mod.evaluate_stock_breakout,
+            ticker=sym,
+            asof_date=asof_date,
+            settings=_settings,
+        )
+        if not result or not result.get("success"):
+            error_msg = result.get("error", "Stock evaluation failed") if result else "No data returned"
+            raise HTTPException(status_code=404, detail=error_msg)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("[BREAKOUT-API] Stock evaluation error for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Breakout evaluation failed: {str(e)}")
+
+
 @app.post("/api/v1/breakout-radar/ai-reasoning/{ticker}", tags=["Breakout Radar"])
 async def get_breakout_ai_reasoning(
     ticker: str,

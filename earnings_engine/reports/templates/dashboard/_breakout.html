@@ -80,6 +80,48 @@
                 </div>
             </div>
 
+            <!-- 🎯 Interactive Stock Evaluator with Live Autocomplete -->
+            <div style="background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.85)); border: 1px solid rgba(59,130,246,0.35); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.85rem; box-shadow: 0 4px 20px -2px rgba(0,0,0,0.4);">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.45rem;">
+                    <div style="display:flex;align-items:center;gap:0.45rem;font-size:0.82rem;font-weight:700;color:#f8fafc;">
+                        <span style="font-size:1.05rem;">🎯</span> Evaluate Stock for Breakout
+                        <span style="font-size:0.65rem;font-weight:600;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.1rem 0.4rem;border-radius:4px;">ON-DEMAND RADAR</span>
+                    </div>
+                    <div style="font-size:0.68rem;color:#94a3b8;">
+                        Instant technical compression, volume surge multiple, 52W resistance & upside target calculation
+                    </div>
+                </div>
+
+                <!-- Search Input & Action Button Container -->
+                <div style="display:flex;align-items:center;gap:0.5rem;position:relative;">
+                    <div style="position:relative;flex:1;min-width:240px;">
+                        <span style="position:absolute;left:0.65rem;top:50%;transform:translateY(-50%);font-size:0.85rem;color:#64748b;pointer-events:none;">🔍</span>
+                        <input 
+                            id="breakoutTickerInput" 
+                            type="text" 
+                            placeholder="Enter stock ticker or company name (e.g. RELIANCE, TCS, INFY, TATAMOTORS, NVDA)..." 
+                            autocomplete="off" 
+                            style="width:100%;padding:0.45rem 2rem 0.45rem 2rem;background:#030712;border:1px solid rgba(255,255,255,0.18);border-radius:6px;color:#f8fafc;font-size:0.8rem;font-family:var(--font-mono);outline:none;transition:border-color 0.2s;"
+                            onfocus="this.style.borderColor='#38bdf8'"
+                            onblur="this.style.borderColor='rgba(255,255,255,0.18)'"
+                        />
+                        <button id="breakoutClearInputBtn" onclick="app.clearBreakoutEvaluator()" style="display:none;position:absolute;right:0.6rem;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#64748b;font-size:0.75rem;cursor:pointer;">✕</button>
+
+                        <!-- Dynamic Autocomplete Dropdown -->
+                        <div id="breakoutAutocompleteDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#090d16;border:1px solid rgba(59,130,246,0.4);border-radius:6px;box-shadow:0 12px 28px rgba(0,0,0,0.8);z-index:999;max-height:260px;overflow-y:auto;">
+                        </div>
+                    </div>
+
+                    <button id="breakoutEvaluateBtn" onclick="app.evaluateCurrentBreakoutInput()" class="btn btn-primary" style="padding:0.45rem 1.1rem;font-size:0.8rem;font-weight:700;display:flex;align-items:center;gap:0.35rem;white-space:nowrap;background:linear-gradient(135deg, #2563eb, #3b82f6);border:1px solid rgba(96,165,250,0.5);">
+                        <span id="breakoutEvaluateIcon">⚡</span> Evaluate Breakout
+                    </button>
+                </div>
+            </div>
+
+            <!-- 📊 Deep Evaluated Stock Intelligence Result Card -->
+            <div id="breakoutEvaluatedStockCard" style="display:none;background:#090d16;border:1px solid rgba(59,130,246,0.4);border-radius:8px;padding:1rem 1.2rem;margin-bottom:0.85rem;box-shadow:0 12px 30px -5px rgba(0,0,0,0.6);">
+            </div>
+
             <!-- Historical Date Quick Presets Toolbar -->
             <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.75rem;padding:0.4rem 0.6rem;background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-size:0.7rem;">
                 <span style="color:#64748b;font-weight:600;">⚡ Quick Date Backtest:</span>

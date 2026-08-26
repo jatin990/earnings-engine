@@ -10756,6 +10756,11 @@
         };
 
         app.loadBreakoutRadar = async function() {
+            if (!app._breakoutAutocompleteWired) {
+                app.wireBreakoutStockAutocomplete();
+                app._breakoutAutocompleteWired = true;
+            }
+
             const badge = document.getElementById('breakoutScanningBadge');
             const lastScanEl = document.getElementById('breakoutLastScanTime');
             const modeBadge = document.getElementById('breakoutModeBadge');
@@ -11173,6 +11178,404 @@
                 return app._breakoutSortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
             });
             app.renderBreakoutTable(sorted, app._breakoutAsofDate);
+        };
+
+        // -------------------------------------------------------------------------
+        // 🎯 On-Demand Stock Breakout Evaluator & Live Autocomplete
+        // -------------------------------------------------------------------------
+        app._breakoutAutocompleteWired = false;
+
+        app.wireBreakoutStockAutocomplete = function() {
+            const input = document.getElementById('breakoutTickerInput');
+            const dropdown = document.getElementById('breakoutAutocompleteDropdown');
+            const clearBtn = document.getElementById('breakoutClearInputBtn');
+            if (!input || !dropdown) return;
+
+            let debounceTimer = null;
+            let selectedIdx = -1;
+
+            input.addEventListener('input', (e) => {
+                const query = e.target.value.trim();
+                if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
+
+                if (debounceTimer) clearTimeout(debounceTimer);
+                if (query.length < 1) {
+                    dropdown.style.display = 'none';
+                    return;
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    try {
+                        const res = await fetch(API_BASE + '/api/v1/breakout-radar/search?q=' + encodeURIComponent(query));
+                        if (!res.ok) throw new Error('Search failed');
+                        const data = await res.json();
+                        const matches = data.matches || [];
+
+                        if (matches.length > 0) {
+                            selectedIdx = -1;
+                            dropdown.innerHTML = matches.map((m, i) => `
+                                <div class="autocomplete-item breakout-auto-item" data-idx="${i}" onclick="app.selectBreakoutStock('${m.symbol.replace(/'/g, "\\'")}')" style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.8rem;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;transition:background 0.15s;">
+                                    <div>
+                                        <div style="display:flex;align-items:center;gap:0.4rem;">
+                                            <strong style="color:#f8fafc;font-size:0.82rem;font-family:var(--font-mono);">${m.symbol}</strong>
+                                            <span style="font-size:0.65rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:4px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.25);">${m.market || 'NSE'}</span>
+                                        </div>
+                                        <div style="font-size:0.72rem;color:#94a3b8;margin-top:0.1rem;">${m.name || ''}</div>
+                                    </div>
+                                    <span style="font-size:0.7rem;color:#38bdf8;font-weight:600;">⚡ Audit Breakout</span>
+                                </div>
+                            `).join('');
+                            dropdown.style.display = 'block';
+                        } else {
+                            dropdown.style.display = 'none';
+                        }
+                    } catch (err) {
+                        console.debug('[BREAKOUT-AUTOCOMPLETE] Error:', err);
+                        dropdown.style.display = 'none';
+                    }
+                }, 180);
+            });
+
+            input.addEventListener('keydown', (e) => {
+                const items = dropdown.querySelectorAll('.breakout-auto-item');
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIdx = Math.min(selectedIdx + 1, items.length - 1);
+                    items.forEach((it, i) => {
+                        const isSel = i === selectedIdx;
+                        it.style.background = isSel ? 'rgba(59,130,246,0.25)' : 'transparent';
+                        if (isSel) it.scrollIntoView({ block: 'nearest' });
+                    });
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIdx = Math.max(selectedIdx - 1, -1);
+                    items.forEach((it, i) => {
+                        const isSel = i === selectedIdx;
+                        it.style.background = isSel ? 'rgba(59,130,246,0.25)' : 'transparent';
+                        if (isSel) it.scrollIntoView({ block: 'nearest' });
+                    });
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (selectedIdx >= 0 && items[selectedIdx]) {
+                        items[selectedIdx].click();
+                    } else if (items.length > 0) {
+                        items[0].click();
+                    } else if (input.value.trim()) {
+                        app.evaluateCurrentBreakoutInput();
+                    }
+                } else if (e.key === 'Escape') {
+                    dropdown.style.display = 'none';
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        };
+
+        app.selectBreakoutStock = function(ticker) {
+            const input = document.getElementById('breakoutTickerInput');
+            const dropdown = document.getElementById('breakoutAutocompleteDropdown');
+            if (input) input.value = ticker;
+            if (dropdown) dropdown.style.display = 'none';
+            app.evaluateBreakoutStock(ticker);
+        };
+
+        app.evaluateCurrentBreakoutInput = function() {
+            const input = document.getElementById('breakoutTickerInput');
+            const ticker = input ? input.value.trim() : '';
+            if (!ticker) {
+                alert('Please enter a stock ticker symbol (e.g. RELIANCE, TCS, INFY).');
+                return;
+            }
+            const dropdown = document.getElementById('breakoutAutocompleteDropdown');
+            if (dropdown) dropdown.style.display = 'none';
+            app.evaluateBreakoutStock(ticker);
+        };
+
+        app.clearBreakoutEvaluator = function() {
+            const input = document.getElementById('breakoutTickerInput');
+            const dropdown = document.getElementById('breakoutAutocompleteDropdown');
+            const clearBtn = document.getElementById('breakoutClearInputBtn');
+            const card = document.getElementById('breakoutEvaluatedStockCard');
+            if (input) input.value = '';
+            if (clearBtn) clearBtn.style.display = 'none';
+            if (dropdown) dropdown.style.display = 'none';
+            if (card) {
+                card.style.display = 'none';
+                card.innerHTML = '';
+            }
+        };
+
+        app.evaluateBreakoutStock = async function(ticker) {
+            if (!ticker) return;
+            const btn = document.getElementById('breakoutEvaluateBtn');
+            const icon = document.getElementById('breakoutEvaluateIcon');
+            const card = document.getElementById('breakoutEvaluatedStockCard');
+            const clearBtn = document.getElementById('breakoutClearInputBtn');
+
+            if (clearBtn) clearBtn.style.display = 'block';
+            if (btn) btn.disabled = true;
+            if (icon) icon.innerHTML = '<span style="display:inline-block;animation:spin 0.8s linear infinite;">⏳</span>';
+
+            if (card) {
+                card.style.display = 'block';
+                card.innerHTML = `
+                    <div style="text-align:center;padding:1.8rem 1rem;color:#94a3b8;">
+                        <div style="font-size:1.6rem;margin-bottom:0.5rem;animation:spin 1s linear infinite;display:inline-block;">⚡</div>
+                        <div style="font-weight:700;color:#f8fafc;font-size:0.92rem;">Evaluating Breakout Setup for ${ticker.toUpperCase()}...</div>
+                        <div style="font-size:0.75rem;color:#64748b;margin-top:0.25rem;">Computing volatility compression, volume surge multiples, 52W resistance ceiling, and risk-reward levels...</div>
+                    </div>
+                `;
+            }
+
+            try {
+                const asofDate = app._breakoutAsofDate || document.getElementById('breakoutDateInput')?.value || null;
+                let url = API_BASE + '/api/v1/breakout-radar/evaluate/' + encodeURIComponent(ticker.trim().toUpperCase());
+                if (asofDate) {
+                    url += '?asof_date=' + encodeURIComponent(asofDate);
+                }
+
+                const res = await fetch(url);
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.detail || `HTTP ${res.status}: Failed to evaluate ticker.`);
+                }
+                const data = await res.json();
+                app.renderEvaluatedStockBreakout(data);
+            } catch (e) {
+                console.error('[BREAKOUT-EVAL] Error:', e);
+                if (card) {
+                    card.innerHTML = `
+                        <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:1rem;color:#fca5a5;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                                <strong style="font-size:0.88rem;color:#f87171;">⚠️ Stock Evaluation Error</strong>
+                                <button type="button" onclick="app.clearBreakoutEvaluator()" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;">✕</button>
+                            </div>
+                            <div style="font-size:0.78rem;">${e.message || 'Could not evaluate stock for breakout. Please verify symbol.'}</div>
+                        </div>
+                    `;
+                }
+            } finally {
+                if (btn) btn.disabled = false;
+                if (icon) icon.textContent = '⚡';
+            }
+        };
+
+        app.renderEvaluatedStockBreakout = function(d) {
+            const card = document.getElementById('breakoutEvaluatedStockCard');
+            if (!card || !d) return;
+
+            const sym = d.ticker || '—';
+            const comp = d.composite_score != null ? d.composite_score : 0;
+            const resScore = d.resistance_score || 0;
+            const volScore = d.volume_score || 0;
+            const compScore = d.compression_score || 0;
+            const momScore = d.momentum_score || 0;
+            const fundScore = d.fundamental_score || 0;
+
+            const tier = d.tier || (comp >= 50 ? 'HOT' : (comp >= 25 ? 'WARM' : 'COLD'));
+            const tierBadge = d.tier_badge || (tier === 'HOT' ? 'emerald' : (tier === 'WARM' ? 'amber' : 'slate'));
+            const tierLabel = d.tier_label || (tier === 'HOT' ? '🔥 High Conviction Setup' : (tier === 'WARM' ? '⚡ Coiling / Approaching Trigger' : '💤 Low Momentum / Dormant'));
+
+            const scoreColor = comp >= 70 ? '#34d399' : (comp >= 45 ? '#38bdf8' : (comp >= 25 ? '#fbbf24' : '#94a3b8'));
+            const calcNotes = d.calculation_notes || {};
+
+            const curPrice = d.current_price != null ? `₹${d.current_price.toFixed(2)}` : '—';
+            const triggerPrice = d.breakout_trigger != null ? `₹${d.breakout_trigger.toFixed(2)}` : '—';
+            const targetPrice = d.target_price != null ? `₹${d.target_price.toFixed(2)}` : '—';
+            const stopLoss = d.stop_loss != null ? `₹${d.stop_loss.toFixed(2)}` : '—';
+            const rrRatio = d.risk_reward_ratio != null ? `${d.risk_reward_ratio.toFixed(2)}x` : '—';
+
+            const pctFromHigh = d.pct_from_high != null ? `${d.pct_from_high >= 0 ? '+' : ''}${d.pct_from_high.toFixed(1)}%` : '—';
+            const volRatio = d.volume_ratio != null ? `${d.volume_ratio.toFixed(2)}x` : '—';
+            const atrPct = d.atr_pct != null ? `${d.atr_pct.toFixed(2)}%` : '—';
+
+            card.innerHTML = `
+                <!-- Header Banner -->
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:0.9rem;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                            <h3 style="margin:0;font-size:1.15rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);letter-spacing:-0.01em;">${sym}</h3>
+                            <span style="font-size:0.75rem;color:#cbd5e1;font-weight:600;">${d.company_name || ''}</span>
+                            <span style="font-size:0.65rem;font-weight:700;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.1rem 0.45rem;border-radius:4px;">${d.industry || 'Equities'}</span>
+                            <span class="badge badge-${tierBadge}" style="font-size:0.7rem;font-weight:700;padding:0.15rem 0.55rem;border-radius:20px;">${tierLabel}</span>
+                        </div>
+                        <div style="font-size:0.72rem;color:#64748b;margin-top:0.2rem;font-family:var(--font-mono);">
+                            Signal Date: ${d.signal_date || 'Live'} &middot; Data Bars: ${d.data_points || '—'} sessions &middot; Evaluated at: ${new Date().toLocaleTimeString()}
+                        </div>
+                    </div>
+
+                    <!-- Composite Score Gauge Box -->
+                    <div style="display:flex;align-items:center;gap:0.75rem;">
+                        <div style="text-align:right;">
+                            <div style="font-size:0.68rem;text-transform:uppercase;color:#94a3b8;font-weight:700;letter-spacing:0.04em;">Breakout Score</div>
+                            <div style="font-size:1.75rem;font-weight:900;color:${scoreColor};font-family:var(--font-mono);line-height:1;">
+                                ${comp}<span style="font-size:0.95rem;color:#64748b;font-weight:600;">/100</span>
+                            </div>
+                        </div>
+                        <button type="button" onclick="app.clearBreakoutEvaluator()" title="Close evaluation" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#94a3b8;width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.8rem;transition:all 0.15s;" onmouseenter="this.style.background='rgba(239,68,68,0.2)';this.style.color='#f87171'" onmouseleave="this.style.background='rgba(255,255,255,0.06)';this.style.color='#94a3b8'">✕</button>
+                    </div>
+                </div>
+
+                <!-- 5-Metric Sub-Score Progress Bars Grid -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.6rem;margin-bottom:0.9rem;">
+                    <!-- 1. Resistance -->
+                    <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);padding:0.6rem 0.75rem;border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;font-size:0.7rem;font-weight:700;color:#f87171;margin-bottom:0.25rem;">
+                            <span>🎯 Resistance Ceiling</span>
+                            <span>${resScore.toFixed(0)} / 30 pts</span>
+                        </div>
+                        <div style="height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;margin-bottom:0.35rem;">
+                            <div style="height:100%;width:${(resScore / 30 * 100).toFixed(0)}%;background:#ef4444;border-radius:3px;"></div>
+                        </div>
+                        <div style="font-size:0.67rem;color:#cbd5e1;">52W Dist: <strong>${pctFromHigh}</strong></div>
+                    </div>
+
+                    <!-- 2. Volume -->
+                    <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);padding:0.6rem 0.75rem;border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;font-size:0.7rem;font-weight:700;color:#60a5fa;margin-bottom:0.25rem;">
+                            <span>📊 Volume Surge</span>
+                            <span>${volScore.toFixed(0)} / 20 pts</span>
+                        </div>
+                        <div style="height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;margin-bottom:0.35rem;">
+                            <div style="height:100%;width:${(volScore / 20 * 100).toFixed(0)}%;background:#3b82f6;border-radius:3px;"></div>
+                        </div>
+                        <div style="font-size:0.67rem;color:#cbd5e1;">Volume: <strong>${volRatio}</strong> vs 20D SMA</div>
+                    </div>
+
+                    <!-- 3. Compression -->
+                    <div style="background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.2);padding:0.6rem 0.75rem;border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;font-size:0.7rem;font-weight:700;color:#fbbf24;margin-bottom:0.25rem;">
+                            <span>🗜️ Squeeze Compression</span>
+                            <span>${compScore.toFixed(0)} / 15 pts</span>
+                        </div>
+                        <div style="height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;margin-bottom:0.35rem;">
+                            <div style="height:100%;width:${(compScore / 15 * 100).toFixed(0)}%;background:#eab308;border-radius:3px;"></div>
+                        </div>
+                        <div style="font-size:0.67rem;color:#cbd5e1;">ATR Volatility: <strong>${atrPct}</strong></div>
+                    </div>
+
+                    <!-- 4. Momentum -->
+                    <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);padding:0.6rem 0.75rem;border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;font-size:0.7rem;font-weight:700;color:#34d399;margin-bottom:0.25rem;">
+                            <span>🚀 Trend Momentum</span>
+                            <span>${momScore.toFixed(0)} / 15 pts</span>
+                        </div>
+                        <div style="height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;margin-bottom:0.35rem;">
+                            <div style="height:100%;width:${(momScore / 15 * 100).toFixed(0)}%;background:#10b981;border-radius:3px;"></div>
+                        </div>
+                        <div style="font-size:0.67rem;color:#cbd5e1;">Signal: <strong>${d.momentum_signal || 'Neutral'}</strong></div>
+                    </div>
+
+                    <!-- 5. Fundamental -->
+                    <div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);padding:0.6rem 0.75rem;border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;font-size:0.7rem;font-weight:700;color:#a78bfa;margin-bottom:0.25rem;">
+                            <span>💎 Earnings Quality</span>
+                            <span>${fundScore.toFixed(0)} / 20 pts</span>
+                        </div>
+                        <div style="height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;margin-bottom:0.35rem;">
+                            <div style="height:100%;width:${(fundScore / 20 * 100).toFixed(0)}%;background:#8b5cf6;border-radius:3px;"></div>
+                        </div>
+                        <div style="font-size:0.67rem;color:#cbd5e1;">Avg Quality: <strong>${d.avg_quality_score != null ? d.avg_quality_score + '/9' : '—'}</strong></div>
+                    </div>
+                </div>
+
+                <!-- Key Levels & Execution Plan Grid -->
+                <div style="background:rgba(15,23,42,0.8);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.8rem 1rem;margin-bottom:0.9rem;">
+                    <div style="font-size:0.72rem;font-weight:700;color:#38bdf8;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.6rem;">
+                        🎯 Key Trading & Breakout Execution Levels
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.6rem;text-align:center;">
+                        <div style="background:rgba(255,255,255,0.03);padding:0.5rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="font-size:0.65rem;color:#94a3b8;margin-bottom:0.15rem;">Current Price</div>
+                            <div style="font-size:1.05rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);">${curPrice}</div>
+                        </div>
+                        <div style="background:rgba(234,179,8,0.08);padding:0.5rem;border-radius:6px;border:1px solid rgba(234,179,8,0.25);">
+                            <div style="font-size:0.65rem;color:#fbbf24;font-weight:700;margin-bottom:0.15rem;">⚡ Trigger Level</div>
+                            <div style="font-size:1.05rem;font-weight:800;color:#fef08a;font-family:var(--font-mono);">${triggerPrice}</div>
+                        </div>
+                        <div style="background:rgba(16,185,129,0.08);padding:0.5rem;border-radius:6px;border:1px solid rgba(16,185,129,0.25);">
+                            <div style="font-size:0.65rem;color:#34d399;font-weight:700;margin-bottom:0.15rem;">🎯 Upside Target</div>
+                            <div style="font-size:1.05rem;font-weight:800;color:#6ee7b7;font-family:var(--font-mono);">${targetPrice}</div>
+                        </div>
+                        <div style="background:rgba(239,68,68,0.08);padding:0.5rem;border-radius:6px;border:1px solid rgba(239,68,68,0.25);">
+                            <div style="font-size:0.65rem;color:#f87171;font-weight:700;margin-bottom:0.15rem;">🛑 Stop Loss</div>
+                            <div style="font-size:1.05rem;font-weight:800;color:#fca5a5;font-family:var(--font-mono);">${stopLoss}</div>
+                        </div>
+                        <div style="background:rgba(59,130,246,0.08);padding:0.5rem;border-radius:6px;border:1px solid rgba(59,130,246,0.25);">
+                            <div style="font-size:0.65rem;color:#60a5fa;font-weight:700;margin-bottom:0.15rem;">⚖️ Risk / Reward</div>
+                            <div style="font-size:1.05rem;font-weight:800;color:#93c5fd;font-family:var(--font-mono);">${rrRatio}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Narrative Rationale Box -->
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.7rem 0.9rem;margin-bottom:0.9rem;font-size:0.75rem;color:#cbd5e1;line-height:1.45;">
+                    <div style="display:flex;align-items:center;gap:0.35rem;font-weight:700;color:#38bdf8;margin-bottom:0.3rem;">
+                        <span>📜</span> Setup Archetype: <span style="color:#f8fafc;">${d.setup_archetype || 'Technical Breakout Candidate'}</span>
+                    </div>
+                    <div>${calcNotes.formula_summary || 'Formula calculation verified against price history sequence.'}</div>
+                </div>
+
+                <!-- Action Bar -->
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;padding-top:0.6rem;border-top:1px solid rgba(255,255,255,0.08);">
+                    <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                        <button type="button" onclick="app.openAiConsensusForStock('${sym}')" class="btn-micro" style="background:rgba(139,92,246,0.18);color:#c084fc;border:1px solid rgba(139,92,246,0.3);padding:0.3rem 0.65rem;">
+                            <span>🧠</span> AI Consensus
+                        </button>
+                        <button type="button" onclick="app.openKronosForStock('${sym}')" class="btn-micro" style="background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.3rem 0.65rem;">
+                            <span>🔮</span> Kronos 14D Forecast
+                        </button>
+                        <button type="button" onclick="window.open('/stock/' + encodeURIComponent('${sym}'), '_blank')" class="btn-micro" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.3rem 0.65rem;">
+                            <span>📊</span> Full Stock Intelligence ↗
+                        </button>
+                    </div>
+
+                    <button type="button" onclick="app.clearBreakoutEvaluator()" class="btn-micro" style="background:rgba(255,255,255,0.06);color:#94a3b8;padding:0.3rem 0.65rem;">
+                        Dismiss Audit ✕
+                    </button>
+                </div>
+            `;
+
+            // Scroll card into view gently
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        };
+
+        app.openAiConsensusForStock = function(ticker) {
+            if (typeof app.switchTab === 'function') {
+                app.switchTab('consensus');
+                setTimeout(() => {
+                    const input = document.getElementById('consensusTickerInput');
+                    if (input) {
+                        input.value = ticker;
+                        if (typeof app.loadConsensusPrediction === 'function') {
+                            app.loadConsensusPrediction(ticker);
+                        }
+                    }
+                }, 150);
+            } else {
+                window.open('/stock/' + encodeURIComponent(ticker) + '#consensus', '_blank');
+            }
+        };
+
+        app.openKronosForStock = function(ticker) {
+            if (typeof app.switchTab === 'function') {
+                app.switchTab('kronos');
+                setTimeout(() => {
+                    const input = document.getElementById('kronosSymbolInput');
+                    if (input) {
+                        input.value = ticker;
+                        if (typeof app.loadKronosPrediction === 'function') {
+                            app.loadKronosPrediction(ticker);
+                        }
+                    }
+                }, 150);
+            } else {
+                window.open('/stock/' + encodeURIComponent(ticker) + '#kronos', '_blank');
+            }
         };
 
         // =========================================================================

@@ -1099,6 +1099,163 @@ async def tiered_scanner_loop(settings: Settings) -> None:
 
 
 # ---------------------------------------------------------------------------
+# On-Demand Single-Stock Evaluation & Ticker Search
+# ---------------------------------------------------------------------------
+
+def evaluate_stock_breakout(
+    ticker: str,
+    asof_date: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Evaluate a single stock on-demand for Breakout Radar setup conviction, key levels, and sub-score metrics."""
+    settings = settings or Settings()
+    raw = (ticker or "").strip().upper()
+    if not raw:
+        return {"success": False, "error": "Ticker symbol cannot be empty."}
+
+    # Normalize ticker (append .NS for Indian equities if missing suffix)
+    sym = raw
+    if not (sym.endswith(".NS") or sym.endswith(".BO") or "." in sym):
+        sym = f"{sym}.NS"
+
+    from earnings_engine.data.prices import load_prices, load_price_metrics, fetch_prices
+    from earnings_engine.data.universe import load_market_cap
+
+    prices_df = load_prices(sym, settings)
+    if prices_df is None or len(prices_df) < 15:
+        # Try raw symbol or fetch/ingest
+        prices_df = load_prices(raw, settings)
+        if prices_df is None or len(prices_df) < 15:
+            try:
+                prices_df = fetch_prices(sym, settings, force=False)
+            except Exception as e:
+                logger.warning("[BREAKOUT-EVAL] Fallback fetch failed for %s: %s", sym, e)
+
+    if prices_df is None or prices_df.empty or len(prices_df) < 10:
+        return {
+            "success": False,
+            "error": f"Insufficient price history found for {sym}. Please ensure the symbol is valid and has trading history.",
+            "ticker": sym,
+        }
+
+    metrics = load_price_metrics(sym, settings) or load_price_metrics(raw, settings) or {}
+    company_name = metrics.get("company_name") or sym.replace(".NS", "")
+    industry = metrics.get("industry") or metrics.get("sector") or "General Equities"
+
+    quality_scores = [
+        float(metrics.get(k)) if metrics.get(k) is not None else None
+        for k in ("q1_earnings_score", "q2_earnings_score", "q3_earnings_score")
+    ]
+
+    scored = score_breakout(sym, prices_df, quality_scores, asof_date=asof_date)
+    if not scored:
+        return {
+            "success": False,
+            "error": f"Could not compute breakout metrics for {sym}.",
+            "ticker": sym,
+        }
+
+    scored["company_name"] = company_name
+    scored["industry"] = industry
+    scored["success"] = True
+
+    # Setup Conviction Tier
+    comp_score = scored.get("composite_score", 0)
+    if comp_score >= HOT_THRESHOLD:
+        tier = "HOT"
+        tier_label = "🔥 High Conviction Setup"
+        tier_badge = "emerald"
+    elif comp_score >= WARM_THRESHOLD:
+        tier = "WARM"
+        tier_label = "⚡ Coiling / Approaching Trigger"
+        tier_badge = "amber"
+    else:
+        tier = "COLD"
+        tier_label = "💤 Low Momentum / Dormant"
+        tier_badge = "slate"
+
+    scored["tier"] = tier
+    scored["tier_label"] = tier_label
+    scored["tier_badge"] = tier_badge
+
+    return scored
+
+
+def search_breakout_tickers(
+    query: str,
+    limit: int = 15,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Fast auto-complete lookup for stocks across price cache and universe registry."""
+    settings = settings or Settings()
+    q = (query or "").strip().upper()
+    if not q:
+        return []
+
+    from earnings_engine.data.db import get_db_connection
+    results: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    try:
+        conn = get_db_connection(settings)
+        # 1. Search in tickers table
+        rows = conn.execute(
+            """
+            SELECT ticker, name, sector, industry
+            FROM tickers
+            WHERE ticker LIKE ? OR name LIKE ?
+            ORDER BY CASE WHEN ticker LIKE ? THEN 1 WHEN ticker LIKE ? THEN 2 ELSE 3 END, ticker
+            LIMIT ?
+            """,
+            (f"{q}%", f"%{q}%", f"{q}", f"{q}%", limit),
+        ).fetchall()
+
+        for r in rows:
+            sym = r[0].upper()
+            if sym not in seen:
+                seen.add(sym)
+                market = "NSE" if sym.endswith(".NS") else ("BSE" if sym.endswith(".BO") else "US")
+                results.append({
+                    "symbol": sym,
+                    "name": r[1] or sym.replace(".NS", ""),
+                    "market": market,
+                    "sector": r[2] or "Equities",
+                })
+    except Exception as e:
+        logger.debug("[BREAKOUT-SEARCH] Tickers table search error: %s", e)
+
+    # 2. Fallback: Search distinct tickers in price_history or universes if needed
+    if len(results) < limit:
+        try:
+            conn = get_db_connection(settings)
+            more_rows = conn.execute(
+                """
+                SELECT DISTINCT ticker
+                FROM price_history
+                WHERE ticker LIKE ?
+                LIMIT ?
+                """,
+                (f"%{q}%", limit - len(results)),
+            ).fetchall()
+            for r in more_rows:
+                sym = r[0].upper()
+                if sym not in seen:
+                    seen.add(sym)
+                    market = "NSE" if sym.endswith(".NS") else ("BSE" if sym.endswith(".BO") else "US")
+                    results.append({
+                        "symbol": sym,
+                        "name": sym.replace(".NS", ""),
+                        "market": market,
+                        "sector": "Equities",
+                    })
+        except Exception as e:
+            logger.debug("[BREAKOUT-SEARCH] Price history search error: %s", e)
+
+    return results[:limit]
+
+
+# ---------------------------------------------------------------------------
 # Legacy compat alias
 # ---------------------------------------------------------------------------
 breakout_scanner_loop = tiered_scanner_loop
+
