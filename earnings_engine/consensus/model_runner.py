@@ -132,6 +132,10 @@ def _query_local_model(
                 ],
                 "temperature": 0.3,
                 "max_tokens": 4096,
+                "options": {
+                    "num_ctx": 4096,
+                    "temperature": 0.3,
+                },
             },
             timeout=timeout,
         )
@@ -162,7 +166,10 @@ def _query_local_model(
                     ],
                     "format": "json",
                     "stream": False,
-                    "options": {"temperature": 0.3},
+                    "options": {
+                        "num_ctx": 4096,
+                        "temperature": 0.3,
+                    },
                 },
                 timeout=timeout,
             )
@@ -188,6 +195,10 @@ def _query_local_model(
                     "prompt": full_user_prompt,
                     "format": "json",
                     "stream": False,
+                    "options": {
+                        "num_ctx": 4096,
+                        "temperature": 0.3,
+                    },
                 },
                 timeout=timeout,
             )

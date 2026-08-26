@@ -49,6 +49,14 @@
                             <span id="wlLiveIndicator" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f87171;"></span>
                             <span id="wlLiveBtnText">🔴 Track Live Prices</span>
                         </button>
+                        <select id="wlLiveIntervalSelect" onchange="app.watchlistTab.setLiveInterval(this.value)" style="height:28px;padding:0 0.45rem;font-size:0.72rem;background:#000000;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:4px;outline:none;" title="Select auto-refresh interval for live prices">
+                            <option value="30000">⏱️ 30s</option>
+                            <option value="60000">⏱️ 1 min</option>
+                            <option value="120000">⏱️ 2 min</option>
+                            <option value="300000" selected>⏱️ 5 min (Default)</option>
+                            <option value="600000">⏱️ 10 min</option>
+                            <option value="900000">⏱️ 15 min</option>
+                        </select>
                         <button type="button" id="wlFetchLiveBtn" onclick="app.watchlistTab.fetchLiveQuotes()" class="btn btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-weight:600;display:flex;align-items:center;gap:0.3rem;" title="Fetch latest intraday OHLCV once">⚡ Refresh Live</button>
                         <button onclick="app.watchlistTab.load(true)" class="btn btn-sm" title="Reload from cache">🔄 Reload</button>
                         <button onclick="app.watchlistTab.addWatchlist()" class="btn btn-primary btn-sm" style="font-weight:600;">＋ New Watchlist</button>

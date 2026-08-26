@@ -243,20 +243,39 @@
                     await this.loadActiveQuotes(true);
                 },
 
-                toggleLiveTracking() {
-                    this.isLiveTracking = !this.isLiveTracking;
+                setLiveInterval(ms) {
+                    this.liveIntervalMs = parseInt(ms, 10) || 300000;
+                    localStorage.setItem('nexus_wl_refresh_interval', this.liveIntervalMs);
                     this.updateLiveButtonUI();
-
                     if (this.isLiveTracking) {
-                        // Immediately fetch live once
-                        this.loadActiveQuotes(true);
-                        // Poll live prices every 10s silently
                         if (this._liveInterval) clearInterval(this._liveInterval);
                         this._liveInterval = setInterval(() => {
                             if (this.isLiveTracking && this.viewMode === 'list') {
                                 this.loadActiveQuotes(true, true);
                             }
-                        }, 10000);
+                        }, this.liveIntervalMs);
+                    }
+                },
+
+                toggleLiveTracking() {
+                    this.isLiveTracking = !this.isLiveTracking;
+                    this.liveIntervalMs = parseInt(localStorage.getItem('nexus_wl_refresh_interval') || '300000', 10);
+                    
+                    const sel = document.getElementById('wlLiveIntervalSelect');
+                    if (sel) sel.value = String(this.liveIntervalMs);
+
+                    this.updateLiveButtonUI();
+
+                    if (this.isLiveTracking) {
+                        // Immediately fetch live once
+                        this.loadActiveQuotes(true);
+                        // Poll live prices every interval (default 5m = 300000ms) silently
+                        if (this._liveInterval) clearInterval(this._liveInterval);
+                        this._liveInterval = setInterval(() => {
+                            if (this.isLiveTracking && this.viewMode === 'list') {
+                                this.loadActiveQuotes(true, true);
+                            }
+                        }, this.liveIntervalMs);
                     } else {
                         if (this._liveInterval) {
                             clearInterval(this._liveInterval);
@@ -271,11 +290,15 @@
                     const ind = document.getElementById('wlLiveIndicator');
                     if (!btn || !text || !ind) return;
 
+                    const intervalMs = this.liveIntervalMs || parseInt(localStorage.getItem('nexus_wl_refresh_interval') || '300000', 10);
+                    const intervalSec = Math.round(intervalMs / 1000);
+                    const intervalLabel = intervalSec >= 60 ? `${Math.round(intervalSec / 60)}m` : `${intervalSec}s`;
+
                     if (this.isLiveTracking) {
                         btn.style.background = 'rgba(239,68,68,0.25)';
                         btn.style.borderColor = '#ef4444';
                         btn.style.color = '#fca5a5';
-                        text.textContent = '🔴 Live (Auto-Refresh 10s)';
+                        text.textContent = `🔴 Live (${intervalLabel})`;
                         ind.style.background = '#ef4444';
                         ind.style.boxShadow = '0 0 8px #ef4444';
                     } else {

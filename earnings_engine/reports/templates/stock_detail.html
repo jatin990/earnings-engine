@@ -712,6 +712,18 @@
                 ⭐ Watchlist
             </button>
 
+            <!-- Auto-Refresh Price Interval -->
+            <div style="display: inline-flex; align-items: center; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 4px; height: 28px;" title="Auto-refresh price & stock intelligence interval">
+                <span style="font-size: 0.68rem; color: var(--text-tertiary); margin-right: 3px;">🔄</span>
+                <select id="stockLiveIntervalSelect" onchange="setStockLiveInterval(this.value)" style="background: transparent; border: none; color: var(--text-secondary); font-size: 0.72rem; outline: none; cursor: pointer;">
+                    <option value="0">Off (Manual)</option>
+                    <option value="60000">1 min</option>
+                    <option value="120000">2 min</option>
+                    <option value="300000" selected>5 min (Default)</option>
+                    <option value="900000">15 min</option>
+                </select>
+            </div>
+
             <!-- Timeframe Selector -->
             <div class="timeframe-pill-group" title="Select analysis & prediction forecast horizon">
                 <span style="font-size: 0.68rem; color: var(--text-tertiary); padding-left: 0.35rem; padding-right: 0.15rem; font-weight: 700;">⏱️</span>
@@ -1442,6 +1454,23 @@
         let currentLocalHost = localStorage.getItem('nexus_local_llm_host') || 'http://localhost:11434';
         let activeLocalModels = JSON.parse(localStorage.getItem('nexus_active_local_models') || '["deepseek-r1:8b"]');
         let availableLocalModelsList = [];
+        let stockLiveIntervalTimer = null;
+        let stockLiveIntervalMs = parseInt(localStorage.getItem('nexus_stock_refresh_interval') || '300000', 10);
+
+        function setStockLiveInterval(ms) {
+            stockLiveIntervalMs = parseInt(ms, 10);
+            localStorage.setItem('nexus_stock_refresh_interval', stockLiveIntervalMs);
+            if (stockLiveIntervalTimer) {
+                clearInterval(stockLiveIntervalTimer);
+                stockLiveIntervalTimer = null;
+            }
+            if (stockLiveIntervalMs > 0) {
+                stockLiveIntervalTimer = setInterval(() => {
+                    fetchStockDetails(false);
+                    fetchRateLimits();
+                }, stockLiveIntervalMs);
+            }
+        }
 
         function updateLocalModelBadge() {
             const lbl = document.getElementById('lblLocalModel');
@@ -1799,6 +1828,10 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            const stockIntSel = document.getElementById('stockLiveIntervalSelect');
+            if (stockIntSel) stockIntSel.value = String(stockLiveIntervalMs);
+            setStockLiveInterval(stockLiveIntervalMs);
+
             updateLocalModelBadge();
             fetchStockDetails();
             fetchRateLimits();
