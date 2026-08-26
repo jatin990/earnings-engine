@@ -13610,10 +13610,12 @@
                 }
                 this.renderCandidates();
             },
+        };
 
-            // =========================================================================
-            // ⏱️ Automation Schedules & Background Job Monitor
-            // =========================================================================
+        // =========================================================================
+        // ⏱️ Automation Schedules & Background Job Monitor
+        // =========================================================================
+        Object.assign(app, {
             _automationSchedules: [],
             _scheduleTimerStarted: false,
 
@@ -14086,7 +14088,7 @@
                     console.error('Error fetching fund portfolio:', e);
                 }
             }
-        };
+        });
 
         // Initialize & export to window
         window.app = app;
