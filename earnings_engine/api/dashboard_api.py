@@ -1041,15 +1041,26 @@ def get_watchlist_quotes_api(
     if not ticker_list:
         return {"success": True, "watchlist": watchlist, "count": 0, "is_live": live, "items": []}
 
-    auto_live = live or (len(ticker_list) < 10)
+    auto_live = bool(live)
     all_ranges = swing_ranges_mod.list_ranges(watchlist, settings)
     range_map = {r["ticker"]: r for r in all_ranges if "ticker" in r}
     all_caps = load_all_market_caps(settings)
 
+    # Pre-fetch ticker company names if available
+    ticker_names = {}
+    try:
+        from earnings_engine.data.db import get_db_connection
+        conn = get_db_connection(settings)
+        placeholders = ",".join("?" for _ in ticker_list)
+        rows = conn.execute(f"SELECT ticker, name FROM tickers WHERE ticker IN ({placeholders})", ticker_list).fetchall()
+        ticker_names = {r[0]: r[1] for r in rows if r[1]}
+    except Exception:
+        pass
+
     def process_ticker(t: str) -> dict[str, Any]:
         item = {
             "ticker": t,
-            "company_name": t,
+            "company_name": ticker_names.get(t) or t.replace(".NS", ""),
             "current_price": None,
             "previous_close": None,
             "change": None,
@@ -1076,6 +1087,8 @@ def get_watchlist_quotes_api(
 
         # 1. Swing Range
         sr = range_map.get(t) or swing_ranges_mod.get_swing_range(watchlist, t, settings)
+        if not sr and watchlist != "ALL":
+            sr = swing_ranges_mod.get_swing_range("ALL", t, settings)
         if sr:
             item["support"] = sr.get("lower") or sr.get("lower_bound")
             item["resistance"] = sr.get("upper") or sr.get("upper_bound")
@@ -1159,6 +1172,19 @@ def get_watchlist_quotes_api(
                                 item["volume_formatted"] = str(int(v))
 
                     item["last_updated"] = str(df.index[-1])[:10] if hasattr(df.index[-1], "strftime") or isinstance(df.index[-1], str) else str(df.index[-1])
+
+                    # Auto-detect missing support & resistance bounds on the fly
+                    if item.get("support") is None and len(closes) >= 10:
+                        try:
+                            from earnings_engine.data.market_context import detect_swing_range
+                            auto_rng = detect_swing_range(closes)
+                            if auto_rng and auto_rng.get("lower") is not None and auto_rng.get("upper") is not None:
+                                item["support"] = round(float(auto_rng["lower"]), 2)
+                                item["resistance"] = round(float(auto_rng["upper"]), 2)
+                                item["cycles"] = auto_rng.get("cycles")
+                                item["range_source"] = "auto"
+                        except Exception:
+                            pass
             except Exception as exc:
                 logger.debug("Error computing OHLCV for %s: %s", t, exc)
 

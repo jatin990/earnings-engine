@@ -115,10 +115,8 @@
                     }
                 },
 
-                selectActiveWatchlist(name) {
-                    this.activeWatchlist = name || (this.customLists.length ? this.customLists[0].name : 'my_watchlist');
-                    this.loadActiveQuotes(false);
-                },
+                isLiveTracking: false,
+                _liveInterval: null,
 
                 async load(forceRefresh = false) {
                     const el = document.getElementById('watchlistCards');
@@ -171,7 +169,18 @@
                     }
                 },
 
-                async loadActiveQuotes(forceLive = false) {
+                selectActiveWatchlist(name) {
+                    if (this._liveInterval) {
+                        clearInterval(this._liveInterval);
+                        this._liveInterval = null;
+                        this.isLiveTracking = false;
+                        this.updateLiveButtonUI();
+                    }
+                    this.activeWatchlist = name || (this.customLists.length ? this.customLists[0].name : 'my_watchlist');
+                    this.loadActiveQuotes(false);
+                },
+
+                async loadActiveQuotes(forceLive = false, silent = false) {
                     const tbody = document.getElementById('wlQuotesTableBody');
                     const titleEl = document.getElementById('wlTableTitle');
                     const countEl = document.getElementById('wlTableCount');
@@ -180,12 +189,14 @@
 
                     if (!tbody) return;
                     this.isLoadingQuotes = true;
-                    if (fetchBtn && forceLive) {
+                    if (fetchBtn && forceLive && !silent) {
                         fetchBtn.disabled = true;
-                        fetchBtn.innerHTML = '⏳ Fetching Live Quotes...';
+                        fetchBtn.innerHTML = '⏳ Fetching...';
                     }
 
-                    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading OHLCV data & live metrics for ' + this.activeWatchlist + '...</td></tr>';
+                    if (!silent && (!this.quotesData || !this.quotesData.length)) {
+                        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading OHLCV data for ' + this.activeWatchlist + '...</td></tr>';
+                    }
 
                     try {
                         const targetWl = this.activeWatchlist || 'my_watchlist';
@@ -201,25 +212,127 @@
                             countEl.textContent = this.quotesData.length + ' stocks';
                         }
                         if (statusBadge) {
-                            statusBadge.style.display = data.is_live ? 'inline-block' : 'none';
-                            statusBadge.textContent = data.is_live ? '⚡ Live Quotes Synced' : '📦 Cached Quotes';
+                            statusBadge.style.display = 'inline-block';
+                            if (forceLive || this.isLiveTracking) {
+                                statusBadge.style.background = 'rgba(16,185,129,0.15)';
+                                statusBadge.style.color = '#34d399';
+                                statusBadge.textContent = '⚡ Live Quotes (' + new Date().toLocaleTimeString() + ')';
+                            } else {
+                                statusBadge.style.background = 'rgba(59,130,246,0.15)';
+                                statusBadge.style.color = '#60a5fa';
+                                statusBadge.textContent = '📦 Cached OHLCV';
+                            }
                         }
 
                         this.renderQuotesTable();
                     } catch (e) {
                         console.error('Error loading watchlist quotes:', e);
-                        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:1.5rem;color:var(--red);">Error loading quotes for ' + this.activeWatchlist + '.</td></tr>';
+                        if (!silent) {
+                            tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:1.5rem;color:var(--red);">Error loading quotes for ' + this.activeWatchlist + '.</td></tr>';
+                        }
                     } finally {
                         this.isLoadingQuotes = false;
                         if (fetchBtn) {
                             fetchBtn.disabled = false;
-                            fetchBtn.innerHTML = '⚡ Fetch Live OHLCV';
+                            fetchBtn.innerHTML = '⚡ Refresh Live';
                         }
                     }
                 },
 
                 async fetchLiveQuotes() {
                     await this.loadActiveQuotes(true);
+                },
+
+                toggleLiveTracking() {
+                    this.isLiveTracking = !this.isLiveTracking;
+                    this.updateLiveButtonUI();
+
+                    if (this.isLiveTracking) {
+                        // Immediately fetch live once
+                        this.loadActiveQuotes(true);
+                        // Poll live prices every 10s silently
+                        if (this._liveInterval) clearInterval(this._liveInterval);
+                        this._liveInterval = setInterval(() => {
+                            if (this.isLiveTracking && this.viewMode === 'list') {
+                                this.loadActiveQuotes(true, true);
+                            }
+                        }, 10000);
+                    } else {
+                        if (this._liveInterval) {
+                            clearInterval(this._liveInterval);
+                            this._liveInterval = null;
+                        }
+                    }
+                },
+
+                updateLiveButtonUI() {
+                    const btn = document.getElementById('wlLiveToggleBtn');
+                    const text = document.getElementById('wlLiveBtnText');
+                    const ind = document.getElementById('wlLiveIndicator');
+                    if (!btn || !text || !ind) return;
+
+                    if (this.isLiveTracking) {
+                        btn.style.background = 'rgba(239,68,68,0.25)';
+                        btn.style.borderColor = '#ef4444';
+                        btn.style.color = '#fca5a5';
+                        text.textContent = '🔴 Live (Auto-Refresh 10s)';
+                        ind.style.background = '#ef4444';
+                        ind.style.boxShadow = '0 0 8px #ef4444';
+                    } else {
+                        btn.style.background = 'rgba(239,68,68,0.12)';
+                        btn.style.borderColor = 'rgba(239,68,68,0.35)';
+                        btn.style.color = '#f87171';
+                        text.textContent = '🔴 Track Live Prices';
+                        ind.style.background = '#f87171';
+                        ind.style.boxShadow = 'none';
+                    }
+                },
+
+                async autoDetectRowRange(ticker, btn) {
+                    if (!ticker) return;
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Detecting...';
+                    }
+                    try {
+                        const wl = this.activeWatchlist || 'my_watchlist';
+                        const res = await fetch(API_BASE + '/api/v1/swing-range?watchlist=' + encodeURIComponent(wl) + '&ticker=' + encodeURIComponent(ticker));
+                        const data = await res.json();
+                        const autoRng = data.auto_range || data.range || {};
+                        const low = autoRng.lower != null ? Number(autoRng.lower) : (autoRng.lower_bound != null ? Number(autoRng.lower_bound) : null);
+                        const high = autoRng.upper != null ? Number(autoRng.upper) : (autoRng.upper_bound != null ? Number(autoRng.upper_bound) : null);
+
+                        if (low != null && high != null) {
+                            // Update internal item in-place
+                            const it = this.quotesData.find(x => x.ticker === ticker);
+                            if (it) {
+                                it.support = low;
+                                it.resistance = high;
+                                it.cycles = autoRng.cycles;
+                                it.range_source = 'auto';
+                            }
+                            this.ranges[wl + ':' + ticker] = {
+                                watchlist: wl,
+                                ticker: ticker,
+                                lower_bound: low,
+                                upper_bound: high,
+                                source: 'auto'
+                            };
+                            // Re-render in-place without network reload
+                            this.renderQuotesTable();
+                        } else {
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.innerHTML = '⚠️ No Channel';
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error auto-detecting swing range for ' + ticker, e);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = '⚠️ Error';
+                        }
+                    }
                 },
 
                 renderQuotesTable() {
@@ -261,22 +374,22 @@
                         const pctH = it.pct_from_52w_high != null ? (it.pct_from_52w_high >= 0 ? '+' : '') + Number(it.pct_from_52w_high).toFixed(1) + '%' : '';
                         const pctHColor = it.pct_from_52w_high != null ? (Number(it.pct_from_52w_high) >= -5 ? '#34d399' : (Number(it.pct_from_52w_high) <= -25 ? '#f87171' : '#fbbf24')) : '#a1a1aa';
 
-                        // Swing Support / Resistance
+                        // Swing Support / Resistance with explicit cursor:pointer and interactive Auto Detect button
                         const s = it.support != null ? currSymbol + Number(it.support).toFixed(2) : '—';
                         const r = it.resistance != null ? currSymbol + Number(it.resistance).toFixed(2) : '—';
                         const rangeStr = (it.support != null && it.resistance != null)
-                            ? '<span style="font-size:0.75rem;font-family:var(--font-mono);">' + s + ' – ' + r + '</span>'
-                            : '<span style="font-size:0.72rem;color:var(--muted);">Auto Detect</span>';
+                            ? '<button type="button" onclick="app.openSwingRangeModal(\'' + this.activeWatchlist.replace(/'/g, "\\'") + '\',\'' + it.ticker + '\')" class="btn-micro" style="font-size:0.75rem;font-family:var(--font-mono);cursor:pointer;color:#38bdf8;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);border-radius:4px;padding:0.12rem 0.4rem;" title="Inspect & edit swing range">' + s + ' – ' + r + '</button>'
+                            : '<button type="button" onclick="app.watchlistTab.autoDetectRowRange(\'' + it.ticker + '\', this)" class="btn-micro" style="font-size:0.7rem;font-weight:700;cursor:pointer;color:#fbbf24;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:0.15rem 0.45rem;display:inline-flex;align-items:center;gap:0.2rem;" title="Auto-detect support & resistance range"><span>⚡</span> Auto Detect</button>';
 
                         return '<tr class="interactive-row">' +
                             '<td>' +
                                 '<div style="display:flex;align-items:center;gap:0.4rem;">' +
-                                    '<button onclick="app.openAddToWatchlistModal(\'' + it.ticker + '\')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.85rem;" title="Manage Watchlists">⭐</button>' +
+                                    '<button onclick="app.openAddToWatchlistModal(\'' + it.ticker + '\')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.85rem;cursor:pointer;" title="Manage Watchlists">⭐</button>' +
                                     '<div>' +
                                         '<strong onclick="app.openSwingRangeModal(\'' + this.activeWatchlist.replace(/'/g, "\\'") + '\',\'' + it.ticker + '\')" style="color:#ffffff;font-size:0.85rem;cursor:pointer;" class="hover-underline" title="Inspect & edit swing range">' + it.ticker + '</strong>' +
-                                        '<a href="/stock/' + encodeURIComponent(it.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a>' +
+                                        '<a href="/stock/' + encodeURIComponent(it.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;cursor:pointer;" title="Open profile in new tab">↗</a>' +
                                         '<div style="font-size:0.7rem;color:#a1a1aa;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (it.company_name || it.ticker) + '</div>' +
-                                    '</div>' +
+                                    </div>' +
                                 '</div>' +
                             '</td>' +
                             '<td style="text-align:right;"><strong style="font-size:0.88rem;color:#ffffff;font-family:var(--font-mono);">' + p + '</strong></td>' +
@@ -293,14 +406,14 @@
                             '<td style="text-align:center;">' +
                                 '<div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">' +
                                     rangeStr +
-                                    '<button onclick="app.openSwingRangeModal(\'' + this.activeWatchlist.replace(/'/g, "\\'") + '\',\'' + it.ticker + '\')" class="btn-micro" style="color:var(--muted);padding:0 0.15rem;font-size:0.75rem;border:none;background:transparent;" title="Edit Swing Range">⚙</button>' +
+                                    '<button onclick="app.openSwingRangeModal(\'' + this.activeWatchlist.replace(/'/g, "\\'") + '\',\'' + it.ticker + '\')" class="btn-micro" style="color:var(--muted);padding:0 0.15rem;font-size:0.75rem;border:none;background:transparent;cursor:pointer;" title="Edit Swing Range">⚙</button>' +
                                 '</div>' +
                             '</td>' +
                             '<td style="text-align:center;">' +
                                 '<div style="display:flex;gap:0.25rem;align-items:center;justify-content:center;">' +
-                                    '<button type="button" onclick="app.runConsensusForStock(\'' + it.ticker + '\')" class="btn btn-sm" style="padding:0.12rem 0.4rem;font-size:0.68rem;background:rgba(99,102,241,0.2);color:#c7d2fe;border:1px solid rgba(99,102,241,0.4);border-radius:3px;" title="Run AI Consensus">🧠</button>' +
-                                    '<button type="button" onclick="app.runPredictionForTickerSingle(\'' + it.ticker + '\')" class="btn btn-sm" style="padding:0.12rem 0.4rem;font-size:0.68rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:3px;" title="Run Kronos AI">🔮</button>' +
-                                    '<button type="button" onclick="app.watchlistTab.removeQuoteTicker(\'' + it.ticker + '\')" class="btn btn-sm btn-danger" style="padding:0.12rem 0.35rem;font-size:0.72rem;border-radius:3px;" title="Remove from this watchlist">🗑</button>' +
+                                    '<button type="button" onclick="app.runConsensusForStock(\'' + it.ticker + '\')" class="btn btn-sm" style="padding:0.12rem 0.4rem;font-size:0.68rem;background:rgba(99,102,241,0.2);color:#c7d2fe;border:1px solid rgba(99,102,241,0.4);border-radius:3px;cursor:pointer;" title="Run AI Consensus">🧠</button>' +
+                                    '<button type="button" onclick="app.runPredictionForTickerSingle(\'' + it.ticker + '\')" class="btn btn-sm" style="padding:0.12rem 0.4rem;font-size:0.68rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:3px;cursor:pointer;" title="Run Kronos AI">🔮</button>' +
+                                    '<button type="button" onclick="app.watchlistTab.removeQuoteTicker(\'' + it.ticker + '\')" class="btn btn-sm btn-danger" style="padding:0.12rem 0.35rem;font-size:0.72rem;border-radius:3px;cursor:pointer;" title="Remove from this watchlist">🗑</button>' +
                                 '</div>' +
                             '</td>' +
                         '</tr>';
@@ -6530,11 +6643,31 @@
                         statusEl.textContent = 'Saved custom range successfully!';
                         statusEl.style.color = 'var(--green)';
                         const badge = document.getElementById('srModalSourceBadge');
-                        badge.textContent = 'Custom (User Override)';
-                        badge.style.background = 'rgba(59,130,246,0.25)';
-                        badge.style.color = '#60a5fa';
-                        // Refresh active tabs
-                        if (app.watchlistTab && app.watchlistTab.load) app.watchlistTab.load();
+                        if (badge) {
+                            badge.textContent = 'Custom (User Override)';
+                            badge.style.background = 'rgba(59,130,246,0.25)';
+                            badge.style.color = '#60a5fa';
+                        }
+                        // Update in-place in watchlist table without full list reload
+                        if (app.watchlistTab && app.watchlistTab.quotesData) {
+                            const it = app.watchlistTab.quotesData.find(x => x.ticker === ticker);
+                            if (it) {
+                                it.support = lower;
+                                it.resistance = upper;
+                                it.cycles = cycles;
+                                it.range_source = 'user';
+                            }
+                            if (app.watchlistTab.ranges) {
+                                app.watchlistTab.ranges[watchlist + ':' + ticker] = {
+                                    watchlist: watchlist,
+                                    ticker: ticker,
+                                    lower_bound: lower,
+                                    upper_bound: upper,
+                                    source: 'user'
+                                };
+                            }
+                            app.watchlistTab.renderQuotesTable();
+                        }
                         if (app.loadSwing) app.loadSwing();
                     } else {
                         statusEl.textContent = 'Error: ' + (data.detail || data.error || 'Failed to save');
@@ -6568,8 +6701,18 @@
                     statusEl.textContent = 'Reset to auto-detected range!';
                     statusEl.style.color = 'var(--green)';
                     await this.openSwingRangeModal(watchlist, ticker);
-                    // Refresh tabs
-                    if (app.watchlistTab && app.watchlistTab.load) app.watchlistTab.load();
+                    // Update in-place in watchlist tab
+                    if (app.watchlistTab && app.watchlistTab.quotesData) {
+                        const it = app.watchlistTab.quotesData.find(x => x.ticker === ticker);
+                        if (it) {
+                            it.range_source = 'auto';
+                            if (data.auto_range) {
+                                it.support = data.auto_range.lower;
+                                it.resistance = data.auto_range.upper;
+                            }
+                        }
+                        app.watchlistTab.renderQuotesTable();
+                    }
                     if (app.loadSwing) app.loadSwing();
                 } catch (e) {
                     console.error('Error resetting swing range:', e);

@@ -2621,6 +2621,20 @@ async def swing_range_set(request: dict):
         raise HTTPException(status_code=500, detail=f"Error setting swing range: {str(e)}")
 
 
+@app.post("/api/v1/swing-range/auto-detect", tags=["Swing"])
+@app.post("/api/v1/dashboard/swing-range/auto-detect", tags=["Swing"])
+async def swing_range_auto_detect(request: dict):
+    """Trigger auto-detection of swing channel support & resistance for a ticker."""
+    ticker = request.get("ticker", "").strip().upper()
+    watchlist = request.get("watchlist", "ALL")
+    if not ticker:
+        raise HTTPException(status_code=400, detail="ticker is required")
+    try:
+        return await asyncio.to_thread(get_swing_range_api, watchlist=watchlist, ticker=ticker)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error auto-detecting swing range: {str(e)}")
+
+
 @app.delete("/api/v1/swing-range", tags=["Swing"])
 @app.delete("/api/v1/dashboard/swing-range", tags=["Swing"])
 async def swing_range_delete(
