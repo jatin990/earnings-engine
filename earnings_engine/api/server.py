@@ -4809,6 +4809,16 @@ async def get_breakout_radar(
         stop_p = c.get("stop_loss")
         sig_p = c.get("predicted_value") or c.get("signal_price") or cur_p
 
+        # Flag active breakout
+        is_breaking = False
+        if cur_p is not None and trig_p is not None and cur_p >= trig_p:
+            is_breaking = True
+        elif c.get("post_high") is not None and trig_p is not None and c.get("post_high") >= trig_p:
+            is_breaking = True
+        elif c.get("outcome") in ("TARGET_HIT", "BREAKOUT_SUCCEEDED"):
+            is_breaking = True
+        c["is_breaking_out"] = is_breaking
+
         if cur_p is not None:
             if target_p is not None and cur_p >= target_p:
                 c["prediction_signal"] = "TARGET_HIT"
@@ -4850,16 +4860,27 @@ async def get_breakout_radar(
         evaluated = [c for c in candidates if c.get("breakout_happened") is not None]
         if evaluated:
             successes = [c for c in evaluated if c.get("breakout_happened") is True]
+            targets_hit = [c for c in evaluated if c.get("outcome") == "TARGET_HIT"]
+            breakouts_succeeded = [c for c in evaluated if c.get("outcome") == "BREAKOUT_SUCCEEDED"]
+            stop_losses_hit = [c for c in evaluated if c.get("outcome") == "STOP_LOSS_HIT"]
+            no_breakouts = [c for c in evaluated if c.get("outcome") in ("NO_BREAKOUT", "FAILED")]
             win_rate = round(len(successes) / len(evaluated) * 100, 1)
             returns = [c.get("realized_return_pct", 0) for c in evaluated]
             avg_return = round(sum(returns) / len(returns), 2)
+            max_gains = [c.get("max_gain_pct", 0) for c in evaluated if c.get("max_gain_pct") is not None]
+            avg_peak_gain = round(sum(max_gains) / len(max_gains), 2) if max_gains else 0.0
             top_winner = max(evaluated, key=lambda x: x.get("realized_return_pct", -999))
             backtest_summary = {
                 "asof_date": asof_date,
                 "total_evaluated": len(evaluated),
                 "success_count": len(successes),
+                "targets_hit_count": len(targets_hit),
+                "breakouts_succeeded_count": len(breakouts_succeeded),
+                "stop_losses_hit_count": len(stop_losses_hit),
+                "no_breakout_count": len(no_breakouts),
                 "win_rate_pct": win_rate,
                 "avg_return_pct": avg_return,
+                "avg_peak_gain_pct": avg_peak_gain,
                 "top_winner_ticker": top_winner.get("ticker"),
                 "top_winner_gain_pct": top_winner.get("realized_return_pct"),
             }

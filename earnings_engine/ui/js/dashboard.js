@@ -11571,6 +11571,36 @@
                 // Update KPI Cards
                 setEl('breakoutStatTotal', total);
 
+                // Calculate breaking out count across all candidates
+                const isItemBreaking = (item) => {
+                    const cp = item.current_price != null ? Number(item.current_price) : null;
+                    const tp = item.breakout_trigger != null ? Number(item.breakout_trigger) : null;
+                    const ph = item.post_high != null ? Number(item.post_high) : null;
+                    return Boolean(
+                        item.is_breaking_out ||
+                        item.outcome === 'TARGET_HIT' ||
+                        item.outcome === 'BREAKOUT_SUCCEEDED' ||
+                        (cp != null && tp != null && cp >= tp) ||
+                        (ph != null && tp != null && ph >= tp)
+                    );
+                };
+                const breakingCount = (app._breakoutData || []).filter(isItemBreaking).length;
+                const fireCard = document.getElementById('breakoutCardOnFire');
+                setEl('breakoutStatBreakingCount', breakingCount);
+
+                if (breakingCount > 0) {
+                    if (fireCard) fireCard.classList.add('card-on-fire');
+                    setEl('breakoutStatBreakingSub', asofDate ? 'Succeeded' : 'Breached');
+                    setEl('breakoutKpiSubFire', asofDate 
+                        ? `🎯 ${summary.targets_hit_count || 0} Targets · 🛑 ${summary.stop_losses_hit_count || 0} Stops`
+                        : `🔥 ${breakingCount} setup(s) crossed trigger!`
+                    );
+                } else {
+                    if (fireCard) fireCard.classList.remove('card-on-fire');
+                    setEl('breakoutStatBreakingSub', 'Active');
+                    setEl('breakoutKpiSubFire', 'All setups coiling below trigger');
+                }
+
                 // Pool tier badge for scanned count
                 const hotCount = status.hot_count || 0;
                 const warmCount = status.warm_count || 0;
@@ -11647,6 +11677,7 @@
                             <div style="display:flex;align-items:center;gap:0.25rem;">
                                 <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="font-weight:700;color:#f1f5f9;font-family:var(--font-mono);font-size:0.78rem;text-decoration:none;" title="Open ${ctx.ticker} stock intelligence in new tab">${ctx.ticker}</a>
                                 <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-size:0.75rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
+                                ${ctx.isBreakingOut ? '<span style="font-size:0.58rem;background:rgba(239,68,68,0.25);color:#f87171;border:1px solid rgba(239,68,68,0.5);padding:0.04rem 0.35rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;"><span class="fire-flame-icon">🔥</span> BREAKING OUT</span>' : ''}
                             </div>
                             <span style="font-size:0.65rem;color:#475569;" title="${c.company_name || ctx.ticker}">${ctx.company}</span>
                             <div style="margin-top:0.2rem;display:flex;gap:0.25rem;flex-wrap:wrap;align-items:center;">
@@ -12030,6 +12061,15 @@
 
                 const archetype = c.setup_archetype || (score >= 60 ? '🔥 Strong Breakout' : '📈 Resistance Coil');
 
+                const postHighVal = c.post_high != null ? Number(c.post_high) : null;
+                const isBreakingOut = Boolean(
+                    c.is_breaking_out ||
+                    c.outcome === 'TARGET_HIT' ||
+                    c.outcome === 'BREAKOUT_SUCCEEDED' ||
+                    (curVal != null && trigVal != null && curVal >= trigVal) ||
+                    (postHighVal != null && trigVal != null && postHighVal >= trigVal)
+                );
+
                 const cellCtx = {
                     ticker,
                     company,
@@ -12050,7 +12090,8 @@
                     score,
                     scoreColor,
                     scoreBg,
-                    outcomeBadgeHtml
+                    outcomeBadgeHtml,
+                    isBreakingOut
                 };
 
                 const cellsHtml = cols.map(colKey => {
@@ -12058,7 +12099,7 @@
                     return colDef ? colDef.render(c, cellCtx) : '';
                 }).join('');
 
-                return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);" data-ticker="${ticker}">${cellsHtml}</tr>`;
+                return `<tr class="${isBreakingOut ? 'breakout-row-on-fire' : ''}" style="border-bottom:1px solid rgba(255,255,255,0.05);" data-ticker="${ticker}">${cellsHtml}</tr>`;
             });
 
             tbody.innerHTML = rows.join('');

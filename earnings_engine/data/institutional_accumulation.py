@@ -153,14 +153,16 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
 
     # 3. Institutional Fund Holdings across quarters
     funds_pool = [
-        ("Nippon India Small Cap Fund", "Mutual Fund (DII)", max(0.5, round(dii_base * 0.28, 2)), "ACCUMULATED", 0.85),
-        ("Quant Active Fund", "Mutual Fund (DII)", max(0.4, round(dii_base * 0.22, 2)), "NEW BUY", 1.95),
-        ("HDFC Mid-Cap Opportunities", "Mutual Fund (DII)", max(0.5, round(dii_base * 0.35, 2)), "ACCUMULATED", 0.60),
-        ("SBI Bluechip Fund", "Mutual Fund (DII)", max(0.3, round(dii_base * 0.25, 2)), "HOLD", 0.0),
-        ("Government Pension Fund Global (Norway)", "Foreign Sovereign / FII", max(0.3, round(fii_base * 0.30, 2)), "ACCUMULATED", 0.45),
-        ("GQG Partners Emerging Markets", "Foreign Institutional (FII)", max(0.4, round(fii_base * 0.35, 2)), "NEW BUY", 2.10),
-        ("Ashish Kacholia", "Super Investor", max(0.2, round(dii_base * 0.18, 2)), "ACCUMULATED", 0.55),
-        ("Vanguard Emerging Markets Fund", "Foreign Institutional (FII)", max(0.3, round(fii_base * 0.25, 2)), "TRIMMED", -0.40),
+        ("Nippon India Small Cap Fund", "Mutual Fund (DII)", max(0.5, round(dii_base * 0.28, 2))),
+        ("Quant Active Fund", "Mutual Fund (DII)", max(0.4, round(dii_base * 0.22, 2))),
+        ("HDFC Mid-Cap Opportunities", "Mutual Fund (DII)", max(0.5, round(dii_base * 0.35, 2))),
+        ("SBI Bluechip Fund", "Mutual Fund (DII)", max(0.3, round(dii_base * 0.25, 2))),
+        ("Government Pension Fund Global (Norway)", "Foreign Sovereign / FII", max(0.3, round(fii_base * 0.30, 2))),
+        ("GQG Partners Emerging Markets", "Foreign Institutional (FII)", max(0.4, round(fii_base * 0.35, 2))),
+        ("Ashish Kacholia", "Super Investor", max(0.2, round(dii_base * 0.18, 2))),
+        ("Vanguard Emerging Markets Fund", "Foreign Institutional (FII)", max(0.3, round(fii_base * 0.25, 2))),
+        ("ICICI Prudential Value Discovery", "Mutual Fund (DII)", max(0.4, round(dii_base * 0.26, 2))),
+        ("Mirae Asset Large Cap Fund", "Mutual Fund (DII)", max(0.3, round(dii_base * 0.20, 2))),
     ]
 
     # Find benchmark reference price for avg & recent buy price calculation
@@ -177,11 +179,55 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
     except Exception:
         pass
 
-    if sym == "ALLCARGO.NS":
-        selected_funds = [funds_pool[0], funds_pool[1], funds_pool[2], funds_pool[6]]
-    else:
-        selected_funds = [funds_pool[(h_val + i) % len(funds_pool)] for i in range(4)]
-    for i, (f_name, f_type, base_stk, act, chg) in enumerate(selected_funds):
+    num_funds = min(6, max(3, 3 + (h_val % 4)))
+    selected_funds = [funds_pool[(h_val + i) % len(funds_pool)] for i in range(num_funds)]
+
+    # Determine ticker institutional posture (Accumulation vs Stable vs Trimming)
+    # Ticker momentum / trend bias
+    bias_score = (h_val % 100)
+    for i, (f_name, f_type, base_stk) in enumerate(selected_funds):
+        fund_seed = (h_val + i * 37) % 100
+        # Determine dynamic action based on ticker bias and fund seed
+        if bias_score >= 65: # Aggressive accumulation ticker
+            if fund_seed < 35:
+                act = "NEW BUY"
+                chg = round(0.4 + (fund_seed % 15) / 10.0, 2)
+            elif fund_seed < 75:
+                act = "ACCUMULATED"
+                chg = round(0.2 + (fund_seed % 10) / 10.0, 2)
+            elif fund_seed < 90:
+                act = "HOLD"
+                chg = 0.0
+            else:
+                act = "TRIMMED"
+                chg = -round(0.1 + (fund_seed % 5) / 10.0, 2)
+        elif bias_score >= 35: # Moderate / balanced ticker
+            if fund_seed < 25:
+                act = "NEW BUY"
+                chg = round(0.3 + (fund_seed % 10) / 10.0, 2)
+            elif fund_seed < 55:
+                act = "ACCUMULATED"
+                chg = round(0.15 + (fund_seed % 8) / 10.0, 2)
+            elif fund_seed < 80:
+                act = "HOLD"
+                chg = 0.0
+            else:
+                act = "TRIMMED"
+                chg = -round(0.2 + (fund_seed % 8) / 10.0, 2)
+        else: # Distribution / trimming ticker
+            if fund_seed < 15:
+                act = "ACCUMULATED"
+                chg = round(0.1 + (fund_seed % 5) / 10.0, 2)
+            elif fund_seed < 45:
+                act = "HOLD"
+                chg = 0.0
+            elif fund_seed < 80:
+                act = "TRIMMED"
+                chg = -round(0.25 + (fund_seed % 10) / 10.0, 2)
+            else:
+                act = "SOLD OUT"
+                chg = -round(base_stk, 2)
+
         stk = max(0.1, round(base_stk + ((h_val >> (i * 2)) % 30) / 100.0, 2))
         prev_stk = max(0.0, round(stk - chg, 2))
         val_cr = round(mcap_cr * (stk / 100.0), 1)
@@ -189,7 +235,6 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
         chg_shares = int((live_meta["shares_outstanding"] or 100_000_000) * (abs(chg) / 100.0)) * (1 if chg >= 0 else -1)
 
         # Estimate fund average holding price and recent buy / transaction price
-        fund_seed = (h_val + i * 17) % 100
         if act == "NEW BUY":
             recent_buy_price = round(curr_price * (0.95 + (fund_seed % 5) / 100.0), 2)
             avg_price = recent_buy_price
