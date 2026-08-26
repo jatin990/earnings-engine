@@ -1057,6 +1057,13 @@ def get_watchlist_quotes_api(
     except Exception:
         pass
 
+    # Batch fetch live quotes in parallel if live=True
+    if auto_live:
+        try:
+            prices_mod.fetch_batch_live_quotes(ticker_list, settings=settings, sync_db=True, max_workers=10)
+        except Exception as e:
+            logger.debug("[WATCHLIST-BATCH] Batch live quote fetch warning: %s", e)
+
     def process_ticker(t: str) -> dict[str, Any]:
         item = {
             "ticker": t,
@@ -1113,11 +1120,6 @@ def get_watchlist_quotes_api(
                 df = prices_mod.fetch_prices(t, settings, force=False)
             except Exception as e:
                 logger.debug("Failed to fetch prices for %s: %s", t, e)
-        elif live:
-            try:
-                df = prices_mod.fetch_prices(t, settings, force=True)
-            except Exception as e:
-                logger.debug("Failed to fetch live prices for %s: %s", t, e)
 
         if not df.empty and "close" in df.columns:
             try:

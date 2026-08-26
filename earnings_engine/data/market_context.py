@@ -482,6 +482,15 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
     except Exception:
         sr_map = {}
 
+    # If force=True or if any tickers have missing prices, batch-fetch live quotes in parallel
+    missing_or_forced = [t for t in tickers if force or t not in prices_map or prices_map[t].empty]
+    if missing_or_forced:
+        try:
+            from earnings_engine.data.prices import fetch_batch_live_quotes
+            fetch_batch_live_quotes(missing_or_forced, settings=settings, sync_db=True, max_workers=10)
+        except Exception as e:
+            logger.debug("[RESULTS-BATCH] Batch live quote fetch error: %s", e)
+
     t1_bulk = time.perf_counter()
 
     rows: list[dict] = []

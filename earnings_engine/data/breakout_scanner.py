@@ -1217,10 +1217,18 @@ def run_warm_rescore(settings: Settings) -> None:
 
     t0 = time.perf_counter()
 
+    from earnings_engine.data.prices import fetch_batch_live_quotes
     from concurrent.futures import ThreadPoolExecutor
 
+    # 1. Batch fetch latest quotes in parallel for warm setups
+    try:
+        fetch_batch_live_quotes(warm_tickers, settings=settings, sync_db=True, max_workers=8)
+    except Exception as e:
+        logger.debug("[BREAKOUT-WARM] Batch live quote fetch warning: %s", e)
+
+    # 2. Rescore warm tickers
     def _score(ticker: str) -> tuple[str, dict | None]:
-        return ticker, _score_single_ticker(ticker, settings)
+        return ticker, _score_single_ticker(ticker, settings, use_live_quote=False)
 
     with ThreadPoolExecutor(max_workers=6) as executor:
         scored = list(executor.map(_score, warm_tickers))
