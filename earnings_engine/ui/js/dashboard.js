@@ -10966,7 +10966,93 @@
             app.loadBreakoutRadar();
         };
 
-        app.loadBreakoutRadar = async function() {
+        app.breakoutLiveTracking = false;
+        app.breakoutLiveIntervalTimer = null;
+        app.breakoutLiveIntervalMs = parseInt(localStorage.getItem('nexus_breakout_refresh_interval') || '300000', 10);
+
+        app.setBreakoutLiveInterval = function(ms) {
+            app.breakoutLiveIntervalMs = parseInt(ms, 10) || 300000;
+            localStorage.setItem('nexus_breakout_refresh_interval', app.breakoutLiveIntervalMs);
+            app.updateBreakoutLiveButtonUI();
+            if (app.breakoutLiveTracking) {
+                if (app.breakoutLiveIntervalTimer) clearInterval(app.breakoutLiveIntervalTimer);
+                app.breakoutLiveIntervalTimer = setInterval(() => {
+                    if (app.breakoutLiveTracking) {
+                        app.loadBreakoutRadar(true, true);
+                    }
+                }, app.breakoutLiveIntervalMs);
+            }
+        };
+
+        app.toggleBreakoutLiveTracking = function() {
+            app.breakoutLiveTracking = !app.breakoutLiveTracking;
+            app.breakoutLiveIntervalMs = parseInt(localStorage.getItem('nexus_breakout_refresh_interval') || '300000', 10);
+
+            const sel = document.getElementById('breakoutLiveIntervalSelect');
+            if (sel) sel.value = String(app.breakoutLiveIntervalMs);
+
+            app.updateBreakoutLiveButtonUI();
+
+            if (app.breakoutLiveTracking) {
+                app.loadBreakoutRadar(true);
+                if (app.breakoutLiveIntervalTimer) clearInterval(app.breakoutLiveIntervalTimer);
+                app.breakoutLiveIntervalTimer = setInterval(() => {
+                    if (app.breakoutLiveTracking) {
+                        app.loadBreakoutRadar(true, true);
+                    }
+                }, app.breakoutLiveIntervalMs);
+            } else {
+                if (app.breakoutLiveIntervalTimer) {
+                    clearInterval(app.breakoutLiveIntervalTimer);
+                    app.breakoutLiveIntervalTimer = null;
+                }
+            }
+        };
+
+        app.fetchLiveBreakoutQuotes = async function() {
+            const fetchBtn = document.getElementById('breakoutFetchLiveBtn');
+            if (fetchBtn) {
+                fetchBtn.disabled = true;
+                fetchBtn.innerHTML = '⏳ Fetching...';
+            }
+            try {
+                await app.loadBreakoutRadar(true);
+            } finally {
+                if (fetchBtn) {
+                    fetchBtn.disabled = false;
+                    fetchBtn.innerHTML = '⚡ Refresh Live';
+                }
+            }
+        };
+
+        app.updateBreakoutLiveButtonUI = function() {
+            const btn = document.getElementById('breakoutLiveToggleBtn');
+            const text = document.getElementById('breakoutLiveBtnText');
+            const ind = document.getElementById('breakoutLiveIndicator');
+            if (!btn || !text || !ind) return;
+
+            const intLabel = app.breakoutLiveIntervalMs >= 60000
+                ? `${Math.round(app.breakoutLiveIntervalMs / 60000)}m`
+                : `${Math.round(app.breakoutLiveIntervalMs / 1000)}s`;
+
+            if (app.breakoutLiveTracking) {
+                btn.style.background = 'rgba(16, 185, 129, 0.2)';
+                btn.style.color = '#34d399';
+                btn.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+                text.textContent = `🟢 Live (${intLabel})`;
+                ind.style.background = '#34d399';
+                ind.style.boxShadow = '0 0 6px #34d399';
+            } else {
+                btn.style.background = 'rgba(239, 68, 68, 0.12)';
+                btn.style.color = '#f87171';
+                btn.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+                text.textContent = '🔴 Track Live Prices';
+                ind.style.background = '#f87171';
+                ind.style.boxShadow = 'none';
+            }
+        };
+
+        app.loadBreakoutRadar = async function(forceLive = false, silent = false) {
             if (!app._breakoutAutocompleteWired) {
                 app.wireBreakoutStockAutocomplete();
                 app._breakoutAutocompleteWired = true;
@@ -10977,7 +11063,7 @@
             const modeBadge = document.getElementById('breakoutModeBadge');
             const histNotice = document.getElementById('breakoutHistoricalNotice');
             const tbody = document.getElementById('breakoutTableBody');
-            if (badge) badge.style.display = 'inline-block';
+            if (badge && !silent) badge.style.display = 'inline-block';
 
             const universe = document.getElementById('breakoutUniverseSelect')?.value || 'nifty_50';
             const sortBy = document.getElementById('breakoutSortBy')?.value || 'composite_score';
@@ -10991,6 +11077,12 @@
                     modeBadge.style.color = '#fbbf24';
                     modeBadge.style.borderColor = 'rgba(234,179,8,0.3)';
                     if (histNotice) histNotice.style.display = 'inline';
+                } else if (forceLive || app.breakoutLiveTracking) {
+                    modeBadge.textContent = `LIVE TRACKING (${new Date().toLocaleTimeString()})`;
+                    modeBadge.style.background = 'rgba(16,185,129,0.15)';
+                    modeBadge.style.color = '#34d399';
+                    modeBadge.style.borderColor = 'rgba(16,185,129,0.35)';
+                    if (histNotice) histNotice.style.display = 'none';
                 } else {
                     modeBadge.textContent = 'LIVE SCAN';
                     modeBadge.style.background = 'rgba(59,130,246,0.15)';
@@ -11004,6 +11096,9 @@
                 const params = new URLSearchParams({ universe: universe, sort_by: sortBy, min_score: minScore, limit: 100 });
                 if (asofDate) {
                     params.set('asof_date', asofDate);
+                }
+                if (forceLive || app.breakoutLiveTracking) {
+                    params.set('live', 'true');
                 }
                 const res = await fetch(API_BASE + '/api/v1/breakout-radar?' + params.toString());
                 if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -11028,7 +11123,6 @@
                 const warmCount = status.warm_count || 0;
                 const coldScanned = status.cold_tickers_scanned || total || '\u2014';
                 setEl('breakoutStatScanned', coldScanned);
-                // Update the sub-label for scanned to show tier breakdown
                 const scannedSub = document.getElementById('breakoutKpiSub4');
                 if (scannedSub) {
                     scannedSub.innerHTML = `<span style="color:#ef4444">🔴 ${hotCount}</span> <span style="color:#eab308">🟡 ${warmCount}</span>`;
@@ -11079,7 +11173,7 @@
                 app.renderBreakoutTable(app._breakoutData.slice(0, limitNum), asofDate);
             } catch (err) {
                 console.error('[BREAKOUT] Load error:', err);
-                if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#ef4444;font-size:0.8rem;">\u26a1 Failed to load breakout data. Is the server running?</td></tr>';
+                if (tbody && !silent) tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#ef4444;font-size:0.8rem;">\u26a1 Failed to load breakout data. Is the server running?</td></tr>';
             } finally {
                 if (badge) badge.style.display = 'none';
             }
@@ -11130,6 +11224,56 @@
                 const targetStr = c.target_price != null ? `\u20b9${Number(c.target_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
                 const stopStr = c.stop_loss != null ? `\u20b9${Number(c.stop_loss).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
 
+                // Compute Color-Coded Prediction Status & Current Price Styling
+                let curPriceColor = '#e2e8f0';
+                let curPriceBadgeBg = 'rgba(255,255,255,0.05)';
+                let curPriceBadgeBorder = 'rgba(255,255,255,0.12)';
+                let curPriceBadgeText = '#94a3b8';
+                let curPriceBadgeLabel = 'Pending ⏳';
+
+                const curVal = c.current_price != null ? Number(c.current_price) : null;
+                const trigVal = c.breakout_trigger != null ? Number(c.breakout_trigger) : null;
+                const targetVal = c.target_price != null ? Number(c.target_price) : null;
+                const stopVal = c.stop_loss != null ? Number(c.stop_loss) : null;
+
+                if (curVal != null) {
+                    if (targetVal != null && curVal >= targetVal) {
+                        // Green: Target Hit!
+                        curPriceColor = '#34d399';
+                        curPriceBadgeBg = 'rgba(16,185,129,0.2)';
+                        curPriceBadgeBorder = 'rgba(16,185,129,0.5)';
+                        curPriceBadgeText = '#34d399';
+                        curPriceBadgeLabel = '🎯 Target Hit';
+                    } else if (trigVal != null && curVal >= trigVal) {
+                        // Green: Breakout Fired / Surging
+                        curPriceColor = '#34d399';
+                        curPriceBadgeBg = 'rgba(16,185,129,0.18)';
+                        curPriceBadgeBorder = 'rgba(16,185,129,0.45)';
+                        curPriceBadgeText = '#34d399';
+                        curPriceBadgeLabel = '🟢 Breakout Fired';
+                    } else if (stopVal != null && curVal <= stopVal) {
+                        // Red: Stop Loss Hit
+                        curPriceColor = '#f87171';
+                        curPriceBadgeBg = 'rgba(239,68,68,0.2)';
+                        curPriceBadgeBorder = 'rgba(239,68,68,0.5)';
+                        curPriceBadgeText = '#f87171';
+                        curPriceBadgeLabel = '🔴 SL Hit';
+                    } else if (trigVal != null && stopVal != null) {
+                        // Brown: Coiling / Compression Zone
+                        curPriceColor = '#fcd34d';
+                        curPriceBadgeBg = 'rgba(146,64,14,0.28)';
+                        curPriceBadgeBorder = 'rgba(217,119,6,0.45)';
+                        curPriceBadgeText = '#fcd34d';
+                        curPriceBadgeLabel = '🟤 Coiling';
+                    } else {
+                        curPriceColor = '#93c5fd';
+                        curPriceBadgeBg = 'rgba(59,130,246,0.15)';
+                        curPriceBadgeBorder = 'rgba(59,130,246,0.35)';
+                        curPriceBadgeText = '#93c5fd';
+                        curPriceBadgeLabel = '⏳ Active Setup';
+                    }
+                }
+
                 const retPct = c.realized_return_pct;
                 const retColor = retPct > 0 ? '#34d399' : retPct < 0 ? '#f87171' : '#94a3b8';
                 const retStr = retPct != null
@@ -11165,9 +11309,11 @@
                         <div style="color:#34d399;" title="Target Price">T: ${targetStr}</div>
                         <div style="color:#f87171;" title="Stop Loss">SL: ${stopStr}</div>
                     </td>
-                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);color:#e2e8f0;font-size:0.74rem;white-space:nowrap;">
-                        <div>${curPriceStr}</div>
-                        <div style="font-size:0.6rem;color:#475569;">${c.current_date || 'Live'}</div>
+                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);font-size:0.74rem;white-space:nowrap;">
+                        <div style="font-weight:800;color:${curPriceColor};font-size:0.82rem;">${curPriceStr}</div>
+                        <div style="margin-top:0.15rem;">
+                            <span class="signal-badge" style="background:${curPriceBadgeBg};border:1px solid ${curPriceBadgeBorder};color:${curPriceBadgeText};font-size:0.62rem;font-weight:700;padding:0.08rem 0.35rem;border-radius:3px;">${curPriceBadgeLabel}</span>
+                        </div>
                     </td>
                     <td style="padding:0.55rem 0.75rem;text-align:right;font-size:0.76rem;white-space:nowrap;">
                         ${retStr}
@@ -11191,9 +11337,6 @@
                             </button>
                         </div>
                     </td>
-                </tr>`;
-            });
-
             tbody.innerHTML = rows.join('');
         };
 

@@ -4613,6 +4613,7 @@ async def get_breakout_radar(
     limit: int = Query(50, ge=1, le=200, description="Max candidates to return"),
     sort_by: str = Query("composite_score", description="Sort field (composite_score, fundamental_score, resistance_score, volume_score, realized_return_pct)"),
     asof_date: str | None = Query(None, description="Point-in-time scan date in YYYY-MM-DD format"),
+    live: bool = Query(False, description="Force live real-time price fetching for candidates"),
 ):
     """Return breakout candidates from the background scanner or point-in-time historical backtest."""
     candidates = breakout_scanner_mod.get_cached_scan_results(
@@ -4624,6 +4625,69 @@ async def get_breakout_radar(
 
     # Apply min_score filter
     candidates = [c for c in candidates if c.get("composite_score", 0) >= min_score]
+
+    # Live parallel price fetching if requested
+    if live and candidates and not asof_date:
+        from concurrent.futures import ThreadPoolExecutor
+        from earnings_engine.data.prices import fetch_prices, load_prices
+        
+        def _fetch_live(c: dict[str, Any]) -> None:
+            t = c.get("ticker")
+            if not t:
+                return
+            try:
+                df = fetch_prices(t, _settings, force=True)
+                if not df.empty and "close" in df.columns:
+                    closes = pd.to_numeric(df["close"], errors="coerce").dropna()
+                    if not closes.empty:
+                        cur_p = round(float(closes.iloc[-1]), 2)
+                        c["current_price"] = cur_p
+                        c["current_date"] = str(df.index[-1])[:10]
+                        sig_p = c.get("predicted_value") or c.get("signal_price")
+                        if sig_p and sig_p > 0:
+                            c["realized_return_pct"] = round(((cur_p - sig_p) / sig_p) * 100, 2)
+                        trig = c.get("breakout_trigger")
+                        if trig:
+                            c["breakout_happened"] = cur_p >= trig
+            except Exception as e:
+                logger.debug("Failed live breakout refresh for %s: %s", t, e)
+
+        with ThreadPoolExecutor(max_workers=min(10, len(candidates))) as pool:
+            list(pool.map(_fetch_live, candidates))
+
+    # Compute prediction signals & color-coding for all candidates
+    for c in candidates:
+        cur_p = c.get("current_price")
+        trig_p = c.get("breakout_trigger")
+        target_p = c.get("target_price")
+        stop_p = c.get("stop_loss")
+        sig_p = c.get("predicted_value") or c.get("signal_price") or cur_p
+
+        if cur_p is not None:
+            if target_p is not None and cur_p >= target_p:
+                c["prediction_signal"] = "TARGET_HIT"
+                c["prediction_color"] = "green"
+                c["prediction_label"] = "Target Hit 🎯"
+            elif trig_p is not None and cur_p >= trig_p:
+                c["prediction_signal"] = "TRIGGERED"
+                c["prediction_color"] = "green"
+                c["prediction_label"] = "Breakout Fired 🚀"
+            elif stop_p is not None and cur_p <= stop_p:
+                c["prediction_signal"] = "STOP_HIT"
+                c["prediction_color"] = "red"
+                c["prediction_label"] = "Stop Hit 🛑"
+            elif trig_p is not None and stop_p is not None:
+                c["prediction_signal"] = "COILING"
+                c["prediction_color"] = "brown"
+                c["prediction_label"] = "Coiling 🗜️"
+            else:
+                c["prediction_signal"] = "WATCH"
+                c["prediction_color"] = "blue"
+                c["prediction_label"] = "Watchlist ⏳"
+        else:
+            c["prediction_signal"] = "PENDING"
+            c["prediction_color"] = "blue"
+            c["prediction_label"] = "Pending ⏳"
 
     # Sort
     valid_sort = {
@@ -4661,6 +4725,7 @@ async def get_breakout_radar(
         "success": True,
         "count": len(candidates),
         "asof_date": asof_date,
+        "is_live": bool(live),
         "candidates": candidates,
         "universe": universe or "ALL",
         "scan_status": status,

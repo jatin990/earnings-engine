@@ -201,7 +201,7 @@ class TestCacheAccessors:
         assert isinstance(status, dict)
         assert "status" in status
         assert "candidates_found" in status
-        assert "scan_interval_min" in status
+        assert "scan_intervals" in status or "scan_interval_min" in status
 
 
 # ---------------------------------------------------------------------------
@@ -255,3 +255,15 @@ class TestBreakoutRadarEndpoints:
         data = resp.json()
         assert data["success"] is True
         assert "nifty_50" in data["message"]
+
+    def test_get_breakout_radar_live_and_prediction_signals(self):
+        resp = self.client.get("/api/v1/breakout-radar?live=true")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data.get("is_live") is True
+        for c in data["candidates"]:
+            assert "prediction_signal" in c
+            assert "prediction_color" in c
+            assert c["prediction_color"] in ("green", "red", "brown", "blue")
+

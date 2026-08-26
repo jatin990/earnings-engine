@@ -68,6 +68,21 @@
                         </select>
                     </div>
 
+                    <!-- Live Tracking & Auto-Refresh Interval Controls -->
+                    <button type="button" id="breakoutLiveToggleBtn" onclick="app.toggleBreakoutLiveTracking()" class="btn btn-sm" style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-weight:700;display:flex;align-items:center;gap:0.35rem;" title="Start/Stop live real-time price tracking for breakout setups">
+                        <span id="breakoutLiveIndicator" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f87171;"></span>
+                        <span id="breakoutLiveBtnText">🔴 Track Live Prices</span>
+                    </button>
+                    <select id="breakoutLiveIntervalSelect" onchange="app.setBreakoutLiveInterval(this.value)" style="height:28px;padding:0 0.45rem;font-size:0.72rem;background:#000000;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:4px;outline:none;" title="Select auto-refresh interval for live breakout prices">
+                        <option value="30000">⏱️ 30s</option>
+                        <option value="60000">⏱️ 1 min</option>
+                        <option value="120000">⏱️ 2 min</option>
+                        <option value="300000" selected>⏱️ 5 min (Default)</option>
+                        <option value="600000">⏱️ 10 min</option>
+                        <option value="900000">⏱️ 15 min</option>
+                    </select>
+                    <button type="button" id="breakoutFetchLiveBtn" onclick="app.fetchLiveBreakoutQuotes()" class="btn btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-weight:600;display:flex;align-items:center;gap:0.3rem;" title="Fetch latest intraday breakout prices once">⚡ Refresh Live</button>
+
                     <!-- Formula breakdown toggle -->
                     <button type="button" onclick="app.toggleBreakoutExplainer()" class="btn btn-secondary" style="padding:0.35rem 0.65rem;font-size:0.74rem;display:flex;align-items:center;gap:0.25rem;">
                         <span>📐</span> Formula & Logic
