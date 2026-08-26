@@ -984,14 +984,47 @@ Evaluate the following breakout setup for {sym} ({company_name}) and provide an 
 # Internal: score a single ticker with DB lookups
 # ---------------------------------------------------------------------------
 
-def _score_single_ticker(ticker: str, settings: Settings, asof_date: str | None = None) -> dict[str, Any] | None:
-    """Load prices, metrics, and score a single ticker. Returns result dict or None."""
+def _score_single_ticker(
+    ticker: str,
+    settings: Settings,
+    asof_date: str | None = None,
+    use_live_quote: bool = False,
+) -> dict[str, Any] | None:
+    """Load prices, metrics, news catalysts, and score a single ticker. Returns result dict or None."""
     try:
-        from earnings_engine.data.prices import load_prices, load_price_metrics
+        from earnings_engine.data.prices import load_prices, load_price_metrics, fetch_live_quote
 
         prices_df = load_prices(ticker, settings)
         if prices_df is None or prices_df.empty:
             return None
+
+        # 1. Live Price integration for Hot stocks / on-demand re-eval
+        if use_live_quote and not asof_date:
+            try:
+                live_q = fetch_live_quote(ticker, settings, sync_db=False)
+                if live_q and live_q.get("current_price"):
+                    live_price = float(live_q["current_price"])
+                    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                    if not prices_df.empty:
+                        last_idx_str = str(prices_df.index[-1])[:10]
+                        if last_idx_str == today_str:
+                            prices_df.loc[prices_df.index[-1], "close"] = live_price
+                            if live_q.get("volume"):
+                                prices_df.loc[prices_df.index[-1], "volume"] = float(live_q["volume"])
+                        else:
+                            new_row = pd.DataFrame(
+                                {
+                                    "open": [float(live_q.get("open") or live_price)],
+                                    "high": [max(live_price, float(live_q.get("high") or live_price))],
+                                    "low": [min(live_price, float(live_q.get("low") or live_price))],
+                                    "close": [live_price],
+                                    "volume": [float(live_q.get("volume") or 0)],
+                                },
+                                index=pd.to_datetime([today_str]),
+                            )
+                            prices_df = pd.concat([prices_df, new_row])
+            except Exception as e:
+                logger.debug("[BREAKOUT-LIVE] Live quote fetch skipped for %s: %s", ticker, e)
 
         metrics = load_price_metrics(ticker, settings) or {}
         quality_scores: list[float | None] = []
@@ -1010,6 +1043,42 @@ def _score_single_ticker(ticker: str, settings: Settings, asof_date: str | None 
             result["company_name"] = metrics.get("company_name") or ticker
             result["market_cap_cr"] = metrics.get("market_cap_cr") or metrics.get("market_cap")
             result["industry"] = metrics.get("industry") or metrics.get("sector") or "—"
+
+            # 2. News Catalyst Integration from pooled news database
+            if not asof_date:
+                try:
+                    from earnings_engine.data.catalysts_news import get_recent_catalysts
+                    catalysts = get_recent_catalysts(ticker, limit=3, settings=settings)
+                    if catalysts:
+                        top_cat = catalysts[0]
+                        direction = str(top_cat.get("direction") or "NEUTRAL").upper()
+                        impact = float(top_cat.get("impact_score") or 50)
+                        title = str(top_cat.get("title") or "")
+                        result["latest_news"] = {
+                            "title": title,
+                            "direction": direction,
+                            "impact_score": impact,
+                            "impact_level": top_cat.get("impact_level", "MEDIUM"),
+                            "published_at": top_cat.get("published_at"),
+                            "category": top_cat.get("category", "General"),
+                        }
+                        # Apply catalyst modifier to composite score
+                        news_bonus = 0.0
+                        if direction == "BULLISH" and impact >= 60:
+                            news_bonus = min(10.0, round((impact - 50) / 50 * 10, 1))
+                        elif direction == "BEARISH" and impact >= 65:
+                            news_bonus = -min(15.0, round((impact - 50) / 50 * 15, 1))
+
+                        if news_bonus != 0.0:
+                            result["news_bonus"] = news_bonus
+                            result["composite_score"] = max(0.0, min(100.0, round(result["composite_score"] + news_bonus, 1)))
+                            cat_tag = "🚀 Bullish" if news_bonus > 0 else "⚠️ Bearish"
+                            result.setdefault("reasoning", []).append(
+                                f"{cat_tag} News Catalyst ({impact:.0f}% impact, {news_bonus:+.1f} pts): {title[:75]}..."
+                            )
+                except Exception as e:
+                    logger.debug("[BREAKOUT-NEWS] Catalyst integration error for %s: %s", ticker, e)
+
         return result
     except Exception as e:
         logger.debug("[BREAKOUT] Error scoring %s: %s", ticker, e)
@@ -1200,7 +1269,7 @@ def run_hot_rescore(settings: Settings) -> None:
     from concurrent.futures import ThreadPoolExecutor
 
     def _score(ticker: str) -> tuple[str, dict | None]:
-        return ticker, _score_single_ticker(ticker, settings)
+        return ticker, _score_single_ticker(ticker, settings, use_live_quote=True)
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         scored = list(executor.map(_score, hot_tickers))
