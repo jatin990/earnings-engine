@@ -119,10 +119,11 @@ def _query_local_model(
     total_tokens = 0
     success = False
     
-    # Attempt 1: OpenAI-compatible endpoint ({base_host}/v1/chat/completions)
+    # Attempt 1: Native Ollama /api/chat (Enforces num_ctx: 4096 for 100% GPU VRAM fit)
     try:
+        native_chat_url = f"{base_host}/api/chat"
         resp = requests.post(
-            v1_url,
+            native_chat_url,
             headers={"Content-Type": "application/json"},
             json={
                 "model": local_model,
@@ -130,8 +131,8 @@ def _query_local_model(
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
-                "temperature": 0.3,
-                "max_tokens": 4096,
+                "format": "json",
+                "stream": False,
                 "options": {
                     "num_ctx": 4096,
                     "temperature": 0.3,
@@ -141,22 +142,18 @@ def _query_local_model(
         )
         if resp.status_code == 200:
             data = resp.json()
-            total_tokens = data.get("usage", {}).get("total_tokens", 0)
-            choice = (data.get("choices") or [{}])[0]
-            msg = choice.get("message") or {}
-            content = msg.get("content") or ""
-            reasoning = msg.get("reasoning") or ""
-            resp_text = (content or reasoning or "").strip()
+            msg = data.get("message") or {}
+            resp_text = (msg.get("content") or "").strip()
+            total_tokens = data.get("eval_count", 0)
             success = True
     except Exception as e1:
-        logger.debug("[CONSENSUS-LOCAL] /v1/chat/completions attempt failed: %s. Trying native /api/chat...", e1)
+        logger.debug("[CONSENSUS-LOCAL] /api/chat attempt failed: %s. Trying /v1/chat/completions...", e1)
 
-    # Attempt 2: Native Ollama /api/chat if v1 endpoint was not available
+    # Attempt 2: OpenAI-compatible endpoint ({base_host}/v1/chat/completions) for LM Studio
     if not success:
         try:
-            native_chat_url = f"{base_host}/api/chat"
             resp = requests.post(
-                native_chat_url,
+                v1_url,
                 headers={"Content-Type": "application/json"},
                 json={
                     "model": local_model,
@@ -164,23 +161,22 @@ def _query_local_model(
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": prompt},
                     ],
-                    "format": "json",
-                    "stream": False,
-                    "options": {
-                        "num_ctx": 4096,
-                        "temperature": 0.3,
-                    },
+                    "temperature": 0.3,
+                    "max_tokens": 4096,
                 },
                 timeout=timeout,
             )
             if resp.status_code == 200:
                 data = resp.json()
-                msg = data.get("message") or {}
-                resp_text = (msg.get("content") or "").strip()
-                total_tokens = data.get("eval_count", 0)
+                total_tokens = data.get("usage", {}).get("total_tokens", 0)
+                choice = (data.get("choices") or [{}])[0]
+                msg = choice.get("message") or {}
+                content = msg.get("content") or ""
+                reasoning = msg.get("reasoning") or ""
+                resp_text = (content or reasoning or "").strip()
                 success = True
         except Exception as e2:
-            logger.debug("[CONSENSUS-LOCAL] /api/chat attempt failed: %s. Trying native /api/generate...", e2)
+            logger.debug("[CONSENSUS-LOCAL] /v1/chat/completions attempt failed: %s. Trying /api/generate...", e2)
 
     # Attempt 3: Native Ollama /api/generate
     if not success:

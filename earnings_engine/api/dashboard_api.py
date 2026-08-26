@@ -1417,7 +1417,19 @@ def summarize_results_with_llm(items: list[dict[str, Any]]) -> dict[str, Any]:
     )
 
     try:
-        resp = req.post(generate_url, json={"model": model, "prompt": prompt, "stream": False}, timeout=120)
+        resp = req.post(
+            generate_url,
+            json={
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "num_ctx": 4096,
+                    "temperature": 0.3,
+                },
+            },
+            timeout=120,
+        )
         resp.raise_for_status()
         data = resp.json()
         text = data.get("response", "").strip()

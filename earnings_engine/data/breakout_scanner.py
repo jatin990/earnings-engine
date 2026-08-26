@@ -652,6 +652,10 @@ Evaluate the following breakout setup for {sym} ({company_name}) and provide an 
             "prompt": prompt,
             "stream": False,
             "format": "json",
+            "options": {
+                "num_ctx": 4096,
+                "temperature": 0.3,
+            },
         }).encode("utf-8")
         req = urllib.request.Request(
             f"{ollama_host}/api/generate",
