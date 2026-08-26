@@ -798,7 +798,7 @@
     <!-- TOPBAR -->
     <header class="topbar">
         <div style="display: flex; align-items: center; gap: 1rem;">
-            <a href="/dashboard" class="back-link">
+            <a href="/dashboard" onclick="if(window.self !== window.top && window.parent?.app?.closeStockModal){ event.preventDefault(); window.parent.app.closeStockModal(); }" class="back-link" title="Return to Dashboard">
                 <span>←</span>
                 <span>Dashboard</span>
             </a>

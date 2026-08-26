@@ -179,7 +179,13 @@ class Autocomplete {
         const sym = ticker.trim().toUpperCase();
         if (this.searchInput) this.searchInput.value = '';
         this.hideDropdown();
-        window.open('/stock/' + encodeURIComponent(sym), '_blank');
+        if (window.app && typeof window.app.openStockModal === 'function') {
+            window.app.openStockModal(sym);
+        } else if (typeof window.openStockModal === 'function') {
+            window.openStockModal(sym);
+        } else {
+            window.open('/stock/' + encodeURIComponent(sym), '_blank');
+        }
     }
 }
 

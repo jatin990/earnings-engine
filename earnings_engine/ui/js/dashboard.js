@@ -8811,7 +8811,7 @@
             const sym = ticker.trim().toUpperCase();
             dropdown.style.display = 'none';
             if (searchInput) searchInput.value = '';
-            window.open('/stock/' + encodeURIComponent(sym), '_blank');
+            app.openStockModal(sym);
         };
 
         // Global report popup handlers
@@ -14495,6 +14495,121 @@
                 }
             }
         });
+
+        // ========================================================
+        // 🚀 FULL SCREEN STOCK INTELLIGENCE MODAL CONTROLLER
+        // ========================================================
+        app.activeStockModalTicker = null;
+
+        app.openStockModal = function (ticker, hash = '') {
+            if (!ticker) return;
+            const sym = String(ticker).trim().toUpperCase();
+            app.activeStockModalTicker = sym;
+
+            const modal = document.getElementById('stockFullScreenModal');
+            const tickerEl = document.getElementById('stockModalTicker');
+            const nameEl = document.getElementById('stockModalName');
+            const spinner = document.getElementById('stockModalSpinner');
+            const iframe = document.getElementById('stockModalIframe');
+
+            if (!modal || !iframe) {
+                // Fallback if modal container is not rendered
+                window.open('/stock/' + encodeURIComponent(sym) + (hash ? (hash.startsWith('#') ? hash : '#' + hash) : ''), '_blank');
+                return;
+            }
+
+            if (tickerEl) tickerEl.textContent = sym;
+            if (nameEl) nameEl.textContent = 'Loading live financials & AI consensus...';
+            if (spinner) spinner.style.display = 'flex';
+
+            const cleanHash = hash ? (hash.startsWith('#') ? hash : '#' + hash) : '';
+            const targetUrl = '/stock/' + encodeURIComponent(sym) + cleanHash;
+
+            iframe.src = targetUrl;
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+
+            // Attempt to fetch company name & live price for top bar
+            try {
+                fetch(`/api/v1/stock/${encodeURIComponent(sym)}/overview`)
+                    .then(r => r.ok ? r.json() : null)
+                    .then(data => {
+                        if (data && nameEl && app.activeStockModalTicker === sym) {
+                            const name = data.company_name || data.short_name || 'Stock Intelligence';
+                            const pStr = data.current_price ? ` · ₹${Number(data.current_price).toFixed(2)}` : '';
+                            nameEl.textContent = `${name}${pStr}`;
+                        }
+                    })
+                    .catch(() => {});
+            } catch (_) {}
+        };
+
+        app.closeStockModal = function () {
+            const modal = document.getElementById('stockFullScreenModal');
+            const iframe = document.getElementById('stockModalIframe');
+            if (modal) modal.style.display = 'none';
+            if (iframe) iframe.src = 'about:blank';
+            document.body.style.overflow = '';
+            app.activeStockModalTicker = null;
+        };
+
+        app.navStockModal = function (hash) {
+            const iframe = document.getElementById('stockModalIframe');
+            if (!iframe || !app.activeStockModalTicker) return;
+            const cleanHash = hash.startsWith('#') ? hash : '#' + hash;
+            if (iframe.contentWindow) {
+                try {
+                    iframe.contentWindow.location.hash = cleanHash;
+                    return;
+                } catch (_) {}
+            }
+            iframe.src = '/stock/' + encodeURIComponent(app.activeStockModalTicker) + cleanHash;
+        };
+
+        app.refreshStockModal = function () {
+            const iframe = document.getElementById('stockModalIframe');
+            const spinner = document.getElementById('stockModalSpinner');
+            if (iframe && app.activeStockModalTicker) {
+                if (spinner) spinner.style.display = 'flex';
+                iframe.src = iframe.src;
+            }
+        };
+
+        app.openStockInNewTab = function () {
+            if (app.activeStockModalTicker) {
+                window.open('/stock/' + encodeURIComponent(app.activeStockModalTicker), '_blank');
+            }
+        };
+
+        window.openStockModal = app.openStockModal;
+        window.closeStockModal = app.closeStockModal;
+        window.openStockPage = app.openStockModal;
+
+        // Global Esc Key Listener for Full Screen Stock Modal
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('stockFullScreenModal');
+                if (modal && modal.style.display !== 'none') {
+                    app.closeStockModal();
+                }
+            }
+        });
+
+        // Global Stock Link Interceptor across the Entire Dashboard
+        document.addEventListener('click', function (e) {
+            const link = e.target.closest('a[href^="/stock/"]');
+            if (link) {
+                const href = link.getAttribute('href') || '';
+                const match = href.match(/\/stock\/([^/?#]+)(#.*)?/);
+                if (match && match[1]) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const rawTicker = decodeURIComponent(match[1]);
+                    const hash = match[2] || '';
+                    app.openStockModal(rawTicker, hash);
+                }
+            }
+        }, true);
 
         // Initialize & export to window
         window.app = app;
