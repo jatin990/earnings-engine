@@ -220,3 +220,42 @@ def test_detect_swing_range_3_months_history():
     assert len(res["monthly_ranges"]) >= 2
     assert len(res["cycles_data"]) >= 1
 
+
+def test_watchlist_quotes_swing_signal(test_settings):
+    from earnings_engine.api.dashboard_api import get_watchlist_quotes_api
+    from earnings_engine.data.swing_ranges import set_user_range
+    from earnings_engine.data.prices import set_cached_price_df
+    import pandas as pd
+
+    # Save price history for TEST1 (at support -> BUY), TEST2 (at resistance -> SELL), TEST3 (mid -> HOLD)
+    dates = pd.date_range("2026-08-01", periods=10, freq="B")
+
+    # TEST1: support=100, resistance=200, current=110 (10% -> BUY)
+    df1 = pd.DataFrame({"open": [100.0]*10, "high": [115.0]*10, "low": [95.0]*10, "close": [110.0]*10, "volume": [1000.0]*10}, index=dates)
+    set_cached_price_df("TEST1.NS", df1)
+    set_user_range("TestWL", "TEST1.NS", lower=100.0, upper=200.0, settings=test_settings)
+
+    # TEST2: support=100, resistance=200, current=190 (90% -> SELL)
+    df2 = pd.DataFrame({"open": [180.0]*10, "high": [195.0]*10, "low": [175.0]*10, "close": [190.0]*10, "volume": [1000.0]*10}, index=dates)
+    set_cached_price_df("TEST2.NS", df2)
+    set_user_range("TestWL", "TEST2.NS", lower=100.0, upper=200.0, settings=test_settings)
+
+    # TEST3: support=100, resistance=200, current=150 (50% -> HOLD)
+    df3 = pd.DataFrame({"open": [140.0]*10, "high": [155.0]*10, "low": [135.0]*10, "close": [150.0]*10, "volume": [1000.0]*10}, index=dates)
+    set_cached_price_df("TEST3.NS", df3)
+    set_user_range("TestWL", "TEST3.NS", lower=100.0, upper=200.0, settings=test_settings)
+
+    quotes = get_watchlist_quotes_api(watchlist="TestWL", tickers=["TEST1.NS", "TEST2.NS", "TEST3.NS"], settings=test_settings)
+    assert quotes["success"] is True
+    items = {it["ticker"]: it for it in quotes["items"]}
+
+    assert items["TEST1.NS"]["swing_signal"] == "BUY"
+    assert items["TEST1.NS"]["swing_signal_color"] == "green"
+
+    assert items["TEST2.NS"]["swing_signal"] == "SELL"
+    assert items["TEST2.NS"]["swing_signal_color"] == "red"
+
+    assert items["TEST3.NS"]["swing_signal"] == "HOLD"
+    assert items["TEST3.NS"]["swing_signal_color"] == "brown"
+
+

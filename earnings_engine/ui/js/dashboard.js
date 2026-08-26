@@ -397,13 +397,60 @@
                         const pctH = it.pct_from_52w_high != null ? (it.pct_from_52w_high >= 0 ? '+' : '') + Number(it.pct_from_52w_high).toFixed(1) + '%' : '';
                         const pctHColor = it.pct_from_52w_high != null ? (Number(it.pct_from_52w_high) >= -5 ? '#34d399' : (Number(it.pct_from_52w_high) <= -25 ? '#f87171' : '#fbbf24')) : '#a1a1aa';
 
-                        // Swing Support / Resistance with explicit cursor:pointer and interactive Auto Detect button
+                        // Swing Support / Resistance with color-coded BUY (Green) / SELL (Red) / HOLD (Brown) signals
                         const s = it.support != null ? currSymbol + Number(it.support).toFixed(2) : '—';
                         const r = it.resistance != null ? currSymbol + Number(it.resistance).toFixed(2) : '—';
                         const activeWl = (this.activeWatchlist || '').replace(/'/g, "\\'");
-                        const rangeStr = (it.support != null && it.resistance != null)
-                            ? `<button type="button" onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="font-size:0.75rem;font-family:var(--font-mono);cursor:pointer;color:#38bdf8;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);border-radius:4px;padding:0.12rem 0.4rem;" title="Inspect & edit swing range">${s} – ${r}</button>`
-                            : `<button type="button" onclick="app.watchlistTab.autoDetectRowRange('${it.ticker}', this)" class="btn-micro" style="font-size:0.7rem;font-weight:700;cursor:pointer;color:#fbbf24;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:0.15rem 0.45rem;display:inline-flex;align-items:center;gap:0.2rem;" title="Auto-detect support & resistance range"><span>⚡</span> Auto Detect</button>`;
+                        
+                        let rangeCellHtml = '';
+                        if (it.support != null && it.resistance != null && it.current_price != null && Number(it.resistance) > Number(it.support)) {
+                            const pVal = Number(it.current_price);
+                            const sVal = Number(it.support);
+                            const rVal = Number(it.resistance);
+                            const posPct = ((pVal - sVal) / (rVal - sVal)) * 100;
+
+                            let sig = it.swing_signal;
+                            if (!sig) {
+                                if (posPct <= 35 || pVal <= sVal) sig = 'BUY';
+                                else if (posPct >= 70 || pVal >= rVal) sig = 'SELL';
+                                else sig = 'HOLD';
+                            }
+
+                            let badgeBg = 'rgba(146, 64, 14, 0.28)';
+                            let badgeBorder = 'rgba(217, 119, 6, 0.45)';
+                            let badgeColor = '#fcd34d';
+                            let badgeIcon = '🟤';
+                            let badgeTitle = `Swing Hold: ${posPct.toFixed(0)}% mid-channel`;
+
+                            if (sig === 'BUY') {
+                                badgeBg = 'rgba(16, 185, 129, 0.2)';
+                                badgeBorder = 'rgba(16, 185, 129, 0.5)';
+                                badgeColor = '#34d399';
+                                badgeIcon = '🟢';
+                                badgeTitle = `Swing Buy: ${posPct.toFixed(0)}% near support (${s})`;
+                            } else if (sig === 'SELL') {
+                                badgeBg = 'rgba(239, 68, 68, 0.2)';
+                                badgeBorder = 'rgba(239, 68, 68, 0.5)';
+                                badgeColor = '#f87171';
+                                badgeIcon = '🔴';
+                                badgeTitle = `Swing Sell: ${posPct.toFixed(0)}% near resistance (${r})`;
+                            }
+
+                            rangeCellHtml = `
+                                <div style="display:flex;align-items:center;justify-content:center;gap:0.35rem;flex-wrap:wrap;">
+                                    <span class="signal-badge" style="background:${badgeBg};border:1px solid ${badgeBorder};color:${badgeColor};font-size:0.68rem;font-weight:800;padding:0.12rem 0.45rem;border-radius:4px;display:inline-flex;align-items:center;gap:0.2rem;letter-spacing:0.02em;" title="${badgeTitle}">${badgeIcon} ${sig}</span>
+                                    <button type="button" onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="font-size:0.72rem;font-family:var(--font-mono);cursor:pointer;color:#94a3b8;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:4px;padding:0.1rem 0.35rem;" title="Inspect & edit swing range (${s} – ${r})">${s} – ${r}</button>
+                                    <button onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="color:var(--muted);padding:0;font-size:0.72rem;border:none;background:transparent;cursor:pointer;" title="Edit Swing Range">⚙</button>
+                                </div>`;
+                        } else if (it.support != null && it.resistance != null) {
+                            rangeCellHtml = `
+                                <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">
+                                    <button type="button" onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="font-size:0.75rem;font-family:var(--font-mono);cursor:pointer;color:#38bdf8;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);border-radius:4px;padding:0.12rem 0.4rem;" title="Inspect & edit swing range">${s} – ${r}</button>
+                                    <button onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="color:var(--muted);padding:0 0.15rem;font-size:0.75rem;border:none;background:transparent;cursor:pointer;" title="Edit Swing Range">⚙</button>
+                                </div>`;
+                        } else {
+                            rangeCellHtml = `<button type="button" onclick="app.watchlistTab.autoDetectRowRange('${it.ticker}', this)" class="btn-micro" style="font-size:0.7rem;font-weight:700;cursor:pointer;color:#fbbf24;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:0.15rem 0.45rem;display:inline-flex;align-items:center;gap:0.2rem;" title="Auto-detect support & resistance range"><span>⚡</span> Auto Detect</button>`;
+                        }
 
                         return `<tr class="interactive-row">
                             <td>
@@ -428,10 +475,7 @@
                             </td>
                             <td style="text-align:right;font-size:0.75rem;font-family:var(--font-mono);color:#94a3b8;">${mcStr}</td>
                             <td style="text-align:center;">
-                                <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">
-                                    ${rangeStr}
-                                    <button onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="color:var(--muted);padding:0 0.15rem;font-size:0.75rem;border:none;background:transparent;cursor:pointer;" title="Edit Swing Range">⚙</button>
-                                </div>
+                                ${rangeCellHtml}
                             </td>
                             <td style="text-align:center;">
                                 <div style="display:flex;gap:0.25rem;align-items:center;justify-content:center;">

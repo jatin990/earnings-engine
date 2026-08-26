@@ -1188,6 +1188,31 @@ def get_watchlist_quotes_api(
             except Exception as exc:
                 logger.debug("Error computing OHLCV for %s: %s", t, exc)
 
+        # 4. Compute Swing Signal & Action (BUY=green / SELL=red / HOLD=brown)
+        p = item.get("current_price")
+        s = item.get("support")
+        r = item.get("resistance")
+        if p is not None and s is not None and r is not None and r > s:
+            pos_pct = round(((p - s) / (r - s)) * 100, 1)
+            item["swing_position_pct"] = pos_pct
+            if pos_pct <= 35.0 or p <= s:
+                item["swing_signal"] = "BUY"
+                item["swing_signal_color"] = "green"
+                item["swing_signal_label"] = "BUY"
+            elif pos_pct >= 70.0 or p >= r:
+                item["swing_signal"] = "SELL"
+                item["swing_signal_color"] = "red"
+                item["swing_signal_label"] = "SELL"
+            else:
+                item["swing_signal"] = "HOLD"
+                item["swing_signal_color"] = "brown"
+                item["swing_signal_label"] = "HOLD"
+        else:
+            item["swing_position_pct"] = None
+            item["swing_signal"] = None
+            item["swing_signal_color"] = None
+            item["swing_signal_label"] = None
+
         return item
 
     workers = min(12, max(1, len(ticker_list)))
