@@ -114,9 +114,9 @@ def test_context_builder_and_prompt():
     assert "catalysts" in ctx
 
     prompt = context_builder.context_to_prompt(ctx)
-    assert "Stock Analysis Context: RELIANCE.NS" in prompt
-    assert "Price Action & Momentum" in prompt
-    assert "Swing Channel & Structure" in prompt
+    assert "Point-in-Time Quantitative Analysis Context: RELIANCE.NS" in prompt
+    assert "Technical Momentum & Price Structure" in prompt
+    assert "Quantitative Factor Weight Rubric" in prompt
 
 
 def test_storage_crud_and_stats(mock_model_results):

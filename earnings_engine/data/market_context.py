@@ -254,11 +254,14 @@ def detect_swing_range(closes: pd.Series) -> dict[str, Any]:
     - Monthly breakdown: 30-day buckets over the past 3 months
     - Cycle oscillations: transitions between lower 25% and upper 75% of channel
     """
-    if closes.empty:
+    if closes is None or (hasattr(closes, "empty") and closes.empty):
         return {
             "lower": None, "upper": None, "cycles": 0, "avg_days": 0, "cycles_data": [],
             "three_month_lower": None, "three_month_upper": None, "monthly_ranges": [],
         }
+
+    if isinstance(closes, pd.DataFrame):
+        closes = closes["close"] if "close" in closes.columns else closes.iloc[:, 0]
 
     # Ensure clean series sorted by date/index
     clean_closes = pd.to_numeric(closes, errors="coerce").dropna()

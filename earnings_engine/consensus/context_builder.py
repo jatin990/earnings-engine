@@ -19,133 +19,32 @@ logger = logging.getLogger("earnings_engine.consensus.context_builder")
 
 
 def build_context(ticker: str, timeframe_days: int = 14, settings: Settings | None = None, fetch_live: bool = True) -> dict[str, Any]:
-    """Assemble a full context payload for a single ticker on live market data.
+    """Assemble a full standardized context payload for a single ticker on live market data.
 
-    Returns a dict with keys: ticker, price_action, swing_channel, earnings,
-    catalysts, and metadata — ready for serialization into an LLM prompt.
+    Utilizes the canonical 6-pillar factor standardization engine including
+    market sentiment, macro VIX regimes, institutional flows, and fundamentals.
     """
+    from earnings_engine.consensus.standard_inputs import build_standardized_model_context
+
     settings = settings or Settings()
     sym = ticker.strip().upper()
-    ctx: dict[str, Any] = {
-        "ticker": sym,
-        "timeframe_days": timeframe_days,
-        "generated_at": datetime.now().isoformat(),
-        "is_live": False,
-    }
 
-    # 1. Fetch and sync real-time authoritative market quote
-    live_q: dict[str, Any] = {}
-    if fetch_live:
-        try:
-            from earnings_engine.data.prices import fetch_live_quote
-            live_q = fetch_live_quote(sym, settings=settings, sync_db=True)
-            if live_q.get("current_price"):
-                ctx["is_live"] = True
-                ctx["live_quote"] = live_q
-        except Exception as e:
-            logger.debug("[CONSENSUS-CTX] Live quote fetch skipped/failed for %s: %s", sym, e)
+    # Build canonical standardized context
+    ctx = build_standardized_model_context(sym, timeframe_days=timeframe_days, settings=settings, fetch_live=fetch_live)
 
-    ctx["price_action"] = _build_price_action(sym, settings, live_quote=live_q)
-    ctx["swing_channel"] = _build_swing_channel(sym, settings)
-    ctx["earnings"] = _build_earnings_context(sym, settings)
-    ctx["catalysts"] = _build_catalysts(sym, settings)
-
-    # 2. Multi-Factor Fundamental & Institutional Intelligence Pipeline
-    try:
-        from earnings_engine.features.fundamental_pipeline import build_multi_factor_pipeline
-        ctx["multi_factor"] = build_multi_factor_pipeline(sym, settings=settings)
-    except Exception as e:
-        logger.debug("[CONSENSUS-CTX] Multi-factor pipeline build skipped for %s: %s", sym, e)
+    # Attach backward-compatible keys for existing consumers
+    ctx["price_action"] = ctx.get("technical_momentum", {})
+    ctx["swing_channel"] = ctx.get("swing_structure", {})
+    ctx["earnings"] = ctx.get("earnings_track_record", {})
+    ctx["catalysts"] = ctx.get("corporate_catalysts", [])
 
     return ctx
 
 
 def context_to_prompt(ctx: dict[str, Any]) -> str:
-    """Render a context dict into a markdown prompt string for LLMs."""
-    from earnings_engine.features.fundamental_pipeline import format_pipeline_for_llm_prompt
-
-    ticker = ctx.get("ticker", "UNKNOWN")
-    timeframe = ctx.get("timeframe_days", 14)
-    pa = ctx.get("price_action", {})
-    sw = ctx.get("swing_channel", {})
-    ea = ctx.get("earnings", {})
-    cat = ctx.get("catalysts", [])
-    mf = ctx.get("multi_factor", {})
-    is_live = ctx.get("is_live", False)
-    curr_sym = "$" if not ticker.endswith(".NS") else "₹"
-
-    lines = [
-        f"# Stock Analysis Context: {ticker}",
-        f"**Analysis Date:** {ctx.get('generated_at', 'N/A')}",
-        f"**Prediction Timeframe:** {timeframe} days",
-        f"**Data Status:** {'🟢 Live Real-Time Market Feed' if is_live else '📊 Cached Daily Historical Feed'}",
-        "",
-    ]
-
-    # Include formatted 6-pillar multi-factor briefing if available
-    if mf and mf.get("success"):
-        lines.append(format_pipeline_for_llm_prompt(mf))
-        lines.append("")
-
-    lines.append("## Price Action & Technical Momentum")
-
-    if pa:
-        lines.extend([
-            f"- **Current Live Price:** {curr_sym}{pa.get('current_price', 'N/A')}",
-            f"- **7-Day Return:** {_fmt_pct(pa.get('return_7d'))}",
-            f"- **30-Day Return:** {_fmt_pct(pa.get('return_30d'))}",
-            f"- **52-Week High:** {curr_sym}{pa.get('high_52w', 'N/A')} ({_fmt_pct(pa.get('pct_from_52w_high'))} from current)",
-            f"- **52-Week Low:** {curr_sym}{pa.get('low_52w', 'N/A')} ({_fmt_pct(pa.get('pct_from_52w_low'))} from current)",
-            f"- **RSI-14:** {pa.get('rsi_14', 'N/A')}",
-            f"- **EMA-20:** {curr_sym}{pa.get('ema_20', 'N/A')}",
-            f"- **EMA-50:** {curr_sym}{pa.get('ema_50', 'N/A')}",
-            f"- **EMA-200:** {curr_sym}{pa.get('ema_200', 'N/A')}",
-            f"- **Avg Volume (20D):** {pa.get('avg_volume_20d', 'N/A')}",
-        ])
-    else:
-        lines.append("- No price data available")
-
-    lines.extend(["", "## Swing Channel & Structure"])
-    if sw and sw.get("lower") is not None:
-        lines.extend([
-            f"- **20-Day Channel:** {curr_sym}{sw.get('lower', 'N/A')} – {curr_sym}{sw.get('upper', 'N/A')}",
-            f"- **3-Month Channel:** {curr_sym}{sw.get('three_month_lower', 'N/A')} – {curr_sym}{sw.get('three_month_upper', 'N/A')}",
-            f"- **Swing Cycles (3M):** {sw.get('cycles', 0)} cycles, avg {sw.get('avg_cycle_days', 0)} days",
-        ])
-        pos = sw.get("position_in_channel")
-        if pos is not None:
-            lines.append(f"- **Position in Channel:** {pos:.0f}% (0%=support, 100%=resistance)")
-    else:
-        lines.append("- No swing data available")
-
-    lines.extend(["", "## Earnings History"])
-    if ea:
-        if ea.get("days_to_next") is not None:
-            lines.append(f"- **Days to Next Earnings:** {ea['days_to_next']}")
-        surprises = ea.get("past_surprises", [])
-        if surprises:
-            for s in surprises:
-                lines.append(f"  - Q{s.get('quarter', '?')}: {_fmt_pct(s.get('surprise_pct'))} surprise")
-        post_moves = ea.get("post_earnings_moves", [])
-        if post_moves:
-            lines.append("- **Historical Post-Earnings 7D Moves:**")
-            for m in post_moves:
-                lines.append(f"  - {m.get('date', '?')}: {_fmt_pct(m.get('move_pct'))}")
-    else:
-        lines.append("- No earnings data available")
-
-    lines.extend(["", "## Recent News & Catalysts"])
-    if cat:
-        for i, c in enumerate(cat[:5], 1):
-            direction = c.get("direction", "NEUTRAL")
-            icon = "🟢" if direction == "BULLISH" else ("🔴" if direction == "BEARISH" else "⚪")
-            lines.append(f"{i}. {icon} [{c.get('impact_score', 0)}] {c.get('title', 'N/A')}")
-            if c.get("category"):
-                lines.append(f"   Category: {c['category']} | Impact: {c.get('impact_level', 'N/A')}")
-    else:
-        lines.append("- No recent catalysts found")
-
-    return "\n".join(lines)
+    """Render a context dict into a standardized markdown prompt string for LLMs."""
+    from earnings_engine.consensus.standard_inputs import format_standardized_llm_prompt
+    return format_standardized_llm_prompt(ctx)
 
 
 def _fmt_pct(val: float | None) -> str:
