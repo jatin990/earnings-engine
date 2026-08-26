@@ -205,7 +205,7 @@ def scan_quarter_repeaters(
         uni = load_universe("NSE_TOP", settings) or load_universe("NIFTY_50", settings)
         if uni:
             tickers.update(uni)
-    elif u_clean == "nse_large_cap":
+    elif u_clean in ("nse_large_cap", "large_cap"):
         large_caps = load_universe("NSE_LARGE_CAP", settings)
         if large_caps:
             tickers.update(large_caps)
@@ -213,7 +213,31 @@ def scan_quarter_repeaters(
         us_uni = load_universe("US_TOP", settings)
         if us_uni:
             tickers.update(us_uni)
-    elif u_clean != "all":
+    elif u_clean == "all":
+        # Load all tracked universes
+        for u in ("NSE_ALL", "IN", "NSE_LARGE_CAP", "NSE_TOP", "US_TOP"):
+            uni = load_universe(u, settings)
+            if uni:
+                tickers.update(uni)
+        try:
+            wls = all_watchlists(settings)
+            for wl in wls:
+                if isinstance(wl, dict):
+                    tickers.update(wl.get("tickers", []))
+                elif isinstance(wl, str):
+                    wl_t = get_watchlist(wl, settings)
+                    if wl_t:
+                        tickers.update(wl_t)
+        except Exception:
+            pass
+        try:
+            conn = get_db_connection(settings)
+            rows = conn.execute("SELECT ticker FROM tickers WHERE metrics IS NOT NULL").fetchall()
+            conn.close()
+            tickers.update([r[0] for r in rows if r[0]])
+        except Exception:
+            pass
+    else:
         wl_tickers = get_watchlist(universe, settings)
         if wl_tickers:
             tickers.update(wl_tickers)
@@ -235,17 +259,17 @@ def scan_quarter_repeaters(
         except Exception:
             pass
         try:
-            for u in ("NSE_TOP", "IN", "NSE_LARGE_CAP"):
+            for u in ("NSE_ALL", "NSE_TOP", "IN", "NSE_LARGE_CAP"):
                 uni = load_universe(u, settings)
                 if uni:
-                    tickers.update(uni[:100])
+                    tickers.update(uni)
         except Exception:
             pass
 
     if not tickers:
         try:
             conn = get_db_connection(settings)
-            rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 100").fetchall()
+            rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 200").fetchall()
             conn.close()
             tickers.update([r[0] for r in rows if r[0]])
         except Exception:

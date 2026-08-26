@@ -448,12 +448,17 @@ def store_price_metrics_bulk(
 
 def load_price_metrics(ticker: str, settings: Settings, as_of_date: str | None = None) -> dict[str, Any] | None:
     """Load previously persisted metrics for a ticker and day if they exist from tickers master table."""
-    as_of_date_value = as_of_date or pd.Timestamp.now().strftime("%Y-%m-%d")
     with _connect(settings) as connection:
-        row = connection.execute(
-            "SELECT metrics FROM tickers WHERE ticker = ? AND metrics_as_of_date = ?",
-            (ticker, as_of_date_value),
-        ).fetchone()
+        if as_of_date:
+            row = connection.execute(
+                "SELECT metrics FROM tickers WHERE ticker = ? AND metrics_as_of_date = ?",
+                (ticker, as_of_date),
+            ).fetchone()
+        else:
+            row = connection.execute(
+                "SELECT metrics FROM tickers WHERE ticker = ? AND metrics IS NOT NULL ORDER BY metrics_as_of_date DESC LIMIT 1",
+                (ticker,),
+            ).fetchone()
 
     if not row or not row[0]:
         return None

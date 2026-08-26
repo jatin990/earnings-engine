@@ -742,31 +742,31 @@
 
             <!-- Local Models Group -->
             <div style="display: inline-flex; align-items: center; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); padding: 1px 2px; gap: 2px;">
-                <button id="btnModel-local" onclick="openLocalModelModal()" class="btn-model-opt local" style="border: none; background: transparent; padding: 0.28rem 0.45rem; color: #34d399; font-weight: 700; font-size: 0.74rem;" title="Open Local Models hub (choose active models & run individually or in parallel)">
+                <button type="button" id="btnModel-local" onclick="openLocalModelModal()" class="btn-model-opt local" style="border: none; background: transparent; padding: 0.28rem 0.45rem; color: #34d399; font-weight: 700; font-size: 0.74rem;" title="Open Local Models hub (choose active models & run individually or in parallel)">
                     <span>💻</span> <span id="lblLocalModel">Local Models</span>
                 </button>
-                <button id="btnModel-local-all" onclick="runAllActiveLocalConsensus()" class="btn-model-opt local" style="border: none; background: rgba(16, 185, 129, 0.18); padding: 0.28rem 0.5rem; color: #a7f3d0; font-weight: 700; font-size: 0.72rem; border-radius: 3px;" title="Dispatch prediction in parallel to ALL checked active local models">
+                <button type="button" id="btnModel-local-all" onclick="runAllActiveLocalConsensus()" class="btn-model-opt local" style="border: none; background: rgba(16, 185, 129, 0.18); padding: 0.28rem 0.5rem; color: #a7f3d0; font-weight: 700; font-size: 0.72rem; border-radius: 3px;" title="Dispatch prediction in parallel to ALL checked active local models">
                     <span>⚡</span> Run Active Local
                 </button>
                 <button type="button" onclick="openLocalModelModal()" style="background: transparent; border: none; color: #6ee7b7; font-size: 0.72rem; padding: 0.25rem 0.35rem; cursor: pointer;" title="Configure local models, host & active list">⚙️</button>
             </div>
 
             <!-- Per-Model Action Buttons -->
-            <button id="btnModel-deepseek-r1" onclick="runConsensus(true, 'deepseek/deepseek-r1')" class="btn-model-opt deepseek" title="Run DeepSeek-R1 reasoning engine (Chain of thought)">
+            <button type="button" id="btnModel-deepseek-r1" onclick="runConsensus(true, 'deepseek/deepseek-r1')" class="btn-model-opt deepseek" title="Run DeepSeek-R1 reasoning engine (Chain of thought)">
                 <span>🤖</span> DeepSeek-R1
             </button>
-            <button id="btnModel-llama-70b" onclick="runConsensus(true, 'meta-llama/llama-3.3-70b-instruct')" class="btn-model-opt llama" title="Run Meta Llama-3.3-70B institutional model">
+            <button type="button" id="btnModel-llama-70b" onclick="runConsensus(true, 'meta-llama/llama-3.3-70b-instruct')" class="btn-model-opt llama" title="Run Meta Llama-3.3-70B institutional model">
                 <span>🦙</span> Llama-70B
             </button>
-            <button id="btnModel-qwen-72b" onclick="runConsensus(true, 'qwen/qwen-2.5-72b-instruct')" class="btn-model-opt qwen" title="Run Alibaba Qwen-2.5-72B algorithmic model">
+            <button type="button" id="btnModel-qwen-72b" onclick="runConsensus(true, 'qwen/qwen-2.5-72b-instruct')" class="btn-model-opt qwen" title="Run Alibaba Qwen-2.5-72B algorithmic model">
                 <span>🌐</span> Qwen-72B
             </button>
-            <button id="btnModel-mistral-large" onclick="runConsensus(true, 'mistralai/mistral-large')" class="btn-model-opt mistral" title="Run Mistral-Large catalyst model">
+            <button type="button" id="btnModel-mistral-large" onclick="runConsensus(true, 'mistralai/mistral-large')" class="btn-model-opt mistral" title="Run Mistral-Large catalyst model">
                 <span>⚡</span> Mistral
             </button>
 
             <!-- Run All Consensus Button -->
-            <button id="btnConsensus" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.32rem 0.75rem; font-size: 0.75rem;" title="Run all AI engines in parallel and synthesize consensus">
+            <button type="button" id="btnConsensus" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.32rem 0.75rem; font-size: 0.75rem;" title="Run all AI engines in parallel and synthesize consensus">
                 🧠 All Consensus
             </button>
         </div>
