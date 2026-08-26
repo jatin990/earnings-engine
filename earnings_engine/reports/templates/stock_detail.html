@@ -882,6 +882,25 @@
             </div>
         </section>
 
+        <!-- ⚖️ STANDARDIZED 6-PILLAR FACTOR EVALUATION MATRIX -->
+        <section class="card" id="cardFactorEvaluation" style="border: 1px solid rgba(56, 189, 248, 0.25); background: linear-gradient(180deg, #0b111e 0%, #070a12 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
+            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #ffffff;">
+                    <span style="color: #38bdf8;">⚖️</span>
+                    <span>Standardized Multi-Factor Evaluation Matrix</span>
+                    <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 500; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.12rem 0.45rem; border-radius: 4px;">6 Pillars · 100% Weight Model</span>
+                </div>
+                <div id="factorCompositePill" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.76rem; font-weight: 800; padding: 0.28rem 0.85rem; border-radius: var(--radius-sm); font-family: var(--font-mono); background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
+                    COMPOSITE: -- / 100
+                </div>
+            </div>
+
+            <!-- 6 Pillars Grid -->
+            <div id="factorPillarsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.9rem;">
+                <div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 1rem;">Evaluating multi-factor pillars...</div>
+            </div>
+        </section>
+
         <!-- 4-MODEL AI MATRIX -->
         <section class="card">
             <div class="card-header">
@@ -1043,11 +1062,63 @@
             // Render Consensus Setup
             renderConsensus(c, curr);
 
+            // Render 6-Pillar Standardized Factor Evaluation
+            renderFactorEvaluation(data.factor_evaluation);
+
             // Render Earnings History
             renderEarnings(data.earnings_history || []);
 
             // Render News Catalysts
             renderCatalysts(data.catalysts || []);
+        }
+
+        function renderFactorEvaluation(fe) {
+            const card = document.getElementById('cardFactorEvaluation');
+            const pill = document.getElementById('factorCompositePill');
+            const grid = document.getElementById('factorPillarsGrid');
+            if (!grid) return;
+
+            if (!fe || !fe.pillars) {
+                if (card) card.style.display = 'none';
+                return;
+            }
+            if (card) card.style.display = 'block';
+
+            const comp = fe.composite_score || 50;
+            const isBull = fe.verdict_badge === 'emerald';
+            const isWarn = fe.verdict_badge === 'amber';
+            const badgeBg = isBull ? 'rgba(16,185,129,0.15)' : (isWarn ? 'rgba(245,158,11,0.15)' : 'rgba(244,63,94,0.15)');
+            const badgeColor = isBull ? '#34d399' : (isWarn ? '#fbbf24' : '#f87171');
+            const badgeBorder = isBull ? 'rgba(16,185,129,0.3)' : (isWarn ? 'rgba(245,158,11,0.3)' : 'rgba(244,63,94,0.3)');
+
+            if (pill) {
+                pill.innerHTML = `<span>${fe.verdict_icon || '⚖️'}</span> <strong>${fe.verdict || 'EVALUATED'} (${comp}/100)</strong>`;
+                pill.style.background = badgeBg;
+                pill.style.color = badgeColor;
+                pill.style.borderColor = badgeBorder;
+            }
+
+            const pillars = Object.values(fe.pillars || {});
+            grid.innerHTML = pillars.map(p => {
+                const sc = p.score || 50;
+                const barCol = sc >= 70 ? '#34d399' : (sc >= 45 ? '#38bdf8' : '#f87171');
+                return `
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.45rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:0.75rem;font-weight:700;color:#f8fafc;">${p.name}</span>
+                            <span style="font-size:0.65rem;font-family:var(--font-mono);background:rgba(255,255,255,0.06);color:#94a3b8;padding:0.1rem 0.35rem;border-radius:4px;">${p.weight_pct}% Wgt</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:0.15rem;">
+                            <div style="font-family:var(--font-mono);font-size:1.15rem;font-weight:800;color:${barCol};">${sc.toFixed(0)} <span style="font-size:0.7rem;color:#64748b;font-weight:500;">/ 100</span></div>
+                            <span style="font-size:0.7rem;font-weight:700;color:#e2e8f0;background:rgba(255,255,255,0.05);padding:0.15rem 0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);">${p.badge}</span>
+                        </div>
+                        <div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;margin:0.2rem 0;">
+                            <div style="height:100%;width:${Math.max(5, Math.min(100, sc))}%;background:${barCol};border-radius:2px;"></div>
+                        </div>
+                        <div style="font-size:0.7rem;color:#94a3b8;line-height:1.35;">${p.detail}</div>
+                    </div>
+                `;
+            }).join('');
         }
 
         function renderConsensus(c, curr) {

@@ -2366,6 +2366,16 @@ async def get_stock_rating_endpoint(ticker: str):
     return res
 
 
+@app.get("/api/v1/stock/{ticker}/factor-evaluation", tags=["Stock Intelligence & Ratings"])
+async def get_stock_factor_evaluation_endpoint(ticker: str):
+    """Return standardized 6-Pillar factor evaluation matrix, weights, and master composite score."""
+    from earnings_engine.api.stock_api import get_stock_factor_evaluation
+    res = await asyncio.to_thread(get_stock_factor_evaluation, ticker, _settings)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to evaluate standard factors"))
+    return res
+
+
 @app.get("/api/v1/stock/{ticker}/intelligence-note", tags=["Stock Intelligence & Ratings"])
 @app.post("/api/v1/stock/{ticker}/intelligence-note", tags=["Stock Intelligence & Ratings"])
 async def get_stock_intelligence_note_endpoint(

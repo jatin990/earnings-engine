@@ -1217,15 +1217,51 @@ def get_watchlist_quotes_api(
 
         return item
 
+    # Pre-fetch institutional accumulation activity
+    inst_map = {}
+    try:
+        from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
+        # Pre-populate for known active tickers
+        for t in ticker_list[:25]:
+            act = get_stock_institutional_activity(t, settings=settings)
+            if act:
+                inst_map[t] = act
+    except Exception:
+        pass
+
+    # Market Sentiment Summary
+    mkt_summary = {}
+    try:
+        from earnings_engine.features.market_sentiment import get_market_sentiment
+        mkt_summary = get_market_sentiment("NIFTY 50", settings=settings, fetch_live=False)
+    except Exception:
+        pass
+
     workers = min(12, max(1, len(ticker_list)))
     with ThreadPoolExecutor(max_workers=workers) as executor:
         results = list(executor.map(process_ticker, ticker_list))
+
+    # Enrich results with institutional metrics
+    for item in results:
+        t = item.get("ticker")
+        inst_info = inst_map.get(t)
+        if inst_info:
+            item["institutional_score"] = inst_info.get("accumulation_score")
+            item["institutional_verdict"] = inst_info.get("verdict")
+            item["funds_buying"] = inst_info.get("funds_accumulating_count", 0)
+            item["funds_selling"] = inst_info.get("funds_selling_count", 0)
+        else:
+            item["institutional_score"] = None
+            item["institutional_verdict"] = None
+            item["funds_buying"] = 0
+            item["funds_selling"] = 0
 
     return {
         "success": True,
         "watchlist": watchlist,
         "count": len(results),
         "is_live": auto_live,
+        "market_sentiment": mkt_summary,
         "items": results,
     }
 

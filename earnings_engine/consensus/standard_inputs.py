@@ -597,3 +597,227 @@ def format_standardized_llm_prompt(ctx: dict[str, Any]) -> str:
     ])
 
     return "\n".join(lines)
+
+
+# =============================================================================
+# ⚖️ MASTER 6-PILLAR FACTOR EVALUATION ENGINE
+# =============================================================================
+def evaluate_stock_standard_pillars(
+    ticker: str,
+    settings: Settings | None = None,
+    ctx: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Compute normalized 0–100 scores for each of the 6 standardized pillars and synthesize the master weighted factor score.
+
+    Weights (Total: 100%):
+    - Pillar 1: Institutional & Smart Money Flows (22%)
+    - Pillar 2: Technical Momentum & Price Structure (20%)
+    - Pillar 3: Earnings Surprises & Track Record (18%)
+    - Pillar 4: Corporate Filings & News Catalysts (16%)
+    - Pillar 5: Market Sentiment & Macro Volatility Regime (14%)
+    - Pillar 6: Valuation Multiples & Financial Health (10%)
+    """
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if ctx is None:
+        ctx = build_standardized_model_context(sym, settings=settings)
+
+    # 1. Pillar 1: Institutional & Smart Money (22%)
+    inst = ctx.get("institutional_flows", {})
+    p1_score = float(inst.get("accumulation_score", 50.0))
+    funds_in = inst.get("funds_in_count", 0)
+    funds_out = inst.get("funds_out_count", 0)
+    net_flow_cr = inst.get("net_flow_cr", 0.0)
+    p1_badge = f"+{funds_in} Funds Buying" if funds_in > 0 else (f"-{funds_out} Funds Selling" if funds_out > 0 else "Neutral")
+    p1_detail = f"Score {p1_score:.0f}/100 | +{funds_in} in / -{funds_out} out | Net: ₹{net_flow_cr:+.1f} Cr ({inst.get('verdict', 'Neutral')})"
+
+    # 2. Pillar 2: Technical Momentum & Structure (20%)
+    pa = ctx.get("technical_momentum", {})
+    p2_base = 50.0
+    vol_ratio = pa.get("volume_ratio_5d_63d", 1.0) or 1.0
+    pct_52h = pa.get("pct_from_52w_high", -20.0) or -20.0
+    ret_30d = pa.get("return_30d", 0.0) or 0.0
+    cmp = pa.get("current_price")
+    e20 = pa.get("ema_20")
+    e50 = pa.get("ema_50")
+    e200 = pa.get("ema_200")
+
+    if vol_ratio >= 2.0: p2_base += 20.0
+    elif vol_ratio >= 1.3: p2_base += 10.0
+    elif vol_ratio < 0.7: p2_base -= 10.0
+
+    if pct_52h >= -5.0: p2_base += 20.0
+    elif pct_52h >= -12.0: p2_base += 10.0
+    elif pct_52h < -30.0: p2_base -= 15.0
+
+    if ret_30d >= 8.0: p2_base += 15.0
+    elif ret_30d >= 0.0: p2_base += 5.0
+    elif ret_30d < -8.0: p2_base -= 15.0
+
+    if cmp and e20 and e50 and e200 and (cmp > e20 > e50 > e200):
+        p2_base += 15.0
+
+    p2_score = max(10.0, min(98.0, p2_base))
+    p2_badge = f"{vol_ratio:.1f}x Vol Surge" if vol_ratio >= 1.3 else f"{pct_52h:+.1f}% from 52W High"
+    p2_detail = f"Vol Multiple: {vol_ratio:.2f}x | 30D Ret: {ret_30d:+.1f}% | 52W High Gap: {pct_52h:+.1f}%"
+
+    # 3. Pillar 3: Earnings Surprises & Track Record (18%)
+    ea = ctx.get("earnings_track_record", {})
+    p3_base = 50.0
+    beat_rate = ea.get("beat_rate_pct")
+    mean_surp = ea.get("mean_surprise_pct", 0.0) or 0.0
+    if beat_rate is not None:
+        if beat_rate >= 75.0: p3_base += 25.0
+        elif beat_rate >= 50.0: p3_base += 10.0
+        elif beat_rate < 30.0: p3_base -= 20.0
+    if mean_surp > 10.0: p3_base += 15.0
+    elif mean_surp > 0.0: p3_base += 5.0
+    elif mean_surp < -5.0: p3_base -= 15.0
+
+    p3_score = max(10.0, min(98.0, p3_base))
+    p3_badge = f"{beat_rate:.0f}% Beat Rate" if beat_rate is not None else f"{mean_surp:+.1f}% Mean Surprise"
+    p3_detail = f"Historical Beat Rate: {beat_rate or 50:.0f}% | Avg Surprise: {mean_surp:+.1f}%"
+
+    # 4. Pillar 4: Corporate Catalysts & Filings (16%)
+    cat = ctx.get("corporate_catalysts", [])
+    p4_base = 50.0
+    pos_count = 0
+    neg_count = 0
+    if cat:
+        for c in cat[:6]:
+            d = c.get("direction", "NEUTRAL")
+            imp = c.get("impact_score", 50)
+            if d == "BULLISH" or imp >= 70:
+                p4_base += 10.0
+                pos_count += 1
+            elif d == "BEARISH" or imp <= 30:
+                p4_base -= 15.0
+                neg_count += 1
+    p4_score = max(10.0, min(98.0, p4_base))
+    p4_badge = f"+{pos_count} Positive Catalysts" if pos_count > 0 else (f"{neg_count} Headwinds" if neg_count > 0 else "Neutral News")
+    p4_detail = f"{len(cat)} Catalysts Tracked ({pos_count} positive, {neg_count} negative in last 30d)"
+
+    # 5. Pillar 5: Market Sentiment & Macro Volatility (14%)
+    mkt = ctx.get("market_sentiment", {})
+    p5_score = float(mkt.get("market_sentiment_score", 50.0))
+    vix_val = mkt.get("vix_level", 14.0)
+    vix_reg = mkt.get("vix_regime_label", "Normal Volatility")
+    p5_badge = f"VIX {vix_val} ({vix_reg})"
+    p5_detail = f"Climate: {mkt.get('market_climate', 'Supportive')} | Index: {mkt.get('benchmark_trend', 'NEUTRAL')} | VIX: {vix_val}"
+
+    # 6. Pillar 6: Valuation & Financial Health (10%)
+    val = ctx.get("valuation_fundamentals", {})
+    p6_base = 50.0
+    pe = val.get("pe")
+    de = val.get("debt_to_equity")
+    roe = val.get("roe_pct")
+    if pe is not None:
+        if 10.0 <= pe <= 35.0: p6_base += 15.0
+        elif pe > 75.0: p6_base -= 15.0
+    if de is not None:
+        if de <= 0.4: p6_base += 15.0
+        elif de > 1.5: p6_base -= 15.0
+    if roe is not None:
+        if roe >= 15.0: p6_base += 15.0
+        elif roe < 6.0: p6_base -= 10.0
+
+    p6_score = max(10.0, min(98.0, p6_base))
+    p6_badge = f"P/E {pe:.1f}" if pe else (f"ROE {roe:.1f}%" if roe else "Fair Valuation")
+    p6_detail = f"P/E: {pe or '—'} | D/E: {de or '—'} | ROE: {roe or '—'}%"
+
+    # Composite Synthesis (Weights: 22%, 20%, 18%, 16%, 14%, 10%)
+    composite = (
+        0.22 * p1_score +
+        0.20 * p2_score +
+        0.18 * p3_score +
+        0.16 * p4_score +
+        0.14 * p5_score +
+        0.10 * p6_score
+    )
+    composite = round(composite, 1)
+
+    if composite >= 75.0:
+        verdict = "STRONG BUY / HIGH CONVICTION"
+        verdict_badge = "emerald"
+        verdict_icon = "🟢"
+    elif composite >= 60.0:
+        verdict = "MODERATE BUY / BULLISH TAILWIND"
+        verdict_badge = "emerald"
+        verdict_icon = "🌱"
+    elif composite >= 45.0:
+        verdict = "NEUTRAL / RANGE-BOUND"
+        verdict_badge = "amber"
+        verdict_icon = "🟡"
+    elif composite >= 32.0:
+        verdict = "CAUTION / DISTRIBUTION PRESSURE"
+        verdict_badge = "rose"
+        verdict_icon = "🟠"
+    else:
+        verdict = "BEARISH / ELEVATED RISK"
+        verdict_badge = "rose"
+        verdict_icon = "🔴"
+
+    return {
+        "ticker": sym,
+        "composite_score": composite,
+        "verdict": verdict,
+        "verdict_badge": verdict_badge,
+        "verdict_icon": verdict_icon,
+        "evaluated_at": datetime.now(timezone.utc).isoformat(),
+        "pillars": {
+            "institutional_flows": {
+                "name": "🏛️ Institutional & Smart Money Flows",
+                "weight_pct": 22.0,
+                "score": round(p1_score, 1),
+                "badge": p1_badge,
+                "detail": p1_detail,
+                "weighted_points": round(0.22 * p1_score, 1),
+            },
+            "technical_momentum": {
+                "name": "⚡ Technical Momentum & Price Structure",
+                "weight_pct": 20.0,
+                "score": round(p2_score, 1),
+                "badge": p2_badge,
+                "detail": p2_detail,
+                "weighted_points": round(0.20 * p2_score, 1),
+            },
+            "earnings_track_record": {
+                "name": "📊 Earnings Surprises & Track Record",
+                "weight_pct": 18.0,
+                "score": round(p3_score, 1),
+                "badge": p3_badge,
+                "detail": p3_detail,
+                "weighted_points": round(0.18 * p3_score, 1),
+            },
+            "corporate_catalysts": {
+                "name": "📰 Corporate Filings & News Catalysts",
+                "weight_pct": 16.0,
+                "score": round(p4_score, 1),
+                "badge": p4_badge,
+                "detail": p4_detail,
+                "weighted_points": round(0.16 * p4_score, 1),
+            },
+            "market_sentiment": {
+                "name": "🌐 Market Sentiment & Macro Volatility",
+                "weight_pct": 14.0,
+                "score": round(p5_score, 1),
+                "badge": p5_badge,
+                "detail": p5_detail,
+                "weighted_points": round(0.14 * p5_score, 1),
+            },
+            "valuation_fundamentals": {
+                "name": "💰 Valuation Multiples & Financial Health",
+                "weight_pct": 10.0,
+                "score": round(p6_score, 1),
+                "badge": p6_badge,
+                "detail": p6_detail,
+                "weighted_points": round(0.10 * p6_score, 1),
+            },
+        },
+    }
+
+
+# Convenient alias
+build_standardized_stock_context = build_standardized_model_context
+
+

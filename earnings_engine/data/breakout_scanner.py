@@ -984,6 +984,22 @@ def score_breakout(
         "formula_summary": f"Score {composite}/100 = Res({res_score:.0f}) + Vol({vol_score:.0f}) + Squeeze({comp_score:.0f}) + Mom({mom_score:.0f}) + Fund({fund_score:.0f})",
     }
 
+    # Institutional Accumulation & Flow
+    inst_flow = {}
+    try:
+        from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
+        act = get_stock_institutional_activity(ticker)
+        if act:
+            inst_flow = {
+                "accumulation_score": act.get("accumulation_score"),
+                "verdict": act.get("verdict"),
+                "funds_in": act.get("funds_accumulating_count", 0),
+                "funds_out": act.get("funds_selling_count", 0),
+                "net_flow_cr": act.get("net_flow_cr", 0.0),
+            }
+    except Exception:
+        pass
+
     return {
         "ticker": ticker,
         "signal_date": signal_date,
@@ -995,6 +1011,7 @@ def score_breakout(
         "risk_reward_ratio": risk_reward_ratio,
         "setup_archetype": archetype,
         "calculation_notes": calculation_notes,
+        "institutional_flow": inst_flow,
         "current_price": round(current_price, 2),
         "current_date": current_date,
         "realized_return_pct": realized_return_pct,

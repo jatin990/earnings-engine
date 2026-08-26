@@ -460,6 +460,7 @@
                                         <strong onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" style="color:#ffffff;font-size:0.85rem;cursor:pointer;" class="hover-underline" title="Inspect & edit swing range">${it.ticker}</strong>
                                         <a href="/stock/${encodeURIComponent(it.ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;cursor:pointer;" title="Open profile in new tab">↗</a>
                                         <div style="font-size:0.7rem;color:#a1a1aa;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.company_name || it.ticker}</div>
+                                        ${it.funds_buying > 0 ? `<div style="font-size:0.64rem;color:#34d399;font-weight:700;margin-top:2px;" title="Institutional Accumulation (+${it.funds_buying} Funds Buying)">🏛️ +${it.funds_buying} Funds Buying</div>` : (it.funds_selling > 0 ? `<div style="font-size:0.64rem;color:#f87171;font-weight:700;margin-top:2px;" title="Institutional Distribution (-${it.funds_selling} Funds Selling)">🏛️ -${it.funds_selling} Funds Selling</div>` : '')}
                                     </div>
                                 </div>
                             </td>
@@ -11348,7 +11349,10 @@
                                 <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-size:0.75rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
                             </div>
                             <span style="font-size:0.65rem;color:#475569;" title="${c.company_name || ctx.ticker}">${ctx.company}</span>
-                            <div style="margin-top:0.2rem;"><span style="font-size:0.62rem;background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.25);padding:0.08rem 0.35rem;border-radius:3px;">${ctx.archetype}</span></div>
+                            <div style="margin-top:0.2rem;display:flex;gap:0.25rem;flex-wrap:wrap;align-items:center;">
+                                <span style="font-size:0.62rem;background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.25);padding:0.08rem 0.35rem;border-radius:3px;">${ctx.archetype}</span>
+                                ${(c.institutional_flow && c.institutional_flow.funds_in > 0) ? `<span style="font-size:0.6rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.06rem 0.3rem;border-radius:3px;font-weight:700;" title="Institutional Accumulation: +${c.institutional_flow.funds_in} Funds Buying">🏛️ +${c.institutional_flow.funds_in} Funds</span>` : ''}
+                            </div>
                         </div>
                     </td>
                 `

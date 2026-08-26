@@ -217,7 +217,15 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
     # 6. Live Short-Term News Catalysts
     catalysts_data = get_short_term_catalysts(watchlist_or_universe="ALL", search_query=sym, limit=15, settings=settings)
 
-    # 7. Check Watchlist status
+    # 7. Standardized 6-Pillar Factor Evaluation Matrix
+    factor_eval = {}
+    try:
+        from earnings_engine.consensus.standard_inputs import evaluate_stock_standard_pillars
+        factor_eval = evaluate_stock_standard_pillars(sym, settings=settings)
+    except Exception as e:
+        logger.debug("Error computing standard factor evaluation for %s: %s", sym, e)
+
+    # 8. Check Watchlist status
     is_in_watchlist = False
     try:
         from earnings_engine.data.watchlists import get_watchlist
@@ -235,8 +243,24 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
         "earnings_history": earnings_history,
         "consensus": consensus_data,
         "catalysts": catalysts_data,
+        "factor_evaluation": factor_eval,
         "is_in_watchlist": is_in_watchlist,
     }
+
+
+def get_stock_factor_evaluation(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve dedicated 6-Pillar factor evaluation matrix and composite rating for a ticker."""
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if not sym:
+        return {"success": False, "error": "Ticker symbol is required"}
+    try:
+        from earnings_engine.consensus.standard_inputs import evaluate_stock_standard_pillars
+        eval_data = evaluate_stock_standard_pillars(sym, settings=settings)
+        return {"success": True, "data": eval_data}
+    except Exception as e:
+        logger.error("Failed evaluating standard factors for %s: %s", sym, e)
+        return {"success": False, "error": str(e)}
 
 
 def calculate_stock_rating(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
