@@ -791,10 +791,20 @@ def _migration_013_automation_and_institutional(conn: Any) -> None:
             action TEXT NOT NULL DEFAULT 'HOLD',
             change_shares INTEGER DEFAULT 0,
             change_pct REAL DEFAULT 0.0,
+            avg_price REAL DEFAULT 0.0,
+            recent_buy_price REAL DEFAULT 0.0,
             reported_date TEXT,
             created_at TEXT NOT NULL
         )
     """)
+    try:
+        conn.execute("ALTER TABLE institutional_holdings ADD COLUMN avg_price REAL DEFAULT 0.0")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE institutional_holdings ADD COLUMN recent_buy_price REAL DEFAULT 0.0")
+    except Exception:
+        pass
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_holdings_ticker ON institutional_holdings (ticker)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_holdings_fund ON institutional_holdings (fund_name)")
@@ -842,6 +852,18 @@ def _migration_013_automation_and_institutional(conn: Any) -> None:
         pass
 
 
+def _migration_014_institutional_avg_and_recent_price(conn: Any) -> None:
+    """Add avg_price and recent_buy_price columns to institutional_holdings."""
+    try:
+        conn.execute("ALTER TABLE institutional_holdings ADD COLUMN avg_price REAL DEFAULT 0.0")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE institutional_holdings ADD COLUMN recent_buy_price REAL DEFAULT 0.0")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -857,6 +879,7 @@ MIGRATIONS: list[Migration] = [
     Migration(11, "011_trips_and_net_worth_expansion", _migration_011_trips_and_net_worth_expansion),
     Migration(12, "012_quarter_repeater_predictions", _migration_012_quarter_repeaters),
     Migration(13, "013_automation_schedules_and_institutional_hub", _migration_013_automation_and_institutional),
+    Migration(14, "014_institutional_avg_and_recent_price", _migration_014_institutional_avg_and_recent_price),
 ]
 
 

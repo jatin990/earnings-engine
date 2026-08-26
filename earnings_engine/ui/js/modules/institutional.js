@@ -393,7 +393,7 @@
             if (hBody) {
                 const holdings = data.holdings || [];
                 if (!holdings.length) {
-                    hBody.innerHTML = '<tr><td colspan="7" style="padding:1.5rem;text-align:center;color:#64748b;">No individual fund positions reported.</td></tr>';
+                    hBody.innerHTML = '<tr><td colspan="9" style="padding:1.5rem;text-align:center;color:#64748b;">No individual fund positions reported.</td></tr>';
                 } else {
                     hBody.innerHTML = holdings.map(h => {
                         const isBuy = h.action === 'ACCUMULATED' || h.action === 'NEW BUY';
@@ -411,6 +411,8 @@
                                     <span class="signal-badge" style="background:${actBg};color:${actCol};font-size:0.62rem;padding:0.08rem 0.35rem;">${h.action}</span>
                                 </td>
                                 <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${h.stake_pct}%</td>
+                                <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#38bdf8;font-weight:600;">₹${h.avg_price != null ? Number(h.avg_price).toFixed(2) : '—'}</td>
+                                <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#a7f3d0;font-weight:600;">₹${h.recent_buy_price != null ? Number(h.recent_buy_price).toFixed(2) : '—'}</td>
                                 <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:${actCol};font-weight:700;">${chgSign}</td>
                                 <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#cbd5e1;">₹${(h.holding_value_cr || 0).toLocaleString()} Cr</td>
                                 <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#94a3b8;font-size:0.68rem;">${h.reported_date || '—'}</td>
@@ -430,7 +432,7 @@
 
             if (titleEl) titleEl.textContent = fundName;
             if (subEl) subEl.textContent = 'Loading equity portfolio disclosures...';
-            if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#64748b;"><div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Fetching portfolio holdings...</td></tr>';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#64748b;"><div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Fetching portfolio holdings...</td></tr>';
             if (modal) modal.style.display = 'flex';
 
             try {
@@ -441,7 +443,7 @@
                     if (subEl) subEl.textContent = `${holdings.length} tracked equity positions · Category: ${holdings[0]?.fund_type || 'Institutional'}`;
 
                     if (!holdings.length) {
-                        tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#64748b;">No recent holdings filed for this fund.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#64748b;">No recent holdings filed for this fund.</td></tr>';
                         return;
                     }
 
@@ -460,6 +462,8 @@
                                     <span class="signal-badge" style="background:${actBg};color:${actCol};font-size:0.65rem;padding:0.1rem 0.4rem;">${h.action}</span>
                                 </td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${h.stake_pct}%</td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#38bdf8;font-weight:600;">₹${h.avg_price != null ? Number(h.avg_price).toFixed(2) : '—'}</td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#a7f3d0;font-weight:600;">₹${h.recent_buy_price != null ? Number(h.recent_buy_price).toFixed(2) : '—'}</td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">₹${(h.holding_value_cr || 0).toLocaleString()} Cr</td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#94a3b8;font-size:0.72rem;">${h.reported_date || '—'}</td>
                                 <td style="padding:0.55rem 0.8rem;text-align:center;">
@@ -469,11 +473,11 @@
                         `;
                     }).join('');
                 } else {
-                    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#f87171;">Failed fetching fund details.</td></tr>';
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#f87171;">Failed fetching fund details.</td></tr>';
                 }
             } catch (e) {
                 console.error('Error inspecting fund:', e);
-                if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:2rem;text-align:center;color:#f87171;">Error: ${e.message}</td></tr>`;
+                if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="padding:2rem;text-align:center;color:#f87171;">Error: ${e.message}</td></tr>`;
             }
         },
 
