@@ -38,14 +38,15 @@ from earnings_engine.data import quarter_repeaters as repeaters_mod
 
 logger = get_logger("earnings_engine.api.server")
 
-# Background task handle (kept so we can cancel on shutdown)
+# Background task handles (kept so we can cancel on shutdown)
 _breakout_scanner_task: asyncio.Task | None = None
+_news_catalyst_task: asyncio.Task | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Run migrations and startup diagnostics on API startup."""
-    global _breakout_scanner_task
+    """Run migrations, schedule initialization, and startup diagnostics on API startup."""
+    global _breakout_scanner_task, _news_catalyst_task
     try:
         applied = apply_migrations(_settings)
         if applied:
@@ -53,6 +54,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Startup database migration check failed: %s", e)
     log_startup_diagnostics(logger)
+
+    # Initialize automated schedule registry
+    try:
+        from earnings_engine.data.automation_schedules import init_automation_schedules
+        init_automation_schedules(_settings)
+    except Exception as e:
+        logger.warning("[SCHEDULES] Startup schedule init warning: %s", e)
+
+    # Initialize institutional dataset
+    try:
+        from earnings_engine.data.institutional_accumulation import init_institutional_db
+        init_institutional_db(_settings)
+    except Exception as e:
+        logger.warning("[INSTITUTIONAL] Startup institutional DB init warning: %s", e)
 
     # Sync local SQLite state with upstream Turso Cloud on startup
     try:
@@ -95,16 +110,28 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("[BREAKOUT] Could not start scanner task: %s", e)
 
+    # Start the background news catalyst harvester loop
+    try:
+        from earnings_engine.data.catalysts_news import news_catalyst_harvest_loop
+        _news_catalyst_task = asyncio.create_task(
+            news_catalyst_harvest_loop(_settings),
+            name="news_catalyst_harvester",
+        )
+        logger.info("[NEWS-HARVESTER] Background news harvester task started.")
+    except Exception as e:
+        logger.warning("[NEWS-HARVESTER] Could not start news harvester task: %s", e)
+
     yield
 
-    # Graceful shutdown: cancel the scanner task
-    if _breakout_scanner_task and not _breakout_scanner_task.done():
-        _breakout_scanner_task.cancel()
-        try:
-            await asyncio.wait_for(_breakout_scanner_task, timeout=5.0)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
-            pass
-        logger.info("[BREAKOUT] Scanner task shut down.")
+    # Graceful shutdown: cancel background tasks
+    for task_handle, name in [(_breakout_scanner_task, "Breakout scanner"), (_news_catalyst_task, "News harvester")]:
+        if task_handle and not task_handle.done():
+            task_handle.cancel()
+            try:
+                await asyncio.wait_for(task_handle, timeout=3.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                pass
+            logger.info("[%s] Task shut down.", name)
 
 
 app = FastAPI(
@@ -4950,4 +4977,153 @@ async def batch_forecast_repeaters(
         "message": f"Started AI Forward batch forecasting for {len(tickers)} stocks in {universe or 'all universes'}.",
         "tickers": tickers,
     }
+
+
+# ---------------------------------------------------------------------------
+# Live Automation Schedules & Background Job Monitor Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/automation/schedules", tags=["Automation Schedules"])
+async def get_automation_schedules():
+    """Retrieve all background schedule states, intervals, last execution, and live countdowns."""
+    from earnings_engine.data.automation_schedules import get_all_schedules
+    schedules = await asyncio.to_thread(get_all_schedules, _settings)
+    return {"success": True, "schedules": schedules}
+
+
+@app.post("/api/v1/automation/trigger", tags=["Automation Schedules"])
+async def trigger_automation_job(
+    job_id: str = Query(..., description="Job ID to run immediately (e.g. breakout_hot_rescore, breakout_warm_rescore, breakout_cold_scan, news_catalyst_harvest)"),
+):
+    """Manually trigger immediate execution of any background scheduled job."""
+    import threading
+
+    def _execute():
+        try:
+            if job_id == "breakout_hot_rescore":
+                breakout_scanner_mod.run_hot_rescore(_settings)
+            elif job_id == "breakout_warm_rescore":
+                breakout_scanner_mod.run_warm_rescore(_settings)
+            elif job_id == "breakout_cold_scan":
+                breakout_scanner_mod.run_cold_scan(_settings)
+            elif job_id == "news_catalyst_harvest":
+                from earnings_engine.data.catalysts_news import scan_watchlist_catalysts
+                from earnings_engine.data.automation_schedules import record_job_start, record_job_finish
+                record_job_start("news_catalyst_harvest", _settings)
+                t0 = time.perf_counter()
+                res = scan_watchlist_catalysts("my_watchlist", 3, False, _settings)
+                elapsed = round(time.perf_counter() - t0, 2)
+                record_job_finish("news_catalyst_harvest", elapsed, f"Harvested {res.get('catalysts_fetched', 0)} headlines across {res.get('scanned_tickers', 0)} stocks", settings=_settings)
+        except Exception as e:
+            logger.error("[AUTOMATION-TRIGGER] Error running %s: %s", job_id, e)
+
+    t = threading.Thread(target=_execute, daemon=True, name=f"trigger_{job_id}")
+    t.start()
+    return {"success": True, "message": f"Triggered execution for '{job_id}' in background thread."}
+
+
+# ---------------------------------------------------------------------------
+# Breakout Movement Audit Log & Transition History Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/breakout-radar/audit-log", tags=["Breakout Radar"])
+async def get_breakout_audit_trail(
+    ticker: str | None = Query(None, description="Optional ticker filter (e.g. TCS.NS)"),
+    limit: int = Query(50, ge=1, le=100, description="Max transition log entries to return"),
+):
+    """Retrieve chronological audit trail of breakout pool promotions, demotions, and triggers with full explanations."""
+    logs = await asyncio.to_thread(
+        breakout_scanner_mod.get_breakout_audit_log,
+        ticker=ticker,
+        limit=limit,
+        settings=_settings,
+    )
+    return {"success": True, "count": len(logs), "logs": logs}
+
+
+# ---------------------------------------------------------------------------
+# News Catalyst Activity & Ingestion Feed Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/news/activity", tags=["News Catalysts"])
+async def get_news_catalyst_activity(
+    limit: int = Query(50, ge=1, le=100, description="Max news catalyst events to return"),
+):
+    """Retrieve recently harvested news catalysts with impacted stocks, sentiment direction, and impact analysis."""
+    from earnings_engine.data.catalysts_news import get_recent_news_activity
+    items = await asyncio.to_thread(get_recent_news_activity, limit=limit, settings=_settings)
+    return {"success": True, "count": len(items), "items": items}
+
+
+# ---------------------------------------------------------------------------
+# Institutional Accumulation & Mutual Fund Activity Hub Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/v1/institutional/summary", tags=["Institutional Activity"])
+async def get_institutional_summary():
+    """Retrieve high-level institutional market accumulation metrics and top accumulated/distributed highlights."""
+    from earnings_engine.data.institutional_accumulation import (
+        get_top_accumulated_stocks,
+        get_top_distributed_stocks,
+        get_all_funds_activity,
+    )
+    accumulating = await asyncio.to_thread(get_top_accumulated_stocks, min_score=60.0, limit=10, settings=_settings)
+    distributing = await asyncio.to_thread(get_top_distributed_stocks, limit=10, settings=_settings)
+    funds = await asyncio.to_thread(get_all_funds_activity, limit=10, settings=_settings)
+    return {
+        "success": True,
+        "accumulating_stocks": accumulating,
+        "distributing_stocks": distributing,
+        "active_funds": funds,
+    }
+
+
+@app.get("/api/v1/institutional/stock/{ticker}", tags=["Institutional Activity"])
+async def get_stock_institutional_details(ticker: str):
+    """Retrieve complete fund-by-fund breakdown, shareholding trend, and block deals for a specific stock (e.g. ALLCARGO.NS)."""
+    from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
+    result = await asyncio.to_thread(get_stock_institutional_activity, ticker=ticker, settings=_settings)
+    if not result.get("success"):
+        raise HTTPException(status_code=404, detail=result.get("error", "Failed fetching institutional activity"))
+    return result
+
+
+@app.get("/api/v1/institutional/accumulating", tags=["Institutional Activity"])
+async def get_institutional_accumulating(
+    min_score: float = Query(55.0, description="Minimum accumulation score (0-100)"),
+    limit: int = Query(25, ge=1, le=100, description="Max stocks to return"),
+):
+    """Screen for equities with aggressive mutual fund, FII, and super investor buying."""
+    from earnings_engine.data.institutional_accumulation import get_top_accumulated_stocks
+    items = await asyncio.to_thread(get_top_accumulated_stocks, min_score=min_score, limit=limit, settings=_settings)
+    return {"success": True, "count": len(items), "items": items}
+
+
+@app.get("/api/v1/institutional/distributing", tags=["Institutional Activity"])
+async def get_institutional_distributing(
+    limit: int = Query(20, ge=1, le=100, description="Max stocks to return"),
+):
+    """Screen for equities where institutions are actively selling or trimming stake."""
+    from earnings_engine.data.institutional_accumulation import get_top_distributed_stocks
+    items = await asyncio.to_thread(get_top_distributed_stocks, limit=limit, settings=_settings)
+    return {"success": True, "count": len(items), "items": items}
+
+
+@app.get("/api/v1/institutional/funds", tags=["Institutional Activity"])
+async def get_institutional_funds_list(
+    limit: int = Query(50, ge=1, le=100, description="Max funds to return"),
+):
+    """List tracked institutional funds and super investors with their total tracked positions and buying/selling stats."""
+    from earnings_engine.data.institutional_accumulation import get_all_funds_activity
+    items = await asyncio.to_thread(get_all_funds_activity, limit=limit, settings=_settings)
+    return {"success": True, "count": len(items), "funds": items}
+
+
+@app.get("/api/v1/institutional/fund/{fund_name}", tags=["Institutional Activity"])
+async def get_fund_portfolio(fund_name: str):
+    """Reverse lookup: retrieve all equities held and recent actions for a specific mutual fund or super investor."""
+    from earnings_engine.data.institutional_accumulation import get_fund_portfolio_activity
+    items = await asyncio.to_thread(get_fund_portfolio_activity, fund_name=fund_name, settings=_settings)
+    return {"success": True, "fund_name": fund_name, "count": len(items), "holdings": items}
+
 

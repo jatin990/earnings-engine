@@ -573,3 +573,69 @@ def scan_watchlist_catalysts(
         "elapsed_seconds": round(elapsed, 2),
         "stats": stats,
     }
+
+
+def get_recent_news_activity(
+    limit: int = 50,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Retrieve recently harvested news catalysts with impacted stock context and plain-English summary."""
+    settings = settings or Settings()
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT ticker, stock_name, title, publisher, link, published_at,
+                   summary, impact_score, impact_level, category, direction,
+                   expected_horizon, volatility_est, why_it_matters, created_at
+            FROM news_catalysts
+            ORDER BY published_at DESC, id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+        results = []
+        for r in rows:
+            d = dict(r)
+            results.append(d)
+        return results
+
+
+async def news_catalyst_harvest_loop(settings: Settings | None = None) -> None:
+    """Async background task: periodically harvests news across active stocks and updates schedules."""
+    import asyncio
+    settings = settings or Settings()
+    interval_s = 600  # 10 minutes
+
+    logger.info("[NEWS-HARVESTER] Started background news catalyst harvester loop (interval=%ds)", interval_s)
+    loop = asyncio.get_event_loop()
+
+    while True:
+        try:
+            from earnings_engine.data.automation_schedules import record_job_start, record_job_finish
+            record_job_start("news_catalyst_harvest", settings)
+            t0 = time.perf_counter()
+
+            # Harvest for key watchlist and top breakout tickers
+            res = await loop.run_in_executor(None, scan_watchlist_catalysts, "my_watchlist", 3, False, settings)
+            elapsed = round(time.perf_counter() - t0, 2)
+            summary_msg = f"Harvested {res.get('catalysts_fetched', 0)} headlines ({res.get('high_impact_found', 0)} high impact) across {res.get('scanned_tickers', 0)} stocks"
+            record_job_finish("news_catalyst_harvest", elapsed, summary_msg, settings=settings)
+
+        except asyncio.CancelledError:
+            logger.info("[NEWS-HARVESTER] News catalyst harvester loop cancelled.")
+            break
+        except Exception as e:
+            logger.error("[NEWS-HARVESTER] Harvest cycle error: %s", e)
+            try:
+                from earnings_engine.data.automation_schedules import record_job_finish
+                record_job_finish("news_catalyst_harvest", 0.0, "", error_message=str(e), settings=settings)
+            except Exception:
+                pass
+
+        try:
+            await asyncio.sleep(interval_s)
+        except asyncio.CancelledError:
+            break
+

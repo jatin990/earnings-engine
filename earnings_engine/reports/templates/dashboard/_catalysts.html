@@ -26,6 +26,25 @@
                 </div>
             </div>
 
+            <!-- ⏱️ Live News Harvester Schedule Status Bar -->
+            <div id="catalystScheduleBar" class="card" style="padding:0.55rem 0.85rem;background:#090d16;border:1px solid rgba(59,130,246,0.25);margin-bottom:0.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                <div style="display:flex;align-items:center;gap:0.6rem;">
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399;"></span>
+                    <div>
+                        <div style="display:flex;align-items:center;gap:0.35rem;">
+                            <span style="font-size:0.75rem;font-weight:700;color:#f8fafc;">Automated News Catalyst Harvester</span>
+                            <span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);">(Every 10m)</span>
+                        </div>
+                        <div id="schedNewsHarvesterTimer" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.1rem;">
+                            Next scheduled run: <strong style="color:#38bdf8;">--</strong> | Last harvested: --
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.4rem;">
+                    <button type="button" onclick="app.triggerScheduleJob('news_catalyst_harvest')" class="btn btn-sm" style="padding:0.25rem 0.65rem;font-size:0.7rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">⚡ Harvest Now</button>
+                </div>
+            </div>
+
             <!-- ================= VIEW 1: LIVE CATALYST FEED ================= -->
             <div id="catalystsFeedView" style="display: block;">
                 <!-- ⚡ Top Summary KPI Cards for Live Feed -->

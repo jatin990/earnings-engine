@@ -373,42 +373,246 @@ def _should_be_hot(result: dict) -> bool:
     return False
 
 
-def _promote(ticker: str, result: dict) -> None:
-    """Place a ticker into the correct tier based on its score."""
+def record_breakout_transition(
+    ticker: str,
+    event_type: str,
+    from_tier: str,
+    to_tier: str,
+    score_before: float | None = None,
+    score_after: float | None = None,
+    price: float | None = None,
+    trigger_price: float | None = None,
+    reason: str = "",
+    catalyst_impact: str | None = None,
+    company_name: str | None = None,
+    settings: Settings | None = None,
+) -> None:
+    """Record an audit trail event explaining why a stock moved in, out, or between breakout tiers."""
+    settings = settings or Settings()
+    try:
+        from earnings_engine.data.migrations import apply_migrations
+        apply_migrations(settings)
+        conn = get_db_connection(settings)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        if not company_name:
+            from earnings_engine.data.names import get_name
+            company_name = get_name(ticker) or ticker.replace(".NS", "")
+
+        conn.execute(
+            """
+            INSERT INTO breakout_audit_log (
+                ticker, company_name, event_type, from_tier, to_tier,
+                score_before, score_after, price, trigger_price,
+                reason, catalyst_impact, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                ticker,
+                company_name,
+                event_type,
+                from_tier.upper(),
+                to_tier.upper(),
+                round(float(score_before), 1) if score_before is not None else None,
+                round(float(score_after), 1) if score_after is not None else None,
+                round(float(price), 2) if price is not None else None,
+                round(float(trigger_price), 2) if trigger_price is not None else None,
+                reason,
+                catalyst_impact,
+                now_iso,
+            ),
+        )
+        if hasattr(conn, "commit"):
+            conn.commit()
+    except Exception as e:
+        logger.debug("[BREAKOUT-AUDIT] Failed recording transition for %s: %s", ticker, e)
+
+
+def get_breakout_audit_log(
+    ticker: str | None = None,
+    limit: int = 50,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Query recent breakout movement audit log entries with formatted explanations."""
+    settings = settings or Settings()
+    logs: list[dict[str, Any]] = []
+    try:
+        from earnings_engine.data.migrations import apply_migrations
+        apply_migrations(settings)
+        conn = get_db_connection(settings)
+        if ticker:
+            sym = ticker.strip().upper()
+            if not (sym.endswith(".NS") or sym.endswith(".BO") or "." in sym):
+                sym = f"{sym}.NS"
+            rows = conn.execute(
+                """
+                SELECT id, ticker, company_name, event_type, from_tier, to_tier,
+                       score_before, score_after, price, trigger_price,
+                       reason, catalyst_impact, created_at
+                FROM breakout_audit_log
+                WHERE ticker = ?
+                ORDER BY id DESC LIMIT ?
+                """,
+                (sym, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, ticker, company_name, event_type, from_tier, to_tier,
+                       score_before, score_after, price, trigger_price,
+                       reason, catalyst_impact, created_at
+                FROM breakout_audit_log
+                ORDER BY id DESC LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+        for r in rows:
+            logs.append({
+                "id": r[0],
+                "ticker": r[1],
+                "company_name": r[2] or r[1].replace(".NS", ""),
+                "event_type": r[3],
+                "from_tier": r[4],
+                "to_tier": r[5],
+                "score_before": r[6],
+                "score_after": r[7],
+                "price": r[8],
+                "trigger_price": r[9],
+                "reason": r[10] or "Automated multi-factor evaluation",
+                "catalyst_impact": r[11],
+                "created_at": r[12],
+            })
+    except Exception as e:
+        logger.warning("[BREAKOUT-AUDIT] Failed querying audit log: %s", e)
+    return logs
+
+
+def _promote(ticker: str, result: dict, settings: Settings | None = None) -> None:
+    """Place a ticker into the correct tier based on its score and audit the transition."""
+    settings = settings or Settings()
+    new_score = result.get("composite_score", 0)
+    cur_p = result.get("current_price") or result.get("signal_price")
+    trig_p = result.get("breakout_trigger")
+    vol_r = result.get("volume_ratio", 1.0)
+    cat_headline = (result.get("catalyst_headlines") or [None])[0]
+
     if _should_be_hot(result):
+        was_warm = ticker in _pool["warm"]
+        was_hot = ticker in _pool["hot"]
         _pool["hot"][ticker] = {"result": result, "consecutive_low": 0}
         _pool["warm"].pop(ticker, None)
-    elif result.get("composite_score", 0) >= WARM_THRESHOLD:
+
+        if not was_hot:
+            from_t = "WARM" if was_warm else "COLD"
+            reason_str = f"Promoted to HOT: Score {new_score:.1f} (>= {HOT_THRESHOLD}) with volume ratio {vol_r:.2f}x approaching resistance/trigger ₹{trig_p}"
+            if cat_headline:
+                reason_str += f" + News: {cat_headline}"
+            record_breakout_transition(
+                ticker=ticker,
+                event_type="PROMOTED_HOT",
+                from_tier=from_t,
+                to_tier="HOT",
+                score_before=None,
+                score_after=new_score,
+                price=cur_p,
+                trigger_price=trig_p,
+                reason=reason_str,
+                catalyst_impact=cat_headline,
+                settings=settings,
+            )
+
+    elif new_score >= WARM_THRESHOLD:
         if ticker not in _pool["hot"]:
+            was_warm = ticker in _pool["warm"]
             _pool["warm"][ticker] = {"result": result, "consecutive_low": 0}
-    # Below warm threshold: don't add to any pool
+            if not was_warm:
+                reason_str = f"Added to WARM: Coiling compression setup with score {new_score:.1f} (>= {WARM_THRESHOLD})"
+                record_breakout_transition(
+                    ticker=ticker,
+                    event_type="ADDED_WARM",
+                    from_tier="COLD",
+                    to_tier="WARM",
+                    score_before=None,
+                    score_after=new_score,
+                    price=cur_p,
+                    trigger_price=trig_p,
+                    reason=reason_str,
+                    catalyst_impact=cat_headline,
+                    settings=settings,
+                )
 
 
-def _demote_hot(ticker: str) -> None:
-    """Demote a Hot ticker: increment consecutive_low, remove after 2 strikes."""
+def _demote_hot(ticker: str, settings: Settings | None = None) -> None:
+    """Demote a Hot ticker: increment consecutive_low, remove after 2 strikes with audit log."""
+    settings = settings or Settings()
     entry = _pool["hot"].get(ticker)
     if not entry:
         return
     entry["consecutive_low"] += 1
     if entry["consecutive_low"] >= 2:
         result = entry["result"]
+        score = result.get("composite_score", 0)
+        cur_p = result.get("current_price") or result.get("signal_price")
+        trig_p = result.get("breakout_trigger")
         del _pool["hot"][ticker]
+
         # Maybe keep in warm if score still qualifies
-        if result.get("composite_score", 0) >= WARM_THRESHOLD:
+        if score >= WARM_THRESHOLD:
             _pool["warm"][ticker] = {"result": result, "consecutive_low": 0}
-            logger.debug("[BREAKOUT] %s demoted Hot → Warm (score %.1f)", ticker, result.get("composite_score", 0))
+            record_breakout_transition(
+                ticker=ticker,
+                event_type="DEMOTED_WARM",
+                from_tier="HOT",
+                to_tier="WARM",
+                score_before=score,
+                score_after=score,
+                price=cur_p,
+                trigger_price=trig_p,
+                reason=f"Demoted HOT ➔ WARM: Score dropped to {score:.1f} (< {HOT_DEMOTION_THRESHOLD}) for 2 consecutive scan cycles",
+                settings=settings,
+            )
+            logger.debug("[BREAKOUT] %s demoted Hot → Warm (score %.1f)", ticker, score)
         else:
-            logger.debug("[BREAKOUT] %s demoted Hot → Cold (score %.1f)", ticker, result.get("composite_score", 0))
+            record_breakout_transition(
+                ticker=ticker,
+                event_type="REMOVED_COLD",
+                from_tier="HOT",
+                to_tier="COLD",
+                score_before=score,
+                score_after=score,
+                price=cur_p,
+                trigger_price=trig_p,
+                reason=f"Removed from Breakout Radar: Score fell to {score:.1f} below minimum setup criteria",
+                settings=settings,
+            )
+            logger.debug("[BREAKOUT] %s demoted Hot → Cold (score %.1f)", ticker, score)
 
 
-def _demote_warm(ticker: str) -> None:
-    """Demote a Warm ticker: increment consecutive_low, remove after 2 strikes."""
+def _demote_warm(ticker: str, settings: Settings | None = None) -> None:
+    """Demote a Warm ticker: increment consecutive_low, remove after 2 strikes with audit log."""
+    settings = settings or Settings()
     entry = _pool["warm"].get(ticker)
     if not entry:
         return
     entry["consecutive_low"] += 1
     if entry["consecutive_low"] >= 2:
-        logger.debug("[BREAKOUT] %s demoted Warm → Cold (score %.1f)", ticker, entry["result"].get("composite_score", 0))
+        result = entry["result"]
+        score = result.get("composite_score", 0)
+        cur_p = result.get("current_price") or result.get("signal_price")
+        trig_p = result.get("breakout_trigger")
+        record_breakout_transition(
+            ticker=ticker,
+            event_type="REMOVED_COLD",
+            from_tier="WARM",
+            to_tier="COLD",
+            score_before=score,
+            score_after=score,
+            price=cur_p,
+            trigger_price=trig_p,
+            reason=f"Removed from Warm Pool: Score dropped to {score:.1f} (< {WARM_DEMOTION_THRESHOLD}) for 2 consecutive cycles",
+            settings=settings,
+        )
+        logger.debug("[BREAKOUT] %s demoted Warm → Cold (score %.1f)", ticker, score)
         del _pool["warm"][ticker]
 
 
@@ -1160,6 +1364,9 @@ def run_cold_scan(settings: Settings, universe: str | None = None) -> None:
     _pool["status"] = "running"
     _pool["error"] = None
 
+    from earnings_engine.data.automation_schedules import record_job_start, record_job_finish
+    record_job_start("breakout_cold_scan", settings)
+
     ticker_list = _resolve_universe_tickers(settings, universe)
     if not ticker_list:
         logger.info("[BREAKOUT-COLD] No tickers found to scan.")
@@ -1167,6 +1374,7 @@ def run_cold_scan(settings: Settings, universe: str | None = None) -> None:
         _pool["cold_tickers_scanned"] = 0
         _pool["last_cold_scan_at"] = datetime.now(timezone.utc).isoformat()
         _pool["last_scan_at"] = _pool["last_cold_scan_at"]
+        record_job_finish("breakout_cold_scan", 0.0, "No tickers found to scan.", settings=settings)
         return
 
     from concurrent.futures import ThreadPoolExecutor
@@ -1183,7 +1391,7 @@ def run_cold_scan(settings: Settings, universe: str | None = None) -> None:
     for ticker, result in scored:
         if result is None:
             continue
-        _promote(ticker, result)
+        _promote(ticker, result, settings=settings)
         if ticker in _pool["hot"]:
             promoted_hot += 1
         elif ticker in _pool["warm"]:
@@ -1203,9 +1411,12 @@ def run_cold_scan(settings: Settings, universe: str | None = None) -> None:
         "error": None,
     })
 
+    summary_msg = f"Full scan: {len(ticker_list)} tickers → {len(_pool['hot'])} hot, {len(_pool['warm'])} warm, {len(_pool['candidates'])} candidates"
+    record_job_finish("breakout_cold_scan", elapsed, summary_msg, settings=settings)
+
     logger.info(
-        "[BREAKOUT-COLD] Full scan: %d tickers → %d hot, %d warm, %d API candidates in %.1fs",
-        len(ticker_list), len(_pool["hot"]), len(_pool["warm"]), len(_pool["candidates"]), elapsed,
+        "[BREAKOUT-COLD] %s in %.1fs",
+        summary_msg, elapsed,
     )
 
 
@@ -1216,6 +1427,8 @@ def run_warm_rescore(settings: Settings) -> None:
         return
 
     t0 = time.perf_counter()
+    from earnings_engine.data.automation_schedules import record_job_start, record_job_finish
+    record_job_start("breakout_warm_rescore", settings)
 
     from earnings_engine.data.prices import fetch_batch_live_quotes
     from concurrent.futures import ThreadPoolExecutor
@@ -1235,7 +1448,7 @@ def run_warm_rescore(settings: Settings) -> None:
 
     for ticker, result in scored:
         if result is None:
-            _demote_warm(ticker)
+            _demote_warm(ticker, settings=settings)
             continue
 
         new_score = result.get("composite_score", 0)
@@ -1243,10 +1456,24 @@ def run_warm_rescore(settings: Settings) -> None:
             # Promote to hot
             _pool["warm"].pop(ticker, None)
             _pool["hot"][ticker] = {"result": result, "consecutive_low": 0}
+            cur_p = result.get("current_price") or result.get("signal_price")
+            trig_p = result.get("breakout_trigger")
+            record_breakout_transition(
+                ticker=ticker,
+                event_type="PROMOTED_HOT",
+                from_tier="WARM",
+                to_tier="HOT",
+                score_before=None,
+                score_after=new_score,
+                price=cur_p,
+                trigger_price=trig_p,
+                reason=f"Warm setup upgraded to HOT: Score {new_score:.1f} crossed threshold",
+                settings=settings,
+            )
         elif new_score >= WARM_THRESHOLD:
             _pool["warm"][ticker] = {"result": result, "consecutive_low": 0}
         elif new_score < WARM_DEMOTION_THRESHOLD:
-            _demote_warm(ticker)
+            _demote_warm(ticker, settings=settings)
         else:
             # Between demotion threshold and warm threshold: keep but update
             if ticker in _pool["warm"]:
@@ -1260,9 +1487,12 @@ def run_warm_rescore(settings: Settings) -> None:
     _pool["last_warm_scan_at"] = now_iso
     _pool["last_scan_at"] = now_iso
 
+    summary_msg = f"Rescored {len(warm_tickers)} warm tickers (hot={len(_pool['hot'])}, warm={len(_pool['warm'])})"
+    record_job_finish("breakout_warm_rescore", elapsed, summary_msg, settings=settings)
+
     logger.info(
-        "[BREAKOUT-WARM] Rescore: %d warm tickers in %.1fs (hot=%d, warm=%d)",
-        len(warm_tickers), elapsed, len(_pool["hot"]), len(_pool["warm"]),
+        "[BREAKOUT-WARM] %s in %.1fs",
+        summary_msg, elapsed,
     )
 
 
@@ -1273,6 +1503,8 @@ def run_hot_rescore(settings: Settings) -> None:
         return
 
     t0 = time.perf_counter()
+    from earnings_engine.data.automation_schedules import record_job_start, record_job_finish
+    record_job_start("breakout_hot_rescore", settings)
 
     from earnings_engine.data.prices import fetch_batch_live_quotes
     from concurrent.futures import ThreadPoolExecutor
@@ -1292,7 +1524,7 @@ def run_hot_rescore(settings: Settings) -> None:
 
     for ticker, result in scored:
         if result is None:
-            _demote_hot(ticker)
+            _demote_hot(ticker, settings=settings)
             continue
 
         new_score = result.get("composite_score", 0)
@@ -1302,7 +1534,7 @@ def run_hot_rescore(settings: Settings) -> None:
             # Score dropped: track for two-strike demotion
             if ticker in _pool["hot"]:
                 _pool["hot"][ticker]["result"] = result
-                _demote_hot(ticker)
+                _demote_hot(ticker, settings=settings)
         else:
             # Between demotion threshold and hot threshold: keep but update
             if ticker in _pool["hot"]:
@@ -1317,9 +1549,12 @@ def run_hot_rescore(settings: Settings) -> None:
     _pool["last_hot_scan_at"] = now_iso
     _pool["last_scan_at"] = now_iso
 
+    summary_msg = f"Rescored {len(hot_tickers)} hot tickers"
+    record_job_finish("breakout_hot_rescore", elapsed, summary_msg, settings=settings)
+
     logger.debug(
-        "[BREAKOUT-HOT] Rescore: %d hot tickers in %.1fs",
-        len(hot_tickers), elapsed,
+        "[BREAKOUT-HOT] %s in %.1fs",
+        summary_msg, elapsed,
     )
 
 

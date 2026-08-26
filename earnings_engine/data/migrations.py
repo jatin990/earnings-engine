@@ -735,6 +735,113 @@ def _migration_012_quarter_repeaters(conn: Any) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_repeater_verdict ON quarter_repeater_predictions (ai_repeat_verdict)")
 
 
+def _migration_013_automation_and_institutional(conn: Any) -> None:
+    """Automation schedules, breakout movement audit log, and institutional holdings/block deals."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS automation_schedules (
+            job_id TEXT PRIMARY KEY,
+            job_name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            interval_seconds INTEGER NOT NULL,
+            last_run_at TEXT,
+            next_run_at TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            last_duration_s REAL DEFAULT 0,
+            total_runs INTEGER NOT NULL DEFAULT 0,
+            last_summary TEXT,
+            error_message TEXT,
+            updated_at TEXT NOT NULL
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS breakout_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            company_name TEXT,
+            event_type TEXT NOT NULL,
+            from_tier TEXT,
+            to_tier TEXT,
+            score_before REAL,
+            score_after REAL,
+            price REAL,
+            trigger_price REAL,
+            reason TEXT,
+            catalyst_impact TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_audit_ticker ON breakout_audit_log (ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_audit_time ON breakout_audit_log (created_at DESC)")
+    except Exception:
+        pass
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS institutional_holdings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            fund_name TEXT NOT NULL,
+            fund_type TEXT NOT NULL DEFAULT 'Mutual Fund',
+            quarter TEXT NOT NULL,
+            shares_held INTEGER NOT NULL DEFAULT 0,
+            stake_pct REAL NOT NULL DEFAULT 0.0,
+            holding_value_cr REAL DEFAULT 0.0,
+            prev_stake_pct REAL,
+            action TEXT NOT NULL DEFAULT 'HOLD',
+            change_shares INTEGER DEFAULT 0,
+            change_pct REAL DEFAULT 0.0,
+            reported_date TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_holdings_ticker ON institutional_holdings (ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_holdings_fund ON institutional_holdings (fund_name)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_holdings_action ON institutional_holdings (action)")
+    except Exception:
+        pass
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS institutional_block_deals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            deal_date TEXT NOT NULL,
+            ticker TEXT NOT NULL,
+            client_name TEXT NOT NULL,
+            deal_type TEXT NOT NULL,
+            quantity INTEGER NOT NULL,
+            price REAL NOT NULL,
+            value_cr REAL NOT NULL,
+            pct_equity REAL,
+            exchange TEXT NOT NULL DEFAULT 'NSE',
+            created_at TEXT NOT NULL
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_block_deals_ticker ON institutional_block_deals (ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_block_deals_date ON institutional_block_deals (deal_date DESC)")
+    except Exception:
+        pass
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS shareholding_patterns (
+            ticker TEXT NOT NULL,
+            quarter TEXT NOT NULL,
+            promoter_pct REAL NOT NULL DEFAULT 0.0,
+            fii_pct REAL NOT NULL DEFAULT 0.0,
+            dii_mf_pct REAL NOT NULL DEFAULT 0.0,
+            public_retail_pct REAL NOT NULL DEFAULT 0.0,
+            other_pct REAL NOT NULL DEFAULT 0.0,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (ticker, quarter)
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_shareholding_ticker ON shareholding_patterns (ticker)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -749,6 +856,7 @@ MIGRATIONS: list[Migration] = [
     Migration(10, "010_credit_cards_and_otp_requests", _migration_010_credit_cards_and_otp_requests),
     Migration(11, "011_trips_and_net_worth_expansion", _migration_011_trips_and_net_worth_expansion),
     Migration(12, "012_quarter_repeater_predictions", _migration_012_quarter_repeaters),
+    Migration(13, "013_automation_schedules_and_institutional_hub", _migration_013_automation_and_institutional),
 ]
 
 

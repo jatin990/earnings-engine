@@ -1006,7 +1006,7 @@
                 // 3. Check LocalStorage
                 const storedTab = localStorage.getItem('dashboard_active_tab');
 
-                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 
                 if (hash && validTabs.includes(hash.toLowerCase())) return hash.toLowerCase();
                 if (queryTab && validTabs.includes(queryTab.toLowerCase())) return queryTab.toLowerCase();
@@ -1462,7 +1462,7 @@
 
             switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'results').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'results';
 
                 // Abort any pending fetch requests when switching tabs
@@ -1499,6 +1499,7 @@
                         'catalysts': 'Catalysts & News',
                         'gainers': 'Gainers & Breakouts',
                         'breakout': '⚡ Breakout Radar',
+                        'institutional': '🏛️ Institutional Flows',
                         'repeaters': '🔁 Quarter Repeaters',
                         'swing': 'Swing Ranges',
                         'kronos': 'Kronos 14D Forecast',
@@ -1576,10 +1577,13 @@
                         this._breakoutLoaded = true;
                         this.loadBreakoutRadar();
                     }
+                    this.loadAutomationSchedules();
+                    this.loadBreakoutAuditLog();
                     // Start 5-minute auto-poll (cleared when leaving the tab)
                     this._breakoutPollTimer = setInterval(() => {
                         if (document.getElementById('tab-breakout')?.classList.contains('active')) {
                             this.loadBreakoutRadar();
+                            this.loadAutomationSchedules();
                         } else {
                             clearInterval(this._breakoutPollTimer);
                         }
@@ -1589,6 +1593,15 @@
                     if (this._breakoutPollTimer) {
                         clearInterval(this._breakoutPollTimer);
                         this._breakoutPollTimer = null;
+                    }
+                }
+                if (name === 'catalysts') {
+                    this.loadAutomationSchedules();
+                }
+                if (name === 'institutional') {
+                    if (!this._institutionalLoaded) {
+                        this._institutionalLoaded = true;
+                        this.loadInstitutionalData();
                     }
                 }
                 if (name === 'repeaters') {
@@ -13596,6 +13609,482 @@
                     etaEl.textContent = 'ETA: Done ✅';
                 }
                 this.renderCandidates();
+            },
+
+            // =========================================================================
+            // ⏱️ Automation Schedules & Background Job Monitor
+            // =========================================================================
+            _automationSchedules: [],
+            _scheduleTimerStarted: false,
+
+            async loadAutomationSchedules() {
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/automation/schedules');
+                    if (res.ok) {
+                        const data = await res.json();
+                        this._automationSchedules = data.schedules || [];
+                        this.renderAutomationSchedules();
+                        if (!this._scheduleTimerStarted) {
+                            this._scheduleTimerStarted = true;
+                            this.startScheduleTimer();
+                        }
+                    }
+                } catch (e) {
+                    console.debug('Failed loading schedules:', e);
+                }
+            },
+
+            startScheduleTimer() {
+                setInterval(() => {
+                    if (this._automationSchedules && this._automationSchedules.length) {
+                        this._automationSchedules.forEach(s => {
+                            if (s.seconds_until_next > 0) {
+                                s.seconds_until_next -= 1;
+                            }
+                        });
+                        this.renderAutomationSchedules();
+                    }
+                }, 1000);
+            },
+
+            renderAutomationSchedules() {
+                if (!this._automationSchedules) return;
+
+                const hotSched = this._automationSchedules.find(s => s.job_id === 'breakout_hot_rescore');
+                const warmSched = this._automationSchedules.find(s => s.job_id === 'breakout_warm_rescore');
+                const coldSched = this._automationSchedules.find(s => s.job_id === 'breakout_cold_scan');
+                const newsSched = this._automationSchedules.find(s => s.job_id === 'news_catalyst_harvest');
+
+                const formatTimer = (s) => {
+                    if (!s) return 'Next run: <strong style="color:#38bdf8;">--</strong>';
+                    const sec = s.seconds_until_next;
+                    const timeIn = sec <= 0 ? 'Due now' : (sec < 60 ? `${sec}s` : `${Math.floor(sec/60)}m ${sec%60}s`);
+                    const lastRun = s.last_run_formatted || 'Never';
+                    return `Next run: <strong style="color:#38bdf8;">${timeIn}</strong> | Last: ${lastRun}`;
+                };
+
+                const elHot = document.getElementById('schedBreakoutHotTimer');
+                if (elHot && hotSched) elHot.innerHTML = formatTimer(hotSched);
+
+                const elWarm = document.getElementById('schedBreakoutWarmTimer');
+                if (elWarm && warmSched) elWarm.innerHTML = formatTimer(warmSched);
+
+                const elCold = document.getElementById('schedBreakoutColdTimer');
+                if (elCold && coldSched) elCold.innerHTML = formatTimer(coldSched);
+
+                const elNews = document.getElementById('schedNewsHarvesterTimer');
+                if (elNews && newsSched) elNews.innerHTML = formatTimer(newsSched);
+            },
+
+            async triggerScheduleJob(jobId) {
+                try {
+                    const res = await fetch(API_BASE + `/api/v1/automation/trigger?job_id=${encodeURIComponent(jobId)}`, { method: 'POST' });
+                    if (res.ok) {
+                        const data = await res.json();
+                        console.log(data.message);
+                        setTimeout(() => this.loadAutomationSchedules(), 1500);
+                        if (jobId.startsWith('breakout')) {
+                            setTimeout(() => {
+                                this.loadBreakoutRadar();
+                                this.loadBreakoutAuditLog();
+                            }, 2500);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Trigger schedule error:', e);
+                }
+            },
+
+            // =========================================================================
+            // 🔄 Breakout Movement & Tier Transition Audit Log
+            // =========================================================================
+            _breakoutAuditOpen: false,
+
+            toggleBreakoutAuditLog() {
+                const container = document.getElementById('breakoutAuditContainer');
+                const toggleIcon = document.getElementById('breakoutAuditToggleIcon');
+                if (!container) return;
+
+                this._breakoutAuditOpen = !this._breakoutAuditOpen;
+                container.style.display = this._breakoutAuditOpen ? 'block' : 'none';
+                if (toggleIcon) toggleIcon.textContent = this._breakoutAuditOpen ? '▲ Hide Log' : '▼ Show Log';
+
+                if (this._breakoutAuditOpen) {
+                    this.loadBreakoutAuditLog();
+                }
+            },
+
+            async loadBreakoutAuditLog(ticker = null) {
+                const listEl = document.getElementById('breakoutAuditList');
+                const countBadge = document.getElementById('breakoutAuditBadgeCount');
+                if (!listEl) return;
+
+                try {
+                    const url = API_BASE + '/api/v1/breakout-radar/audit-log' + (ticker ? `?ticker=${encodeURIComponent(ticker)}` : '?limit=40');
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const logs = data.logs || [];
+                        if (countBadge) countBadge.textContent = `(${logs.length} events)`;
+
+                        if (!logs.length) {
+                            listEl.innerHTML = '<div style="text-align:center;color:#64748b;font-size:0.72rem;padding:0.75rem;">No recent tier movement events recorded yet. Transitions will appear automatically during scan cycles.</div>';
+                            return;
+                        }
+
+                        listEl.innerHTML = logs.map(l => {
+                            const isPromoted = l.event_type === 'PROMOTED_HOT' || l.to_tier === 'HOT';
+                            const isAdded = l.event_type === 'ADDED_WARM';
+                            const isDemoted = l.event_type === 'DEMOTED_WARM' || l.to_tier === 'WARM';
+                            const isRemoved = l.event_type === 'REMOVED_COLD' || l.to_tier === 'COLD';
+                            const isOverride = l.event_type === 'MANUAL_OVERRIDE';
+
+                            const bg = isPromoted ? 'rgba(16,185,129,0.12)' : isAdded ? 'rgba(56,189,248,0.12)' : isDemoted ? 'rgba(245,158,11,0.12)' : isRemoved ? 'rgba(239,68,68,0.12)' : 'rgba(148,163,184,0.1)';
+                            const border = isPromoted ? 'rgba(16,185,129,0.3)' : isAdded ? 'rgba(56,189,248,0.3)' : isDemoted ? 'rgba(245,158,11,0.3)' : isRemoved ? 'rgba(239,68,68,0.3)' : 'rgba(148,163,184,0.2)';
+                            const color = isPromoted ? '#34d399' : isAdded ? '#38bdf8' : isDemoted ? '#fbbf24' : isRemoved ? '#f87171' : '#cbd5e1';
+                            const icon = isPromoted ? '🔥 PROMOTED' : isAdded ? '⚡ ADDED' : isDemoted ? '📉 DEMOTED' : isRemoved ? '❌ REMOVED' : '⚙️ OVERRIDE';
+
+                            const timeStr = l.created_at ? l.created_at.replace('T', ' ').substring(0, 16) : '';
+                            const priceStr = l.price ? `₹${l.price.toFixed(2)}` : '';
+                            const scoreStr = l.score_after !== null && l.score_after !== undefined ? `Score: ${l.score_after}` : '';
+
+                            return `
+                                <div style="background:${bg};border:1px solid ${border};border-radius:6px;padding:0.45rem 0.65rem;display:flex;flex-direction:column;gap:0.2rem;">
+                                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.3rem;">
+                                        <div style="display:flex;align-items:center;gap:0.45rem;">
+                                            <span style="font-size:0.65rem;font-weight:800;color:${color};background:#000000;padding:0.1rem 0.35rem;border-radius:4px;border:1px solid ${border};">${icon}</span>
+                                            <strong style="font-size:0.78rem;color:#f8fafc;font-family:var(--font-mono);cursor:pointer;" onclick="app.inspectBreakoutStock('${l.ticker}')">${l.ticker}</strong>
+                                            <span style="font-size:0.7rem;color:#94a3b8;">${l.company_name}</span>
+                                            <span style="font-size:0.65rem;color:#64748b;">(${l.from_tier} ➔ ${l.to_tier})</span>
+                                        </div>
+                                        <div style="font-size:0.65rem;color:#64748b;font-family:var(--font-mono);">
+                                            ${priceStr ? priceStr + ' | ' : ''} ${scoreStr ? scoreStr + ' | ' : ''} ${timeStr}
+                                        </div>
+                                    </div>
+                                    <div style="font-size:0.72rem;color:#e2e8f0;line-height:1.35;margin-top:0.1rem;">
+                                        <strong>Why:</strong> ${l.reason}
+                                    </div>
+                                    ${l.catalyst_impact ? `<div style="font-size:0.68rem;color:#38bdf8;margin-top:0.05rem;">📰 <em>Catalyst:</em> ${l.catalyst_impact}</div>` : ''}
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                } catch (e) {
+                    console.error('Error loading breakout audit log:', e);
+                    listEl.innerHTML = '<div style="color:#f87171;font-size:0.72rem;padding:0.5rem;">Failed loading movement logs.</div>';
+                }
+            },
+
+            // =========================================================================
+            // 🏛️ Institutional Accumulation & Mutual Fund Activity Hub
+            // =========================================================================
+            institutionalActiveView: 'accumulating',
+            institutionalData: {
+                accumulating: [],
+                distributing: [],
+                funds: [],
+                currentStock: null,
+            },
+
+            switchInstitutionalView(view) {
+                this.institutionalActiveView = view || 'accumulating';
+                ['accumulating', 'stock', 'distributing', 'funds'].forEach(v => {
+                    const el = document.getElementById('instView-' + v);
+                    const btn = document.getElementById('btnInstTab-' + v);
+                    if (el) el.style.display = (v === this.institutionalActiveView) ? 'block' : 'none';
+                    if (btn) {
+                        if (v === this.institutionalActiveView) {
+                            btn.style.background = '#1e293b';
+                            btn.style.color = '#38bdf8';
+                            btn.style.borderColor = 'rgba(56,189,248,0.4)';
+                            btn.style.fontWeight = '700';
+                        } else {
+                            btn.style.background = 'transparent';
+                            btn.style.color = '#94a3b8';
+                            btn.style.borderColor = 'rgba(255,255,255,0.1)';
+                            btn.style.fontWeight = '500';
+                        }
+                    }
+                });
+            },
+
+            async loadInstitutionalData() {
+                try {
+                    const [resAcc, resDist, resFunds] = await Promise.all([
+                        fetch(API_BASE + '/api/v1/institutional/accumulating?limit=30'),
+                        fetch(API_BASE + '/api/v1/institutional/distributing?limit=20'),
+                        fetch(API_BASE + '/api/v1/institutional/funds?limit=50')
+                    ]);
+
+                    if (resAcc.ok) {
+                        const accData = await resAcc.json();
+                        this.institutionalData.accumulating = accData.items || [];
+                        this.renderInstitutionalAccumulatingTable(this.institutionalData.accumulating);
+                    }
+
+                    if (resDist.ok) {
+                        const distData = await resDist.json();
+                        this.institutionalData.distributing = distData.items || [];
+                        this.renderInstitutionalDistributingTable(this.institutionalData.distributing);
+                    }
+
+                    if (resFunds.ok) {
+                        const fundsData = await resFunds.json();
+                        this.institutionalData.funds = fundsData.funds || [];
+                        this.renderInstitutionalFundsTable(this.institutionalData.funds);
+                    }
+
+                    // Default search ALLCARGO.NS
+                    this.searchInstitutionalStock('ALLCARGO.NS', false);
+
+                } catch (e) {
+                    console.error('Failed loading institutional data:', e);
+                }
+            },
+
+            renderInstitutionalAccumulatingTable(items) {
+                const tbody = document.getElementById('instAccumulatingTableBody');
+                const countEl = document.getElementById('instAccumulatingCount');
+                if (countEl) countEl.textContent = items ? items.length : '0';
+                if (!tbody) return;
+
+                if (!items || !items.length) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">No high-conviction accumulating stocks found.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = items.map(it => {
+                    const badgeBg = it.verdict_badge === 'emerald' ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)';
+                    const badgeCol = it.verdict_badge === 'emerald' ? '#34d399' : '#60a5fa';
+                    const fundsInStr = `<span style="color:#34d399;font-weight:700;">+${it.funds_accumulating_count} in</span> / <span style="color:#f87171;">-${it.funds_selling_count} out</span>`;
+                    const topFundsStr = it.top_funds && it.top_funds.length ? it.top_funds.join(', ') : '—';
+
+                    return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                            <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;cursor:pointer;" onclick="app.searchInstitutionalStock('${it.ticker}')">
+                                <span style="color:#38bdf8;">${it.ticker}</span>
+                            </td>
+                            <td style="padding:0.65rem 0.8rem;color:#cbd5e1;">${it.company_name}</td>
+                            <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);font-weight:800;color:#38bdf8;">${it.accumulation_score} / 100</td>
+                            <td style="padding:0.65rem 0.8rem;">
+                                <span class="signal-badge" style="background:${badgeBg};color:${badgeCol};font-size:0.68rem;padding:0.15rem 0.45rem;">${it.verdict}</span>
+                            </td>
+                            <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);font-size:0.74rem;">${fundsInStr}</td>
+                            <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#f8fafc;">${it.total_institutional_stake}%</td>
+                            <td style="padding:0.65rem 0.8rem;color:#94a3b8;font-size:0.72rem;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${topFundsStr}">
+                                ${topFundsStr}
+                            </td>
+                            <td style="padding:0.65rem 0.8rem;text-align:center;">
+                                <button type="button" onclick="app.searchInstitutionalStock('${it.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.55rem;">Inspect</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            },
+
+            renderInstitutionalDistributingTable(items) {
+                const tbody = document.getElementById('instDistributingTableBody');
+                if (!tbody) return;
+
+                if (!items || !items.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="padding:2rem;text-align:center;color:#64748b;">No high-distribution equities detected.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = items.map(it => {
+                    const exitingStr = it.exiting_funds && it.exiting_funds.length ? it.exiting_funds.join(', ') : '—';
+                    return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                            <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f87171;cursor:pointer;" onclick="app.searchInstitutionalStock('${it.ticker}')">${it.ticker}</td>
+                            <td style="padding:0.65rem 0.8rem;color:#cbd5e1;">${it.company_name}</td>
+                            <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f87171;">${it.accumulation_score} / 100</td>
+                            <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#f87171;font-weight:700;">-${it.funds_selling_count} Funds</td>
+                            <td style="padding:0.65rem 0.8rem;color:#94a3b8;font-size:0.72rem;">${exitingStr}</td>
+                            <td style="padding:0.65rem 0.8rem;text-align:center;">
+                                <button type="button" onclick="app.searchInstitutionalStock('${it.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.55rem;">Inspect</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            },
+
+            renderInstitutionalFundsTable(funds) {
+                const tbody = document.getElementById('instFundsTableBody');
+                const countEl = document.getElementById('instFundsTrackedCount');
+                if (countEl) countEl.textContent = funds ? funds.length + '+' : '50+';
+                if (!tbody) return;
+
+                if (!funds || !funds.length) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#64748b;">No fund profiles loaded.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = funds.map(f => {
+                    return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                            <td style="padding:0.65rem 0.8rem;font-weight:700;color:#f8fafc;">${f.fund_name}</td>
+                            <td style="padding:0.65rem 0.8rem;color:#94a3b8;font-size:0.72rem;">${f.fund_type}</td>
+                            <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#38bdf8;">${f.total_positions} Stocks</td>
+                            <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#34d399;font-weight:700;">+${f.buying_actions}</td>
+                            <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#f87171;font-weight:700;">-${f.selling_actions}</td>
+                            <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">₹${f.total_aum_tracked_cr.toLocaleString()} Cr</td>
+                            <td style="padding:0.65rem 0.8rem;text-align:center;">
+                                <button type="button" onclick="app.inspectFundPortfolio('${f.fund_name.replace(/'/g, "\\'")}')" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.55rem;">View Holdings</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            },
+
+            async searchInstitutionalStock(ticker, autoSwitch = true) {
+                if (!ticker) return;
+                const cleanTicker = ticker.trim().toUpperCase();
+                try {
+                    const res = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        this.renderStockInstitutionalDetails(data);
+                        if (autoSwitch) {
+                            this.switchInstitutionalView('stock');
+                        }
+                    } else {
+                        console.warn('Failed finding institutional data for ' + cleanTicker);
+                    }
+                } catch (e) {
+                    console.error('Error fetching institutional stock:', e);
+                }
+            },
+
+            renderStockInstitutionalDetails(data) {
+                if (!data) return;
+
+                const tickerEl = document.getElementById('instSelectedTicker');
+                const nameEl = document.getElementById('instSelectedCompanyName');
+                const badgeEl = document.getElementById('instSelectedVerdictBadge');
+                const scoreTextEl = document.getElementById('instSelectedScoreText');
+
+                if (tickerEl) tickerEl.textContent = data.ticker;
+                if (nameEl) nameEl.textContent = data.company_name || '';
+                if (badgeEl) {
+                    badgeEl.textContent = data.verdict;
+                    badgeEl.style.background = data.verdict_badge === 'emerald' ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)';
+                    badgeEl.style.color = data.verdict_badge === 'emerald' ? '#34d399' : '#60a5fa';
+                }
+                if (scoreTextEl) {
+                    scoreTextEl.innerHTML = `Accumulation Score: <strong style="color:#38bdf8;">${data.accumulation_score} / 100</strong> | Net Tracked Flow: <strong style="color:#34d399;">+₹${data.net_flow_cr} Cr</strong> | Funds In/Out: <strong style="color:#34d399;">+${data.funds_accumulating_count}</strong> / <strong style="color:#f87171;">-${data.funds_selling_count}</strong>`;
+                }
+
+                // 1. Shareholding pattern history
+                const patContainer = document.getElementById('instShareholdingPatternContainer');
+                if (patContainer) {
+                    const pats = data.shareholding_patterns || [];
+                    if (!pats.length) {
+                        patContainer.innerHTML = '<div style="color:#64748b;font-size:0.72rem;">No historical shareholding filings found.</div>';
+                    } else {
+                        patContainer.innerHTML = `
+                            <table style="width:100%;font-size:0.72rem;text-align:left;border-collapse:collapse;">
+                                <thead>
+                                    <tr style="color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.06);font-family:var(--font-mono);">
+                                        <th style="padding:0.35rem 0.5rem;">QUARTER</th>
+                                        <th style="padding:0.35rem 0.5rem;">PROMOTER</th>
+                                        <th style="padding:0.35rem 0.5rem;">FII / FPI</th>
+                                        <th style="padding:0.35rem 0.5rem;">DII / MUTUAL FUNDS</th>
+                                        <th style="padding:0.35rem 0.5rem;">RETAIL / PUBLIC</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${pats.map(p => `
+                                        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                                            <td style="padding:0.4rem 0.5rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${p.quarter}</td>
+                                            <td style="padding:0.4rem 0.5rem;color:#cbd5e1;font-family:var(--font-mono);">${p.promoter_pct}%</td>
+                                            <td style="padding:0.4rem 0.5rem;color:#38bdf8;font-weight:700;font-family:var(--font-mono);">${p.fii_pct}%</td>
+                                            <td style="padding:0.4rem 0.5rem;color:#34d399;font-weight:700;font-family:var(--font-mono);">${p.dii_mf_pct}%</td>
+                                            <td style="padding:0.4rem 0.5rem;color:#94a3b8;font-family:var(--font-mono);">${p.public_retail_pct}%</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+                }
+
+                // 2. Block deals
+                const dealsContainer = document.getElementById('instBlockDealsContainer');
+                if (dealsContainer) {
+                    const deals = data.block_deals || [];
+                    if (!deals.length) {
+                        dealsContainer.innerHTML = '<div style="color:#64748b;font-size:0.72rem;padding:0.5rem;">No recent bulk or block deals recorded for this ticker.</div>';
+                    } else {
+                        dealsContainer.innerHTML = deals.map(d => {
+                            const isBuy = d.deal_type === 'BUY';
+                            const bg = isBuy ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+                            const col = isBuy ? '#34d399' : '#f87171';
+                            return `
+                                <div style="background:${bg};border:1px solid ${isBuy ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'};border-radius:4px;padding:0.35rem 0.55rem;margin-bottom:0.35rem;display:flex;justify-content:space-between;align-items:center;font-size:0.72rem;">
+                                    <div>
+                                        <span style="font-weight:700;color:${col};font-family:var(--font-mono);margin-right:0.35rem;">[${d.deal_type}]</span>
+                                        <strong style="color:#f8fafc;">${d.client_name}</strong>
+                                    </div>
+                                    <div style="font-family:var(--font-mono);color:#cbd5e1;text-align:right;">
+                                        ${d.quantity.toLocaleString()} shares @ ₹${d.price} (₹${d.value_cr} Cr) | <span style="color:#94a3b8;">${d.deal_date}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                }
+
+                // 3. Fund-by-Fund Table
+                const tbody = document.getElementById('instStockHoldingsTableBody');
+                if (tbody) {
+                    const holdings = data.holdings || [];
+                    if (!holdings.length) {
+                        tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">No fund positions recorded for this ticker yet.</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = holdings.map(h => {
+                        const act = h.action;
+                        const isBuy = act === 'NEW BUY';
+                        const isAcc = act === 'ACCUMULATED';
+                        const isTrim = act === 'TRIMMED';
+                        const isSold = act === 'SOLD OUT';
+
+                        const actBg = isBuy ? 'rgba(56,189,248,0.15)' : isAcc ? 'rgba(16,185,129,0.15)' : isTrim ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)';
+                        const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : '#f87171';
+                        const changeStr = h.change_pct > 0 ? `+${h.change_pct}%` : `${h.change_pct}%`;
+
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                                <td style="padding:0.6rem 0.8rem;font-weight:700;color:#f8fafc;">${h.fund_name}</td>
+                                <td style="padding:0.6rem 0.8rem;color:#94a3b8;font-size:0.72rem;">${h.fund_type}</td>
+                                <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">${h.quarter}</td>
+                                <td style="padding:0.6rem 0.8rem;">
+                                    <span class="signal-badge" style="background:${actBg};color:${actCol};font-size:0.68rem;padding:0.12rem 0.4rem;">${h.action}</span>
+                                </td>
+                                <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${h.stake_pct}%</td>
+                                <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:${actCol};">${changeStr}</td>
+                                <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#38bdf8;">₹${h.holding_value_cr} Cr</td>
+                                <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#64748b;font-size:0.7rem;">${h.reported_date || '—'}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            },
+
+            async inspectFundPortfolio(fundName) {
+                if (!fundName) return;
+                try {
+                    const res = await fetch(API_BASE + `/api/v1/institutional/fund/${encodeURIComponent(fundName)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const holdings = data.holdings || [];
+                        const summary = holdings.map(h => `${h.ticker} (${h.stake_pct}% stake, Action: ${h.action})`).join('\n• ');
+                        alert(`💼 Holdings for ${fundName}:\n\n• ${summary || 'No positions recorded.'}`);
+                    }
+                } catch (e) {
+                    console.error('Error fetching fund portfolio:', e);
+                }
             }
         };
 

@@ -1,0 +1,232 @@
+        <!-- ================================================================= -->
+        <!-- 🏛️ INSTITUTIONAL ACCUMULATION & MUTUAL FUND ACTIVITY HUB            -->
+        <!-- ================================================================= -->
+        <div id="tab-institutional" class="tab-content" style="width:100%;max-width:100%;">
+
+            <!-- Header & Controls Row -->
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;gap:0.6rem;">
+                    <span style="font-size:1.4rem;">🏛️</span>
+                    <div>
+                        <div style="display:flex;align-items:center;gap:0.45rem;">
+                            <div style="font-size:1.05rem;font-weight:700;color:#f8fafc;letter-spacing:-0.01em;">Institutional Accumulation & Fund Flows</div>
+                            <span style="font-size:0.65rem;font-weight:700;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.1rem 0.45rem;border-radius:4px;">SMART MONEY RADAR</span>
+                        </div>
+                        <div style="font-size:0.72rem;color:#94a3b8;">Track Indian Mutual Funds (Nippon, Quant, HDFC, SBI), FIIs & Super Investors accumulating or exiting equities.</div>
+                    </div>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                    <!-- Stock Quick Search -->
+                    <div style="position:relative;display:flex;align-items:center;">
+                        <input id="instStockSearchInput" type="text" placeholder="Search stock (e.g. ALLCARGO, TCS)..." onkeydown="if(event.key==='Enter') app.searchInstitutionalStock(this.value)" style="background:#0f172a;border:1px solid rgba(255,255,255,0.15);color:#f8fafc;font-size:0.75rem;padding:0.35rem 0.65rem 0.35rem 1.8rem;border-radius:6px;width:220px;font-family:var(--font-mono);outline:none;">
+                        <span style="position:absolute;left:0.55rem;font-size:0.75rem;color:#64748b;">🔍</span>
+                        <button type="button" onclick="app.searchInstitutionalStock(document.getElementById('instStockSearchInput').value)" class="btn btn-sm" style="margin-left:0.3rem;padding:0.35rem 0.65rem;font-size:0.72rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">Lookup</button>
+                    </div>
+
+                    <!-- Preset Quick Buttons (e.g. ALLCARGO) -->
+                    <button type="button" onclick="app.searchInstitutionalStock('ALLCARGO.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;" title="View ALLCARGO fund investment & selling details">📦 ALLCARGO</button>
+                    <button type="button" onclick="app.searchInstitutionalStock('FORCEMOT.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);">FORCEMOT</button>
+                    <button type="button" onclick="app.searchInstitutionalStock('PCJEWELLER.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);">PCJEWELLER</button>
+
+                    <!-- Refresh Button -->
+                    <button type="button" onclick="app.loadInstitutionalData()" class="btn btn-primary" style="padding:0.35rem 0.85rem;font-size:0.76rem;display:flex;align-items:center;gap:0.3rem;">
+                        <span>🔄</span> Refresh Flows
+                    </button>
+                </div>
+            </div>
+
+            <!-- Subview Navigation Tabs -->
+            <div style="display:flex;gap:0.4rem;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+                <button type="button" id="btnInstTab-accumulating" onclick="app.switchInstitutionalView('accumulating')" class="btn btn-sm" style="background:#1e293b;color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-weight:700;">🔥 Top Accumulated Equities</button>
+                <button type="button" id="btnInstTab-stock" onclick="app.switchInstitutionalView('stock')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);">📊 Stock Drilldown & Fund List</button>
+                <button type="button" id="btnInstTab-distributing" onclick="app.switchInstitutionalView('distributing')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);">🔴 Institutional Trimming / Exits</button>
+                <button type="button" id="btnInstTab-funds" onclick="app.switchInstitutionalView('funds')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);">💼 Mutual Funds Directory</button>
+            </div>
+
+            <!-- VIEW 1: Top Accumulated Equities -->
+            <div id="instView-accumulating" style="display:block;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:0.75rem;margin-bottom:1rem;">
+                    <div class="card" style="padding:0.75rem;background:#0f172a;border:1px solid rgba(16,185,129,0.25);">
+                        <div style="font-size:0.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Aggressive Accumulation</div>
+                        <div id="instAccumulatingCount" style="font-size:1.4rem;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:0.15rem;">--</div>
+                        <div style="font-size:0.68rem;color:#64748b;">Equities with net institutional inflow</div>
+                    </div>
+                    <div class="card" style="padding:0.75rem;background:#0f172a;border:1px solid rgba(59,130,246,0.25);">
+                        <div style="font-size:0.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Top Accumulated Equities</div>
+                        <div id="instTopStockHighlight" style="font-size:1.1rem;font-weight:800;color:#60a5fa;font-family:var(--font-mono);margin-top:0.25rem;">ALLCARGO / FORCEMOT</div>
+                        <div style="font-size:0.68rem;color:#64748b;">Highest mutual fund + FII accumulation score</div>
+                    </div>
+                    <div class="card" style="padding:0.75rem;background:#0f172a;border:1px solid rgba(245,158,11,0.25);">
+                        <div style="font-size:0.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;">Active Funds Tracked</div>
+                        <div id="instFundsTrackedCount" style="font-size:1.4rem;font-weight:800;color:#fbbf24;font-family:var(--font-mono);margin-top:0.15rem;">50+</div>
+                        <div style="font-size:0.68rem;color:#64748b;">Nippon, Quant, HDFC, SBI, Ashish Kacholia</div>
+                    </div>
+                </div>
+
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.1);">
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.76rem;text-align:left;">
+                            <thead>
+                                <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.7rem;">
+                                    <th style="padding:0.6rem 0.8rem;">TICKER</th>
+                                    <th style="padding:0.6rem 0.8rem;">COMPANY NAME</th>
+                                    <th style="padding:0.6rem 0.8rem;">ACCUMULATION SCORE</th>
+                                    <th style="padding:0.6rem 0.8rem;">VERDICT</th>
+                                    <th style="padding:0.6rem 0.8rem;">FUNDS IN / OUT</th>
+                                    <th style="padding:0.6rem 0.8rem;">TOTAL INST. STAKE</th>
+                                    <th style="padding:0.6rem 0.8rem;">TOP ACCUMULATING FUNDS</th>
+                                    <th style="padding:0.6rem 0.8rem;text-align:center;">ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="instAccumulatingTableBody">
+                                <tr>
+                                    <td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">
+                                        <div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Loading institutional accumulation setups...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: Stock Drilldown & Fund-by-Fund Table (e.g. ALLCARGO) -->
+            <div id="instView-stock" style="display:none;">
+                <div id="instStockHeaderCard" class="card" style="padding:1rem;background:#0f172a;border:1px solid rgba(56,189,248,0.25);margin-bottom:1rem;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.5rem;">
+                                <span id="instSelectedTicker" style="font-size:1.2rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);">ALLCARGO.NS</span>
+                                <span id="instSelectedCompanyName" style="font-size:0.85rem;color:#94a3b8;">Allcargo Logistics Ltd</span>
+                                <span id="instSelectedVerdictBadge" class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.72rem;">🔥 Aggressive Institutional Accumulation</span>
+                            </div>
+                            <div id="instSelectedScoreText" style="font-size:0.74rem;color:#cbd5e1;margin-top:0.3rem;">
+                                Accumulation Conviction: <strong style="color:#38bdf8;">84.5 / 100</strong> | Net Tracked Flow: <strong style="color:#34d399;">+₹320.5 Cr</strong>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;">
+                            <button type="button" onclick="window.open('/stock/' + encodeURIComponent(document.getElementById('instSelectedTicker').textContent || 'ALLCARGO.NS'), '_blank')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;display:flex;align-items:center;gap:0.3rem;">
+                                <span>📈</span> Open Full Stock Detail
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2-Column: Shareholding Pattern Trend + Block Deals -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:1rem;margin-bottom:1rem;">
+                    <!-- Quarter-on-Quarter Shareholding Trend -->
+                    <div class="card" style="padding:0.85rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);">
+                        <div style="font-size:0.8rem;font-weight:700;color:#f8fafc;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.35rem;">
+                            <span>📊</span> Quarter-over-Quarter Shareholding Pattern
+                        </div>
+                        <div id="instShareholdingPatternContainer" style="overflow-x:auto;">
+                            <!-- Dynamic Table / Bars -->
+                        </div>
+                    </div>
+
+                    <!-- Recent Block & Bulk Deals -->
+                    <div class="card" style="padding:0.85rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);">
+                        <div style="font-size:0.8rem;font-weight:700;color:#f8fafc;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.35rem;">
+                            <span>⚡</span> Major Bulk & Block Deals (Exchange Filings)
+                        </div>
+                        <div id="instBlockDealsContainer" style="max-height:220px;overflow-y:auto;">
+                            <!-- Dynamic Block Deals -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fund-by-Fund Investment & Exit Table -->
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.1);">
+                    <div style="padding:0.75rem 1rem;background:#0f172a;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
+                        <div style="font-size:0.82rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+                            <span>💼</span> Fund-by-Fund Investment & Exit Activity
+                        </div>
+                        <div style="font-size:0.7rem;color:#94a3b8;">Detailed mutual fund & institutional holdings</div>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.76rem;text-align:left;">
+                            <thead>
+                                <tr style="background:#0b1329;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:0.7rem;">
+                                    <th style="padding:0.6rem 0.8rem;">INSTITUTIONAL FUND / INVESTOR</th>
+                                    <th style="padding:0.6rem 0.8rem;">FUND TYPE</th>
+                                    <th style="padding:0.6rem 0.8rem;">REPORTED QUARTER</th>
+                                    <th style="padding:0.6rem 0.8rem;">ACTION</th>
+                                    <th style="padding:0.6rem 0.8rem;">STAKE %</th>
+                                    <th style="padding:0.6rem 0.8rem;">CHANGE %</th>
+                                    <th style="padding:0.6rem 0.8rem;">HOLDING VALUE (₹ CR)</th>
+                                    <th style="padding:0.6rem 0.8rem;">FILING DATE</th>
+                                </tr>
+                            </thead>
+                            <tbody id="instStockHoldingsTableBody">
+                                <tr>
+                                    <td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">
+                                        Select or search a stock to inspect fund activities.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 3: Distributing / Trimming Stocks -->
+            <div id="instView-distributing" style="display:none;">
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(239,68,68,0.2);">
+                    <div style="padding:0.75rem 1rem;background:#180d14;border-bottom:1px solid rgba(239,68,68,0.15);">
+                        <div style="font-size:0.82rem;font-weight:700;color:#fca5a5;display:flex;align-items:center;gap:0.4rem;">
+                            <span>🔴</span> Equities With Heavy Institutional Trimming or Complete Exits
+                        </div>
+                        <div style="font-size:0.7rem;color:#f87171;">Stocks where mutual funds and FIIs are reducing exposure</div>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.76rem;text-align:left;">
+                            <thead>
+                                <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:0.7rem;">
+                                    <th style="padding:0.6rem 0.8rem;">TICKER</th>
+                                    <th style="padding:0.6rem 0.8rem;">COMPANY NAME</th>
+                                    <th style="padding:0.6rem 0.8rem;">ACCUMULATION SCORE</th>
+                                    <th style="padding:0.6rem 0.8rem;">FUNDS TRIMMING / EXITED</th>
+                                    <th style="padding:0.6rem 0.8rem;">EXITING INSTITUTION NAMES</th>
+                                    <th style="padding:0.6rem 0.8rem;text-align:center;">ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="instDistributingTableBody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 4: Mutual Funds Directory -->
+            <div id="instView-funds" style="display:none;">
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.1);">
+                    <div style="padding:0.75rem 1rem;background:#0f172a;border-bottom:1px solid rgba(255,255,255,0.08);">
+                        <div style="font-size:0.82rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+                            <span>💼</span> Tracked Institutional Funds & Super Investors
+                        </div>
+                        <div style="font-size:0.7rem;color:#94a3b8;">Click on any fund to see all equities they recently bought, accumulated, or sold</div>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.76rem;text-align:left;">
+                            <thead>
+                                <tr style="background:#0b1329;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:0.7rem;">
+                                    <th style="padding:0.6rem 0.8rem;">FUND / INVESTOR NAME</th>
+                                    <th style="padding:0.6rem 0.8rem;">CATEGORY</th>
+                                    <th style="padding:0.6rem 0.8rem;">TRACKED POSITIONS</th>
+                                    <th style="padding:0.6rem 0.8rem;">BUYING ACTIONS</th>
+                                    <th style="padding:0.6rem 0.8rem;">SELLING ACTIONS</th>
+                                    <th style="padding:0.6rem 0.8rem;">TOTAL TRACKED VALUE (₹ CR)</th>
+                                    <th style="padding:0.6rem 0.8rem;text-align:center;">VIEW HOLDINGS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="instFundsTableBody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>

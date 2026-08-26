@@ -100,6 +100,72 @@
                 </div>
             </div>
 
+            <!-- ⏱️ Live Breakout Schedules & Automation Status Bar -->
+            <div id="breakoutSchedulesBar" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:0.6rem;margin-bottom:0.85rem;">
+                <div class="card" style="padding:0.55rem 0.85rem;background:#090d16;border:1px solid rgba(239,68,68,0.25);display:flex;align-items:center;justify-content:space-between;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:0.35rem;">
+                            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ef4444;"></span>
+                            <span style="font-size:0.72rem;font-weight:700;color:#f87171;">Hot Pool Rescore</span>
+                            <span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);">(60s)</span>
+                        </div>
+                        <div id="schedBreakoutHotTimer" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.15rem;">
+                            Next run: <strong style="color:#38bdf8;">--</strong> | Last: --
+                        </div>
+                    </div>
+                    <button type="button" onclick="app.triggerScheduleJob('breakout_hot_rescore')" class="btn btn-sm" style="padding:0.2rem 0.5rem;font-size:0.68rem;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.35);">⚡ Run</button>
+                </div>
+
+                <div class="card" style="padding:0.55rem 0.85rem;background:#090d16;border:1px solid rgba(245,158,11,0.25);display:flex;align-items:center;justify-content:space-between;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:0.35rem;">
+                            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#fbbf24;"></span>
+                            <span style="font-size:0.72rem;font-weight:700;color:#fbbf24;">Warm Pool Rescore</span>
+                            <span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);">(5m)</span>
+                        </div>
+                        <div id="schedBreakoutWarmTimer" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.15rem;">
+                            Next run: <strong style="color:#38bdf8;">--</strong> | Last: --
+                        </div>
+                    </div>
+                    <button type="button" onclick="app.triggerScheduleJob('breakout_warm_rescore')" class="btn btn-sm" style="padding:0.2rem 0.5rem;font-size:0.68rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);">⚡ Run</button>
+                </div>
+
+                <div class="card" style="padding:0.55rem 0.85rem;background:#090d16;border:1px solid rgba(59,130,246,0.25);display:flex;align-items:center;justify-content:space-between;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:0.35rem;">
+                            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#60a5fa;"></span>
+                            <span style="font-size:0.72rem;font-weight:700;color:#60a5fa;">Universe Sweep</span>
+                            <span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);">(60m)</span>
+                        </div>
+                        <div id="schedBreakoutColdTimer" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.15rem;">
+                            Next run: <strong style="color:#38bdf8;">--</strong> | Last: --
+                        </div>
+                    </div>
+                    <button type="button" onclick="app.triggerScheduleJob('breakout_cold_scan')" class="btn btn-sm" style="padding:0.2rem 0.5rem;font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">🌐 Scan</button>
+                </div>
+            </div>
+
+            <!-- 🔄 Breakout Movement & Activity Audit Feed ("What Changed & Why") -->
+            <div id="breakoutAuditPanel" class="card" style="padding:0.75rem 1rem;background:#080d1a;border:1px solid rgba(56,189,248,0.2);margin-bottom:0.85rem;">
+                <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="app.toggleBreakoutAuditLog()">
+                    <div style="display:flex;align-items:center;gap:0.45rem;">
+                        <span style="font-size:0.95rem;">🔄</span>
+                        <span style="font-size:0.82rem;font-weight:700;color:#f8fafc;">Breakout Activity & Tier Movements</span>
+                        <span style="font-size:0.65rem;background:rgba(56,189,248,0.15);color:#38bdf8;padding:0.1rem 0.4rem;border-radius:4px;font-weight:600;">What Changed & Why</span>
+                        <span id="breakoutAuditBadgeCount" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">(0 events)</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                        <span id="breakoutAuditToggleIcon" style="font-size:0.75rem;color:#94a3b8;">▼ Show Log</span>
+                    </div>
+                </div>
+
+                <div id="breakoutAuditContainer" style="display:none;margin-top:0.75rem;max-height:260px;overflow-y:auto;border-top:1px solid rgba(255,255,255,0.08);padding-top:0.6rem;">
+                    <div id="breakoutAuditList" style="display:flex;flex-direction:column;gap:0.45rem;">
+                        <div style="text-align:center;color:#64748b;font-size:0.72rem;padding:0.5rem;">Loading movement audit logs...</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 🎯 Interactive Stock Evaluator with Live Autocomplete -->
             <div style="background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.85)); border: 1px solid rgba(59,130,246,0.35); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.85rem; box-shadow: 0 4px 20px -2px rgba(0,0,0,0.4);">
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.45rem;">
