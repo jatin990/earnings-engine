@@ -63,3 +63,30 @@ def test_local_model_offline_fallback():
         assert res["is_local"] is True
         assert res["direction"] == "NEUTRAL"
         assert "unavailable" in res["error"].lower()
+
+
+def test_parallel_all_local_models_dispatch():
+    """Verify run_consensus_models expands 'local_all' and runs multiple local models in parallel."""
+    ctx = {"ticker": "TCS.NS", "timeframe_days": 14}
+    
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": '{"direction": "BULLISH", "confidence_pct": 80, "target_price": 4100.0, "support_level": 3900.0, "resistance_level": 4200.0, "stop_loss_price": 3850.0, "risk_reward_ratio": 2.5, "recommended_action": "BUY", "key_drivers": ["Local reasoning"]}'
+                }
+            }
+        ],
+        "usage": {"total_tokens": 100},
+    }
+
+    with patch("requests.post", return_value=mock_resp):
+        with patch("earnings_engine.consensus.model_runner.get_installed_local_models", return_value=["local/deepseek-r1:8b", "local/llama3.2:3b", "local/qwen2.5:7b"]):
+            results = run_consensus_models(ctx, models=["local_all"], timeout=10)
+            assert len(results) == 3
+            for r in results:
+                assert r["direction"] == "BULLISH"
+                assert r["is_local"] is True
+

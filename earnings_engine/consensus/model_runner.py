@@ -609,6 +609,44 @@ def _parse_model_json(content: Any) -> dict[str, Any] | None:
     return None
 
 
+def get_installed_local_models(local_url: str | None = None) -> list[str]:
+    """Discover installed local model tags from running Ollama / LM Studio instances."""
+    base_host = (local_url or os.getenv("LOCAL_LLM_URL") or os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
+    installed: list[str] = []
+    # 1. Native Ollama /api/tags
+    try:
+        resp = requests.get(f"{base_host}/api/tags", timeout=2)
+        if resp.status_code == 200:
+            for m in resp.json().get("models", []):
+                name = m.get("name")
+                if name and f"local/{name}" not in installed:
+                    installed.append(f"local/{name}")
+    except Exception:
+        pass
+    
+    # 2. OpenAI-compatible /v1/models
+    if not installed:
+        try:
+            resp = requests.get(f"{base_host}/v1/models", timeout=2)
+            if resp.status_code == 200:
+                for m in resp.json().get("data", []):
+                    mid = m.get("id")
+                    if mid and f"local/{mid}" not in installed:
+                        installed.append(f"local/{mid}")
+        except Exception:
+            pass
+
+    # 3. Fallback default ensemble if offline/empty
+    if not installed:
+        installed = [
+            "local/deepseek-r1:8b",
+            "local/llama3.2:3b",
+            "local/qwen2.5:7b",
+            "local/mistral:7b",
+        ]
+    return installed
+
+
 def run_consensus_models(
     context: dict[str, Any],
     models: list[str] | None = None,
@@ -619,7 +657,7 @@ def run_consensus_models(
 
     Args:
         context: The assembled context dict from context_builder.build_context().
-        models: List of model IDs (e.g. OpenRouter or local/*). Defaults to DEFAULT_MODELS.
+        models: List of model IDs (e.g. OpenRouter or local/* or 'local_all'). Defaults to DEFAULT_MODELS.
         timeout: Per-model timeout in seconds.
         local_url: Optional override URL for local model (e.g. http://localhost:11434).
 
@@ -627,6 +665,18 @@ def run_consensus_models(
         List of prediction dicts, one per model (including errored ones).
     """
     models = models or DEFAULT_MODELS
+
+    # Expand "local_all", "all_local", or "local:all" into all installed local models
+    if any(m in ("local_all", "all_local", "local:all") for m in models):
+        expanded = []
+        for m in models:
+            if m in ("local_all", "all_local", "local:all"):
+                expanded.extend(get_installed_local_models(local_url=local_url))
+            else:
+                expanded.append(m)
+        seen = set()
+        models = [x for x in expanded if not (x in seen or seen.add(x))]
+
     has_remote_models = any(
         not (m.startswith("local/") or m.startswith("ollama/") or m.startswith("lmstudio/") or m == "local")
         for m in models
