@@ -47,6 +47,7 @@ _CACHED_LOCAL_MODELS: dict[str, Any] = {}
 def _scan_and_cache_local_models(host: str | None = None) -> dict[str, Any]:
     """Scan running local model endpoints (Ollama / LM Studio) and cache the result."""
     import os, requests
+    from datetime import timezone
     ollama_host = (host or os.getenv("LOCAL_LLM_URL") or os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
     models = []
     status = "offline"
