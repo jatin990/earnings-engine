@@ -95,10 +95,29 @@
                     if (!sel) return;
 
                     let customOpts = this.customLists.map(w => '<option value="' + w.name + '">' + (w.name === 'my_watchlist' ? '⭐ my_watchlist (Default)' : '⭐ ' + w.name) + ' (' + (w.tickers ? w.tickers.length : 0) + ')</option>').join('');
-                    let univOpts = this.universes.map(u => '<option value="' + u.name + '">🏛️ ' + (u.display_name || u.name) + ' (' + (u.tickers ? u.tickers.length : 0) + ')</option>').join('');
 
-                    sel.innerHTML = '<optgroup label="⭐ Custom Watchlists">' + (customOpts || '<option value="my_watchlist">⭐ my_watchlist (0)</option>') + '</optgroup>' +
-                        (univOpts ? '<optgroup label="🏛️ Built-in Universes">' + univOpts + '</optgroup>' : '');
+                    const benchmarkKeys = ['nifty_50', 'nifty_next_50', 'nifty_100', 'nifty_200', 'nifty_500'];
+                    const capKeys = ['nse_large_cap', 'nse_mid_cap', 'nse_small_cap', 'nse_all'];
+                    const usKeys = ['us_top', 'us'];
+
+                    const benchUnis = this.universes.filter(u => benchmarkKeys.includes(u.name.toLowerCase()));
+                    const capUnis = this.universes.filter(u => capKeys.includes(u.name.toLowerCase()));
+                    const usUnis = this.universes.filter(u => usKeys.includes(u.name.toLowerCase()));
+                    const otherUnis = this.universes.filter(u => !benchmarkKeys.includes(u.name.toLowerCase()) && !capKeys.includes(u.name.toLowerCase()) && !usKeys.includes(u.name.toLowerCase()));
+
+                    let benchHtml = benchUnis.map(u => '<option value="' + u.name + '">' + (u.display_name || u.name) + ' (' + (u.tickers ? u.tickers.length : 0) + ')</option>').join('');
+                    let capHtml = capUnis.map(u => '<option value="' + u.name + '">' + (u.display_name || u.name) + ' (' + (u.tickers ? u.tickers.length : 0) + ')</option>').join('');
+                    let usHtml = usUnis.map(u => '<option value="' + u.name + '">' + (u.display_name || u.name) + ' (' + (u.tickers ? u.tickers.length : 0) + ')</option>').join('');
+                    let otherHtml = otherUnis.map(u => '<option value="' + u.name + '">🏛️ ' + (u.display_name || u.name) + ' (' + (u.tickers ? u.tickers.length : 0) + ')</option>').join('');
+
+                    let html = '';
+                    if (benchHtml) html += '<optgroup label="🇮🇳 Groww Benchmark Indices">' + benchHtml + '</optgroup>';
+                    if (capHtml) html += '<optgroup label="🚀 Market Cap Segments">' + capHtml + '</optgroup>';
+                    html += '<optgroup label="⭐ Custom Watchlists">' + (customOpts || '<option value="my_watchlist">⭐ my_watchlist (0)</option>') + '</optgroup>';
+                    if (usHtml) html += '<optgroup label="🇺🇸 US Mega-Caps">' + usHtml + '</optgroup>';
+                    if (otherHtml) html += '<optgroup label="🏛️ Other Universes">' + otherHtml + '</optgroup>';
+
+                    sel.innerHTML = html;
 
                     // Keep selected value if present and populated, or default to first non-empty custom list
                     const populatedCustom = this.customLists.find(w => w.tickers && w.tickers.length > 0);

@@ -123,7 +123,12 @@ def _resolve_tickers(market: str | None) -> list[str]:
             tickers_raw = watchlists_mod.get_watchlist("my_watchlist", _settings())
         elif mu == "ALL":
             tickers_raw = load_all()
-        elif mu in {"IN", "US", "NSE_ALL", "NSE_LARGE_CAP"}:
+        elif mu in {
+            "IN", "US", "NSE_ALL", "NSE_LARGE_CAP", "NSE_TOP", "NIFTY_50", "NSE_50",
+            "NIFTY_NEXT_50", "NEXT_50", "NIFTY_100", "NSE_100", "NIFTY_200", "NSE_200",
+            "NIFTY_500", "NSE_500", "NSE_MID_CAP", "NSE_MIDCAP", "NIFTY_MIDCAP_100",
+            "NSE_SMALL_CAP", "NSE_SMALLCAP", "NIFTY_SMALLCAP_100", "US_TOP", "US_50"
+        }:
             tickers_raw = load_universe(mu)
         else:
             db_list = watchlists_mod.get_watchlist(market, _settings())
@@ -132,13 +137,16 @@ def _resolve_tickers(market: str | None) -> list[str]:
             if db_list:
                 tickers_raw = db_list
             else:
-                f = UNIVERSES_DIR / f"{market}.txt"
-                if f.exists():
-                    tickers_raw = load_universe_from_file(f)
-                elif mu != market:
-                    f_mu = UNIVERSES_DIR / f"{mu}.txt"
-                    if f_mu.exists():
-                        tickers_raw = load_universe_from_file(f_mu)
+                try:
+                    tickers_raw = load_universe(mu)
+                except Exception:
+                    f = UNIVERSES_DIR / f"{market}.txt"
+                    if f.exists():
+                        tickers_raw = load_universe_from_file(f)
+                    elif mu != market:
+                        f_mu = UNIVERSES_DIR / f"{mu}.txt"
+                        if f_mu.exists():
+                            tickers_raw = load_universe_from_file(f_mu)
     else:
         tickers_raw = load_all()
 
@@ -964,13 +972,16 @@ def get_watchlist_names_summary() -> dict[str, Any]:
     custom_names = [{"name": w.get("name"), "title": w.get("name"), "count": w.get("tickers", 0)} for w in custom_meta]
 
     standard_universes = [
-        {"name": "", "title": "🌐 All Stocks (Global)", "count": 89},
-        {"name": "NSE_ALL", "title": "🇮🇳 NSE All Stocks", "count": 4959},
-        {"name": "NSE_TOP", "title": "🇮🇳 NSE Top 50 (Nifty 50)", "count": 50},
-        {"name": "NSE_LARGE_CAP", "title": "🇮🇳 NSE Large Caps", "count": 1417},
-        {"name": "US_TOP", "title": "🇺🇸 US Top Stocks", "count": 45},
-        {"name": "IN", "title": "🇮🇳 All Indian Stocks", "count": 44},
-        {"name": "US", "title": "🇺🇸 All US Stocks", "count": 45},
+        {"name": "NIFTY_50", "title": "🇮🇳 Nifty 50 (Bluechips)", "count": 50},
+        {"name": "NIFTY_NEXT_50", "title": "🇮🇳 Nifty Next 50 (Large-Cap Growth)", "count": 50},
+        {"name": "NIFTY_100", "title": "🇮🇳 Nifty 100 (Top 100 Large-Cap)", "count": 100},
+        {"name": "NIFTY_200", "title": "🇮🇳 Nifty 200 (Large & Mid-Cap Leaders)", "count": 200},
+        {"name": "NIFTY_500", "title": "🇮🇳 Nifty 500 (Broad Market Index)", "count": 500},
+        {"name": "NSE_MID_CAP", "title": "🚀 NSE Mid Cap (Top 100 Mid-Cap Growth)", "count": 100},
+        {"name": "NSE_SMALL_CAP", "title": "⚡ NSE Small Cap (Top 100 Small-Cap Compounders)", "count": 100},
+        {"name": "NSE_LARGE_CAP", "title": "🏛️ NSE Large Caps (>₹1,000 Cr)", "count": 1417},
+        {"name": "NSE_ALL", "title": "🌐 NSE All Listed Equities (2,000+)", "count": 4959},
+        {"name": "US_TOP", "title": "🇺🇸 US Top 50 (Mega-Cap Leaders)", "count": 45},
     ]
 
     return {

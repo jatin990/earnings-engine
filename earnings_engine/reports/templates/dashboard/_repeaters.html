@@ -25,10 +25,23 @@
             
             <!-- Universe Selector -->
             <select id="repeatersUniverseSelect" onchange="app.loadQuarterRepeaters()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;font-size:0.76rem;padding:0.35rem 0.6rem;border-radius:6px;outline:none;cursor:pointer;">
-                <option value="nifty_50">Nifty 50</option>
-                <option value="nse_top">NSE Top Liquid</option>
-                <option value="nse_large_cap">NSE Large Cap</option>
-                <option value="all">All Monitored</option>
+                <optgroup label="🇮🇳 Benchmark Indices">
+                    <option value="nifty_50" selected>🇮🇳 Nifty 50</option>
+                    <option value="nifty_next_50">🇮🇳 Nifty Next 50</option>
+                    <option value="nifty_100">🇮🇳 Nifty 100</option>
+                    <option value="nifty_200">🇮🇳 Nifty 200</option>
+                    <option value="nifty_500">🇮🇳 Nifty 500</option>
+                </optgroup>
+                <optgroup label="🚀 Market Cap Segments">
+                    <option value="nse_large_cap">🏛️ NSE Large Cap</option>
+                    <option value="nse_mid_cap">🚀 NSE Mid Cap</option>
+                    <option value="nse_small_cap">⚡ NSE Small Cap</option>
+                    <option value="all">🌐 All Monitored</option>
+                </optgroup>
+                <optgroup label="⭐ Portfolios & Global">
+                    <option value="my_watchlist">⭐ My Watchlist</option>
+                    <option value="us_top">🇺🇸 US Top 50</option>
+                </optgroup>
             </select>
 
             <!-- Verdict Filter -->

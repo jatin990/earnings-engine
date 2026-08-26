@@ -173,3 +173,28 @@ def test_ingest_market_caps_uses_cache(u_settings, monkeypatch):
     results = ingest_market_caps(["CACHED.NS", "NEW.NS"], force=False, settings=u_settings)
     assert results["CACHED.NS"] == 1
     assert results["NEW.NS"] == 1
+
+
+def test_groww_benchmark_indices(u_settings):
+    """Test resolution and constituent scaling of Groww-style indices."""
+    nifty_50 = load_universe("NIFTY_50", settings=u_settings)
+    assert len(nifty_50) >= 50
+    assert "RELIANCE.NS" in nifty_50
+    assert "TCS.NS" in nifty_50
+
+    nifty_next_50 = load_universe("NIFTY_NEXT_50", settings=u_settings)
+    assert len(nifty_next_50) >= 45
+    assert "HAL.NS" in nifty_next_50 or "DLF.NS" in nifty_next_50
+
+    nifty_100 = load_universe("NIFTY_100", settings=u_settings)
+    assert len(nifty_100) >= 95
+
+    nifty_200 = load_universe("NIFTY_200", settings=u_settings)
+    assert len(nifty_200) >= 180
+
+    mid_cap = load_universe("NSE_MID_CAP", settings=u_settings)
+    assert len(mid_cap) >= 80
+
+    small_cap = load_universe("NSE_SMALL_CAP", settings=u_settings)
+    assert len(small_cap) >= 70
+

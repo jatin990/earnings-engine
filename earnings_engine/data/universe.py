@@ -20,7 +20,7 @@ MARKET_CAP_MAX_AGE_DAYS = 15  # same as earnings cache freshness
 
 logger = logging.getLogger("earnings_engine.data.universe")
 
-_SEED_NSE_TOP = [
+_SEED_NIFTY_50 = [
     "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS",
     "BHARTIARTL.NS", "KOTAKBANK.NS", "SBIN.NS", "LT.NS", "AXISBANK.NS",
     "HINDUNILVR.NS", "ITC.NS", "ASIANPAINT.NS", "MARUTI.NS", "SUNPHARMA.NS",
@@ -28,11 +28,65 @@ _SEED_NSE_TOP = [
     "TATASTEEL.NS", "M&M.NS", "WIPRO.NS", "TECHM.NS", "HCLTECH.NS",
     "BAJAJ-AUTO.NS", "TITAN.NS", "ADANIPORTS.NS", "HEROMOTOCO.NS", "INDUSINDBK.NS",
     "EICHERMOT.NS", "DIVISLAB.NS", "DRREDDY.NS", "CIPLA.NS", "NESTLEIND.NS",
-    "GRASIM.NS", "BEL.NS", "IOC.NS", "BPCL.NS", "COALINDIA.NS",
-    "BANKBARODA.NS", "PNB.NS", "SHREECEM.NS", "ETERNAL.NS", "ADANIENT.NS",
-    "BAJFINANCE.NS", "BAJAJFINSV.NS", "TRENT.NS", "APOLLOHOSP.NS", "BRITANNIA.NS",
-    "TATAMOTORS.NS", "SBILIFE.NS", "HDFCLIFE.NS", "HINDALCO.NS",
+    "GRASIM.NS", "BEL.NS", "BPCL.NS", "COALINDIA.NS", "SHREECEM.NS",
+    "ETERNAL.NS", "ADANIENT.NS", "BAJFINANCE.NS", "BAJAJFINSV.NS", "TRENT.NS",
+    "APOLLOHOSP.NS", "BRITANNIA.NS", "TATAMOTORS.NS", "SBILIFE.NS", "HDFCLIFE.NS",
+    "HINDALCO.NS", "SHRIRAMFIN.NS", "LTIM.NS"
 ]
+
+_SEED_NIFTY_NEXT_50 = [
+    "HAL.NS", "DLF.NS", "SIEMENS.NS", "ABB.NS", "INDIGO.NS",
+    "TVSMOTOR.NS", "VEDL.NS", "AMBUJACEM.NS", "GAIL.NS", "TATAPOWER.NS",
+    "HAVELLS.NS", "NAUKRI.NS", "CANBK.NS", "BANKBARODA.NS", "PNB.NS",
+    "UNIONBANK.NS", "ZYDUSLIFE.NS", "CHOLAFIN.NS", "CUMMINSIND.NS", "PERSISTENT.NS",
+    "POLYCAB.NS", "LODHA.NS", "INDHOTEL.NS", "CGPOWER.NS", "BOSCHLTD.NS",
+    "PIDILITIND.NS", "DABUR.NS", "MARICO.NS", "GODREJCP.NS", "ICICIGI.NS",
+    "ICICIPRULI.NS", "UNITDSPR.NS", "SRF.NS", "TORNTPHARM.NS", "JUBLFOOD.NS",
+    "BHEL.NS", "REC.NS", "PFC.NS", "IRFC.NS", "SOLARINDS.NS",
+    "SUPREMEIND.NS", "TIINDIA.NS", "COLPAL.NS", "BERGEPAINT.NS", "ASHOKLEY.NS",
+    "CONCOR.NS", "BIOCON.NS", "PAGEIND.NS", "ASTRAL.NS", "MAXHEALTH.NS"
+]
+
+_SEED_NIFTY_MIDCAP_100 = [
+    "DIXON.NS", "KAYNES.NS", "MAZDOCK.NS", "COCHINSHIP.NS", "SUZLON.NS",
+    "INOXWIND.NS", "WAAREEENER.NS", "IREDA.NS", "KPITTECH.NS", "COFORGE.NS",
+    "MPHASIS.NS", "LTTS.NS", "TATAELXSI.NS", "UNOMINDA.NS", "BHARATFORG.NS",
+    "FEDERALBNK.NS", "IDFCFIRSTB.NS", "AUBANK.NS", "BANDHANBNK.NS", "OBEROIRLTY.NS",
+    "PRESTIGE.NS", "PHOENIXLTD.NS", "GODREJPROP.NS", "SUNTV.NS", "GLENMARK.NS",
+    "ALKEM.NS", "IPCALAB.NS", "AARTIIND.NS", "DEEPAKNTR.NS", "TATACHEM.NS",
+    "CLEAN.NS", "FLUOROCHEM.NS", "EXIDEIND.NS", "AMARAJABAT.NS", "APOLLOTYRE.NS",
+    "BALKRISIND.NS", "MRF.NS", "VOLTAS.NS", "BLUESTARCO.NS", "CROMPTON.NS",
+    "KEI.NS", "FINCABLES.NS", "CDSL.NS", "BSE.NS", "ANGELONE.NS",
+    "KFINTECH.NS", "MCX.NS", "NAM-INDIA.NS", "HDFCAMC.NS", "UTIAMC.NS",
+    "ABCAPITAL.NS", "L&TFH.NS", "SUNDARMFIN.NS", "POONAWALLA.NS", "CREDITACC.NS",
+    "FORTIS.NS", "NH.NS", "ASTERDM.NS", "SYNGENE.NS", "GLAND.NS",
+    "LAURUSLABS.NS", "NATCOPHARM.NS", "JBMA.NS", "MSUMI.NS", "CRAFTSMAN.NS",
+    "SONACOMS.NS", "ESCORTS.NS", "ACE.NS", "ELECON.NS", "KIRLOSENG.NS",
+    "THERMAX.NS", "TRIVENI.NS", "AIAENG.NS", "CARBORUNIV.NS", "GRINDWELL.NS",
+    "TIMKEN.NS", "SCHAEFFLER.NS", "SKFINDIA.NS", "CENTURYPLY.NS", "GREENPANEL.NS",
+    "KAJARIACER.NS", "CERA.NS", "CASTROLIND.NS", "AEGISCHEM.NS", "MGL.NS",
+    "IGL.NS", "GUJGASLTD.NS", "PETRONET.NS", "OIL.NS", "MOTILALOFS.NS"
+]
+
+_SEED_NIFTY_SMALLCAP_100 = [
+    "TATATECH.NS", "NETWEB.NS", "CYIENT.NS", "BSOFT.NS", "TANLA.NS",
+    "HAPPSTMNDS.NS", "RALLIS.NS", "AVANTIFEED.NS", "CENTURYTEX.NS", "RAYMOND.NS",
+    "WELSPUNLIV.NS", "TRIDENT.NS", "KNRCON.NS", "PNCINFRA.NS", "GRINFRA.NS",
+    "HGINFRA.NS", "ASHOKA.NS", "PRAJIND.NS", "ISGEC.NS", "IONEXCHANG.NS",
+    "TECHNOCRAF.NS", "SANGHVIMOV.NS", "JWL.NS", "TITAGARH.NS", "TEXRAIL.NS",
+    "RAILTEL.NS", "RITES.NS", "IRCON.NS", "MSTCLTD.NS", "HUDCO.NS",
+    "NBCC.NS", "ENGINERSIN.NS", "MOIL.NS", "KIOCL.NS", "SANDUMA.NS",
+    "LLOYDSME.NS", "JAIBALAJI.NS", "JINDALSAW.NS", "MAHSEAMLES.NS", "WELCORP.NS",
+    "APLAPOLLO.NS", "RATNAMANI.NS", "VENUSPIPES.NS", "PRINCEPIPE.NS", "FINPIPE.NS",
+    "CAMPUS.NS", "METROBRAND.NS", "RELAXO.NS", "SAFARI.NS", "VIPIND.NS",
+    "VAIBHAVGBL.NS", "ETHOSLTD.NS", "SENCO.NS", "KALYANKJIL.NS", "MEDPLUS.NS",
+    "YATHARTH.NS", "JLHL.NS", "SHALBY.NS", "THYROCARE.NS", "METROPOLIS.NS",
+    "VIJAYA.NS", "LALPATHLAB.NS", "KIMS.NS", "MARKSANS.NS", "SUPRIYA.NS",
+    "SIGACHI.NS", "NEULANDLAB.NS", "FDC.NS", "CAPLIPOINT.NS", "RPGLIFE.NS",
+    "STRIDES.NS", "GRANULES.NS", "JBCHEPHARM.NS", "ERIS.NS", "AJANTPHARM.NS"
+]
+
+_SEED_NSE_TOP = _SEED_NIFTY_50
 
 _SEED_US_TOP = [
     "AAPL", "MSFT", "AMZN", "NVDA", "GOOGL", "META", "TSLA", "BRK-B", "LLY",
@@ -287,7 +341,7 @@ def list_universes(settings: Settings | None = None) -> list[dict[str, Any]]:
 
 
 def get_universe(name: str, settings: Settings | None = None) -> list[str]:
-    """Get tickers in a universe from SQLite."""
+    """Get tickers in a universe from SQLite with comprehensive Groww-style benchmark fallbacks."""
     clean_name = name.lower().strip()
     with _connect(settings) as connection:
         rows = connection.execute(
@@ -297,10 +351,22 @@ def get_universe(name: str, settings: Settings | None = None) -> list[str]:
         if rows:
             return [row[0] for row in rows]
 
-    # Fallback to seed universes if not populated
-    if clean_name in ("nse_top", "nifty_50", "nifty50", "nifty_top_50", "in", "nse"):
-        return list(_SEED_NSE_TOP)
-    elif clean_name in ("us_top", "us"):
+    # Benchmark index resolutions
+    if clean_name in ("nse_top", "nifty_50", "nifty50", "nifty_top_50", "nse_50", "in", "nse"):
+        return list(_SEED_NIFTY_50)
+    elif clean_name in ("nifty_next_50", "niftynext50", "next_50"):
+        return list(_SEED_NIFTY_NEXT_50)
+    elif clean_name in ("nifty_100", "nifty100", "nse_100"):
+        return list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50))
+    elif clean_name in ("nifty_midcap_100", "nse_mid_cap", "nse_midcap", "mid_cap", "midcap"):
+        return list(_SEED_NIFTY_MIDCAP_100)
+    elif clean_name in ("nifty_smallcap_100", "nse_small_cap", "nse_smallcap", "small_cap", "smallcap"):
+        return list(_SEED_NIFTY_SMALLCAP_100)
+    elif clean_name in ("nifty_200", "nifty200", "nse_200"):
+        return list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100))
+    elif clean_name in ("nifty_500", "nifty500", "nse_500"):
+        return list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100 + _SEED_NIFTY_SMALLCAP_100))
+    elif clean_name in ("us_top", "us", "us_50"):
         return list(_SEED_US_TOP)
 
     return []
@@ -309,36 +375,102 @@ def get_universe(name: str, settings: Settings | None = None) -> list[str]:
 UNIVERSE_METADATA: dict[str, dict[str, Any]] = {
     "nifty_50": {
         "name": "nifty_50",
-        "display_name": "🇮🇳 NIFTY Top 50 (Bluechips)",
+        "display_name": "🇮🇳 Nifty 50 (Bluechips)",
         "market": "IN",
         "type": "universe",
         "is_builtin": True,
         "is_under_100": True,
-        "summary": "India's premier 50 large-cap benchmark constituents listed on the National Stock Exchange of India (NSE).",
-        "explanation": "Includes benchmark NIFTY 50 market leaders across banking, IT, energy, consumer, auto, and pharma.",
+        "summary": "India's flagship 50 mega-cap blue-chip index constituents on the NSE.",
+        "explanation": "Includes benchmark market leaders across banking, IT, energy, consumer, auto, and pharma.",
         "selection_criteria": "Official 50 constituents of the Nifty 50 Index.",
     },
-    "nse_top": {
-        "name": "nse_top",
-        "display_name": "🇮🇳 NSE Top 50 (NIFTY 50 Bluechips)",
+    "nifty_next_50": {
+        "name": "nifty_next_50",
+        "display_name": "🇮🇳 Nifty Next 50 (Large-Cap Growth)",
         "market": "IN",
         "type": "universe",
         "is_builtin": True,
         "is_under_100": True,
-        "summary": "Top liquid blue-chip Indian large-cap stocks listed on the National Stock Exchange of India (NSE).",
-        "explanation": "Includes benchmark NIFTY 50 market leaders (Reliance, TCS, HDFC Bank, Infosys, ICICI Bank, Bharti Airtel, etc.) representing India's highest market capitalization and volume leaders across banking, IT, energy, consumer, and pharma.",
-        "selection_criteria": "Top 50 high-volume, highly-liquid large-cap equities on the NSE.",
+        "summary": "The next 50 largest companies by market cap ranked 51–100.",
+        "explanation": "High-growth large cap companies poised for future inclusion in Nifty 50.",
+        "selection_criteria": "Official constituents of the Nifty Next 50 Index.",
     },
-    "in": {
-        "name": "in",
-        "display_name": "🇮🇳 All Indian Equities (NSE Core)",
+    "nifty_100": {
+        "name": "nifty_100",
+        "display_name": "🇮🇳 Nifty 100 (Top 100 Large-Cap)",
         "market": "IN",
         "type": "universe",
         "is_builtin": True,
         "is_under_100": True,
-        "summary": "Core Indian universe covering all primary tracked equities on the NSE.",
-        "explanation": "Primary Indian market universe used for earnings forecasts, volatility tracking, and swing range identification.",
-        "selection_criteria": "Core Indian stocks listed on NSE with active price histories.",
+        "summary": "Complete Top 100 large cap companies (Nifty 50 + Nifty Next 50).",
+        "explanation": "Represents ~70% of total Indian free float market capitalization with deep liquidity.",
+        "selection_criteria": "Top 100 large cap companies on the NSE.",
+    },
+    "nifty_200": {
+        "name": "nifty_200",
+        "display_name": "🇮🇳 Nifty 200 (Large & Mid-Cap Leaders)",
+        "market": "IN",
+        "type": "universe",
+        "is_builtin": True,
+        "is_under_100": False,
+        "summary": "Top 200 companies combining Large Cap (Nifty 100) and Mid Cap leaders.",
+        "explanation": "Comprehensive exposure to institutional-grade growth and quality compounders.",
+        "selection_criteria": "Top 200 companies ranked by market capitalization.",
+    },
+    "nifty_500": {
+        "name": "nifty_500",
+        "display_name": "🇮🇳 Nifty 500 (Broad Market Index)",
+        "market": "IN",
+        "type": "universe",
+        "is_builtin": True,
+        "is_under_100": False,
+        "summary": "Top 500 companies representing ~96% of total free-float market capitalization.",
+        "explanation": "Full market representation across Large, Mid, and Small Cap segments.",
+        "selection_criteria": "Top 500 listed companies on the NSE.",
+    },
+    "nse_mid_cap": {
+        "name": "nse_mid_cap",
+        "display_name": "🚀 NSE Mid Cap (Top 100 Mid-Cap Growth)",
+        "market": "IN",
+        "type": "universe",
+        "is_builtin": True,
+        "is_under_100": True,
+        "summary": "Ranked 101–250 by market cap; the primary engine of alpha and manufacturing expansion.",
+        "explanation": "Fast-growing companies across defense, electronics, renewables, and consumer sectors.",
+        "selection_criteria": "Companies ranked 101–250 by market capitalization.",
+    },
+    "nse_small_cap": {
+        "name": "nse_small_cap",
+        "display_name": "⚡ NSE Small Cap (Top 100 Small-Cap Compounders)",
+        "market": "IN",
+        "type": "universe",
+        "is_builtin": True,
+        "is_under_100": True,
+        "summary": "Ranked 251–500 by market cap; high-beta growth opportunities and emerging leaders.",
+        "explanation": "Emerging industry disruptors with high earnings surprise velocity.",
+        "selection_criteria": "Companies ranked 251–500 by market capitalization.",
+    },
+    "nse_large_cap": {
+        "name": "nse_large_cap",
+        "display_name": "🏛️ NSE Large Cap (>₹1,000 Cr Institutional)",
+        "market": "IN",
+        "type": "universe",
+        "is_builtin": True,
+        "is_under_100": False,
+        "summary": "All Indian companies on the NSE with market capitalization exceeding ₹1,000 Crore.",
+        "explanation": "Isolates institutional-grade large and mid-to-large cap companies.",
+        "selection_criteria": "Market Cap > ₹1,000 Crore on NSE.",
+    },
+    "nse_all": {
+        "name": "nse_all",
+        "display_name": "🌐 NSE All (Complete Listed Equities 2,000+)",
+        "market": "IN",
+        "type": "universe",
+        "is_builtin": True,
+        "is_under_100": False,
+        "summary": "Comprehensive universe of all active equity symbols traded on the National Stock Exchange of India.",
+        "explanation": "Over 2,000 active tickers across all sectors and market capitalizations.",
+        "selection_criteria": "All active traded equity tickers on NSE.",
     },
     "us_top": {
         "name": "us_top",
@@ -348,48 +480,18 @@ UNIVERSE_METADATA: dict[str, dict[str, Any]] = {
         "is_builtin": True,
         "is_under_100": True,
         "summary": "Curated top 50 mega-cap US equities across NASDAQ & NYSE.",
-        "explanation": "Features Magnificent Seven leaders (AAPL, MSFT, NVDA, AMZN, GOOGL, META, TSLA) and core S&P 500 blue-chips with deepest options liquidity and high institutional earnings coverage.",
+        "explanation": "Features Magnificent Seven leaders and core S&P 500 blue-chips.",
         "selection_criteria": "Top 50 US mega-cap companies by liquidity and market cap.",
-    },
-    "us": {
-        "name": "us",
-        "display_name": "🇺🇸 All US Equities (Core S&P/NASDAQ)",
-        "market": "US",
-        "type": "universe",
-        "is_builtin": True,
-        "is_under_100": True,
-        "summary": "Core US universe covering key US market equities.",
-        "explanation": "Primary US market universe used for quarterly earnings cycle tracking and macroeconomic catalysts.",
-        "selection_criteria": "Key US traded stocks on NYSE/NASDAQ.",
-    },
-    "nse_large_cap": {
-        "name": "nse_large_cap",
-        "display_name": "🇮🇳 NSE Large Cap (>₹1,000 Cr)",
-        "market": "IN",
-        "type": "universe",
-        "is_builtin": True,
-        "is_under_100": False,
-        "summary": "All Indian companies on the NSE with market capitalization exceeding ₹1,000 Crore (₹10 Billion INR).",
-        "explanation": "Sourced and refreshed via live market cap data to isolate institutional-grade large and mid-to-large cap companies.",
-        "selection_criteria": "Market Cap > ₹1,000 Crore on NSE.",
-    },
-    "nse_all": {
-        "name": "nse_all",
-        "display_name": "🇮🇳 NSE Broad Universe (All Listed Equities)",
-        "market": "IN",
-        "type": "universe",
-        "is_builtin": True,
-        "is_under_100": False,
-        "summary": "Comprehensive universe of all active equity symbols traded on the National Stock Exchange of India.",
-        "explanation": "Dynamically fetched from the official NSE stock directory via nsetools, covering over 1,000 active tickers across all sectors.",
-        "selection_criteria": "All active traded equity tickers on NSE.",
     },
 }
 
 
 def get_universe_details(settings: Settings | None = None) -> list[dict[str, Any]]:
     """Return all built-in universes with their full ticker lists, metadata, and explanations."""
-    universe_names = ["nse_top", "us_top", "nse_large_cap", "nse_all"]
+    universe_names = [
+        "nifty_50", "nifty_next_50", "nifty_100", "nifty_200", "nifty_500",
+        "nse_mid_cap", "nse_small_cap", "nse_large_cap", "nse_all", "us_top"
+    ]
     # Also inspect any other universes in SQLite
     for u in list_universes(settings):
         uname = u["name"].lower()
@@ -560,10 +662,22 @@ def load_nse_large_cap(force_refresh: bool = False, settings: Settings | None = 
 def load_universe(market: str, settings: Settings | None = None) -> list[str]:
     """Load the configured ticker universe for one market from SQLite."""
     market_key = market.upper()
-    if market_key in {"IN", "NSE_TOP"}:
-        res = get_universe("IN", settings) or get_universe("nse_top", settings)
-        return res or list(_SEED_NSE_TOP)
-    if market_key in {"US", "US_TOP"}:
+    if market_key in {"IN", "NSE_TOP", "NIFTY_50", "NSE_50"}:
+        res = get_universe("nifty_50", settings) or get_universe("IN", settings) or get_universe("nse_top", settings)
+        return res or list(_SEED_NIFTY_50)
+    if market_key in {"NIFTY_NEXT_50", "NEXT_50"}:
+        return get_universe("nifty_next_50", settings) or list(_SEED_NIFTY_NEXT_50)
+    if market_key in {"NIFTY_100", "NSE_100"}:
+        return get_universe("nifty_100", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50))
+    if market_key in {"NIFTY_MIDCAP_100", "NSE_MID_CAP", "NSE_MIDCAP", "MID_CAP"}:
+        return get_universe("nse_mid_cap", settings) or list(_SEED_NIFTY_MIDCAP_100)
+    if market_key in {"NIFTY_SMALLCAP_100", "NSE_SMALL_CAP", "NSE_SMALLCAP", "SMALL_CAP"}:
+        return get_universe("nse_small_cap", settings) or list(_SEED_NIFTY_SMALLCAP_100)
+    if market_key in {"NIFTY_200", "NSE_200"}:
+        return get_universe("nifty_200", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100))
+    if market_key in {"NIFTY_500", "NSE_500"}:
+        return get_universe("nifty_500", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100 + _SEED_NIFTY_SMALLCAP_100))
+    if market_key in {"US", "US_TOP", "US_50"}:
         res = get_universe("US", settings) or get_universe("us_top", settings)
         return res or list(_SEED_US_TOP)
     if market_key == "NSE_ALL":
