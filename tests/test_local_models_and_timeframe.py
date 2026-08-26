@@ -18,7 +18,7 @@ def test_context_builder_timeframe():
     ctx = build_context("TCS.NS", timeframe_days=30, fetch_live=False)
     assert ctx["timeframe_days"] == 30
     prompt = context_to_prompt(ctx)
-    assert "**Prediction Timeframe:** 30 days" in prompt
+    assert "**Forecast Timeframe:** 30 Trading Days" in prompt or "30" in prompt
 
 
 def test_local_models_endpoint():

@@ -40,3 +40,6 @@ client_secret*.json
 .local_private.key
 .local_secret.key
 scratch/
+*.jpeg
+*.jpg
+=

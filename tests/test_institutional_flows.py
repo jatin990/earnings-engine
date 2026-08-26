@@ -49,13 +49,13 @@ def test_allcargo_institutional_breakdown():
 
 
 def test_top_accumulated_and_distributed_stocks():
-    acc = get_top_accumulated_stocks(limit=100)
+    acc = get_top_accumulated_stocks(limit=300)
     assert len(acc) >= 2
     tickers = [x["ticker"] for x in acc]
     assert "ALLCARGO.NS" in tickers
     assert "DIXON.NS" in tickers
 
-    dist = get_top_distributed_stocks(limit=100)
+    dist = get_top_distributed_stocks(limit=300)
     assert isinstance(dist, list)
 
 

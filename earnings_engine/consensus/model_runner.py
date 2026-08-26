@@ -157,7 +157,15 @@ def _query_local_model(
             msg = data.get("message") or {}
             resp_text = (msg.get("content") or "").strip()
             total_tokens = data.get("eval_count", 0)
-            success = True
+            if resp_text:
+                success = True
+            elif "choices" in data:
+                choice = (data.get("choices") or [{}])[0]
+                msg = choice.get("message") or {}
+                resp_text = (msg.get("content") or msg.get("reasoning") or "").strip()
+                total_tokens = data.get("usage", {}).get("total_tokens", 0)
+                if resp_text:
+                    success = True
     except Exception as e1:
         logger.debug("[CONSENSUS-LOCAL] /api/chat attempt failed: %s. Trying /v1/chat/completions...", e1)
 

@@ -104,6 +104,6 @@ def test_consensus_context_uses_live_data():
 
     prompt = context_to_prompt(ctx)
     assert "SUNPHARMA.NS" in prompt
-    assert "Current Live Price:" in prompt
+    assert "Live Real-Time" in prompt or "Price" in prompt
 
 

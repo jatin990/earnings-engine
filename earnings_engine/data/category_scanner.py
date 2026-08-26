@@ -527,6 +527,23 @@ def get_categories_overview(
                 (universe_or_watchlist,),
             ).fetchall()
         )
+        cand_rows = conn.execute(
+            "SELECT category_id, ticker, confidence_score, current_price, trigger_level FROM scanner_candidates WHERE universe = ? ORDER BY confidence_score DESC",
+            (universe_or_watchlist,),
+        ).fetchall()
+
+    top_candidates_map: dict[str, list[dict[str, Any]]] = {}
+    for r in cand_rows:
+        cid, t, conf, cp, tl = r[0], r[1], r[2], r[3], r[4]
+        if cid not in top_candidates_map:
+            top_candidates_map[cid] = []
+        if len(top_candidates_map[cid]) < 5:
+            top_candidates_map[cid].append({
+                "ticker": t,
+                "confidence_score": conf,
+                "current_price": cp,
+                "trigger_level": tl,
+            })
 
     results: list[dict[str, Any]] = []
     for cat_id, meta in SCANNER_CATEGORIES.items():
@@ -540,6 +557,7 @@ def get_categories_overview(
             "color": meta["color"],
             "target_horizon": meta["target_horizon"],
             "count": counts_map.get(cat_id, 0),
+            "top_candidates": top_candidates_map.get(cat_id, []),
         })
 
     return results

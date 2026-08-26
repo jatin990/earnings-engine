@@ -483,13 +483,24 @@ UNIVERSE_METADATA: dict[str, dict[str, Any]] = {
         "explanation": "Features Magnificent Seven leaders and core S&P 500 blue-chips.",
         "selection_criteria": "Top 50 US mega-cap companies by liquidity and market cap.",
     },
+    "nse_top": {
+        "name": "nse_top",
+        "display_name": "🇮🇳 NSE Top 50 (Nifty 50 Blue-Chips)",
+        "market": "IN",
+        "type": "universe",
+        "is_builtin": True,
+        "is_under_100": True,
+        "summary": "India's flagship 50 mega-cap blue-chip index constituents on the NSE.",
+        "explanation": "Includes benchmark NIFTY 50 blue-chip market leaders across banking, IT, energy, consumer, auto, and pharma.",
+        "selection_criteria": "Official 50 constituents of the Nifty 50 Index.",
+    },
 }
 
 
 def get_universe_details(settings: Settings | None = None) -> list[dict[str, Any]]:
     """Return all built-in universes with their full ticker lists, metadata, and explanations."""
     universe_names = [
-        "nifty_50", "nifty_next_50", "nifty_100", "nifty_200", "nifty_500",
+        "nse_top", "nifty_50", "nifty_next_50", "nifty_100", "nifty_200", "nifty_500",
         "nse_mid_cap", "nse_small_cap", "nse_large_cap", "nse_all", "us_top"
     ]
     # Also inspect any other universes in SQLite

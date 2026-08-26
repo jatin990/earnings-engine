@@ -354,13 +354,16 @@ def fetch_ticker_catalysts(
 
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [executor.submit(_get_yahoo), executor.submit(_get_yf), executor.submit(_get_google)]
-        for f in as_completed(futures, timeout=3.5):
-            try:
-                res = f.result()
-                if res:
-                    raw_items.extend(res)
-            except Exception:
-                pass
+        try:
+            for f in as_completed(futures, timeout=4.0):
+                try:
+                    res = f.result()
+                    if res:
+                        raw_items.extend(res)
+                except Exception:
+                    pass
+        except (TimeoutError, Exception):
+            pass
 
     articles: list[dict[str, Any]] = []
     seen_titles: set[str] = set()
