@@ -24,10 +24,15 @@
                         <button type="button" onclick="app.searchInstitutionalStock(document.getElementById('instStockSearchInput').value)" class="btn btn-sm" style="margin-left:0.3rem;padding:0.35rem 0.65rem;font-size:0.72rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">Lookup</button>
                     </div>
 
-                    <!-- Preset Quick Buttons (e.g. ALLCARGO) -->
+                    <!-- Preset Quick Buttons (e.g. ALLCARGO, DIXON, KAYNES, MAZDOCK, TRENT) -->
                     <button type="button" onclick="app.searchInstitutionalStock('ALLCARGO.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;" title="View ALLCARGO fund investment & selling details">📦 ALLCARGO</button>
+                    <button type="button" onclick="app.searchInstitutionalStock('DIXON.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);color:#34d399;">DIXON</button>
+                    <button type="button" onclick="app.searchInstitutionalStock('KAYNES.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);color:#34d399;">KAYNES</button>
+                    <button type="button" onclick="app.searchInstitutionalStock('MAZDOCK.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);color:#38bdf8;">MAZDOCK</button>
+                    <button type="button" onclick="app.searchInstitutionalStock('TRENT.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);color:#a78bfa;">TRENT</button>
+                    <button type="button" onclick="app.searchInstitutionalStock('CDSL.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);color:#fbbf24;">CDSL</button>
+                    <button type="button" onclick="app.searchInstitutionalStock('SUZLON.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);color:#38bdf8;">SUZLON</button>
                     <button type="button" onclick="app.searchInstitutionalStock('FORCEMOT.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);">FORCEMOT</button>
-                    <button type="button" onclick="app.searchInstitutionalStock('PCJEWELLER.NS')" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.55rem;font-family:var(--font-mono);">PCJEWELLER</button>
 
                     <!-- Refresh Button -->
                     <button type="button" onclick="app.loadInstitutionalData()" class="btn btn-primary" style="padding:0.35rem 0.85rem;font-size:0.76rem;display:flex;align-items:center;gap:0.3rem;">
@@ -206,7 +211,7 @@
                         <div style="font-size:0.82rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
                             <span>💼</span> Tracked Institutional Funds & Super Investors
                         </div>
-                        <div style="font-size:0.7rem;color:#94a3b8;">Click on any fund to see all equities they recently bought, accumulated, or sold</div>
+                        <div style="font-size:0.7rem;color:#94a3b8;">Click on any fund to inspect all equities they recently bought, accumulated, or trimmed</div>
                     </div>
                     <div style="overflow-x:auto;">
                         <table style="width:100%;border-collapse:collapse;font-size:0.76rem;text-align:left;">
@@ -225,6 +230,45 @@
                                 <!-- Dynamic rows -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: Fund Portfolio Drilldown (replaces alert) -->
+            <div id="instFundModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
+                <div style="background:#0f172a;border:1px solid rgba(56,189,248,0.3);border-radius:12px;width:100%;max-width:850px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.8);overflow:hidden;">
+                    <div style="padding:1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;background:#0b1329;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.5rem;">
+                                <span style="font-size:1.1rem;">💼</span>
+                                <h3 id="instFundModalTitle" style="margin:0;font-size:1.05rem;color:#f8fafc;font-weight:700;">Fund Holdings Portfolio</h3>
+                            </div>
+                            <div id="instFundModalSubtitle" style="font-size:0.74rem;color:#94a3b8;margin-top:0.2rem;">Detailed equity positions and quarterly disclosures</div>
+                        </div>
+                        <button type="button" onclick="app.closeFundModal()" class="btn btn-secondary btn-sm" style="padding:0.3rem 0.65rem;font-size:0.8rem;border-radius:6px;">✕ Close</button>
+                    </div>
+                    <div style="padding:1rem 1.25rem;overflow-y:auto;flex:1;">
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;font-size:0.76rem;text-align:left;">
+                                <thead>
+                                    <tr style="background:#020617;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.7rem;">
+                                        <th style="padding:0.6rem 0.8rem;">TICKER</th>
+                                        <th style="padding:0.6rem 0.8rem;">QUARTER</th>
+                                        <th style="padding:0.6rem 0.8rem;">ACTION</th>
+                                        <th style="padding:0.6rem 0.8rem;">STAKE %</th>
+                                        <th style="padding:0.6rem 0.8rem;">HOLDING VALUE (₹ CR)</th>
+                                        <th style="padding:0.6rem 0.8rem;">FILING DATE</th>
+                                        <th style="padding:0.6rem 0.8rem;text-align:center;">QUICK VIEW</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="instFundModalTableBody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div style="padding:0.75rem 1.25rem;border-top:1px solid rgba(255,255,255,0.08);background:#0b1329;display:flex;justify-content:flex-end;">
+                        <button type="button" onclick="app.closeFundModal()" class="btn btn-primary btn-sm" style="font-size:0.75rem;padding:0.35rem 0.85rem;">Done</button>
                     </div>
                 </div>
             </div>
