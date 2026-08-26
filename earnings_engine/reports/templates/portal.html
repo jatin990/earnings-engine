@@ -198,7 +198,7 @@
                 <span id="userLabelBadge" class="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-semibold text-xs mono">
                     Loading...
                 </span>
-                <button onclick="portal.lockSession()" class="px-3 py-1 rounded-lg bg-white/5 hover:bg-rose-500/20 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 text-xs font-semibold transition flex items-center gap-1.5">
+                <button type="button" onclick="portal.lockSession()" class="px-3 py-1 rounded-lg bg-white/5 hover:bg-rose-500/20 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 text-xs font-semibold transition flex items-center gap-1.5">
                     <span>🔒</span> Logout
                 </button>
             </div>
@@ -293,7 +293,7 @@
                         <p class="text-xs text-slate-400">Generate invite codes with specific section scopes and manage friend access.</p>
                     </div>
 
-                    <button onclick="portal.toggleGeneratorForm()" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition">
+                    <button type="button" onclick="portal.toggleGeneratorForm()" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition">
                         <span>➕</span> Create Scoped Invite
                     </button>
                 </div>
@@ -365,8 +365,8 @@
                     </div>
 
                     <div class="flex justify-end gap-2">
-                        <button onclick="portal.toggleGeneratorForm()" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 text-xs font-semibold">Cancel</button>
-                        <button onclick="portal.submitCreateInvite()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">Generate Scoped Invite</button>
+                        <button type="button" onclick="portal.toggleGeneratorForm()" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 text-xs font-semibold">Cancel</button>
+                        <button type="button" onclick="portal.submitCreateInvite()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">Generate Scoped Invite</button>
                     </div>
                 </div>
 
@@ -442,8 +442,8 @@
             </div>
 
             <div class="flex gap-2">
-                <button onclick="document.getElementById('otpModal').style.display='none'" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 text-xs font-semibold">Cancel</button>
-                <button onclick="portal.submitVerifyOtp()" id="btnSubmitOtp" class="glow-btn flex-1 py-2.5 rounded-xl text-xs font-bold">Verify & Unlock</button>
+                <button type="button" onclick="document.getElementById('otpModal').style.display='none'" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 text-xs font-semibold">Cancel</button>
+                <button type="button" onclick="portal.submitVerifyOtp()" id="btnSubmitOtp" class="glow-btn flex-1 py-2.5 rounded-xl text-xs font-bold">Verify & Unlock</button>
             </div>
         </div>
     </div>
@@ -459,7 +459,7 @@
                         <p class="text-xs text-slate-400">Upcoming journeys and curated travel plans.</p>
                     </div>
                 </div>
-                <button onclick="document.getElementById('tripsModal').style.display='none'" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                <button type="button" onclick="document.getElementById('tripsModal').style.display='none'" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
             </div>
             <div id="tripsListContainer" class="space-y-3">
                 <p class="text-xs text-slate-500 text-center py-6">Loading itineraries...</p>
@@ -478,7 +478,7 @@
                         <p class="text-xs text-slate-400">Category breakdown and portfolio distribution.</p>
                     </div>
                 </div>
-                <button onclick="document.getElementById('netWorthModal').style.display='none'" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                <button type="button" onclick="document.getElementById('netWorthModal').style.display='none'" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
             </div>
             <div id="netWorthContainer" class="space-y-4">
                 <p class="text-xs text-slate-500 text-center py-6">Loading net worth snapshot...</p>
@@ -914,7 +914,7 @@
                                 <input type="checkbox" onchange="portal.toggleFriendScope('${f.id}', 'can_view_net_worth', this.checked)" ${f.scopes.can_view_net_worth ? 'checked' : ''} class="cursor-pointer">
                             </td>
                             <td class="py-2.5 px-3 text-right">
-                                <button onclick="portal.revokeFriend('${f.id}')" class="text-rose-400 hover:text-rose-300 font-semibold" title="Revoke Friend Access">Revoke</button>
+                                <button type="button" onclick="portal.revokeFriend('${f.id}')" class="text-rose-400 hover:text-rose-300 font-semibold" title="Revoke Friend Access">Revoke</button>
                             </td>
                         </tr>
                     `).join('');
@@ -976,7 +976,7 @@
                                 <td class="py-2.5 px-3 font-mono text-slate-300">${maxStr}</td>
                                 <td class="py-2.5 px-3">${expDisplay}</td>
                                 <td class="py-2.5 px-3 text-right">
-                                    <button onclick="portal.copyInviteLink('${inv.code}')" class="px-2 py-1 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold text-xs" title="Copy join link">📋 Copy Link</button>
+                                    <button type="button" onclick="portal.copyInviteLink('${inv.code}')" class="px-2 py-1 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold text-xs" title="Copy join link">📋 Copy Link</button>
                                 </td>
                             </tr>
                         `;

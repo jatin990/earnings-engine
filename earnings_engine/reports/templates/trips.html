@@ -130,7 +130,7 @@
                     <span id="userNameLabel">Loading access...</span>
                 </div>
 
-                <button id="addTripBtn" onclick="openAddTripModal()" class="hidden items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition shadow-sm shadow-sky-500/20">
+                <button type="button" id="addTripBtn" onclick="openAddTripModal()" class="hidden items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition shadow-sm shadow-sky-500/20">
                     <span>+ Add Trip</span>
                 </button>
             </div>
@@ -192,7 +192,7 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <button onclick="openActivityModalForFeatured()" class="px-4 py-2.5 rounded-xl bg-white text-sky-900 hover:bg-sky-50 text-xs font-bold transition shadow-lg flex items-center gap-2">
+                    <button type="button" onclick="openActivityModalForFeatured()" class="px-4 py-2.5 rounded-xl bg-white text-sky-900 hover:bg-sky-50 text-xs font-bold transition shadow-lg flex items-center gap-2">
                         <span>💡 Suggest Activity</span>
                     </button>
                 </div>
@@ -231,10 +231,10 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="manageGroupBtn" onclick="openManageCurrentGroupModal()" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition shadow-sm">
+                    <button type="button" id="manageGroupBtn" onclick="openManageCurrentGroupModal()" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition shadow-sm">
                         <span>⚙️ Manage Group & Roster</span>
                     </button>
-                    <button id="createGroupBtn" onclick="openCreateGroupModal()" class="hidden items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition shadow-sm shadow-sky-500/20">
+                    <button type="button" id="createGroupBtn" onclick="openCreateGroupModal()" class="hidden items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition shadow-sm shadow-sky-500/20">
                         <span>+ Create Group</span>
                     </button>
                 </div>
@@ -271,7 +271,7 @@
                     </h2>
                     <p class="text-xs text-slate-500">Collaborative itinerary suggestions, vote for your favorite spots</p>
                 </div>
-                <button onclick="openActivityModal()" class="px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-xs font-bold transition flex items-center gap-2 self-start md:self-auto">
+                <button type="button" onclick="openActivityModal()" class="px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-xs font-bold transition flex items-center gap-2 self-start md:self-auto">
                     <span>+ Suggest New Activity</span>
                 </button>
             </div>
@@ -291,7 +291,7 @@
                     <span class="text-xl">🌴</span>
                     <h3 class="heading-title text-base font-bold text-slate-900">Create New Travel Group</h3>
                 </div>
-                <button onclick="closeCreateGroupModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
+                <button type="button" onclick="closeCreateGroupModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
             </div>
 
             <form id="createGroupForm" onsubmit="submitNewGroup(event)" class="space-y-4">
@@ -368,7 +368,7 @@
                         <p id="manageGroupDesc" class="text-xs text-slate-500"></p>
                     </div>
                 </div>
-                <button onclick="closeManageGroupModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
+                <button type="button" onclick="closeManageGroupModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
             </div>
 
             <!-- Group Invite Link & Share Card -->
@@ -384,10 +384,10 @@
                 </p>
                 <div class="flex items-center gap-2">
                     <input type="text" id="manageGroupInviteUrl" readonly class="flex-1 bg-white border border-slate-300 px-3 py-1.5 rounded-xl text-xs font-mono text-slate-700 select-all">
-                    <button onclick="copyGroupInviteUrl()" class="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                    <button type="button" onclick="copyGroupInviteUrl()" class="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
                         Copy Link
                     </button>
-                    <button onclick="shareGroupOnWhatsApp()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                    <button type="button" onclick="shareGroupOnWhatsApp()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
                         WhatsApp
                     </button>
                 </div>
@@ -424,7 +424,7 @@
             <div class="space-y-2 pt-2 border-t border-slate-200">
                 <div class="flex items-center justify-between">
                     <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">🗺️ Attached Trips</h4>
-                    <button id="btnSaveAttachedTrips" onclick="saveAttachedTripsForCurrentGroup()" class="text-xs text-sky-600 hover:text-sky-800 font-bold">
+                    <button type="button" id="btnSaveAttachedTrips" onclick="saveAttachedTripsForCurrentGroup()" class="text-xs text-sky-600 hover:text-sky-800 font-bold">
                         Save Attached Trips
                     </button>
                 </div>
@@ -434,10 +434,10 @@
             </div>
 
             <div class="flex items-center justify-between pt-3 border-t border-slate-200">
-                <button id="btnDeleteCurrentGroup" onclick="deleteCurrentGroup()" class="text-xs text-rose-500 hover:text-rose-700 font-semibold">
+                <button type="button" id="btnDeleteCurrentGroup" onclick="deleteCurrentGroup()" class="text-xs text-rose-500 hover:text-rose-700 font-semibold">
                     Delete Group
                 </button>
-                <button onclick="closeManageGroupModal()" class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
+                <button type="button" onclick="closeManageGroupModal()" class="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
                     Done
                 </button>
             </div>
@@ -452,7 +452,7 @@
                     <span class="text-xl">✈️</span>
                     <h3 class="heading-title text-base font-bold text-slate-900">Add New Trip Itinerary</h3>
                 </div>
-                <button onclick="closeAddTripModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
+                <button type="button" onclick="closeAddTripModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
             </div>
 
             <form id="addTripForm" onsubmit="submitNewTrip(event)" class="space-y-4">
@@ -542,7 +542,7 @@
                     <span class="text-xl">💡</span>
                     <h3 class="heading-title text-base font-bold text-slate-900">Suggest Activity</h3>
                 </div>
-                <button onclick="closeActivityModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
+                <button type="button" onclick="closeActivityModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
             </div>
 
             <form id="suggestActivityForm" onsubmit="submitActivitySuggestion(event)" class="space-y-3">
@@ -655,7 +655,7 @@
             }
 
             let tabsHtml = `
-                <button onclick="selectGroupTab('all')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${activeGroupId === 'all' ? 'bg-slate-900 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}">
+                <button type="button" onclick="selectGroupTab('all')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${activeGroupId === 'all' ? 'bg-slate-900 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}">
                     <span>🌟 All Expeditions</span>
                     <span class="text-[10px] px-1.5 py-0.2 rounded-full ${activeGroupId === 'all' ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-500'}">${allTrips.length}</span>
                 </button>
@@ -664,7 +664,7 @@
             tabsHtml += allGroups.map(g => {
                 const isActive = activeGroupId === g.id;
                 return `
-                    <button onclick="selectGroupTab('${g.id}')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 whitespace-nowrap ${isActive ? 'bg-sky-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}">
+                    <button type="button" onclick="selectGroupTab('${g.id}')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 whitespace-nowrap ${isActive ? 'bg-sky-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}">
                         <span>${g.icon || '🌴'} ${g.name}</span>
                         <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-sky-700 text-sky-100' : 'bg-slate-100 text-slate-500'}">${g.trip_count || 0}</span>
                     </button>
@@ -793,12 +793,12 @@
                         </div>
 
                         <div class="flex items-center justify-between pt-3 border-t border-slate-100">
-                            <button onclick="openActivityModalForTrip('${t.id}')" class="px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold transition flex items-center gap-1.5">
+                            <button type="button" onclick="openActivityModalForTrip('${t.id}')" class="px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold transition flex items-center gap-1.5">
                                 <span>💡 Suggest</span>
                             </button>
 
                             ${isOwner ? `
-                                <button onclick="deleteTrip('${t.id}')" class="text-xs text-rose-500 hover:text-rose-700 font-semibold px-2 py-1">
+                                <button type="button" onclick="deleteTrip('${t.id}')" class="text-xs text-rose-500 hover:text-rose-700 font-semibold px-2 py-1">
                                     Delete
                                 </button>
                             ` : `
@@ -1065,11 +1065,11 @@
                         <div class="flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1 rounded-lg">
                             <span class="text-[10px] text-slate-400 font-bold uppercase">Code:</span>
                             <span class="text-xs font-mono font-bold text-slate-800">${m.passcode}</span>
-                            <button onclick="copyText('${m.passcode}')" class="text-slate-400 hover:text-sky-600 ml-1" title="Copy Passcode">📋</button>
+                            <button type="button" onclick="copyText('${m.passcode}')" class="text-slate-400 hover:text-sky-600 ml-1" title="Copy Passcode">📋</button>
                         </div>
 
                         ${isOwner ? `
-                            <button onclick="removeGroupMember('${grp.id}', '${m.id}')" class="text-xs text-rose-500 hover:text-rose-700 font-bold px-1.5 py-1" title="Remove Member">✕</button>
+                            <button type="button" onclick="removeGroupMember('${grp.id}', '${m.id}')" class="text-xs text-rose-500 hover:text-rose-700 font-bold px-1.5 py-1" title="Remove Member">✕</button>
                         ` : ''}
                     </div>
                 </div>

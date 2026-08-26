@@ -440,13 +440,13 @@
                                 <div style="display:flex;align-items:center;justify-content:center;gap:0.35rem;flex-wrap:wrap;">
                                     <span class="signal-badge" style="background:${badgeBg};border:1px solid ${badgeBorder};color:${badgeColor};font-size:0.68rem;font-weight:800;padding:0.12rem 0.45rem;border-radius:4px;display:inline-flex;align-items:center;gap:0.2rem;letter-spacing:0.02em;" title="${badgeTitle}">${badgeIcon} ${sig}</span>
                                     <button type="button" onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="font-size:0.72rem;font-family:var(--font-mono);cursor:pointer;color:#94a3b8;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:4px;padding:0.1rem 0.35rem;" title="Inspect & edit swing range (${s} – ${r})">${s} – ${r}</button>
-                                    <button onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="color:var(--muted);padding:0;font-size:0.72rem;border:none;background:transparent;cursor:pointer;" title="Edit Swing Range">⚙</button>
+                                    <button type="button" onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="color:var(--muted);padding:0;font-size:0.72rem;border:none;background:transparent;cursor:pointer;" title="Edit Swing Range">⚙</button>
                                 </div>`;
                         } else if (it.support != null && it.resistance != null) {
                             rangeCellHtml = `
                                 <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">
                                     <button type="button" onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="font-size:0.75rem;font-family:var(--font-mono);cursor:pointer;color:#38bdf8;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);border-radius:4px;padding:0.12rem 0.4rem;" title="Inspect & edit swing range">${s} – ${r}</button>
-                                    <button onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="color:var(--muted);padding:0 0.15rem;font-size:0.75rem;border:none;background:transparent;cursor:pointer;" title="Edit Swing Range">⚙</button>
+                                    <button type="button" onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" class="btn-micro" style="color:var(--muted);padding:0 0.15rem;font-size:0.75rem;border:none;background:transparent;cursor:pointer;" title="Edit Swing Range">⚙</button>
                                 </div>`;
                         } else {
                             rangeCellHtml = `<button type="button" onclick="app.watchlistTab.autoDetectRowRange('${it.ticker}', this)" class="btn-micro" style="font-size:0.7rem;font-weight:700;cursor:pointer;color:#fbbf24;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:0.15rem 0.45rem;display:inline-flex;align-items:center;gap:0.2rem;" title="Auto-detect support & resistance range"><span>⚡</span> Auto Detect</button>`;
@@ -455,7 +455,7 @@
                         return `<tr class="interactive-row">
                             <td>
                                 <div style="display:flex;align-items:center;gap:0.4rem;">
-                                    <button onclick="app.openAddToWatchlistModal('${it.ticker}')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.85rem;cursor:pointer;" title="Manage Watchlists">⭐</button>
+                                    <button type="button" onclick="app.openAddToWatchlistModal('${it.ticker}')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.85rem;cursor:pointer;" title="Manage Watchlists">⭐</button>
                                     <div>
                                         <strong onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" style="color:#ffffff;font-size:0.85rem;cursor:pointer;" class="hover-underline" title="Inspect & edit swing range">${it.ticker}</strong>
                                         <a href="/stock/${encodeURIComponent(it.ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;cursor:pointer;" title="Open profile in new tab">↗</a>
@@ -597,7 +597,7 @@
                     if (!filteredCustom.length && !filteredUniverses.length) {
                         el.innerHTML = '<div class="card" style="margin:0;padding:1.5rem;text-align:center;color:var(--muted);">' +
                             'No watchlists found matching this filter.' +
-                            (this.activeFilter !== 'all' || this.searchQuery ? '<br><button class="btn btn-sm btn-primary" onclick="app.watchlistTab.setFilter(\'all\'); if(document.getElementById(\'wlSearchInput\')) document.getElementById(\'wlSearchInput\').value=\'\'; app.watchlistTab.handleSearch(\'\');" style="margin-top:0.75rem;">Reset Filters</button>' : '') +
+                            (this.activeFilter !== 'all' || this.searchQuery ? '<br><button type="button" class="btn btn-sm btn-primary" onclick="app.watchlistTab.setFilter(\'all\'); if(document.getElementById(\'wlSearchInput\')) document.getElementById(\'wlSearchInput\').value=\'\'; app.watchlistTab.handleSearch(\'\');" style="margin-top:0.75rem;">Reset Filters</button>' : '') +
                             '</div>';
                         return;
                     }
@@ -643,8 +643,8 @@
                             return '<span style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(99,102,241,0.12);border:1px solid ' + (isUser ? 'rgba(56,189,248,0.45)' : 'rgba(99,102,241,0.25)') + ';padding:0.25rem 0.6rem;border-radius:9999px;font-size:0.78rem;" title="' + (this.names[t] || t) + '">' +
                                 '<strong onclick="app.watchlistTab.selectActiveWatchlist(\'' + u.name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="cursor:pointer;">' + t + '</strong>' +
                                 rangeBadge +
-                                '<button onclick="app.openAddToWatchlistModal(\'' + t.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:#fbbf24;cursor:pointer;font-size:0.75rem;padding:0;" title="Add to Custom Watchlist">⭐</button>' +
-                                '<button onclick="app.openSwingRangeModal(\'' + u.name.replace(/'/g, "\\'") + '\',\'' + t.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--light);opacity:0.7;cursor:pointer;font-size:0.75rem;line-height:1;padding:0 0.15rem;" title="Edit Swing Range">⚙</button>' +
+                                '<button type="button" onclick="app.openAddToWatchlistModal(\'' + t.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:#fbbf24;cursor:pointer;font-size:0.75rem;padding:0;" title="Add to Custom Watchlist">⭐</button>' +
+                                '<button type="button" onclick="app.openSwingRangeModal(\'' + u.name.replace(/'/g, "\\'") + '\',\'' + t.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--light);opacity:0.7;cursor:pointer;font-size:0.75rem;line-height:1;padding:0 0.15rem;" title="Edit Swing Range">⚙</button>' +
                                 '</span>';
                           }).join('')
                         : '<span class="timestamp" style="font-size:0.8rem;">No symbols in universe.</span>';
@@ -677,9 +677,9 @@
                                 '<span class="timestamp" style="font-size:0.72rem;">' + tickers.length + ' stocks tracked</span>' +
                             '</div>' +
                             '<div style="display:flex;gap:0.35rem;flex-wrap:wrap;">' +
-                                '<button class="btn btn-sm" onclick="app.watchlistTab.selectActiveWatchlist(\'' + u.name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);" title="Open list view with full OHLCV metrics">📋 List View</button>' +
-                                '<button class="btn btn-sm" onclick="app.watchlistTab.copyToCustom(\'' + u.name.replace(/'/g, "\\'") + '\',\'' + (u.display_name || u.name).replace(/'/g, "\\'") + '\',' + JSON.stringify(tickers).replace(/"/g, '&quot;') + ')" style="background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.35);" title="Copy all tickers into a customizable custom watchlist">📋 Copy to Custom</button>' +
-                                '<button class="btn btn-sm" onclick="app.switchTab(\'results\'); const el = document.getElementById(\'resultsMarket\'); if(el) { el.value=\'' + u.name.toUpperCase() + '\'; app.loadResultsReport(); }" style="background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.35);" title="View in Corporate Results tab">📈 Results</button>' +
+                                '<button type="button" class="btn btn-sm" onclick="app.watchlistTab.selectActiveWatchlist(\'' + u.name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);" title="Open list view with full OHLCV metrics">📋 List View</button>' +
+                                '<button type="button" class="btn btn-sm" onclick="app.watchlistTab.copyToCustom(\'' + u.name.replace(/'/g, "\\'") + '\',\'' + (u.display_name || u.name).replace(/'/g, "\\'") + '\',' + JSON.stringify(tickers).replace(/"/g, '&quot;') + ')" style="background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.35);" title="Copy all tickers into a customizable custom watchlist">📋 Copy to Custom</button>' +
+                                '<button type="button" class="btn btn-sm" onclick="app.switchTab(\'results\'); const el = document.getElementById(\'resultsMarket\'); if(el) { el.value=\'' + u.name.toUpperCase() + '\'; app.loadResultsReport(); }" style="background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.35);" title="View in Corporate Results tab">📈 Results</button>' +
                             '</div>' +
                         '</div>' +
                         explanationHtml +
@@ -706,8 +706,8 @@
                             return '<span style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(59,130,246,0.15);border:1px solid ' + (isUser ? 'rgba(56,189,248,0.45)' : 'rgba(59,130,246,0.3)') + ';padding:0.3rem 0.65rem;border-radius:9999px;font-size:0.8rem;" title="' + (this.names[t] || t) + '">' +
                                 '<strong onclick="app.watchlistTab.selectActiveWatchlist(\'' + name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="cursor:pointer;">' + t + '</strong>' +
                                 rangeBadge +
-                                '<button onclick="app.openSwingRangeModal(\'' + name.replace(/'/g, "\\'") + '\',\'' + t.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--light);opacity:0.7;cursor:pointer;font-size:0.75rem;line-height:1;padding:0 0.15rem;" title="Edit Swing Range">⚙</button>' +
-                                '<button onclick="app.watchlistTab.removeTicker(\'' + name.replace(/'/g, "\\'") + '\',\'' + t.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;line-height:1;margin-left:0.1rem;" title="Remove">&minus;</button>' +
+                                '<button type="button" onclick="app.openSwingRangeModal(\'' + name.replace(/'/g, "\\'") + '\',\'' + t.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--light);opacity:0.7;cursor:pointer;font-size:0.75rem;line-height:1;padding:0 0.15rem;" title="Edit Swing Range">⚙</button>' +
+                                '<button type="button" onclick="app.watchlistTab.removeTicker(\'' + name.replace(/'/g, "\\'") + '\',\'' + t.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;line-height:1;margin-left:0.1rem;" title="Remove">&minus;</button>' +
                                 '</span>';
                           }).join('')
                         : '<span class="timestamp" style="font-size:0.8rem;">Empty — add a ticker below.</span>';
@@ -727,15 +727,15 @@
                                 '<span class="timestamp" style="font-size:0.72rem;">' + tickers.length + ' stock' + (tickers.length === 1 ? '' : 's') + '</span>' +
                             '</div>' +
                             '<div style="display:flex;gap:0.35rem;">' +
-                                '<button class="btn btn-sm" onclick="app.watchlistTab.selectActiveWatchlist(\'' + name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);" title="Open list view with full OHLCV metrics">📋 List View</button>' +
-                                '<button class="btn btn-sm" onclick="app.watchlistTab.rename(\'' + name.replace(/'/g, "\\'") + '\')">✎ Rename</button>' +
-                                '<button class="btn btn-sm btn-danger" onclick="app.watchlistTab.remove(\'' + name.replace(/'/g, "\\'") + '\')">🗑 Delete</button>' +
+                                '<button type="button" class="btn btn-sm" onclick="app.watchlistTab.selectActiveWatchlist(\'' + name.replace(/'/g, "\\'") + '\'); app.watchlistTab.setViewMode(\'list\');" style="background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);" title="Open list view with full OHLCV metrics">📋 List View</button>' +
+                                '<button type="button" class="btn btn-sm" onclick="app.watchlistTab.rename(\'' + name.replace(/'/g, "\\'") + '\')">✎ Rename</button>' +
+                                '<button type="button" class="btn btn-sm btn-danger" onclick="app.watchlistTab.remove(\'' + name.replace(/'/g, "\\'") + '\')">🗑 Delete</button>' +
                             '</div>' +
                         '</div>' +
                         '<div style="display:flex;gap:0.4rem;align-items:center;margin-bottom:0.55rem;position:relative;z-index:50;">' +
                             '<input id="wlAddInput' + wi + '" placeholder="Add by name or symbol..." style="flex:1;padding:0.4rem;border:1px solid rgba(255,255,255,0.2);border-radius:0.4rem;background:rgba(255,255,255,0.05);color:var(--light);" autocomplete="off">' +
                             '<div id="wlAddDropdown' + wi + '" class="dropdown" style="z-index:10000;position:absolute;top:100%;left:0;right:0;max-height:280px;overflow-y:auto;box-shadow:0 14px 35px rgba(0,0,0,0.7);"></div>' +
-                            '<button class="btn btn-primary btn-sm" onclick="app.watchlistTab.addTicker(\'' + name.replace(/'/g, "\\'") + '\',' + wi + ')">＋ Add</button>' +
+                            '<button type="button" class="btn btn-primary btn-sm" onclick="app.watchlistTab.addTicker(\'' + name.replace(/'/g, "\\'") + '\',' + wi + ')">＋ Add</button>' +
                         '</div>' +
                         '<div id="wlChips' + wi + '" style="display:flex;flex-wrap:wrap;gap:0.4rem;">' + chips + '</div>' +
                     '</div>';
@@ -1682,7 +1682,7 @@
                     const badgeBg = isActive ? 'rgba(255,255,255,0.25)' : 'rgba(59,130,246,0.2)';
                     const badgeColor = isActive ? '#fff' : '#60a5fa';
 
-                    return '<button onclick="app.selectScannerCategory(\'' + c.id + '\')" class="btn btn-sm" style="padding:0.35rem 0.75rem;border-radius:2rem;' + pillBorder + 'background:' + pillBg + ';color:' + pillColor + ';font-size:0.78rem;font-weight:600;display:inline-flex;align-items:center;gap:0.4rem;cursor:pointer;transition:all 0.15s ease;">' +
+                    return '<button type="button" onclick="app.selectScannerCategory(\'' + c.id + '\')" class="btn btn-sm" style="padding:0.35rem 0.75rem;border-radius:2rem;' + pillBorder + 'background:' + pillBg + ';color:' + pillColor + ';font-size:0.78rem;font-weight:600;display:inline-flex;align-items:center;gap:0.4rem;cursor:pointer;transition:all 0.15s ease;">' +
                         '<span>' + c.icon + ' ' + c.badge + '</span>' +
                         '<span style="background:' + badgeBg + ';color:' + badgeColor + ';padding:0.1rem 0.45rem;border-radius:1rem;font-size:0.7rem;font-weight:700;">' + c.count + '</span>' +
                     '</button>';
@@ -1797,10 +1797,10 @@
                         '<td style="text-align:center;white-space:nowrap;min-width:120px;">' + this.renderConsensusBadge(c.ticker, 'ALL') + '</td>' +
                         '<td style="text-align:center;white-space:nowrap;min-width:125px;">' +
                             '<div style="display:inline-flex;gap:0.3rem;justify-content:center;align-items:center;">' +
-                                '<button onclick="event.stopPropagation(); app.openAddToWatchlistModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐</button>' +
-                                '<button onclick="event.stopPropagation(); app.runConsensusForStock(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(99,102,241,0.2);color:#c7d2fe;border:1px solid rgba(99,102,241,0.4);border-radius:0.3rem;" title="Run AI Consensus">🧠</button>' +
-                                '<button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="14D OHLCV Benchmark">📊</button>' +
-                                '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Forecast">🔮</button>' +
+                                '<button type="button" onclick="event.stopPropagation(); app.openAddToWatchlistModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐</button>' +
+                                '<button type="button" onclick="event.stopPropagation(); app.runConsensusForStock(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(99,102,241,0.2);color:#c7d2fe;border:1px solid rgba(99,102,241,0.4);border-radius:0.3rem;" title="Run AI Consensus">🧠</button>' +
+                                '<button type="button" onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="14D OHLCV Benchmark">📊</button>' +
+                                '<button type="button" onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Forecast">🔮</button>' +
                             '</div>' +
                         '</td>' +
                     '</tr>';
@@ -2286,9 +2286,9 @@
                             '</div>' +
                             '<div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">' +
                                 '<span class="timestamp" style="font-size:0.72rem;background:rgba(255,255,255,0.05);padding:0.15rem 0.45rem;border-radius:0.25rem;">' + (c.publisher || 'News') + ' &middot; ⏱️ ' + dateDisplay + '</span>' +
-                                `<button onclick="app.runConsensusForStock('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.45);border-radius:0.3rem;font-weight:700;" title="Run AI Multi-Model Consensus for Target, Resistance, Support & Buy Zone">🧠 Consensus</button>` +
-                                `<button onclick="app.openAddToWatchlistModal('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐ Watchlist</button>` +
-                                `<button onclick="app.runPredictionForTickerSingle('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run Kronos Forecast">🔮 Predict</button>` +
+                                `<button type="button" onclick="app.runConsensusForStock('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.45);border-radius:0.3rem;font-weight:700;" title="Run AI Multi-Model Consensus for Target, Resistance, Support & Buy Zone">🧠 Consensus</button>` +
+                                `<button type="button" onclick="app.openAddToWatchlistModal('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐ Watchlist</button>` +
+                                `<button type="button" onclick="app.runPredictionForTickerSingle('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run Kronos Forecast">🔮 Predict</button>` +
                             '</div>' +
                         '</div>' +
                         '<div style="margin-bottom:0.5rem;">' + headlineLink + '</div>' +
@@ -2429,8 +2429,8 @@
                         '<td>' + this.renderConsensusBadge(g.ticker, 'ALL') + '</td>' +
                         '<td style="text-align:center;">' +
                             '<div style="display:flex;gap:0.3rem;justify-content:center;">' +
-                                '<button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + g.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="14D OHLCV Forecast Benchmark">📊 Benchmark</button>' +
-                                '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + g.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Prediction">🔮 Predict</button>' +
+                                '<button type="button" onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + g.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="14D OHLCV Forecast Benchmark">📊 Benchmark</button>' +
+                                '<button type="button" onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + g.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Prediction">🔮 Predict</button>' +
                             '</div>' +
                         '</td>' +
                     '</tr>';
@@ -2522,7 +2522,7 @@
                         '<td style="max-width:320px;font-size:0.75rem;color:#cbd5e1;line-height:1.35;">' + s.why_it_matches + '</td>' +
                         '<td>' + this.renderConsensusBadge(s.ticker, 'ALL') + '</td>' +
                         '<td style="text-align:center;">' +
-                            '<button onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + s.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Prediction">🔮 Predict</button>' +
+                            '<button type="button" onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + s.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Prediction">🔮 Predict</button>' +
                         '</td>' +
                     '</tr>';
                 }).join('');
@@ -2741,7 +2741,7 @@
                     const data = await res.json();
                     if (!data.success) {
                         if (statusEl) statusEl.textContent = data.error || 'No report data';
-                        document.getElementById('resultsReportSections').innerHTML = '<div class="card" style="margin:1rem 0;color:var(--muted);text-align:center;padding:1.5rem;">' + (data.error || 'No results data found for this selection.') + '<br><br><button onclick="app.loadResultsReport()" class="btn btn-sm btn-primary">↻ Try Again</button></div>';
+                        document.getElementById('resultsReportSections').innerHTML = '<div class="card" style="margin:1rem 0;color:var(--muted);text-align:center;padding:1.5rem;">' + (data.error || 'No results data found for this selection.') + '<br><br><button type="button" onclick="app.loadResultsReport()" class="btn btn-sm btn-primary">↻ Try Again</button></div>';
                         return;
                     }
                     document.getElementById('resultsReportLegend').innerHTML = data.day_legend || '';
@@ -3569,7 +3569,7 @@
                             </div>
                         </div>
                         <div style="padding:0.75rem 1.25rem;background:rgba(0,0,0,0.2);border-top:1px solid rgba(255,255,255,0.08);display:flex;justify-content:flex-end;">
-                            <button class="btn btn-sm btn-primary" onclick="document.getElementById('recalculateResultModal').remove()">Done</button>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('recalculateResultModal').remove()">Done</button>
                         </div>
                     </div>
                 </div>`;
@@ -3596,14 +3596,14 @@
                                 <span style="font-size:1.2rem;">📜</span>
                                 <h3 style="margin:0;font-size:1.05rem;font-weight:700;">${title}</h3>
                             </div>
-                            <button class="btn btn-sm" onclick="document.getElementById('tickerAuditModal').remove()" style="background:rgba(255,255,255,0.1);color:var(--light);border:none;border-radius:0.3rem;cursor:pointer;">✕</button>
+                            <button type="button" class="btn btn-sm" onclick="document.getElementById('tickerAuditModal').remove()" style="background:rgba(255,255,255,0.1);color:var(--light);border:none;border-radius:0.3rem;cursor:pointer;">✕</button>
                         </div>
                         <div id="auditModalBody" style="padding:1.25rem;overflow-y:auto;flex:1;">
                             <div style="text-align:center;padding:2rem;color:var(--muted);"><span class="loading-spinner"></span> Loading audit logs...</div>
                         </div>
                         <div style="padding:0.75rem 1.25rem;background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;color:var(--muted);">
                             <span>Audit records are permanently preserved in the local/cloud database.</span>
-                            <button class="btn btn-sm btn-primary" onclick="document.getElementById('tickerAuditModal').remove()">Close</button>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('tickerAuditModal').remove()">Close</button>
                         </div>
                     </div>
                 `;
@@ -4194,9 +4194,9 @@
                         const kronosColHtml = hasKp
                             ? ('<div style="display:flex;align-items:center;gap:0.35rem;">' +
                                '<span class="' + trendCls + '" style="font-weight:600;">' + trendStr + '</span>' +
-                               '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);" title="Re-run Kronos AI prediction">🔄</button>' +
+                               '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);" title="Re-run Kronos AI prediction">🔄</button>' +
                                '</div>')
-                            : ('<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.2rem 0.5rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Run on-demand Kronos AI prediction for ' + (r.ticker || '') + '">🔮 Predict</button>');
+                            : ('<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.2rem 0.5rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Run on-demand Kronos AI prediction for ' + (r.ticker || '') + '">🔮 Predict</button>');
 
                         // AI Multi-Modal & News Synthesis Column
                         const ai = r.ai_synthesis || {};
@@ -4215,10 +4215,10 @@
 
                             aiColHtml = '<div style="display:flex;align-items:center;gap:0.35rem;">' +
                                 '<span class="signal-badge" style="background:' + aiBg + ';color:' + aiColor + ';border:' + aiBorder + ';font-size:0.72rem;padding:0.15rem 0.45rem;font-weight:600;cursor:pointer;" title="Click to view AI Reasons, Catalysts & News" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)">' + aiSig + ' (' + scoreStr + ')' + volBadge + '</span>' +
-                                '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSingleAiForecast(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);" title="Re-run AI Multi-Modal News Synthesis">🔄</button>' +
+                                '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runSingleAiForecast(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);" title="Re-run AI Multi-Modal News Synthesis">🔄</button>' +
                                 '</div>';
                         } else {
-                            aiColHtml = '<button class="btn btn-sm" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)" style="padding:0.2rem 0.5rem;font-size:0.72rem;background:rgba(59,130,246,0.22);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);" title="Run AI News, World Events & Volume synthesis for ' + (r.ticker || '') + '">🧠 AI Thesis</button>';
+                            aiColHtml = '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)" style="padding:0.2rem 0.5rem;font-size:0.72rem;background:rgba(59,130,246,0.22);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);" title="Run AI News, World Events & Volume synthesis for ' + (r.ticker || '') + '">🧠 AI Thesis</button>';
                         }
 
                         // AI Consensus Column
@@ -4253,9 +4253,9 @@
                             '<td><span class="timestamp">' + (r.earnings_date || '—') + '</span></td>' +
                             '<td style="text-align:right;">' +
                                 '<div style="display:flex;justify-content:flex-end;gap:0.3rem;align-items:center;">' +
-                                '<button class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\')" style="padding:0.25rem 0.55rem;font-size:0.75rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);">✎ Range</button>' +
-                                '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.25rem 0.55rem;font-size:0.75rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Run on-demand Kronos AI prediction">⚡ Kronos</button>' +
-                                '<button class="btn btn-sm" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)" style="padding:0.25rem 0.55rem;font-size:0.75rem;background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);" title="View AI Reasons, Catalysts & Big News">🧠 AI</button>' +
+                                '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\')" style="padding:0.25rem 0.55rem;font-size:0.75rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);">✎ Range</button>' +
+                                '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.25rem 0.55rem;font-size:0.75rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Run on-demand Kronos AI prediction">⚡ Kronos</button>' +
+                                '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)" style="padding:0.25rem 0.55rem;font-size:0.75rem;background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);" title="View AI Reasons, Catalysts & Big News">🧠 AI</button>' +
                                 '</div>' +
                             '</td>' +
                             '</tr>';
@@ -4321,15 +4321,15 @@
                             '<div><strong style="font-size:0.92rem;">₹' + srLower + ' – ₹' + srUpper + '</strong>' +
                             (srCycles ? '<span class="timestamp" style="display:block;font-size:0.72rem;">' + srCycles + '</span>' : '') +
                             '</div>' +
-                            '<button class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\')" style="padding:0.2rem 0.5rem;font-size:0.75rem;">✎ Range</button>' +
+                            '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openSwingRangeModal(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\')" style="padding:0.2rem 0.5rem;font-size:0.75rem;">✎ Range</button>' +
                             '</div>' +
                             '</div>' +
                             (hasAi ? ('<div class="metric" style="margin-top:0.4rem;cursor:pointer;" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)"><span>AI Synthesis</span><strong style="color:#60a5fa;">' + ai.ai_signal + ' (' + (ai.sentiment_score >= 0 ? '+' : '') + Number(ai.sentiment_score).toFixed(2) + ') 🔍</strong></div>') : '') +
                             (hasKp ? ('<div class="metric" style="margin-top:0.2rem"><span>Kronos 14D Return</span><strong class="' + trendCls + '">' + (kp.return_pct != null ? kp.return_pct.toFixed(2) + '%' : '—') + ' (' + trend + ')</strong></div>') : '') +
                             (kp.explanation ? '<p class="timestamp" style="margin-top:0.5rem;font-size:0.75rem;">' + kp.explanation + '</p>' : '') +
                             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;">' +
-                            '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);">' + (hasKp ? '🔄 Kronos' : '⚡ Kronos AI') + '</button>' +
-                            '<button class="btn btn-sm" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(59,130,246,0.22);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);">' + (hasAi ? '🔍 Reasons & News' : '🧠 AI Thesis') + '</button>' +
+                            '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runSwingKronos(\'' + (r.ticker || '').replace(/'/g, "\\'") + '\', this)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);">' + (hasKp ? '🔄 Kronos' : '⚡ Kronos AI') + '</button>' +
+                            '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.openAiDetails(\'' + currentMarket.replace(/'/g, "\\'") + '\', \'' + (r.ticker || '').replace(/'/g, "\\'") + '\', event)" style="padding:0.35rem 0.4rem;font-size:0.72rem;background:rgba(59,130,246,0.22);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);">' + (hasAi ? '🔍 Reasons & News' : '🧠 AI Thesis') + '</button>' +
                             '</div>';
                     }).join('');
                 }
@@ -4608,7 +4608,7 @@
                     badge.style.display = 'none';
                     content.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin:0.25rem 0;">' +
                         '<p class="timestamp" style="margin:0;font-size:0.8rem;">Click <strong>"⚡ Run AI Synthesis"</strong> to analyze real-time news headlines, volume surge, and price action.</p>' +
-                        '<button class="btn btn-sm" onclick="app.runModalAiForecast()" style="font-size:0.75rem;background:rgba(59,130,246,0.25);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);">⚡ Run Now</button>' +
+                        '<button type="button" class="btn btn-sm" onclick="app.runModalAiForecast()" style="font-size:0.75rem;background:rgba(59,130,246,0.25);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);">⚡ Run Now</button>' +
                         '</div>';
                     
                     // Also try to load raw news preview in background if available
@@ -4763,7 +4763,7 @@
                             '<strong style="display:block;font-size:0.85rem;color:var(--light);">No Multi-Model Consensus on Record</strong>' +
                             '<span style="font-size:0.78rem;color:var(--muted);">Trigger an ensemble run to gather calibrated votes, support/resistance targets, and chart patterns from DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral Large.</span>' +
                             '</div>' +
-                            '<button class="btn btn-sm" onclick="app.runModalConsensus()" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);color:#fff;border:none;font-size:0.78rem;font-weight:700;padding:0.4rem 0.85rem;border-radius:0.4rem;box-shadow:0 2px 8px rgba(37,99,235,0.3);">⚡ Run Consensus Now</button>' +
+                            '<button type="button" class="btn btn-sm" onclick="app.runModalConsensus()" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);color:#fff;border:none;font-size:0.78rem;font-weight:700;padding:0.4rem 0.85rem;border-radius:0.4rem;box-shadow:0 2px 8px rgba(37,99,235,0.3);">⚡ Run Consensus Now</button>' +
                             '</div>';
                         return;
                     }
@@ -5095,11 +5095,11 @@
                         '<span class="signal-badge" style="background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';font-size:0.72rem;padding:0.18rem 0.5rem;font-weight:700;cursor:pointer;white-space:nowrap;" onclick="event.stopPropagation(); app.openAiDetails(\'' + safeMarket + '\', \'' + safeSym + '\', event)" title="' + titleText.replace(/"/g, '&quot;') + '">' +
                         '🤖 ' + dir + (retStr ? ' ' + retStr : '') +
                         '</span>' +
-                        '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(99,102,241,0.18);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);border-radius:0.3rem;" title="Re-run 4-Model AI Consensus for ' + safeSym + '">⚡</button>' +
+                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(99,102,241,0.18);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);border-radius:0.3rem;" title="Re-run 4-Model AI Consensus for ' + safeSym + '">⚡</button>' +
                         '</div>';
                 } else {
                     return '<div id="' + domId + '" style="white-space:nowrap;">' +
-                        '<button class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.18rem 0.45rem;font-size:0.7rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:0.3rem;font-weight:600;white-space:nowrap;" title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model consensus for ' + safeSym + '">⚡ AI Consensus</button>' +
+                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.18rem 0.45rem;font-size:0.7rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:0.3rem;font-weight:600;white-space:nowrap;" title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model consensus for ' + safeSym + '">⚡ AI Consensus</button>' +
                         '</div>';
                 }
             },
@@ -5436,8 +5436,8 @@
                         '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.2rem;padding-top:0.3rem;border-top:1px solid rgba(255,255,255,0.05);">' +
                             '<span style="font-size:0.68rem;color:var(--muted);">' + (f.run_at ? f.run_at.split('.')[0] : '') + '</span>' +
                             '<div style="display:flex;gap:0.3rem;">' +
-                                '<button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + sym + '\', \'' + (f.run_at || '') + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="Benchmark OHLCV accuracy against realized prices">📊 Benchmark</button>' +
-                                '<button onclick="event.stopPropagation(); app.showKronosHistory(\'' + sym + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);border-radius:0.3rem;">🔍 History</button>' +
+                                '<button type="button" onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + sym + '\', \'' + (f.run_at || '') + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="Benchmark OHLCV accuracy against realized prices">📊 Benchmark</button>' +
+                                '<button type="button" onclick="event.stopPropagation(); app.showKronosHistory(\'' + sym + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);border-radius:0.3rem;">🔍 History</button>' +
                             '</div>' +
                         '</div>' +
                     '</div>';
@@ -5456,7 +5456,7 @@
                     '</tr>'
                 ).join('');
 
-                const benchBtn = ticker ? '<button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + ticker + '\', \'' + (runAt || '') + '\')" class="btn btn-sm" style="margin-top:0.4rem;width:100%;font-size:0.7rem;padding:0.2rem 0.4rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;">📊 Benchmark Realized vs Predicted OHLCV →</button>' : '';
+                const benchBtn = ticker ? '<button type="button" onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + ticker + '\', \'' + (runAt || '') + '\')" class="btn btn-sm" style="margin-top:0.4rem;width:100%;font-size:0.7rem;padding:0.2rem 0.4rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;">📊 Benchmark Realized vs Predicted OHLCV →</button>' : '';
 
                 return '<table class="results-table" style="font-size:0.7rem;width:100%;border-collapse:collapse;">' +
                     '<thead><tr><th style="padding:0.2rem 0.35rem;">Date</th><th style="padding:0.2rem 0.35rem;">O</th><th style="padding:0.2rem 0.35rem;">H</th><th style="padding:0.2rem 0.35rem;">L</th><th style="padding:0.2rem 0.35rem;">C</th><th style="padding:0.2rem 0.35rem;">Vol</th>' +
@@ -6046,8 +6046,8 @@
                         '<td><span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;">' + srDisplay + '</span></td>' +
                         '<td style="text-align:center;">' +
                             '<div style="display:flex;gap:0.3rem;justify-content:center;">' +
-                                '<button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + item.ticker + '\', \'' + item.run_at + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="Benchmark OHLCV forecast against realized bars">📊 Benchmark</button>' +
-                                '<button onclick="event.stopPropagation(); app.showKronosHistory(\'' + item.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);border-radius:0.3rem;" title="View prediction history & accuracy timeline">🔍 History</button>' +
+                                '<button type="button" onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + item.ticker + '\', \'' + item.run_at + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="Benchmark OHLCV forecast against realized bars">📊 Benchmark</button>' +
+                                '<button type="button" onclick="event.stopPropagation(); app.showKronosHistory(\'' + item.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);border-radius:0.3rem;" title="View prediction history & accuracy timeline">🔍 History</button>' +
                             '</div>' +
                         '</td>' +
                     '</tr>';
@@ -6265,7 +6265,7 @@
                         '<td style="text-align:center;"><span style="background:' + outcomeBg + ';color:' + outcomeColor + ';padding:0.2rem 0.5rem;border-radius:0.3rem;font-size:0.75rem;font-weight:600;white-space:nowrap;">' + outcomeLabel + '</span></td>' +
                         '<td>' + (p.support ? '₹' + Number(p.support).toFixed(2) : (row.support ? '₹' + Number(row.support).toFixed(2) : '—')) + '</td>' +
                         '<td>' + (p.resistance ? '₹' + Number(p.resistance).toFixed(2) : (row.resistance ? '₹' + Number(row.resistance).toFixed(2) : '—')) + '</td>' +
-                        '<td><div style="display:flex;gap:0.3rem;"><button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + row.ticker + '\', \'' + row.run_at + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="Benchmark OHLCV accuracy against realized prices">📊 Benchmark</button><button onclick="app.deleteKronosPrediction(\'' + row.ticker + '\', \'' + row.run_at + '\')" class="btn btn-danger btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;" title="Delete record">🗑️</button></div></td>' +
+                        '<td><div style="display:flex;gap:0.3rem;"><button type="button" onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + row.ticker + '\', \'' + row.run_at + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="Benchmark OHLCV accuracy against realized prices">📊 Benchmark</button><button type="button" onclick="app.deleteKronosPrediction(\'' + row.ticker + '\', \'' + row.run_at + '\')" class="btn btn-danger btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;" title="Delete record">🗑️</button></div></td>' +
                         '</tr>';
                 }).join('');
 
@@ -6308,7 +6308,7 @@
                                 '<td><strong class="' + accCls + '">' + accPct + (s.evaluated > 0 ? '%' : '') + '</strong></td>' +
                                 '<td>' + avgProj + '</td>' +
                                 '<td>' + avgAct + '</td>' +
-                                '<td><button onclick="app.showKronosHistory(\'' + s.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.2);color:#60a5fa;">🔍 History</button></td>' +
+                                '<td><button type="button" onclick="app.showKronosHistory(\'' + s.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.2);color:#60a5fa;">🔍 History</button></td>' +
                                 '</tr>';
                         }).join('');
                     }
@@ -6487,7 +6487,7 @@
                                 '<td style="text-align:center;"><span style="background:' + outcomeBg + ';color:' + outcomeColor + ';padding:0.2rem 0.5rem;border-radius:0.3rem;font-size:0.75rem;font-weight:600;">' + outcomeLabel + '</span></td>' +
                                 '<td>₹' + (p.support ? Number(p.support).toFixed(2) : (row.support ? Number(row.support).toFixed(2) : '—')) + '</td>' +
                                 '<td>₹' + (p.resistance ? Number(p.resistance).toFixed(2) : (row.resistance ? Number(row.resistance).toFixed(2) : '—')) + '</td>' +
-                                '<td><button onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + row.ticker + '\', \'' + (row.run_at || '') + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="Benchmark this past forecast against realized prices">📊 Benchmark</button></td>' +
+                                '<td><button type="button" onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + row.ticker + '\', \'' + (row.run_at || '') + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="Benchmark this past forecast against realized prices">📊 Benchmark</button></td>' +
                                 '</tr>';
                         }).join('') + '</tbody></table></div>';
 
@@ -6830,7 +6830,7 @@
                     }
                     el.innerHTML = tickers.map(t =>
                         '<span style="display:inline-flex;align-items:center;gap:0.4rem;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);padding:0.4rem 0.75rem;border-radius:9999px;font-size:0.8rem;">' +
-                        t + '<button onclick="app.removeFromWatchlist(\'' + t + '\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;" title="Remove">&times;</button></span>'
+                        t + '<button type="button" onclick="app.removeFromWatchlist(\'' + t + '\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;" title="Remove">&times;</button></span>'
                     ).join('');
                 } catch (e) {
                     console.error('Error loading watchlist:', e);
@@ -7011,7 +7011,7 @@
                                 '<td>' + dateDisplay + '</td>' +
                                 '<td>' + returnDisplay + '</td>' +
                                 '<td class="' + trendCls + '">' + trendDisplay + '</td>' +
-                                '<td><button onclick="app.generateForTicker(\'' + ticker + '\')" class="btn btn-primary btn-sm">Regenerate</button></td>' +
+                                '<td><button type="button" onclick="app.generateForTicker(\'' + ticker + '\')" class="btn btn-primary btn-sm">Regenerate</button></td>' +
                                 '</tr>';
                         } else {
                             return '<tr>' +
@@ -7019,7 +7019,7 @@
                                 '<td class="timestamp">No prediction</td>' +
                                 '<td class="timestamp">—</td>' +
                                 '<td class="timestamp">—</td>' +
-                                '<td><button onclick="app.generateForTicker(\'' + ticker + '\')" class="btn btn-primary btn-sm">Generate</button></td>' +
+                                '<td><button type="button" onclick="app.generateForTicker(\'' + ticker + '\')" class="btn btn-primary btn-sm">Generate</button></td>' +
                                 '</tr>';
                         }
                     }).join('');
@@ -8453,7 +8453,7 @@
                             '<div>' +
                                 '<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">' +
                                     '<div style="display:flex;align-items:center;gap:0.35rem;">' +
-                                        `<button onclick="app.openAddToWatchlistModal('${p.ticker}')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.9rem;cursor:pointer;" title="Add to Watchlist">⭐</button>` +
+                                        `<button type="button" onclick="app.openAddToWatchlistModal('${p.ticker}')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.9rem;cursor:pointer;" title="Add to Watchlist">⭐</button>` +
                                         '<strong style="font-size:1.15rem;color:var(--light);">' + p.ticker + '</strong>' +
                                     '</div>' +
                                     '<span style="font-size:0.75rem;font-weight:700;background:' + dirBg + ';color:' + dirColor + ';padding:0.2rem 0.55rem;border-radius:0.35rem;border:1px solid ' + dirColor + '44;">' + dirIcon + '</span>' +
@@ -8471,7 +8471,7 @@
                                     '<div style="font-size:0.75rem;color:var(--muted);">Consensus Strength</div>' +
                                     '<div style="font-size:0.95rem;font-weight:700;color:' + dirColor + ';">' + strength.toFixed(0) + '% <span style="font-size:0.75rem;color:var(--muted);">(' + agreeRatio + ' agree)</span></div>' +
                                 '</div>' +
-                                '<button onclick="app.openConsensusDetailModal(' + p.id + ')" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);padding:0.4rem 0.75rem;border-radius:0.4rem;font-weight:600;">🔍 View Audit</button>' +
+                                '<button type="button" onclick="app.openConsensusDetailModal(' + p.id + ')" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);padding:0.4rem 0.75rem;border-radius:0.4rem;font-weight:600;">🔍 View Audit</button>' +
                             '</div>' +
                         '</div>' +
                         (modelPills ? '<div style="margin-top:0.6rem;display:flex;gap:0.4rem;flex-wrap:wrap;">' + modelPills + '</div>' : '') +
@@ -9187,8 +9187,8 @@
                             <td style="padding: 0.65rem 0.8rem; text-align: center; font-family: monospace; color: var(--muted);">${maxStr}</td>
                             <td style="padding: 0.65rem 0.8rem; text-align: center;">${expDisplay}</td>
                             <td style="padding: 0.65rem 0.8rem; text-align: right; white-space: nowrap;">
-                                <button onclick="app.copyPasscodeLink('${item.code}')" class="btn btn-sm" style="background: rgba(56,189,248,0.15); color: #38bdf8; padding: 0.2rem 0.5rem; margin-right: 0.3rem;" title="Copy direct portal invite link">🔗 Link</button>
-                                <button onclick="app.deletePasscodeInCustomizer('${item.code}')" class="btn btn-sm btn-danger" style="padding: 0.2rem 0.5rem;" title="Delete Passcode">🗑️</button>
+                                <button type="button" onclick="app.copyPasscodeLink('${item.code}')" class="btn btn-sm" style="background: rgba(56,189,248,0.15); color: #38bdf8; padding: 0.2rem 0.5rem; margin-right: 0.3rem;" title="Copy direct portal invite link">🔗 Link</button>
+                                <button type="button" onclick="app.deletePasscodeInCustomizer('${item.code}')" class="btn btn-sm btn-danger" style="padding: 0.2rem 0.5rem;" title="Delete Passcode">🗑️</button>
                             </td>
                         </tr>
                     `;
@@ -9693,12 +9693,12 @@
                         </td>
                         <td style="padding: 0.65rem 0.85rem; font-family: monospace; font-size: 0.8rem;">
                             <span id="envVal_${safeKey}" data-masked="${masked}" data-raw="${encodedVal}" data-revealed="false">${masked}</span>
-                            ${item.is_secret ? `<button onclick="app.toggleRevealEnv('${safeKey}')" style="background: none; border: none; color: #60a5fa; cursor: pointer; margin-left: 0.4rem; font-size: 0.75rem;" title="Reveal/Hide">👁️</button>` : ''}
+                            ${item.is_secret ? `<button type="button" onclick="app.toggleRevealEnv('${safeKey}')" style="background: none; border: none; color: #60a5fa; cursor: pointer; margin-left: 0.4rem; font-size: 0.75rem;" title="Reveal/Hide">👁️</button>` : ''}
                         </td>
                         <td style="padding: 0.65rem 0.85rem; text-align: right; white-space: nowrap;">
                             ${isLocal ? `
-                                <button onclick="app.showEditEnvModal('${item.key}', decodeURIComponent('${encodedVal}'))" class="btn btn-sm" style="background: rgba(59,130,246,0.15); color: #60a5fa; padding: 0.25rem 0.5rem; margin-right: 0.3rem;">✏️ Edit</button>
-                                <button onclick="app.deleteEnvVar('${item.key}')" class="btn btn-sm" style="background: rgba(239,68,68,0.15); color: #f87171; padding: 0.25rem 0.5rem;">🗑️</button>
+                                <button type="button" onclick="app.showEditEnvModal('${item.key}', decodeURIComponent('${encodedVal}'))" class="btn btn-sm" style="background: rgba(59,130,246,0.15); color: #60a5fa; padding: 0.25rem 0.5rem; margin-right: 0.3rem;">✏️ Edit</button>
+                                <button type="button" onclick="app.deleteEnvVar('${item.key}')" class="btn btn-sm" style="background: rgba(239,68,68,0.15); color: #f87171; padding: 0.25rem 0.5rem;">🗑️</button>
                             ` : `
                                 <span style="font-size: 0.72rem; color: var(--muted);">Read-Only</span>
                             `}
@@ -11465,13 +11465,13 @@
                 render: (c, ctx) => `
                     <td style="padding:0.55rem 0.75rem;text-align:center;white-space:nowrap;">
                         <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">
-                            <button id="btnReeval-${ctx.ticker.replace(/[^a-zA-Z0-9]/g, '_')}" onclick="app.reevaluateBreakoutStock('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(234,179,8,0.15);color:#fbbf24;border:1px solid rgba(234,179,8,0.35);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:5px;cursor:pointer;" title="Re-evaluate with fresh market prices and recalculate conviction">
+                            <button type="button" id="btnReeval-${ctx.ticker.replace(/[^a-zA-Z0-9]/g, '_')}" onclick="app.reevaluateBreakoutStock('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(234,179,8,0.15);color:#fbbf24;border:1px solid rgba(234,179,8,0.35);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:5px;cursor:pointer;" title="Re-evaluate with fresh market prices and recalculate conviction">
                                 ⚡ Re-eval
                             </button>
-                            <button onclick="app.openBreakoutNotesModal('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-size:0.68rem;padding:0.2rem 0.5rem;border-radius:5px;cursor:pointer;" title="View Mathematical Calculation Notes & Ollama AI Reasoning">
+                            <button type="button" onclick="app.openBreakoutNotesModal('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-size:0.68rem;padding:0.2rem 0.5rem;border-radius:5px;cursor:pointer;" title="View Mathematical Calculation Notes & Ollama AI Reasoning">
                                 🧠 Reasoning
                             </button>
-                            <button onclick="app.openSwingRangeModal('ALL','${ctx.ticker}')" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:5px;" title="Analyse ${ctx.ticker}">
+                            <button type="button" onclick="app.openSwingRangeModal('ALL','${ctx.ticker}')" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:5px;" title="Analyse ${ctx.ticker}">
                                 📊
                             </button>
                         </div>
@@ -11860,7 +11860,7 @@
                                 <option value="deepseek-r1:8b">deepseek-r1:8b (Deep Reasoning)</option>
                                 <option value="qwen2.5-coder:latest">qwen2.5-coder (Algorithmic)</option>
                             </select>
-                            <button onclick="app.runBreakoutAiReasoning('${ticker}')" class="btn btn-sm" style="background:#2563eb;color:#fff;font-size:0.72rem;padding:0.2rem 0.55rem;border-radius:5px;cursor:pointer;">
+                            <button type="button" onclick="app.runBreakoutAiReasoning('${ticker}')" class="btn btn-sm" style="background:#2563eb;color:#fff;font-size:0.72rem;padding:0.2rem 0.55rem;border-radius:5px;cursor:pointer;">
                                 ⚡ Generate Opinion
                             </button>
                         </div>
@@ -11874,7 +11874,7 @@
                 <!-- Footer Action -->
                 <div style="display:flex;align-items:center;justify-content:space-between;padding-top:0.75rem;border-top:1px solid rgba(255,255,255,0.08);">
                     <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="color:#38bdf8;font-size:0.78rem;text-decoration:none;font-weight:600;">Open Full Stock Intelligence ↗</a>
-                    <button onclick="document.getElementById('breakoutNotesModal').style.display='none'" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);padding:0.35rem 0.85rem;border-radius:6px;font-size:0.75rem;cursor:pointer;">
+                    <button type="button" onclick="document.getElementById('breakoutNotesModal').style.display='none'" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);padding:0.35rem 0.85rem;border-radius:6px;font-size:0.75rem;cursor:pointer;">
                         Close
                     </button>
                 </div>

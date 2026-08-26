@@ -62,11 +62,11 @@
                             <input type="number" id="resultsDays" value="60" min="1" max="180" style="width: 55px; height: 30px; padding: 0 0.35rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; background: #000000; color: #ededed; font-size: 0.75rem;" title="Days ahead (lookahead)">
                         </span>
                         {{ comps.market_dropdown('resultsMarket', 'ALL', 'app.onResultsMarketChange(this.value)') }}
-                        <button onclick="app.loadResultsReport()" id="resultsLoadBtn" class="btn btn-primary btn-sm">▶ Load Report</button>
-                        <button onclick="app.cancelReportLoad('results')" id="resultsCancelBtn" class="btn btn-danger btn-sm" style="display:none;" title="Cancel pending load request">⏹ Cancel</button>
-                        <button onclick="app.showMoreResultsDays()" id="resultsMoreDaysBtn" class="btn btn-sm" style="display:none;">📅 Next Date</button>
-                        <button onclick="app.summarizeResults()" class="btn btn-sm">✨ LLM Summary</button>
-                        <button onclick="app.refreshResults()" class="btn btn-sm">🔄 Sync Feed</button>
+                        <button type="button" onclick="app.loadResultsReport()" id="resultsLoadBtn" class="btn btn-primary btn-sm">▶ Load Report</button>
+                        <button type="button" onclick="app.cancelReportLoad('results')" id="resultsCancelBtn" class="btn btn-danger btn-sm" style="display:none;" title="Cancel pending load request">⏹ Cancel</button>
+                        <button type="button" onclick="app.showMoreResultsDays()" id="resultsMoreDaysBtn" class="btn btn-sm" style="display:none;">📅 Next Date</button>
+                        <button type="button" onclick="app.summarizeResults()" class="btn btn-sm">✨ LLM Summary</button>
+                        <button type="button" onclick="app.refreshResults()" class="btn btn-sm">🔄 Sync Feed</button>
                     </div>
                 </div>
 
@@ -108,7 +108,7 @@
                         <p style="max-width:480px;margin:0 auto 1rem auto;font-size:0.78rem;line-height:1.5;color:var(--text-muted);">
                             Results are served instantaneously from the local cache. Click <strong>Load Report</strong> to view upcoming earnings catalysts and previous quarter performance.
                         </p>
-                        <button onclick="app.loadResultsReport()" id="resultsCenterLoadBtn" class="btn btn-primary btn-sm" style="padding:0.45rem 1.2rem;font-size:0.8rem;font-weight:700;">▶ Load Results Report</button>
+                        <button type="button" onclick="app.loadResultsReport()" id="resultsCenterLoadBtn" class="btn btn-primary btn-sm" style="padding:0.45rem 1.2rem;font-size:0.8rem;font-weight:700;">▶ Load Results Report</button>
                     </div>
                 </div>
                 <div id="resultsReportStatus" class="timestamp" style="margin-top: 0.4rem; font-size: 0.72rem;"></div>

@@ -118,7 +118,7 @@ class WatchlistManager {
                     </svg>
                     <span class="font-semibold text-gray-900 dark:text-white">${ticker}</span>
                 </div>
-                <button onclick="event.stopPropagation(); watchlist.removeTicker('${ticker}')" class="text-red-500 hover:text-red-700 p-1">
+                <button type="button" onclick="event.stopPropagation(); watchlist.removeTicker('${ticker}')" class="text-red-500 hover:text-red-700 p-1">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>

@@ -56,10 +56,10 @@
                     <!-- Right Controls -->
                     <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
                         {{ comps.market_dropdown('swingMarket', 'ALL', 'app.onGlobalWatchlistChange(this.value); app.loadSwing();') }}
-                        <button onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" title="Load and refresh swing setups">🔄 Refresh Setups</button>
-                        <button onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-sm" title="Compute Kronos AI predictions for all stocks in the selected watchlist">🔮 Predict All</button>
-                        <button onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-sm" title="Run Multi-Modal AI News & Synthesis">🧠 AI Thesis</button>
-                        <button onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-sm" title="Run 4-Model AI Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral)">🤖 Consensus</button>
+                        <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" title="Load and refresh swing setups">🔄 Refresh Setups</button>
+                        <button type="button" onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-sm" title="Compute Kronos AI predictions for all stocks in the selected watchlist">🔮 Predict All</button>
+                        <button type="button" onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-sm" title="Run Multi-Modal AI News & Synthesis">🧠 AI Thesis</button>
+                        <button type="button" onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-sm" title="Run 4-Model AI Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral)">🤖 Consensus</button>
                     </div>
                 </div>
 
@@ -68,10 +68,10 @@
                     
                     <!-- Filter Pills -->
                     <div id="swingFilterPills" style="display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center;">
-                        <button onclick="app.filterSwing('all')" id="swingFilter-all" class="btn btn-primary btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;font-weight:700;">🌐 All (<span id="count-all-pill">0</span>)</button>
-                        <button onclick="app.filterSwing('buyzone')" id="swingFilter-buyzone" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#34d399;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);">🟢 In Buy Zone (<span id="count-buyzone-pill">0</span>)</button>
-                        <button onclick="app.filterSwing('strongbuy')" id="swingFilter-strongbuy" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#38bdf8;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);">⭐ Strong Buy (<span id="count-strongbuy-pill">0</span>)</button>
-                        <button onclick="app.filterSwing('custom')" id="swingFilter-custom" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#38bdf8;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);">🔒 Custom (<span id="count-custom-pill">0</span>)</button>
+                        <button type="button" onclick="app.filterSwing('all')" id="swingFilter-all" class="btn btn-primary btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;font-weight:700;">🌐 All (<span id="count-all-pill">0</span>)</button>
+                        <button type="button" onclick="app.filterSwing('buyzone')" id="swingFilter-buyzone" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#34d399;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);">🟢 In Buy Zone (<span id="count-buyzone-pill">0</span>)</button>
+                        <button type="button" onclick="app.filterSwing('strongbuy')" id="swingFilter-strongbuy" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#38bdf8;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);">⭐ Strong Buy (<span id="count-strongbuy-pill">0</span>)</button>
+                        <button type="button" onclick="app.filterSwing('custom')" id="swingFilter-custom" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#38bdf8;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);">🔒 Custom (<span id="count-custom-pill">0</span>)</button>
                     </div>
 
                     <!-- Search & View Toggle -->
@@ -111,7 +111,7 @@
                                     <div style="font-size:2rem;margin-bottom:0.5rem;">🔄</div>
                                     <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;">Swing Trading Matrix Ready</h4>
                                     <p style="font-size:0.8rem;margin:0 0 1rem 0;color:var(--text-muted);">Select your universe above and click <strong>Load Setups</strong> to scan trading bands and buy zones.</p>
-                                    <button onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Load Swing Setups</button>
+                                    <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Load Swing Setups</button>
                                 </td>
                             </tr>
                         </tbody>

@@ -119,7 +119,7 @@
                     <span id="userNameLabel">Loading access...</span>
                 </div>
 
-                <button id="updateSnapshotBtn" onclick="openUpdateSnapshotModal()" class="hidden items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm shadow-emerald-500/20">
+                <button type="button" id="updateSnapshotBtn" onclick="openUpdateSnapshotModal()" class="hidden items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm shadow-emerald-500/20">
                     <span>+ Update Snapshot</span>
                 </button>
             </div>
@@ -256,7 +256,7 @@
                     <span class="text-xl">🏛️</span>
                     <h3 class="heading-title text-base font-bold text-slate-900">Record Net Worth Snapshot</h3>
                 </div>
-                <button onclick="closeUpdateSnapshotModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
+                <button type="button" onclick="closeUpdateSnapshotModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
             </div>
 
             <form id="updateSnapshotForm" onsubmit="submitNewSnapshot(event)" class="space-y-4">

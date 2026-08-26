@@ -52,7 +52,7 @@
                             <option value="90">Last 90 days</option>
                             <option value="">Custom / All history</option>
                         </select>
-                        <button onclick="app.loadRecentResults()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Load Setups</button>
+                        <button type="button" onclick="app.loadRecentResults()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Load Setups</button>
                     </div>
                 </div>
 
@@ -87,7 +87,7 @@
                 <div id="bdCandidates"></div>
 
                 <div class="bd-section" style="margin-top: 0.75rem;">
-                    <button class="bd-section-header" onclick="app.toggleBdSection('today')" style="background:#08080e;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.5rem 0.75rem;display:flex;justify-content:space-between;align-items:center;width:100%;color:#fff;font-weight:600;font-size:0.8rem;cursor:pointer;">
+                    <button type="button" class="bd-section-header" onclick="app.toggleBdSection('today')" style="background:#08080e;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.5rem 0.75rem;display:flex;justify-content:space-between;align-items:center;width:100%;color:#fff;font-weight:600;font-size:0.8rem;cursor:pointer;">
                         <span>📈 Today's Results</span>
                         <span id="bdTodayToggle" class="bd-toggle">▼</span>
                     </button>
@@ -105,7 +105,7 @@
                 </div>
 
                 <div class="bd-section" style="margin-top: 0.75rem;">
-                    <button class="bd-section-header" onclick="app.toggleBdSection('yesterday')" style="background:#08080e;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.5rem 0.75rem;display:flex;justify-content:space-between;align-items:center;width:100%;color:#fff;font-weight:600;font-size:0.8rem;cursor:pointer;">
+                    <button type="button" class="bd-section-header" onclick="app.toggleBdSection('yesterday')" style="background:#08080e;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.5rem 0.75rem;display:flex;justify-content:space-between;align-items:center;width:100%;color:#fff;font-weight:600;font-size:0.8rem;cursor:pointer;">
                         <span>📊 Yesterday's Results with Price Action</span>
                         <span id="bdYesterdayToggle" class="bd-toggle">▼</span>
                     </button>

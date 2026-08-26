@@ -267,7 +267,7 @@ class App {
         container.innerHTML = tickers.map(ticker => `
             <div class="flex justify-between items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
                 <span class="text-sm text-gray-900 dark:text-white">${ticker}</span>
-                <button onclick="app.removeTickerFromUniverse('${ticker}')" class="text-red-500 hover:text-red-700 text-sm">
+                <button type="button" onclick="app.removeTickerFromUniverse('${ticker}')" class="text-red-500 hover:text-red-700 text-sm">
                     Remove
                 </button>
             </div>

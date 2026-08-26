@@ -170,7 +170,7 @@
                     <div style="display: flex; gap: 0.35rem; align-items: center;">
                         <label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.75rem;color:var(--muted);cursor:pointer;" title="Always hit live source">
                             <input type="checkbox" id="pgLive" checked style="accent-color:var(--accent);"> LIVE</label>
-                        <button id="pgSendBtn" onclick="app.pg.send()" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Send</button>
+                        <button type="button" id="pgSendBtn" onclick="app.pg.send()" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Send</button>
                     </div>
                 </div>
                 <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center;">
@@ -196,7 +196,7 @@
                     <h4 style="margin: 0; font-size: 0.95rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">📦 Raw JSON Response</h4>
                     <div style="display: flex; gap: 0.35rem; align-items: center;">
                         <span id="pgStatus" class="timestamp" style="font-size:0.72rem;"></span>
-                        <button onclick="app.pg.copyJson()" class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.75rem;">📋 Copy</button>
+                        <button type="button" onclick="app.pg.copyJson()" class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.75rem;">📋 Copy</button>
                     </div>
                 </div>
                 <div id="pgResponse" class="table-wrapper" style="max-height:460px;overflow:auto;background:#030305;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.75rem;font-family:var(--font-mono);font-size:0.75rem;white-space:pre-wrap;word-break:break-word;color:#38bdf8;">
@@ -211,7 +211,7 @@
                     <div class="card" style="padding:0.75rem;background:#0a0a10;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                             <h4 style="margin: 0; font-size:0.9rem; color:#ffffff;">🇮🇳 NSE Universe Stats</h4>
-                            <button onclick="app.loadPlaygroundNse()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Load</button>
+                            <button type="button" onclick="app.loadPlaygroundNse()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Load</button>
                         </div>
                         <p class="timestamp" style="margin: 0 0 0.5rem 0; font-size:0.72rem;">Universe sizes from nsetools (<code>NSE_ALL</code>) and yfinance fast_info (<code>NSE_LARGE_CAP</code>, > 1000 cr).</p>
                         <div id="pgNseStats" class="widget-grid"></div>
@@ -221,7 +221,7 @@
                             <h4 style="margin: 0; font-size:0.9rem; color:#ffffff;">🤖 Kronos Quick Run</h4>
                             <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
                                 <input type="text" id="pgKronosTickers" placeholder="Comma-separated tickers (blank = watchlist)" style="min-width:180px;height:28px;padding:0 0.5rem;border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;background:#030305;color:#fff;font-size:0.75rem;font-family:var(--font-mono);outline:none;">
-                                <button id="pgKronosRunBtn" onclick="app.runPlaygroundKronos()" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Run</button>
+                                <button type="button" id="pgKronosRunBtn" onclick="app.runPlaygroundKronos()" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Run</button>
                             </div>
                         </div>
                         <div id="pgKronosStatus" class="timestamp" style="font-size:0.72rem;"></div>

@@ -132,7 +132,7 @@
                         <td class="px-3 py-2 text-center">${statusBadge}</td>
                         <td class="px-3 py-2 text-gray-500 dark:text-gray-400 max-w-xs truncate" title="${_esc(headline)}">${_esc(headline)}</td>
                         <td class="px-3 py-2 text-center">
-                            <button onclick="window.strategyAuditor.deletePrediction(${item.id})" class="text-red-400 hover:text-red-600 text-xs" title="Delete">🗑️</button>
+                            <button type="button" onclick="window.strategyAuditor.deletePrediction(${item.id})" class="text-red-400 hover:text-red-600 text-xs" title="Delete">🗑️</button>
                         </td>
                     </tr>`;
             }

@@ -55,10 +55,10 @@
                                 </optgroup>
                             </select>
                         </div>
-                        <button class="tab-btn tab-btn-sm active" onclick="app.switchGainersSubTab('gainers')" id="gainersSubTabBtn_gainers" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🏆 Top 10 Gainers</button>
-                        <button class="tab-btn tab-btn-sm" onclick="app.switchGainersSubTab('patterns')" id="gainersSubTabBtn_patterns" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🧩 Pattern Archetypes</button>
-                        <button class="tab-btn tab-btn-sm" onclick="app.switchGainersSubTab('setups')" id="gainersSubTabBtn_setups" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🔮 Watchlist Setups</button>
-                        <button onclick="app.refreshGainersTab()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Refresh</button>
+                        <button type="button" class="tab-btn tab-btn-sm active" onclick="app.switchGainersSubTab('gainers')" id="gainersSubTabBtn_gainers" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🏆 Top 10 Gainers</button>
+                        <button type="button" class="tab-btn tab-btn-sm" onclick="app.switchGainersSubTab('patterns')" id="gainersSubTabBtn_patterns" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🧩 Pattern Archetypes</button>
+                        <button type="button" class="tab-btn tab-btn-sm" onclick="app.switchGainersSubTab('setups')" id="gainersSubTabBtn_setups" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🔮 Watchlist Setups</button>
+                        <button type="button" onclick="app.refreshGainersTab()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Refresh</button>
                     </div>
                 </div>
             </section>
@@ -122,7 +122,7 @@
                             <h4 style="margin: 0; font-size: 0.95rem; font-family: 'Space Grotesk', sans-serif; color: #f8fafc;">🔮 Upcoming Breakout Candidates (Watchlist Scanner)</h4>
                             <p class="timestamp" style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--text-muted);">Stocks currently coiling in tight consolidation channels matching high-win-rate pre-breakout patterns.</p>
                         </div>
-                        <button onclick="app.loadUpcomingSetups()" class="btn btn-primary btn-sm" style="font-weight:600;">🔍 Scan Watchlist</button>
+                        <button type="button" onclick="app.loadUpcomingSetups()" class="btn btn-primary btn-sm" style="font-weight:600;">🔍 Scan Watchlist</button>
                     </div>
                     <div class="table-wrapper">
                         <table class="results-table" style="font-size:0.78rem;">

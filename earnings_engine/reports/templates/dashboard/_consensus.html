@@ -102,7 +102,7 @@
                             <option value="PARTIAL">🟡 Partial</option>
                             <option value="FAILURE">❌ Failure (Post-Mortems)</option>
                         </select>
-                        <button onclick="app.loadConsensusTab()" class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.75rem;">🔄 Refresh</button>
+                        <button type="button" onclick="app.loadConsensusTab()" class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.75rem;">🔄 Refresh</button>
                     </div>
                 </div>
 
@@ -117,7 +117,7 @@
         <div id="consensusDetailModal" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(3,7,18,0.85); backdrop-filter: blur(12px); justify-content: center; align-items: center; padding: 1rem;">
             <div style="background: #0b1120; border: 1px solid rgba(59,130,246,0.35); border-radius: 1.15rem; width: 100%; max-width: 850px; max-height: 90vh; overflow-y: auto; box-shadow: 0 30px 80px rgba(0,0,0,0.9), 0 0 50px rgba(59,130,246,0.2); padding: 1.75rem; position: relative;">
                 <!-- Close button -->
-                <button onclick="app.closeConsensusModal()" style="position: absolute; top: 1rem; right: 1rem; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); border-radius: 50%; width: 32px; height: 32px; color: #93c5fd; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">✕</button>
+                <button type="button" onclick="app.closeConsensusModal()" style="position: absolute; top: 1rem; right: 1rem; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); border-radius: 50%; width: 32px; height: 32px; color: #93c5fd; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">✕</button>
 
                 <!-- Modal Content Hook -->
                 <div id="consensusModalBody">

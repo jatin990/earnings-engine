@@ -45,9 +45,9 @@
                     </div>
                     <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
                         {{ comps.market_dropdown('mfMarket', 'ALL', 'app.loadMonthFilterTab();') }}
-                        <button onclick="app.syncMonthFilter()" id="mfSyncBtn" data-master-only="true" class="btn btn-primary btn-sm" style="font-weight:600;" title="Sync present-day delta (Master only)">🔄 Sync Delta</button>
-                        <button onclick="app.loadMonthFilterTab(true)" id="mfRefreshBtn" class="btn btn-sm">↻ Refresh</button>
-                        <button onclick="app.cancelReportLoad('monthfilter')" id="mfCancelBtn" class="btn btn-danger btn-sm" style="display:none;" title="Cancel pending load request">⏹ Cancel</button>
+                        <button type="button" onclick="app.syncMonthFilter()" id="mfSyncBtn" data-master-only="true" class="btn btn-primary btn-sm" style="font-weight:600;" title="Sync present-day delta (Master only)">🔄 Sync Delta</button>
+                        <button type="button" onclick="app.loadMonthFilterTab(true)" id="mfRefreshBtn" class="btn btn-sm">↻ Refresh</button>
+                        <button type="button" onclick="app.cancelReportLoad('monthfilter')" id="mfCancelBtn" class="btn btn-danger btn-sm" style="display:none;" title="Cancel pending load request">⏹ Cancel</button>
                     </div>
                 </div>
 

@@ -708,7 +708,7 @@
         </div>
 
         <div class="ai-model-toolbar" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-            <button id="btnWatchlist" onclick="toggleWatchlist()" class="btn btn-secondary" style="padding: 0.32rem 0.65rem; font-size: 0.75rem;">
+            <button type="button" id="btnWatchlist" onclick="toggleWatchlist()" class="btn btn-secondary" style="padding: 0.32rem 0.65rem; font-size: 0.75rem;">
                 ⭐ Watchlist
             </button>
 
@@ -795,7 +795,7 @@
                     <span id="lblPriceAsOf" style="font-size: 0.75rem; color: #94a3b8; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.18rem 0.55rem; border-radius: 4px;">
                         🕒 As of: —
                     </span>
-                    <button onclick="fetchStockDetails(true)" class="btn-live-refresh" id="btnRefreshQuote" title="Fetch latest live market price">
+                    <button type="button" onclick="fetchStockDetails(true)" class="btn-live-refresh" id="btnRefreshQuote" title="Fetch latest live market price">
                         ⚡ Refresh Live
                     </button>
                     <span class="prev-close-text" id="lblPrevClose">Prev Close: ₹—</span>
@@ -919,7 +919,7 @@
             <section class="card">
                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                     <div class="card-title">📅 Quarterly Earnings Track Record</div>
-                    <button id="btnCalcAllEps" onclick="calculateEpsAll()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;" title="Recalculate and fill missing EPS for past earnings">
+                    <button type="button" id="btnCalcAllEps" onclick="calculateEpsAll()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;" title="Recalculate and fill missing EPS for past earnings">
                         ⚡ Calculate Missing EPS
                     </button>
                 </div>
@@ -1333,7 +1333,7 @@
                             <span style="color: #93c5fd; font-family: var(--font-mono); font-size: 0.64rem;" title="Average generation latency across 1h, 24h & all-time">${avgDisplay ? 'Avg: ' + avgDisplay : (m.tokens_used ? m.tokens_used + ' tokens' : '')}</span>
                         </div>
                         <div style="margin-top: auto; padding-top: 0.45rem; display: flex; gap: 0.4rem; align-items: center;">
-                            <button id="tileBtn-${safeMid}" onclick="runConsensus(true, '${mid || mName}')" class="btn-tile-run" style="flex: 1;" title="Run and refresh prediction specifically for ${mName}">
+                            <button type="button" id="tileBtn-${safeMid}" onclick="runConsensus(true, '${mid || mName}')" class="btn-tile-run" style="flex: 1;" title="Run and refresh prediction specifically for ${mName}">
                                 ⚡ Run ${mName}
                             </button>
                             <button type="button" onclick="openRawModal('${safeMid}', ${idx})" class="btn-tile-raw" title="View full raw reasoning, chain-of-thought, generation speed stats, and JSON output from ${mName}">
@@ -1380,14 +1380,14 @@
                         <td>${weekMove}</td>
                         <td style="text-align: right; white-space: nowrap;">
                             ${isMissing ? `
-                                <button onclick="calculateSingleEps('${edStr}')" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.5rem; background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;" title="Auto-calculate EPS from quarterly reports">
+                                <button type="button" onclick="calculateSingleEps('${edStr}')" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.5rem; background: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;" title="Auto-calculate EPS from quarterly reports">
                                     ⚡ Calculate EPS
                                 </button>
-                                <button onclick="openEpsModal('${edStr}', ${e.eps_estimate ?? 'null'}, ${e.eps_reported ?? 'null'})" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.4rem; color: var(--text-secondary);" title="Enter custom EPS values">
+                                <button type="button" onclick="openEpsModal('${edStr}', ${e.eps_estimate ?? 'null'}, ${e.eps_reported ?? 'null'})" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.4rem; color: var(--text-secondary);" title="Enter custom EPS values">
                                     ✏️
                                 </button>
                             ` : `
-                                <button onclick="openEpsModal('${edStr}', ${e.eps_estimate ?? 'null'}, ${e.eps_reported ?? 'null'})" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.5rem; color: var(--text-tertiary);" title="View or edit EPS">
+                                <button type="button" onclick="openEpsModal('${edStr}', ${e.eps_estimate ?? 'null'}, ${e.eps_reported ?? 'null'})" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.5rem; color: var(--text-tertiary);" title="View or edit EPS">
                                     ✏️ Edit
                                 </button>
                             `}
@@ -1991,7 +1991,7 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span id="rawModalBadge" style="font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px;">BULLISH (85%)</span>
-                    <button onclick="closeRawModal()" style="background: none; border: none; color: var(--text-tertiary); font-size: 1.3rem; cursor: pointer; padding: 0.2rem 0.5rem;">✕</button>
+                    <button type="button" onclick="closeRawModal()" style="background: none; border: none; color: var(--text-tertiary); font-size: 1.3rem; cursor: pointer; padding: 0.2rem 0.5rem;">✕</button>
                 </div>
             </div>
 
@@ -2030,7 +2030,7 @@
                         <div style="font-size: 0.75rem; color: var(--text-tertiary);">Zero-quota offline inference · Choose active models & run individually or all in parallel</div>
                     </div>
                 </div>
-                <button onclick="closeLocalModelModal()" style="background: none; border: none; color: var(--text-tertiary); font-size: 1.3rem; cursor: pointer; padding: 0.2rem 0.5rem;">✕</button>
+                <button type="button" onclick="closeLocalModelModal()" style="background: none; border: none; color: var(--text-tertiary); font-size: 1.3rem; cursor: pointer; padding: 0.2rem 0.5rem;">✕</button>
             </div>
 
             <!-- Host configuration -->
@@ -2085,7 +2085,7 @@
                     <span>⚡</span>
                     <span>Calculate & Record EPS</span>
                 </div>
-                <button onclick="closeEpsModal()" style="background: none; border: none; color: var(--text-tertiary); font-size: 1.2rem; cursor: pointer;">✕</button>
+                <button type="button" onclick="closeEpsModal()" style="background: none; border: none; color: var(--text-tertiary); font-size: 1.2rem; cursor: pointer;">✕</button>
             </div>
 
             <form id="formEpsCalc" onsubmit="submitEpsModal(event)" style="display: flex; flex-direction: column; gap: 1rem;">

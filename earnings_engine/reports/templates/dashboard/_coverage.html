@@ -41,8 +41,8 @@
                     <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
                         {{ comps.market_dropdown('coverageMarket', 'ALL', 'app.loadDataCoverage();') }}
                         <input type="text" id="coverageSearch" placeholder="Filter ticker..." style="width: 140px; height: 30px; padding: 0 0.5rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; background: #000000; color: #ededed; font-size:0.75rem; font-family:var(--font-mono); outline:none;" oninput="app.renderCoverageTable()">
-                        <button onclick="app.loadDataCoverage()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Refresh</button>
-                        <button onclick="app.runIncrementalEarnings()" id="coverageFetchMissingBtn" data-master-only="true" class="btn btn-sm" title="Fetch earnings for missing tickers (Master only)">⚡ Fetch Missing</button>
+                        <button type="button" onclick="app.loadDataCoverage()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Refresh</button>
+                        <button type="button" onclick="app.runIncrementalEarnings()" id="coverageFetchMissingBtn" data-master-only="true" class="btn btn-sm" title="Fetch earnings for missing tickers (Master only)">⚡ Fetch Missing</button>
                     </div>
                 </div>
                 <div id="coverageSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;"></div>

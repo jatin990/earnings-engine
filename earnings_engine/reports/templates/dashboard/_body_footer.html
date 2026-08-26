@@ -1,7 +1,7 @@
     <!-- Stock Analysis, AI Prediction & Swing Intelligence Modal -->
     <div id="swingRangeModal" onclick="if(event.target === this) app.closeSwingRangeModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.82);backdrop-filter:blur(6px);z-index:2000;padding:1.5rem;overflow-y:auto;">
         <div class="card" style="max-width:1080px;width:95%;margin:3vh auto;position:relative;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:1rem;box-shadow:0 25px 60px rgba(0,0,0,0.7);padding:1.5rem;">
-            <button onclick="app.closeSwingRangeModal()" style="position:absolute;top:1.25rem;right:1.25rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:var(--light);width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;" title="Close">✕</button>
+            <button type="button" onclick="app.closeSwingRangeModal()" style="position:absolute;top:1.25rem;right:1.25rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:var(--light);width:32px;height:32px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;" title="Close">✕</button>
             <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
                 <h3 style="margin:0;font-size:1.3rem;font-weight:700;background:linear-gradient(to right, #ffffff, #60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">🎯 Stock Intelligence & Multi-Model Prediction</h3>
                 <span id="srModalSourceBadge" class="signal-badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;">Auto</span>
@@ -138,7 +138,7 @@
     <!-- ======================================================== -->
     <div id="stockRatingModal" onclick="if(event.target === this) app.closeStockRatingModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:2500;padding:1.5rem;overflow-y:auto;">
         <div class="card" style="max-width:960px;width:95%;margin:3vh auto;position:relative;background:#050508;border:1px solid rgba(255,255,255,0.14);border-radius:12px;box-shadow:0 30px 80px rgba(0,0,0,0.9);padding:1.5rem;">
-            <button onclick="app.closeStockRatingModal()" class="btn-icon" style="position:absolute;top:1.25rem;right:1.25rem;" title="Close">✕</button>
+            <button type="button" onclick="app.closeStockRatingModal()" class="btn-icon" style="position:absolute;top:1.25rem;right:1.25rem;" title="Close">✕</button>
             
             <!-- Modal Header -->
             <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem;">
@@ -223,7 +223,7 @@
     <!-- ======================================================== -->
     <div id="tickerAuditModal" onclick="if(event.target === this) app.closeTickerAuditModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:2600;padding:1.5rem;overflow-y:auto;">
         <div class="card" style="max-width:860px;width:95%;margin:5vh auto;position:relative;background:#050508;border:1px solid rgba(255,255,255,0.14);border-radius:12px;box-shadow:0 30px 80px rgba(0,0,0,0.9);padding:1.5rem;">
-            <button onclick="app.closeTickerAuditModal()" class="btn-icon" style="position:absolute;top:1.25rem;right:1.25rem;" title="Close">✕</button>
+            <button type="button" onclick="app.closeTickerAuditModal()" class="btn-icon" style="position:absolute;top:1.25rem;right:1.25rem;" title="Close">✕</button>
             
             <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
                 <h3 id="auditModalTitle" style="margin:0;font-size:1.25rem;font-family:var(--font-mono);color:#ffffff;">Audit Trail</h3>
@@ -242,7 +242,7 @@
     <!-- ======================================================== -->
     <div id="addToWatchlistModal" onclick="if(event.target === this) app.closeAddToWatchlistModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:2700;padding:1.5rem;overflow-y:auto;">
         <div class="card card-glow-blue" style="max-width:520px;width:95%;margin:8vh auto;position:relative;background:#060609;border:1px solid rgba(59,130,246,0.35);border-radius:14px;box-shadow:0 30px 80px rgba(0,0,0,0.9);padding:1.5rem;">
-            <button onclick="app.closeAddToWatchlistModal()" class="btn-icon" style="position:absolute;top:1.15rem;right:1.15rem;" title="Close">✕</button>
+            <button type="button" onclick="app.closeAddToWatchlistModal()" class="btn-icon" style="position:absolute;top:1.15rem;right:1.15rem;" title="Close">✕</button>
             
             <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem;">
                 <span style="font-size:1.4rem;">⭐</span>
@@ -290,7 +290,7 @@
     <!-- ======================================================== -->
     <div id="catalystConsensusModal" onclick="if(event.target === this) app.closeCatalystConsensusModal();" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);backdrop-filter:blur(8px);z-index:2800;padding:1.5rem;overflow-y:auto;">
         <div class="card card-glow-blue" style="max-width:960px;width:96%;margin:3vh auto;position:relative;background:#060609;border:1px solid rgba(59,130,246,0.35);border-radius:14px;box-shadow:0 30px 90px rgba(0,0,0,0.95);padding:1.5rem;">
-            <button onclick="app.closeCatalystConsensusModal()" class="btn-icon" style="position:absolute;top:1.15rem;right:1.15rem;" title="Close">✕</button>
+            <button type="button" onclick="app.closeCatalystConsensusModal()" class="btn-icon" style="position:absolute;top:1.15rem;right:1.15rem;" title="Close">✕</button>
             
             <!-- Modal Header & Hero Setup Bar -->
             <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:0.4rem;flex-wrap:wrap;">
@@ -430,7 +430,7 @@
                 </div>
                 <div style="display:flex;align-items:center;gap:0.5rem;">
                     <span id="dashRawModalBadge" class="signal-badge" style="font-size:0.72rem;font-weight:700;padding:0.2rem 0.5rem;">BULLISH (85%)</span>
-                    <button onclick="app.closeDashboardRawModal()" style="background:none;border:none;color:#94a3b8;font-size:1.3rem;cursor:pointer;padding:0.2rem 0.5rem;">✕</button>
+                    <button type="button" onclick="app.closeDashboardRawModal()" style="background:none;border:none;color:#94a3b8;font-size:1.3rem;cursor:pointer;padding:0.2rem 0.5rem;">✕</button>
                 </div>
             </div>
 
@@ -463,7 +463,7 @@
         <div style="background:#090d16;border:1px solid rgba(255,255,255,0.14);width:100%;max-width:920px;max-height:92vh;border-radius:14px;padding:1.4rem;box-shadow:0 30px 90px rgba(0,0,0,0.95);display:flex;flex-direction:column;gap:0.85rem;overflow-y:auto;position:relative;">
             
             <!-- Close Button -->
-            <button onclick="app.closeStockNote()" style="position:absolute;top:1.1rem;right:1.1rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#94a3b8;width:30px;height:30px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Close">✕</button>
+            <button type="button" onclick="app.closeStockNote()" style="position:absolute;top:1.1rem;right:1.1rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#94a3b8;width:30px;height:30px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Close">✕</button>
 
             <!-- Modal Dynamic Content Container -->
             <div id="stockIntelligenceNoteContent">

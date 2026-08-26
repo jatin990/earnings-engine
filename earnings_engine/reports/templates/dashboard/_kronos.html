@@ -44,17 +44,17 @@
                             <option value="">All / Global Watchlist</option>
                         </select>
                         <input type="text" id="kronosTickers" placeholder="Tickers (comma-separated)" style="min-width: 170px; height: 30px; padding:0 0.5rem; font-size:0.75rem; background:#000000; color:#ededed; border:1px solid rgba(255,255,255,0.15); border-radius:6px; font-family: var(--font-mono); outline:none;">
-                        <button id="kronosRunBtn" onclick="app.runKronos()" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Run Predictions</button>
-                        <button id="kronosRunAllBtn" onclick="app.runAllKronos()" class="btn btn-sm" style="background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:700;" title="Run Kronos neural predictions in batch for all stocks in the selected universe/watchlist">⚡ Run All (Batch)</button>
-                        <button onclick="app.refreshKronos()" class="btn btn-sm">🔄 Refresh Latest</button>
+                        <button type="button" id="kronosRunBtn" onclick="app.runKronos()" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Run Predictions</button>
+                        <button type="button" id="kronosRunAllBtn" onclick="app.runAllKronos()" class="btn btn-sm" style="background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:700;" title="Run Kronos neural predictions in batch for all stocks in the selected universe/watchlist">⚡ Run All (Batch)</button>
+                        <button type="button" onclick="app.refreshKronos()" class="btn btn-sm">🔄 Refresh Latest</button>
                     </div>
                 </div>
 
                 <!-- Kronos sub-tabs -->
                 <div style="display: flex; gap: 0.3rem; margin-top: 0.5rem; padding: 0.35rem 0.55rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem;">
-                    <button class="tab-btn tab-btn-sm active" onclick="app.switchKronosTab('latest')" id="kronosTabLatest" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">📈 Latest Charts</button>
-                    <button class="tab-btn tab-btn-sm" onclick="app.switchKronosTab('list')" id="kronosTabList" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">📋 Overview List</button>
-                    <button class="tab-btn tab-btn-sm" onclick="app.switchKronosTab('audit')" id="kronosTabAudit" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">📜 Audit History</button>
+                    <button type="button" class="tab-btn tab-btn-sm active" onclick="app.switchKronosTab('latest')" id="kronosTabLatest" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">📈 Latest Charts</button>
+                    <button type="button" class="tab-btn tab-btn-sm" onclick="app.switchKronosTab('list')" id="kronosTabList" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">📋 Overview List</button>
+                    <button type="button" class="tab-btn tab-btn-sm" onclick="app.switchKronosTab('audit')" id="kronosTabAudit" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">📜 Audit History</button>
                 </div>
             </section>
             <div id="kronosLatestView">
@@ -84,8 +84,8 @@
                                 <option value="FAILED">❌ Failed</option>
                                 <option value="PENDING">⏳ Pending / Flat</option>
                             </select>
-                            <button id="kronosListRunAllBtn" onclick="app.runAllKronos()" class="btn btn-sm" style="background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:700;padding:0.25rem 0.6rem;font-size:0.75rem;" title="Run Kronos batch predictions for all stocks in universe">⚡ Run All</button>
-                            <button onclick="app.loadKronosList()" class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.75rem;">🔄 Refresh</button>
+                            <button type="button" id="kronosListRunAllBtn" onclick="app.runAllKronos()" class="btn btn-sm" style="background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:700;padding:0.25rem 0.6rem;font-size:0.75rem;" title="Run Kronos batch predictions for all stocks in universe">⚡ Run All</button>
+                            <button type="button" onclick="app.loadKronosList()" class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.75rem;">🔄 Refresh</button>
                         </div>
                     </div>
                     <div class="table-wrapper">
@@ -165,7 +165,7 @@
                         <h3 style="margin: 0; font-size: 1rem;">📜 Prediction Audit Trail</h3>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
                             <input type="number" id="kronosAuditLimit" value="200" min="10" max="1000" style="width: 70px; padding: 0.4rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 0.4rem; background: rgba(255,255,255,0.05); color: var(--light);" title="Max audit rows">
-                            <button onclick="app.loadKronosAudit()" class="btn btn-primary btn-sm">Refresh</button>
+                            <button type="button" onclick="app.loadKronosAudit()" class="btn btn-primary btn-sm">Refresh</button>
                         </div>
                     </div>
                     <p class="timestamp" style="margin: 0;">"Worked?" = whether the realized price direction matched Kronos's forecast direction (Bullish ➔ Up, Bearish ➔ Down).</p>
@@ -195,7 +195,7 @@
         <!-- Kronos History Modal -->
         <div id="kronosHistoryModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:2000;padding:2rem;overflow-y:auto;">
             <div class="card" style="max-width:950px;margin:2rem auto;position:relative;">
-                <button onclick="document.getElementById('kronosHistoryModal').style.display='none'" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--light);font-size:1.5rem;cursor:pointer;">&times;</button>
+                <button type="button" onclick="document.getElementById('kronosHistoryModal').style.display='none'" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--light);font-size:1.5rem;cursor:pointer;">&times;</button>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.5rem;">
                     <h3 style="margin:0;">📊 Prediction History & Accuracy</h3>
                     <div id="kronosHistoryAccuracyBadge" class="signal-badge" style="font-size:0.8rem;background:rgba(59,130,246,0.2);color:#60a5fa;"></div>
@@ -208,7 +208,7 @@
         <!-- Kronos OHLCV Forecast Benchmark Modal -->
         <div id="kronosOhlcvModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:2100;padding:1.5rem;overflow-y:auto;">
             <div class="card" style="max-width:1050px;margin:1.5rem auto;position:relative;background:#0d1117;border:1px solid rgba(255,255,255,0.15);">
-                <button onclick="document.getElementById('kronosOhlcvModal').style.display='none'" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--light);font-size:1.5rem;cursor:pointer;">&times;</button>
+                <button type="button" onclick="document.getElementById('kronosOhlcvModal').style.display='none'" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--light);font-size:1.5rem;cursor:pointer;">&times;</button>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.5rem;">
                     <h3 style="margin:0;display:flex;align-items:center;gap:0.5rem;">
                         <span>📊 14-Day OHLCV Realized vs Forecast Benchmark</span>
@@ -218,7 +218,7 @@
                 <div id="kronosOhlcvControls" style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;flex-wrap:wrap;background:rgba(255,255,255,0.03);padding:0.5rem 0.75rem;border-radius:0.4rem;border:1px solid rgba(255,255,255,0.08);">
                     <label style="font-size:0.8rem;color:var(--muted);font-weight:600;">📅 Prediction Run:</label>
                     <select id="kronosOhlcvRunSelector" style="padding:0.35rem 0.6rem;font-size:0.8rem;background:#1e293b;color:var(--light);border:1px solid rgba(255,255,255,0.2);border-radius:0.3rem;min-width:280px;"></select>
-                    <button onclick="app.refreshOhlcvBenchmarkPrices()" id="kronosOhlcvFetchBtn" class="btn btn-sm" style="background:linear-gradient(135deg, #10b981, #059669);color:white;border:none;padding:0.35rem 0.75rem;border-radius:0.35rem;font-weight:600;display:flex;align-items:center;gap:0.3rem;" title="Fetch latest prices from providers and settle past forecast dates">
+                    <button type="button" onclick="app.refreshOhlcvBenchmarkPrices()" id="kronosOhlcvFetchBtn" class="btn btn-sm" style="background:linear-gradient(135deg, #10b981, #059669);color:white;border:none;padding:0.35rem 0.75rem;border-radius:0.35rem;font-weight:600;display:flex;align-items:center;gap:0.3rem;" title="Fetch latest prices from providers and settle past forecast dates">
                         🔄 Fetch Latest Prices & Settle
                     </button>
                 </div>
