@@ -194,10 +194,19 @@ def get_upcoming_results(
     None/"ALL" -> IN+US (load_all), "WATCHLIST" -> watchlist file, an
     "IN"/"US"/"NSE_ALL"/"NSE_LARGE_CAP" code, or a user-created universe name.
     """
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        days = 60
+    try:
+        past_days = int(past_days)
+    except (TypeError, ValueError):
+        past_days = 0
+
     settings = _settings()
     tickers = _resolve_tickers(market)
     logger.info(
-        "get_upcoming_results: market=%s, days=%d, past_days=%d, start_date=%s (resolved %d tickers)",
+        "get_upcoming_results: market=%s, days=%s, past_days=%s, start_date=%s (resolved %d tickers)",
         market,
         days,
         past_days,
@@ -290,6 +299,15 @@ def get_results_report_components(
     import earnings_engine.reports.render as _render_mod
     importlib.reload(_render_mod)
     build_upcoming_results_fragments = _render_mod.build_upcoming_results_fragments
+
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        days = 60
+    try:
+        past_days = int(past_days)
+    except (TypeError, ValueError):
+        past_days = 0
 
     settings = _settings()
     tickers = _resolve_tickers(market)
