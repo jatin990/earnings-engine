@@ -908,11 +908,23 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
                 f'title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral consensus for {ticker}">Consensus</button>'
                 f'</div>'
             )
+        # Result Sequence Badge (🌟 1st Result Debut, 🌱 2nd Result, 🌿 3rd Result)
+        seq_num = row.get("result_sequence_number")
+        is_debut = row.get("is_debut_result", False)
+        if seq_num == 1 or is_debut:
+            seq_badge_html = '<span class="signal-badge" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.3rem;" title="1st Post-IPO Debut Earnings Report">🌟 1st Result</span>'
+        elif seq_num == 2:
+            seq_badge_html = '<span class="signal-badge" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.3rem;" title="2nd Public Company Earnings Report">🌱 2nd Result</span>'
+        elif seq_num == 3:
+            seq_badge_html = '<span class="signal-badge" style="background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.3rem;" title="3rd Public Company Earnings Report">🌿 3rd Result</span>'
+        else:
+            seq_badge_html = ""
 
         row_values = {
             "ticker": ticker,
             "row_ticker_id": re.sub(r"[^a-zA-Z0-9]", "_", ticker),
             "company_name": company_name,
+            "result_sequence_badge_html": seq_badge_html,
             "earnings_date": earnings_date_display,
             "day_class": day_class,
             "market_cap": market_cap,

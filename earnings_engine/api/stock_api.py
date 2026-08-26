@@ -865,3 +865,38 @@ def get_stock_intelligence_note(
     }
 
 
+def get_recent_market_additions(
+    days: int = 180,
+    limit: int = 100,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve recent IPOs and market additions listed on the NSE."""
+    from earnings_engine.data.new_listings import get_recent_nse_additions
+    settings = settings or Settings()
+    items = get_recent_nse_additions(days=days, limit=limit, settings=settings)
+    return {
+        "success": True,
+        "count": len(items),
+        "lookback_days": days,
+        "items": items,
+    }
+
+
+def sync_recent_additions_to_watchlist(
+    ticker: str,
+    watchlist_name: str = "my_watchlist",
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """One-click addition of a newly listed stock to a watchlist."""
+    from earnings_engine.data.watchlists import add_to_watchlist
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    success = add_to_watchlist(watchlist_name, sym, settings=settings)
+    return {
+        "success": success,
+        "ticker": sym,
+        "watchlist": watchlist_name,
+        "message": f"Successfully added {sym} to {watchlist_name}" if success else f"Failed adding {sym} to {watchlist_name}",
+    }
+
+

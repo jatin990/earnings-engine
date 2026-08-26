@@ -841,6 +841,10 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             }
             metrics_to_store[ticker] = metrics_payload
 
+            # Calculate result sequence for new listing / debut earnings tracking
+            from earnings_engine.data.new_listings import compute_ticker_result_sequence
+            seq_info = compute_ticker_result_sequence(ticker, settings=settings)
+
             rows.append({
                 "ticker": ticker,
                 "company_name": company_name,
@@ -895,11 +899,13 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "last_week_high_price": last_week_high_price,
                 "last_week_low_price": last_week_low_price,
                 "next_resistance": next_resistance,
-                "current_support": current_support,
-                "swing_range": sr_map.get(ticker),
                 "eps_estimate": eps_estimate,
                 "eps_reported": eps_reported,
                 "surprise_pct": surprise_pct,
+                "result_sequence_number": seq_info["result_sequence_number"],
+                "result_sequence_label": seq_info["result_sequence_label"],
+                "result_sequence_badge": seq_info["result_sequence_badge"],
+                "is_debut_result": seq_info["is_debut"],
             })
 
         except Exception as e:

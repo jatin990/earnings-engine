@@ -91,6 +91,17 @@ def get_watchlist(name: str, settings: Settings | None = None) -> list[str]:
     return [r[0] for r in rows if r[0]]
 
 
+def get_all_watchlist_tickers(settings: Settings | None = None) -> list[str]:
+    """Return all unique tickers across all watchlists."""
+    settings = settings or Settings()
+    try:
+        with _connect(settings) as conn:
+            rows = conn.execute("SELECT DISTINCT ticker FROM watchlists").fetchall()
+            return [r[0] for r in rows if r[0]]
+    except Exception:
+        return []
+
+
 def add_to_watchlist(name: str, ticker: str, settings: Settings | None = None) -> dict[str, Any]:
     """Add a ticker to a named watchlist. Rejects duplicates."""
     settings = settings or Settings()

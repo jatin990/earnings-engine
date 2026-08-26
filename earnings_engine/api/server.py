@@ -847,6 +847,32 @@ async def get_upcoming_earnings(
         raise HTTPException(status_code=500, detail=f"Error fetching upcoming earnings: {str(e)}")
 
 
+@app.get("/api/v1/market/recent-additions", tags=["Market Data"])
+async def api_get_recent_market_additions(
+    days: int = Query(180, description="Lookback window in days for newly listed stocks", ge=1, le=730),
+    limit: int = Query(100, description="Max additions to return", ge=1, le=500),
+):
+    """Retrieve recent IPOs and market additions listed on the NSE."""
+    try:
+        from earnings_engine.api.stock_api import get_recent_market_additions
+        return get_recent_market_additions(days=days, limit=limit, settings=_settings)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching recent market additions: {e}")
+
+
+@app.post("/api/v1/market/recent-additions/sync-watchlist", tags=["Market Data"])
+async def api_sync_recent_addition_to_watchlist(
+    ticker: str = Query(..., description="Stock ticker symbol (e.g. SHIPROCKET.NS)"),
+    watchlist: str = Query("my_watchlist", description="Target watchlist name"),
+):
+    """One-click addition of a newly listed stock to a watchlist."""
+    try:
+        from earnings_engine.api.stock_api import sync_recent_additions_to_watchlist
+        return sync_recent_additions_to_watchlist(ticker=ticker, watchlist_name=watchlist, settings=_settings)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error adding ticker to watchlist: {e}")
+
+
 @app.get("/api/v1/universe/files", tags=["Universe"])
 async def get_universe_files(response: Response):
     """Get list of available universes from SQLite."""

@@ -1610,6 +1610,14 @@
                         this.loadQuarterRepeaters();
                     }
                 }
+                if (name === 'new-additions') {
+                    if (!this._newAdditionsLoaded) {
+                        this._newAdditionsLoaded = true;
+                        if (typeof this.loadRecentAdditions === 'function') {
+                            this.loadRecentAdditions();
+                        }
+                    }
+                }
                 this.applyRoleRestrictions();
             },
 
