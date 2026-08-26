@@ -855,11 +855,249 @@
                     <span>Day Range:</span>
                     <strong id="valDayRange">₹— – ₹—</strong>
                 </div>
+                <div class="meta-stat">
+                    <span>Listing Date:</span>
+                    <strong id="valListingDate" style="color: #67e8f9;">—</strong>
+                </div>
             </div>
         </section>
 
-        <!-- TRADE SETUP & STRATEGIC VERDICT CARD -->
-        <section class="card" style="border: 1px solid rgba(99, 102, 241, 0.25); background: linear-gradient(180deg, #0e111a 0%, #08090f 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
+        <!-- ━━━ INSTANT STATS BAR: Returns · Composite Scores ━━━ -->
+        <div id="instantStatsBar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.65rem;padding:0.85rem 1.1rem;background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">
+            <div style="text-align:center;">
+                <div style="font-size:0.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">3D Ret</div>
+                <div id="iRet3d" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);">—</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:0.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">7D Ret</div>
+                <div id="iRet7d" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);">—</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:0.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">30D Ret</div>
+                <div id="iRet30d" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);">—</div>
+            </div>
+            <div style="text-align:center;border-left:1px solid rgba(255,255,255,0.07);padding-left:0.65rem;">
+                <div style="font-size:0.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Fundamental</div>
+                <div id="iFundGrade" style="font-size:0.85rem;font-weight:800;">—</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:0.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Technical</div>
+                <div id="iTechGrade" style="font-size:0.85rem;font-weight:800;">—</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:0.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Composite</div>
+                <div id="iComposite" style="font-size:0.85rem;font-weight:800;">—</div>
+            </div>
+            <div style="text-align:center;border-left:1px solid rgba(255,255,255,0.07);padding-left:0.65rem;">
+                <div style="font-size:0.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Inst Score</div>
+                <div id="iInstScore" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);">—</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:0.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Inst Stake</div>
+                <div id="iInstStake" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);">—%</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:0.65rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Vol Surge</div>
+                <div id="iVolSurge" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);">—x</div>
+            </div>
+        </div>
+
+        <!-- ⚖️ STANDARDIZED 6-PILLAR FACTOR EVALUATION MATRIX -->
+        <section class="card" id="cardFactorEvaluation" style="border: 1px solid rgba(56, 189, 248, 0.25); background: linear-gradient(180deg, #0b111e 0%, #070a12 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
+            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #ffffff;">
+                    <span style="color: #38bdf8;">⚖️</span>
+                    <span>Standardized Multi-Factor Evaluation Matrix</span>
+                    <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 500; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.12rem 0.45rem; border-radius: 4px;">6 Pillars · 100% Weight Model</span>
+                </div>
+                <div id="factorCompositePill" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.76rem; font-weight: 800; padding: 0.28rem 0.85rem; border-radius: var(--radius-sm); font-family: var(--font-mono); background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
+                    COMPOSITE: -- / 100
+                </div>
+            </div>
+
+            <!-- 6 Pillars Grid -->
+            <div id="factorPillarsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.9rem;">
+                <div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 1rem;">Evaluating multi-factor pillars...</div>
+            </div>
+        </section>
+
+        <!-- 🏦 SECTION 2: INSTITUTIONAL ACCUMULATION & SMART MONEY -->
+        <section class="card" id="cardInstitutional" style="border:1px solid rgba(99,102,241,0.25);background:linear-gradient(180deg,#0c0e1a 0%,#07090f 100%);border-radius:var(--radius-lg);padding:1.35rem;box-shadow:0 10px 30px -10px rgba(0,0,0,0.5);">
+            <div class="card-header" style="border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0.85rem;margin-bottom:1.1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                <div class="card-title" style="display:flex;align-items:center;gap:0.5rem;font-size:1.05rem;font-weight:800;color:#fff;">
+                    <span style="color:#818cf8;">🏦</span>
+                    <span>Institutional Accumulation &amp; Smart Money</span>
+                </div>
+                <div id="instVerdictPill" style="font-size:0.73rem;font-weight:800;padding:0.25rem 0.8rem;border-radius:var(--radius-sm);font-family:var(--font-mono);background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">Loading...</div>
+            </div>
+
+            <!-- KPI Row -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.65rem;margin-bottom:1.1rem;">
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;text-align:center;">
+                    <div style="font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Accum Score</div>
+                    <div id="instScore" style="font-size:1.3rem;font-weight:800;font-family:var(--font-mono);color:#818cf8;">—</div>
+                    <div style="font-size:0.65rem;color:#64748b;">/100</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;text-align:center;">
+                    <div style="font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Gross Inflow</div>
+                    <div id="instInflow" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);color:#34d399;">—</div>
+                    <div style="font-size:0.65rem;color:#64748b;">₹ Cr</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;text-align:center;">
+                    <div style="font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Gross Outflow</div>
+                    <div id="instOutflow" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);color:#f87171;">—</div>
+                    <div style="font-size:0.65rem;color:#64748b;">₹ Cr</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;text-align:center;">
+                    <div style="font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Net Flow</div>
+                    <div id="instNetFlow" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);color:#38bdf8;">—</div>
+                    <div style="font-size:0.65rem;color:#64748b;">₹ Cr</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;text-align:center;">
+                    <div style="font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Total Inst Stake</div>
+                    <div id="instTotalStake" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);color:#fbbf24;">—%</div>
+                    <div style="font-size:0.65rem;color:#64748b;">FII + DII</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;text-align:center;">
+                    <div style="font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Funds In / Out</div>
+                    <div id="instFundsCount" style="font-size:1rem;font-weight:800;font-family:var(--font-mono);">—</div>
+                    <div style="font-size:0.65rem;color:#64748b;">Acc / Sell</div>
+                </div>
+            </div>
+
+            <!-- Shareholding Pattern Table -->
+            <div style="margin-bottom:1rem;">
+                <div style="font-size:0.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.5rem;">📊 4-Quarter Shareholding Pattern</div>
+                <div style="overflow-x:auto;">
+                    <table class="clean-table" id="tblShareholding">
+                        <thead>
+                            <tr>
+                                <th>Quarter</th>
+                                <th>Promoter %</th>
+                                <th>FII %</th>
+                                <th>DII/MF %</th>
+                                <th>Public %</th>
+                                <th>Other %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tblShareholdingBody">
+                            <tr><td colspan="6" style="text-align:center;color:var(--text-tertiary);">Loading shareholding data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Block Deals & Top Holdings -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;">
+                <div>
+                    <div style="font-size:0.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.5rem;">🔄 Recent Block Deals</div>
+                    <div id="listBlockDeals" style="display:flex;flex-direction:column;gap:0.3rem;">
+                        <div style="color:var(--text-tertiary);font-size:0.8rem;">No recent block deals</div>
+                    </div>
+                </div>
+                <div>
+                    <div style="font-size:0.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:0.5rem;">🏆 Top Institutional Holdings</div>
+                    <div id="listTopHoldings" style="display:flex;flex-direction:column;gap:0.3rem;">
+                        <div style="color:var(--text-tertiary);font-size:0.8rem;">Loading fund holdings...</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 📈 SECTION 3: TECHNICAL & SWING STRUCTURE -->
+        <section class="card" id="cardTechnical" style="border:1px solid rgba(16,185,129,0.2);background:linear-gradient(180deg,#080e10 0%,#060809 100%);border-radius:var(--radius-lg);padding:1.35rem;">
+            <div class="card-header" style="border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0.85rem;margin-bottom:1.1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                <div class="card-title" style="display:flex;align-items:center;gap:0.5rem;font-size:1.05rem;font-weight:800;color:#fff;">
+                    <span style="color:#34d399;">📈</span>
+                    <span>Technical &amp; Swing Structure</span>
+                </div>
+                <div id="techBreakoutPill" style="font-size:0.73rem;font-weight:800;padding:0.25rem 0.8rem;border-radius:var(--radius-sm);background:rgba(255,255,255,0.05);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);">Loading...</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.65rem;">
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;">
+                    <div style="font-size:0.62rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:0.3rem;">20D Swing Range</div>
+                    <div id="techSwing20" style="font-family:var(--font-mono);font-size:0.88rem;color:#e2e8f0;">—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;">
+                    <div style="font-size:0.62rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:0.3rem;">3M Swing Range</div>
+                    <div id="techSwing3m" style="font-family:var(--font-mono);font-size:0.88rem;color:#e2e8f0;">—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;">
+                    <div style="font-size:0.62rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:0.3rem;">Cycles</div>
+                    <div id="techCycles" style="font-family:var(--font-mono);font-size:0.88rem;color:#e2e8f0;">— (avg — days)</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;">
+                    <div style="font-size:0.62rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:0.3rem;">Vol Surge 5d/20d</div>
+                    <div id="techVolSurge" style="font-family:var(--font-mono);font-size:0.88rem;color:#e2e8f0;">—x</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;">
+                    <div style="font-size:0.62rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:0.3rem;">20-DMA</div>
+                    <div id="techDma20" style="font-family:var(--font-mono);font-size:0.88rem;color:#e2e8f0;">₹—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;">
+                    <div style="font-size:0.62rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:0.3rem;">50-DMA</div>
+                    <div id="techDma50" style="font-family:var(--font-mono);font-size:0.88rem;color:#e2e8f0;">₹—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;">
+                    <div style="font-size:0.62rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:0.3rem;">200-DMA</div>
+                    <div id="techDma200" style="font-family:var(--font-mono);font-size:0.88rem;color:#e2e8f0;">₹—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;">
+                    <div style="font-size:0.62rem;color:#64748b;text-transform:uppercase;margin-bottom:0.3rem;">Structure &amp; Alignment</div>
+                    <div id="techDmaAlignment" style="font-size:0.82rem;font-weight:700;color:#94a3b8;">—</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TWO COLUMN LAYOUT: EARNINGS TRACK RECORD & SHORT-TERM CATALYSTS -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 1.75rem;">
+            
+            <!-- Earnings History -->
+            <section class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="card-title">📅 Quarterly Earnings Track Record</div>
+                    <button type="button" id="btnCalcAllEps" onclick="calculateEpsAll()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;" title="Recalculate and fill missing EPS for past earnings">
+                        ⚡ Calculate Missing EPS
+                    </button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="clean-table">
+                        <thead>
+                            <tr>
+                                <th>Quarter / Date</th>
+                                <th>EPS Est / Act</th>
+                                <th>Surprise %</th>
+                                <th>Result Week Move</th>
+                                <th style="text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tblEarningsBody">
+                            <tr><td colspan="5" style="text-align: center; color: var(--text-tertiary);">Loading past earnings signals...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- News Catalysts with Fetch Delta button -->
+            <section class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div class="card-title">🔥 Short-Term News Catalysts</div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 0.75rem; color: var(--text-tertiary);" id="lblCatalystCount">0 headlines</span>
+                        <button type="button" id="btnFetchNewsDelta" onclick="fetchNewsDelta()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.22rem 0.6rem; border-color: rgba(56, 189, 248, 0.35); color: #38bdf8; font-weight: 600;" title="Fetch latest news delta and fresh headlines">
+                            ⚡ Fetch News Delta
+                        </button>
+                    </div>
+                </div>
+                <div id="listCatalysts" style="display: flex; flex-direction: column; max-height: 420px; overflow-y: auto;">
+                    <div style="text-align: center; color: var(--text-tertiary); padding: 2rem;">Loading news headlines...</div>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ━━━ BOTTOM: AI CONSENSUS TRADE SETUP & STRATEGIC VERDICT (CONDITIONAL) ━━━ -->
+        <section class="card" id="cardTradeSetup" style="display: none; border: 1px solid rgba(99, 102, 241, 0.25); background: linear-gradient(180deg, #0e111a 0%, #08090f 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
             <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                 <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #ffffff;">
                     <span style="color: #6366f1;">⚡</span>
@@ -918,27 +1156,8 @@
             </div>
         </section>
 
-        <!-- ⚖️ STANDARDIZED 6-PILLAR FACTOR EVALUATION MATRIX -->
-        <section class="card" id="cardFactorEvaluation" style="border: 1px solid rgba(56, 189, 248, 0.25); background: linear-gradient(180deg, #0b111e 0%, #070a12 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
-            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-                <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #ffffff;">
-                    <span style="color: #38bdf8;">⚖️</span>
-                    <span>Standardized Multi-Factor Evaluation Matrix</span>
-                    <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 500; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.12rem 0.45rem; border-radius: 4px;">6 Pillars · 100% Weight Model</span>
-                </div>
-                <div id="factorCompositePill" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.76rem; font-weight: 800; padding: 0.28rem 0.85rem; border-radius: var(--radius-sm); font-family: var(--font-mono); background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
-                    COMPOSITE: -- / 100
-                </div>
-            </div>
-
-            <!-- 6 Pillars Grid -->
-            <div id="factorPillarsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.9rem;">
-                <div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 1rem;">Evaluating multi-factor pillars...</div>
-            </div>
-        </section>
-
-        <!-- 4-MODEL AI MATRIX -->
-        <section class="card">
+        <!-- 4-MODEL AI MATRIX (BOTTOM) -->
+        <section class="card" id="cardAIModelsMatrix">
             <div class="card-header">
                 <div class="card-title">🤖 4-Model AI Engine Breakdown</div>
                 <span style="font-size: 0.75rem; color: var(--text-tertiary);">DeepSeek-R1 · Llama-3.3-70B · Qwen-2.5-72B · Mistral-Large</span>
@@ -947,48 +1166,6 @@
                 <div style="grid-column: 1/-1; text-align: center; color: var(--text-tertiary); padding: 2rem;">Loading model outputs...</div>
             </div>
         </section>
-
-        <!-- TWO COLUMN LAYOUT: EARNINGS TRACK RECORD & SHORT-TERM CATALYSTS -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 1.75rem;">
-            
-            <!-- Earnings History -->
-            <section class="card">
-                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <div class="card-title">📅 Quarterly Earnings Track Record</div>
-                    <button type="button" id="btnCalcAllEps" onclick="calculateEpsAll()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;" title="Recalculate and fill missing EPS for past earnings">
-                        ⚡ Calculate Missing EPS
-                    </button>
-                </div>
-                <div style="overflow-x: auto;">
-                    <table class="clean-table">
-                        <thead>
-                            <tr>
-                                <th>Quarter / Date</th>
-                                <th>EPS Est / Act</th>
-                                <th>Surprise %</th>
-                                <th>Result Week Move</th>
-                                <th style="text-align: right;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tblEarningsBody">
-                            <tr><td colspan="5" style="text-align: center; color: var(--text-tertiary);">Loading past earnings signals...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <!-- News Catalysts -->
-            <section class="card">
-                <div class="card-header">
-                    <div class="card-title">🔥 Short-Term News Catalysts</div>
-                    <span style="font-size: 0.75rem; color: var(--text-tertiary);" id="lblCatalystCount">0 headlines</span>
-                </div>
-                <div id="listCatalysts" style="display: flex; flex-direction: column; max-height: 420px; overflow-y: auto;">
-                    <div style="text-align: center; color: var(--text-tertiary); padding: 2rem;">Loading news headlines...</div>
-                </div>
-            </section>
-
-        </div>
 
     </main>
 
@@ -1069,12 +1246,22 @@
                     asOfEl.style.display = 'inline-block';
                 }
             }
-
             document.getElementById('lblPrevClose').textContent = `Prev Close: ${currSym}${q.previous_close || '—'}`;
             document.getElementById('val52Low').textContent = `${currSym}${q.week_52_low || '—'}`;
             document.getElementById('val52High').textContent = `${currSym}${q.week_52_high || '—'}`;
             document.getElementById('valMarketCap').textContent = p.market_cap ? `${currSym}${(p.market_cap / 10000000).toLocaleString(undefined, {maximumFractionDigits: 0})} Cr` : '—';
             document.getElementById('valDayRange').textContent = (q.day_low && q.day_high) ? `${currSym}${q.day_low} – ${currSym}${q.day_high}` : '—';
+
+            // Listing date and discovery tag
+            const listEl = document.getElementById('valListingDate');
+            if (listEl) {
+                if (p.listing_date) {
+                    listEl.textContent = p.is_new_listing ? `${p.listing_date} (${p.trading_days_count || '?'}D New Listing)` : p.listing_date;
+                    listEl.style.color = p.is_new_listing ? '#38bdf8' : '#e2e8f0';
+                } else {
+                    listEl.textContent = '—';
+                }
+            }
 
             if (q.week_52_low && q.week_52_high && curr) {
                 const ratio = Math.max(0, Math.min(100, ((curr - q.week_52_low) / (q.week_52_high - q.week_52_low)) * 100));
@@ -1083,16 +1270,18 @@
 
             // Watchlist button
             const btnW = document.getElementById('btnWatchlist');
-            if (data.is_in_watchlist) {
-                btnW.innerHTML = '⭐ In Watchlist';
-                btnW.style.background = 'rgba(245, 158, 11, 0.15)';
-                btnW.style.borderColor = 'rgba(245, 158, 11, 0.35)';
-                btnW.style.color = '#fbbf24';
-            } else {
-                btnW.innerHTML = '☆ Add to Watchlist';
-                btnW.style.background = 'rgba(255, 255, 255, 0.05)';
-                btnW.style.borderColor = 'var(--border)';
-                btnW.style.color = 'var(--text-secondary)';
+            if (btnW) {
+                if (data.is_in_watchlist) {
+                    btnW.innerHTML = '⭐ In Watchlist';
+                    btnW.style.background = 'rgba(245, 158, 11, 0.15)';
+                    btnW.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+                    btnW.style.color = '#fbbf24';
+                } else {
+                    btnW.innerHTML = '☆ Add to Watchlist';
+                    btnW.style.background = 'rgba(255, 255, 255, 0.05)';
+                    btnW.style.borderColor = 'var(--border)';
+                    btnW.style.color = 'var(--text-secondary)';
+                }
             }
 
             // Render Consensus Setup
@@ -1101,6 +1290,15 @@
             // Render 6-Pillar Standardized Factor Evaluation
             renderFactorEvaluation(data.factor_evaluation);
 
+            // Render Instant Stats Bar
+            renderInstantStats(t, data.institutional, data.factor_evaluation, curr, p, q);
+
+            // Render Institutional Accumulation Section
+            renderInstitutional(data.institutional);
+
+            // Render Technical & Swing Structure Section
+            renderTechnicalSection(t, curr, p, q);
+
             // Render Earnings History
             renderEarnings(data.earnings_history || []);
 
@@ -1108,114 +1306,284 @@
             renderCatalysts(data.catalysts || []);
         }
 
-        function renderFactorEvaluation(fe) {
-            const card = document.getElementById('cardFactorEvaluation');
-            const pill = document.getElementById('factorCompositePill');
-            const grid = document.getElementById('factorPillarsGrid');
-            if (!grid) return;
+        function renderInstantStats(t, inst, fe, curr, p, q) {
+            const fmt = (v, suffix='%') => v != null ? `${v >= 0 ? '+' : ''}${Number(v).toFixed(1)}${suffix}` : '—';
+            const col = (v) => v == null ? '#94a3b8' : (v >= 0 ? '#34d399' : '#f87171');
 
-            if (!fe || !fe.pillars) {
+            const r3 = document.getElementById('iRet3d');
+            const r7 = document.getElementById('iRet7d');
+            const r30 = document.getElementById('iRet30d');
+            if (r3) { r3.textContent = fmt(t.momentum_3d); r3.style.color = col(t.momentum_3d); }
+            if (r7) {
+                if (t.momentum_7d != null) {
+                    r7.textContent = fmt(t.momentum_7d); r7.style.color = col(t.momentum_7d);
+                } else if (p && p.is_new_listing && t.momentum_since_listing != null) {
+                    r7.textContent = `${fmt(t.momentum_since_listing)} (${p.trading_days_count}D)`; r7.style.color = col(t.momentum_since_listing);
+                } else {
+                    r7.textContent = '—'; r7.style.color = '#94a3b8';
+                }
+            }
+            if (r30) {
+                if (t.momentum_30d != null) {
+                    r30.textContent = fmt(t.momentum_30d); r30.style.color = col(t.momentum_30d);
+                } else if (p && p.is_new_listing && t.momentum_since_listing != null) {
+                    r30.textContent = `${fmt(t.momentum_since_listing)} (${p.trading_days_count}D)`; r30.style.color = col(t.momentum_since_listing);
+                } else {
+                    r30.textContent = '—'; r30.style.color = '#94a3b8';
+                }
+            }
+
+            // Factor evaluation grades
+            if (fe && fe.pillars) {
+                const pillars = fe.pillars;
+                const fundPillar = pillars.valuation_fundamentals || Object.values(pillars).find(pi => pi.name && (pi.name.toLowerCase().includes('fundamental') || pi.name.toLowerCase().includes('valuation')));
+                const techPillar = pillars.technical_momentum || Object.values(pillars).find(pi => pi.name && (pi.name.toLowerCase().includes('technical') || pi.name.toLowerCase().includes('momentum')));
+                const compScore = fe.composite_score || 0;
+                const gradeColor = (s) => s >= 70 ? '#34d399' : (s >= 45 ? '#fbbf24' : '#f87171');
+
+                const iFund = document.getElementById('iFundGrade');
+                const iTech = document.getElementById('iTechGrade');
+                const iComp = document.getElementById('iComposite');
+                if (iFund) {
+                    if (fundPillar) {
+                        iFund.textContent = fundPillar.badge ? fundPillar.badge : `${fundPillar.score.toFixed(0)}/100`;
+                        iFund.style.color = gradeColor(fundPillar.score);
+                    } else {
+                        iFund.textContent = '—';
+                    }
+                }
+                if (iTech) {
+                    if (techPillar) {
+                        iTech.textContent = techPillar.badge ? techPillar.badge : `${techPillar.score.toFixed(0)}/100`;
+                        iTech.style.color = gradeColor(techPillar.score);
+                    } else {
+                        iTech.textContent = '—';
+                    }
+                }
+                if (iComp) {
+                    iComp.textContent = `${compScore.toFixed(0)}/100`;
+                    iComp.style.color = gradeColor(compScore);
+                }
+            }
+
+            // Institutional stats
+            const iInstScore = document.getElementById('iInstScore');
+            const iInstStake = document.getElementById('iInstStake');
+            const iVolSurge = document.getElementById('iVolSurge');
+            if (inst && inst.accumulation_score != null) {
+                if (iInstScore) { iInstScore.textContent = inst.accumulation_score.toFixed(0); iInstScore.style.color = inst.accumulation_score >= 60 ? '#34d399' : (inst.accumulation_score >= 42 ? '#fbbf24' : '#f87171'); }
+                if (iInstStake) { iInstStake.textContent = `${inst.total_institutional_stake_pct != null ? inst.total_institutional_stake_pct.toFixed(1) : '—'}%`; }
+            } else {
+                if (iInstScore) iInstScore.textContent = '—';
+                if (iInstStake) iInstStake.textContent = '—%';
+            }
+
+            if (iVolSurge) {
+                if (t.volume_ratio_5d_20d != null) {
+                    const vr = t.volume_ratio_5d_20d;
+                    iVolSurge.textContent = `${vr.toFixed(2)}x`;
+                    iVolSurge.style.color = vr >= 1.5 ? '#fbbf24' : (vr >= 1.0 ? '#34d399' : '#94a3b8');
+                } else {
+                    iVolSurge.textContent = '—x';
+                    iVolSurge.style.color = '#94a3b8';
+                }
+            }
+        }
+
+        function renderInstitutional(inst) {
+            const card = document.getElementById('cardInstitutional');
+            if (!inst || !inst.accumulation_score) {
                 if (card) card.style.display = 'none';
                 return;
             }
             if (card) card.style.display = 'block';
 
-            const comp = fe.composite_score || 50;
-            const isBull = fe.verdict_badge === 'emerald';
-            const isWarn = fe.verdict_badge === 'amber';
-            const badgeBg = isBull ? 'rgba(16,185,129,0.15)' : (isWarn ? 'rgba(245,158,11,0.15)' : 'rgba(244,63,94,0.15)');
-            const badgeColor = isBull ? '#34d399' : (isWarn ? '#fbbf24' : '#f87171');
-            const badgeBorder = isBull ? 'rgba(16,185,129,0.3)' : (isWarn ? 'rgba(245,158,11,0.3)' : 'rgba(244,63,94,0.3)');
+            const score = inst.accumulation_score || 50;
+            const isBull = inst.verdict_badge === 'emerald' || inst.verdict_badge === 'green';
+            const isWarn = inst.verdict_badge === 'amber';
+            const vpBg = isBull ? 'rgba(16,185,129,0.15)' : (isWarn ? 'rgba(245,158,11,0.15)' : 'rgba(244,63,94,0.15)');
+            const vpCol = isBull ? '#34d399' : (isWarn ? '#fbbf24' : '#f87171');
+            const vpBrd = isBull ? 'rgba(16,185,129,0.3)' : (isWarn ? 'rgba(245,158,11,0.3)' : 'rgba(244,63,94,0.3)');
 
+            const pill = document.getElementById('instVerdictPill');
             if (pill) {
-                pill.innerHTML = `<span>${fe.verdict_icon || '⚖️'}</span> <strong>${fe.verdict || 'EVALUATED'} (${comp}/100)</strong>`;
-                pill.style.background = badgeBg;
-                pill.style.color = badgeColor;
-                pill.style.borderColor = badgeBorder;
+                pill.textContent = `${inst.verdict || 'NEUTRAL FLOWS'} (${score.toFixed(0)}/100)`;
+                pill.style.background = vpBg;
+                pill.style.color = vpCol;
+                pill.style.borderColor = vpBrd;
             }
 
-            const pillars = Object.values(fe.pillars || {});
-            grid.innerHTML = pillars.map(p => {
-                const sc = p.score || 50;
-                const barCol = sc >= 70 ? '#34d399' : (sc >= 45 ? '#38bdf8' : '#f87171');
-                return `
-                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.45rem;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <span style="font-size:0.75rem;font-weight:700;color:#f8fafc;">${p.name}</span>
-                            <span style="font-size:0.65rem;font-family:var(--font-mono);background:rgba(255,255,255,0.06);color:#94a3b8;padding:0.1rem 0.35rem;border-radius:4px;">${p.weight_pct}% Wgt</span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:0.15rem;">
-                            <div style="font-family:var(--font-mono);font-size:1.15rem;font-weight:800;color:${barCol};">${sc.toFixed(0)} <span style="font-size:0.7rem;color:#64748b;font-weight:500;">/ 100</span></div>
-                            <span style="font-size:0.7rem;font-weight:700;color:#e2e8f0;background:rgba(255,255,255,0.05);padding:0.15rem 0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);">${p.badge}</span>
-                        </div>
-                        <div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;margin:0.2rem 0;">
-                            <div style="height:100%;width:${Math.max(5, Math.min(100, sc))}%;background:${barCol};border-radius:2px;"></div>
-                        </div>
-                        <div style="font-size:0.7rem;color:#94a3b8;line-height:1.35;">${p.detail}</div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function renderConsensus(c, curr) {
-            const vPill = document.getElementById('verdictPill');
-            const wEl = document.getElementById('kpiWorth');
-            const eEl = document.getElementById('kpiEntry');
-            const tgEl = document.getElementById('kpiTarget');
-            const tgSub = document.getElementById('kpiTargetSub');
-            const slEl = document.getElementById('kpiSL');
-            const slSub = document.getElementById('kpiSLSub');
-            const rrEl = document.getElementById('kpiRR');
-            const stEl = document.getElementById('kpiStrength');
-            const thEl = document.getElementById('txtThesis');
-            const cAsOfEl = document.getElementById('lblConsensusAsOf');
-
-            const dir = (c && (c.consensus_direction || c.direction || '')).toUpperCase();
-
-            if (!c || !dir) {
-                if (cAsOfEl) cAsOfEl.style.display = 'none';
-                vPill.textContent = 'NO RECENT PREDICTION';
-                vPill.style.background = 'rgba(255, 255, 255, 0.05)';
-                vPill.style.borderColor = 'var(--border)';
-                vPill.style.color = 'var(--text-tertiary)';
-                wEl.textContent = 'Click "Run AI Consensus"';
-                thEl.textContent = 'No multi-model consensus prediction has been computed yet. Click the "🧠 Run AI Consensus" button above to evaluate DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large.';
-                renderModelsMatrix([]);
-                return;
+            const el = (id) => document.getElementById(id);
+            if (el('instScore')) el('instScore').textContent = score.toFixed(0);
+            if (el('instInflow')) el('instInflow').textContent = (inst.gross_inflow_cr || 0).toLocaleString();
+            if (el('instOutflow')) el('instOutflow').textContent = (inst.gross_outflow_cr || 0).toLocaleString();
+            if (el('instNetFlow')) {
+                const net = inst.net_flow_cr || 0;
+                el('instNetFlow').textContent = `${net >= 0 ? '+' : ''}${net.toLocaleString()}`;
+                el('instNetFlow').style.color = net >= 0 ? '#34d399' : '#f87171';
             }
+            if (el('instTotalStake')) el('instTotalStake').textContent = inst.total_institutional_stake_pct != null ? `${inst.total_institutional_stake_pct.toFixed(1)}%` : '—%';
+            if (el('instFundsCount')) el('instFundsCount').textContent = `${inst.funds_accumulating_count || 0} / ${inst.funds_selling_count || 0}`;
 
-            // Render consensus prediction as-of timestamp
-            const predDate = c.event_date || c.asof_date || c.created_at || c.run_at;
-            if (cAsOfEl) {
-                if (predDate) {
-                    const formattedPred = (typeof predDate === 'string' && predDate.includes('T')) 
-                        ? new Date(predDate).toLocaleString() 
-                        : predDate;
-                    cAsOfEl.textContent = `🕒 Evaluated: ${formattedPred}`;
-                    cAsOfEl.style.display = 'inline-block';
+            // Shareholding pattern
+            const tbody = document.getElementById('tblShareholdingBody');
+            const patterns = inst.shareholding_patterns || [];
+            if (tbody) {
+                if (!patterns.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-tertiary);">No historical shareholding patterns</td></tr>';
                 } else {
-                    cAsOfEl.style.display = 'none';
+                    tbody.innerHTML = patterns.map(p => `<tr>
+                        <td><strong>${p.quarter || '—'}</strong></td>
+                        <td>${p.promoter_pct != null ? p.promoter_pct.toFixed(1) + '%' : '—'}</td>
+                        <td>${p.fii_pct != null ? p.fii_pct.toFixed(1) + '%' : '—'}</td>
+                        <td>${p.dii_pct != null ? p.dii_pct.toFixed(1) + '%' : '—'}</td>
+                        <td>${p.public_pct != null ? p.public_pct.toFixed(1) + '%' : '—'}</td>
+                        <td>${p.other_pct != null ? p.other_pct.toFixed(1) + '%' : '—'}</td>
+                    </tr>`).join('');
                 }
             }
 
-            const isBull = dir === 'BULLISH';
-            const str = Number(c.consensus_strength != null ? c.consensus_strength : (c.strength_pct || 80));
-            vPill.textContent = `${dir} (${str.toFixed(0)}%)`;
-            vPill.style.background = isBull ? 'var(--emerald-subtle)' : 'var(--rose-subtle)';
-            vPill.style.borderColor = isBull ? 'var(--emerald-border)' : 'var(--rose-border)';
-            vPill.style.color = isBull ? 'var(--emerald)' : 'var(--rose)';
+            // Block deals
+            const dealsEl = document.getElementById('listBlockDeals');
+            const deals = inst.block_deals || [];
+            if (dealsEl) {
+                if (!deals.length) {
+                    dealsEl.innerHTML = '<div style="color:var(--text-tertiary);font-size:0.8rem;">No recent block deals recorded</div>';
+                } else {
+                    dealsEl.innerHTML = deals.map(d => {
+                        const isBuy = (d.deal_type || '').toUpperCase() === 'BUY';
+                        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.35rem 0.6rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:6px;">
+                            <div>
+                                <span style="font-size:0.7rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:3px;background:${isBuy ? 'rgba(16,185,129,0.15)' : 'rgba(244,63,94,0.15)'};color:${isBuy ? '#34d399' : '#f87171'};margin-right:0.4rem;">${d.deal_type}</span>
+                                <span style="font-size:0.78rem;color:#e2e8f0;">${d.client_name || '—'}</span>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-size:0.75rem;font-family:var(--font-mono);color:#fff;">₹${d.value_cr != null ? d.value_cr.toLocaleString() : '—'} Cr</div>
+                                <div style="font-size:0.65rem;color:#64748b;">${d.deal_date || ''} · ₹${d.price || '—'}</div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+            }
 
-            wEl.textContent = c.is_worth_entering || (dir === 'BULLISH' && str >= 75 ? 'YES - HIGH CONVICTION' : (dir === 'BULLISH' ? 'YES - ACCUMULATE ON DIPS' : (dir === 'BEARISH' ? 'NO - HIGH RISK' : 'WAIT FOR BREAKOUT')));
-            wEl.style.color = (c.is_worth_entering && c.is_worth_entering.includes('HIGH')) ? 'var(--emerald)' : (isBull ? 'var(--sky)' : 'var(--rose)');
+            // Top holdings
+            const holdingsEl = document.getElementById('listTopHoldings');
+            const holdings = inst.top_holdings || [];
+            if (holdingsEl) {
+                if (!holdings.length) {
+                    holdingsEl.innerHTML = '<div style="color:var(--text-tertiary);font-size:0.8rem;">No institutional holdings data</div>';
+                } else {
+                    holdingsEl.innerHTML = holdings.map(h => {
+                        const act = h.action || 'HOLD';
+                        const actCol = act === 'NEW BUY' || act === 'ACCUMULATED' ? '#34d399' : (act === 'TRIMMED' || act === 'SOLD OUT' ? '#f87171' : '#94a3b8');
+                        const actBg = act === 'NEW BUY' || act === 'ACCUMULATED' ? 'rgba(16,185,129,0.12)' : (act === 'TRIMMED' || act === 'SOLD OUT' ? 'rgba(244,63,94,0.12)' : 'rgba(255,255,255,0.04)');
+                        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.35rem 0.6rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:6px;">
+                            <div>
+                                <div style="font-size:0.78rem;font-weight:600;color:#e2e8f0;">${h.fund_name || '—'}</div>
+                                <div style="font-size:0.65rem;color:#64748b;">${h.fund_type || ''} · ${h.quarter || ''}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <span style="font-size:0.65rem;padding:0.1rem 0.35rem;border-radius:3px;background:${actBg};color:${actCol};font-weight:700;">${act}</span>
+                                <div style="font-size:0.75rem;font-family:var(--font-mono);color:#fff;margin-top:0.1rem;">${h.stake_pct != null ? h.stake_pct.toFixed(2) + '%' : '—'} · ₹${h.holding_value_cr != null ? h.holding_value_cr.toLocaleString() : '—'} Cr</div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+            }
+        }
+
+        function renderTechnicalSection(t, curr, p, q) {
+            const card = document.getElementById('cardTechnical');
+            if (!t) { if (card) card.style.display = 'none'; return; }
+            if (card) card.style.display = 'block';
+
+            const currSym = ACTIVE_SYM.endsWith('.NS') ? '₹' : '$';
+            const el = (id) => document.getElementById(id);
+
+            // Swing ranges
+            const s20 = t.swing_range_20d;
+            const s3m = t.swing_range_3m;
+            if (el('techSwing20')) el('techSwing20').textContent = (s20 && s20.lower && s20.upper) ? `${currSym}${s20.lower.toFixed(2)} – ${currSym}${s20.upper.toFixed(2)}` : '—';
+            if (el('techSwing3m')) el('techSwing3m').textContent = (s3m && s3m.lower && s3m.upper) ? `${currSym}${s3m.lower.toFixed(2)} – ${currSym}${s3m.upper.toFixed(2)}` : '—';
+            if (el('techCycles')) el('techCycles').textContent = t.cycles ? `${t.cycles} (avg ${t.avg_cycle_days || '?'} days)` : '—';
+
+            // Volume surge
+            const vsEl = el('techVolSurge');
+            if (vsEl) {
+                const vr = t.volume_ratio_5d_20d;
+                vsEl.textContent = vr != null ? `${vr.toFixed(2)}x` : '—x';
+                vsEl.style.color = vr == null ? '#94a3b8' : (vr >= 2.0 ? '#fbbf24' : (vr >= 1.2 ? '#34d399' : '#94a3b8'));
+            }
+
+            // DMAs
+            const fmt = (v) => v != null ? `${currSym}${v.toFixed(2)}` : `${currSym}—`;
+            if (el('techDma20')) el('techDma20').textContent = fmt(t.dma_20);
+            if (el('techDma50')) el('techDma50').textContent = fmt(t.dma_50);
+            if (el('techDma200')) el('techDma200').textContent = fmt(t.dma_200);
+
+            // Dynamic structure verdict & DMA alignment
+            const dmaEl = el('techDmaAlignment');
+            const bp = document.getElementById('techBreakoutPill');
+
+            let verdict = 'CONSOLIDATION';
+            let verdictCol = '#fbbf24';
+            let verdictBg = 'rgba(245,158,11,0.15)';
+            let verdictBorder = 'rgba(245,158,11,0.3)';
+            let alignText = 'Consolidation / Channel Range';
+
+            const above20 = (t.dma_20 && curr) ? curr >= t.dma_20 : null;
+            const above50 = (t.dma_50 && curr) ? curr >= t.dma_50 : null;
+            const above200 = (t.dma_200 && curr) ? curr >= t.dma_200 : null;
+
+            if (above20 === true && above50 !== false && above200 !== false) {
+                verdict = 'BULLISH STRUCTURE';
+                verdictCol = '#34d399';
+                verdictBg = 'rgba(16,185,129,0.15)';
+                verdictBorder = 'rgba(16,185,129,0.3)';
+                alignText = '✅ Bullish – Above All Active DMAs';
+            } else if (above20 === false && above50 === false) {
+                verdict = 'BEARISH STRUCTURE';
+                verdictCol = '#f87171';
+                verdictBg = 'rgba(244,63,94,0.15)';
+                verdictBorder = 'rgba(244,63,94,0.3)';
+                alignText = '🔴 Bearish – Below All Active DMAs';
+            } else if (p && p.is_new_listing) {
+                const dChg = (q && q.day_change_pct) || 0;
+                verdict = `NEW LISTING (${p.trading_days_count || 4}D)`;
+                verdictCol = '#38bdf8';
+                verdictBg = 'rgba(56,189,248,0.15)';
+                verdictBorder = 'rgba(56,189,248,0.3)';
+                alignText = `Recent Listing Discovery (${dChg >= 0 ? '+' : ''}${dChg.toFixed(1)}% today)`;
+            } else if (above20 === true) {
+                verdict = 'SHORT-TERM BOUNCE';
+                verdictCol = '#34d399';
+                verdictBg = 'rgba(16,185,129,0.12)';
+                verdictBorder = 'rgba(16,185,129,0.25)';
+                alignText = '⚠️ Above 20-DMA · Testing 50-DMA Resistance';
+            }
+
+            if (bp) {
+                bp.textContent = verdict;
+                bp.style.color = verdictCol;
+                bp.style.background = verdictBg;
+                bp.style.borderColor = verdictBorder;
+            }
+            if (dmaEl) {
+                dmaEl.textContent = alignText;
+                dmaEl.style.color = verdictCol;
+            }
+        }
 
             const supportP = Number(c.consensus_support || 0);
-            if (c.consensus_entry_zone) {
-                eEl.textContent = c.consensus_entry_zone;
-            } else if (curr > 0) {
-                const floor = supportP && supportP <= curr ? supportP : (curr * 0.985);
-                eEl.textContent = `₹${floor.toFixed(2)} – ₹${curr.toFixed(2)}`;
-            } else {
-                eEl.textContent = 'Market Price';
+            if (eEl) {
+                if (c.consensus_entry_zone) {
+                    eEl.textContent = c.consensus_entry_zone;
+                } else if (curr > 0) {
+                    const floor = supportP && supportP <= curr ? supportP : (curr * 0.985);
+                    eEl.textContent = `₹${floor.toFixed(2)} – ₹${curr.toFixed(2)}`;
+                } else {
+                    eEl.textContent = 'Market Price';
+                }
             }
 
             const targetP = Number(c.consensus_target_price || c.target_price || 0);
@@ -1559,6 +1927,35 @@
             }).join('');
         }
 
+        async function fetchNewsDelta() {
+            const btn = document.getElementById('btnFetchNewsDelta');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner"></span> Fetching Delta...';
+            }
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/fetch-news`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed to fetch news delta');
+                
+                if (data.catalysts) {
+                    renderCatalysts(data.catalysts);
+                }
+                const count = data.catalysts ? data.catalysts.length : 0;
+                console.info(`[NEWS] Synced ${count} catalysts for ${ACTIVE_SYM}`);
+            } catch (err) {
+                alert('Error fetching news delta: ' + err.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ Fetch News Delta';
+                }
+            }
+        }
+
         let rateLimitsData = null;
 
         async function fetchRateLimits() {
@@ -1616,9 +2013,7 @@
         let stockLiveIntervalTimer = null;
         let stockLiveIntervalMs = parseInt(localStorage.getItem('nexus_stock_refresh_interval') || '300000', 10);
 
-        // Pre-detect local models on load (instant via server startup cache)
-        detectLocalModels();
-
+        // Local model configuration state
         function setStockLiveInterval(ms) {
             stockLiveIntervalMs = parseInt(ms, 10);
             localStorage.setItem('nexus_stock_refresh_interval', stockLiveIntervalMs);
@@ -1663,24 +2058,29 @@
         }
 
         function openLocalModelModal() {
-            document.getElementById('cfgLocalHost').value = currentLocalHost;
-            document.getElementById('modalLocalModel').style.display = 'flex';
+            const hostInput = document.getElementById('cfgLocalHost');
+            if (hostInput) hostInput.value = currentLocalHost;
+            const modal = document.getElementById('modalLocalModel');
+            if (modal) modal.style.display = 'flex';
             detectLocalModels();
         }
 
         function closeLocalModelModal() {
-            document.getElementById('modalLocalModel').style.display = 'none';
+            const modal = document.getElementById('modalLocalModel');
+            if (modal) modal.style.display = 'none';
         }
 
         function saveLocalHostConfig() {
-            const host = document.getElementById('cfgLocalHost').value.trim() || 'http://localhost:11434';
+            const hostInput = document.getElementById('cfgLocalHost');
+            const host = (hostInput && hostInput.value ? hostInput.value.trim() : null) || 'http://localhost:11434';
             currentLocalHost = host;
             localStorage.setItem('nexus_local_llm_host', host);
             detectLocalModels();
         }
 
         async function detectLocalModels() {
-            const host = document.getElementById('cfgLocalHost').value.trim() || currentLocalHost;
+            const hostInput = document.getElementById('cfgLocalHost');
+            const host = (hostInput && hostInput.value ? hostInput.value.trim() : null) || currentLocalHost || 'http://localhost:11434';
             const statusEl = document.getElementById('lblLocalStatus');
             if (statusEl) statusEl.innerHTML = '<span class="spinner"></span> Scanning local models...';
             try {
@@ -1965,15 +2365,25 @@
 
         async function toggleWatchlist() {
             const isIn = stockState && stockState.is_in_watchlist;
+            const btnW = document.getElementById('btnToggleWatchlist');
+            if (btnW) btnW.disabled = true;
             try {
-                if (isIn) {
-                    await fetch(`/api/v1/watchlist/remove?ticker=${encodeURIComponent(ACTIVE_SYM)}`, { method: 'POST' });
-                } else {
-                    await fetch(`/api/v1/watchlist/add?ticker=${encodeURIComponent(ACTIVE_SYM)}`, { method: 'POST' });
+                const endpoint = isIn ? '/api/v1/watchlist/remove' : '/api/v1/watchlist/add';
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticker: ACTIVE_SYM, name: 'my_watchlist' })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Failed to update watchlist');
                 }
                 await fetchStockDetails();
             } catch (e) {
-                console.error(e);
+                console.error('Watchlist toggle error:', e);
+                alert('Error updating watchlist: ' + e.message);
+            } finally {
+                if (btnW) btnW.disabled = false;
             }
         }
 
@@ -2011,6 +2421,7 @@
             setStockLiveInterval(stockLiveIntervalMs);
 
             updateLocalModelBadge();
+            detectLocalModels();
             fetchStockDetails();
             fetchRateLimits();
             autoRunLocalModels();

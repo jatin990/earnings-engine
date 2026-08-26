@@ -107,13 +107,23 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
             if quote.get("week_52_low") is None and len(closes) >= 20:
                 quote["week_52_low"] = round(float(closes.tail(252).min()), 2)
 
-    # Compute 52W % distances and date timestamps
+    # Compute 52W % distances, listing date and timestamps
     if not prices_df.empty:
         try:
             last_dt = prices_df.index[-1]
+            first_dt = prices_df.index[0]
             quote["price_date"] = last_dt.strftime("%Y-%m-%d") if hasattr(last_dt, "strftime") else str(last_dt)[:10]
             if not quote.get("asof_date"):
                 quote["asof_date"] = quote["price_date"]
+
+            list_date_str = first_dt.strftime("%Y-%m-%d") if hasattr(first_dt, "strftime") else str(first_dt)[:10]
+            profile["listing_date"] = list_date_str
+            profile["first_traded_date"] = list_date_str
+            profile["trading_days_count"] = len(prices_df)
+            profile["is_new_listing"] = len(prices_df) < 60
+            quote["listing_date"] = list_date_str
+            quote["trading_days_count"] = len(prices_df)
+            quote["is_new_listing"] = len(prices_df) < 60
         except Exception:
             pass
 
@@ -133,6 +143,11 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
         "momentum_3d": None,
         "momentum_7d": None,
         "momentum_30d": None,
+        "momentum_since_listing": None,
+        "dma_20": None,
+        "dma_50": None,
+        "dma_200": None,
+        "volume_ratio_5d_20d": None,
     }
 
     if not prices_df.empty and "close" in prices_df.columns:
@@ -153,15 +168,54 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
             technical["avg_cycle_days"] = auto_rng.get("avg_days", 0)
 
             latest_c = float(closes.iloc[-1])
+            first_c = float(closes.iloc[0])
+            if first_c > 0:
+                technical["momentum_since_listing"] = round((latest_c / first_c - 1.0) * 100.0, 2)
+
             if len(closes) >= 4:
                 p3 = float(closes.iloc[-4])
                 technical["momentum_3d"] = round((latest_c / p3 - 1.0) * 100.0, 2) if p3 else None
+            elif len(closes) >= 2:
+                p_first = float(closes.iloc[0])
+                technical["momentum_3d"] = round((latest_c / p_first - 1.0) * 100.0, 2) if p_first else None
+
             if len(closes) >= 8:
                 p7 = float(closes.iloc[-8])
                 technical["momentum_7d"] = round((latest_c / p7 - 1.0) * 100.0, 2) if p7 else None
+            elif len(closes) >= 2:
+                technical["momentum_7d"] = technical["momentum_since_listing"]
+
             if len(closes) >= 22:
                 p30 = float(closes.iloc[-22])
                 technical["momentum_30d"] = round((latest_c / p30 - 1.0) * 100.0, 2) if p30 else None
+            elif len(closes) >= 2:
+                technical["momentum_30d"] = technical["momentum_since_listing"]
+
+            # DMA computation
+            if len(closes) >= 20:
+                technical["dma_20"] = round(float(closes.tail(20).mean()), 2)
+            elif len(closes) >= 5:
+                technical["dma_20"] = round(float(closes.mean()), 2)
+
+            if len(closes) >= 50:
+                technical["dma_50"] = round(float(closes.tail(50).mean()), 2)
+
+            if len(closes) >= 200:
+                technical["dma_200"] = round(float(closes.tail(200).mean()), 2)
+
+            # Volume surge ratio 5d vs 20d (with fallback for recent listings)
+            if "volume" in prices_df.columns:
+                vols = pd.to_numeric(prices_df["volume"], errors="coerce").dropna()
+                if len(vols) >= 20:
+                    avg5 = float(vols.tail(5).mean())
+                    avg20 = float(vols.tail(20).mean())
+                    if avg20 > 0:
+                        technical["volume_ratio_5d_20d"] = round(avg5 / avg20, 2)
+                elif len(vols) >= 2:
+                    avg_all = float(vols.mean())
+                    last_vol = float(vols.iloc[-1])
+                    if avg_all > 0:
+                        technical["volume_ratio_5d_20d"] = round(last_vol / avg_all, 2)
 
     # Stored swing range override if present
     stored_sr = get_swing_range("ALL", sym, settings)
@@ -214,8 +268,15 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
     preds = get_predictions(settings, ticker=sym, limit=1)
     consensus_data = preds[0] if preds else None
 
-    # 6. Live Short-Term News Catalysts
+    # 6. Live Short-Term News Catalysts (auto-fetch delta if empty)
     catalysts_data = get_short_term_catalysts(watchlist_or_universe="ALL", search_query=sym, limit=15, settings=settings)
+    if not catalysts_data:
+        try:
+            from earnings_engine.data.catalysts_news import fetch_ticker_catalysts
+            fetch_ticker_catalysts(sym, limit=15, force=False, settings=settings)
+            catalysts_data = get_short_term_catalysts(watchlist_or_universe="ALL", search_query=sym, limit=15, settings=settings)
+        except Exception as e:
+            logger.debug("Auto-fetch catalysts error for %s: %s", sym, e)
 
     # 7. Standardized 6-Pillar Factor Evaluation Matrix
     factor_eval = {}
@@ -224,6 +285,37 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
         factor_eval = evaluate_stock_standard_pillars(sym, settings=settings)
     except Exception as e:
         logger.debug("Error computing standard factor evaluation for %s: %s", sym, e)
+
+    # 7b. Institutional Accumulation (lightweight embed for stock detail page)
+    institutional_data: dict[str, Any] = {}
+    try:
+        from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
+        inst = get_stock_institutional_activity(sym, settings)
+        if inst.get("success"):
+            # Include only the summary fields + first 4 patterns + top 8 holdings
+            institutional_data = {
+                "accumulation_score": inst.get("accumulation_score"),
+                "verdict": inst.get("verdict"),
+                "verdict_badge": inst.get("verdict_badge"),
+                "funds_accumulating_count": inst.get("funds_accumulating_count", 0),
+                "funds_selling_count": inst.get("funds_selling_count", 0),
+                "new_funds_bought_count": inst.get("new_funds_bought_count", 0),
+                "gross_inflow_cr": inst.get("gross_inflow_cr", 0),
+                "gross_outflow_cr": inst.get("gross_outflow_cr", 0),
+                "net_flow_cr": inst.get("net_flow_cr", 0),
+                "total_institutional_stake_pct": inst.get("total_institutional_stake_pct"),
+                "return_7d_pct": inst.get("return_7d_pct"),
+                "return_30d_pct": inst.get("return_30d_pct"),
+                "shareholding_patterns": (inst.get("shareholding_patterns") or [])[-4:],
+                "block_deals": (inst.get("block_deals") or [])[:5],
+                "top_holdings": sorted(
+                    (inst.get("holdings") or []),
+                    key=lambda h: h.get("holding_value_cr", 0),
+                    reverse=True,
+                )[:8],
+            }
+    except Exception as e:
+        logger.debug("Error fetching institutional data for %s: %s", sym, e)
 
     # 8. Check Watchlist status
     is_in_watchlist = False
@@ -244,6 +336,7 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
         "consensus": consensus_data,
         "catalysts": catalysts_data,
         "factor_evaluation": factor_eval,
+        "institutional": institutional_data,
         "is_in_watchlist": is_in_watchlist,
     }
 
@@ -922,5 +1015,30 @@ def sync_recent_additions_to_watchlist(
         "watchlist": watchlist_name,
         "message": f"Successfully added {sym} to {watchlist_name}" if success else f"Failed adding {sym} to {watchlist_name}",
     }
+
+
+def refresh_stock_news(
+    ticker: str,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Fetch live incremental news delta for a specific ticker and return fresh catalysts."""
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if not sym:
+        return {"success": False, "error": "Ticker symbol is required"}
+    try:
+        from earnings_engine.data.catalysts_news import fetch_ticker_catalysts, get_short_term_catalysts
+        fetched = fetch_ticker_catalysts(sym, limit=20, force=True, settings=settings)
+        catalysts = get_short_term_catalysts(watchlist_or_universe="ALL", search_query=sym, limit=25, settings=settings)
+        return {
+            "success": True,
+            "ticker": sym,
+            "fetched_count": len(fetched),
+            "catalysts": catalysts,
+        }
+    except Exception as e:
+        logger.error("Failed refreshing news delta for %s: %s", sym, e)
+        return {"success": False, "error": str(e)}
+
 
 

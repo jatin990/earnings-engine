@@ -509,6 +509,56 @@
             margin-top: 0.5rem;
         }
 
+        .btn-model-opt {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.28rem 0.55rem;
+            border-radius: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .btn-model-opt:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+        .btn-model-opt:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-model-opt.deepseek:hover:not(:disabled) {
+            border-color: rgba(99, 102, 241, 0.6);
+            color: #c7d2fe;
+            background: rgba(99, 102, 241, 0.18);
+        }
+        .btn-model-opt.llama:hover:not(:disabled) {
+            border-color: rgba(56, 189, 248, 0.6);
+            color: #bae6fd;
+            background: rgba(56, 189, 248, 0.18);
+        }
+        .btn-model-opt.qwen:hover:not(:disabled) {
+            border-color: rgba(168, 85, 247, 0.6);
+            color: #e9d5ff;
+            background: rgba(168, 85, 247, 0.18);
+        }
+        .btn-model-opt.mistral:hover:not(:disabled) {
+            border-color: rgba(245, 158, 11, 0.6);
+            color: #fde68a;
+            background: rgba(245, 158, 11, 0.18);
+        }
+        .btn-model-opt.local:hover:not(:disabled) {
+            border-color: rgba(16, 185, 129, 0.6);
+            color: #a7f3d0;
+            background: rgba(16, 185, 129, 0.18);
+        }
+
         .results-table {
             width: 100%;
             border-collapse: collapse;

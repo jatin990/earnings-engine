@@ -2458,7 +2458,17 @@ async def get_stock_factor_evaluation_endpoint(ticker: str):
     from earnings_engine.api.stock_api import get_stock_factor_evaluation
     res = await asyncio.to_thread(get_stock_factor_evaluation, ticker, _settings)
     if not res.get("success"):
-        raise HTTPException(status_code=400, detail=res.get("error", "Failed to evaluate standard factors"))
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to evaluate stock factors"))
+    return res
+
+
+@app.api_route("/api/v1/stock/{ticker}/fetch-news", methods=["GET", "POST"], tags=["Stock Intelligence & Ratings"])
+async def fetch_stock_news_endpoint(ticker: str):
+    """Fetch fresh news headlines and corporate announcements delta for a stock."""
+    from earnings_engine.api.stock_api import refresh_stock_news
+    res = await asyncio.to_thread(refresh_stock_news, ticker, _settings)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Failed to refresh news delta"))
     return res
 
 
@@ -3418,26 +3428,44 @@ async def watchlist_delete(request: dict):
 
 
 @app.post("/api/v1/watchlist/add", tags=["Dashboard"])
-async def watchlist_add_endpoint(request: dict):
-    """Add a ticker to a named watchlist. Body: {"ticker": str, "name"?: str}"""
-    ticker = request.get("ticker", "")
-    name = request.get("name", "my_watchlist")
-    if not ticker:
+async def watchlist_add_endpoint(
+    request: Request,
+    ticker: str | None = Query(None, description="Ticker symbol"),
+    name: str | None = Query(None, description="Watchlist name"),
+):
+    """Add a ticker to a named watchlist. Accepts JSON body or query params."""
+    body_data = {}
+    try:
+        body_data = await request.json()
+    except Exception:
+        pass
+    final_ticker = (body_data.get("ticker") if isinstance(body_data, dict) else None) or ticker or ""
+    final_name = (body_data.get("name") if isinstance(body_data, dict) else None) or name or "my_watchlist"
+    if not final_ticker:
         raise HTTPException(status_code=400, detail="Ticker is required")
-    result = add_to_watchlist(ticker=ticker, name=name)
+    result = add_to_watchlist(ticker=final_ticker, name=final_name)
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "Failed to add ticker to watchlist"))
     return result
 
 
 @app.post("/api/v1/watchlist/remove", tags=["Dashboard"])
-async def watchlist_remove_endpoint(request: dict):
-    """Remove a ticker from a named watchlist. Body: {"ticker": str, "name"?: str}"""
-    ticker = request.get("ticker", "")
-    name = request.get("name", "my_watchlist")
-    if not ticker:
+async def watchlist_remove_endpoint(
+    request: Request,
+    ticker: str | None = Query(None, description="Ticker symbol"),
+    name: str | None = Query(None, description="Watchlist name"),
+):
+    """Remove a ticker from a named watchlist. Accepts JSON body or query params."""
+    body_data = {}
+    try:
+        body_data = await request.json()
+    except Exception:
+        pass
+    final_ticker = (body_data.get("ticker") if isinstance(body_data, dict) else None) or ticker or ""
+    final_name = (body_data.get("name") if isinstance(body_data, dict) else None) or name or "my_watchlist"
+    if not final_ticker:
         raise HTTPException(status_code=400, detail="Ticker is required")
-    result = remove_from_watchlist(ticker=ticker, name=name)
+    result = remove_from_watchlist(ticker=final_ticker, name=final_name)
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "Failed to remove ticker from watchlist"))
     return result

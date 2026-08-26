@@ -16,3 +16,9 @@
 ## 4. UI/UX & Performance Polish
 - [ ] **Client-side IndexedDB Caching**: Cache heavy quote and pattern responses for instant offline tab switching.
 - [ ] **Virtualized Table Rendering**: Implement windowed virtual scrolling for tables exceeding 500 rows.
+
+## 5. Verification & Test Suite Runs (Deferred)
+- [ ] **Full Regression Suite**: Run `pytest` across all test suites (`tests/test_institutional_flows.py`, `tests/test_market_pulse.py`, `tests/test_swing_ranges.py`, `tests/test_recalculate_audit.py`).
+- [ ] **Stock Detail E2E Verification**: Validate `/stock/{ticker}` end-to-end for new listings (`LEAPIND.NS`), news delta fetching (`JNPR.NS`), and individual AI model partial runs.
+- [ ] **Git Push Batching**: Push accumulated commits to remote `origin/new_report` at the next 5-commit milestone.
+

@@ -10684,34 +10684,204 @@
             });
         };
 
-        app.runModalConsensus = async function() {
+        app.currentLocalHost = localStorage.getItem('nexus_local_llm_host') || 'http://localhost:11434';
+        app.activeLocalModels = JSON.parse(localStorage.getItem('nexus_active_local_models') || '[]');
+        app.availableLocalModelsList = [];
+
+        app.openDashboardLocalModelModal = function() {
+            const hostInput = document.getElementById('dashCfgLocalHost');
+            if (hostInput) hostInput.value = app.currentLocalHost;
+            const modal = document.getElementById('modalDashboardLocalModel');
+            if (modal) modal.style.display = 'flex';
+            app.detectDashboardLocalModels();
+        };
+
+        app.closeDashboardLocalModelModal = function() {
+            const modal = document.getElementById('modalDashboardLocalModel');
+            if (modal) modal.style.display = 'none';
+        };
+
+        app.saveDashboardLocalHostConfig = function() {
+            const host = document.getElementById('dashCfgLocalHost')?.value.trim() || 'http://localhost:11434';
+            app.currentLocalHost = host;
+            localStorage.setItem('nexus_local_llm_host', host);
+            app.detectDashboardLocalModels();
+        };
+
+        app.detectDashboardLocalModels = async function() {
+            const host = document.getElementById('dashCfgLocalHost')?.value.trim() || app.currentLocalHost;
+            const statusEl = document.getElementById('lblDashLocalStatus');
+            if (statusEl) statusEl.innerHTML = '<span class="loading-spinner"></span> Scanning local models...';
+            try {
+                const res = await fetch(`/api/v1/consensus/local-models?host=${encodeURIComponent(host)}`);
+                const data = await res.json();
+                app.availableLocalModelsList = data.models || [];
+
+                if (app.activeLocalModels.length === 0 && app.availableLocalModelsList.length > 0) {
+                    app.activeLocalModels = app.availableLocalModelsList.map(m => m.name);
+                    localStorage.setItem('nexus_active_local_models', JSON.stringify(app.activeLocalModels));
+                }
+
+                app.renderDashboardLocalModelsList();
+
+                if (statusEl) {
+                    if (data.status === 'online') {
+                        statusEl.innerHTML = `<span style="color:#34d399;font-weight:700;">🟢 Online</span> · Found ${data.models ? data.models.length : 0} models on ${data.host}`;
+                    } else {
+                        statusEl.innerHTML = `<span style="color:#fbbf24;font-weight:700;">🟡 Offline / Unreachable</span> · Using fallback models for ${data.host}`;
+                    }
+                }
+            } catch (e) {
+                if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">🔴 Error: ${e.message}</span>`;
+            }
+        };
+
+        app.renderDashboardLocalModelsList = function() {
+            const listContainer = document.getElementById('dashLocalModelsChecklist');
+            const countEl = document.getElementById('dashActiveLocalModelsCount');
+            if (countEl) countEl.textContent = app.activeLocalModels.length;
+            const lbl = document.getElementById('lblDashboardLocalModel');
+            if (lbl) lbl.textContent = app.activeLocalModels.length ? `Local (${app.activeLocalModels.length})` : 'Local Models';
+
+            if (!listContainer) return;
+
+            const modelsToRender = app.availableLocalModelsList.length > 0 ? app.availableLocalModelsList.map(m => ({...m})) : [
+                { name: 'deepseek-r1:8b', size: 4700000000, provider: 'ollama' },
+                { name: 'llama3.2:3b', size: 2000000000, provider: 'ollama' },
+                { name: 'qwen2.5:7b', size: 4500000000, provider: 'ollama' },
+                { name: 'mistral:7b', size: 4100000000, provider: 'ollama' }
+            ];
+
+            app.activeLocalModels.forEach(act => {
+                if (!modelsToRender.some(m => m.name === act)) {
+                    modelsToRender.push({ name: act, size: 0, provider: 'custom' });
+                }
+            });
+
+            listContainer.innerHTML = modelsToRender.map(m => {
+                const isActive = app.activeLocalModels.includes(m.name);
+                const sizeStr = m.size ? `${(m.size/1e9).toFixed(1)}GB` : (m.provider || 'local');
+                return `
+                    <div style="display:flex;align-items:center;justify-content:space-between;background:${isActive ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.02)'};border:1px solid ${isActive ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.08)'};padding:0.45rem 0.75rem;border-radius:6px;gap:0.5rem;">
+                        <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;flex:1;">
+                            <input type="checkbox" onchange="app.toggleDashboardLocalModelActive('${m.name}', this.checked)" ${isActive ? 'checked' : ''} style="accent-color:#10b981;cursor:pointer;width:16px;height:16px;">
+                            <div>
+                                <div style="font-weight:700;font-size:0.85rem;color:#ffffff;">${m.name}</div>
+                                <div style="font-size:0.7rem;color:var(--text-tertiary);">${sizeStr}</div>
+                            </div>
+                        </label>
+                        <button type="button" onclick="app.runDashboardSingleLocalModel('${m.name}')" class="btn btn-secondary" style="font-size:0.72rem;padding:0.25rem 0.65rem;color:#34d399;border-color:rgba(16,185,129,0.4);" title="Run ${m.name} immediately on current stock">
+                            ⚡ Run This
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        app.toggleDashboardLocalModelActive = function(name, checked) {
+            if (checked) {
+                if (!app.activeLocalModels.includes(name)) app.activeLocalModels.push(name);
+            } else {
+                app.activeLocalModels = app.activeLocalModels.filter(m => m !== name);
+            }
+            localStorage.setItem('nexus_active_local_models', JSON.stringify(app.activeLocalModels));
+            app.renderDashboardLocalModelsList();
+        };
+
+        app.toggleAllDashboardLocalCheckboxes = function(checkAll) {
+            if (checkAll) {
+                const models = app.availableLocalModelsList.length > 0 ? app.availableLocalModelsList.map(m => m.name) : ['deepseek-r1:8b', 'llama3.2:3b', 'qwen2.5:7b', 'mistral:7b'];
+                app.activeLocalModels = [...new Set([...app.activeLocalModels, ...models])];
+            } else {
+                app.activeLocalModels = [];
+            }
+            localStorage.setItem('nexus_active_local_models', JSON.stringify(app.activeLocalModels));
+            app.renderDashboardLocalModelsList();
+        };
+
+        app.addDashboardCustomLocalModel = function() {
+            const input = document.getElementById('dashCfgCustomModelInput');
+            if (!input) return;
+            const val = input.value.trim();
+            if (!val) return;
+            if (!app.activeLocalModels.includes(val)) {
+                app.activeLocalModels.push(val);
+                localStorage.setItem('nexus_active_local_models', JSON.stringify(app.activeLocalModels));
+            }
+            input.value = '';
+            app.renderDashboardLocalModelsList();
+        };
+
+        app.runDashboardSingleLocalModel = async function(modelName) {
+            app.closeDashboardLocalModelModal();
+            const localId = `local/${modelName}`;
+            await app.runModalConsensus(localId);
+        };
+
+        app.runModalAllActiveLocalConsensus = async function() {
+            if (app.activeLocalModels.length === 0) {
+                app.openDashboardLocalModelModal();
+                alert('Please select at least one active local model to run.');
+                return;
+            }
+            app.closeDashboardLocalModelModal();
+            const modelIds = app.activeLocalModels.map(m => `local/${m}`);
+            await app.runModalConsensus(modelIds);
+        };
+
+        app.runModalConsensus = async function(modelId = null) {
             const ticker = (document.getElementById('srModalTicker')?.value || '').trim().toUpperCase();
             if (!ticker) {
                 alert('Please enter or select a ticker symbol first.');
                 return;
             }
-            const btn = document.getElementById('srModalConsensusRunBtn');
+
+            const allBtn = document.getElementById('srModalConsensusRunBtn');
+            let targetBtn = allBtn;
+            let prevHtml = '';
+
+            if (modelId) {
+                const mKey = Array.isArray(modelId) ? 'local' : String(modelId).toLowerCase();
+                if (mKey.includes('local') || mKey.includes('ollama')) {
+                    targetBtn = document.getElementById('btnModalModel-local-all') || document.getElementById('btnModalModel-local') || allBtn;
+                } else if (mKey.includes('deepseek')) {
+                    targetBtn = document.getElementById('btnModalModel-deepseek') || allBtn;
+                } else if (mKey.includes('llama')) {
+                    targetBtn = document.getElementById('btnModalModel-llama') || allBtn;
+                } else if (mKey.includes('qwen')) {
+                    targetBtn = document.getElementById('btnModalModel-qwen') || allBtn;
+                } else if (mKey.includes('mistral')) {
+                    targetBtn = document.getElementById('btnModalModel-mistral') || allBtn;
+                }
+            }
+
+            if (targetBtn) {
+                prevHtml = targetBtn.innerHTML;
+                targetBtn.disabled = true;
+                targetBtn.innerHTML = `<span class="loading-spinner"></span> ${modelId ? (Array.isArray(modelId) ? 'Running ' + modelId.length + ' Local Models...' : 'Running Model...') : 'Running All AI Models...'}`;
+            }
+
             const content = document.getElementById('srModalConsensusContent');
             const badge = document.getElementById('srModalConsensusBadge');
-            let prevHtml = '';
-            if (btn) {
-                prevHtml = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerHTML = '<span class="spinner" style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Running AI...';
-            }
-            if (content) {
-                content.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Running multi-model AI consensus for ${ticker} (${app._modalSelectedTimeframe || 14}D horizon)...</div>`;
+            if (content && !modelId) {
+                content.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Synthesizing multi-model AI consensus for ${ticker} (${app._modalSelectedTimeframe || 14}D horizon)...</div>`;
             }
 
             try {
+                const reqBody = {
+                    ticker: ticker,
+                    timeframe_days: app._modalSelectedTimeframe || 14,
+                    local_model_url: app.currentLocalHost || 'http://localhost:11434',
+                    force: true
+                };
+                if (modelId) {
+                    reqBody.models = Array.isArray(modelId) ? modelId : [modelId];
+                }
+
                 const res = await fetch('/api/v1/consensus/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ticker: ticker,
-                        timeframe_days: app._modalSelectedTimeframe || 14,
-                        force: true
-                    })
+                    body: JSON.stringify(reqBody)
                 });
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({}));
@@ -10735,21 +10905,37 @@
                     const cardsHtml = models.map((m, idx) => {
                         const mDir = (m.direction || 'NEUTRAL').toUpperCase();
                         const mCol = mDir === 'BULLISH' ? '#34d399' : (mDir === 'BEARISH' ? '#f87171' : '#fbbf24');
+                        const mid = m.model_id || '';
+                        const mName = m.model_name || mid.split('/').pop() || 'AI Model';
+                        const safeMid = (mid || mName).replace(/[^a-zA-Z0-9]/g, '_');
+
+                        let icon = '🤖';
+                        if (mid.includes('llama') || mName.includes('Llama')) icon = '🦙';
+                        else if (mid.includes('qwen') || mName.includes('Qwen')) icon = '🌐';
+                        else if (mid.includes('mistral') || mName.includes('Mistral')) icon = '⚡';
+                        else if (mid.includes('local') || m.provider === 'ollama') icon = '💻';
+
                         return `
-                            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.75rem;">
-                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
-                                    <strong style="color:#ffffff;font-size:0.85rem;">${m.model_name || m.model_id}</strong>
+                            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.75rem;display:flex;flex-direction:column;gap:0.4rem;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                                        <span>${icon}</span>
+                                        <strong style="color:#ffffff;font-size:0.85rem;">${mName}</strong>
+                                    </div>
                                     <span style="font-size:0.72rem;font-weight:700;color:${mCol};background:rgba(255,255,255,0.05);padding:0.12rem 0.4rem;border-radius:3px;">${mDir} (${m.confidence_pct || 75}%)</span>
                                 </div>
-                                <div style="font-size:0.74rem;color:#94a3b8;margin-bottom:0.35rem;">
+                                <div style="font-size:0.74rem;color:#94a3b8;margin-bottom:0.25rem;">
                                     Target: <strong style="color:#38bdf8;">₹${m.target_price || '—'}</strong> | SL: <strong style="color:#f87171;">₹${m.stop_loss_price || '—'}</strong> | R:R: <strong style="color:#93c5fd;">1:${m.risk_reward_ratio || '2.0'}</strong>
                                 </div>
-                                <div style="font-size:0.72rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.4rem;">
+                                <div style="font-size:0.72rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.35rem;">
                                     ${m.chart_pattern || m.rationale_summary || 'Quantitative structure and momentum align with directional setup.'}
                                 </div>
-                                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.68rem;color:#64748b;">
+                                <div style="margin-top:auto;display:flex;justify-content:space-between;align-items:center;padding-top:0.4rem;border-top:1px solid rgba(255,255,255,0.06);font-size:0.68rem;color:#64748b;gap:0.4rem;">
                                     <span>⏱️ ${m.latency_ms ? m.latency_ms + 'ms' : '—'}</span>
-                                    <button type="button" onclick="app.openDashboardRawModal('modal_${idx}', ${idx})" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.15rem 0.45rem;border-radius:4px;font-size:0.68rem;cursor:pointer;">📄 Raw</button>
+                                    <div style="display:flex;gap:0.35rem;align-items:center;">
+                                        <button type="button" id="tileBtn-modal-${safeMid}" onclick="app.runModalConsensus('${mid || mName}')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.18rem 0.45rem;color:#e2e8f0;" title="Re-run prediction specifically for ${mName}">⚡ Run</button>
+                                        <button type="button" onclick="app.openDashboardRawModal('${safeMid}', ${idx})" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.18rem 0.45rem;border-radius:4px;font-size:0.68rem;cursor:pointer;">📄 Raw</button>
+                                    </div>
                                 </div>
                             </div>
                         `;
@@ -10769,11 +10955,67 @@
                     content.innerHTML = `<div style="color:#f87171;font-size:0.8rem;padding:0.5rem;">Failed to run AI consensus: ${e.message || e}</div>`;
                 }
             } finally {
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = prevHtml;
+                if (targetBtn) {
+                    targetBtn.disabled = false;
+                    targetBtn.innerHTML = prevHtml;
                 }
             }
+        };
+
+        app.openDashboardRawModal = function(safeMid, idx) {
+            const models = window._dashModalModels || [];
+            const m = models[idx] || {};
+            const modalEl = document.getElementById('modalDashboardRawOutput');
+            if (!modalEl) return;
+
+            const mName = m.model_name || m.model_id || 'AI Model';
+            const mid = m.model_id || mName;
+            const dir = (m.direction || 'NEUTRAL').toUpperCase();
+            const isBull = dir.includes('BULL');
+            const isBear = dir.includes('BEAR');
+            const dirCol = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
+            const dirBg = isBull ? 'rgba(16,185,129,0.15)' : isBear ? 'rgba(244,63,94,0.15)' : 'rgba(251,191,36,0.15)';
+
+            let icon = '🤖';
+            if (mid.includes('llama') || mName.includes('Llama')) icon = '🦙';
+            else if (mid.includes('qwen') || mName.includes('Qwen')) icon = '🌐';
+            else if (mid.includes('mistral') || mName.includes('Mistral')) icon = '⚡';
+            else if (mid.includes('local') || m.provider === 'ollama') icon = '💻';
+
+            const iconEl = document.getElementById('dashRawModalIcon');
+            if (iconEl) iconEl.textContent = icon;
+            const titleEl = document.getElementById('dashRawModalTitle');
+            if (titleEl) titleEl.textContent = mName;
+            const subEl = document.getElementById('dashRawModalSubtitle');
+            if (subEl) subEl.textContent = mid;
+
+            const badgeEl = document.getElementById('dashRawModalBadge');
+            if (badgeEl) {
+                badgeEl.textContent = `${dir} (${m.confidence_pct || 80}%)`;
+                badgeEl.style.color = dirCol;
+                badgeEl.style.background = dirBg;
+            }
+
+            const latEl = document.getElementById('dashRawModalLatency');
+            if (latEl) latEl.textContent = m.latency_ms ? `${m.latency_ms}ms` : '—';
+            const avg1hEl = document.getElementById('dashRawModalAvg1h');
+            if (avg1hEl) avg1hEl.textContent = m.avg_latency_1h_s ? `${m.avg_latency_1h_s}s` : '—';
+            const avg24hEl = document.getElementById('dashRawModalAvg24h');
+            if (avg24hEl) avg24hEl.textContent = m.avg_latency_24h_s ? `${m.avg_latency_24h_s}s` : '—';
+            const avgAllEl = document.getElementById('dashRawModalAvgAll');
+            if (avgAllEl) avgAllEl.textContent = m.avg_latency_all_s ? `${m.avg_latency_all_s}s` : '—';
+            const runsEl = document.getElementById('dashRawModalTotalRuns');
+            if (runsEl) runsEl.textContent = m.total_runs || '1';
+            const tokEl = document.getElementById('dashRawModalTokens');
+            if (tokEl) tokEl.textContent = m.tokens_used ? `${m.tokens_used} tokens` : (m.prompt_tokens ? `${m.prompt_tokens} prompt` : '—');
+
+            const rawContent = m.raw_prediction_json || m.raw_reasoning || m.chain_of_thought || JSON.stringify(m, null, 2);
+            const contentEl = document.getElementById('dashRawModalContent');
+            if (contentEl) {
+                contentEl.textContent = typeof rawContent === 'object' ? JSON.stringify(rawContent, null, 2) : rawContent;
+            }
+
+            modalEl.style.display = 'flex';
         };
 
         app.closeDashboardRawModal = function() {
