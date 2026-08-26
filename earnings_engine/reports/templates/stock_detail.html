@@ -1195,6 +1195,13 @@
                 else if (mid.includes('mistral') || mName.includes('Mistral')) icon = '⚡';
                 else if (mid.includes('gemini') || mName.includes('Gemini')) icon = '✨';
 
+                const stats = (window._aiModelsStats || []).find(x => x.id === mid || x.name === mName || (x.name || '').toLowerCase() === (mName || '').toLowerCase()) || {};
+                const genStats = stats.generation_stats || {};
+                const avg1hStr = genStats['1h']?.avg_s ? `${genStats['1h'].avg_s}s (1h)` : (stats.avg_latency_1h_s ? `${stats.avg_latency_1h_s}s (1h)` : null);
+                const avg24hStr = genStats['24h']?.avg_s ? `${genStats['24h'].avg_s}s (24h)` : (stats.avg_latency_24h_s ? `${stats.avg_latency_24h_s}s (24h)` : null);
+                const avgAllStr = genStats['all_time']?.avg_s ? `${genStats['all_time'].avg_s}s (All)` : (stats.avg_latency_all_s ? `${stats.avg_latency_all_s}s (All)` : null);
+                const avgDisplay = [avg1hStr, avg24hStr, avgAllStr].filter(Boolean).join(' · ');
+
                 return `
                     <div class="model-tile">
                         <div class="model-top">
@@ -1214,11 +1221,15 @@
                         <div class="model-rationale">
                             ${m.rationale_summary || m.thesis || m.chart_pattern || 'Quantitative structure and momentum align with directional setup.'}
                         </div>
+                        <div style="margin-top: 0.35rem; font-size: 0.68rem; color: var(--text-tertiary); display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 0.3rem;">
+                            <span>⏱️ ${m.latency_ms ? m.latency_ms + 'ms' : '—'}</span>
+                            <span style="color: #93c5fd; font-family: var(--font-mono); font-size: 0.64rem;" title="Average generation latency across 1h, 24h & all-time">${avgDisplay ? 'Avg: ' + avgDisplay : (m.tokens_used ? m.tokens_used + ' tokens' : '')}</span>
+                        </div>
                         <div style="margin-top: auto; padding-top: 0.45rem; display: flex; gap: 0.4rem; align-items: center;">
                             <button id="tileBtn-${safeMid}" onclick="runConsensus(true, '${mid || mName}')" class="btn-tile-run" style="flex: 1;" title="Run and refresh prediction specifically for ${mName}">
                                 ⚡ Run ${mName}
                             </button>
-                            <button type="button" onclick="openRawModal('${safeMid}', ${idx})" class="btn-tile-raw" title="View full raw reasoning, chain-of-thought, and JSON output from ${mName}">
+                            <button type="button" onclick="openRawModal('${safeMid}', ${idx})" class="btn-tile-raw" title="View full raw reasoning, chain-of-thought, generation speed stats, and JSON output from ${mName}">
                                 📄 Raw
                             </button>
                         </div>
@@ -1413,6 +1424,7 @@
                 if (!res.ok) return;
                 const data = await res.json();
                 rateLimitsData = data;
+                window._aiModelsStats = data.models || [];
                 
                 const pill = document.getElementById('ratelimitPill');
                 const txt = document.getElementById('txtRatelimit');
@@ -1436,7 +1448,11 @@
                     const btnId = 'btnModel-' + (m.name ? m.name.toLowerCase().replace(/[^a-z0-9]/g, '-') : '');
                     const btn = document.getElementById(btnId);
                     if (btn) {
-                        btn.title = `${m.name} (${m.badge}): ${m.remaining_1m}/${m.allowed_1m} RPM remaining. ${m.description}`;
+                        const gStats = m.generation_stats || {};
+                        const g1h = gStats['1h']?.avg_s ? ` · Avg: ${gStats['1h'].avg_s}s (1h)` : '';
+                        const g24h = gStats['24h']?.avg_s ? ` | ${gStats['24h'].avg_s}s (24h)` : '';
+                        const gAll = gStats['all_time']?.avg_s ? ` | ${gStats['all_time'].avg_s}s (All)` : '';
+                        btn.title = `${m.name} (${m.badge}): ${m.remaining_1m}/${m.allowed_1m} RPM remaining${g1h}${g24h}${gAll}.\n${m.description}`;
                         if (m.remaining_1m <= 0 || m.remaining_24h <= 0) {
                             btn.style.opacity = '0.5';
                             btn.title += ' (Rate Limited - Cooldown)';
@@ -1757,6 +1773,22 @@
             document.getElementById('rawModalLatency').textContent = m.latency_ms ? `${m.latency_ms} ms` : '—';
             document.getElementById('rawModalTokens').textContent = m.tokens_used ? `${m.tokens_used} tokens` : (m.tokens ? `${m.tokens}` : '—');
 
+            const stats = (window._aiModelsStats || []).find(x => x.id === mid || x.name === mName || (x.name || '').toLowerCase() === (mName || '').toLowerCase()) || {};
+            const gStats = stats.generation_stats || {};
+            const lat1h = gStats['1h']?.avg_s ? `${gStats['1h'].avg_s}s` : (stats.avg_latency_1h_s ? `${stats.avg_latency_1h_s}s` : '—');
+            const lat24h = gStats['24h']?.avg_s ? `${gStats['24h'].avg_s}s` : (stats.avg_latency_24h_s ? `${stats.avg_latency_24h_s}s` : '—');
+            const latAll = gStats['all_time']?.avg_s ? `${gStats['all_time'].avg_s}s` : (stats.avg_latency_all_s ? `${stats.avg_latency_all_s}s` : '—');
+            const totalRuns = stats.total_generations != null ? stats.total_generations : (m.latency_ms ? 1 : '—');
+
+            const el1h = document.getElementById('rawModalAvg1h');
+            const el24h = document.getElementById('rawModalAvg24h');
+            const elAll = document.getElementById('rawModalAvgAll');
+            const elRuns = document.getElementById('rawModalTotalRuns');
+            if (el1h) el1h.textContent = lat1h;
+            if (el24h) el24h.textContent = lat24h;
+            if (elAll) elAll.textContent = latAll;
+            if (elRuns) elRuns.textContent = totalRuns;
+
             let rawText = m.raw_response || '';
             if (!rawText) {
                 const formatted = { ...m };
@@ -1857,8 +1889,12 @@
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.74rem; color: var(--text-secondary); background: rgba(255,255,255,0.02); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem;">
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <span>⏱️ Latency: <strong id="rawModalLatency" style="color: #ffffff;">—</strong></span>
+                <div style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap;">
+                    <span>⏱️ Latest: <strong id="rawModalLatency" style="color: #ffffff;">—</strong></span>
+                    <span>📊 1h Avg: <strong id="rawModalAvg1h" style="color: #93c5fd;">—</strong></span>
+                    <span>📊 24h Avg: <strong id="rawModalAvg24h" style="color: #60a5fa;">—</strong></span>
+                    <span>📊 All-Time: <strong id="rawModalAvgAll" style="color: #38bdf8;">—</strong></span>
+                    <span>🔢 Runs: <strong id="rawModalTotalRuns" style="color: #a7f3d0;">—</strong></span>
                     <span>🔢 Tokens: <strong id="rawModalTokens" style="color: #ffffff;">—</strong></span>
                 </div>
                 <div>

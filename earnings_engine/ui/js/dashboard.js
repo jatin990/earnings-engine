@@ -10582,6 +10582,22 @@
             if (latEl) latEl.textContent = m.latency_ms ? `${m.latency_ms} ms` : '—';
             if (tokEl) tokEl.textContent = m.tokens_used ? `${m.tokens_used} tokens` : (m.tokens ? `${m.tokens}` : '—');
 
+            const stats = (window._dashModelsStats || []).find(x => x.id === mid || x.name === mName || (x.name || '').toLowerCase() === (mName || '').toLowerCase()) || {};
+            const gStats = stats.generation_stats || {};
+            const lat1h = gStats['1h']?.avg_s ? `${gStats['1h'].avg_s}s` : (stats.avg_latency_1h_s ? `${stats.avg_latency_1h_s}s` : '—');
+            const lat24h = gStats['24h']?.avg_s ? `${gStats['24h'].avg_s}s` : (stats.avg_latency_24h_s ? `${stats.avg_latency_24h_s}s` : '—');
+            const latAll = gStats['all_time']?.avg_s ? `${gStats['all_time'].avg_s}s` : (stats.avg_latency_all_s ? `${stats.avg_latency_all_s}s` : '—');
+            const totalRuns = stats.total_generations != null ? stats.total_generations : (m.latency_ms ? 1 : '—');
+
+            const el1h = document.getElementById('dashRawModalAvg1h');
+            const el24h = document.getElementById('dashRawModalAvg24h');
+            const elAll = document.getElementById('dashRawModalAvgAll');
+            const elRuns = document.getElementById('dashRawModalTotalRuns');
+            if (el1h) el1h.textContent = lat1h;
+            if (el24h) el24h.textContent = lat24h;
+            if (elAll) elAll.textContent = latAll;
+            if (elRuns) elRuns.textContent = totalRuns;
+
             let rawText = m.raw_response || '';
             if (!rawText) {
                 const formatted = { ...m };
@@ -10591,6 +10607,119 @@
 
             if (contentEl) contentEl.textContent = rawText;
             if (modalEl) modalEl.style.display = 'flex';
+        };
+
+        app._modalSelectedTimeframe = 14;
+
+        app.setModalTimeframe = function(days) {
+            app._modalSelectedTimeframe = parseInt(days, 10) || 14;
+            [3, 7, 14, 30, 90].forEach(d => {
+                const btn = document.getElementById(`modalTfBtn-${d}`);
+                if (btn) {
+                    if (d === app._modalSelectedTimeframe) {
+                        btn.style.background = '#2563eb';
+                        btn.style.color = '#fff';
+                        btn.style.fontWeight = '700';
+                        btn.style.borderRadius = '3px';
+                    } else {
+                        btn.style.background = 'transparent';
+                        btn.style.color = '#94a3b8';
+                        btn.style.fontWeight = 'normal';
+                    }
+                }
+            });
+        };
+
+        app.runModalConsensus = async function() {
+            const ticker = (document.getElementById('srModalTicker')?.value || '').trim().toUpperCase();
+            if (!ticker) {
+                alert('Please enter or select a ticker symbol first.');
+                return;
+            }
+            const btn = document.getElementById('srModalConsensusRunBtn');
+            const content = document.getElementById('srModalConsensusContent');
+            const badge = document.getElementById('srModalConsensusBadge');
+            let prevHtml = '';
+            if (btn) {
+                prevHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Running AI...';
+            }
+            if (content) {
+                content.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Running multi-model AI consensus for ${ticker} (${app._modalSelectedTimeframe || 14}D horizon)...</div>`;
+            }
+
+            try {
+                const res = await fetch('/api/v1/consensus/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ticker: ticker,
+                        timeframe_days: app._modalSelectedTimeframe || 14,
+                        force: true
+                    })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Consensus request failed with HTTP ' + res.status);
+                }
+                const data = await res.json();
+                const p = data.prediction || {};
+                const models = p.models_breakdown || [];
+                const dir = (p.consensus_direction || 'NEUTRAL').toUpperCase();
+                const dirCol = dir === 'BULLISH' ? '#34d399' : (dir === 'BEARISH' ? '#f87171' : '#fbbf24');
+
+                if (badge) {
+                    badge.style.display = 'inline-block';
+                    badge.textContent = `${dir} (${p.consensus_strength || 75}%)`;
+                    badge.style.background = dir === 'BULLISH' ? 'rgba(16,185,129,0.2)' : (dir === 'BEARISH' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)');
+                    badge.style.color = dirCol;
+                    badge.style.borderColor = dirCol;
+                }
+
+                if (content) {
+                    const cardsHtml = models.map((m, idx) => {
+                        const mDir = (m.direction || 'NEUTRAL').toUpperCase();
+                        const mCol = mDir === 'BULLISH' ? '#34d399' : (mDir === 'BEARISH' ? '#f87171' : '#fbbf24');
+                        return `
+                            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.75rem;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
+                                    <strong style="color:#ffffff;font-size:0.85rem;">${m.model_name || m.model_id}</strong>
+                                    <span style="font-size:0.72rem;font-weight:700;color:${mCol};background:rgba(255,255,255,0.05);padding:0.12rem 0.4rem;border-radius:3px;">${mDir} (${m.confidence_pct || 75}%)</span>
+                                </div>
+                                <div style="font-size:0.74rem;color:#94a3b8;margin-bottom:0.35rem;">
+                                    Target: <strong style="color:#38bdf8;">₹${m.target_price || '—'}</strong> | SL: <strong style="color:#f87171;">₹${m.stop_loss_price || '—'}</strong> | R:R: <strong style="color:#93c5fd;">1:${m.risk_reward_ratio || '2.0'}</strong>
+                                </div>
+                                <div style="font-size:0.72rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.4rem;">
+                                    ${m.chart_pattern || m.rationale_summary || 'Quantitative structure and momentum align with directional setup.'}
+                                </div>
+                                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.68rem;color:#64748b;">
+                                    <span>⏱️ ${m.latency_ms ? m.latency_ms + 'ms' : '—'}</span>
+                                    <button type="button" onclick="app.openDashboardRawModal('modal_${idx}', ${idx})" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.15rem 0.45rem;border-radius:4px;font-size:0.68rem;cursor:pointer;">📄 Raw</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    window._dashModalModels = models;
+                    content.innerHTML = `
+                        <div style="margin-bottom:0.75rem;background:rgba(255,255,255,0.02);padding:0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="font-size:0.78rem;color:#e2e8f0;line-height:1.45;"><strong>Synthesized Verdict (${app._modalSelectedTimeframe || 14}D):</strong> ${p.synthesized_thesis || 'Multi-model consensus calculated.'}</div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.6rem;">${cardsHtml}</div>
+                    `;
+                }
+            } catch (e) {
+                console.error('Modal consensus error:', e);
+                if (content) {
+                    content.innerHTML = `<div style="color:#f87171;font-size:0.8rem;padding:0.5rem;">Failed to run AI consensus: ${e.message || e}</div>`;
+                }
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = prevHtml;
+                }
+            }
         };
 
         app.closeDashboardRawModal = function() {

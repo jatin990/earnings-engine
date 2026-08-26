@@ -226,6 +226,14 @@ def _query_local_model(
             }
 
     elapsed_ms = (time.perf_counter() - start) * 1000
+    try:
+        from earnings_engine.rate_limits import record_generation
+        record_generation("local/deepseek-r1:8b", elapsed_ms, tokens=total_tokens, is_local=True)
+        record_generation(model_id, elapsed_ms, tokens=total_tokens, is_local=True)
+        record_generation(display_name, elapsed_ms, tokens=total_tokens, is_local=True)
+    except Exception:
+        pass
+
     prediction = _parse_model_json(resp_text)
     
     if prediction is None:
@@ -452,6 +460,14 @@ def _query_single_model(
 
             logger.info("[CONSENSUS] %s parsed: direction=%s, conf=%d%%, target=%s, action=%s (latency=%.2fs)",
                         display_name, direction, conf_pct, target_p, rec_action, elapsed_ms / 1000.0)
+
+            try:
+                from earnings_engine.rate_limits import record_generation
+                record_generation("openrouter", elapsed_ms, tokens=total_tokens)
+                record_generation(current_model, elapsed_ms, tokens=total_tokens)
+                record_generation(display_name, elapsed_ms, tokens=total_tokens)
+            except Exception:
+                pass
 
             return {
                 "model_name": display_name,

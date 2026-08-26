@@ -195,9 +195,15 @@ class RateLimitTracker:
         self._request_timestamps: dict[str, collections.deque[float]] = {
             k: collections.deque(maxlen=10000) for k in DOWNSTREAM_CRITERIA
         }
+        # Deque of detailed generation metrics (timestamp, latency_ms, tokens, is_local) per model
+        self._generation_history: dict[str, collections.deque[dict[str, Any]]] = {
+            k: collections.deque(maxlen=5000) for k in DOWNSTREAM_CRITERIA
+        }
         for m in AVAILABLE_AI_MODELS:
             self._request_timestamps[m["id"].lower()] = collections.deque(maxlen=10000)
             self._request_timestamps[m["name"].lower()] = collections.deque(maxlen=10000)
+            self._generation_history[m["id"].lower()] = collections.deque(maxlen=5000)
+            self._generation_history[m["name"].lower()] = collections.deque(maxlen=5000)
 
         # Last known HTTP response headers from OpenRouter
         self._openrouter_headers: dict[str, Any] = {
@@ -218,6 +224,29 @@ class RateLimitTracker:
             if service_key not in self._request_timestamps:
                 self._request_timestamps[service_key] = collections.deque(maxlen=10000)
             self._request_timestamps[service_key].append(now)
+
+    def record_generation(
+        self,
+        model: str,
+        latency_ms: float,
+        tokens: int | None = None,
+        is_local: bool = False,
+    ) -> None:
+        """Record an AI inference generation run with latency and tokens across time horizons."""
+        now = time.time()
+        m_key = model.lower().strip()
+        with self._lock:
+            if m_key not in self._generation_history:
+                self._generation_history[m_key] = collections.deque(maxlen=5000)
+            self._generation_history[m_key].append({
+                "timestamp": now,
+                "latency_ms": float(latency_ms),
+                "tokens": tokens,
+                "is_local": is_local,
+            })
+            if m_key not in self._request_timestamps:
+                self._request_timestamps[m_key] = collections.deque(maxlen=10000)
+            self._request_timestamps[m_key].append(now)
 
     def update_openrouter_headers(self, headers: dict[str, Any]) -> None:
         """Store x-ratelimit-* headers from OpenRouter API responses."""
@@ -268,9 +297,8 @@ class RateLimitTracker:
 
         return self._openrouter_key_cache
 
-
     def get_models_summary(self) -> list[dict[str, Any]]:
-        """Compute rate limit consumption and remaining capacity for each supported AI model."""
+        """Compute rate limit consumption, quota, and average generation time across 1h, 24h, 7d, and all-time."""
         now = time.time()
         openrouter_summary = self.get_downstream_summary().get("downstreams", {}).get("openrouter", {})
         or_remaining_1m = openrouter_summary.get("timeframes", {}).get("1m", {}).get("remaining", 20)
@@ -283,6 +311,17 @@ class RateLimitTracker:
                 m_name = m["name"].lower()
                 # Aggregate timestamps recorded under id or display name
                 timestamps = list(self._request_timestamps.get(m_id, [])) + list(self._request_timestamps.get(m_name, []))
+
+                # Aggregate generation records
+                gen_records = list(self._generation_history.get(m_id, [])) + list(self._generation_history.get(m_name, []))
+                # Remove duplicate records by timestamp
+                seen_ts = set()
+                dedup_gens = []
+                for g in gen_records:
+                    ts_key = (g["timestamp"], g["latency_ms"])
+                    if ts_key not in seen_ts:
+                        seen_ts.add(ts_key)
+                        dedup_gens.append(g)
 
                 count_1m = sum(1 for t in timestamps if now - t <= 60)
                 count_1h = sum(1 for t in timestamps if now - t <= 3600)
@@ -305,6 +344,20 @@ class RateLimitTracker:
                     status = "warning"
                     status_badge = "🟡 Near Quota"
 
+                # Multi-range generation latency analytics
+                g_1h = [g for g in dedup_gens if now - g["timestamp"] <= 3600]
+                g_24h = [g for g in dedup_gens if now - g["timestamp"] <= 86400]
+                g_7d = [g for g in dedup_gens if now - g["timestamp"] <= 604800]
+
+                avg_1h_ms = round(sum(g["latency_ms"] for g in g_1h) / len(g_1h), 1) if g_1h else None
+                avg_24h_ms = round(sum(g["latency_ms"] for g in g_24h) / len(g_24h), 1) if g_24h else None
+                avg_7d_ms = round(sum(g["latency_ms"] for g in g_7d) / len(g_7d), 1) if g_7d else None
+                avg_all_ms = round(sum(g["latency_ms"] for g in dedup_gens) / len(dedup_gens), 1) if dedup_gens else None
+
+                latest_ms = round(dedup_gens[-1]["latency_ms"], 1) if dedup_gens else None
+                min_ms = round(min(g["latency_ms"] for g in dedup_gens), 1) if dedup_gens else None
+                max_ms = round(max(g["latency_ms"] for g in dedup_gens), 1) if dedup_gens else None
+
                 out.append({
                     "id": m["id"],
                     "name": m["name"],
@@ -322,6 +375,26 @@ class RateLimitTracker:
                     "count_24h": count_24h,
                     "allowed_24h": allowed_24h,
                     "remaining_24h": rem_24h,
+                    # Multi-horizon Generation Latency Metrics
+                    "total_generations": len(dedup_gens),
+                    "latest_latency_ms": latest_ms,
+                    "latest_latency_s": round(latest_ms / 1000, 2) if latest_ms else None,
+                    "avg_latency_1h_ms": avg_1h_ms,
+                    "avg_latency_1h_s": round(avg_1h_ms / 1000, 2) if avg_1h_ms else None,
+                    "avg_latency_24h_ms": avg_24h_ms,
+                    "avg_latency_24h_s": round(avg_24h_ms / 1000, 2) if avg_24h_ms else None,
+                    "avg_latency_7d_ms": avg_7d_ms,
+                    "avg_latency_7d_s": round(avg_7d_ms / 1000, 2) if avg_7d_ms else None,
+                    "avg_latency_all_ms": avg_all_ms,
+                    "avg_latency_all_s": round(avg_all_ms / 1000, 2) if avg_all_ms else None,
+                    "min_latency_ms": min_ms,
+                    "max_latency_ms": max_ms,
+                    "generation_stats": {
+                        "1h": {"count": len(g_1h), "avg_ms": avg_1h_ms, "avg_s": round(avg_1h_ms / 1000, 2) if avg_1h_ms else None},
+                        "24h": {"count": len(g_24h), "avg_ms": avg_24h_ms, "avg_s": round(avg_24h_ms / 1000, 2) if avg_24h_ms else None},
+                        "7d": {"count": len(g_7d), "avg_ms": avg_7d_ms, "avg_s": round(avg_7d_ms / 1000, 2) if avg_7d_ms else None},
+                        "all_time": {"count": len(dedup_gens), "avg_ms": avg_all_ms, "avg_s": round(avg_all_ms / 1000, 2) if avg_all_ms else None},
+                    }
                 })
         return out
 
@@ -464,6 +537,16 @@ def get_ratelimits_summary(settings: Settings | None = None) -> dict[str, Any]:
     return tracker.get_downstream_summary(settings)
 
 
+def record_generation(
+    model: str,
+    latency_ms: float,
+    tokens: int | None = None,
+    is_local: bool = False,
+) -> None:
+    """Convenience helper to record generation latency metrics across time horizons."""
+    tracker.record_generation(model, latency_ms, tokens=tokens, is_local=is_local)
+
+
 def get_models_rate_limits() -> list[dict[str, Any]]:
-    """Retrieve list of supported models and their live rate limit stats."""
+    """Retrieve list of supported models and their live rate limit and generation latency stats."""
     return tracker.get_models_summary()

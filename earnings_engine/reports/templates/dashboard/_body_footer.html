@@ -84,7 +84,18 @@
                         <span>🧠 AI Multi-Model Consensus (DeepSeek + Claude + Llama + Gemini)</span>
                         <span id="srModalConsensusBadge" class="signal-badge" style="font-size:0.7rem;display:none;"></span>
                     </h4>
-                    <button type="button" id="srModalConsensusRunBtn" onclick="app.runModalConsensus()" class="btn btn-sm" style="background:linear-gradient(135deg, #2563eb, #3b82f6);color:#fff;border:none;font-size:0.75rem;font-weight:700;display:flex;align-items:center;gap:0.3rem;box-shadow:0 2px 8px rgba(37,99,235,0.3);">⚡ Run AI Consensus</button>
+                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                        <!-- Timeframe Interval Selector -->
+                        <div class="timeframe-pill-group" style="display:inline-flex;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:4px;padding:1px 2px;" title="Select analysis & prediction forecast horizon">
+                            <span style="font-size:0.65rem;color:var(--text-tertiary);padding:0 0.25rem;font-weight:700;">⏱️</span>
+                            <button type="button" class="btn btn-sm" onclick="app.setModalTimeframe(3)" id="modalTfBtn-3" style="padding:0.15rem 0.4rem;font-size:0.68rem;background:transparent;border:none;color:#94a3b8;cursor:pointer;">3D</button>
+                            <button type="button" class="btn btn-sm" onclick="app.setModalTimeframe(7)" id="modalTfBtn-7" style="padding:0.15rem 0.4rem;font-size:0.68rem;background:transparent;border:none;color:#94a3b8;cursor:pointer;">7D</button>
+                            <button type="button" class="btn btn-sm" onclick="app.setModalTimeframe(14)" id="modalTfBtn-14" style="padding:0.15rem 0.4rem;font-size:0.68rem;background:#2563eb;color:#fff;font-weight:700;border:none;border-radius:3px;cursor:pointer;">14D</button>
+                            <button type="button" class="btn btn-sm" onclick="app.setModalTimeframe(30)" id="modalTfBtn-30" style="padding:0.15rem 0.4rem;font-size:0.68rem;background:transparent;border:none;color:#94a3b8;cursor:pointer;">30D</button>
+                            <button type="button" class="btn btn-sm" onclick="app.setModalTimeframe(90)" id="modalTfBtn-90" style="padding:0.15rem 0.4rem;font-size:0.68rem;background:transparent;border:none;color:#94a3b8;cursor:pointer;">90D</button>
+                        </div>
+                        <button type="button" id="srModalConsensusRunBtn" onclick="app.runModalConsensus()" class="btn btn-sm" style="background:linear-gradient(135deg, #2563eb, #3b82f6);color:#fff;border:none;font-size:0.75rem;font-weight:700;display:flex;align-items:center;gap:0.3rem;box-shadow:0 2px 8px rgba(37,99,235,0.3);">⚡ Run AI Consensus</button>
+                    </div>
                 </div>
                 <div id="srModalConsensusContent">
                     <p class="timestamp" style="margin:0;font-size:0.8rem;">Click "Run AI Consensus" to trigger ensemble reasoning across DeepSeek-R1, Llama-3.3-70B, Claude, and Gemini.</p>
@@ -423,8 +434,12 @@
             </div>
 
             <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.74rem;color:#94a3b8;background:rgba(255,255,255,0.02);padding:0.5rem 0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;gap:0.5rem;">
-                <div style="display:flex;gap:1rem;align-items:center;">
-                    <span>⏱️ Latency: <strong id="dashRawModalLatency" style="color:#ffffff;">—</strong></span>
+                <div style="display:flex;gap:0.85rem;align-items:center;flex-wrap:wrap;">
+                    <span>⏱️ Latest: <strong id="dashRawModalLatency" style="color:#ffffff;">—</strong></span>
+                    <span>📊 1h Avg: <strong id="dashRawModalAvg1h" style="color:#93c5fd;">—</strong></span>
+                    <span>📊 24h Avg: <strong id="dashRawModalAvg24h" style="color:#60a5fa;">—</strong></span>
+                    <span>📊 All-Time: <strong id="dashRawModalAvgAll" style="color:#38bdf8;">—</strong></span>
+                    <span>🔢 Runs: <strong id="dashRawModalTotalRuns" style="color:#a7f3d0;">—</strong></span>
                     <span>🔢 Tokens: <strong id="dashRawModalTokens" style="color:#ffffff;">—</strong></span>
                 </div>
                 <div>
