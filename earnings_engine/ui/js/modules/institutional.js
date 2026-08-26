@@ -149,7 +149,7 @@
             if (!tbody) return;
 
             if (!items || !items.length) {
-                tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">No high-accumulation stocks found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" style="padding:2rem;text-align:center;color:#64748b;">No high-accumulation stocks found.</td></tr>';
                 return;
             }
 
@@ -157,6 +157,13 @@
                 const fundsList = it.funds_accumulating || [];
                 const fundsStr = fundsList.slice(0, 2).map(f => `<span style="color:#f8fafc;font-weight:600;">${f.fund_name}</span> (${f.action})`).join(', ') + (fundsList.length > 2 ? ` <span style="color:#38bdf8;">+${fundsList.length - 2} more</span>` : '');
                 const scoreCol = it.accumulation_score >= 75 ? '#34d399' : '#60a5fa';
+                
+                // 7D and 30D Returns
+                const ret7dStr = it.return_7d_pct != null ? (it.return_7d_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${it.return_7d_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${it.return_7d_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+                const ret30dStr = it.return_30d_pct != null ? (it.return_30d_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${it.return_30d_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${it.return_30d_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+                
+                const instStakeStr = (it.total_institutional_stake_pct != null && it.total_institutional_stake_pct > 0) ? `${it.total_institutional_stake_pct}%` : ((it.total_institutional_stake != null && it.total_institutional_stake > 0) ? `${it.total_institutional_stake}%` : '—');
+
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);font-weight:700;">
@@ -164,12 +171,14 @@
                         </td>
                         <td style="padding:0.65rem 0.8rem;color:#f8fafc;font-weight:600;">${it.company_name}</td>
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:${scoreCol};">${it.accumulation_score} / 100</td>
+                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);">${ret7dStr}</td>
+                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);">${ret30dStr}</td>
                         <td style="padding:0.65rem 0.8rem;">
                             <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.68rem;padding:0.12rem 0.45rem;">${it.verdict || '🔥 Accumulation'}</span>
                         </td>
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#34d399;font-weight:700;">+${it.funds_accumulating_count} Funds</td>
-                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">${it.total_institutional_stake_pct ? it.total_institutional_stake_pct + '%' : '—'}</td>
-                        <td style="padding:0.65rem 0.8rem;color:#cbd5e1;font-size:0.72rem;max-width:280px;white-space:normal;">${fundsStr || 'Multiple institutions'}</td>
+                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;font-weight:600;">${instStakeStr}</td>
+                        <td style="padding:0.65rem 0.8rem;color:#cbd5e1;font-size:0.72rem;max-width:260px;white-space:normal;">${fundsStr || 'Multiple institutions'}</td>
                         <td style="padding:0.65rem 0.8rem;text-align:center;">
                             <button type="button" onclick="app.searchInstitutionalStock('${it.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.55rem;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);">🔍 Inspect</button>
                         </td>
@@ -183,13 +192,20 @@
             if (!tbody) return;
 
             if (!items || !items.length) {
-                tbody.innerHTML = '<tr><td colspan="6" style="padding:2rem;text-align:center;color:#64748b;">No high-distribution stocks found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#64748b;">No high-distribution stocks found.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = items.map(it => {
                 const exitingList = it.funds_selling || [];
                 const exitingStr = exitingList.slice(0, 2).map(f => `<span style="color:#f8fafc;font-weight:600;">${f.fund_name}</span> (${f.action})`).join(', ') + (exitingList.length > 2 ? ` <span style="color:#f87171;">+${exitingList.length - 2} more</span>` : '');
+                
+                // 7D and 30D Returns
+                const ret7dStr = it.return_7d_pct != null ? (it.return_7d_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${it.return_7d_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${it.return_7d_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+                const ret30dStr = it.return_30d_pct != null ? (it.return_30d_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${it.return_30d_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${it.return_30d_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+                
+                const instStakeStr = (it.total_institutional_stake_pct != null && it.total_institutional_stake_pct > 0) ? `${it.total_institutional_stake_pct}%` : ((it.total_institutional_stake != null && it.total_institutional_stake > 0) ? `${it.total_institutional_stake}%` : '—');
+
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);font-weight:700;">
@@ -197,8 +213,11 @@
                         </td>
                         <td style="padding:0.65rem 0.8rem;color:#f8fafc;font-weight:600;">${it.company_name}</td>
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f87171;">${it.accumulation_score} / 100</td>
+                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);">${ret7dStr}</td>
+                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);">${ret30dStr}</td>
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#f87171;font-weight:700;">-${it.funds_selling_count} Funds</td>
-                        <td style="padding:0.65rem 0.8rem;color:#94a3b8;font-size:0.72rem;max-width:280px;white-space:normal;">${exitingStr || 'Institutions trimming'}</td>
+                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;font-weight:600;">${instStakeStr}</td>
+                        <td style="padding:0.65rem 0.8rem;color:#94a3b8;font-size:0.72rem;max-width:260px;white-space:normal;">${exitingStr || 'Institutions trimming'}</td>
                         <td style="padding:0.65rem 0.8rem;text-align:center;">
                             <button type="button" onclick="app.searchInstitutionalStock('${it.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.55rem;background:rgba(239,68,68,0.1);color:#f87171;border:1px solid rgba(239,68,68,0.3);">🔍 Inspect</button>
                         </td>
@@ -267,10 +286,23 @@
                 badgeEl.style.color = data.verdict_badge === 'emerald' ? '#34d399' : data.verdict_badge === 'green' ? '#4ade80' : data.verdict_badge === 'rose' ? '#f87171' : '#fbbf24';
             }
             if (scoreTextEl) {
-                scoreTextEl.innerHTML = `Accumulation Score: <strong style="color:#38bdf8;">${data.accumulation_score} / 100</strong> | Net Tracked Flow: <strong style="color:#34d399;">+₹${data.net_flow_cr} Cr</strong> | Funds In/Out: <strong style="color:#34d399;">+${data.funds_accumulating_count}</strong> / <strong style="color:#f87171;">-${data.funds_selling_count}</strong>`;
+                const netSign = (data.net_flow_cr || 0) >= 0 ? '+' : '-';
+                const netCol = (data.net_flow_cr || 0) >= 0 ? '#34d399' : '#f87171';
+                const ret7dStr = data.return_7d_pct != null ? (data.return_7d_pct >= 0 ? `<strong style="color:#34d399;">+${data.return_7d_pct}%</strong>` : `<strong style="color:#f87171;">${data.return_7d_pct}%</strong>`) : '—';
+                const ret30dStr = data.return_30d_pct != null ? (data.return_30d_pct >= 0 ? `<strong style="color:#34d399;">+${data.return_30d_pct}%</strong>` : `<strong style="color:#f87171;">${data.return_30d_pct}%</strong>`) : '—';
+
+                scoreTextEl.innerHTML = `
+                    Accumulation Score: <strong style="color:#38bdf8;">${data.accumulation_score} / 100</strong>
+                    &nbsp;·&nbsp; Inflow: <strong style="color:#34d399;">+₹${(data.gross_inflow_cr || 0).toLocaleString()} Cr</strong>
+                    &nbsp;·&nbsp; Outflow: <strong style="color:#f87171;">-₹${(data.gross_outflow_cr || 0).toLocaleString()} Cr</strong>
+                    &nbsp;·&nbsp; Net: <strong style="color:${netCol};">${netSign}₹${Math.abs(data.net_flow_cr || 0).toLocaleString()} Cr</strong>
+                    &nbsp;·&nbsp; 7D: ${ret7dStr}
+                    &nbsp;·&nbsp; 30D: ${ret30dStr}
+                    &nbsp;·&nbsp; Funds In/Out: <strong style="color:#34d399;">+${data.funds_accumulating_count}</strong> / <strong style="color:#f87171;">-${data.funds_selling_count}</strong>
+                `;
             }
 
-            // 1. Shareholding pattern history with QoQ deltas
+            // 1. Shareholding pattern history with QoQ deltas in chronological descending order
             const patContainer = document.getElementById('instShareholdingPatternContainer');
             if (patContainer) {
                 const pats = data.shareholding_patterns || [];
