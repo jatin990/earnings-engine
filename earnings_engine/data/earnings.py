@@ -403,9 +403,20 @@ def ingest_nse_result_calendar(settings: Settings, days: int = 60) -> dict[str, 
     for entry in entries:
         if not isinstance(entry, dict):
             continue
-        # Only keep financial-results events (board meetings for results).
+        # Strict validation: Only keep genuine quarterly financial-results events.
+        # Exclude AGMs, EGMs, postal ballots, warrants, or general corporate board meetings.
         purpose = str(entry.get("purpose", "")).lower()
-        if "financial result" not in purpose and "results" not in purpose:
+        has_results_keyword = any(kw in purpose for kw in [
+            "financial result", "financial results", "quarterly result", "quarterly results",
+            "audited result", "audited results", "unaudited result", "unaudited results",
+            "accounts and results", "financial performance"
+        ])
+        is_excluded_event = any(kw in purpose for kw in [
+            "agm", "annual general meeting", "egm", "extraordinary general meeting",
+            "postal ballot", "dividend only", "fund raising only", "warrants allotment", "employee stock"
+        ]) and not ("financial result" in purpose or "quarterly result" in purpose)
+
+        if not has_results_keyword or is_excluded_event:
             continue
         sym = str(entry.get("symbol", "")).strip().upper()
         if not sym:
