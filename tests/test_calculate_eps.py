@@ -51,7 +51,19 @@ def test_calculate_or_fetch_eps_manual_override():
 
 
 def test_calculate_eps_api_endpoint():
+    from earnings_engine.data.auth import create_session_token
+    token = create_session_token(
+        user_id="test-admin",
+        role="owner",
+        email="admin@nexus.local",
+        name="Test Admin",
+        scopes=["*"],
+    )
     client = TestClient(app)
+    client.headers.update({
+        "Cookie": f"nexus_session={token}",
+        "Authorization": f"Bearer {token}",
+    })
     
     settings = Settings()
     conn = get_db_connection(settings)

@@ -73,7 +73,19 @@ def test_recalculate_ticker_metrics_flow(temp_settings):
 
 def test_recalculate_api_endpoints():
     """Test POST /api/v1/ticker/recalculate and GET /api/v1/ticker/audit-log endpoints."""
+    from earnings_engine.data.auth import create_session_token
+    token = create_session_token(
+        user_id="test-admin",
+        role="owner",
+        email="admin@nexus.local",
+        name="Test Admin",
+        scopes=["*"],
+    )
     client = TestClient(app)
+    client.headers.update({
+        "Cookie": f"nexus_session={token}",
+        "Authorization": f"Bearer {token}",
+    })
 
     # Missing ticker parameter should return 422 Unprocessable Entity
     bad_res = client.post("/api/v1/ticker/recalculate")

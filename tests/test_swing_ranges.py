@@ -163,7 +163,19 @@ def test_get_swing_setups_enriches_swing_range(monkeypatch, test_settings):
 
 def test_api_endpoints_swing_range(monkeypatch, test_settings):
     monkeypatch.setattr("earnings_engine.api.dashboard_api._settings", lambda: test_settings)
+    from earnings_engine.data.auth import create_session_token
+    token = create_session_token(
+        user_id="test-admin",
+        role="owner",
+        email="admin@nexus.local",
+        name="Test Admin",
+        scopes=["*"],
+    )
     client = TestClient(app)
+    client.headers.update({
+        "Cookie": f"nexus_session={token}",
+        "Authorization": f"Bearer {token}",
+    })
 
     # 1. POST /api/v1/swing-range
     resp = client.post("/api/v1/swing-range", json={
