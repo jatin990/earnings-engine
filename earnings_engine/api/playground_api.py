@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+import pandas as pd
+import yfinance as yf
 
 from earnings_engine.config import market_of
 

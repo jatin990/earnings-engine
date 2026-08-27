@@ -5245,7 +5245,7 @@ async def get_stock_institutional_details(ticker: str):
 @app.get("/api/v1/institutional/accumulating", tags=["Institutional Activity"])
 async def get_institutional_accumulating(
     min_score: float = Query(55.0, description="Minimum accumulation score (0-100)"),
-    limit: int = Query(25, ge=1, le=100, description="Max stocks to return"),
+    limit: int = Query(25, ge=1, le=500, description="Max stocks to return"),
 ):
     """Screen for equities with aggressive mutual fund, FII, and super investor buying."""
     from earnings_engine.data.institutional_accumulation import get_top_accumulated_stocks
@@ -5255,7 +5255,7 @@ async def get_institutional_accumulating(
 
 @app.get("/api/v1/institutional/distributing", tags=["Institutional Activity"])
 async def get_institutional_distributing(
-    limit: int = Query(20, ge=1, le=100, description="Max stocks to return"),
+    limit: int = Query(20, ge=1, le=500, description="Max stocks to return"),
 ):
     """Screen for equities where institutions are actively selling or trimming stake."""
     from earnings_engine.data.institutional_accumulation import get_top_distributed_stocks
@@ -5265,7 +5265,7 @@ async def get_institutional_distributing(
 
 @app.get("/api/v1/institutional/funds", tags=["Institutional Activity"])
 async def get_institutional_funds_list(
-    limit: int = Query(50, ge=1, le=100, description="Max funds to return"),
+    limit: int = Query(50, ge=1, le=500, description="Max funds to return"),
 ):
     """List tracked institutional funds and super investors with their total tracked positions and buying/selling stats."""
     from earnings_engine.data.institutional_accumulation import get_all_funds_activity

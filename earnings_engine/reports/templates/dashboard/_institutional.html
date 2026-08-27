@@ -102,6 +102,13 @@
                             </tbody>
                         </table>
                     </div>
+                    <!-- Accumulation Load More Footer -->
+                    <div id="instAccFooterBar" style="padding:0.55rem 0.8rem;background:#0b1329;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                        <span id="instAccCountBadge" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">Showing 0 setups</span>
+                        <button type="button" id="btnInstLoadMoreAcc" onclick="app.loadMoreInstitutionalEquities('accumulating')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.25rem 0.65rem;background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.3rem;">
+                            <span>📥</span> Load More Accumulating (+25)
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Distribution Table (Compact) -->
@@ -123,6 +130,13 @@
                                 <!-- Dynamic rows -->
                             </tbody>
                         </table>
+                    </div>
+                    <!-- Distribution Load More Footer -->
+                    <div id="instDistFooterBar" style="padding:0.55rem 0.8rem;background:#180d14;border-top:1px solid rgba(239,68,68,0.18);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                        <span id="instDistCountBadge" style="font-size:0.68rem;color:#fca5a5;font-family:var(--font-mono);">Showing 0 setups</span>
+                        <button type="button" id="btnInstLoadMoreDist" onclick="app.loadMoreInstitutionalEquities('distributing')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.25rem 0.65rem;background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.3rem;">
+                            <span>📥</span> Load More Distributing (+25)
+                        </button>
                     </div>
                 </div>
             </div>
@@ -263,6 +277,13 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <!-- Investors Directory Load More Footer -->
+            <div id="instFundsFooterBar" style="padding:0.65rem 1rem;background:#0b1329;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                <span id="instFundsCountBadge" style="font-size:0.72rem;color:#94a3b8;font-family:var(--font-mono);">Showing 0 funds & whales</span>
+                <button type="button" id="btnInstLoadMoreFunds" onclick="app.loadMoreInstitutionalFunds()" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.3rem 0.8rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.35rem;">
+                    <span>📥</span> Load More Funds & Whales (+25)
+                </button>
             </div>
         </div>
     </div>
