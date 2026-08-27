@@ -333,23 +333,214 @@ async def get_earnings_freshness(
     ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()] if tickers else None
     try:
         from earnings_engine.data.earnings import get_watchlist_earnings_freshness
-        return await asyncio.to_thread(
+        freshness = await asyncio.to_thread(
             get_watchlist_earnings_freshness,
             watchlist_name=watchlist,
             tickers=ticker_list,
             settings=_settings,
         )
+        return {"success": True, **(freshness or {})}
     except Exception as e:
         logger.exception("Error in get_earnings_freshness: %s", e)
         raise HTTPException(status_code=500, detail=f"Error checking freshness: {str(e)}")
 
 
+@router.get("/api/v1/dashboard/ai-forecast/latest")
+async def dashboard_ai_forecast_latest():
+    """Get the latest cached multi-modal AI prediction for all tracked stocks."""
+    try:
+        return await asyncio.to_thread(dashboard_api.get_latest_ai_forecasts_api)
+    except Exception as e:
+        logger.exception("Error in dashboard_ai_forecast_latest: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching AI forecasts: {str(e)}")
+
+
+@router.get("/api/v1/dashboard/ai-forecast/news/{ticker}")
+async def dashboard_ai_forecast_news(
+    ticker: str,
+    limit: int = Query(10, description="Max number of news articles to fetch"),
+):
+    """Fetch real-time financial news, world event topics, and sentiment scores for a stock."""
+    try:
+        return await asyncio.to_thread(dashboard_api.get_ticker_news_api, ticker=ticker, limit=limit)
+    except Exception as e:
+        logger.exception("Error in dashboard_ai_forecast_news for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching news for {ticker}: {str(e)}")
+
+
+@router.post("/api/v1/dashboard/ai-forecast/run")
+async def dashboard_ai_forecast_run(request: dict):
+    """Run on-demand multi-modal AI prediction synthesizing news, world events, volume, price action, and swing levels."""
+    try:
+        ticker = request.get("ticker")
+        tickers = request.get("tickers")
+        timeframe_days = int(request.get("timeframe_days", 14))
+        force = bool(request.get("force", False))
+        if ticker:
+            return await asyncio.to_thread(
+                dashboard_api.run_ai_forecast_for_ticker_api,
+                ticker=ticker,
+                timeframe_days=timeframe_days,
+                force=force,
+            )
+        if tickers:
+            return await asyncio.to_thread(
+                dashboard_api.run_ai_forecast_batch_api,
+                tickers=tickers,
+                timeframe_days=timeframe_days,
+                force=force,
+            )
+        raise HTTPException(status_code=400, detail="Either 'ticker' or 'tickers' must be provided.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error running AI forecast: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error running AI forecast: {str(e)}")
+
+
+@router.get("/api/v1/dashboard/kronos/benchmark-ohlcv/{ticker}")
+async def dashboard_kronos_benchmark_ohlcv(
+    ticker: str,
+    run_at: str | None = Query(None, description="Optional specific run_at timestamp"),
+    force_refresh: bool = Query(False, description="Force re-fetch of latest prices from providers"),
+):
+    """Benchmark the 14-day forecasted OHLCV series against realized daily market bars."""
+    try:
+        from urllib.parse import unquote
+        ticker_decoded = unquote(ticker)
+        run_at_decoded = unquote(run_at) if run_at else None
+        return await asyncio.to_thread(
+            dashboard_api.get_kronos_ohlcv_benchmark_api,
+            ticker=ticker_decoded,
+            run_at=run_at_decoded,
+            force_refresh=force_refresh,
+        )
+    except Exception as e:
+        logger.exception("Error in dashboard_kronos_benchmark_ohlcv for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error benchmarking OHLCV series: {str(e)}")
+
+
+@router.post("/api/v1/dashboard/results/summarize")
+async def dashboard_results_summarize(request: dict):
+    """Generate an LLM summary for the provided results rows."""
+    items = request.get("items")
+    try:
+        if not items:
+            days = request.get("days", 14)
+            market = request.get("market")
+            items = await asyncio.to_thread(dashboard_api.get_upcoming_results, days=days, market=market)
+        if not items:
+            return {"success": True, "summary": "No results to summarize.", "model": "none"}
+        from earnings_engine.data.market_context import summarize_results_with_llm
+        return await asyncio.to_thread(summarize_results_with_llm, items)
+    except Exception as e:
+        logger.exception("Error summarizing results: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error summarizing results: {str(e)}")
+
+
+@router.post("/api/v1/earnings-radar/repeaters/batch-forecast")
+async def batch_forecast_repeaters(
+    universe: str | None = Query(None, description="Universe to batch forecast"),
+    limit: int = Query(15, ge=1, le=40, description="Max stocks to process in batch"),
+):
+    """Run background batch AI Forward analysis for top quarter repeat candidates."""
+    try:
+        from earnings_engine.data import quarter_repeaters as repeaters_mod
+        candidates = await asyncio.to_thread(
+            repeaters_mod.scan_quarter_repeaters,
+            settings=_settings,
+            universe=universe,
+            limit=limit,
+        )
+        return {"success": True, "count": len(candidates), "candidates": candidates}
+    except Exception as e:
+        logger.exception("Error in batch_forecast_repeaters: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error batch forecasting repeaters: {str(e)}")
+
+
+@router.get("/api/v1/market-caps")
+async def get_all_market_caps():
+    """Get all cached market caps."""
+    try:
+        from earnings_engine.data.universe import load_all_market_caps
+        return await asyncio.to_thread(load_all_market_caps, _settings)
+    except Exception as e:
+        logger.exception("Error fetching market caps: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching market caps: {str(e)}")
+
+
+@router.get("/api/v1/market-cap/{ticker}")
+async def get_single_market_cap(ticker: str):
+    """Get cached market cap for a single ticker."""
+    try:
+        from earnings_engine.data.universe import load_market_cap
+        cap = await asyncio.to_thread(load_market_cap, ticker.upper().strip(), _settings)
+        return {"ticker": ticker.upper().strip(), "market_cap": cap}
+    except Exception as e:
+        logger.exception("Error fetching market cap for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/price-history/{ticker}")
+async def get_price_history(
+    ticker: str,
+    start_date: str | None = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="End date (YYYY-MM-DD)"),
+    force_refresh: bool = Query(False, description="Force refresh from yfinance"),
+):
+    """Get OHLCV price history for a ticker."""
+    try:
+        from earnings_engine.data import prices as prices_mod
+        df = await asyncio.to_thread(prices_mod.fetch_prices, ticker, _settings, force=force_refresh)
+        if df.empty:
+            return []
+        if start_date:
+            df = df[df.index >= start_date]
+        if end_date:
+            df = df[df.index <= end_date]
+        records = []
+        for dt, row in df.iterrows():
+            records.append({
+                "date": dt.strftime("%Y-%m-%d") if hasattr(dt, "strftime") else str(dt),
+                "open": float(row.get("open", 0.0)),
+                "high": float(row.get("high", 0.0)),
+                "low": float(row.get("low", 0.0)),
+                "close": float(row.get("close", 0.0)),
+                "volume": int(row.get("volume", 0)),
+            })
+        return records
+    except Exception as e:
+        logger.exception("Error fetching price history for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching price history: {str(e)}")
+
+
+@router.post("/api/v1/market/recent-additions/sync-watchlist")
+async def api_sync_recent_addition_to_watchlist(
+    ticker: str = Query(..., description="Stock ticker symbol (e.g. SHIPROCKET.NS)"),
+    watchlist: str = Query("my_watchlist", description="Target watchlist name"),
+):
+    """One-click addition of a newly listed stock to a watchlist."""
+    try:
+        from earnings_engine.api.stock_api import sync_recent_additions_to_watchlist
+        return await asyncio.to_thread(sync_recent_additions_to_watchlist, ticker=ticker, watchlist_name=watchlist, settings=_settings)
+    except Exception as e:
+        logger.exception("Error syncing recent addition to watchlist: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error adding ticker to watchlist: {str(e)}")
+
+
 @router.post("/api/v1/earnings/refresh-watchlist")
 async def refresh_watchlist_earnings(request: dict | None = None):
     """Refresh earnings calendar dates for a watchlist."""
-    name = (request or {}).get("name", "DEFAULT")
+    watchlist = (request or {}).get("watchlist") or (request or {}).get("name", "DEFAULT")
+    tickers = (request or {}).get("tickers")
     try:
-        return await asyncio.to_thread(dashboard_api.ingest_earnings_incremental_api, market=name)
+        from earnings_engine.data import earnings as earnings_mod
+        return await asyncio.to_thread(
+            earnings_mod.refresh_watchlist_earnings,
+            watchlist_name=watchlist,
+            tickers=tickers,
+            settings=_settings,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error refreshing watchlist earnings: {str(e)}")
 

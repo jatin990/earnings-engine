@@ -26,6 +26,7 @@ router = APIRouter(tags=["News Catalysts & Filings"])
 
 
 @router.get("/api/v1/news/catalysts")
+@router.get("/api/v1/catalysts")
 async def get_news_catalysts_endpoint(
     market: str | None = Query("ALL"),
     category: str | None = Query(None),
@@ -57,13 +58,14 @@ async def get_news_catalyst_stats():
     """Retrieve aggregated counts and category distribution of news catalysts."""
     try:
         stats = await asyncio.to_thread(get_catalyst_summary_stats, settings=_settings)
-        return {"success": True, **stats}
+        return {"success": True, "stats": stats, **(stats or {})}
     except Exception as e:
         logger.exception("Error in get_news_catalyst_stats: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching catalyst stats: {str(e)}")
 
 
 @router.get("/api/v1/news/outcomes")
+@router.get("/api/v1/catalysts/outcomes")
 async def get_news_outcomes_endpoint(
     category: str | None = Query(None),
     direction: str | None = Query(None),
@@ -112,7 +114,7 @@ async def get_news_trade_metrics_endpoint(
             category=category,
             min_impact=min_impact,
         )
-        return {"success": True, **metrics}
+        return {"success": True, "metrics": metrics, **(metrics or {})}
     except Exception as e:
         logger.exception("Error in get_news_trade_metrics: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching trade metrics: {str(e)}")

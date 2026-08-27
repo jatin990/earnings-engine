@@ -136,9 +136,29 @@ class CreateCardRequest(BaseModel):
 
 class CreateCardOtpRequest(BaseModel):
     card_id: str
-    transaction_amount: float
-    merchant_name: str
-    purpose: str = "Online Travel Booking"
+    requested_by_name: str = "Friend"
+    amount: float = 0.0
+    merchant: str = ""
+    purpose: str | None = "Online Travel Booking"
+    urgency: str = "normal"
+    transaction_amount: float | None = None
+    merchant_name: str | None = None
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.transaction_amount is not None and not self.amount:
+            self.amount = self.transaction_amount
+        if self.merchant_name and not self.merchant:
+            self.merchant = self.merchant_name
+
+
+class ApproveCardOtpRequest(BaseModel):
+    otp_code: str | None = None
+    duration_minutes: int = 5
+    response_notes: str | None = None
+
+
+class RejectCardOtpRequest(BaseModel):
+    response_notes: str | None = None
 
 
 class ResolveCardOtpRequest(BaseModel):
@@ -161,10 +181,14 @@ class CalculateEpsRequest(BaseModel):
 
 
 class ConsensusPredictRequest(BaseModel):
-    ticker: str
+    ticker: str | None = None
+    tickers: list[str] | None = None
+    timeframe_days: int = 14
     event_date: str | None = None
+    force: bool = False
     force_refresh: bool = False
     models: list[str] | None = None
+    local_model_url: str | None = None
 
 
 class ConsensusSettleRequest(BaseModel):

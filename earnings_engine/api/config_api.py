@@ -157,6 +157,10 @@ def save_env_var(payload: EnvVarPayload) -> dict[str, Any]:
     return {"success": True, "key": key, "value": val}
 
 
+# Backward-compatible alias
+set_env_var = save_env_var
+
+
 def delete_env_var(key: str) -> dict[str, Any]:
     """Delete an environment variable from local .env."""
     if is_server_environment():

@@ -372,3 +372,8 @@ def clear_telemetry_records(settings: Settings | None = None) -> dict[str, Any]:
         conn.execute("DELETE FROM meta_data")
         conn.commit()
     return {"success": True, "message": "Telemetry records cleared"}
+
+
+# Aliases for backward compatibility
+get_telemetry_logs = get_telemetry_records
+clear_telemetry_logs = clear_telemetry_records

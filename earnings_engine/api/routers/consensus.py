@@ -104,8 +104,14 @@ def _scan_and_cache_local_models(host: str | None = None) -> dict[str, Any]:
 async def get_consensus_models():
     """Return available AI models, their display metadata, and live rate limit quotas."""
     try:
+        from earnings_engine.rate_limits import get_ratelimits_summary
         models = get_models_rate_limits()
-        return {"models": models, "default_models": DEFAULT_MODELS}
+        return {
+            "success": True,
+            "models": models,
+            "default_models": DEFAULT_MODELS,
+            "rate_limits": get_ratelimits_summary(_settings),
+        }
     except Exception as e:
         logger.exception("Error fetching consensus models: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -132,7 +138,7 @@ async def get_consensus_accuracy_stats(
     """Retrieve historical accuracy, hit rate, and Brier score across all models."""
     try:
         stats = await asyncio.to_thread(get_accuracy_stats, settings=_settings)
-        return stats
+        return {"success": True, **(stats or {})}
     except Exception as e:
         logger.exception("Error in get_consensus_accuracy_stats: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -147,6 +153,28 @@ async def settle_consensus_predictions(req: ConsensusSettleRequest = ConsensusSe
     except Exception as e:
         logger.exception("Error in settle_consensus_predictions: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/consensus/audit")
+async def get_consensus_audit_records(
+    ticker: str | None = Query(None, description="Optional ticker symbol filter"),
+    status: str | None = Query(None, description="Status filter (SETTLED, PENDING)"),
+    limit: int = Query(50, ge=1, le=5000),
+):
+    """Historical audit of consensus predictions including settlement outcomes and failure analyses."""
+    try:
+        from earnings_engine.consensus import storage
+        preds = await asyncio.to_thread(
+            storage.get_predictions,
+            settings=_settings,
+            ticker=ticker.upper().strip() if ticker else None,
+            status=status,
+            limit=limit,
+        )
+        return {"success": True, "count": len(preds), "audit_records": preds}
+    except Exception as e:
+        logger.exception("Error in get_consensus_audit_records: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching consensus audit records: {str(e)}")
 
 
 @router.get("/api/v1/consensus/latest")
@@ -194,22 +222,108 @@ async def get_cached_consensus_prediction(
 @router.post("/api/v1/consensus/predict")
 async def run_consensus_predict(req: ConsensusPredictRequest):
     """Execute live multi-model AI consensus reasoning workflow."""
-    ticker = req.ticker.upper().strip()
-    try:
-        if not req.force_refresh:
-            preds = await asyncio.to_thread(get_predictions, settings=_settings, ticker=ticker, limit=1)
-            if preds and preds[0].get("consensus_direction") is not None:
-                return {"success": True, "source": "cache", "prediction": preds[0]}
+    from earnings_engine.consensus import context_builder, model_runner, aggregator, storage
+    from earnings_engine.rate_limits import get_models_rate_limits, get_ratelimits_summary
 
-        context = await asyncio.to_thread(build_context, ticker=ticker, settings=_settings)
-        model_predictions = await asyncio.to_thread(run_consensus_models, context=context, models=req.models)
-        as_of_price = context.get("price_action", {}).get("current_price", 0.0) or context.get("current_price", 0.0)
-        consensus = aggregate_predictions(model_predictions, ticker, context.get("earnings_date", req.event_date or ""), as_of_price=as_of_price)
-        eval_date = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
-        row_id = await asyncio.to_thread(save_prediction, consensus, eval_date, _settings)
-        consensus["id"] = row_id
+    target_tickers: list[str] = []
+    if req.ticker:
+        target_tickers.append(req.ticker.strip().upper())
+    if req.tickers:
+        for t in req.tickers:
+            if t and t.strip().upper() not in target_tickers:
+                target_tickers.append(t.strip().upper())
 
-        return {"success": True, "source": "live", "prediction": consensus}
-    except Exception as e:
-        logger.exception("Error generating consensus prediction for %s: %s", ticker, e)
-        raise HTTPException(status_code=500, detail=f"Consensus prediction failed: {str(e)}")
+    if not target_tickers:
+        raise HTTPException(status_code=400, detail="Must provide at least one ticker symbol.")
+
+    results: list[dict[str, Any]] = []
+    for ticker in target_tickers:
+        try:
+            if not req.force_refresh and not req.force:
+                cached_preds = await asyncio.to_thread(storage.get_predictions, settings=_settings, ticker=ticker, limit=1)
+                if cached_preds:
+                    latest = cached_preds[0]
+                    created_at_str = latest.get("created_at") or ""
+                    is_usable_cache = False
+                    try:
+                        created_dt = datetime.fromisoformat(created_at_str)
+                        age_secs = (datetime.now() - created_dt).total_seconds()
+                        if age_secs < 86400 or latest.get("settlement_status") == "PENDING":
+                            is_usable_cache = True
+                    except Exception:
+                        is_usable_cache = bool(latest.get("consensus_direction"))
+
+                    if is_usable_cache:
+                        logger.info("[CONSENSUS-CACHE] Returning cached prediction for %s (id=%s, direction=%s)",
+                                    ticker, latest.get("id"), latest.get("consensus_direction"))
+                        results.append(latest)
+                        continue
+
+            ctx = await asyncio.to_thread(context_builder.build_context, ticker=ticker, timeframe_days=req.timeframe_days, settings=_settings)
+            as_of_price = ctx.get("price_action", {}).get("current_price") or ctx.get("current_price", 0.0)
+            if not as_of_price or as_of_price <= 0:
+                try:
+                    import yfinance as yf
+                    info = yf.Ticker(ticker).fast_info
+                    as_of_price = float(info.last_price or 0.0)
+                except Exception:
+                    pass
+
+            model_outputs = await asyncio.to_thread(
+                model_runner.run_consensus_models,
+                context=ctx,
+                models=req.models,
+                local_url=req.local_model_url,
+            )
+
+            # If running a single model (or subset), merge with previous model outputs to keep 4-model matrix updated
+            if req.models and len(req.models) < len(model_runner.DEFAULT_MODELS):
+                cached_preds = await asyncio.to_thread(storage.get_predictions, settings=_settings, ticker=ticker, limit=1)
+                if cached_preds:
+                    prev_models = cached_preds[0].get("models_breakdown", [])
+                    new_ids = {m.get("model_id") for m in model_outputs}
+                    new_names = {m.get("model_name") for m in model_outputs}
+                    merged = [
+                        m for m in prev_models
+                        if m.get("model_id") not in new_ids and m.get("model_name") not in new_names
+                    ]
+                    merged.extend(model_outputs)
+                    model_outputs = merged
+
+            consensus = aggregator.aggregate_predictions(
+                model_results=model_outputs,
+                ticker=ticker,
+                as_of_price=as_of_price,
+                timeframe_days=req.timeframe_days,
+            )
+
+            eval_date = (datetime.now() + timedelta(days=req.timeframe_days)).strftime("%Y-%m-%d")
+            pred_id = await asyncio.to_thread(storage.save_prediction, consensus, evaluation_date=eval_date, settings=_settings)
+            consensus["id"] = pred_id
+            consensus["evaluation_date"] = eval_date
+            results.append(consensus)
+        except Exception as e:
+            logger.error("[CONSENSUS-API] Error predicting for %s: %s", ticker, e)
+            results.append({"ticker": ticker, "error": str(e)})
+
+    return {
+        "success": True,
+        "count": len(results),
+        "prediction": results[0] if results else None,
+        "predictions": results,
+        "results": results,
+        "models": get_models_rate_limits(),
+        "rate_limits": get_ratelimits_summary(_settings),
+    }
+
+
+@router.post("/api/v1/consensus/run/{ticker}")
+@router.get("/api/v1/consensus/run/{ticker}")
+async def run_consensus_for_ticker_path(
+    ticker: str,
+    force: bool = Query(True),
+    timeframe_days: int = Query(14),
+):
+    """Execute consensus prediction for a specific ticker path parameter."""
+    req = ConsensusPredictRequest(ticker=ticker, force=force, timeframe_days=timeframe_days)
+    return await run_consensus_predict(req)

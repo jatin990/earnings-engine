@@ -263,6 +263,7 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
     after the market closes, are reused without re-downloading.
     """
     sym = canonical_symbol(ticker)
+    fetch_symbol = sym
     if not force:
         cached_df = load_prices(sym, settings)
         if not cached_df.empty and prices_recent_enough(sym, settings):

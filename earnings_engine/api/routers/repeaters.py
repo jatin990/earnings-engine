@@ -17,20 +17,50 @@ router = APIRouter(tags=["Quarter Repeaters & Seasonality"])
 
 @router.get("/api/v1/earnings-radar/repeaters")
 async def get_quarter_repeaters(
-    universe: str | None = Query(None, description="Universe filter (None = all)"),
-    min_beat_rate: float = Query(0.0, ge=0.0, le=1.0),
-    limit: int = Query(60, ge=1, le=200),
+    universe: str | None = Query(None, description="Universe or watchlist to screen (e.g. nifty_50, nse_top, nse_large_cap, us_top, all)"),
+    min_beat_pct: float = Query(0.0, description="Minimum prior EPS surprise percentage"),
+    min_week_high_pct: float = Query(2.5, description="Minimum post-earnings week peak high percentage"),
+    limit: int = Query(50, ge=1, le=150, description="Max candidates to return"),
+    verdict: str | None = Query(None, description="Filter by AI repeat verdict (e.g. STRONG_REPEAT_BEAT, MODERATE_BEAT)"),
 ):
-    """Retrieve recurring seasonal quarter repeater candidates."""
+    """Screen for companies that had stellar past earnings beats & week highs, with AI continuity forecasts."""
     try:
-        repeaters = await asyncio.to_thread(
+        candidates = await asyncio.to_thread(
             repeaters_mod.scan_quarter_repeaters,
             settings=_settings,
             universe=universe,
-            min_beat_pct=min_beat_rate,
+            min_beat_pct=min_beat_pct,
+            min_week_high_pct=min_week_high_pct,
             limit=limit,
         )
-        return {"success": True, "count": len(repeaters), "repeaters": repeaters}
+        if verdict:
+            candidates = [c for c in candidates if c.get("ai_verdict") == verdict]
+
+        total_screened = len(candidates)
+        avg_beat = round(sum(c.get("prior_surprise_pct", 0) for c in candidates) / total_screened, 1) if total_screened else 0.0
+        top_conviction = max(candidates, key=lambda x: x.get("conviction_score", 0)) if candidates else None
+
+        # Determine dominant industry buzz
+        buzz_counts: dict[str, int] = {}
+        for c in candidates:
+            b = c.get("industry_buzz", "Neutral")
+            buzz_counts[b] = buzz_counts.get(b, 0) + 1
+        dominant_buzz = max(buzz_counts.items(), key=lambda x: x[1])[0] if buzz_counts else "Stable"
+
+        return {
+            "success": True,
+            "count": total_screened,
+            "universe": universe or "ALL",
+            "summary": {
+                "total_screened": total_screened,
+                "avg_prior_beat_pct": avg_beat,
+                "top_pick_ticker": top_conviction.get("ticker") if top_conviction else "—",
+                "top_pick_score": top_conviction.get("conviction_score") if top_conviction else 0,
+                "dominant_industry_buzz": dominant_buzz,
+            },
+            "candidates": candidates,
+            "repeaters": candidates,
+        }
     except Exception as e:
         logger.exception("Error in get_quarter_repeaters: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching quarter repeaters: {str(e)}")
@@ -38,11 +68,27 @@ async def get_quarter_repeaters(
 
 @router.get("/api/v1/earnings-radar/repeaters/forecast/{ticker}")
 @router.post("/api/v1/earnings-radar/repeaters/forecast/{ticker}")
-async def get_quarter_repeater_forecast(ticker: str):
-    """Retrieve seasonal cyclical trajectory and historical repeat pattern for a specific ticker."""
+async def get_quarter_repeater_forecast(
+    ticker: str,
+    model_name: str | None = Query(None, description="Specific local Ollama or OpenRouter model"),
+    provider: str = Query("auto", description="Inference provider: 'auto', 'ollama', or 'openrouter'"),
+):
+    """Run on-demand AI Forward reasoning for upcoming quarter earnings continuity for a single ticker."""
+    sym = ticker.strip().upper()
     try:
-        forecast = await asyncio.to_thread(repeaters_mod.get_cached_repeater_prediction, ticker=ticker, settings=_settings)
-        return {"success": True, "ticker": ticker, **(forecast or {"message": "No forecast cached for this ticker"})}
+        forecast = await asyncio.to_thread(
+            repeaters_mod.generate_ai_repeater_forecast,
+            sym,
+            settings=_settings,
+            model_name=model_name,
+            provider=provider,
+        )
+        return {
+            "success": True,
+            "ticker": sym,
+            "forecast": forecast,
+            **(forecast or {}),
+        }
     except Exception as e:
         logger.exception("Error in get_quarter_repeater_forecast for %s: %s", ticker, e)
         raise HTTPException(status_code=500, detail=f"Error fetching repeater forecast: {str(e)}")

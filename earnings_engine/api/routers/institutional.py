@@ -48,7 +48,7 @@ async def get_institutional_accumulating(
             limit=limit,
             settings=_settings,
         )
-        return {"success": True, "count": len(stocks), "stocks": stocks}
+        return {"success": True, "count": len(stocks), "items": stocks, "stocks": stocks}
     except Exception as e:
         logger.exception("Error in get_institutional_accumulating: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching accumulating stocks: {str(e)}")
@@ -61,7 +61,7 @@ async def get_institutional_distributing(
     """Retrieve stocks experiencing institutional distribution or stakeholder exits."""
     try:
         stocks = await asyncio.to_thread(inst_mod.get_top_distributed_stocks, limit=limit, settings=_settings)
-        return {"success": True, "count": len(stocks), "stocks": stocks}
+        return {"success": True, "count": len(stocks), "items": stocks, "stocks": stocks}
     except Exception as e:
         logger.exception("Error in get_institutional_distributing: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching distributing stocks: {str(e)}")
@@ -78,6 +78,17 @@ async def get_top_institutional_funds(
     except Exception as e:
         logger.exception("Error in get_top_institutional_funds: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching funds: {str(e)}")
+
+
+@router.get("/api/v1/institutional/fund/{fund_name:path}")
+async def get_fund_portfolio(fund_name: str):
+    """Reverse lookup: retrieve all equities held and recent actions for a specific mutual fund or super investor."""
+    try:
+        items = await asyncio.to_thread(inst_mod.get_fund_portfolio_activity, fund_name=fund_name, settings=_settings)
+        return {"success": True, "fund_name": fund_name, "count": len(items), "holdings": items}
+    except Exception as e:
+        logger.exception("Error in get_fund_portfolio for %s: %s", fund_name, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching fund portfolio: {str(e)}")
 
 
 @router.get("/api/v1/institutional/stock/{ticker}")

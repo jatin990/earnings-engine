@@ -343,6 +343,95 @@ async def remove_watchlist_item_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/v1/universe/files")
+async def get_universe_files_endpoint():
+    """Get list of available universes from SQLite."""
+    try:
+        from earnings_engine.data.universe import list_universes
+        universes = await asyncio.to_thread(list_universes, _settings)
+        return {"files": [u["name"] for u in universes]}
+    except Exception as e:
+        logger.exception("Error in get_universe_files: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error listing universes: {str(e)}")
+
+
+@router.post("/api/v1/universe/add")
+async def add_to_universe_api(request: dict):
+    """Add ticker(s) to a universe in SQLite."""
+    try:
+        from earnings_engine.data.universe import add_to_universe, get_universe
+        file_name = request.get("file", "") or request.get("name", "")
+        tickers = request.get("tickers", [])
+        if not file_name or not tickers:
+            raise HTTPException(status_code=400, detail="Universe name and tickers are required")
+        added = []
+        for ticker in tickers:
+            ticker = ticker.strip().upper()
+            if ticker:
+                if await asyncio.to_thread(add_to_universe, file_name, ticker, _settings):
+                    added.append(ticker)
+        total_tickers = await asyncio.to_thread(get_universe, file_name, _settings)
+        return {
+            "success": True,
+            "file": file_name,
+            "added": added,
+            "total": len(total_tickers or []),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error adding to universe: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error adding tickers: {str(e)}")
+
+
+@router.post("/api/v1/universe/remove")
+async def remove_from_universe_api(request: dict):
+    """Remove ticker(s) from a universe in SQLite."""
+    try:
+        from earnings_engine.data.universe import remove_from_universe, get_universe
+        file_name = request.get("file", "") or request.get("name", "")
+        tickers = request.get("tickers", [])
+        if not file_name or not tickers:
+            raise HTTPException(status_code=400, detail="Universe name and tickers are required")
+        removed = []
+        for ticker in tickers:
+            ticker = ticker.strip().upper()
+            if ticker:
+                if await asyncio.to_thread(remove_from_universe, file_name, ticker, _settings):
+                    removed.append(ticker)
+        total_tickers = await asyncio.to_thread(get_universe, file_name, _settings)
+        return {
+            "success": True,
+            "file": file_name,
+            "removed": removed,
+            "total": len(total_tickers or []),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error removing from universe: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error removing tickers: {str(e)}")
+
+
+@router.post("/api/v1/universe/create")
+async def create_universe_endpoint(request: dict):
+    """Create a new watchlist/universe file."""
+    try:
+        file_name = request.get("file", "") or request.get("name", "")
+        tickers = request.get("tickers", [])
+        if not file_name:
+            raise HTTPException(status_code=400, detail="File name is required")
+        result = await asyncio.to_thread(dashboard_api.create_universe_file, file_name, tickers)
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to create universe"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error creating universe: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error creating universe: {str(e)}")
+
+
 @router.get("/api/v1/universe/{name}")
 async def get_universe_tickers_endpoint(name: str):
     """Retrieve tickers belonging to a market universe."""

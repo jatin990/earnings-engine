@@ -14,6 +14,7 @@ from earnings_engine.api.server import app
 
 def test_rate_limit_tracker_sliding_windows():
     tracker = RateLimitTracker()
+    tracker._request_timestamps.clear()
 
     # Record requests for openrouter
     tracker.record_request("openrouter")

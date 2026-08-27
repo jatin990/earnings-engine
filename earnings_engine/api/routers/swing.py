@@ -17,8 +17,9 @@ router = APIRouter(tags=["Swing Ranges & Strategy Backtest"])
 
 
 @router.get("/api/v1/swing-range")
+@router.get("/api/v1/dashboard/swing-range")
 async def get_swing_range_endpoint(
-    watchlist: str = Query(..., description="Watchlist name"),
+    watchlist: str = Query("my_watchlist", description="Watchlist name"),
     ticker: str = Query(..., description="Stock ticker symbol"),
 ):
     """Retrieve support and resistance channel bounds and cycle counts."""
@@ -32,7 +33,14 @@ async def get_swing_range_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/v1/swing-ranges/{watchlist}/{ticker}")
+async def get_swing_range_by_path(watchlist: str, ticker: str):
+    """Retrieve swing range by path parameters."""
+    return await get_swing_range_endpoint(watchlist=watchlist, ticker=ticker)
+
+
 @router.get("/api/v1/swing-range/list")
+@router.get("/api/v1/dashboard/swing-range/list")
 async def list_swing_ranges_endpoint(
     watchlist: str | None = Query(None, description="Watchlist name filter"),
 ):
@@ -46,16 +54,19 @@ async def list_swing_ranges_endpoint(
 
 
 @router.post("/api/v1/swing-range")
+@router.post("/api/v1/dashboard/swing-range")
+@router.post("/api/v1/swing-range/set")
+@router.post("/api/v1/swing-ranges/save")
 async def set_swing_range_endpoint(request: dict):
     """Set or override manual swing support/resistance bounds."""
-    watchlist = request.get("watchlist")
+    watchlist = request.get("watchlist", "my_watchlist")
     ticker = request.get("ticker")
     lower = request.get("lower") if request.get("lower") is not None else request.get("support")
     upper = request.get("upper") if request.get("upper") is not None else request.get("resistance")
     cycles = request.get("cycles")
     
-    if not watchlist or not ticker or lower is None or upper is None:
-        raise HTTPException(status_code=400, detail="watchlist, ticker, lower/support, and upper/resistance are required")
+    if not ticker or lower is None or upper is None:
+        raise HTTPException(status_code=400, detail="ticker, lower/support, and upper/resistance are required")
     try:
         saved = await asyncio.to_thread(
             swing_mod.set_user_range,
@@ -73,8 +84,9 @@ async def set_swing_range_endpoint(request: dict):
 
 
 @router.delete("/api/v1/swing-range")
+@router.delete("/api/v1/dashboard/swing-range")
 async def delete_swing_range_endpoint(
-    watchlist: str = Query(...),
+    watchlist: str = Query("my_watchlist"),
     ticker: str = Query(...),
 ):
     """Delete manual swing range override to revert to automated channel detection."""
@@ -84,6 +96,29 @@ async def delete_swing_range_endpoint(
     except Exception as e:
         logger.exception("Error deleting swing range: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/swing-range/auto-detect")
+@router.post("/api/v1/dashboard/swing-range/auto-detect")
+async def auto_detect_swing_range_endpoint(request: dict):
+    """Trigger automated swing range detection for a ticker."""
+    ticker = request.get("ticker")
+    watchlist = request.get("watchlist", "my_watchlist")
+    if not ticker:
+        raise HTTPException(status_code=400, detail="ticker is required")
+    try:
+        res = await asyncio.to_thread(dashboard_api.get_swing_range_api, watchlist=watchlist, ticker=ticker)
+        return {"success": True, **(res or {})}
+    except Exception as e:
+        logger.exception("Error auto-detecting swing range for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Auto detection failed: {str(e)}")
+
+
+@router.post("/api/v1/swing-ranges/auto-detect/{ticker}")
+@router.post("/api/v1/swing-ranges/auto-detect/{watchlist}/{ticker}")
+async def auto_detect_swing_range_path(ticker: str, watchlist: str = "my_watchlist"):
+    """Trigger automated swing range detection by path parameter."""
+    return await auto_detect_swing_range_endpoint({"ticker": ticker, "watchlist": watchlist})
 
 
 @router.get("/api/v1/dashboard/swing")
@@ -102,8 +137,10 @@ async def get_swing_setups_endpoint(
 
 
 @router.get("/api/v1/swing-range/cycles")
+@router.get("/api/v1/swing-range/history")
+@router.get("/api/v1/dashboard/swing-range/history")
 async def get_swing_cycle_history_endpoint(
-    watchlist: str = Query(..., description="Watchlist name"),
+    watchlist: str = Query("my_watchlist", description="Watchlist name"),
     ticker: str = Query(..., description="Stock ticker symbol"),
 ):
     """Return historical swing cycle data for a specific ticker."""
@@ -128,6 +165,7 @@ async def get_backtest_stats_endpoint():
 
 
 @router.get("/api/v1/backtest/latest")
+@router.get("/api/v1/backtest/swing/latest")
 async def get_latest_backtest_endpoint():
     """Retrieve the most recent strategy audit records."""
     try:
@@ -140,6 +178,7 @@ async def get_latest_backtest_endpoint():
 
 
 @router.post("/api/v1/backtest/run")
+@router.post("/api/v1/backtest/swing/run")
 async def run_custom_backtest_endpoint(request: dict):
     """Execute on-demand walk-forward backtesting with custom thresholds."""
     model_name = request.get("model", "gbm")

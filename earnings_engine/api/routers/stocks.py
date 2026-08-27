@@ -66,7 +66,48 @@ async def get_stock_notes_endpoint(ticker: str):
         raise HTTPException(status_code=500, detail=f"Error fetching notes: {str(e)}")
 
 
+@router.get("/api/v1/stock/{ticker}/rating")
+async def get_stock_rating_endpoint(ticker: str):
+    """Retrieve the industry-benchmarked fundamental rating, technical score, and AI note."""
+    sym = ticker.upper().strip()
+    try:
+        from earnings_engine.data.stock_rating import get_stock_rating, recalculate_stock_rating
+        rating = await asyncio.to_thread(get_stock_rating, sym, _settings)
+        if not rating:
+            rating = await asyncio.to_thread(recalculate_stock_rating, sym, _settings, source="auto_on_demand")
+        return {"success": True, "ticker": sym, **(rating or {})}
+    except Exception as e:
+        logger.exception("Error in get_stock_rating for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching stock rating: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/intelligence-note")
+@router.post("/api/v1/stock/{ticker}/intelligence-note")
+async def get_stock_intelligence_note_endpoint(ticker: str):
+    """Return or generate an AI intelligence note for a stock."""
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_intelligence_note, ticker=ticker.upper(), settings=_settings)
+    except Exception as e:
+        logger.exception("Error in stock intelligence note for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error with intelligence note: {str(e)}")
+
+
+@router.post("/api/v1/stock/ratings/batch")
+async def get_batch_stock_ratings(request: dict):
+    """Compute and return ratings for a list of tickers."""
+    tickers = request.get("tickers", [])
+    try:
+        results = {}
+        for t in tickers:
+            results[t] = stock_api.calculate_stock_rating(ticker=t.upper(), settings=_settings)
+        return {"success": True, "ratings": results}
+    except Exception as e:
+        logger.exception("Error in batch stock ratings: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error computing batch ratings: {str(e)}")
+
+
 @router.post("/api/v1/stock/{ticker}/calculate-eps")
+@router.post("/api/v1/earnings/{ticker}/calculate-eps")
 async def calculate_eps_endpoint(ticker: str, req: CalculateEpsRequest):
     """Calculate and derive EPS estimate, reported values, surprise %, and quality score."""
     try:
@@ -81,46 +122,6 @@ async def calculate_eps_endpoint(ticker: str, req: CalculateEpsRequest):
     except Exception as e:
         logger.exception("Error in calculate_eps for %s: %s", ticker, e)
         raise HTTPException(status_code=500, detail=f"Error calculating EPS: {str(e)}")
-
-
-@router.get("/api/v1/stock/{ticker}/quarterly-financials")
-async def get_quarterly_financials_endpoint(ticker: str):
-    """Return trailing quarterly income statements and balance sheet metrics."""
-    try:
-        return await stock_api.get_quarterly_financials(ticker=ticker, settings=_settings)
-    except Exception as e:
-        logger.exception("Error in get_quarterly_financials for %s: %s", ticker, e)
-        raise HTTPException(status_code=500, detail=f"Error fetching financials: {str(e)}")
-
-
-@router.get("/api/v1/stock/{ticker}/factors")
-async def get_stock_factors_endpoint(ticker: str):
-    """Return 6-pillar factor evaluation (Quality, Momentum, Valuation, Catalyst, Volatility, Sentiment)."""
-    try:
-        return await stock_api.get_stock_factor_scores(ticker=ticker, settings=_settings)
-    except Exception as e:
-        logger.exception("Error in get_stock_factors for %s: %s", ticker, e)
-        raise HTTPException(status_code=500, detail=f"Error fetching factor scores: {str(e)}")
-
-
-@router.post("/api/v1/stock/{ticker}/factors/evaluate")
-async def evaluate_stock_factors_endpoint(ticker: str, request: dict | None = None):
-    """Trigger fresh evaluation of standardized factor weights for a stock."""
-    try:
-        return await stock_api.evaluate_stock_factors(ticker=ticker, settings=_settings)
-    except Exception as e:
-        logger.exception("Error in evaluate_stock_factors for %s: %s", ticker, e)
-        raise HTTPException(status_code=500, detail=f"Error evaluating factors: {str(e)}")
-
-
-@router.get("/api/v1/stock/{ticker}/recalculated-preview")
-async def get_recalculated_preview_endpoint(ticker: str):
-    """Preview newly computed metrics vs existing cached metrics for a stock."""
-    try:
-        return await recalculate_api.preview_recalculated_metrics(ticker=ticker, settings=_settings)
-    except Exception as e:
-        logger.exception("Error in get_recalculated_preview for %s: %s", ticker, e)
-        raise HTTPException(status_code=500, detail=f"Error previewing metrics: {str(e)}")
 
 
 @router.post("/api/v1/ticker/recalculate")
@@ -140,6 +141,43 @@ async def recalculate_ticker_metrics_endpoint(
         raise HTTPException(status_code=500, detail=f"Recalculation error: {str(e)}")
 
 
+@router.post("/api/v1/stock/{ticker}/recalculate")
+@router.post("/api/v1/recalculate/{ticker}")
+async def recalculate_stock_path_endpoint(ticker: str, request: dict | None = None):
+    """Force refresh earnings date, prices, recalculate technical/quality metrics for path ticker."""
+    sym = ticker.upper().strip()
+    src = (request or {}).get("source", "user_recalculate")
+    try:
+        from earnings_engine.data.stock_rating import recalculate_stock_rating
+        rating_res = await asyncio.to_thread(recalculate_stock_rating, sym, _settings, source=src)
+        recalc_res = await asyncio.to_thread(recalculate_api.recalculate_ticker_metrics, sym, _settings)
+        combined = {**recalc_res, **(rating_res or {})}
+        combined["success"] = True
+        combined["ticker"] = sym
+        combined["fundamental"] = (rating_res or {}).get("fundamental")
+        combined["technical"] = (rating_res or {}).get("technical")
+        return combined
+    except Exception as e:
+        logger.exception("Error in recalculate_ticker_metrics: %s", e)
+        raise HTTPException(status_code=500, detail=f"Recalculation error: {str(e)}")
+
+
+@router.api_route("/api/v1/stock/{ticker}/live-week-hl", methods=["GET", "POST"])
+async def get_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Query(None)):
+    """Calculate and return real-time post-earnings week move high/low statistics."""
+    try:
+        from earnings_engine.api.stock_api import get_live_week_hl
+        res = await asyncio.to_thread(get_live_week_hl, ticker, earnings_date, _settings)
+        if not res.get("success"):
+            raise HTTPException(status_code=400, detail=res.get("error", "Failed to calculate live week high/low"))
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error in live_week_hl for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Failed to calculate live week high/low: {str(e)}")
+
+
 @router.get("/api/v1/ticker/audit-log")
 async def get_ticker_audit_log_endpoint(
     ticker: str | None = Query(None),
@@ -157,6 +195,43 @@ async def get_ticker_audit_log_endpoint(
         return result
     except Exception as e:
         logger.exception("Error in get_ticker_audit_log: %s", e)
+        raise HTTPException(status_code=500, detail=f"Audit log error: {str(e)}")
+
+
+@router.get("/api/v1/recalculate/audit")
+async def get_recalculate_audit_all_endpoint(
+    ticker: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """Retrieve audit log wrapped with success boolean."""
+    try:
+        from earnings_engine.data.ticker_audit import get_audit_history
+        entries = await asyncio.to_thread(
+            get_audit_history,
+            ticker=ticker,
+            limit=limit,
+            settings=_settings,
+        )
+        return {"success": True, "ticker": ticker, "entries": entries, "history": entries}
+    except Exception as e:
+        logger.exception("Error in recalculate_audit: %s", e)
+        raise HTTPException(status_code=500, detail=f"Audit log error: {str(e)}")
+
+
+@router.get("/api/v1/recalculate/audit/{ticker}")
+async def get_recalculate_audit_path(ticker: str, limit: int = Query(50, ge=1, le=200)):
+    """Retrieve audit log of recalculated fields for specific ticker wrapped with success boolean."""
+    try:
+        from earnings_engine.data.ticker_audit import get_audit_history
+        entries = await asyncio.to_thread(
+            get_audit_history,
+            ticker=ticker,
+            limit=limit,
+            settings=_settings,
+        )
+        return {"success": True, "ticker": ticker, "entries": entries, "history": entries}
+    except Exception as e:
+        logger.exception("Error in get_recalculate_audit for %s: %s", ticker, e)
         raise HTTPException(status_code=500, detail=f"Audit log error: {str(e)}")
 
 

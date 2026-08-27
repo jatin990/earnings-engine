@@ -106,19 +106,32 @@ async def get_ratelimits_endpoint():
 # ---------------------------------------------------------------------------
 
 @router.get("/api/v1/system/telemetry")
-async def get_system_telemetry(request: Request):
-    """Retrieve system diagnostics telemetry logs (Master only)."""
+async def get_system_telemetry(
+    request: Request,
+    limit: int = Query(200, ge=1, le=1000),
+    grouped: bool = Query(True, description="Club same machine + IP combos together with counts"),
+):
+    """Retrieve system diagnostics telemetry logs with optional grouping (Master only)."""
     _require_master_role(request)
-    from earnings_engine.data.telemetry import get_telemetry_logs
-    return get_telemetry_logs(settings=_settings)
+    from earnings_engine.data.crypto import has_private_key
+    from earnings_engine.data.telemetry import get_grouped_telemetry_records, get_telemetry_records
+
+    if not has_private_key():
+        return {"has_key": False, "total": 0, "records": []}
+
+    if grouped:
+        records = get_grouped_telemetry_records(limit=limit, settings=_settings)
+    else:
+        records = get_telemetry_records(limit=limit, settings=_settings)
+    return {"has_key": True, "total": len(records), "grouped": grouped, "records": records}
 
 
 @router.delete("/api/v1/system/telemetry")
 async def clear_system_telemetry(request: Request):
     """Clear telemetry logs (Master only)."""
     _require_master_role(request)
-    from earnings_engine.data.telemetry import clear_telemetry_logs
-    return clear_telemetry_logs(settings=_settings)
+    from earnings_engine.data.telemetry import clear_telemetry_records
+    return clear_telemetry_records(settings=_settings)
 
 
 @router.get("/api/v1/dashboard/system/gpu")
@@ -149,32 +162,44 @@ async def get_errors_summary_endpoint():
 
 
 @router.get("/api/v1/errors/open")
+async def get_open_errors_endpoint(limit: int = Query(50, ge=1, le=200)):
+    """List all unresolved application errors requiring diagnosis or fix."""
+    errors = get_open_errors(_settings, limit=limit)
+    return {"success": True, "count": len(errors), "open_errors": errors, "errors": errors}
+
+
 @router.get("/api/v1/errors")
-async def get_open_errors_endpoint():
-    """List open unhandled exceptions in the ledger."""
-    return get_open_errors(_settings)
+async def get_all_errors_endpoint(limit: int = Query(100, ge=1, le=500)):
+    """List all recorded application errors in the ledger."""
+    errors = get_open_errors(_settings, limit=limit)
+    return {"success": True, "count": len(errors), "errors": errors, "open_errors": errors}
 
 
 @router.post("/api/v1/errors/scan-logs")
-async def scan_logs_endpoint(request: Request):
+async def scan_logs_endpoint(request: Request = None):
     """Scan recent log outputs to ingest any untracked tracebacks (Master only)."""
-    _require_master_role(request)
-    count = scan_log_files(_settings)
-    return {"success": True, "new_errors_found": count}
+    if request:
+        _require_master_role(request)
+    result = await asyncio.to_thread(scan_log_files, settings=_settings)
+    return {"success": True, **result}
 
 
 @router.get("/api/v1/errors/stream")
-async def get_errors_stream_endpoint():
+async def get_errors_stream_endpoint(limit: int = Query(50, ge=1, le=500)):
     """Real-time streaming ledger of recent application events."""
-    return read_error_stream(_settings)
+    events = read_error_stream()
+    if limit:
+        events = events[:limit]
+    return {"success": True, "count": len(events), "events": events}
 
 
 @router.post("/api/v1/errors/stream/drain")
 @router.delete("/api/v1/errors/stream")
-async def drain_errors_stream_endpoint(request: Request):
+async def drain_errors_stream_endpoint(request: Request = None):
     """Drain or clear the real-time error stream (Master only)."""
-    _require_master_role(request)
-    consume_error_stream(_settings)
+    if request:
+        _require_master_role(request)
+    consume_error_stream(settings=_settings)
     return {"success": True, "message": "Error stream drained."}
 
 
@@ -187,6 +212,49 @@ async def resolve_error_endpoint(error_id: str, request: dict, req_obj: Request)
     return {"success": success, "error_id": error_id}
 
 
+@router.get("/api/v1/system/db-latency")
+async def get_system_db_latency():
+    """Measure server roundtrip query latency for both local SQLite and remote Turso Cloud DB."""
+    try:
+        from earnings_engine.data.db import measure_db_latencies
+        return await asyncio.to_thread(measure_db_latencies, _settings)
+    except Exception as e:
+        logger.exception("Error measuring DB latencies: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Task Cancellation
+# ---------------------------------------------------------------------------
+
+@router.post("/api/v1/tasks/{task_id}/cancel")
+async def cancel_task_by_id(task_id: str):
+    """Cancel an active backend calculation, data fetch, or batch job by request/task ID."""
+    from earnings_engine.api.cancellation import cancellation_manager
+    cancelled = cancellation_manager.cancel(task_id, reason="Explicit client cancel API call")
+    return {
+        "success": True,
+        "task_id": task_id,
+        "cancelled": cancelled,
+        "message": f"Task {task_id} cancellation signal dispatched." if cancelled else f"Task {task_id} was not active or already finished.",
+    }
+
+
+@router.post("/api/v1/tasks/cancel")
+async def cancel_task_generic(request: dict):
+    """Cancel an active backend calculation, data fetch, or batch job."""
+    from earnings_engine.api.cancellation import cancellation_manager
+    req_id = request.get("request_id") or request.get("task_id", "")
+    reason = request.get("reason", "Explicit client cancellation")
+    cancelled = cancellation_manager.cancel(req_id, reason=reason)
+    return {
+        "success": True,
+        "request_id": req_id,
+        "cancelled": cancelled,
+        "message": f"Request {req_id} cancellation signal dispatched." if cancelled else f"Request {req_id} was not active or already finished.",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Automation & Scheduled Jobs
 # ---------------------------------------------------------------------------
@@ -194,18 +262,54 @@ async def resolve_error_endpoint(error_id: str, request: dict, req_obj: Request)
 @router.get("/api/v1/automation/schedules")
 async def get_automation_schedules_endpoint():
     """List registered automation cron schedules and execution history."""
-    from earnings_engine.data.automation_schedules import list_schedules
-    return {"success": True, "schedules": list_schedules(_settings)}
+    from earnings_engine.data.automation_schedules import get_all_schedules
+    schedules = await asyncio.to_thread(get_all_schedules, _settings)
+    return {"success": True, "schedules": schedules}
 
 
 @router.post("/api/v1/automation/trigger")
-async def trigger_automation_job(request: dict, req_obj: Request):
-    """Manually trigger an automated pipeline job (Master only)."""
-    _require_master_role(req_obj)
-    job_id = request.get("job_id") or request.get("schedule_id")
-    from earnings_engine.data.automation_schedules import trigger_schedule
-    res = await asyncio.to_thread(trigger_schedule, job_id, _settings)
-    return {"success": True, "job_id": job_id, "result": res}
+@router.post("/api/v1/automation/trigger/{schedule_id}")
+async def trigger_automation_job(
+    request: Request,
+    job_id: str | None = Query(None),
+    schedule_id: str | None = None,
+):
+    """Manually trigger immediate execution of any background scheduled job."""
+    target_job = job_id or schedule_id
+    if not target_job:
+        try:
+            body = await request.json()
+            target_job = body.get("job_id") or body.get("schedule_id")
+        except Exception:
+            pass
+    if not target_job:
+        raise HTTPException(status_code=400, detail="job_id or schedule_id is required")
+
+    import threading
+    from earnings_engine.data import breakout_scanner as breakout_scanner_mod
+
+    def _execute():
+        try:
+            if target_job == "breakout_hot_rescore":
+                breakout_scanner_mod.run_hot_rescore(_settings)
+            elif target_job == "breakout_warm_rescore":
+                breakout_scanner_mod.run_warm_rescore(_settings)
+            elif target_job == "breakout_cold_scan":
+                breakout_scanner_mod.run_cold_scan(_settings)
+            elif target_job == "news_catalyst_harvest":
+                from earnings_engine.data.catalysts_news import scan_watchlist_catalysts
+                from earnings_engine.data.automation_schedules import record_job_start, record_job_finish
+                record_job_start("news_catalyst_harvest", _settings)
+                t0 = time.perf_counter()
+                res = scan_watchlist_catalysts("my_watchlist", 3, False, _settings)
+                elapsed = round(time.perf_counter() - t0, 2)
+                record_job_finish("news_catalyst_harvest", elapsed, f"Harvested {res.get('catalysts_fetched', 0)} headlines across {res.get('scanned_tickers', 0)} stocks", settings=_settings)
+        except Exception as e:
+            logger.error("[AUTOMATION-TRIGGER] Error running %s: %s", target_job, e)
+
+    t = threading.Thread(target=_execute, daemon=True, name=f"trigger_{target_job}")
+    t.start()
+    return {"success": True, "job_id": target_job, "message": f"Triggered execution for '{target_job}' in background thread."}
 
 
 # ---------------------------------------------------------------------------

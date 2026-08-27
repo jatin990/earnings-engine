@@ -300,6 +300,7 @@ async def revoke_friend_endpoint(user_id: str, request: Request):
 
 
 @router.post("/api/v1/friends/{user_id}/access")
+@router.patch("/api/v1/friends/{user_id}/access")
 async def update_friend_access_endpoint(user_id: str, request: Request):
     """Owner-only update of friend scoped permissions."""
     session = _get_current_session(request)

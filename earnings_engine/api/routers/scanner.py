@@ -48,19 +48,31 @@ async def get_scanner_category_matches(
             limit=limit,
             settings=_settings,
         )
-        return {"success": True, "category_id": category_id, "count": len(matches), "matches": matches}
+        return {
+            "success": True,
+            "category_id": category_id,
+            "count": len(matches),
+            "matches": matches,
+            "candidates": matches,
+        }
     except Exception as e:
         logger.exception("Error in get_scanner_category_matches for %s: %s", category_id, e)
         raise HTTPException(status_code=500, detail=f"Error fetching category matches: {str(e)}")
 
 
 @router.post("/api/v1/scanner/scan")
+@router.post("/api/v1/scanner/sweep")
 async def run_full_category_scan(request: dict | None = None):
     """Execute complete multi-universe scan across all 12 categories."""
     universe = (request or {}).get("universe", "NSE_TOP")
     try:
         res = await asyncio.to_thread(scanner_mod.compute_and_save_scanner_universe, universe, _settings)
-        return {"success": True, "result": res}
+        return {
+            "success": True,
+            "result": res,
+            "total_candidates_found": (res or {}).get("total_saved", 0),
+            **(res or {}),
+        }
     except Exception as e:
         logger.exception("Error in run_full_category_scan: %s", e)
         raise HTTPException(status_code=500, detail=f"Scanner execution failed: {str(e)}")

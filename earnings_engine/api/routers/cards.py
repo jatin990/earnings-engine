@@ -13,8 +13,10 @@ from earnings_engine.api.dependencies import (
     _settings,
     get_template_env,
     require_scope,
+    ApproveCardOtpRequest,
     CreateCardOtpRequest,
     CreateCardRequest,
+    RejectCardOtpRequest,
     ResolveCardOtpRequest,
 )
 from earnings_engine.data.db import get_db_connection
@@ -142,65 +144,94 @@ async def delete_card_endpoint(card_id: str, session: dict = Depends(require_sco
 
 
 @router.get("/api/v1/cards/otp-requests")
-async def get_card_otp_requests(session: dict = Depends(require_scope("can_view_cards"))):
-    """Retrieve pending and historical OTP requests for friend card sharing."""
+async def get_card_otp_requests_endpoint(
+    card_id: str | None = None,
+    status: str | None = None,
+    session: dict = Depends(require_scope("can_view_cards")),
+):
+    """List OTP requests for credit cards with live status and expiration."""
+    from datetime import timedelta
     role = session.get("role")
     scopes = session.get("scopes", [])
     is_owner = bool(role == "owner" or "admin" in scopes or "*" in scopes)
-    user_id = session.get("sub")
 
     conn = get_db_connection(_settings)
     with conn:
-        if is_owner:
-            rows = conn.execute("""
-                SELECT o.id, o.card_id, o.requested_by_user_id, o.requested_by_name, o.transaction_amount,
-                       o.merchant_name, o.purpose, o.status, o.otp_code, o.requested_at, o.resolved_at,
-                       c.card_name, c.last4
-                FROM card_otp_requests o
-                JOIN credit_cards c ON o.card_id = c.id
-                ORDER BY o.requested_at DESC LIMIT 50
-            """).fetchall()
-        else:
-            rows = conn.execute("""
-                SELECT o.id, o.card_id, o.requested_by_user_id, o.requested_by_name, o.transaction_amount,
-                       o.merchant_name, o.purpose, o.status, o.otp_code, o.requested_at, o.resolved_at,
-                       c.card_name, c.last4
-                FROM card_otp_requests o
-                JOIN credit_cards c ON o.card_id = c.id
-                WHERE o.requested_by_user_id = ?
-                ORDER BY o.requested_at DESC LIMIT 20
-            """, (user_id,)).fetchall()
+        query = """
+            SELECT r.id, r.card_id, r.requested_by_name, r.requested_by_role, r.amount, r.merchant,
+                   r.purpose, r.urgency, r.status, r.otp_code, r.otp_expires_at, r.response_notes,
+                   r.created_at, r.updated_at, c.card_name, c.last4, c.color_theme, c.issuer
+            FROM credit_card_otp_requests r
+            LEFT JOIN credit_cards c ON r.card_id = c.id
+            WHERE 1=1
+        """
+        params: list[Any] = []
+        if card_id:
+            query += " AND r.card_id = ?"
+            params.append(card_id)
+        if status:
+            query += " AND r.status = ?"
+            params.append(status)
+        query += " ORDER BY r.created_at DESC LIMIT 50"
 
-    requests_list = [
-        {
+        rows = conn.execute(query, params).fetchall()
+
+    requests_list: list[dict[str, Any]] = []
+    now = datetime.now()
+    for r in rows:
+        req_status = r[8]
+        otp_expires_at = r[10]
+        remaining_seconds = 0
+        if otp_expires_at:
+            try:
+                exp_dt = datetime.fromisoformat(otp_expires_at)
+                diff = (exp_dt - now).total_seconds()
+                if diff > 0:
+                    remaining_seconds = int(diff)
+                elif req_status == "approved":
+                    req_status = "expired"
+            except Exception:
+                pass
+
+        requests_list.append({
             "id": r[0],
             "card_id": r[1],
-            "requested_by_user_id": r[2],
-            "requested_by_name": r[3],
-            "transaction_amount": float(r[4] or 0.0),
-            "merchant_name": r[5],
+            "requested_by_name": r[2],
+            "requested_by_role": r[3],
+            "amount": float(r[4] or 0.0),
+            "merchant": r[5],
             "purpose": r[6],
-            "status": r[7],
-            "otp_code": r[8] if is_owner or r[7] == "approved" else None,
-            "requested_at": r[9],
-            "resolved_at": r[10],
-            "card_name": r[11],
-            "last4": r[12],
-        }
-        for r in rows
-    ]
-    return {"success": True, "count": len(requests_list), "otp_requests": requests_list, "is_owner": is_owner}
+            "urgency": r[7],
+            "status": req_status,
+            "otp_code": r[9] if (req_status == "approved" or is_owner) else None,
+            "otp_expires_at": otp_expires_at,
+            "remaining_seconds": remaining_seconds,
+            "response_notes": r[11],
+            "created_at": r[12],
+            "updated_at": r[13],
+            "card_name": r[14] or "Shared Credit Card",
+            "last4": r[15] or "8842",
+            "color_theme": r[16] or "obsidian",
+            "issuer": r[17] or "Bank",
+        })
+
+    return {
+        "success": True,
+        "count": len(requests_list),
+        "requests": requests_list,
+        "otp_requests": requests_list,
+        "is_owner": is_owner,
+    }
 
 
 @router.post("/api/v1/cards/otp-requests")
-async def create_card_otp_request(
+async def create_card_otp_request_endpoint(
     req: CreateCardOtpRequest,
     session: dict = Depends(require_scope("can_view_cards")),
 ):
-    """Submit a real-time OTP request to use a friend/family card for an online payment."""
-    user_id = session.get("sub", "friend_usr")
-    user_name = session.get("name", "Friend User")
-    req_id = f"otp_{uuid.uuid4().hex[:8]}"
+    """Submit a request for an OTP for a specific card and transaction amount."""
+    role = session.get("role") or "friend"
+    req_id = f"req_cc_{uuid.uuid4().hex[:8]}"
     now_str = datetime.now().isoformat(timespec="seconds")
 
     conn = get_db_connection(_settings)
@@ -210,52 +241,77 @@ async def create_card_otp_request(
             raise HTTPException(status_code=404, detail="Credit card not found.")
 
         conn.execute("""
-            INSERT INTO card_otp_requests (
-                id, card_id, requested_by_user_id, requested_by_name, transaction_amount,
-                merchant_name, purpose, status, requested_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+            INSERT INTO credit_card_otp_requests (
+                id, card_id, requested_by_name, requested_by_role, amount, merchant,
+                purpose, urgency, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
         """, (
-            req_id, req.card_id, user_id, user_name, req.transaction_amount,
-            req.merchant_name, req.purpose, now_str
+            req_id, req.card_id, req.requested_by_name, role, req.amount,
+            req.merchant, req.purpose, req.urgency, now_str, now_str
         ))
         conn.commit()
 
-    logger.info("[CARDS-API] New OTP request %s by %s for ₹%.2f on %s", req_id, user_name, req.transaction_amount, req.merchant_name)
-    return {"success": True, "request_id": req_id, "message": "OTP request dispatched to vault owner."}
+    logger.info("[CARDS-OTP] New OTP request %s from %s for ₹%.2f on %s (%s)",
+                req_id, req.requested_by_name, req.amount, card[1], req.merchant)
+    return {
+        "success": True,
+        "request_id": req_id,
+        "status": "pending",
+        "message": f"OTP Request for ₹{req.amount:,.2f} at {req.merchant} submitted. Waiting for owner approval."
+    }
 
 
 @router.post("/api/v1/cards/otp-requests/{request_id}/approve")
-async def approve_card_otp_request(
+async def approve_card_otp_request_endpoint(
     request_id: str,
-    req: ResolveCardOtpRequest,
+    req: ApproveCardOtpRequest,
     session: dict = Depends(require_scope("can_view_cards")),
 ):
-    """Approve card OTP request and dispatch OTP code (Owner only)."""
+    """Approve a card OTP request and provide/generate the active OTP code (Owner only)."""
+    from datetime import timedelta
+    import random
     role = session.get("role")
     scopes = session.get("scopes", [])
     if role != "owner" and "admin" not in scopes and "*" not in scopes:
         raise HTTPException(status_code=403, detail="Only the vault owner can approve OTP requests.")
 
+    otp_code = req.otp_code.strip() if req.otp_code else f"{random.randint(100000, 999999)}"
+    duration = max(1, min(req.duration_minutes, 30))
+    exp_dt = (datetime.now() + timedelta(minutes=duration)).isoformat(timespec="seconds")
     now_str = datetime.now().isoformat(timespec="seconds")
+
     conn = get_db_connection(_settings)
     with conn:
+        row = conn.execute("SELECT id, requested_by_name, amount, merchant FROM credit_card_otp_requests WHERE id = ?", (request_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="OTP request not found.")
+
         conn.execute("""
-            UPDATE card_otp_requests
-            SET status = 'approved', otp_code = ?, resolved_at = ?
+            UPDATE credit_card_otp_requests
+            SET status = 'approved', otp_code = ?, otp_expires_at = ?, response_notes = ?, updated_at = ?
             WHERE id = ?
-        """, (req.otp_code, now_str, request_id))
+        """, (otp_code, exp_dt, req.response_notes or "Approved by Owner", now_str, request_id))
         conn.commit()
 
-    logger.info("[CARDS-API] Approved OTP request %s with code %s", request_id, req.otp_code)
-    return {"success": True, "request_id": request_id, "status": "approved"}
+    logger.info("[CARDS-OTP] Approved OTP request %s for %s (OTP: %s, expires: %s)", request_id, row[1], otp_code, exp_dt)
+    return {
+        "success": True,
+        "request_id": request_id,
+        "status": "approved",
+        "otp_code": otp_code,
+        "expires_at": exp_dt,
+        "duration_minutes": duration,
+        "message": f"OTP request approved. OTP code {otp_code} valid for {duration} minutes."
+    }
 
 
 @router.post("/api/v1/cards/otp-requests/{request_id}/reject")
-async def reject_card_otp_request(
+async def reject_card_otp_request_endpoint(
     request_id: str,
+    req: RejectCardOtpRequest,
     session: dict = Depends(require_scope("can_view_cards")),
 ):
-    """Reject card OTP request (Owner only)."""
+    """Reject a card OTP request (Owner only)."""
     role = session.get("role")
     scopes = session.get("scopes", [])
     if role != "owner" and "admin" not in scopes and "*" not in scopes:
@@ -264,12 +320,16 @@ async def reject_card_otp_request(
     now_str = datetime.now().isoformat(timespec="seconds")
     conn = get_db_connection(_settings)
     with conn:
+        row = conn.execute("SELECT id, requested_by_name FROM credit_card_otp_requests WHERE id = ?", (request_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="OTP request not found.")
+
         conn.execute("""
-            UPDATE card_otp_requests
-            SET status = 'rejected', resolved_at = ?
+            UPDATE credit_card_otp_requests
+            SET status = 'rejected', response_notes = ?, updated_at = ?
             WHERE id = ?
-        """, (now_str, request_id))
+        """, (req.response_notes or "Declined by Owner", now_str, request_id))
         conn.commit()
 
-    logger.info("[CARDS-API] Rejected OTP request %s", request_id)
-    return {"success": True, "request_id": request_id, "status": "rejected"}
+    logger.info("[CARDS-OTP] Rejected OTP request %s for %s", request_id, row[1])
+    return {"success": True, "request_id": request_id, "status": "rejected", "message": "OTP request declined."}
