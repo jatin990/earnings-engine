@@ -106,16 +106,27 @@
             }
         },
 
+        _accLimit: 25,
+        _distLimit: 20,
+        _fundsLimit: 50,
+        _loadingMoreAcc: false,
+        _loadingMoreDist: false,
+        _loadingMoreFunds: false,
+
         async loadInstitutionalData() {
             // Restore active sub-page state on load / refresh
             const savedSub = localStorage.getItem('ee_institutional_subpage') || 'equities';
             this.switchInstitutionalPage(savedSub);
 
+            this._accLimit = 25;
+            this._distLimit = 20;
+            this._fundsLimit = 50;
+
             try {
                 const [resAcc, resDist, resFunds] = await Promise.all([
-                    fetch(API_BASE + '/api/v1/institutional/accumulating?limit=35'),
-                    fetch(API_BASE + '/api/v1/institutional/distributing?limit=25'),
-                    fetch(API_BASE + '/api/v1/institutional/funds?limit=50')
+                    fetch(API_BASE + `/api/v1/institutional/accumulating?limit=${this._accLimit}`),
+                    fetch(API_BASE + `/api/v1/institutional/distributing?limit=${this._distLimit}`),
+                    fetch(API_BASE + `/api/v1/institutional/funds?limit=${this._fundsLimit}`)
                 ]);
 
                 if (resAcc.ok) {
@@ -141,6 +152,133 @@
 
             } catch (e) {
                 console.error('[INSTITUTIONAL] Failed loading institutional flows:', e);
+            }
+        },
+
+        async loadMoreInstitutionalEquities(type) {
+            const isAcc = type === 'accumulating';
+            if (isAcc && this._loadingMoreAcc) return;
+            if (!isAcc && this._loadingMoreDist) return;
+
+            const btnId = isAcc ? 'btnInstLoadMoreAcc' : 'btnInstLoadMoreDist';
+            const btn = document.getElementById(btnId);
+            const originalBtnHtml = isAcc 
+                ? '<span>📥</span> Load More Accumulating (+25)'
+                : '<span>📥</span> Load More Distributing (+25)';
+
+            if (isAcc) {
+                this._loadingMoreAcc = true;
+                this._accLimit = (this._accLimit || 25) + 25;
+            } else {
+                this._loadingMoreDist = true;
+                this._distLimit = (this._distLimit || 20) + 25;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.3rem;">⏳</div> Loading...';
+            }
+
+            try {
+                const targetLimit = isAcc ? this._accLimit : this._distLimit;
+                const endpoint = isAcc 
+                    ? `/api/v1/institutional/accumulating?limit=${targetLimit}`
+                    : `/api/v1/institutional/distributing?limit=${targetLimit}`;
+                
+                const prevCount = isAcc ? (this.institutionalData.accumulating || []).length : (this.institutionalData.distributing || []).length;
+                const res = await fetch(API_BASE + endpoint);
+                if (res.ok) {
+                    const data = await res.json();
+                    const items = data.items || [];
+                    if (isAcc) {
+                        this.institutionalData.accumulating = items;
+                        this.renderInstitutionalAccumulatingTable(items);
+                    } else {
+                        this.institutionalData.distributing = items;
+                        this.renderInstitutionalDistributingTable(items);
+                    }
+
+                    if (btn) {
+                        if (items.length <= prevCount || items.length < targetLimit) {
+                            btn.disabled = true;
+                            btn.style.opacity = '0.6';
+                            btn.innerHTML = `✓ All Setups Loaded (${items.length})`;
+                        } else {
+                            btn.disabled = false;
+                            btn.innerHTML = originalBtnHtml;
+                        }
+                    }
+                } else {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalBtnHtml;
+                    }
+                }
+            } catch (e) {
+                console.error('[INSTITUTIONAL] Failed loading more equities:', e);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalBtnHtml;
+                }
+            } finally {
+                if (isAcc) this._loadingMoreAcc = false;
+                else this._loadingMoreDist = false;
+            }
+        },
+
+        async loadMoreInstitutionalFunds() {
+            if (this._loadingMoreFunds) return;
+            const btn = document.getElementById('btnInstLoadMoreFunds');
+            const originalBtnHtml = '<span>📥</span> Load More Funds & Whales (+25)';
+
+            this._loadingMoreFunds = true;
+            this._fundsLimit = (this._fundsLimit || 50) + 25;
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.3rem;">⏳</div> Loading...';
+            }
+
+            try {
+                const prevCount = (this.institutionalData.funds || []).length;
+                const res = await fetch(API_BASE + `/api/v1/institutional/funds?limit=${this._fundsLimit}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const allFunds = data.funds || [];
+                    this.institutionalData.funds = allFunds;
+
+                    // Apply active category filter
+                    if (this._currentInvestorFilter === 'ALL') {
+                        this.renderInstitutionalFundsTable(allFunds);
+                    } else {
+                        const filtered = allFunds.filter(f => (f.fund_type || '').toLowerCase().includes(this._currentInvestorFilter.toLowerCase()));
+                        this.renderInstitutionalFundsTable(filtered);
+                    }
+
+                    if (btn) {
+                        if (allFunds.length <= prevCount || allFunds.length < this._fundsLimit) {
+                            btn.disabled = true;
+                            btn.style.opacity = '0.6';
+                            btn.innerHTML = `✓ All Funds Loaded (${allFunds.length})`;
+                        } else {
+                            btn.disabled = false;
+                            btn.innerHTML = originalBtnHtml;
+                        }
+                    }
+                } else {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalBtnHtml;
+                    }
+                }
+            } catch (e) {
+                console.error('[INSTITUTIONAL] Failed loading more funds:', e);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalBtnHtml;
+                }
+            } finally {
+                this._loadingMoreFunds = false;
             }
         },
 
@@ -181,6 +319,10 @@
 
         renderInstitutionalAccumulatingTable(items) {
             const tbody = document.getElementById('instAccumulatingTableBody');
+            const countBadge = document.getElementById('instAccCountBadge');
+            if (countBadge) {
+                countBadge.innerText = `Showing ${items ? items.length : 0} setups`;
+            }
             if (!tbody) return;
 
             if (!items || !items.length) {
@@ -216,6 +358,10 @@
 
         renderInstitutionalDistributingTable(items) {
             const tbody = document.getElementById('instDistributingTableBody');
+            const countBadge = document.getElementById('instDistCountBadge');
+            if (countBadge) {
+                countBadge.innerText = `Showing ${items ? items.length : 0} setups`;
+            }
             if (!tbody) return;
 
             if (!items || !items.length) {
@@ -250,6 +396,10 @@
 
         renderInstitutionalFundsTable(funds) {
             const tbody = document.getElementById('instFundsTableBody') || document.getElementById('instInvestorsDirectoryTableBody');
+            const countBadge = document.getElementById('instFundsCountBadge');
+            if (countBadge) {
+                countBadge.innerText = `Showing ${funds ? funds.length : 0} funds & whales`;
+            }
             if (!tbody) return;
 
             if (!funds || !funds.length) {
@@ -512,7 +662,15 @@
                     }
 
                     tbody.innerHTML = holdings.map(h => {
+                        const isBuy = h.action === 'ACCUMULATED' || h.action === 'NEW BUY';
                         const isTrim = h.action === 'TRIMMED' || h.action === 'SOLD OUT';
+                        const actCol = isBuy ? '#34d399' : isTrim ? '#f87171' : '#cbd5e1';
+                        const actBg = isBuy ? 'rgba(16,185,129,0.15)' : isTrim ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)';
+                        const compName = h.company_name ? `<div style="font-size:0.68rem;color:#94a3b8;font-weight:normal;">${h.company_name}</div>` : '';
+                        const ret30 = h.return_30d_pct != null ? Number(h.return_30d_pct) : null;
+                        const ret30Str = ret30 != null ? `<span style="color:${ret30 >= 0 ? '#34d399' : '#f87171'};font-weight:700;">${ret30 >= 0 ? '+' : ''}${ret30.toFixed(1)}%</span>` : '<span style="color:#64748b;">—</span>';
+                        const ret1y = h.return_1y_pct != null ? Number(h.return_1y_pct) : null;
+                        const ret1yStr = ret1y != null ? `<span style="color:${ret1y >= 0 ? '#34d399' : '#f87171'};font-weight:700;">${ret1y >= 0 ? '+' : ''}${ret1y.toFixed(1)}%</span>` : '<span style="color:#64748b;">—</span>';
                         const txnPrice = h.recent_txn_price != null ? Number(h.recent_txn_price).toFixed(2) : (isBuy && h.recent_buy_price != null ? Number(h.recent_buy_price).toFixed(2) : null);
                         const txnDate = h.recent_txn_date || h.reported_date;
 
