@@ -152,8 +152,13 @@ def compute_stock_daily_telemetry(ticker: str, prices_df: pd.DataFrame) -> dict[
         except (ValueError, TypeError):
             return default
 
-    last = df.iloc[-1]
-    prev = df.iloc[-2]
+    # Filter out empty or non-positive price rows
+    clean_df = df[df["close"] > 0].copy()
+    if len(clean_df) < 2:
+        return None
+
+    last = clean_df.iloc[-1]
+    prev = clean_df.iloc[-2]
 
     prev_close = _safe_float(prev.get("close") if hasattr(prev, "get") else prev["close"])
     close = _safe_float(last.get("close") if hasattr(last, "get") else last["close"])
@@ -165,16 +170,32 @@ def compute_stock_daily_telemetry(ticker: str, prices_df: pd.DataFrame) -> dict[
     if prev_close <= 0 or close <= 0:
         return None
 
+    # Sanity guard: Outlier check on prev_close vs historical median
+    # Protects against corrupt price rows (e.g. 100 vs 2300) causing fake +2000% returns
+    if len(clean_df) >= 5:
+        hist_median = float(clean_df["close"].tail(11).iloc[:-1].median())
+        if hist_median > 0 and abs(prev_close - hist_median) / hist_median > 0.35:
+            prev_close = hist_median
+
     return_pct = round(((close - prev_close) / prev_close) * 100.0, 2)
 
+    # Hard circuit breaker: Indian equities have a max 20% daily circuit filter.
+    # Reject extreme price jump anomalies (e.g. +2000% split artifacts or dummy insertions)
+    is_in_market = ticker.upper().endswith(".NS") or ticker.upper().endswith(".BO") or ".NS" in ticker.upper()
+    if is_in_market and return_pct > 25.0 and close > 50.0:
+        # Check if actual price was anomalous or return exceeded circuit
+        return None
+    elif return_pct > 150.0:  # Global extreme anomaly cutoff
+        return None
+
     # 20-Day Average Volume
-    vols_20 = df["volume"].tail(21).iloc[:-1]
+    vols_20 = clean_df["volume"].tail(21).iloc[:-1]
     v_mean = vols_20.mean() if not vols_20.empty else None
     avg_vol = float(v_mean) if v_mean is not None and pd.notna(v_mean) and float(v_mean) > 0 else 1.0
     vol_multiple = round(vol / max(avg_vol, 1.0), 1)
 
     # 52-Week High/Low
-    closes_52w = df["close"].tail(252)
+    closes_52w = clean_df["close"].tail(252)
     c_max_52w = closes_52w.max() if not closes_52w.empty else None
     c_min_52w = closes_52w.min() if not closes_52w.empty else None
     high_52w = float(c_max_52w) if c_max_52w is not None and pd.notna(c_max_52w) else high
@@ -183,7 +204,7 @@ def compute_stock_daily_telemetry(ticker: str, prices_df: pd.DataFrame) -> dict[
     dist_52w = round(((close - high_52w) / max(high_52w, 0.01)) * 100.0, 1)
 
     # 14-Day Consolidation Range width prior to today
-    closes_14 = df["close"].tail(15).iloc[:-1]
+    closes_14 = clean_df["close"].tail(15).iloc[:-1]
     if len(closes_14) >= 5 and pd.notna(closes_14.min()) and pd.notna(closes_14.max()):
         c_min = float(closes_14.min())
         c_max = float(closes_14.max())
@@ -288,6 +309,21 @@ def get_daily_top_gainers(
             (trade_date, universe_or_watchlist, top_n),
         ).fetchall()
 
+        # Sanity check: Ensure cached records do not contain legacy anomalies (e.g. +2000%)
+        has_anomaly = any(
+            (r["ticker"].endswith(".NS") and r["return_pct"] > 25.0 and r["close_price"] > 50.0)
+            or r["return_pct"] > 150.0
+            or "TEST" in r["ticker"]
+            for r in cached
+        )
+        if has_anomaly:
+            conn.execute(
+                "DELETE FROM daily_top_gainers WHERE trade_date = ? AND universe = ?",
+                (trade_date, universe_or_watchlist),
+            )
+            conn.commit()
+            cached = []
+
         if len(cached) >= top_n:
             return [dict(r) for r in cached]
 
@@ -306,6 +342,9 @@ def get_daily_top_gainers(
         with _connect(settings) as conn:
             rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 300").fetchall()
             tickers = [r[0] for r in rows]
+
+    # Filter out test and mock tickers and deduplicate
+    tickers = list(dict.fromkeys([t for t in tickers if not any(x in t.upper() for x in ("TEST", "MOCK", "SAMPLE"))]))
 
     if not tickers:
         tickers = ["PCJEWELLER.NS", "FORCEMOT.NS", "JIOFIN.NS", "IDBI.NS", "RELIANCE.NS", "TCS.NS", "INFY.NS", "SBIN.NS", "HDFCBANK.NS", "ETERNAL.NS"]
