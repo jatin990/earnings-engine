@@ -444,6 +444,26 @@
                         const actCol = isBuy ? '#34d399' : h.action === 'TRIMMED' || h.action === 'SOLD OUT' ? '#f87171' : '#cbd5e1';
                         const actBg = isBuy ? 'rgba(16,185,129,0.15)' : h.action === 'TRIMMED' || h.action === 'SOLD OUT' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)';
                         const chgSign = (h.change_pct || 0) > 0 ? `+${h.change_pct}%` : (h.change_pct || 0) < 0 ? `${h.change_pct}%` : '0.00%';
+                        const isTrim = h.action === 'TRIMMED' || h.action === 'SOLD OUT';
+                        const txnPrice = h.recent_txn_price != null ? Number(h.recent_txn_price).toFixed(2) : (isBuy && h.recent_buy_price != null ? Number(h.recent_buy_price).toFixed(2) : null);
+                        const txnDate = h.recent_txn_date || h.reported_date;
+                        
+                        let txnCellHtml = `<span style="color:#64748b;font-family:var(--font-mono);font-size:0.68rem;">— <span style="font-size:0.58rem;color:#475569;">(Holding)</span></span>`;
+                        if (isBuy && txnPrice) {
+                            txnCellHtml = `
+                                <div>
+                                    <span style="color:#34d399;font-weight:700;font-family:var(--font-mono);font-size:0.68rem;">🟢 Buy ₹${txnPrice}</span>
+                                    <div style="font-size:0.58rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.05rem;">📅 ${txnDate || '—'}</div>
+                                </div>
+                            `;
+                        } else if (isTrim && txnPrice) {
+                            txnCellHtml = `
+                                <div>
+                                    <span style="color:#f87171;font-weight:700;font-family:var(--font-mono);font-size:0.68rem;">🔴 ${h.action === 'TRIMMED' ? 'Trim' : 'Exit'} ₹${txnPrice}</span>
+                                    <div style="font-size:0.58rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.05rem;">📅 ${txnDate || '—'}</div>
+                                </div>
+                            `;
+                        }
 
                         return `
                             <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
@@ -456,7 +476,7 @@
                                 </td>
                                 <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${h.stake_pct}%</td>
                                 <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#38bdf8;font-weight:600;">₹${h.avg_price != null ? Number(h.avg_price).toFixed(2) : '—'}</td>
-                                <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#a7f3d0;font-weight:600;">₹${h.recent_buy_price != null ? Number(h.recent_buy_price).toFixed(2) : '—'}</td>
+                                <td style="padding:0.45rem 0.5rem;">${txnCellHtml}</td>
                                 <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:${actCol};font-weight:700;">${chgSign}</td>
                                 <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#cbd5e1;">₹${(h.holding_value_cr || 0).toLocaleString()} Cr</td>
                                 <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#94a3b8;font-size:0.68rem;">${h.reported_date || '—'}</td>
@@ -492,12 +512,26 @@
                     }
 
                     tbody.innerHTML = holdings.map(h => {
-                        const isBuy = h.action === 'ACCUMULATED' || h.action === 'NEW BUY';
-                        const actCol = isBuy ? '#34d399' : h.action === 'TRIMMED' || h.action === 'SOLD OUT' ? '#f87171' : '#cbd5e1';
-                        const actBg = isBuy ? 'rgba(16,185,129,0.15)' : h.action === 'TRIMMED' || h.action === 'SOLD OUT' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)';
-                        const ret30Str = h.return_30d_pct != null ? (h.return_30d_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${h.return_30d_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${h.return_30d_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
-                        const ret1yStr = h.return_1y_pct != null ? (h.return_1y_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${h.return_1y_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${h.return_1y_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
-                        const compName = h.company_name && h.company_name !== h.ticker ? `<div style="font-size:0.68rem;color:#94a3b8;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${h.company_name}</div>` : '';
+                        const isTrim = h.action === 'TRIMMED' || h.action === 'SOLD OUT';
+                        const txnPrice = h.recent_txn_price != null ? Number(h.recent_txn_price).toFixed(2) : (isBuy && h.recent_buy_price != null ? Number(h.recent_buy_price).toFixed(2) : null);
+                        const txnDate = h.recent_txn_date || h.reported_date;
+
+                        let txnCellHtml = `<span style="color:#64748b;font-family:var(--font-mono);font-size:0.7rem;">— <span style="font-size:0.6rem;color:#475569;">(Holding)</span></span>`;
+                        if (isBuy && txnPrice) {
+                            txnCellHtml = `
+                                <div>
+                                    <span style="color:#34d399;font-weight:700;font-family:var(--font-mono);font-size:0.72rem;">🟢 Buy ₹${txnPrice}</span>
+                                    <div style="font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.08rem;">📅 ${txnDate || '—'}</div>
+                                </div>
+                            `;
+                        } else if (isTrim && txnPrice) {
+                            txnCellHtml = `
+                                <div>
+                                    <span style="color:#f87171;font-weight:700;font-family:var(--font-mono);font-size:0.72rem;">🔴 ${h.action === 'TRIMMED' ? 'Trim' : 'Exit'} ₹${txnPrice}</span>
+                                    <div style="font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.08rem;">📅 ${txnDate || '—'}</div>
+                                </div>
+                            `;
+                        }
 
                         return `
                             <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
@@ -513,7 +547,7 @@
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);">${ret30Str}</td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);">${ret1yStr}</td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#38bdf8;font-weight:600;">₹${h.avg_price != null ? Number(h.avg_price).toFixed(2) : '—'}</td>
-                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#a7f3d0;font-weight:600;">₹${h.recent_buy_price != null ? Number(h.recent_buy_price).toFixed(2) : '—'}</td>
+                                <td style="padding:0.55rem 0.8rem;">${txnCellHtml}</td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">₹${(h.holding_value_cr || 0).toLocaleString()} Cr</td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#94a3b8;font-size:0.72rem;">${h.reported_date || '—'}</td>
                                 <td style="padding:0.55rem 0.8rem;text-align:center;white-space:nowrap;">

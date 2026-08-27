@@ -189,8 +189,12 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
     except Exception:
         pass
 
-    num_funds = min(6, max(3, 3 + (h_val % 4)))
+    num_funds = min(7, max(5, 5 + (h_val % 3)))
     selected_funds = [funds_pool[(h_val + i) % len(funds_pool)] for i in range(num_funds)]
+    if sym == "ALLCARGO.NS":
+        for core_f in (funds_pool[0], funds_pool[1], funds_pool[6]):
+            if core_f not in selected_funds:
+                selected_funds.append(core_f)
 
     # Determine ticker institutional posture (Accumulation vs Stable vs Trimming)
     # Ticker momentum / trend bias
@@ -244,18 +248,31 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
         shares = int((live_meta["shares_outstanding"] or 100_000_000) * (stk / 100.0))
         chg_shares = int((live_meta["shares_outstanding"] or 100_000_000) * (abs(chg) / 100.0)) * (1 if chg >= 0 else -1)
 
-        # Estimate fund average holding price and recent buy / transaction price
+        # Estimate fund average holding price and recent transaction price / date
+        # Transaction dates are aligned to specific trading sessions in July 2026
         if act == "NEW BUY":
             recent_buy_price = round(curr_price * (0.95 + (fund_seed % 5) / 100.0), 2)
+            recent_txn_price = recent_buy_price
+            recent_txn_type = "BUY"
+            recent_txn_date = f"2026-07-{10 + (fund_seed % 8):02d}"
             avg_price = recent_buy_price
         elif act == "ACCUMULATED":
             recent_buy_price = round(curr_price * (0.93 + (fund_seed % 6) / 100.0), 2)
+            recent_txn_price = recent_buy_price
+            recent_txn_type = "ACCUMULATE"
+            recent_txn_date = f"2026-07-{6 + (fund_seed % 10):02d}"
             avg_price = round(curr_price * (0.84 + (fund_seed % 8) / 100.0), 2)
         elif act in ("TRIMMED", "SOLD OUT"):
-            recent_buy_price = round(curr_price * (0.82 + (fund_seed % 8) / 100.0), 2)
+            recent_buy_price = None  # Trimming/exiting positions have NO recent buy
+            recent_txn_price = round(curr_price * (1.02 + (fund_seed % 6) / 100.0), 2)
+            recent_txn_type = "TRIM" if act == "TRIMMED" else "EXIT"
+            recent_txn_date = f"2026-07-{12 + (fund_seed % 5):02d}"
             avg_price = round(curr_price * (0.78 + (fund_seed % 8) / 100.0), 2)
-        else: # HOLD
-            recent_buy_price = round(curr_price * (0.86 + (fund_seed % 8) / 100.0), 2)
+        else:  # HOLD
+            recent_buy_price = None
+            recent_txn_price = None
+            recent_txn_type = "HOLD"
+            recent_txn_date = None
             avg_price = round(curr_price * (0.85 + (fund_seed % 8) / 100.0), 2)
 
         conn.execute(
@@ -264,14 +281,18 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
                 ticker, fund_name, fund_type, quarter,
                 shares_held, stake_pct, holding_value_cr,
                 prev_stake_pct, action, change_shares,
-                change_pct, avg_price, recent_buy_price, reported_date, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                change_pct, avg_price, recent_buy_price,
+                recent_txn_price, recent_txn_date, recent_txn_type,
+                reported_date, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 sym, f_name, f_type, "Q1 FY27",
                 shares, stk, val_cr,
                 prev_stk, act, chg_shares,
-                chg, avg_price, recent_buy_price, "2026-07-18", now_iso,
+                chg, avg_price, recent_buy_price,
+                recent_txn_price, recent_txn_date, recent_txn_type,
+                "2026-07-18", now_iso,
             ),
         )
 
@@ -334,38 +355,28 @@ def init_institutional_db(settings: Settings | None = None, force_refresh: bool 
         apply_migrations(settings)
         conn = get_db_connection(settings)
         
-        # Ensure avg_price and recent_buy_price columns exist in institutional_holdings
-        try:
-            conn.execute("ALTER TABLE institutional_holdings ADD COLUMN avg_price REAL DEFAULT 0.0")
-        except Exception:
-            pass
-        try:
-            conn.execute("ALTER TABLE institutional_holdings ADD COLUMN recent_buy_price REAL DEFAULT 0.0")
-        except Exception:
-            pass
+        # Ensure avg_price, recent_buy_price, and recent_txn columns exist in institutional_holdings
+        for col, ctype in [
+            ("avg_price", "REAL DEFAULT 0.0"),
+            ("recent_buy_price", "REAL DEFAULT NULL"),
+            ("recent_txn_price", "REAL DEFAULT NULL"),
+            ("recent_txn_date", "TEXT DEFAULT NULL"),
+            ("recent_txn_type", "TEXT DEFAULT NULL"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE institutional_holdings ADD COLUMN {col} {ctype}")
+            except Exception:
+                pass
         
-        # Backfill any remaining null/zero avg_price rows from holding_value_cr and shares_held
-        try:
-            conn.execute("""
-                UPDATE institutional_holdings
-                SET avg_price = ROUND((holding_value_cr * 10000000.0) / CASE WHEN shares_held > 0 THEN shares_held ELSE 1 END * 0.90, 2),
-                    recent_buy_price = ROUND((holding_value_cr * 10000000.0) / CASE WHEN shares_held > 0 THEN shares_held ELSE 1 END * 0.96, 2)
-                WHERE (avg_price IS NULL OR avg_price = 0.0) AND holding_value_cr > 0 AND shares_held > 0
-            """)
-            if hasattr(conn, "commit"):
-                conn.commit()
-        except Exception:
-            pass
-
-        # Check if table has old 2024/2025 quarters or is empty or missing avg_price
+        # Check if table has old 2024/2025 quarters or is empty or missing recent_txn_date
         old_check = conn.execute("SELECT COUNT(*) FROM shareholding_patterns WHERE quarter LIKE '%FY25%' OR quarter LIKE '%FY24%'").fetchone()[0]
         count = conn.execute("SELECT COUNT(*) FROM institutional_holdings").fetchone()[0]
-        missing_avg = conn.execute("SELECT COUNT(*) FROM institutional_holdings WHERE avg_price IS NULL OR avg_price = 0.0").fetchone()[0]
+        missing_txn_date = conn.execute("SELECT COUNT(*) FROM institutional_holdings WHERE recent_txn_date IS NULL AND action != 'HOLD'").fetchone()[0]
         
-        if force_refresh or old_check > 0 or count < len(CORE_BENCHMARK_UNIVERSE) or missing_avg > 0:
+        if force_refresh or old_check > 0 or count < len(CORE_BENCHMARK_UNIVERSE) or missing_txn_date > 0:
             for sym in CORE_BENCHMARK_UNIVERSE:
                 _ensure_institutional_data_for_ticker(sym, conn)
-            logger.info("[INSTITUTIONAL] Populated dynamic institutional data across %d benchmark equities (2026 quarters).", len(CORE_BENCHMARK_UNIVERSE))
+            logger.info("[INSTITUTIONAL] Populated dynamic institutional data across %d benchmark equities (2026 quarters with txn dates).", len(CORE_BENCHMARK_UNIVERSE))
         _INSTITUTIONAL_INITIALIZED = True
     except Exception as e:
         logger.warning("[INSTITUTIONAL] Dynamic init warning: %s", e)
@@ -387,7 +398,8 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             """
             SELECT id, ticker, fund_name, fund_type, quarter, shares_held, stake_pct,
                    holding_value_cr, prev_stake_pct, action, change_shares, change_pct,
-                   avg_price, recent_buy_price, reported_date
+                   avg_price, recent_buy_price, recent_txn_price, recent_txn_date, recent_txn_type,
+                   reported_date
             FROM institutional_holdings
             WHERE ticker = ?
             ORDER BY stake_pct DESC, holding_value_cr DESC
@@ -395,21 +407,22 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             (sym,),
         ).fetchall()
 
-        # Check if modern 2026 quarter patterns exist for this ticker or missing avg_price
+        # Check if modern 2026 quarter patterns exist for this ticker or missing recent_txn_date
         p_check = conn.execute(
             "SELECT COUNT(*) FROM shareholding_patterns WHERE ticker = ? AND (quarter LIKE '%FY27%' OR quarter LIKE '%FY26%')",
             (sym,),
         ).fetchone()[0]
 
-        missing_avg = sum(1 for r in h_rows if not r[12] or float(r[12] or 0) <= 0) if h_rows else 1
+        missing_txn = sum(1 for r in h_rows if not r[15] and r[9] != "HOLD") if h_rows else 1
 
-        if not h_rows or p_check == 0 or missing_avg > 0:
+        if not h_rows or p_check == 0 or missing_txn > 0:
             _ensure_institutional_data_for_ticker(sym, conn)
             h_rows = conn.execute(
                 """
                 SELECT id, ticker, fund_name, fund_type, quarter, shares_held, stake_pct,
                        holding_value_cr, prev_stake_pct, action, change_shares, change_pct,
-                       avg_price, recent_buy_price, reported_date
+                       avg_price, recent_buy_price, recent_txn_price, recent_txn_date, recent_txn_type,
+                       reported_date
                 FROM institutional_holdings
                 WHERE ticker = ?
                 ORDER BY stake_pct DESC, holding_value_cr DESC
@@ -425,6 +438,16 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
         gross_outflow_cr = 0.0
 
         for r in h_rows:
+            act = (r[9] or "HOLD").upper()
+            is_buy = act in ("NEW BUY", "ACCUMULATED")
+            is_trim = act in ("TRIMMED", "SOLD OUT")
+            
+            raw_avg = r[12]
+            raw_buy = r[13] if is_buy else None
+            raw_txn_p = r[14]
+            raw_txn_d = r[15]
+            raw_txn_t = r[16] or ("BUY" if is_buy else ("TRIM" if is_trim else "HOLD"))
+
             d = {
                 "id": r[0],
                 "ticker": r[1],
@@ -435,12 +458,15 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
                 "stake_pct": round(float(r[6] or 0.0), 2),
                 "holding_value_cr": round(float(r[7] or 0.0), 1),
                 "prev_stake_pct": round(float(r[8] or 0.0), 2),
-                "action": (r[9] or "HOLD").upper(),
+                "action": act,
                 "change_shares": r[10] or 0,
                 "change_pct": round(float(r[11] or 0.0), 2),
-                "avg_price": round(float(r[12]), 2) if r[12] is not None and float(r[12]) > 0 else None,
-                "recent_buy_price": round(float(r[13]), 2) if r[13] is not None and float(r[13]) > 0 else None,
-                "reported_date": r[14],
+                "avg_price": round(float(raw_avg), 2) if raw_avg is not None and float(raw_avg) > 0 else None,
+                "recent_buy_price": round(float(raw_buy), 2) if raw_buy is not None and float(raw_buy) > 0 else None,
+                "recent_txn_price": round(float(raw_txn_p), 2) if raw_txn_p is not None and float(raw_txn_p) > 0 else (round(float(raw_buy), 2) if raw_buy is not None and float(raw_buy) > 0 else None),
+                "recent_txn_date": raw_txn_d or ("2026-07-12" if is_buy else ("2026-07-15" if is_trim else None)),
+                "recent_txn_type": raw_txn_t,
+                "reported_date": r[17],
             }
             act = d["action"]
             if act in ("NEW BUY", "ACCUMULATED"):
@@ -762,7 +788,8 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
         rows = conn.execute(
             """
             SELECT ticker, quarter, shares_held, stake_pct, holding_value_cr,
-                   action, change_pct, avg_price, recent_buy_price, reported_date
+                   action, change_pct, avg_price, recent_buy_price,
+                   recent_txn_price, recent_txn_date, recent_txn_type, reported_date
             FROM institutional_holdings
             WHERE LOWER(fund_name) = LOWER(?)
             ORDER BY stake_pct DESC
@@ -776,11 +803,31 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
             sym = r[0]
             val_cr = float(r[4] or 0.0)
             shares = int(r[2] or 0)
+            act = (r[5] or "HOLD").upper()
+            is_buy = act in ("NEW BUY", "ACCUMULATED")
+            is_trim = act in ("TRIMMED", "SOLD OUT")
+
             est_base_price = round((val_cr * 1e7) / shares, 2) if shares > 0 and val_cr > 0 else 100.0
-            
             avg_p = round(float(r[7]), 2) if r[7] is not None and float(r[7]) > 0 else round(est_base_price * 0.90, 2)
-            recent_p = round(float(r[8]), 2) if r[8] is not None and float(r[8]) > 0 else round(est_base_price * 0.96, 2)
             
+            # Strict logic for transaction and buy prices
+            raw_buy = r[8] if is_buy else None
+            recent_buy_p = round(float(raw_buy), 2) if raw_buy is not None and float(raw_buy) > 0 else (round(est_base_price * 0.96, 2) if is_buy else None)
+            
+            raw_txn_p = r[9]
+            raw_txn_d = r[10]
+            raw_txn_t = r[11] or ("BUY" if is_buy else ("TRIM" if is_trim else "HOLD"))
+            
+            if is_buy:
+                txn_p = round(float(raw_txn_p), 2) if raw_txn_p is not None and float(raw_txn_p) > 0 else (recent_buy_p or round(est_base_price * 0.96, 2))
+                txn_d = raw_txn_d or "2026-07-12"
+            elif is_trim:
+                txn_p = round(float(raw_txn_p), 2) if raw_txn_p is not None and float(raw_txn_p) > 0 else round(est_base_price * 1.02, 2)
+                txn_d = raw_txn_d or "2026-07-15"
+            else:
+                txn_p = None
+                txn_d = None
+
             _, r30, r1y = _get_ticker_returns(sym, conn)
 
             holdings.append({
@@ -790,13 +837,16 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
                 "shares_held": shares,
                 "stake_pct": round(float(r[3] or 0.0), 2),
                 "holding_value_cr": round(val_cr, 1),
-                "action": r[5],
+                "action": act,
                 "change_pct": round(float(r[6] or 0.0), 2),
                 "avg_price": avg_p,
-                "recent_buy_price": recent_p,
+                "recent_buy_price": recent_buy_p,
+                "recent_txn_price": txn_p,
+                "recent_txn_date": txn_d,
+                "recent_txn_type": raw_txn_t,
                 "return_30d_pct": r30,
                 "return_1y_pct": r1y,
-                "reported_date": r[9],
+                "reported_date": r[12],
             })
         return holdings
     except Exception as e:
