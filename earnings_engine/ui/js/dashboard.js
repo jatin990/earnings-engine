@@ -2582,6 +2582,7 @@
 
             renderDatasetSummary(ds) {
                 const el = document.getElementById('resultsDatasetSummary');
+                if (!el) return;
                 if (!ds || !ds.available) {
                     el.innerHTML = '<div class="card" style="margin:0">⚠️ Event dataset not available. Run <code>earnings-engine build-dataset</code> first.</div>';
                     return;
@@ -2596,6 +2597,7 @@
 
             renderRefreshStatus(status) {
                 const el = document.getElementById('lastRefreshed');
+                if (!el) return;
                 if (!status || Object.keys(status).length === 0) {
                     el.textContent = 'Last refreshed: Never';
                     return;
@@ -3890,6 +3892,7 @@
 
             renderResultsWidgets() {
                 const el = document.getElementById('resultsWidgets');
+                if (!el) return;
                 if (!this.resultsData.length) {
                     el.innerHTML = '<div class="card" style="grid-column:1/-1;margin:0">No upcoming results found. Try a different market or refresh data.</div>';
                     return;
