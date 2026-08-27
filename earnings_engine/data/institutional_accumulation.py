@@ -72,10 +72,16 @@ def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]
 
 def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None, float | None]:
     """Compute 7-day, 30-day, and 1-year percentage returns directly from price_history."""
+    if not sym:
+        return None, None, None
     try:
+        clean_sym = sym.strip().upper()
+        clean_sym_ns = clean_sym if clean_sym.endswith(".NS") else f"{clean_sym}.NS"
+        clean_sym_plain = clean_sym.replace(".NS", "")
+
         rows = conn.execute(
-            "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
-            (sym,),
+            "SELECT date, close FROM price_history WHERE ticker IN (?, ?, ?) ORDER BY date DESC LIMIT 260",
+            (clean_sym, clean_sym_ns, clean_sym_plain),
         ).fetchall()
         if not rows or len(rows) < 2:
             return None, None, None
