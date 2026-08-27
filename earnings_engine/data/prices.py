@@ -77,6 +77,7 @@ def _connect(settings: Settings) -> sqlite3.Connection | Any:
 
 
 def _is_fresh(ticker: str, settings: Settings) -> bool:
+    sym = canonical_symbol(ticker)
     if not is_turso_enabled():
         path = _cache_path(settings)
         if not path.exists():
@@ -85,7 +86,7 @@ def _is_fresh(ticker: str, settings: Settings) -> bool:
     with _connect(settings) as connection:
         row = connection.execute(
             "SELECT COUNT(*) FROM price_history WHERE ticker = ?",
-            (ticker,),
+            (sym,),
         ).fetchone()
 
     return bool(row and row[0])
@@ -96,6 +97,7 @@ def _last_cached_date(ticker: str, settings: Settings) -> pd.Timestamp | None:
 
     Returns ``None`` if the ticker has no cached rows.
     """
+    sym = canonical_symbol(ticker)
     if not is_turso_enabled():
         path = _cache_path(settings)
         if not path.exists():
@@ -104,7 +106,7 @@ def _last_cached_date(ticker: str, settings: Settings) -> pd.Timestamp | None:
     with _connect(settings) as connection:
         row = connection.execute(
             "SELECT MAX(date) FROM price_history WHERE ticker = ?",
-            (ticker,),
+            (sym,),
         ).fetchone()
 
     if not row or not row[0]:
@@ -114,6 +116,7 @@ def _last_cached_date(ticker: str, settings: Settings) -> pd.Timestamp | None:
 
 def _mark_fetched(ticker: str, settings: Settings) -> None:
     """Record the moment this ticker's prices were last written to the cache."""
+    sym = canonical_symbol(ticker)
     now_str = datetime.now().isoformat(timespec="seconds")
     with _connect(settings) as connection:
         connection.execute(
@@ -124,16 +127,17 @@ def _mark_fetched(ticker: str, settings: Settings) -> None:
                 prices_fetched_at = excluded.prices_fetched_at,
                 last_updated = excluded.last_updated
             """,
-            (ticker, now_str, now_str),
+            (sym, now_str, now_str),
         )
         connection.commit()
 
 
 def _fetch_log_time(ticker: str, settings: Settings) -> datetime | None:
     """Return the last-fetched timestamp for a ticker (None if never logged)."""
+    sym = canonical_symbol(ticker)
     with _connect(settings) as connection:
         row = connection.execute(
-            "SELECT prices_fetched_at FROM tickers WHERE ticker = ?", (ticker,)
+            "SELECT prices_fetched_at FROM tickers WHERE ticker = ?", (sym,)
         ).fetchone()
     if not row or not row[0]:
         return None
@@ -155,7 +159,8 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
     no recorded fetch stamp (legacy/seeded rows) — the last case preserves the
     original behaviour so existing callers/tests keep working.
     """
-    fetched = _fetch_log_time(ticker, settings)
+    sym = canonical_symbol(ticker)
+    fetched = _fetch_log_time(sym, settings)
     if fetched is None:
         # No stamp recorded (e.g. rows seeded directly) -> treat as usable.
         return True
@@ -244,6 +249,12 @@ KNOWN_TICKER_ALIASES: dict[str, str] = {
 }
 
 
+def canonical_symbol(ticker: str) -> str:
+    """Return the official/current active NSE trading symbol for rebranded or renamed tickers."""
+    sym = (ticker or "").strip().upper()
+    return KNOWN_TICKER_ALIASES.get(sym, sym)
+
+
 def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.DataFrame:
     """Fetch prices from yfinance or load from SQLite.
 
@@ -251,7 +262,7 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
     yfinance hits during live scans: prices fetched within the TTL, or any time
     after the market closes, are reused without re-downloading.
     """
-    sym = ticker.strip().upper()
+    sym = canonical_symbol(ticker)
     if not force:
         cached_df = load_prices(sym, settings)
         if not cached_df.empty and prices_recent_enough(sym, settings):
@@ -259,9 +270,6 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
             return cached_df
 
     clear_price_df_cache(sym)
-
-    # Resolve alias if ticker is known to be renamed/rebranded
-    fetch_symbol = KNOWN_TICKER_ALIASES.get(sym, sym)
 
     # Delta fetch: only download the dates we're missing. A 5-day overlap
     # buffer means a prior day's interrupted/partial write is corrected by the
@@ -338,7 +346,7 @@ def load_prices_batch(tickers: list[str], settings: Settings) -> dict[str, pd.Da
     if not tickers:
         return {}
 
-    cleaned = [t.strip().upper() for t in tickers if t and t.strip()]
+    cleaned = [canonical_symbol(t) for t in tickers if t and t.strip()]
     unique_tickers = list(dict.fromkeys(cleaned))
     result: dict[str, pd.DataFrame] = {}
     missing: list[str] = []
@@ -350,38 +358,43 @@ def load_prices_batch(tickers: list[str], settings: Settings) -> dict[str, pd.Da
         else:
             missing.append(t)
 
-    if not missing:
-        return result
+    if missing:
+        CHUNK_SIZE = 200
+        with _connect(settings) as connection:
+            for i in range(0, len(missing), CHUNK_SIZE):
+                chunk = missing[i : i + CHUNK_SIZE]
+                placeholders = ",".join("?" for _ in chunk)
+                rows = connection.execute(
+                    f"SELECT ticker, date, open, high, low, close, volume FROM price_history WHERE ticker IN ({placeholders}) ORDER BY ticker, date ASC",
+                    chunk,
+                ).fetchall()
 
-    CHUNK_SIZE = 200
-    with _connect(settings) as connection:
-        for i in range(0, len(missing), CHUNK_SIZE):
-            chunk = missing[i : i + CHUNK_SIZE]
-            placeholders = ",".join("?" for _ in chunk)
-            rows = connection.execute(
-                f"SELECT ticker, date, open, high, low, close, volume FROM price_history WHERE ticker IN ({placeholders}) ORDER BY ticker, date ASC",
-                chunk,
-            ).fetchall()
+                grouped: dict[str, list[Any]] = {sym: [] for sym in chunk}
+                for r in rows:
+                    grouped[r[0]].append((r[1], r[2], r[3], r[4], r[5], r[6]))
 
-            grouped: dict[str, list[Any]] = {sym: [] for sym in chunk}
-            for r in rows:
-                grouped[r[0]].append((r[1], r[2], r[3], r[4], r[5], r[6]))
+                for sym, row_list in grouped.items():
+                    if not row_list:
+                        empty_df = _empty_frame()
+                        result[sym] = empty_df
+                        set_cached_price_df(sym, empty_df)
+                    else:
+                        frame = pd.DataFrame(row_list, columns=["date", *COLUMNS])
+                        frame["date"] = pd.to_datetime(frame["date"])
+                        frame = frame.set_index("date")
+                        for col in COLUMNS:
+                            frame[col] = pd.to_numeric(frame[col], errors="coerce")
+                        frame = frame.astype({"volume": "Int64"}, errors="ignore")
+                        frame.index.name = "date"
+                        result[sym] = frame
+                        set_cached_price_df(sym, frame)
 
-            for sym, row_list in grouped.items():
-                if not row_list:
-                    empty_df = _empty_frame()
-                    result[sym] = empty_df
-                    set_cached_price_df(sym, empty_df)
-                else:
-                    frame = pd.DataFrame(row_list, columns=["date", *COLUMNS])
-                    frame["date"] = pd.to_datetime(frame["date"])
-                    frame = frame.set_index("date")
-                    for col in COLUMNS:
-                        frame[col] = pd.to_numeric(frame[col], errors="coerce")
-                    frame = frame.astype({"volume": "Int64"}, errors="ignore")
-                    frame.index.name = "date"
-                    result[sym] = frame
-                    set_cached_price_df(sym, frame)
+    # Also map any requested original aliases to their canonical result
+    for orig in tickers:
+        if orig and orig.strip():
+            canon = canonical_symbol(orig)
+            if canon in result and orig not in result:
+                result[orig] = result[canon]
 
     return result
 
@@ -390,7 +403,7 @@ def load_prices(ticker: str, settings: Settings) -> pd.DataFrame:
     """Load prices from in-memory cache or SQLite if present."""
     if not ticker:
         return _empty_frame()
-    sym = ticker.strip().upper()
+    sym = canonical_symbol(ticker)
     cached = get_cached_price_df(sym)
     if cached is not None:
         return cached

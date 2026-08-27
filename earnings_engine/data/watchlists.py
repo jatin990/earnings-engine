@@ -38,11 +38,13 @@ def _connect(settings: Settings) -> Any:
     )
     # Auto-migrate rebranded/renamed symbols (e.g. ZOMATO.NS -> ETERNAL.NS, STERTECH.NS -> STLTECH.NS)
     try:
-        conn.execute("UPDATE watchlists SET ticker = 'ETERNAL.NS' WHERE ticker = 'ZOMATO.NS'")
-        conn.execute("UPDATE watchlists SET ticker = 'STLTECH.NS' WHERE ticker IN ('STERTECH.NS', 'STERLITE.NS')")
+        conn.execute("UPDATE OR IGNORE watchlists SET ticker = 'ETERNAL.NS' WHERE ticker = 'ZOMATO.NS'")
+        conn.execute("DELETE FROM watchlists WHERE ticker = 'ZOMATO.NS'")
+        conn.execute("UPDATE OR IGNORE watchlists SET ticker = 'STLTECH.NS' WHERE ticker IN ('STERTECH.NS', 'STERLITE.NS')")
+        conn.execute("DELETE FROM watchlists WHERE ticker IN ('STERTECH.NS', 'STERLITE.NS')")
+        conn.commit()
     except Exception:
         pass
-    conn.commit()
     return conn
 
 
@@ -88,7 +90,10 @@ def get_watchlist(name: str, settings: Settings | None = None) -> list[str]:
                 if m_rows:
                     rows = m_rows
                     break
-    return [r[0] for r in rows if r[0]]
+    from earnings_engine.data.prices import canonical_symbol
+    raw_tickers = [canonical_symbol(r[0]) for r in rows if r[0]]
+    # Return deduplicated preserving insertion order
+    return list(dict.fromkeys(raw_tickers))
 
 
 def get_all_watchlist_tickers(settings: Settings | None = None) -> list[str]:
@@ -97,7 +102,9 @@ def get_all_watchlist_tickers(settings: Settings | None = None) -> list[str]:
     try:
         with _connect(settings) as conn:
             rows = conn.execute("SELECT DISTINCT ticker FROM watchlists").fetchall()
-            return [r[0] for r in rows if r[0]]
+            from earnings_engine.data.prices import canonical_symbol
+            raw_tickers = [canonical_symbol(r[0]) for r in rows if r[0]]
+            return list(dict.fromkeys(raw_tickers))
     except Exception:
         return []
 
@@ -105,7 +112,9 @@ def get_all_watchlist_tickers(settings: Settings | None = None) -> list[str]:
 def add_to_watchlist(name: str, ticker: str, settings: Settings | None = None) -> dict[str, Any]:
     """Add a ticker to a named watchlist. Rejects duplicates."""
     settings = settings or Settings()
-    ticker = ticker.strip().upper()
+    from earnings_engine.data.prices import canonical_symbol
+    raw_ticker = ticker.strip().upper()
+    ticker = canonical_symbol(raw_ticker)
     if not ticker:
         return {"success": False, "error": "Ticker is required"}
     with _connect(settings) as conn:
@@ -124,11 +133,13 @@ def add_to_watchlist(name: str, ticker: str, settings: Settings | None = None) -
 def remove_from_watchlist(name: str, ticker: str, settings: Settings | None = None) -> dict[str, Any]:
     """Remove a ticker from a named watchlist."""
     settings = settings or Settings()
-    ticker = ticker.strip().upper()
+    from earnings_engine.data.prices import canonical_symbol
+    raw_ticker = ticker.strip().upper()
+    ticker = canonical_symbol(raw_ticker)
     if not ticker:
         return {"success": False, "error": "Ticker is required"}
     with _connect(settings) as conn:
-        cur = conn.execute("DELETE FROM watchlists WHERE name = ? AND ticker = ?", (name, ticker))
+        cur = conn.execute("DELETE FROM watchlists WHERE name = ? AND ticker IN (?, ?)", (name, ticker, raw_ticker))
         conn.commit()
         if cur.rowcount == 0:
             return {"success": False, "error": f"{ticker} not in {name} watchlist"}

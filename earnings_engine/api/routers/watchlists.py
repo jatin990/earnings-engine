@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from earnings_engine.api.dependencies import _settings
 from earnings_engine.api import dashboard_api
@@ -21,27 +21,12 @@ router = APIRouter(tags=["Watchlists & Universes"])
 # LITERAL ROUTES (Defined BEFORE Parameterized Routes for Strict Precedence)
 # ---------------------------------------------------------------------------
 
-@router.get("/api/v1/watchlist/quotes")
-async def get_watchlist_quotes_endpoint(
-    name: str = Query("my_watchlist", description="Watchlist name"),
-    watchlist: str | None = Query(None, description="Alias for name"),
-):
-    """Retrieve live OHLCV price quotes, volume, and percentage returns for tickers in a watchlist."""
-    wl_name = watchlist or name
-    try:
-        quotes = await asyncio.to_thread(dashboard_api.get_watchlist_quotes_api, watchlist=wl_name, settings=_settings)
-        return quotes
-    except Exception as e:
-        logger.exception("Error in get_watchlist_quotes: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/api/v1/watchlist/all")
 async def get_all_watchlists_endpoint():
-    """Retrieve all watchlists and their assigned tickers."""
+    """Retrieve all custom watchlists and built-in universes with full ordered ticker lists and metadata."""
     try:
-        all_wl = await asyncio.to_thread(watchlists_mod.all_watchlists, settings=_settings)
-        return {"watchlists": all_wl}
+        res = await asyncio.to_thread(dashboard_api.get_all_watchlists_and_universes)
+        return res
     except Exception as e:
         logger.exception("Error in get_all_watchlists: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -49,13 +34,203 @@ async def get_all_watchlists_endpoint():
 
 @router.get("/api/v1/watchlist/names")
 async def get_watchlist_names_endpoint():
-    """Retrieve list of distinct watchlist names."""
+    """Fast summary of watchlist names and universe metadata for dropdowns (no heavy ticker arrays)."""
     try:
-        rows = await asyncio.to_thread(watchlists_mod.list_watchlists, settings=_settings)
-        names = [r["name"] if isinstance(r, dict) else r for r in rows]
-        return {"names": names}
+        res = await asyncio.to_thread(dashboard_api.get_watchlist_names_summary)
+        return res
     except Exception as e:
         logger.exception("Error in get_watchlist_names: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/watchlist/list")
+async def get_watchlist_list_endpoint():
+    """List all named watchlists in SQLite."""
+    try:
+        lists = await asyncio.to_thread(dashboard_api.get_universe_files)
+        return {"watchlists": lists}
+    except Exception as e:
+        logger.exception("Error in get_watchlist_list: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/watchlist/quotes")
+@router.get("/api/v1/watchlist/{name}/quotes")
+async def get_watchlist_quotes_endpoint(
+    name: str | None = None,
+    watchlist: str | None = Query(None, description="Watchlist name"),
+    tickers: str | None = Query(None, description="Comma-separated ticker list (overrides watchlist name)"),
+    live: bool = Query(False, description="Force live intraday / price fetching"),
+):
+    """Retrieve full OHLCV, pricing, market cap, and swing levels for tickers in a watchlist."""
+    wl_name = watchlist or (name if name and name != "quotes" else None) or "my_watchlist"
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()] if tickers else None
+    try:
+        quotes = await asyncio.to_thread(
+            dashboard_api.get_watchlist_quotes_api,
+            watchlist=wl_name,
+            tickers=ticker_list,
+            live=live,
+            settings=_settings,
+        )
+        return quotes
+    except Exception as e:
+        logger.exception("Error in get_watchlist_quotes: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/watchlist/quotes")
+async def post_watchlist_quotes_endpoint(request: dict):
+    """Retrieve full OHLCV, pricing, market cap, and swing levels via POST body.
+    Body: {"watchlist"?: str, "tickers"?: list[str], "live"?: bool}
+    """
+    wl_name = request.get("watchlist") or request.get("name") or "my_watchlist"
+    tickers = request.get("tickers")
+    live = bool(request.get("live", False))
+    try:
+        quotes = await asyncio.to_thread(
+            dashboard_api.get_watchlist_quotes_api,
+            watchlist=wl_name,
+            tickers=tickers,
+            live=live,
+            settings=_settings,
+        )
+        return quotes
+    except Exception as e:
+        logger.exception("Error in post_watchlist_quotes: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/watchlist/create")
+async def create_watchlist_endpoint(request: dict):
+    """Create a new watchlist. Body: {"name"?: str, "tickers"?: list[str]}"""
+    name = request.get("name") or request.get("watchlist") or "my_watchlist"
+    tickers = request.get("tickers") or []
+    try:
+        result = await asyncio.to_thread(watchlists_mod.create_watchlist, name=name, settings=_settings)
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to create watchlist"))
+        for t in tickers:
+            await asyncio.to_thread(watchlists_mod.add_to_watchlist, name=name, ticker=t, settings=_settings)
+        saved = await asyncio.to_thread(watchlists_mod.get_watchlist, name=name, settings=_settings)
+        return {"success": True, "name": name, "count": len(saved), "tickers": saved, "watchlist": saved}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error creating watchlist: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/watchlist/rename")
+async def rename_watchlist_endpoint(request: dict):
+    """Rename a watchlist. Body: {"name": str, "new_name": str} or {"old_name": str, "new_name": str}"""
+    name = request.get("name") or request.get("old_name", "")
+    new_name = request.get("new_name", "")
+    try:
+        result = await asyncio.to_thread(dashboard_api.rename_watchlist_api, name=name, new_name=new_name)
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to rename watchlist"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error renaming watchlist: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/watchlist/delete")
+async def delete_watchlist_post_endpoint(request: dict):
+    """Delete a watchlist. Body: {"name": str} or {"watchlist": str}"""
+    name = request.get("name") or request.get("watchlist", "")
+    try:
+        result = await asyncio.to_thread(dashboard_api.delete_watchlist_api, name=name)
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to delete watchlist"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error deleting watchlist: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/watchlist/add")
+async def add_watchlist_ticker_endpoint(
+    request: Request,
+    ticker: str | None = Query(None, description="Ticker symbol"),
+    name: str | None = Query(None, description="Watchlist name"),
+):
+    """Add a ticker to a named watchlist. Accepts JSON body or query params."""
+    body_data = {}
+    try:
+        body_data = await request.json()
+    except Exception:
+        pass
+    final_ticker = (body_data.get("ticker") if isinstance(body_data, dict) else None) or ticker or ""
+    final_name = (
+        (body_data.get("name") or body_data.get("watchlist") if isinstance(body_data, dict) else None)
+        or name
+        or "my_watchlist"
+    )
+    if not final_ticker:
+        raise HTTPException(status_code=400, detail="Ticker is required")
+    try:
+        result = await asyncio.to_thread(dashboard_api.add_to_watchlist, ticker=final_ticker, name=final_name)
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to add ticker to watchlist"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error adding to watchlist: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/watchlist/remove")
+async def remove_watchlist_ticker_endpoint(
+    request: Request,
+    ticker: str | None = Query(None, description="Ticker symbol"),
+    name: str | None = Query(None, description="Watchlist name"),
+):
+    """Remove a ticker from a named watchlist. Accepts JSON body or query params."""
+    body_data = {}
+    try:
+        body_data = await request.json()
+    except Exception:
+        pass
+    final_ticker = (body_data.get("ticker") if isinstance(body_data, dict) else None) or ticker or ""
+    final_name = (
+        (body_data.get("name") or body_data.get("watchlist") if isinstance(body_data, dict) else None)
+        or name
+        or "my_watchlist"
+    )
+    if not final_ticker:
+        raise HTTPException(status_code=400, detail="Ticker is required")
+    try:
+        result = await asyncio.to_thread(dashboard_api.remove_from_watchlist, ticker=final_ticker, name=final_name)
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Failed to remove ticker from watchlist"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error removing from watchlist: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/watchlist")
+async def get_watchlist_query_endpoint(
+    name: str = Query("my_watchlist", description="Watchlist name (defaults to my_watchlist)"),
+):
+    """Get a named watchlist or universe from the SQLite DB / universe files."""
+    from earnings_engine.data.universe import get_universe as fetch_universe_tickers
+    try:
+        tickers = await asyncio.to_thread(watchlists_mod.get_watchlist, name=name, settings=_settings)
+        if not tickers:
+            tickers = await asyncio.to_thread(fetch_universe_tickers, name, _settings)
+        return {"name": name, "tickers": tickers or [], "count": len(tickers or [])}
+    except Exception as e:
+        logger.exception("Error in get_watchlist: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -102,10 +277,13 @@ async def get_market_status_endpoint():
 
 @router.get("/api/v1/watchlist/{name}")
 async def get_single_watchlist_endpoint(name: str):
-    """Retrieve tickers within a specific watchlist."""
+    """Retrieve tickers within a specific watchlist or universe."""
+    from earnings_engine.data.universe import get_universe as fetch_universe_tickers
     try:
         tickers = await asyncio.to_thread(watchlists_mod.get_watchlist, name=name, settings=_settings)
-        return {"name": name, "count": len(tickers), "tickers": tickers}
+        if not tickers:
+            tickers = await asyncio.to_thread(fetch_universe_tickers, name, _settings)
+        return {"name": name, "count": len(tickers or []), "tickers": tickers or []}
     except Exception as e:
         logger.exception("Error in get_single_watchlist for %s: %s", name, e)
         raise HTTPException(status_code=500, detail=str(e))
