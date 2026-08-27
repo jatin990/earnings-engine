@@ -8753,9 +8753,11 @@
             if (matches.length) {
                 selectedIndex = -1;
                 dropdown.innerHTML = matches.map((t, i) =>
-                    '<div class="autocomplete-item" data-i="' + i + '" onclick="app.selectTicker(\'' + t + '\')" onmouseenter="app.setSearchHoverIndex(' + i + ')">' +
-                    '<span style="font-weight:700;letter-spacing:0.02em;">' + t + '</span>' +
-                    '<span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);">' + (t.endsWith('.NS') ? 'NSE' : 'US') + '</span>' +
+                    '<div class="autocomplete-item" data-i="' + i + '" onclick="app.selectTicker(\'' + t + '\')" onmouseenter="app.setSearchHoverIndex(' + i + ')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:0.45rem 0.75rem;border-bottom:1px solid rgba(255,255,255,0.04);">' +
+                    '<a href="/stock/' + encodeURIComponent(t) + '" onclick="event.preventDefault(); app.selectTicker(\'' + t + '\');" style="color:#ffffff;font-weight:700;letter-spacing:0.02em;text-decoration:none;display:flex;justify-content:space-between;align-items:center;width:100%;">' +
+                    '<span>' + t + '</span>' +
+                    '<span style="font-size:0.68rem;padding:0.12rem 0.45rem;border-radius:4px;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);">' + (t.endsWith('.NS') ? 'NSE' : 'US') + '</span>' +
+                    '</a>' +
                     '</div>'
                 ).join('');
                 dropdown.style.display = 'block';
