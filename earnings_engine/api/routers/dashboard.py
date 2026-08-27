@@ -312,12 +312,22 @@ async def dashboard_predict_run(request: dict | None = None):
 
 
 @router.get("/api/v1/earnings/freshness")
-async def get_earnings_freshness():
-    """Return data ingestion timestamps and cache freshness."""
+async def get_earnings_freshness(
+    watchlist: str | None = Query(None, description="Watchlist name or universe"),
+    tickers: str | None = Query(None, description="Comma-separated list of tickers"),
+):
+    """Return data ingestion timestamps and cache freshness for a watchlist or market universe."""
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()] if tickers else None
     try:
-        from earnings_engine.data.earnings import get_earnings_freshness
-        return await asyncio.to_thread(get_earnings_freshness, settings=_settings)
+        from earnings_engine.data.earnings import get_watchlist_earnings_freshness
+        return await asyncio.to_thread(
+            get_watchlist_earnings_freshness,
+            watchlist_name=watchlist,
+            tickers=ticker_list,
+            settings=_settings,
+        )
     except Exception as e:
+        logger.exception("Error in get_earnings_freshness: %s", e)
         raise HTTPException(status_code=500, detail=f"Error checking freshness: {str(e)}")
 
 

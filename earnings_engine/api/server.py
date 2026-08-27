@@ -415,6 +415,12 @@ if _dashboard_static.exists():
     app.mount("/dashboard/static", StaticFiles(directory=str(_dashboard_static)), name="dashboard_static")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon_endpoint():
+    """Return 204 No Content for favicon requests."""
+    return Response(status_code=204)
+
+
 # ---------------------------------------------------------------------------
 # Mount Domain Routers (Ordered for Exact Precedence)
 # ---------------------------------------------------------------------------

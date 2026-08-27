@@ -150,7 +150,7 @@ async def settle_consensus_predictions(req: ConsensusSettleRequest = ConsensusSe
 
 
 @router.get("/api/v1/consensus/latest")
-async def get_latest_consensus_predictions(limit: int = Query(20, ge=1, le=100)):
+async def get_latest_consensus_predictions(limit: int = Query(20, ge=1, le=5000)):
     """Retrieve recent consensus predictions."""
     try:
         preds = await asyncio.to_thread(get_predictions, settings=_settings, limit=limit)
