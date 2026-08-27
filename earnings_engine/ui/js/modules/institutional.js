@@ -16,6 +16,17 @@
         _institutionalLoaded: false,
 
         switchInstitutionalPage(page) {
+            if (!page || (page !== 'equities' && page !== 'investors')) page = 'equities';
+            try {
+                localStorage.setItem('ee_institutional_subpage', page);
+                if (window.location.hash && window.location.hash.includes('institutional')) {
+                    const newHash = page === 'investors' ? '#institutional/investors' : '#institutional';
+                    if (window.location.hash !== newHash) {
+                        try { history.replaceState(null, '', newHash); } catch (e) { window.location.hash = newHash; }
+                    }
+                }
+            } catch (e) {}
+
             const pages = ['equities', 'investors'];
             pages.forEach(p => {
                 const el = document.getElementById('instPage-' + p);
@@ -96,6 +107,10 @@
         },
 
         async loadInstitutionalData() {
+            // Restore active sub-page state on load / refresh
+            const savedSub = localStorage.getItem('ee_institutional_subpage') || 'equities';
+            this.switchInstitutionalPage(savedSub);
+
             try {
                 const [resAcc, resDist, resFunds] = await Promise.all([
                     fetch(API_BASE + '/api/v1/institutional/accumulating?limit=35'),
@@ -266,10 +281,34 @@
             }).join('');
         },
 
+        inspectInstitutionalHoldingStock(ticker) {
+            if (!ticker) return;
+            const cleanTicker = ticker.trim().toUpperCase();
+            this.closeFundModal();
+            this.switchInstitutionalPage('equities');
+            if (this._splitCollapsed) {
+                this.toggleInstitutionalSplitLayout();
+            }
+            this.searchInstitutionalStock(cleanTicker);
+            const radarEl = document.getElementById('instEquitiesSplitGrid') || document.getElementById('instPage-equities');
+            if (radarEl) {
+                radarEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        },
+
         async searchInstitutionalStock(ticker) {
             if (!ticker) return;
             const cleanTicker = ticker.trim().toUpperCase();
             this._selectedTicker = cleanTicker;
+
+            // Ensure equities page is active and split drilldown is visible
+            const invPage = document.getElementById('instPage-investors');
+            if (invPage && invPage.style.display !== 'none') {
+                this.switchInstitutionalPage('equities');
+            }
+            if (this._splitCollapsed) {
+                this.toggleInstitutionalSplitLayout();
+            }
             
             // Re-render compact tables to update selected row highlighting
             if (this.institutionalData.accumulating.length) {
@@ -463,7 +502,7 @@
                         return `
                             <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);font-weight:700;">
-                                    <a href="javascript:void(0)" onclick="app.closeFundModal(); app.searchInstitutionalStock('${h.ticker}')" style="color:#38bdf8;text-decoration:none;">${h.ticker}</a>
+                                    <a href="javascript:void(0)" onclick="app.inspectInstitutionalHoldingStock('${h.ticker}')" style="color:#38bdf8;text-decoration:none;border-bottom:1px dashed rgba(56,189,248,0.4);" title="Inspect ${h.ticker} Institutional Flow">${h.ticker}</a>
                                     ${compName}
                                 </td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">${h.quarter}</td>
@@ -477,8 +516,11 @@
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#a7f3d0;font-weight:600;">₹${h.recent_buy_price != null ? Number(h.recent_buy_price).toFixed(2) : '—'}</td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">₹${(h.holding_value_cr || 0).toLocaleString()} Cr</td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#94a3b8;font-size:0.72rem;">${h.reported_date || '—'}</td>
-                                <td style="padding:0.55rem 0.8rem;text-align:center;">
-                                    <button type="button" onclick="app.closeFundModal(); app.searchInstitutionalStock('${h.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);">🔍 Analyze Stock</button>
+                                <td style="padding:0.55rem 0.8rem;text-align:center;white-space:nowrap;">
+                                    <div style="display:flex;gap:0.35rem;justify-content:center;">
+                                        <button type="button" onclick="app.inspectInstitutionalHoldingStock('${h.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);" title="Inspect Institutional Flow & Shareholding">🏛️ Flow</button>
+                                        <button type="button" onclick="app.closeFundModal(); if (typeof app.showStockFullScreen === 'function') app.showStockFullScreen('${h.ticker}'); else if (typeof app.openStockDetailModal === 'function') app.openStockDetailModal('${h.ticker}'); else window.open('/stock/${encodeURIComponent(h.ticker)}', '_blank');" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;background:rgba(168,85,247,0.1);color:#c084fc;border:1px solid rgba(168,85,247,0.3);" title="Open Complete Stock Intelligence Analysis">📊 Detail</button>
+                                    </div>
                                 </td>
                             </tr>
                         `;

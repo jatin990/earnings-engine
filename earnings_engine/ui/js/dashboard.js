@@ -1019,18 +1019,30 @@
             },
 
             getInitialTab() {
-                // 1. Check URL Hash (e.g. #swing or #tab=swing)
+                // 1. Check URL Hash (e.g. #swing or #tab=swing or #institutional/investors)
                 let hash = window.location.hash ? window.location.hash.replace(/^#/, '').trim() : '';
                 if (hash.startsWith('tab=')) hash = hash.replace('tab=', '');
                 
+                // Check if hash points to institutional subpage
+                if (hash.includes('institutional/investors') || hash === 'institutional-investors' || hash === 'smart-money') {
+                    try { localStorage.setItem('ee_institutional_subpage', 'investors'); } catch (e) {}
+                    hash = 'institutional';
+                } else if (hash.includes('institutional/equities') || hash === 'institutional-equities') {
+                    try { localStorage.setItem('ee_institutional_subpage', 'equities'); } catch (e) {}
+                    hash = 'institutional';
+                }
+
                 // 2. Check URL Search Query (e.g. ?tab=swing)
                 const params = new URLSearchParams(window.location.search);
                 const queryTab = params.get('tab');
+                if (params.get('sub')) {
+                    try { localStorage.setItem('ee_institutional_subpage', params.get('sub')); } catch (e) {}
+                }
                 
                 // 3. Check LocalStorage
                 const storedTab = localStorage.getItem('dashboard_active_tab');
 
-                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 
                 if (hash && validTabs.includes(hash.toLowerCase())) return hash.toLowerCase();
                 if (queryTab && validTabs.includes(queryTab.toLowerCase())) return queryTab.toLowerCase();
@@ -1633,7 +1645,12 @@
                 if (name === 'institutional') {
                     if (!this._institutionalLoaded) {
                         this._institutionalLoaded = true;
-                        this.loadInstitutionalData();
+                        if (typeof this.loadInstitutionalData === 'function') this.loadInstitutionalData();
+                    } else {
+                        const savedSub = localStorage.getItem('ee_institutional_subpage') || 'equities';
+                        if (typeof this.switchInstitutionalPage === 'function') {
+                            this.switchInstitutionalPage(savedSub);
+                        }
                     }
                 }
                 if (name === 'repeaters') {
