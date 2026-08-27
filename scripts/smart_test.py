@@ -59,8 +59,9 @@ def select_test_files(modified_files: list[str]) -> list[str]:
             if filename.startswith("test_"):
                 selected_tests.add(p)
             elif filename == "conftest.py":
-                # Conftest changes affect all tests -> trigger full suite
-                return ["tests/test_migrations.py", "tests/test_recalculate_audit.py", "tests/test_universe.py", "tests/test_swing_ranges.py"]
+                # Conftest changes affect all tests -> trigger all existing tests
+                all_tests = [str(f.as_posix()) for f in Path("tests").glob("test_*.py")]
+                return sorted(all_tests)
             continue
 
         for module_name, test_paths in MODULE_TEST_MAP.items():
@@ -69,7 +70,7 @@ def select_test_files(modified_files: list[str]) -> list[str]:
                     if Path(t).exists():
                         selected_tests.add(t)
 
-    return sorted(selected_tests)
+    return sorted(t for t in selected_tests if Path(t).exists())
 
 
 def main():

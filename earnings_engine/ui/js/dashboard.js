@@ -1486,7 +1486,7 @@
 
             switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'home').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'home';
 
                 // Abort any pending fetch requests when switching tabs
@@ -1526,6 +1526,7 @@
                         'breakout': '⚡ Breakout Radar',
                         'institutional': '🏛️ Institutional Flows',
                         'repeaters': '🔁 Quarter Repeaters',
+                        'new-additions': '🆕 Recent Additions & IPOs',
                         'swing': 'Swing Ranges',
                         'kronos': 'Kronos 14D Forecast',
                         'consensus': '4-Model Consensus',
@@ -11279,6 +11280,19 @@
                     { name: 'AI Repeat Probability', formula: 'Ensemble ML Classifier (Surprise Track + Momentum + Catalysts)', desc: 'Probability (0-100%) that the stock will beat expectations again in the upcoming release.' }
                 ],
                 tips: 'Focus on 3Q+ beat streak companies with high industry buzz tailwinds (e.g. EMS, Defense, Power Infra).'
+            },
+            'new-additions': {
+                title: 'Recent Market Additions & IPOs Tracker',
+                icon: '🆕',
+                dataSource: 'NSE official new listings Bhavcopy feed, exchange debut announcements, and historical price ingestion table (price_history).',
+                what: 'Tracks newly listed companies, recent IPOs, direct listings, and debut quarterly earnings dates on the National Stock Exchange (NSE).',
+                thought: 'Newly listed equities experience significant price discovery and institutional accumulation cycles. Tracking them early allows quantitative traders to spot post-IPO base breakouts before mainstream analyst coverage begins.',
+                calculations: [
+                    { name: 'Listing Age (Days)', formula: 'Current Date - Official NSE Listing Date', desc: 'Number of calendar days elapsed since the stock debuted on the exchange.' },
+                    { name: 'Series Classification', formula: 'EQ (Normal Equity) · BE (Book Entry / Trade-for-Trade) · SM (SME)', desc: 'Trading series category dictating circuit filter and settlement rules.' },
+                    { name: 'Debut Earnings Proximity', formula: 'Scheduled First Results Date - Today', desc: 'Identifies impending inaugural quarterly financial disclosures.' }
+                ],
+                tips: 'Look for recent IPOs forming tight 3–6 week consolidation bases with deliverable volume accumulation.'
             },
             'swing': {
                 title: 'Swing Range Channels & Cyclic Oscillations',
