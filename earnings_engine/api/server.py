@@ -2014,6 +2014,36 @@ async def suggest_trip_activity_endpoint(
     return {"success": True, "activity_id": act_id, "message": f"Activity '{req.activity_title}' suggested!"}
 
 
+@app.post("/api/v1/trips/{trip_id}/activities/{activity_id}/vote", tags=["Scoped Hubs"])
+async def vote_trip_activity_endpoint(
+    trip_id: str,
+    activity_id: str,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Upvote a suggested trip activity."""
+    conn = get_db_connection(_settings)
+    with conn:
+        conn.execute("UPDATE trip_activities SET votes_count = votes_count + 1 WHERE id = ? AND trip_id = ?", (activity_id, trip_id))
+        conn.commit()
+        row = conn.execute("SELECT votes_count FROM trip_activities WHERE id = ?", (activity_id,)).fetchone()
+        votes = row[0] if row else 1
+    return {"success": True, "activity_id": activity_id, "votes_count": votes}
+
+
+@app.delete("/api/v1/trips/{trip_id}/activities/{activity_id}", tags=["Scoped Hubs"])
+async def delete_trip_activity_endpoint(
+    trip_id: str,
+    activity_id: str,
+    session: dict = Depends(require_scope("can_view_trips")),
+):
+    """Delete a suggested trip activity."""
+    conn = get_db_connection(_settings)
+    with conn:
+        conn.execute("DELETE FROM trip_activities WHERE id = ? AND trip_id = ?", (activity_id, trip_id))
+        conn.commit()
+    return {"success": True, "message": f"Activity {activity_id} removed."}
+
+
 @app.get("/api/v1/cards", tags=["Scoped Hubs"])
 async def get_cards_endpoint(session: dict = Depends(require_scope("can_view_cards"))):
     """Retrieve credit card benefits, reward rates, limits, and lounge access perks."""
