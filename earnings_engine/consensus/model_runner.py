@@ -324,6 +324,7 @@ def _query_single_model(
     timeout: int = 60,
     max_retries: int = 2,
     local_url: str | None = None,
+    _ticker: str | None = None,
 ) -> dict[str, Any]:
     """Send a prediction request to a single model (local or via OpenRouter) with rate limit retry & fallback.
 
@@ -341,10 +342,44 @@ def _query_single_model(
     display_name = MODEL_DISPLAY_NAMES.get(model_id, model_id.split("/")[-1])
     current_model = model_id
 
+    # --- Pre-flight rate-limit check ---
+    try:
+        from earnings_engine.rate_limits import is_rate_limited as _is_rl
+        rl_reason = _is_rl(model_id)
+        if rl_reason:
+            logger.warning("[CONSENSUS] Skipping %s — %s", display_name, rl_reason)
+            return {
+                "model_name": display_name,
+                "model_id": model_id,
+                "error": f"Rate-limited: {rl_reason}",
+                "direction": "NEUTRAL",
+                "confidence_pct": 50,
+                "target_price": None,
+                "support_level": None,
+                "resistance_level": None,
+                "stop_loss_price": None,
+                "risk_reward_ratio": None,
+                "recommended_action": "HOLD / WAIT",
+                "raw_response": f"Skipped: {rl_reason}",
+                "latency_ms": 0,
+            }
+    except Exception:
+        pass
+
     for attempt in range(max_retries + 1):
         start = time.perf_counter()
         logger.info("[CONSENSUS] Querying %s (%s, attempt %d/%d)...", display_name, current_model, attempt + 1, max_retries + 1)
         try:
+            # Record request BEFORE the HTTP call so the sliding window is updated
+            # even if the request errors or times out.
+            try:
+                from earnings_engine.rate_limits import record_request as _rr
+                _rr("openrouter")
+                _rr(current_model)
+                _rr(display_name)
+            except Exception:
+                pass
+
             resp = requests.post(
                 OPENROUTER_API_URL,
                 headers={
@@ -366,10 +401,7 @@ def _query_single_model(
             )
 
             try:
-                from earnings_engine.rate_limits import record_request, update_openrouter_headers
-                record_request("openrouter", resp.status_code)
-                record_request(current_model, resp.status_code)
-                record_request(display_name, resp.status_code)
+                from earnings_engine.rate_limits import update_openrouter_headers
                 update_openrouter_headers(dict(resp.headers))
             except Exception:
                 pass
@@ -484,9 +516,9 @@ def _query_single_model(
 
             try:
                 from earnings_engine.rate_limits import record_generation
-                record_generation("openrouter", elapsed_ms, tokens=total_tokens, success=True)
-                record_generation(current_model, elapsed_ms, tokens=total_tokens, success=True)
-                record_generation(display_name, elapsed_ms, tokens=total_tokens, success=True)
+                record_generation("openrouter", elapsed_ms, tokens=total_tokens, success=True, ticker=_ticker)
+                record_generation(current_model, elapsed_ms, tokens=total_tokens, success=True, ticker=_ticker)
+                record_generation(display_name, elapsed_ms, tokens=total_tokens, success=True, ticker=_ticker)
             except Exception:
                 pass
 
@@ -518,8 +550,8 @@ def _query_single_model(
             logger.warning("[CONSENSUS] %s timed out after %ds", display_name, timeout)
             try:
                 from earnings_engine.rate_limits import record_generation
-                record_generation(current_model, timeout * 1000, tokens=0, success=False)
-                record_generation(display_name, timeout * 1000, tokens=0, success=False)
+                record_generation(current_model, timeout * 1000, tokens=0, success=False, error_message=f"Timeout after {timeout}s", ticker=_ticker)
+                record_generation(display_name, timeout * 1000, tokens=0, success=False, error_message=f"Timeout after {timeout}s", ticker=_ticker)
             except Exception:
                 pass
             return {
@@ -543,8 +575,8 @@ def _query_single_model(
             logger.error("[CONSENSUS] %s unexpected error: %s", display_name, e)
             try:
                 from earnings_engine.rate_limits import record_generation
-                record_generation(current_model, (time.perf_counter() - start) * 1000, tokens=0, success=False)
-                record_generation(display_name, (time.perf_counter() - start) * 1000, tokens=0, success=False)
+                record_generation(current_model, (time.perf_counter() - start) * 1000, tokens=0, success=False, error_message=str(e), ticker=_ticker)
+                record_generation(display_name, (time.perf_counter() - start) * 1000, tokens=0, success=False, error_message=str(e), ticker=_ticker)
             except Exception:
                 pass
             return {
@@ -587,6 +619,7 @@ def _parse_model_json(content: Any) -> dict[str, Any] | None:
     # Strip thinking tags (DeepSeek-R1 uses <think>...</think> or unclosed <think>...)
     content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
     content = re.sub(r"^<think>.*$", "", content, flags=re.DOTALL).strip()
+
 
     # Try direct parse first
     try:
@@ -753,7 +786,7 @@ def run_consensus_models(
 
     with ThreadPoolExecutor(max_workers=len(models)) as executor:
         futures = {
-            executor.submit(_query_single_model, model_id, full_prompt, api_key, timeout, 2, local_url): model_id
+            executor.submit(_query_single_model, model_id, full_prompt, api_key, timeout, 2, local_url, ticker): model_id
             for model_id in models
         }
         for future in as_completed(futures):

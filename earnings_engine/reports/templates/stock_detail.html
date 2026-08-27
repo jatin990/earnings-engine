@@ -1450,6 +1450,7 @@
         }
 
         function renderUI(data) {
+            if (!data) return;
             const p = data.profile || {};
             const q = data.quote || {};
             const t = data.technical || {};
@@ -1457,17 +1458,23 @@
             const currSym = p.currency || (ACTIVE_SYM.endsWith('.NS') ? '₹' : '$');
 
             // Header profile
-            document.getElementById('lblCompanyName').textContent = p.name || p.ticker;
-            document.getElementById('tagMarket').textContent = p.market || (ACTIVE_SYM.endsWith('.NS') ? 'NSE' : 'US');
-            document.getElementById('tagSector').textContent = p.sector || 'Equities';
+            const lblName = document.getElementById('lblCompanyName');
+            if (lblName) lblName.textContent = p.name || p.ticker || ACTIVE_SYM;
+            const tagM = document.getElementById('tagMarket');
+            if (tagM) tagM.textContent = p.market || (ACTIVE_SYM.endsWith('.NS') ? 'NSE' : 'US');
+            const tagS = document.getElementById('tagSector');
+            if (tagS) tagS.textContent = p.sector || 'Equities';
 
             const curr = q.current_price || 0;
-            document.getElementById('valCurrentPrice').textContent = `${currSym}${curr.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            const valP = document.getElementById('valCurrentPrice');
+            if (valP) valP.textContent = curr ? `${currSym}${curr.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '₹—';
 
             const chgPct = q.day_change_pct || 0;
             const chgEl = document.getElementById('pillDayChange');
-            chgEl.textContent = `${chgPct >= 0 ? '+' : ''}${chgPct.toFixed(2)}% (${q.day_change >= 0 ? '+' : ''}${q.day_change != null ? q.day_change : 0})`;
-            chgEl.className = `change-pill ${chgPct >= 0 ? 'up' : 'down'}`;
+            if (chgEl) {
+                chgEl.textContent = `${chgPct >= 0 ? '+' : ''}${chgPct.toFixed(2)}% (${q.day_change >= 0 ? '+' : ''}${q.day_change != null ? q.day_change : 0})`;
+                chgEl.className = `change-pill ${chgPct >= 0 ? 'up' : 'down'}`;
+            }
 
             // Live status badge
             const badgeLive = document.getElementById('badgeLive');
@@ -1499,11 +1506,16 @@
                     asOfEl.style.display = 'inline-block';
                 }
             }
-            document.getElementById('lblPrevClose').textContent = `Prev Close: ${currSym}${q.previous_close || '—'}`;
-            document.getElementById('val52Low').textContent = `${currSym}${q.week_52_low || '—'}`;
-            document.getElementById('val52High').textContent = `${currSym}${q.week_52_high || '—'}`;
-            document.getElementById('valMarketCap').textContent = p.market_cap ? `${currSym}${(p.market_cap / 10000000).toLocaleString(undefined, {maximumFractionDigits: 0})} Cr` : '—';
-            document.getElementById('valDayRange').textContent = (q.day_low && q.day_high) ? `${currSym}${q.day_low} – ${currSym}${q.day_high}` : '—';
+            const prevCls = document.getElementById('lblPrevClose');
+            if (prevCls) prevCls.textContent = `Prev Close: ${currSym}${q.previous_close || '—'}`;
+            const v52L = document.getElementById('val52Low');
+            if (v52L) v52L.textContent = `${currSym}${q.week_52_low || '—'}`;
+            const v52H = document.getElementById('val52High');
+            if (v52H) v52H.textContent = `${currSym}${q.week_52_high || '—'}`;
+            const vMC = document.getElementById('valMarketCap');
+            if (vMC) vMC.textContent = p.market_cap ? `${currSym}${(p.market_cap / 10000000).toLocaleString(undefined, {maximumFractionDigits: 0})} Cr` : '—';
+            const vDR = document.getElementById('valDayRange');
+            if (vDR) vDR.textContent = (q.day_low && q.day_high) ? `${currSym}${q.day_low} – ${currSym}${q.day_high}` : '—';
 
             // Listing date and discovery tag
             const listEl = document.getElementById('valListingDate');
@@ -1516,9 +1528,10 @@
                 }
             }
 
-            if (q.week_52_low && q.week_52_high && curr) {
+            const fill52 = document.getElementById('fill52Range');
+            if (fill52 && q.week_52_low && q.week_52_high && curr) {
                 const ratio = Math.max(0, Math.min(100, ((curr - q.week_52_low) / (q.week_52_high - q.week_52_low)) * 100));
-                document.getElementById('fill52Range').style.width = ratio + '%';
+                fill52.style.width = ratio + '%';
             }
 
             // Watchlist button
@@ -1537,26 +1550,14 @@
                 }
             }
 
-            // Render Consensus Setup
-            renderConsensus(c, curr);
-
-            // Render 6-Pillar Standardized Factor Evaluation
-            renderFactorEvaluation(data.factor_evaluation);
-
-            // Render Instant Stats Bar
-            renderInstantStats(t, data.institutional, data.factor_evaluation, curr, p, q);
-
-            // Render Institutional Accumulation Section
-            renderInstitutional(data.institutional);
-
-            // Render Technical & Swing Structure Section
-            renderTechnicalSection(t, curr, p, q);
-
-            // Render Earnings History
-            renderEarnings(data.earnings_history || []);
-
-            // Render News Catalysts
-            renderCatalysts(data.catalysts || []);
+            // Render subsections safely
+            try { renderConsensus(c, curr); } catch (e) { console.warn('renderConsensus error:', e); }
+            try { renderFactorEvaluation(data.factor_evaluation); } catch (e) { console.warn('renderFactorEvaluation error:', e); }
+            try { renderInstantStats(t, data.institutional, data.factor_evaluation, curr, p, q); } catch (e) { console.warn('renderInstantStats error:', e); }
+            try { renderInstitutional(data.institutional); } catch (e) { console.warn('renderInstitutional error:', e); }
+            try { renderTechnicalSection(t, curr, p, q); } catch (e) { console.warn('renderTechnicalSection error:', e); }
+            try { renderEarnings(data.earnings_history || []); } catch (e) { console.warn('renderEarnings error:', e); }
+            try { renderCatalysts(data.catalysts || []); } catch (e) { console.warn('renderCatalysts error:', e); }
         }
 
         function renderInstantStats(t, inst, fe, curr, p, q) {
@@ -1967,23 +1968,24 @@
             }
 
             const targetP = Number(c.consensus_target_price || c.target_price || 0);
-            tgEl.textContent = targetP ? `₹${targetP.toFixed(2)}` : '—';
+            if (tgEl) tgEl.textContent = targetP ? `₹${targetP.toFixed(2)}` : '—';
             const gainPct = (targetP && curr) ? ((targetP / curr - 1.0) * 100).toFixed(1) : (c.consensus_return_pct ? Number(c.consensus_return_pct).toFixed(1) : '0.0');
-            tgSub.textContent = `+${gainPct}% upside target (${currentSelectedTimeframe || 14}D)`;
+            if (tgSub) tgSub.textContent = `+${gainPct}% upside target (${currentSelectedTimeframe || 14}D)`;
 
             const slP = Number(c.consensus_stop_loss || (supportP && supportP < curr ? supportP : (curr * 0.94)));
-            slEl.textContent = slP ? `₹${slP.toFixed(2)}` : '—';
+            if (slEl) slEl.textContent = slP ? `₹${slP.toFixed(2)}` : '—';
             const riskPct = (slP && curr) ? ((slP / curr - 1.0) * 100).toFixed(1) : '-6.0';
-            slSub.textContent = `${riskPct}% risk cut`;
+            if (slSub) slSub.textContent = `${riskPct}% risk cut`;
 
             const rrVal = c.consensus_risk_reward || (targetP && slP && curr && (curr - slP) > 0 ? ((targetP - curr) / (curr - slP)).toFixed(1) : '2.5');
-            rrEl.textContent = `1 : ${rrVal}`;
-            stEl.textContent = `${str.toFixed(0)}%`;
+            if (rrEl) rrEl.textContent = `1 : ${rrVal}`;
+            if (stEl) stEl.textContent = `${str.toFixed(0)}%`;
 
             const agreeRatio = c.agreement_ratio != null ? c.agreement_ratio : (c.agreeing_models ? c.agreeing_models / (c.total_models || 6) : 1.0);
             const modelCnt = c.model_count || c.total_models || 6;
             const agreeCnt = Math.round(agreeRatio * modelCnt);
-            document.getElementById('kpiAgreeCount').textContent = `${agreeCnt} / ${modelCnt} AI Models Agree`;
+            const kpiAgree = document.getElementById('kpiAgreeCount');
+            if (kpiAgree) kpiAgree.textContent = `${agreeCnt} / ${modelCnt} AI Models Agree`;
 
             // Clean & structured thesis display
             const rawThesis = c.synthesized_thesis || c.failure_reason_summary || c.consensus_narrative || '';
@@ -2752,8 +2754,17 @@
             }
         }
 
-        function openRawModal(idx) {
-            const m = (activeConsensusModels || [])[idx];
+        function openRawModal(safeMid, idx) {
+            const models = window.currentModelsBreakdown || (stockState && stockState.consensus && (stockState.consensus.models_breakdown || stockState.consensus.predictions)) || [];
+            let m = null;
+            if (typeof idx === 'number' && models[idx]) {
+                m = models[idx];
+            } else if (safeMid) {
+                m = models.find(x => (x.model_id || '').replace(/[^a-zA-Z0-9]/g, '_') === safeMid || (x.model_name || '').replace(/[^a-zA-Z0-9]/g, '_') === safeMid);
+            }
+            if (!m && models.length > 0) {
+                m = models[0];
+            }
             if (!m) return;
 
             const mid = m.model_id || '';
@@ -2768,20 +2779,27 @@
             else if (mid.includes('glm') || mName.includes('GLM')) icon = '🐉';
             else if (mid.includes('deepseek') || mName.includes('DeepSeek')) icon = '🤖';
 
-            document.getElementById('rawModalIcon').textContent = icon;
-            document.getElementById('rawModalTitle').textContent = `${mName} — Raw Model Output`;
-            document.getElementById('rawModalSubtitle').textContent = mid;
+            const rawIcon = document.getElementById('rawModalIcon');
+            if (rawIcon) rawIcon.textContent = icon;
+            const rawTitle = document.getElementById('rawModalTitle');
+            if (rawTitle) rawTitle.textContent = `${mName} — Raw Model Output`;
+            const rawSub = document.getElementById('rawModalSubtitle');
+            if (rawSub) rawSub.textContent = mid;
             
             const isBull = (m.direction || 'NEUTRAL').toUpperCase() === 'BULLISH';
             const isBear = (m.direction || '').toUpperCase() === 'BEARISH';
             const bEl = document.getElementById('rawModalBadge');
-            bEl.textContent = `${m.direction || 'NEUTRAL'} (${m.confidence_pct || 75}%)`;
-            bEl.style.background = isBull ? 'var(--emerald-subtle)' : (isBear ? 'var(--rose-subtle)' : 'rgba(245,158,11,0.15)');
-            bEl.style.color = isBull ? 'var(--emerald)' : (isBear ? 'var(--rose)' : '#fbbf24');
-            bEl.style.border = isBull ? '1px solid var(--emerald-border)' : (isBear ? '1px solid var(--rose-border)' : '1px solid rgba(245,158,11,0.3)');
+            if (bEl) {
+                bEl.textContent = `${m.direction || 'NEUTRAL'} (${m.confidence_pct || 75}%)`;
+                bEl.style.background = isBull ? 'var(--emerald-subtle)' : (isBear ? 'var(--rose-subtle)' : 'rgba(245,158,11,0.15)');
+                bEl.style.color = isBull ? 'var(--emerald)' : (isBear ? 'var(--rose)' : '#fbbf24');
+                bEl.style.border = isBull ? '1px solid var(--emerald-border)' : (isBear ? '1px solid var(--rose-border)' : '1px solid rgba(245,158,11,0.3)');
+            }
 
-            document.getElementById('rawModalLatency').textContent = m.latency_ms ? `${m.latency_ms} ms` : '—';
-            document.getElementById('rawModalTokens').textContent = m.tokens_used ? `${m.tokens_used} tokens` : (m.tokens ? `${m.tokens}` : '—');
+            const rawLat = document.getElementById('rawModalLatency');
+            if (rawLat) rawLat.textContent = m.latency_ms ? `${m.latency_ms} ms` : '—';
+            const rawTok = document.getElementById('rawModalTokens');
+            if (rawTok) rawTok.textContent = m.tokens_used ? `${m.tokens_used} tokens` : (m.tokens ? `${m.tokens}` : '—');
 
             const stats = (window._aiModelsStats || []).find(x => x.id === mid || x.name === mName || (x.name || '').toLowerCase() === (mName || '').toLowerCase()) || {};
             const gStats = stats.generation_stats || {};
@@ -2809,22 +2827,28 @@
                 rawText = JSON.stringify(formatted, null, 2);
             }
 
-            document.getElementById('rawModalContent').textContent = rawText;
-            document.getElementById('modalRawOutput').style.display = 'flex';
+            const rawContent = document.getElementById('rawModalContent');
+            if (rawContent) rawContent.textContent = rawText;
+            const modalEl = document.getElementById('modalRawOutput');
+            if (modalEl) modalEl.style.display = 'flex';
         }
 
         function closeRawModal() {
-            document.getElementById('modalRawOutput').style.display = 'none';
+            const modalEl = document.getElementById('modalRawOutput');
+            if (modalEl) modalEl.style.display = 'none';
         }
 
         function copyRawOutput() {
-            const text = document.getElementById('rawModalContent').textContent;
+            const rawContent = document.getElementById('rawModalContent');
+            const text = rawContent ? rawContent.textContent : '';
             if (!text) return;
             navigator.clipboard.writeText(text).then(() => {
                 const btn = document.getElementById('btnCopyRaw');
-                const old = btn.textContent;
-                btn.textContent = '✅ Copied!';
-                setTimeout(() => { btn.textContent = old; }, 2000);
+                if (btn) {
+                    const old = btn.textContent;
+                    btn.textContent = '✅ Copied!';
+                    setTimeout(() => { btn.textContent = old; }, 2000);
+                }
             }).catch(err => {
                 alert('Failed to copy to clipboard: ' + err);
             });
@@ -2832,7 +2856,7 @@
 
         async function toggleWatchlist() {
             const isIn = stockState && stockState.is_in_watchlist;
-            const btnW = document.getElementById('btnToggleWatchlist');
+            const btnW = document.getElementById('btnWatchlist');
             if (btnW) btnW.disabled = true;
             try {
                 const endpoint = isIn ? '/api/v1/watchlist/remove' : '/api/v1/watchlist/add';

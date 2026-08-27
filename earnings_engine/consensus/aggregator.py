@@ -12,6 +12,28 @@ from typing import Any
 logger = logging.getLogger("earnings_engine.consensus.aggregator")
 
 
+def compute_latency_average(model_id: str, window_seconds: int = 3600) -> float:
+    """Return the sliding-window average generation latency (ms) for a model.
+
+    Delegates to ``RateLimitTracker.get_average_latency`` which reads from the
+    in-memory telemetry deque.  Falls back to the model's benchmark default if
+    no empirical records exist in the requested window.
+
+    Args:
+        model_id: Full model ID, display name, or short tag (case-insensitive).
+        window_seconds: Look-back window in seconds (default 3600 = last 1 hour).
+
+    Returns:
+        Average latency in milliseconds.
+    """
+    try:
+        from earnings_engine.rate_limits import get_average_latency
+        return get_average_latency(model_id, window_seconds=window_seconds)
+    except Exception:
+        return 5000.0  # 5s safe default
+
+
+
 def aggregate_predictions(
     model_results: list[dict[str, Any]],
     ticker: str,
@@ -32,6 +54,16 @@ def aggregate_predictions(
     # Separate successful vs errored predictions
     valid = [r for r in model_results if "error" not in r and r.get("direction")]
     errored = [r for r in model_results if "error" in r]
+
+    # Log empirical 1-hour average latency per model for observability
+    for r in model_results:
+        m_name = r.get("model_name") or r.get("model_id", "unknown")
+        avg_lat = compute_latency_average(m_name, window_seconds=3600)
+        status = "❌ errored" if "error" in r else f"✅ {r.get('direction', 'N/A')} {r.get('confidence_pct', '?')}%"
+        logger.debug(
+            "[AGGREGATOR] %s — %s | 1h avg latency: %.0fms | actual: %sms",
+            m_name, status, avg_lat, r.get("latency_ms", "—"),
+        )
 
     if not valid:
         return {

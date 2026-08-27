@@ -223,10 +223,11 @@ AVAILABLE_AI_MODELS: list[dict[str, Any]] = [
 
 
 class RateLimitTracker:
-    """Thread-safe in-memory sliding window request tracker and OpenRouter quota cache."""
+    """Thread-safe in-memory sliding window request tracker with SQLite persistence and OpenRouter quota cache."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
+        self._is_hydrated: bool = False
         # Deque of timestamps per downstream and model
         self._request_timestamps: dict[str, collections.deque[float]] = {
             k: collections.deque(maxlen=10000) for k in DOWNSTREAM_CRITERIA
@@ -252,6 +253,104 @@ class RateLimitTracker:
         self._openrouter_key_cache: dict[str, Any] = {}
         self._openrouter_key_last_fetched: float = 0.0
 
+        # Auto-hydrate historical real model generation records from database
+        try:
+            self.hydrate_from_db()
+        except Exception:
+            pass
+
+    def hydrate_from_db(self, force: bool = False) -> None:
+        """Load all historical real model generation latencies from SQLite database table."""
+        if self._is_hydrated and not force:
+            return
+        try:
+            from earnings_engine.config import Settings
+            from earnings_engine.data.db import get_db_connection
+            settings = Settings()
+            conn = get_db_connection(settings)
+
+            # Ensure ai_model_telemetry table exists
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS ai_model_telemetry (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    model_id TEXT NOT NULL,
+                    model_name TEXT,
+                    created_at TEXT NOT NULL,
+                    timestamp REAL NOT NULL,
+                    latency_ms REAL NOT NULL,
+                    tokens INTEGER,
+                    is_local INTEGER DEFAULT 0,
+                    success INTEGER DEFAULT 1,
+                    error_message TEXT,
+                    ticker TEXT
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_model ON ai_model_telemetry(model_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_ts ON ai_model_telemetry(timestamp)")
+            conn.commit()
+
+            # Backfill from consensus_predictions if telemetry table is empty
+            tel_count = conn.execute("SELECT COUNT(*) FROM ai_model_telemetry").fetchone()[0]
+            if tel_count == 0:
+                try:
+                    import json
+                    from datetime import datetime
+                    cp_rows = conn.execute("SELECT ticker, created_at, models_breakdown_json FROM consensus_predictions").fetchall()
+                    for ticker, created_at, m_json in cp_rows:
+                        try:
+                            models = json.loads(m_json)
+                            try:
+                                dt = datetime.fromisoformat(created_at)
+                                ts = dt.timestamp()
+                            except Exception:
+                                ts = time.time()
+                            for m in models:
+                                lat = m.get("latency_ms")
+                                if lat is not None:
+                                    m_id = m.get("model_id") or m.get("model_name") or "unknown"
+                                    m_name = m.get("model_name")
+                                    is_succ = 1 if not m.get("error") else 0
+                                    conn.execute(
+                                        "INSERT INTO ai_model_telemetry (model_id, model_name, created_at, timestamp, latency_ms, tokens, is_local, success, error_message, ticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                        (m_id, m_name, created_at, ts, float(lat), m.get("tokens"), 1 if m.get("is_local") else 0, is_succ, m.get("error"), ticker)
+                                    )
+                        except Exception:
+                            pass
+                    conn.commit()
+                except Exception as eb:
+                    logger.debug("Telemetry backfill from consensus_predictions skipped: %s", eb)
+
+            # Hydrate in-memory history deques
+            rows = conn.execute("SELECT model_id, model_name, timestamp, latency_ms, tokens, is_local, success FROM ai_model_telemetry ORDER BY timestamp ASC").fetchall()
+            with self._lock:
+                for r in rows:
+                    m_id = str(r[0]).lower().strip()
+                    m_name = str(r[1] or "").lower().strip()
+                    record = {
+                        "timestamp": float(r[2]),
+                        "latency_ms": float(r[3]),
+                        "tokens": r[4],
+                        "is_local": bool(r[5]),
+                        "success": bool(r[6]),
+                    }
+                    if m_id not in self._generation_history:
+                        self._generation_history[m_id] = collections.deque(maxlen=5000)
+                    self._generation_history[m_id].append(record)
+
+                    if m_name and m_name != m_id:
+                        if m_name not in self._generation_history:
+                            self._generation_history[m_name] = collections.deque(maxlen=5000)
+                        self._generation_history[m_name].append(record)
+
+                    if m_id not in self._request_timestamps:
+                        self._request_timestamps[m_id] = collections.deque(maxlen=10000)
+                    self._request_timestamps[m_id].append(float(r[2]))
+
+            self._is_hydrated = True
+            logger.info("Hydrated %d empirical model generation records from ai_model_telemetry", len(rows))
+        except Exception as e:
+            logger.warning("Failed hydrating AI model telemetry from DB: %s", e)
+
     def record_request(self, service: str, status_code: int = 200) -> None:
         """Record an outbound request timestamp for the given downstream service or model."""
         now = time.time()
@@ -268,23 +367,43 @@ class RateLimitTracker:
         tokens: int | None = None,
         is_local: bool = False,
         success: bool = True,
+        ticker: str | None = None,
+        error_message: str | None = None,
     ) -> None:
         """Record an AI inference generation run with latency, success status and tokens across time horizons."""
         now = time.time()
         m_key = model.lower().strip()
+        record = {
+            "timestamp": now,
+            "latency_ms": float(latency_ms),
+            "tokens": tokens,
+            "is_local": is_local,
+            "success": bool(success),
+        }
         with self._lock:
             if m_key not in self._generation_history:
                 self._generation_history[m_key] = collections.deque(maxlen=5000)
-            self._generation_history[m_key].append({
-                "timestamp": now,
-                "latency_ms": float(latency_ms),
-                "tokens": tokens,
-                "is_local": is_local,
-                "success": bool(success),
-            })
+            self._generation_history[m_key].append(record)
             if m_key not in self._request_timestamps:
                 self._request_timestamps[m_key] = collections.deque(maxlen=10000)
             self._request_timestamps[m_key].append(now)
+
+        # Persist to ai_model_telemetry table in background thread
+        def _persist():
+            try:
+                from earnings_engine.config import Settings
+                from earnings_engine.data.db import get_db_connection
+                conn = get_db_connection(Settings())
+                created_at = datetime.now(timezone.utc).isoformat()
+                m_short = model.split("/")[-1]
+                conn.execute(
+                    "INSERT INTO ai_model_telemetry (model_id, model_name, created_at, timestamp, latency_ms, tokens, is_local, success, error_message, ticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (model, m_short, created_at, now, float(latency_ms), tokens, 1 if is_local else 0, 1 if success else 0, error_message, ticker)
+                )
+                conn.commit()
+            except Exception:
+                pass
+        threading.Thread(target=_persist, daemon=True).start()
 
     def update_openrouter_headers(self, headers: dict[str, Any]) -> None:
         """Store x-ratelimit-* headers from OpenRouter API responses."""
@@ -336,7 +455,8 @@ class RateLimitTracker:
         return self._openrouter_key_cache
 
     def get_models_summary(self) -> list[dict[str, Any]]:
-        """Return list of models with quota consumption and multi-horizon generation latency & success rate metrics."""
+        """Return list of models with quota consumption and empirical multi-horizon generation latency & success rate metrics."""
+        self.hydrate_from_db()
         now = time.time()
         or_remaining_1m = self._openrouter_headers["remaining"] if self._openrouter_headers["remaining"] is not None else 20
         or_remaining_24h = 200
@@ -346,16 +466,26 @@ class RateLimitTracker:
             for m in AVAILABLE_AI_MODELS:
                 m_id = m["id"].lower()
                 m_name = m["name"].lower()
-                # Aggregate timestamps recorded under id or display name
-                timestamps = list(self._request_timestamps.get(m_id, [])) + list(self._request_timestamps.get(m_name, []))
+                m_short = m_id.split("/")[-1]
 
-                # Aggregate generation records
-                gen_records = list(self._generation_history.get(m_id, [])) + list(self._generation_history.get(m_name, []))
-                # Remove duplicate records by timestamp
+                # Match all related keys (ID, display name, short tag)
+                matched_keys = {m_id, m_name, m_short}
+                if "local" in m_id or "local" in m_name:
+                    for k in self._generation_history.keys():
+                        if "local" in k or "ollama" in k:
+                            matched_keys.add(k)
+
+                timestamps: list[float] = []
+                gen_records: list[dict[str, Any]] = []
+                for k in matched_keys:
+                    timestamps.extend(self._request_timestamps.get(k, []))
+                    gen_records.extend(self._generation_history.get(k, []))
+
+                # Deduplicate generation records by timestamp & latency
                 seen_ts = set()
-                dedup_gens = []
+                dedup_gens: list[dict[str, Any]] = []
                 for g in gen_records:
-                    ts_key = (g["timestamp"], g["latency_ms"])
+                    ts_key = (round(g["timestamp"], 2), round(g["latency_ms"], 1))
                     if ts_key not in seen_ts:
                         seen_ts.add(ts_key)
                         dedup_gens.append(g)
@@ -397,7 +527,7 @@ class RateLimitTracker:
 
                 # Success rates
                 b_success = m.get("benchmark_success_rate_pct", 100.0)
-                b_avg_s = m.get("benchmark_avg_s", 2.0)
+                b_avg_s = m.get("benchmark_avg_s", 5.0)
 
                 succ_1h = sum(1 for g in g_1h if g.get("success", True))
                 succ_rate_1h = round((succ_1h / len(g_1h)) * 100.0, 1) if g_1h else b_success
@@ -411,8 +541,15 @@ class RateLimitTracker:
                 succ_all = sum(1 for g in dedup_gens if g.get("success", True))
                 succ_rate_all = round((succ_all / len(dedup_gens)) * 100.0, 1) if dedup_gens else b_success
 
-                effective_avg_s = round(avg_24h_ms / 1000, 2) if avg_24h_ms else (round(avg_all_ms / 1000, 2) if avg_all_ms else b_avg_s)
-                effective_success_rate = succ_rate_24h if g_24h else (succ_rate_all if dedup_gens else b_success)
+                # True empirical average return time in seconds
+                if dedup_gens:
+                    effective_avg_s = round(avg_all_ms / 1000.0, 1) if avg_all_ms is not None else b_avg_s
+                    effective_success_rate = succ_rate_all
+                    has_empirical_runs = True
+                else:
+                    effective_avg_s = b_avg_s
+                    effective_success_rate = b_success
+                    has_empirical_runs = False
 
                 out.append({
                     "id": m["id"],
@@ -433,6 +570,7 @@ class RateLimitTracker:
                     "remaining_24h": rem_24h,
                     # Multi-horizon Generation Latency & Success Rate Metrics
                     "total_generations": len(dedup_gens),
+                    "has_empirical_runs": has_empirical_runs,
                     "success_count": succ_all,
                     "failure_count": len(dedup_gens) - succ_all,
                     "success_rate_pct": effective_success_rate,
@@ -440,22 +578,24 @@ class RateLimitTracker:
                     "benchmark_avg_s": b_avg_s,
                     "benchmark_success_rate_pct": b_success,
                     "latest_latency_ms": latest_ms,
-                    "latest_latency_s": round(latest_ms / 1000, 2) if latest_ms else None,
+                    "latest_latency_s": round(latest_ms / 1000, 1) if latest_ms else None,
+                    "min_latency_s": round(min_ms / 1000, 1) if min_ms else None,
+                    "max_latency_s": round(max_ms / 1000, 1) if max_ms else None,
                     "avg_latency_1h_ms": avg_1h_ms,
-                    "avg_latency_1h_s": round(avg_1h_ms / 1000, 2) if avg_1h_ms else b_avg_s,
+                    "avg_latency_1h_s": round(avg_1h_ms / 1000, 1) if avg_1h_ms else effective_avg_s,
                     "avg_latency_24h_ms": avg_24h_ms,
-                    "avg_latency_24h_s": round(avg_24h_ms / 1000, 2) if avg_24h_ms else b_avg_s,
+                    "avg_latency_24h_s": round(avg_24h_ms / 1000, 1) if avg_24h_ms else effective_avg_s,
                     "avg_latency_7d_ms": avg_7d_ms,
-                    "avg_latency_7d_s": round(avg_7d_ms / 1000, 2) if avg_7d_ms else b_avg_s,
+                    "avg_latency_7d_s": round(avg_7d_ms / 1000, 1) if avg_7d_ms else effective_avg_s,
                     "avg_latency_all_ms": avg_all_ms,
-                    "avg_latency_all_s": round(avg_all_ms / 1000, 2) if avg_all_ms else b_avg_s,
+                    "avg_latency_all_s": effective_avg_s,
                     "min_latency_ms": min_ms,
                     "max_latency_ms": max_ms,
                     "generation_stats": {
-                        "1h": {"count": len(g_1h), "success_count": succ_1h, "success_rate_pct": succ_rate_1h, "avg_ms": avg_1h_ms, "avg_s": round(avg_1h_ms / 1000, 2) if avg_1h_ms else b_avg_s},
-                        "24h": {"count": len(g_24h), "success_count": succ_24h, "success_rate_pct": succ_rate_24h, "avg_ms": avg_24h_ms, "avg_s": round(avg_24h_ms / 1000, 2) if avg_24h_ms else b_avg_s},
-                        "7d": {"count": len(g_7d), "success_count": succ_7d, "success_rate_pct": succ_rate_7d, "avg_ms": avg_7d_ms, "avg_s": round(avg_7d_ms / 1000, 2) if avg_7d_ms else b_avg_s},
-                        "all_time": {"count": len(dedup_gens), "success_count": succ_all, "success_rate_pct": succ_rate_all, "avg_ms": avg_all_ms, "avg_s": round(avg_all_ms / 1000, 2) if avg_all_ms else b_avg_s},
+                        "1h": {"count": len(g_1h), "success_count": succ_1h, "success_rate_pct": succ_rate_1h, "avg_ms": avg_1h_ms, "avg_s": round(avg_1h_ms / 1000, 1) if avg_1h_ms else effective_avg_s},
+                        "24h": {"count": len(g_24h), "success_count": succ_24h, "success_rate_pct": succ_rate_24h, "avg_ms": avg_24h_ms, "avg_s": round(avg_24h_ms / 1000, 1) if avg_24h_ms else effective_avg_s},
+                        "7d": {"count": len(g_7d), "success_count": succ_7d, "success_rate_pct": succ_rate_7d, "avg_ms": avg_7d_ms, "avg_s": round(avg_7d_ms / 1000, 1) if avg_7d_ms else effective_avg_s},
+                        "all_time": {"count": len(dedup_gens), "success_count": succ_all, "success_rate_pct": succ_rate_all, "avg_ms": avg_all_ms, "avg_s": effective_avg_s},
                     }
                 })
         return out
@@ -580,6 +720,95 @@ class RateLimitTracker:
         }
 
 
+    def get_average_latency(self, model_key: str, window_seconds: int = 3600) -> float:
+        """Return sliding-window average generation latency (ms) for a model.
+
+        Reads from the in-memory ``_generation_history`` deque for records within
+        ``window_seconds``.  Falls back to the model benchmark default if no
+        empirical records exist in the window.
+
+        Args:
+            model_key: Model ID, display name, or short tag (case-insensitive).
+            window_seconds: Sliding window size in seconds (default 3600 = 1 hour).
+
+        Returns:
+            Average latency in milliseconds.
+        """
+        m_key = model_key.lower().strip()
+        now = time.time()
+        cutoff = now - window_seconds
+
+        with self._lock:
+            records = list(self._generation_history.get(m_key, []))
+
+        windowed = [r["latency_ms"] for r in records if r.get("timestamp", 0) >= cutoff]
+        if windowed:
+            return round(sum(windowed) / len(windowed), 1)
+
+        # Fall back to all-time average if no records in window
+        all_lats = [r["latency_ms"] for r in records if r.get("latency_ms") is not None]
+        if all_lats:
+            return round(sum(all_lats) / len(all_lats), 1)
+
+        # Final fallback: benchmark default from AVAILABLE_AI_MODELS
+        for m in AVAILABLE_AI_MODELS:
+            if m["id"].lower() == m_key or m["name"].lower() == m_key or m["id"].lower().split("/")[-1] == m_key:
+                return round(m.get("benchmark_avg_s", 5.0) * 1000, 1)
+        return 5000.0  # 5s generic default
+
+    def is_rate_limited(self, model_key: str) -> str | None:
+        """Check whether a model is currently rate-limited on the 1m or 24h window.
+
+        Also considers high-latency back-off: if the 1-hour average latency exceeds
+        8 seconds, the model is treated as degraded and callers should back off.
+
+        Args:
+            model_key: Model ID, display name, or short tag (case-insensitive).
+
+        Returns:
+            A human-readable reason string if rate-limited/degraded, or ``None`` if OK.
+        """
+        m_key = model_key.lower().strip()
+        now = time.time()
+
+        # Local models are never rate-limited by quota
+        if m_key.startswith("local") or m_key.startswith("ollama") or m_key.startswith("lmstudio"):
+            return None
+
+        # Find declared limits for this model
+        allowed_1m = 20
+        allowed_24h = 200
+        for m in AVAILABLE_AI_MODELS:
+            if m["id"].lower() == m_key or m["name"].lower() == m_key or m["id"].lower().split("/")[-1] == m_key:
+                allowed_1m = m.get("default_limit_1m", 20)
+                allowed_24h = m.get("default_limit_24h", 200)
+                break
+
+        with self._lock:
+            timestamps = list(self._request_timestamps.get(m_key, []))
+
+        count_1m = sum(1 for t in timestamps if now - t <= 60)
+        count_24h = sum(1 for t in timestamps if now - t <= 86400)
+
+        if count_1m >= allowed_1m:
+            return f"1m quota exhausted ({count_1m}/{allowed_1m} requests in last 60s)"
+        if count_24h >= allowed_24h:
+            return f"24h quota exhausted ({count_24h}/{allowed_24h} requests today)"
+
+        # High-latency degradation check: 1h average > 8000ms → back off
+        avg_1h = self.get_average_latency(m_key, window_seconds=3600)
+        if avg_1h > 8000:
+            return f"High latency degradation (1h avg {avg_1h:.0f}ms > 8000ms threshold)"
+
+        # Also honour live OpenRouter remaining header if available
+        with self._lock:
+            or_remaining = self._openrouter_headers.get("remaining")
+        if or_remaining is not None and or_remaining <= 0:
+            return "OpenRouter global quota exhausted (x-ratelimit-remaining=0)"
+
+        return None
+
+
 # Global singleton instance
 tracker = RateLimitTracker()
 
@@ -605,11 +834,26 @@ def record_generation(
     tokens: int | None = None,
     is_local: bool = False,
     success: bool = True,
+    ticker: str | None = None,
+    error_message: str | None = None,
 ) -> None:
     """Convenience helper to record generation latency and success metrics across time horizons."""
-    tracker.record_generation(model, latency_ms, tokens=tokens, is_local=is_local, success=success)
+    tracker.record_generation(model, latency_ms, tokens=tokens, is_local=is_local, success=success, ticker=ticker, error_message=error_message)
 
 
 def get_models_rate_limits() -> list[dict[str, Any]]:
     """Retrieve list of supported models and their live rate limit and generation latency stats."""
     return tracker.get_models_summary()
+
+
+def get_average_latency(model_key: str, window_seconds: int = 3600) -> float:
+    """Return the sliding-window average generation latency (ms) for a model."""
+    return tracker.get_average_latency(model_key, window_seconds=window_seconds)
+
+
+def is_rate_limited(model_key: str) -> str | None:
+    """Check whether a model is currently rate-limited or degraded.
+
+    Returns a human-readable reason string if yes, or ``None`` if the model is OK to call.
+    """
+    return tracker.is_rate_limited(model_key)

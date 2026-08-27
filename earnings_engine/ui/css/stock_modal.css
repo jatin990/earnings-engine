@@ -1,0 +1,90 @@
+/*
+ * stock_modal.css — Full-Screen Stock Intelligence Modal
+ * Augments the inline styles in _body_footer.html for the
+ * #stockFullScreenModal overlay with animations and polish.
+ */
+
+/* ── Open/close animation ───────────────────────────────────────── */
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.985); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+#stockFullScreenModal[style*="flex"] {
+    animation: modalFadeIn 0.18s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* ── Loading spinner ────────────────────────────────────────────── */
+@keyframes stockModalSpin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+#stockModalSpinner > div:first-child {
+    animation: stockModalSpin 0.75s linear infinite;
+}
+
+/* ── Toolbar nav buttons — hover lift ───────────────────────────── */
+#stockFullScreenModal .btn {
+    transition: background 0.12s ease, transform 0.1s ease, box-shadow 0.12s ease;
+}
+
+#stockFullScreenModal .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+#stockFullScreenModal .btn:active {
+    transform: translateY(0);
+}
+
+/* ── Close button glow on hover ─────────────────────────────────── */
+#stockFullScreenModal button[onclick*="closeStockModal"]:hover {
+    background: rgba(239, 68, 68, 0.35) !important;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
+}
+
+/* ── iframe fade-in after load ──────────────────────────────────── */
+#stockModalIframe {
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+#stockModalIframe.loaded {
+    opacity: 1;
+}
+
+/* ── Scrollbar styling inside the iframe container ──────────────── */
+#stockFullScreenModal ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+#stockFullScreenModal ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+#stockFullScreenModal ::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.4);
+    border-radius: 3px;
+}
+
+#stockFullScreenModal ::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.7);
+}
+
+/* ── Toolbar text truncation on narrow viewports ────────────────── */
+@media (max-width: 768px) {
+    #stockModalName {
+        display: none;
+    }
+    #stockModalLiveBadge {
+        display: none;
+    }
+}
+
+@media (max-width: 540px) {
+    #stockFullScreenModal .btn[onclick*="navStockModal"] {
+        display: none;
+    }
+}
