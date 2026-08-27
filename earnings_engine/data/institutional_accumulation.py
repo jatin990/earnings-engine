@@ -132,6 +132,14 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
 
     mcap_cr = live_meta["market_cap_cr"] or round(promoter_base * 100.0 + ((h_val >> 3) % 1500), 1)
 
+    # Normalize baseline shares so total never exceeds 95% before retail allocation
+    sum_inst_prom = promoter_base + fii_base + dii_base
+    if sum_inst_prom > 95.0:
+        scale = 92.0 / sum_inst_prom
+        promoter_base = round(promoter_base * scale, 2)
+        fii_base = round(fii_base * scale, 2)
+        dii_base = round(dii_base * scale, 2)
+
     # Clean existing rows for this ticker before populating clean 2026 quarters
     conn.execute("DELETE FROM shareholding_patterns WHERE ticker = ?", (sym,))
     conn.execute("DELETE FROM institutional_holdings WHERE ticker = ?", (sym,))
@@ -150,7 +158,11 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
         q_fii = round(fii_base * mult, 2)
         q_dii = round(dii_base * mult, 2)
         q_promoter = round(promoter_base, 2)
-        q_retail = round(max(2.0, 100.0 - (q_promoter + q_fii + q_dii)), 2)
+        q_retail = round(max(1.0, 100.0 - (q_promoter + q_fii + q_dii)), 2)
+        rem = round(100.0 - (q_promoter + q_fii + q_dii + q_retail), 2)
+        if rem != 0:
+            q_retail = round(q_retail + rem, 2)
+
         conn.execute(
             """
             INSERT OR REPLACE INTO shareholding_patterns (
@@ -368,15 +380,18 @@ def init_institutional_db(settings: Settings | None = None, force_refresh: bool 
             except Exception:
                 pass
         
-        # Check if table has old 2024/2025 quarters or is empty or missing recent_txn_date
+        # Check if table has old 2024/2025 quarters or is empty or missing recent_txn_date or un-normalized shareholding
         old_check = conn.execute("SELECT COUNT(*) FROM shareholding_patterns WHERE quarter LIKE '%FY25%' OR quarter LIKE '%FY24%'").fetchone()[0]
         count = conn.execute("SELECT COUNT(*) FROM institutional_holdings").fetchone()[0]
         missing_txn_date = conn.execute("SELECT COUNT(*) FROM institutional_holdings WHERE recent_txn_date IS NULL AND action != 'HOLD'").fetchone()[0]
+        invalid_sums = conn.execute("SELECT COUNT(*) FROM shareholding_patterns WHERE ABS((promoter_pct + fii_pct + dii_mf_pct + public_retail_pct + other_pct) - 100.0) > 0.5").fetchone()[0]
         
-        if force_refresh or old_check > 0 or count < len(CORE_BENCHMARK_UNIVERSE) or missing_txn_date > 0:
-            for sym in CORE_BENCHMARK_UNIVERSE:
+        if force_refresh or old_check > 0 or count < len(CORE_BENCHMARK_UNIVERSE) or missing_txn_date > 0 or invalid_sums > 0:
+            distinct_tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM institutional_holdings").fetchall() if r[0]]
+            universe_to_refresh = list(dict.fromkeys(CORE_BENCHMARK_UNIVERSE + distinct_tickers))
+            for sym in universe_to_refresh:
                 _ensure_institutional_data_for_ticker(sym, conn)
-            logger.info("[INSTITUTIONAL] Populated dynamic institutional data across %d benchmark equities (2026 quarters with txn dates).", len(CORE_BENCHMARK_UNIVERSE))
+            logger.info("[INSTITUTIONAL] Populated dynamic institutional data across %d equities (2026 quarters with txn dates & normalized shareholdings).", len(universe_to_refresh))
         _INSTITUTIONAL_INITIALIZED = True
     except Exception as e:
         logger.warning("[INSTITUTIONAL] Dynamic init warning: %s", e)
@@ -413,9 +428,14 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             (sym,),
         ).fetchone()[0]
 
+        invalid_pat_sum = conn.execute(
+            "SELECT COUNT(*) FROM shareholding_patterns WHERE ticker = ? AND ABS((promoter_pct + fii_pct + dii_mf_pct + public_retail_pct + other_pct) - 100.0) > 0.5",
+            (sym,),
+        ).fetchone()[0]
+
         missing_txn = sum(1 for r in h_rows if not r[15] and r[9] != "HOLD") if h_rows else 1
 
-        if not h_rows or p_check == 0 or missing_txn > 0:
+        if not h_rows or p_check == 0 or missing_txn > 0 or invalid_pat_sum > 0:
             _ensure_institutional_data_for_ticker(sym, conn)
             h_rows = conn.execute(
                 """
