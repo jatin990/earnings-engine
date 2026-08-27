@@ -55,6 +55,14 @@ _news_catalyst_task: asyncio.Task | None = None
 async def lifespan(app: FastAPI):
     """Run database migrations, schedule initialization, and background tasks on startup."""
     global _breakout_scanner_task, _news_catalyst_task
+
+    is_serverless = bool(
+        os.getenv("VERCEL") == "1"
+        or os.getenv("SERVERLESS") == "1"
+        or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+        or os.getenv("K_SERVICE")
+    )
+
     try:
         applied = apply_migrations(_settings)
         if applied:
@@ -63,87 +71,90 @@ async def lifespan(app: FastAPI):
         logger.warning("Startup database migration check failed: %s", e)
     log_startup_diagnostics(logger)
 
-    # Initialize automated schedule registry
-    try:
-        from earnings_engine.data.automation_schedules import init_automation_schedules
-        init_automation_schedules(_settings)
-    except Exception as e:
-        logger.warning("[SCHEDULES] Startup schedule init warning: %s", e)
+    # In serverless environments (e.g. Vercel), do NOT start long-running background daemon loops
+    # as ASGI serverless runtimes will wait indefinitely for unfinished event loop tasks.
+    if not is_serverless:
+        # Initialize automated schedule registry
+        try:
+            from earnings_engine.data.automation_schedules import init_automation_schedules
+            init_automation_schedules(_settings)
+        except Exception as e:
+            logger.warning("[SCHEDULES] Startup schedule init warning: %s", e)
 
-    # Initialize institutional dataset
-    try:
-        from earnings_engine.data.institutional_accumulation import init_institutional_db
-        init_institutional_db(_settings)
-    except Exception as e:
-        logger.warning("[INSTITUTIONAL] Startup institutional DB init warning: %s", e)
+        # Initialize institutional dataset
+        try:
+            from earnings_engine.data.institutional_accumulation import init_institutional_db
+            init_institutional_db(_settings)
+        except Exception as e:
+            logger.warning("[INSTITUTIONAL] Startup institutional DB init warning: %s", e)
 
-    # Sync local SQLite state with upstream Turso Cloud on startup
-    try:
-        from earnings_engine.data.turso_sync import sync_local_to_upstream
+        # Sync local SQLite state with upstream Turso Cloud on startup
+        try:
+            from earnings_engine.data.turso_sync import sync_local_to_upstream
 
-        async def _run_startup_sync():
-            try:
-                loop = asyncio.get_running_loop()
-                await loop.run_in_executor(None, sync_local_to_upstream, _settings)
-            except Exception as sync_err:
-                logger.warning("[TURSO-SYNC] Background startup sync issue: %s", sync_err)
+            async def _run_startup_sync():
+                try:
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, sync_local_to_upstream, _settings)
+                except Exception as sync_err:
+                    logger.warning("[TURSO-SYNC] Background startup sync issue: %s", sync_err)
 
-        asyncio.create_task(_run_startup_sync(), name="turso_upstream_sync")
-    except Exception as e:
-        logger.warning("[TURSO-SYNC] Could not schedule startup upstream sync: %s", e)
+            asyncio.create_task(_run_startup_sync(), name="turso_upstream_sync")
+        except Exception as e:
+            logger.warning("[TURSO-SYNC] Could not schedule startup upstream sync: %s", e)
 
-    # Start the background category scanner sweep
-    try:
-        from earnings_engine.data.category_scanner import compute_and_save_scanner_universe
+        # Start the background category scanner sweep
+        try:
+            from earnings_engine.data.category_scanner import compute_and_save_scanner_universe
 
-        async def _run_startup_scanner_sweep():
-            try:
-                loop = asyncio.get_running_loop()
-                await loop.run_in_executor(None, compute_and_save_scanner_universe, "NSE_TOP", _settings)
-                logger.info("[SCANNER] Startup background multi-category sweep finished.")
-            except Exception as scan_err:
-                logger.warning("[SCANNER] Startup sweep background task warning: %s", scan_err)
+            async def _run_startup_scanner_sweep():
+                try:
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, compute_and_save_scanner_universe, "NSE_TOP", _settings)
+                    logger.info("[SCANNER] Startup background multi-category sweep finished.")
+                except Exception as scan_err:
+                    logger.warning("[SCANNER] Startup sweep background task warning: %s", scan_err)
 
-        asyncio.create_task(_run_startup_scanner_sweep(), name="category_scanner_sweep")
-    except Exception as e:
-        logger.warning("[SCANNER] Could not schedule startup category sweep: %s", e)
+            asyncio.create_task(_run_startup_scanner_sweep(), name="category_scanner_sweep")
+        except Exception as e:
+            logger.warning("[SCANNER] Could not schedule startup category sweep: %s", e)
 
-    # Start the background breakout scanner loop
-    try:
-        from earnings_engine.data import breakout_scanner as breakout_scanner_mod
-        _breakout_scanner_task = asyncio.create_task(
-            breakout_scanner_mod.breakout_scanner_loop(_settings),
-            name="breakout_radar",
-        )
-        logger.info("[BREAKOUT] Background scanner task started.")
-    except Exception as e:
-        logger.warning("[BREAKOUT] Could not start scanner task: %s", e)
+        # Start the background breakout scanner loop
+        try:
+            from earnings_engine.data import breakout_scanner as breakout_scanner_mod
+            _breakout_scanner_task = asyncio.create_task(
+                breakout_scanner_mod.breakout_scanner_loop(_settings),
+                name="breakout_radar",
+            )
+            logger.info("[BREAKOUT] Background scanner task started.")
+        except Exception as e:
+            logger.warning("[BREAKOUT] Could not start scanner task: %s", e)
 
-    # Start the background news catalyst harvester loop
-    try:
-        from earnings_engine.data.catalysts_news import news_catalyst_harvest_loop
-        _news_catalyst_task = asyncio.create_task(
-            news_catalyst_harvest_loop(_settings),
-            name="news_catalyst_harvester",
-        )
-        logger.info("[NEWS-HARVESTER] Background news harvester task started.")
-    except Exception as e:
-        logger.warning("[NEWS-HARVESTER] Could not start news harvester task: %s", e)
+        # Start the background news catalyst harvester loop
+        try:
+            from earnings_engine.data.catalysts_news import news_catalyst_harvest_loop
+            _news_catalyst_task = asyncio.create_task(
+                news_catalyst_harvest_loop(_settings),
+                name="news_catalyst_harvester",
+            )
+            logger.info("[NEWS-HARVESTER] Background news harvester task started.")
+        except Exception as e:
+            logger.warning("[NEWS-HARVESTER] Could not start news harvester task: %s", e)
 
-    # Pre-scan and cache available local LLM models (Ollama / LM Studio)
-    try:
-        from earnings_engine.api.routers.consensus import _scan_and_cache_local_models
+        # Pre-scan and cache available local LLM models (Ollama / LM Studio)
+        try:
+            from earnings_engine.api.routers.consensus import _scan_and_cache_local_models
 
-        async def _run_startup_local_model_scan():
-            try:
-                loop = asyncio.get_running_loop()
-                await loop.run_in_executor(None, _scan_and_cache_local_models)
-            except Exception as scan_err:
-                logger.warning("[LOCAL-MODELS] Startup model scan warning: %s", scan_err)
+            async def _run_startup_local_model_scan():
+                try:
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, _scan_and_cache_local_models)
+                except Exception as scan_err:
+                    logger.warning("[LOCAL-MODELS] Startup model scan warning: %s", scan_err)
 
-        asyncio.create_task(_run_startup_local_model_scan(), name="local_model_startup_scan")
-    except Exception as e:
-        logger.warning("[LOCAL-MODELS] Could not schedule startup local model scan: %s", e)
+            asyncio.create_task(_run_startup_local_model_scan(), name="local_model_startup_scan")
+        except Exception as e:
+            logger.warning("[LOCAL-MODELS] Could not schedule startup local model scan: %s", e)
 
     yield
 
