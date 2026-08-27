@@ -234,7 +234,7 @@
         },
 
         renderInstitutionalFundsTable(funds) {
-            const tbody = document.getElementById('instFundsTableBody');
+            const tbody = document.getElementById('instFundsTableBody') || document.getElementById('instInvestorsDirectoryTableBody');
             if (!tbody) return;
 
             if (!funds || !funds.length) {

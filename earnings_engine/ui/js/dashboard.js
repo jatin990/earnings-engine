@@ -14616,6 +14616,15 @@
             }
         }, true);
 
+        // Merge all modular hub modules
+        if (window.institutionalModule) Object.assign(app, window.institutionalModule);
+        if (window.marketPulseModule) Object.assign(app, window.marketPulseModule);
+        if (window.schedulesModule) Object.assign(app, window.schedulesModule);
+        if (window.newAdditionsModule) Object.assign(app, window.newAdditionsModule);
+        if (window.catalystsModule) Object.assign(app, window.catalystsModule);
+        if (window.consensusModule) Object.assign(app, window.consensusModule);
+        if (window.swingModule) Object.assign(app, window.swingModule);
+
         // Initialize & export to window
         window.app = app;
         if (typeof app.init === 'function') {
