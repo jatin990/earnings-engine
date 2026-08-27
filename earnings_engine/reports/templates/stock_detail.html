@@ -2663,11 +2663,13 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(reqBody)
                 });
-                if (!res.ok) {
-                    const errData = await res.json().catch(() => ({}));
-                    throw new Error(errData.detail || 'Prediction request failed with HTTP ' + res.status);
+                const resData = await res.json();
+                const pred = resData.prediction || resData.consensus || resData;
+                if (stockState) {
+                    stockState.consensus = pred;
                 }
-                await fetchStockDetails();
+                const currPrice = (stockState && stockState.quote && stockState.quote.current_price) || 0;
+                renderConsensus(pred, currPrice);
                 await fetchRateLimits();
             } catch (e) {
                 alert('Error running parallel local consensus: ' + e.message);
@@ -2754,7 +2756,13 @@
                     throw new Error(errData.detail || 'Prediction request failed with HTTP ' + res.status);
                 }
 
-                await fetchStockDetails();
+                const resData = await res.json();
+                const pred = resData.prediction || resData.consensus || resData;
+                if (stockState) {
+                    stockState.consensus = pred;
+                }
+                const currPrice = (stockState && stockState.quote && stockState.quote.current_price) || 0;
+                renderConsensus(pred, currPrice);
                 await fetchRateLimits();
             } catch (e) {
                 alert('Error computing AI consensus: ' + e.message);
@@ -2870,7 +2878,7 @@
         }
 
         async function toggleWatchlist() {
-            const isIn = stockState && stockState.is_in_watchlist;
+            const isIn = !!(stockState && stockState.is_in_watchlist);
             const btnW = document.getElementById('btnWatchlist');
             if (btnW) btnW.disabled = true;
             try {
@@ -2884,7 +2892,14 @@
                     const err = await res.json().catch(() => ({}));
                     throw new Error(err.detail || 'Failed to update watchlist');
                 }
-                await fetchStockDetails();
+                const newStatus = !isIn;
+                if (stockState) {
+                    stockState.is_in_watchlist = newStatus;
+                }
+                if (btnW) {
+                    btnW.textContent = newStatus ? '★ In Watchlist' : '☆ Add to Watchlist';
+                    btnW.classList.toggle('active', newStatus);
+                }
             } catch (e) {
                 console.error('Watchlist toggle error:', e);
                 alert('Error updating watchlist: ' + e.message);

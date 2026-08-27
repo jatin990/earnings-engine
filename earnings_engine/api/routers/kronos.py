@@ -57,16 +57,19 @@ async def run_kronos_predict_ticker(ticker: str | None = None, request: dict | N
     target_ticker = (ticker or (request or {}).get("ticker", "")).upper().strip()
     if not target_ticker:
         raise HTTPException(status_code=400, detail="Ticker symbol is required")
-    device = (request or {}).get("device", "cpu")
+    device = (request or {}).get("device")
     try:
-        pred = await asyncio.to_thread(
+        res = await asyncio.to_thread(
             dashboard_api.run_prediction_for_ticker,
             ticker=target_ticker,
+            engine="kronos",
             device=device,
-            save=True,
-            settings=_settings,
         )
-        return {"success": True, "prediction": pred}
+        if not res.get("success"):
+            raise HTTPException(status_code=400, detail=res.get("error", "Failed to compute Kronos prediction"))
+        return res
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error running Kronos for %s: %s", target_ticker, e)
         raise HTTPException(status_code=500, detail=f"Kronos prediction failed: {str(e)}")
