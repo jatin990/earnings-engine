@@ -51,6 +51,8 @@ AVAILABLE_ROUTES: dict[str, dict[str, Any]] = {
             "/api/v1/audit",
             "/api/v1/recalculate",
             "/api/v1/market-status",
+            "/api/v1/market",
+            "/api/v1/earnings",
             "/api/v1/config/ratelimits",
             "/api/v1/ratelimits",
             "/api/v1/config/ui-preferences",

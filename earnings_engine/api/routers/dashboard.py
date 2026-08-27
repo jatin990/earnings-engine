@@ -311,6 +311,19 @@ async def dashboard_predict_run(request: dict | None = None):
         raise HTTPException(status_code=500, detail=f"Prediction run failed: {str(e)}")
 
 
+@router.get("/api/v1/market/pulse")
+async def api_get_market_pulse(
+    force_refresh: bool = Query(False, description="Force refresh cache"),
+):
+    """Retrieve full macro market pulse, fear & greed index, VIX, prediction, and sector heatmap."""
+    try:
+        from earnings_engine.data.market_pulse import get_market_pulse_data
+        return await asyncio.to_thread(get_market_pulse_data, settings=_settings, force_refresh=force_refresh)
+    except Exception as e:
+        logger.exception("Error in api_get_market_pulse: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error retrieving market pulse: {e}")
+
+
 @router.get("/api/v1/earnings/freshness")
 async def get_earnings_freshness(
     watchlist: str | None = Query(None, description="Watchlist name or universe"),
