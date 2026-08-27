@@ -121,8 +121,19 @@ def _resolve_tickers(market: str | None) -> list[str]:
         mu = market.upper()
         if mu == "WATCHLIST":
             tickers_raw = watchlists_mod.get_watchlist("my_watchlist", _settings())
-        elif mu == "ALL":
-            tickers_raw = load_all()
+        elif mu in ("ALL", "GLOBAL", "DEFAULT", "UNIVERSE"):
+            from earnings_engine.data.db import get_db_connection
+            eh_tickers: list[str] = []
+            try:
+                with get_db_connection(_settings()) as conn:
+                    eh_tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM earnings_history").fetchall() if r[0]]
+            except Exception:
+                pass
+            try:
+                nse_all = load_universe("NSE_ALL")
+            except Exception:
+                nse_all = []
+            tickers_raw = list(dict.fromkeys(eh_tickers + nse_all + load_all()))
         elif mu in {
             "IN", "US", "NSE_ALL", "NSE_LARGE_CAP", "NSE_TOP", "NIFTY_50", "NSE_50",
             "NIFTY_NEXT_50", "NEXT_50", "NIFTY_100", "NSE_100", "NIFTY_200", "NSE_200",
@@ -148,7 +159,18 @@ def _resolve_tickers(market: str | None) -> list[str]:
                         if f_mu.exists():
                             tickers_raw = load_universe_from_file(f_mu)
     else:
-        tickers_raw = load_all()
+        from earnings_engine.data.db import get_db_connection
+        eh_tickers: list[str] = []
+        try:
+            with get_db_connection(_settings()) as conn:
+                eh_tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM earnings_history").fetchall() if r[0]]
+        except Exception:
+            pass
+        try:
+            nse_all = load_universe("NSE_ALL")
+        except Exception:
+            nse_all = []
+        tickers_raw = list(dict.fromkeys(eh_tickers + nse_all + load_all()))
 
     clean_tickers: list[str] = []
     for item in tickers_raw or []:

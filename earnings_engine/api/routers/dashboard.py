@@ -43,9 +43,24 @@ async def serve_dashboard():
 
 @router.get("/api/v1/dashboard/overview")
 async def dashboard_overview():
-    """Return aggregated KPI cards, market regime metrics, and summary data."""
+    """Get dashboard overview: dataset summary + refresh status + watchlist."""
     try:
-        return await asyncio.to_thread(dashboard_api.get_results_report_components)
+        from earnings_engine.api.dashboard_api import (
+            get_event_dataset_summary,
+            get_refresh_status,
+            get_watchlist,
+            get_universe_files,
+        )
+        dataset_summary = await asyncio.to_thread(get_event_dataset_summary)
+        refresh_status = await asyncio.to_thread(get_refresh_status)
+        watchlist = await asyncio.to_thread(get_watchlist)
+        universe_files = await asyncio.to_thread(get_universe_files)
+        return {
+            "dataset": dataset_summary,
+            "refresh_status": refresh_status,
+            "watchlist": watchlist,
+            "universe_files": universe_files,
+        }
     except Exception as e:
         logger.exception("Error in dashboard_overview: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching dashboard overview: {str(e)}")
