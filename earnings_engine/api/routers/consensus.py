@@ -122,10 +122,12 @@ async def get_consensus_models():
 async def get_local_models(
     host: str | None = Query(None, description="Optional custom Ollama host to probe"),
     force_scan: bool = Query(False, description="Bypass cache and perform active network probe"),
+    refresh: bool = Query(False, description="Alias for force_scan"),
 ):
     """Return locally available models detected on Ollama / LM Studio."""
     global _CACHED_LOCAL_MODELS
-    if force_scan or not _CACHED_LOCAL_MODELS or (host and host != _CACHED_LOCAL_MODELS.get("host")):
+    should_refresh = force_scan or refresh
+    if should_refresh or not _CACHED_LOCAL_MODELS or (host and host != _CACHED_LOCAL_MODELS.get("host")):
         return await asyncio.to_thread(_scan_and_cache_local_models, host)
     return _CACHED_LOCAL_MODELS
 
@@ -178,10 +180,23 @@ async def get_consensus_audit_records(
 
 
 @router.get("/api/v1/consensus/latest")
-async def get_latest_consensus_predictions(limit: int = Query(20, ge=1, le=5000)):
+async def get_latest_consensus_predictions(
+    ticker: str | None = Query(None, description="Filter by ticker"),
+    direction: str | None = Query(None, description="Filter by direction"),
+    status: str | None = Query(None, description="Filter by status (SETTLED, PENDING)"),
+    limit: int = Query(20, ge=1, le=5000),
+):
     """Retrieve recent consensus predictions."""
     try:
-        preds = await asyncio.to_thread(get_predictions, settings=_settings, limit=limit)
+        preds = await asyncio.to_thread(
+            get_predictions,
+            settings=_settings,
+            ticker=ticker.upper().strip() if ticker else None,
+            status=status,
+            limit=limit,
+        )
+        if direction:
+            preds = [p for p in preds if p.get("direction", "").upper() == direction.upper()]
         return {"success": True, "count": len(preds), "predictions": preds}
     except Exception as e:
         logger.exception("Error fetching latest predictions: %s", e)

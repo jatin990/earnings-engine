@@ -176,11 +176,11 @@ async def get_all_errors_endpoint(limit: int = Query(100, ge=1, le=500)):
 
 
 @router.post("/api/v1/errors/scan-logs")
-async def scan_logs_endpoint(request: Request = None):
+async def scan_logs_endpoint(request: Request = None, full: bool = Query(False, description="Scan full logs")):
     """Scan recent log outputs to ingest any untracked tracebacks (Master only)."""
     if request:
         _require_master_role(request)
-    result = await asyncio.to_thread(scan_log_files, settings=_settings)
+    result = await asyncio.to_thread(scan_log_files, settings=_settings, full=full)
     return {"success": True, **result}
 
 
@@ -323,9 +323,9 @@ async def get_broker_status_endpoint():
 
 
 @router.get("/api/v1/broker/quote/{symbol}")
-async def get_broker_quote(symbol: str):
+async def get_broker_quote(symbol: str, broker: str | None = Query(None)):
     """Fetch live level-2 market quote from broker."""
-    return {"symbol": symbol, "status": "simulated", "ltp": 0.0}
+    return {"symbol": symbol, "broker": broker or "simulated", "status": "simulated", "ltp": 0.0}
 
 
 @router.post("/api/v1/broker/order")

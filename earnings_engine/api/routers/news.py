@@ -29,18 +29,22 @@ router = APIRouter(tags=["News Catalysts & Filings"])
 @router.get("/api/v1/catalysts")
 async def get_news_catalysts_endpoint(
     market: str | None = Query("ALL"),
+    watchlist: str | None = Query(None),
     category: str | None = Query(None),
     impact: str | None = Query(None),
+    impact_level: str | None = Query(None),
     direction: str | None = Query(None),
     search: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
 ):
     """Retrieve structured news catalysts (order wins, expansions, regulatory approvals)."""
     try:
+        effective_market = watchlist or market
+        effective_impact = impact_level or impact
         items = await asyncio.to_thread(
             get_short_term_catalysts,
-            watchlist_or_universe=market,
-            impact_filter=impact,
+            watchlist_or_universe=effective_market,
+            impact_filter=effective_impact,
             category_filter=category,
             direction_filter=direction,
             search_query=search,
@@ -69,20 +73,28 @@ async def get_news_catalyst_stats():
 async def get_news_outcomes_endpoint(
     category: str | None = Query(None),
     direction: str | None = Query(None),
+    status: str | None = Query(None),
+    predicted_met: bool | None = Query(None),
     verified_only: bool = Query(False),
+    search: str | None = Query(None),
+    sort_by: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
 ):
     """Retrieve post-catalyst market reaction performance auditing."""
     try:
-        status = "VERIFIED" if verified_only else None
+        effective_status = "VERIFIED" if verified_only else status
         outcomes = await asyncio.to_thread(
             get_verified_catalyst_outcomes,
             category=category,
             direction=direction,
-            status=status,
+            status=effective_status,
+            search=search,
+            sort_by=sort_by,
             limit=limit,
             settings=_settings,
         )
+        if predicted_met is not None:
+            outcomes = [o for o in outcomes if bool(o.get("predicted_met")) == predicted_met]
         return {"success": True, "count": len(outcomes), "outcomes": outcomes}
     except Exception as e:
         logger.exception("Error in get_news_outcomes: %s", e)

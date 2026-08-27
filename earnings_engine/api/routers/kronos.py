@@ -21,6 +21,10 @@ router = APIRouter(tags=["Kronos AI Forecasting"])
 @router.get("/api/v1/dashboard/kronos")
 async def get_dashboard_kronos_predictions(
     ticker: str | None = Query(None, description="Filter by ticker"),
+    tickers: str | None = Query(None, description="Comma-separated tickers"),
+    lookback: int = Query(60, description="Lookback window in days"),
+    pred_len: int = Query(14, description="Forecast length in days"),
+    device: str | None = Query(None, description="Compute device (cpu, cuda)"),
 ):
     """Retrieve cached Kronos predictions."""
     try:
@@ -29,7 +33,8 @@ async def get_dashboard_kronos_predictions(
                 dashboard_api.get_kronos_predictions_for_ticker,
                 ticker=ticker.upper(),
             )
-        return await asyncio.to_thread(dashboard_api.get_kronos_latest_predictions)
+        t_list = [t.strip().upper() for t in tickers.split(",") if t.strip()] if tickers else None
+        return await asyncio.to_thread(dashboard_api.get_kronos_latest_predictions, tickers=t_list)
     except Exception as e:
         logger.exception("Error in get_dashboard_kronos_predictions: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -52,18 +57,24 @@ async def run_dashboard_kronos_batch(request: dict | None = None):
 
 @router.post("/api/v1/kronos/predict/{ticker}")
 @router.post("/api/v1/kronos/predict")
-async def run_kronos_predict_ticker(ticker: str | None = None, request: dict | None = None):
+async def run_kronos_predict_ticker(
+    ticker: str | None = None,
+    lookback: int = Query(60, description="Lookback window in days"),
+    pred_len: int = Query(14, description="Forecast length in days"),
+    device: str | None = Query(None, description="Compute device (cpu, cuda)"),
+    request: dict | None = None,
+):
     """Generate 14-day deep sequence forecast for a single stock."""
     target_ticker = (ticker or (request or {}).get("ticker", "")).upper().strip()
     if not target_ticker:
         raise HTTPException(status_code=400, detail="Ticker symbol is required")
-    device = (request or {}).get("device")
+    eff_device = (request or {}).get("device") or device
     try:
         res = await asyncio.to_thread(
             dashboard_api.run_prediction_for_ticker,
             ticker=target_ticker,
             engine="kronos",
-            device=device,
+            device=eff_device,
         )
         if not res.get("success"):
             raise HTTPException(status_code=400, detail=res.get("error", "Failed to compute Kronos prediction"))
@@ -91,30 +102,43 @@ async def get_cached_kronos_prediction(
 
 
 @router.get("/api/v1/dashboard/kronos/latest")
-async def get_kronos_latest():
+async def get_kronos_latest(
+    tickers: str | None = Query(None, description="Comma-separated tickers"),
+    watchlist: str | None = Query(None, description="Watchlist name"),
+):
     """Retrieve latest predictions across the universe."""
     try:
-        return await asyncio.to_thread(dashboard_api.get_kronos_latest_predictions)
+        t_list = [t.strip().upper() for t in tickers.split(",") if t.strip()] if tickers else None
+        return await asyncio.to_thread(dashboard_api.get_kronos_latest_predictions, tickers=t_list, watchlist=watchlist)
     except Exception as e:
         logger.exception("Error in get_kronos_latest: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/v1/dashboard/kronos/accuracy")
-async def get_kronos_accuracy():
+async def get_kronos_accuracy(
+    tickers: str | None = Query(None, description="Comma-separated tickers"),
+    watchlist: str | None = Query(None, description="Watchlist name"),
+):
     """Retrieve Kronos accuracy tracking and historical validation metrics."""
     try:
-        return await asyncio.to_thread(dashboard_api.get_kronos_accuracy_api)
+        t_list = [t.strip().upper() for t in tickers.split(",") if t.strip()] if tickers else None
+        return await asyncio.to_thread(dashboard_api.get_kronos_accuracy_api, tickers=t_list, watchlist=watchlist)
     except Exception as e:
         logger.exception("Error in get_kronos_accuracy: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/v1/dashboard/kronos/audit")
-async def get_kronos_audit():
+async def get_kronos_audit(
+    tickers: str | None = Query(None, description="Comma-separated tickers"),
+    watchlist: str | None = Query(None, description="Watchlist name"),
+    limit: int = Query(50, description="Max entries to return"),
+):
     """Retrieve Kronos predictions audit log."""
     try:
-        return await asyncio.to_thread(dashboard_api.get_kronos_predictions_audit)
+        t_list = [t.strip().upper() for t in tickers.split(",") if t.strip()] if tickers else None
+        return await asyncio.to_thread(dashboard_api.get_kronos_predictions_audit, tickers=t_list, watchlist=watchlist, limit=limit)
     except Exception as e:
         logger.exception("Error in get_kronos_audit: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

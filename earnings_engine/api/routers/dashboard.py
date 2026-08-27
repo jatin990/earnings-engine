@@ -70,6 +70,7 @@ async def dashboard_overview():
 @router.get("/api/v1/upcoming-earnings")
 async def dashboard_results(
     market: str = Query("ALL", description="Market universe (ALL, IN, NSE_ALL, US, etc.)"),
+    tickers: str | None = Query(None, description="Comma-separated ticker list"),
     days: int = Query(14, description="Look-ahead window in days", ge=1, le=90),
     past_days: int = Query(60, description="Past window in days for historical results", ge=0, le=180),
     start_date: str | None = Query(None, description="Optional anchor start date (YYYY-MM-DD)"),
@@ -115,8 +116,10 @@ async def dashboard_results_month_summary(
 
 @router.get("/api/v1/dashboard/results/report")
 async def dashboard_results_report(
-    market: str = Query("ALL", description="Market universe"),
-    days: int = Query(14, description="Look-ahead window in days", ge=1, le=90),
+    days: int = Query(7, description="Look-ahead window in days", ge=0, le=180),
+    past_days: int = Query(4, description="Look-back window in days", ge=0, le=180),
+    market: str | None = Query(None, description="Market universe (IN, US, NSE_ALL, NSE_LARGE_CAP)"),
+    start_date: str | None = Query(None, description="Explicit start date YYYY-MM-DD"),
 ):
     """Retrieve rendered report components for upcoming results."""
     try:
@@ -124,6 +127,8 @@ async def dashboard_results_report(
             dashboard_api.get_results_report_components,
             days=days,
             market=market,
+            past_days=past_days,
+            start_date=start_date,
         )
     except Exception as e:
         logger.exception("Error in dashboard_results_report: %s", e)
@@ -149,12 +154,20 @@ async def dashboard_results_summarize(
 async def dashboard_recent_results(
     days: int = Query(30, description="Past window in days", ge=1, le=90),
     market: str = Query("NSE_ALL", description="Market universe"),
+    correction_pct: float = Query(15.0, description="Min drop % from high"),
+    drop_pct: float = Query(2.0, description="Reaction drop %"),
+    start_date: str | None = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="End date (YYYY-MM-DD)"),
 ):
     """Past earnings results with price reaction returns."""
     try:
         return await asyncio.to_thread(
             dashboard_api.get_recent_results_api,
             market=market,
+            correction_pct=correction_pct,
+            drop_pct=drop_pct,
+            start_date=start_date,
+            end_date=end_date,
         )
     except Exception as e:
         logger.exception("Error in recent results: %s", e)
@@ -163,14 +176,20 @@ async def dashboard_recent_results(
 
 @router.get("/api/v1/dashboard/recent-results/verdict")
 async def dashboard_recent_results_verdict(
-    ticker: str = Query(..., description="Stock ticker symbol"),
-    earnings_date: str = Query(..., description="Earnings date (YYYY-MM-DD)"),
+    ticker: str | None = Query(None, description="Stock ticker symbol"),
+    earnings_date: str | None = Query(None, description="Earnings date (YYYY-MM-DD)"),
+    market: str | None = Query(None, description="Market universe or ticker"),
+    start_date: str | None = Query(None, description="Start date"),
+    end_date: str | None = Query(None, description="End date"),
 ):
     """AI verdict and analysis notes for a specific past earnings announcement."""
+    target_ticker = ticker or market
     try:
         return await asyncio.to_thread(
             dashboard_api.get_recent_results_verdict_api,
-            market=ticker,
+            market=target_ticker,
+            start_date=start_date,
+            end_date=end_date,
         )
     except Exception as e:
         logger.exception("Error in recent results verdict: %s", e)
@@ -231,10 +250,12 @@ async def dashboard_month_filter_sync(
 
 
 @router.get("/api/v1/dashboard/data-coverage")
-async def dashboard_data_coverage():
+async def dashboard_data_coverage(
+    market: str | None = Query("ALL", description="Market universe"),
+):
     """Retrieve coverage matrix for prices, earnings history, and fundamental market caps."""
     try:
-        return await asyncio.to_thread(dashboard_api.get_data_coverage, market=None)
+        return await asyncio.to_thread(dashboard_api.get_data_coverage, market=market)
     except Exception as e:
         logger.exception("Error in data coverage: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching data coverage: {str(e)}")
@@ -244,10 +265,12 @@ async def dashboard_data_coverage():
 async def dashboard_industries(
     market: str | None = Query(None, description="Market universe"),
     days: int = Query(14, description="Look-ahead window in days", ge=1, le=90),
+    lookback_days: int | None = Query(None, description="Lookback window alias for days"),
 ):
     """Sector returns and industry movements."""
+    effective_days = lookback_days or days
     try:
-        return await asyncio.to_thread(dashboard_api.get_industry_moves, market=market, lookback_days=days)
+        return await asyncio.to_thread(dashboard_api.get_industry_moves, market=market, lookback_days=effective_days)
     except Exception as e:
         logger.exception("Error in dashboard_industries: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching industry moves: {str(e)}")
@@ -257,18 +280,23 @@ async def dashboard_industries(
 async def dashboard_industries_classify(request: dict | None = None):
     """Trigger background batch classification of unclassified stock industries."""
     limit = int((request or {}).get("limit", 50))
+    market = (request or {}).get("market")
     try:
-        return await asyncio.to_thread(dashboard_api.classify_industries_api, market=market)
+        return await asyncio.to_thread(dashboard_api.classify_industries_api, limit=limit, market=market)
     except Exception as e:
         logger.exception("Error in industry classify: %s", e)
         raise HTTPException(status_code=500, detail=f"Error classifying industries: {str(e)}")
 
 
 @router.get("/api/v1/dashboard/patterns")
-async def dashboard_patterns(market: str = Query("ALL", description="Market universe")):
+async def dashboard_patterns(
+    market: str = Query("ALL", description="Market universe"),
+    start_date: str | None = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="End date (YYYY-MM-DD)"),
+):
     """Candlestick and chart patterns identified across universe."""
     try:
-        return await asyncio.to_thread(dashboard_api.get_patterns_api, market=market)
+        return await asyncio.to_thread(dashboard_api.get_patterns_api, market=market, start_date=start_date, end_date=end_date)
     except Exception as e:
         logger.exception("Error in patterns: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching patterns: {str(e)}")
@@ -485,11 +513,14 @@ async def get_all_market_caps():
 
 
 @router.get("/api/v1/market-cap/{ticker}")
-async def get_single_market_cap(ticker: str):
+async def get_single_market_cap(
+    ticker: str,
+    force_refresh: bool = Query(False, description="Force refresh from yfinance"),
+):
     """Get cached market cap for a single ticker."""
     try:
         from earnings_engine.data.universe import load_market_cap
-        cap = await asyncio.to_thread(load_market_cap, ticker.upper().strip(), _settings)
+        cap = await asyncio.to_thread(load_market_cap, ticker.upper().strip(), _settings, force_refresh=force_refresh)
         return {"ticker": ticker.upper().strip(), "market_cap": cap}
     except Exception as e:
         logger.exception("Error fetching market cap for %s: %s", ticker, e)
@@ -571,11 +602,14 @@ async def run_incremental_earnings_ingest(request: dict | None = None):
 
 
 @router.get("/api/v1/earnings-history/{ticker}")
-async def get_earnings_history_endpoint(ticker: str):
+async def get_earnings_history_endpoint(
+    ticker: str,
+    force_refresh: bool = Query(False, description="Force refresh from source"),
+):
     """Return historical earnings dates and reported EPS for a ticker."""
     try:
         from earnings_engine.data.earnings import load_earnings
-        df = await asyncio.to_thread(load_earnings, ticker, settings=_settings)
+        df = await asyncio.to_thread(load_earnings, ticker, settings=_settings, force=force_refresh)
         rows = df.to_dict(orient="records") if not df.empty else []
         return {"success": True, "ticker": ticker, "count": len(rows), "earnings": rows}
     except Exception as e:
@@ -583,11 +617,14 @@ async def get_earnings_history_endpoint(ticker: str):
 
 
 @router.get("/api/v1/market-context/{ticker}")
-async def get_market_context_endpoint(ticker: str):
+async def get_market_context_endpoint(
+    ticker: str,
+    live: bool = Query(True, description="Fetch live price and bounds"),
+):
     """Return 52W range position, week high/low around earnings for a ticker."""
     try:
         from earnings_engine.data.market_context import get_market_context_for_ticker
-        ctx = await asyncio.to_thread(get_market_context_for_ticker, ticker, settings=_settings)
+        ctx = await asyncio.to_thread(get_market_context_for_ticker, ticker, settings=_settings, live=live)
         return {"success": True, "ticker": ticker, **(ctx or {})}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching market context: {str(e)}")

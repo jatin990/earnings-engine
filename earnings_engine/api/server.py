@@ -420,7 +420,7 @@ async def enforce_auth_middleware(request: Request, call_next):
 _static_path = Path(__file__).resolve().parent.parent / "ui"
 if _static_path.exists():
     app.mount("/static", StaticFiles(directory=str(_static_path)), name="static")
-    app.mount("/ui", StaticFiles(directory=str(_static_path)), name="ui")
+    app.mount("/ui", StaticFiles(directory=str(_static_path), html=True), name="ui")
 
 _dashboard_static = _templates_dir / "static"
 if _dashboard_static.exists():

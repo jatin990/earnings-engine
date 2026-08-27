@@ -159,9 +159,20 @@ async def owner_login_endpoint(req: dict, response: Response):
 
 @router.get("/api/v1/auth/session")
 @router.get("/api/v1/auth/me")
-async def get_current_user_session(request: Request):
+async def get_current_user_session(request: Request, code: str | None = Query(None)):
     """Retrieve active session metadata and authorized scopes."""
     session = _get_current_session(request)
+    if not session and code:
+        from earnings_engine.data.passcodes import verify_passcode
+        res = verify_passcode(code, _settings)
+        if res.get("valid"):
+            session = {
+                "sub": res.get("user_id", "usr_portal"),
+                "role": res.get("role", "friend"),
+                "email": res.get("email"),
+                "name": res.get("name"),
+                "scopes": res.get("scopes", []),
+            }
     if not session or not session.get("role"):
         return {"authenticated": False, "role": "guest", "scopes": []}
     return {

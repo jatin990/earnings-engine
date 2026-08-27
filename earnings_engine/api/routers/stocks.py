@@ -81,12 +81,37 @@ async def get_stock_rating_endpoint(ticker: str):
         raise HTTPException(status_code=500, detail=f"Error fetching stock rating: {str(e)}")
 
 
+@router.api_route("/api/v1/stock/{ticker}/fetch-news", methods=["GET", "POST"])
+async def fetch_stock_news_endpoint(ticker: str):
+    """Fetch fresh news headlines and corporate announcements delta for a stock."""
+    try:
+        res = await asyncio.to_thread(stock_api.refresh_stock_news, ticker.upper().strip(), _settings)
+        if not res.get("success"):
+            raise HTTPException(status_code=400, detail=res.get("error", "Failed to refresh news delta"))
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error in fetch_stock_news for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Failed to refresh news: {str(e)}")
+
+
 @router.get("/api/v1/stock/{ticker}/intelligence-note")
 @router.post("/api/v1/stock/{ticker}/intelligence-note")
-async def get_stock_intelligence_note_endpoint(ticker: str):
+async def get_stock_intelligence_note_endpoint(
+    ticker: str,
+    model_name: str | None = Query(None, description="Preferred AI model"),
+    provider: str | None = Query(None, description="Preferred provider"),
+):
     """Return or generate an AI intelligence note for a stock."""
     try:
-        return await asyncio.to_thread(stock_api.get_stock_intelligence_note, ticker=ticker.upper(), settings=_settings)
+        return await asyncio.to_thread(
+            stock_api.get_stock_intelligence_note,
+            ticker=ticker.upper(),
+            model_name=model_name,
+            provider=provider,
+            settings=_settings,
+        )
     except Exception as e:
         logger.exception("Error in stock intelligence note for %s: %s", ticker, e)
         raise HTTPException(status_code=500, detail=f"Error with intelligence note: {str(e)}")

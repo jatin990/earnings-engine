@@ -432,13 +432,15 @@ async def create_universe_endpoint(request: dict):
         raise HTTPException(status_code=500, detail=f"Error creating universe: {str(e)}")
 
 
+@router.get("/api/v1/universe/{market}")
 @router.get("/api/v1/universe/{name}")
-async def get_universe_tickers_endpoint(name: str):
+async def get_universe_tickers_endpoint(market: str | None = None, name: str | None = None):
     """Retrieve tickers belonging to a market universe."""
+    target = (market or name or "").strip().upper()
     try:
         from earnings_engine.data.universe import load_universe
-        tickers = await asyncio.to_thread(load_universe, name, settings=_settings)
-        return {"universe": name, "count": len(tickers), "tickers": tickers}
+        tickers = await asyncio.to_thread(load_universe, target, settings=_settings)
+        return {"universe": target, "market": target, "count": len(tickers), "tickers": tickers}
     except Exception as e:
-        logger.exception("Error in get_universe_tickers for %s: %s", name, e)
+        logger.exception("Error in get_universe_tickers for %s: %s", target, e)
         raise HTTPException(status_code=500, detail=str(e))

@@ -2925,8 +2925,8 @@
                     this.renderResultsMonthTabs();
                     this.updateResultsMonthSummaryCards();
 
-                    // Show first 10 dates by default (or all if fewer)
-                    this.resultsShowDays = Math.min(10, (this.resultsDaySections || []).length || 1);
+                    // Render all dates in loaded window by default
+                    this.resultsShowDays = (this.resultsDaySections || []).length || 1;
                     this.renderResultsDays();
                     
                     const totalDates = (this.resultsDaySections || []).length;
@@ -3356,10 +3356,24 @@
                     if (isMatch) matchCount++;
                 });
 
-                // Also hide empty cap/industry sections
+                // Also toggle empty cap/industry sections and auto-expand matching day sections
                 document.querySelectorAll('#resultsReportSections .industry-subgroup, #resultsReportSections .cap-section').forEach(sec => {
                     const visibleTrs = sec.querySelectorAll('tbody tr:not(.row-drawer-tr):not([style*="display: none"])');
-                    sec.style.display = visibleTrs.length ? '' : 'none';
+                    sec.style.display = (!q || visibleTrs.length) ? '' : 'none';
+                });
+
+                document.querySelectorAll('#resultsReportSections details.day-section').forEach(daySec => {
+                    if (!q) {
+                        daySec.style.display = '';
+                    } else {
+                        const visibleTrs = daySec.querySelectorAll('tbody tr:not(.row-drawer-tr):not([style*="display: none"])');
+                        if (visibleTrs.length > 0) {
+                            daySec.style.display = '';
+                            daySec.open = true; // Auto-expand when search query matches tickers inside this day
+                        } else {
+                            daySec.style.display = 'none';
+                        }
+                    }
                 });
 
                 if (matchEl) {

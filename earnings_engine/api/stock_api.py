@@ -229,14 +229,27 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
     try:
         conn = get_db_connection(settings)
         e_rows = conn.execute(
-            "SELECT earnings_date, eps_estimate, eps_reported, surprise_pct FROM earnings_history WHERE ticker = ? ORDER BY earnings_date DESC LIMIT 8",
+            "SELECT earnings_date, eps_estimate, eps_reported, surprise_pct, source FROM earnings_history WHERE ticker = ? ORDER BY earnings_date DESC LIMIT 12",
             (sym,),
         ).fetchall()
+
+        # If earnings history is empty or missing reported EPS for past dates, auto-hydrate from quarterly income stmt
+        if not e_rows or all(r[2] is None for r in e_rows):
+            try:
+                calculate_or_fetch_eps(sym, settings=settings)
+                e_rows = conn.execute(
+                    "SELECT earnings_date, eps_estimate, eps_reported, surprise_pct, source FROM earnings_history WHERE ticker = ? ORDER BY earnings_date DESC LIMIT 12",
+                    (sym,),
+                ).fetchall()
+            except Exception as auto_eps_err:
+                logger.debug("Auto EPS hydration in get_stock_overview for %s: %s", sym, auto_eps_err)
+
         for r in e_rows:
             ed_str = r[0]
             eps_est = float(r[1]) if r[1] is not None else None
             eps_rep = float(r[2]) if r[2] is not None else None
             surp = float(r[3]) if r[3] is not None else None
+            source = str(r[4]) if len(r) > 4 and r[4] else "yfinance"
 
             # Calculate post-earnings week high/low move
             week_hl = None
@@ -254,6 +267,7 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
                 "eps_estimate": eps_est,
                 "eps_reported": eps_rep,
                 "surprise_pct": round(surp, 2) if surp is not None else None,
+                "source": source,
                 "week_high_pct": round(week_hl[0], 2) if week_hl else None,
                 "week_low_pct": round(week_hl[1], 2) if week_hl else None,
                 "week_high_price": round(week_hl[2], 2) if week_hl else None,

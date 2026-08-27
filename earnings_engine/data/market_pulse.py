@@ -29,13 +29,32 @@ _PULSE_CACHE: dict[str, Any] = {}
 _PULSE_CACHE_TTL: float = 60.0  # 60s cache TTL
 
 
+def is_market_open(ts: float) -> bool:
+    """Check if Indian market is open at the given UTC timestamp."""
+    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+    if dt.weekday() >= 5:  # Weekend
+        return False
+    # IST is UTC+5:30. Open: 09:15 IST = 03:45 UTC. Close: 15:30 IST = 10:00 UTC.
+    time_val = dt.hour + dt.minute / 60.0
+    return 3.75 <= time_val < 10.0
+
+
 def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool = False) -> dict[str, Any]:
     """Retrieve full macro market overview, fear/greed index, volatility, and predictions."""
     global _PULSE_CACHE
     now_ts = time.time()
 
-    if not force_refresh and "data" in _PULSE_CACHE and (now_ts - _PULSE_CACHE.get("ts", 0)) < _PULSE_CACHE_TTL:
-        return _PULSE_CACHE["data"]
+    if not force_refresh and "data" in _PULSE_CACHE:
+        cached_ts = _PULSE_CACHE.get("ts", 0)
+        # 1. Normal short TTL cache
+        if (now_ts - cached_ts) < _PULSE_CACHE_TTL:
+            return _PULSE_CACHE["data"]
+            
+        # 2. If market is closed now and was closed during the last refresh, retain EOD cache indefinitely
+        if not is_market_open(now_ts) and not is_market_open(cached_ts):
+            # Maximum valid hold period: 3 days (covers weekends)
+            if (now_ts - cached_ts) < 3 * 24 * 3600:
+                return _PULSE_CACHE["data"]
 
     settings = settings or Settings()
     conn = get_db_connection(settings)
