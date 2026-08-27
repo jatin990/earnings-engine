@@ -103,8 +103,14 @@ def setup_logger(name: str = "earnings_engine", base_dir: Path | None = None) ->
     root_logger.setLevel(logging.INFO)
     formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
 
-    # Stream handler (stdout) is always enabled for console/serverless logs
-    stream_handler = logging.StreamHandler()
+    # Stream handler (stdout) with safe UTF-8 support on all platforms
+    try:
+        if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+    stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(formatter)
     root_logger.addHandler(stream_handler)
 
@@ -161,17 +167,30 @@ def log_startup_diagnostics(target_logger: logging.Logger | None = None) -> None
 
     log = target_logger or logging.getLogger(_ROOT_LOGGER_NAME)
 
-    # 1. Database Configuration
+    # 1. Database Configuration & Latency Audit
     turso_url = os.getenv("TURSO_DATABASE_URL", "").strip()
     turso_token = os.getenv("TURSO_AUTH_TOKEN", "").strip()
     is_cloud_db = bool(turso_url and turso_token)
-    from earnings_engine.data.db import is_server_environment
+    from earnings_engine.data.db import is_server_environment, measure_db_latencies
     if is_server_environment() and is_cloud_db:
         db_mode_desc = f"LibSQL Cloud ({turso_url})"
     elif is_cloud_db:
         db_mode_desc = f"Local SQLite (Fast Local Execution + Upstream Turso Sync)"
     else:
         db_mode_desc = "Local SQLite (Pure offline mode)"
+
+    # Measure DB ping latencies
+    db_latencies = measure_db_latencies()
+    sqlite_lat_ms = db_latencies.get("sqlite_ms")
+    sqlite_lat_str = f"{sqlite_lat_ms:.2f} ms ({db_latencies.get('sqlite_status', 'Healthy')})" if sqlite_lat_ms is not None else f"Error ({db_latencies.get('sqlite_status')})"
+
+    turso_lat_ms = db_latencies.get("turso_ms")
+    if turso_lat_ms is not None:
+        turso_lat_str = f"{turso_lat_ms:.2f} ms ({db_latencies.get('turso_status', 'Connected')})"
+    elif is_cloud_db:
+        turso_lat_str = f"Error ({db_latencies.get('turso_status')})"
+    else:
+        turso_lat_str = "[UNSET] (Local offline mode)"
 
     # 2. Key Environment Variables Audit
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
@@ -213,16 +232,18 @@ def log_startup_diagnostics(target_logger: logging.Logger | None = None) -> None
         "=" * 78,
         "🚀 EARNINGS ENGINE STARTUP & ENVIRONMENT DIAGNOSTICS",
         "=" * 78,
-        "🗄️  DATABASE CONNECTION:",
-        f"    • Mode:               {db_mode_desc}",
-        f"    • Turso URL:          {turso_url if turso_url else '[UNSET] (Falling back to local SQLite)'}",
-        f"    • Turso Auth Token:   {'[SET] (' + turso_token[:12] + '...)' if turso_token else '[UNSET]'}",
-        f"    • Data Directory:     {data_dir}",
+        "🗄️  DATABASE CONNECTION & LATENCY:",
+        f"    • Mode:                  {db_mode_desc}",
+        f"    • Local SQLite Latency:  {sqlite_lat_str}",
+        f"    • Turso Cloud Latency:   {turso_lat_str}",
+        f"    • Turso URL:             {turso_url if turso_url else '[UNSET] (Falling back to local SQLite)'}",
+        f"    • Turso Auth Token:      {'[SET] (' + turso_token[:12] + '...)' if turso_token else '[UNSET]'}",
+        f"    • Data Directory:        {data_dir}",
         "",
         "⚙️  AI & EXTERNAL INTEGRATIONS CONFIG:",
-        f"    • OPENROUTER_API_KEY: {'[SET] (Multi-model consensus enabled)' if openrouter_key else '[MISSING] (Consensus will use rule-based fallback)'}",
-        f"    • Email Alerts:       {'[ENABLED] ' + os.getenv('EARNINGS_ENGINE_EMAIL_TO', '') if email_enabled else '[DISABLED] (EARNINGS_ENGINE_EMAIL_ENABLED=false)'}",
-        f"    • ML Inference Device:{torch_device_desc}",
+        f"    • OPENROUTER_API_KEY:    {'[SET] (Multi-model consensus enabled)' if openrouter_key else '[MISSING] (Consensus will use rule-based fallback)'}",
+        f"    • Email Alerts:          {'[ENABLED] ' + os.getenv('EARNINGS_ENGINE_EMAIL_TO', '') if email_enabled else '[DISABLED] (EARNINGS_ENGINE_EMAIL_ENABLED=false)'}",
+        f"    • ML Inference Device:   {torch_device_desc}",
         "",
         "📦  DATA PROVIDERS & MODULES AUDIT:",
     ]

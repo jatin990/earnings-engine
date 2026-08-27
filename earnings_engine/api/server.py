@@ -691,9 +691,23 @@ def _df_to_earnings_list(df: pd.DataFrame) -> list[dict[str, Any]]:
 
 
 @app.get("/health", tags=["Health"])
+@app.get("/api/v1/health", tags=["Health"])
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "ok", "service": "earnings-engine-api"}
+    """Health check endpoint with database latency diagnostics."""
+    from earnings_engine.data.db import measure_db_latencies
+    db_metrics = measure_db_latencies(_settings)
+    return {
+        "status": "ok",
+        "service": "earnings-engine-api",
+        "database": db_metrics,
+    }
+
+
+@app.get("/api/v1/system/db-latency", tags=["System"])
+async def get_system_db_latency():
+    """Measure and return real-time roundtrip database latency for local SQLite and Turso Cloud."""
+    from earnings_engine.data.db import measure_db_latencies
+    return measure_db_latencies(_settings)
 
 
 @app.get("/api/v1/price-history/{ticker}", response_model=list[PriceData], tags=["Prices"])

@@ -403,3 +403,49 @@ def get_db_connection(settings: Settings | None = None, force_remote: bool = Fal
 
     s.ensure_dirs()
     return sqlite3.connect(str(_cache_path(s)))
+
+
+def measure_db_latencies(settings: Settings | None = None) -> dict[str, Any]:
+    """Measure server roundtrip query latency for both local SQLite and remote Turso Cloud DB."""
+    import time
+    s = settings or Settings()
+    results: dict[str, Any] = {
+        "sqlite_ms": None,
+        "sqlite_status": "Unknown",
+        "sqlite_path": str(_cache_path(s)),
+        "turso_ms": None,
+        "turso_status": "Not Configured",
+        "turso_url": os.getenv("TURSO_DATABASE_URL", "").strip(),
+    }
+
+    # 1. Local SQLite Latency
+    try:
+        s.ensure_dirs()
+        db_path = str(_cache_path(s))
+        t0 = time.perf_counter()
+        conn = sqlite3.connect(db_path, timeout=5.0)
+        cur = conn.cursor()
+        cur.execute("SELECT sqlite_version()")
+        ver = cur.fetchone()
+        conn.close()
+        elapsed_sqlite = (time.perf_counter() - t0) * 1000.0
+        results["sqlite_ms"] = round(elapsed_sqlite, 2)
+        results["sqlite_status"] = f"Healthy (v{ver[0] if ver else 'unknown'})"
+    except Exception as e:
+        results["sqlite_status"] = f"Error: {e}"
+
+    # 2. Turso Cloud Latency (if configured)
+    url = os.getenv("TURSO_DATABASE_URL", "").strip()
+    token = os.getenv("TURSO_AUTH_TOKEN", "").strip()
+    if url and token:
+        try:
+            t0 = time.perf_counter()
+            tconn = TursoConnection(url, token)
+            tconn.execute("SELECT 1")
+            elapsed_turso = (time.perf_counter() - t0) * 1000.0
+            results["turso_ms"] = round(elapsed_turso, 2)
+            results["turso_status"] = "Connected"
+        except Exception as e:
+            results["turso_status"] = f"Error: {e}"
+
+    return results
