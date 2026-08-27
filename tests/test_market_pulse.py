@@ -39,10 +39,23 @@ def test_market_pulse_data_structure():
     assert breadth["advances"] >= 0
     assert breadth["declines"] >= 0
 
-    # Check Institutional Flows
+    # Check Institutional Flows & Past 7 Days History
     inst = data["institutional_flows"]
     assert "fii_net_cr" in inst
     assert "dii_net_cr" in inst
+    assert "total_net_cr" in inst
+    assert "fii_7d_total_cr" in inst
+    assert "dii_7d_total_cr" in inst
+    assert "total_7d_total_cr" in inst
+    assert "history_7d" in inst
+    assert len(inst["history_7d"]) == 7
+    for row in inst["history_7d"]:
+        assert "date" in row
+        assert "day_label" in row
+        assert "fii_net_cr" in row
+        assert "dii_net_cr" in row
+        assert "total_net_cr" in row
+        assert "stance" in row
 
     # Check Prediction
     pred = data["prediction"]
@@ -58,6 +71,11 @@ def test_market_pulse_data_structure():
 def test_market_pulse_api_endpoint(client):
     res = client.get("/api/v1/market/pulse")
     assert res.status_code == 200
+    payload = res.json()
+    assert payload["success"] is True
+    inst = payload["institutional_flows"]
+    assert "history_7d" in inst
+    assert len(inst["history_7d"]) >= 5
     json_data = res.json()
     assert json_data["success"] is True
     assert "fear_and_greed" in json_data

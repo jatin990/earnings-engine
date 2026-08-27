@@ -190,6 +190,9 @@
             const diiEl = document.getElementById('pulseDiiNet');
             const totEl = document.getElementById('pulseTotalNet');
             const biasEl = document.getElementById('pulseInstBias');
+            const badge7d = document.getElementById('pulse7dTotalBadge');
+            const summary7d = document.getElementById('pulse7dFiiDiiSummary');
+            const tbody7d = document.getElementById('pulse7dFlowsTableBody');
 
             if (fiiEl) {
                 const s = flows.fii_net_cr >= 0 ? '+' : '';
@@ -209,6 +212,68 @@
             if (biasEl && flows.bias) {
                 biasEl.textContent = flows.bias;
                 biasEl.style.color = flows.bias.includes('BULLISH') ? '#34d399' : '#f87171';
+            }
+
+            // 7-Day Cumulative Total Badge
+            if (badge7d && flows.total_7d_total_cr != null) {
+                const s = flows.total_7d_total_cr >= 0 ? '+' : '';
+                badge7d.textContent = `7D Net: ${s}₹${Math.abs(flows.total_7d_total_cr).toLocaleString()} Cr`;
+                badge7d.style.color = flows.total_7d_total_cr >= 0 ? '#38bdf8' : '#f87171';
+                badge7d.style.background = flows.total_7d_total_cr >= 0 ? 'rgba(56,189,248,0.12)' : 'rgba(248,113,113,0.12)';
+                badge7d.style.borderColor = flows.total_7d_total_cr >= 0 ? 'rgba(56,189,248,0.25)' : 'rgba(248,113,113,0.25)';
+            }
+
+            // 7-Day FII / DII Sub-Summary
+            if (summary7d && flows.fii_7d_total_cr != null && flows.dii_7d_total_cr != null) {
+                const fSign = flows.fii_7d_total_cr >= 0 ? '+' : '';
+                const dSign = flows.dii_7d_total_cr >= 0 ? '+' : '';
+                summary7d.textContent = `FII: ${fSign}₹${flows.fii_7d_total_cr.toLocaleString()} Cr | DII: ${dSign}₹${flows.dii_7d_total_cr.toLocaleString()} Cr`;
+            }
+
+            // Past 7 Days Table Rows
+            if (tbody7d) {
+                const history = flows.history_7d || flows.past_7_days || [];
+                if (!history.length) {
+                    tbody7d.innerHTML = '<tr><td colspan="5" style="padding:1rem;text-align:center;color:#64748b;">No recent institutional flow history found.</td></tr>';
+                    return;
+                }
+
+                tbody7d.innerHTML = history.map((row, idx) => {
+                    const isToday = idx === 0;
+                    const rowBg = isToday ? 'rgba(56,189,248,0.06)' : 'transparent';
+                    const fiiSign = row.fii_net_cr >= 0 ? '+' : '';
+                    const diiSign = row.dii_net_cr >= 0 ? '+' : '';
+                    const totSign = row.total_net_cr >= 0 ? '+' : '';
+                    const fiiCol = row.fii_net_cr >= 0 ? '#34d399' : '#f87171';
+                    const diiCol = row.dii_net_cr >= 0 ? '#34d399' : '#f87171';
+                    const totCol = row.total_net_cr >= 0 ? '#38bdf8' : '#f87171';
+                    const isBull = row.total_net_cr >= 0;
+                    const badgeCol = isBull ? '#34d399' : '#f87171';
+                    const badgeBg = isBull ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)';
+                    const badgeText = isBull ? '🟢 Inflow' : '🔴 Outflow';
+
+                    return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);background:${rowBg};">
+                            <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);font-weight:${isToday ? '700' : '500'};color:${isToday ? '#f8fafc' : '#cbd5e1'};">
+                                ${row.day_label || row.date}
+                            </td>
+                            <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${fiiCol};font-weight:600;">
+                                ${fiiSign}₹${row.fii_net_cr.toLocaleString()}
+                            </td>
+                            <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${diiCol};font-weight:600;">
+                                ${diiSign}₹${row.dii_net_cr.toLocaleString()}
+                            </td>
+                            <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${totCol};font-weight:700;">
+                                ${totSign}₹${row.total_net_cr.toLocaleString()}
+                            </td>
+                            <td style="padding:0.35rem 0.5rem;text-align:center;">
+                                <span style="font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;background:${badgeBg};color:${badgeCol};font-weight:700;font-family:var(--font-mono);">
+                                    ${badgeText}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             }
         },
 
