@@ -70,19 +70,19 @@ def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]
     }
 
 
-def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None]:
-    """Compute 7-day and 30-day percentage returns directly from price_history."""
+def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None, float | None]:
+    """Compute 7-day, 30-day, and 1-year percentage returns directly from price_history."""
     try:
         rows = conn.execute(
-            "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 35",
+            "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
             (sym,),
         ).fetchall()
         if not rows or len(rows) < 2:
-            return None, None
+            return None, None, None
 
         latest_close = float(rows[0][1] or 0.0)
         if latest_close <= 0:
-            return None, None
+            return None, None, None
 
         idx_7d = min(5, len(rows) - 1)
         prior_7d = float(rows[idx_7d][1] or 0.0)
@@ -92,9 +92,13 @@ def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None
         prior_30d = float(rows[idx_30d][1] or 0.0)
         ret_30d = round(((latest_close - prior_30d) / prior_30d) * 100.0, 2) if prior_30d > 0 else None
 
-        return ret_7d, ret_30d
+        idx_1y = min(252, len(rows) - 1)
+        prior_1y = float(rows[idx_1y][1] or 0.0)
+        ret_1y = round(((latest_close - prior_1y) / prior_1y) * 100.0, 2) if prior_1y > 0 else None
+
+        return ret_7d, ret_30d, ret_1y
     except Exception:
-        return None, None
+        return None, None, None
 
 
 def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
@@ -508,8 +512,8 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
         else:
             total_inst_stake_pct = round(sum(h["stake_pct"] for h in holdings), 2)
 
-        # 4. Returns (7d, 30d)
-        ret_7d, ret_30d = _get_ticker_returns(sym, conn)
+        # 4. Returns (7d, 30d, 1y)
+        ret_7d, ret_30d, ret_1y = _get_ticker_returns(sym, conn)
 
         # Derive institutional accumulation conviction score (0-100)
         score = 50.0
@@ -560,6 +564,7 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             "total_institutional_stake": total_inst_stake_pct,
             "return_7d_pct": ret_7d,
             "return_30d_pct": ret_30d,
+            "return_1y_pct": ret_1y,
             "holdings": holdings,
             "block_deals": deals,
             "shareholding_patterns": patterns,
@@ -672,12 +677,19 @@ def get_top_distributed_stocks(
 
 
 def get_all_funds_activity(limit: int = 50, settings: Settings | None = None) -> list[dict[str, Any]]:
-    """Retrieve distinct list of active institutional funds with their latest actions."""
+    """Retrieve distinct list of active institutional funds with their latest actions and 30D / 1Y returns."""
     settings = settings or Settings()
     init_institutional_db(settings)
 
     try:
         conn = get_db_connection(settings)
+        # Pre-compute returns for all distinct tickers held in institutional_holdings
+        tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM institutional_holdings").fetchall() if r[0]]
+        ticker_returns: dict[str, tuple[float | None, float | None]] = {}
+        for sym in tickers:
+            _, r30, r1y = _get_ticker_returns(sym, conn)
+            ticker_returns[sym] = (r30, r1y)
+
         rows = conn.execute(
             """
             SELECT fund_name, fund_type, COUNT(DISTINCT ticker) as total_positions,
@@ -694,13 +706,39 @@ def get_all_funds_activity(limit: int = 50, settings: Settings | None = None) ->
 
         funds: list[dict[str, Any]] = []
         for r in rows:
+            fname = r[0]
+            holdings = conn.execute(
+                "SELECT ticker, holding_value_cr FROM institutional_holdings WHERE fund_name = ?",
+                (fname,),
+            ).fetchall()
+
+            total_val_30 = 0.0
+            sum_ret_30 = 0.0
+            total_val_1y = 0.0
+            sum_ret_1y = 0.0
+
+            for sym, val in holdings:
+                v = float(val or 1.0)
+                r30, r1y = ticker_returns.get(sym, (None, None))
+                if r30 is not None:
+                    sum_ret_30 += v * r30
+                    total_val_30 += v
+                if r1y is not None:
+                    sum_ret_1y += v * r1y
+                    total_val_1y += v
+
+            fund_30d = round(sum_ret_30 / total_val_30, 2) if total_val_30 > 0 else None
+            fund_1y = round(sum_ret_1y / total_val_1y, 2) if total_val_1y > 0 else None
+
             funds.append({
-                "fund_name": r[0],
+                "fund_name": fname,
                 "fund_type": r[1],
                 "total_positions": r[2],
                 "buying_actions": r[3],
                 "selling_actions": r[4],
                 "total_aum_tracked_cr": round(float(r[5] or 0.0), 1),
+                "return_30d_pct": fund_30d,
+                "return_1y_pct": fund_1y,
             })
         return funds
     except Exception as e:
@@ -709,7 +747,7 @@ def get_all_funds_activity(limit: int = 50, settings: Settings | None = None) ->
 
 
 def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None) -> list[dict[str, Any]]:
-    """Reverse lookup: retrieve all equities held and recent actions for a specific fund."""
+    """Reverse lookup: retrieve all equities held, 30D/1Y returns, and recent actions for a specific fund."""
     settings = settings or Settings()
     init_institutional_db(settings)
 
@@ -726,8 +764,10 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
             (fund_name.strip(),),
         ).fetchall()
 
+        from earnings_engine.data.names import get_name
         holdings: list[dict[str, Any]] = []
         for r in rows:
+            sym = r[0]
             val_cr = float(r[4] or 0.0)
             shares = int(r[2] or 0)
             est_base_price = round((val_cr * 1e7) / shares, 2) if shares > 0 and val_cr > 0 else 100.0
@@ -735,8 +775,11 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
             avg_p = round(float(r[7]), 2) if r[7] is not None and float(r[7]) > 0 else round(est_base_price * 0.90, 2)
             recent_p = round(float(r[8]), 2) if r[8] is not None and float(r[8]) > 0 else round(est_base_price * 0.96, 2)
             
+            _, r30, r1y = _get_ticker_returns(sym, conn)
+
             holdings.append({
-                "ticker": r[0],
+                "ticker": sym,
+                "company_name": get_name(sym) or sym.replace(".NS", ""),
                 "quarter": r[1],
                 "shares_held": shares,
                 "stake_pct": round(float(r[3] or 0.0), 2),
@@ -745,6 +788,8 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
                 "change_pct": round(float(r[6] or 0.0), 2),
                 "avg_price": avg_p,
                 "recent_buy_price": recent_p,
+                "return_30d_pct": r30,
+                "return_1y_pct": r1y,
                 "reported_date": r[9],
             })
         return holdings

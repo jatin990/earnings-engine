@@ -64,12 +64,17 @@ def test_funds_directory_and_portfolio():
     assert len(funds) >= 4
     fund_names = [f["fund_name"] for f in funds]
     assert any("Nippon" in fn for fn in fund_names)
+    assert "return_30d_pct" in funds[0]
+    assert "return_1y_pct" in funds[0]
 
     # Test reverse fund portfolio lookup
     nippon_holdings = get_fund_portfolio_activity("Nippon India Small Cap Fund")
     assert nippon_holdings is not None
     assert len(nippon_holdings) >= 1
     assert any(h["ticker"] == "ALLCARGO.NS" for h in nippon_holdings)
+    assert "return_30d_pct" in nippon_holdings[0]
+    assert "return_1y_pct" in nippon_holdings[0]
+    assert "company_name" in nippon_holdings[0]
 
 
 def test_institutional_multi_quarter_and_dates():
@@ -111,9 +116,15 @@ def test_institutional_api_endpoints(client):
     # Funds list
     res_funds = client.get("/api/v1/institutional/funds")
     assert res_funds.status_code == 200
-    assert len(res_funds.json()["funds"]) >= 1
+    funds_data = res_funds.json()["funds"]
+    assert len(funds_data) >= 1
+    assert "return_30d_pct" in funds_data[0]
+    assert "return_1y_pct" in funds_data[0]
 
     # Single fund drilldown
-    res_fund = client.get("/api/v1/institutional/fund/Quant%20Small%20Cap%20Fund")
+    top_fund_name = funds_data[0]["fund_name"]
+    res_fund = client.get(f"/api/v1/institutional/fund/{top_fund_name}")
     assert res_fund.status_code == 200
     assert res_fund.json()["success"] is True
+    assert len(res_fund.json()["holdings"]) >= 1
+    assert "return_30d_pct" in res_fund.json()["holdings"][0]

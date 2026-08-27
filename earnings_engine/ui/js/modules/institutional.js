@@ -238,11 +238,14 @@
             if (!tbody) return;
 
             if (!funds || !funds.length) {
-                tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#64748b;">No fund profiles match the selected filter.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#64748b;">No fund profiles match the selected filter.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = funds.map(f => {
+                const ret30Str = f.return_30d_pct != null ? (f.return_30d_pct >= 0 ? `<span style="color:#34d399;font-weight:700;font-family:var(--font-mono);">+${f.return_30d_pct}%</span>` : `<span style="color:#f87171;font-weight:700;font-family:var(--font-mono);">${f.return_30d_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+                const ret1yStr = f.return_1y_pct != null ? (f.return_1y_pct >= 0 ? `<span style="color:#34d399;font-weight:700;font-family:var(--font-mono);">+${f.return_1y_pct}%</span>` : `<span style="color:#f87171;font-weight:700;font-family:var(--font-mono);">${f.return_1y_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
                         <td style="padding:0.65rem 0.8rem;font-weight:700;color:#f8fafc;">
@@ -252,6 +255,8 @@
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#38bdf8;font-weight:700;">${f.total_positions} Stocks</td>
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#34d399;font-weight:700;">+${f.buying_actions}</td>
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#f87171;font-weight:700;">-${f.selling_actions}</td>
+                        <td style="padding:0.65rem 0.8rem;">${ret30Str}</td>
+                        <td style="padding:0.65rem 0.8rem;">${ret1yStr}</td>
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">₹${(f.total_aum_tracked_cr || 0).toLocaleString()} Cr</td>
                         <td style="padding:0.65rem 0.8rem;text-align:center;">
                             <button type="button" onclick="app.inspectFundPortfolio('${f.fund_name.replace(/'/g, "\\'")}')" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.55rem;background:rgba(59,130,246,0.1);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">💼 Portfolio</button>
@@ -432,7 +437,7 @@
 
             if (titleEl) titleEl.textContent = fundName;
             if (subEl) subEl.textContent = 'Loading equity portfolio disclosures...';
-            if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#64748b;"><div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Fetching portfolio holdings...</td></tr>';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="padding:2rem;text-align:center;color:#64748b;"><div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Fetching portfolio holdings & returns...</td></tr>';
             if (modal) modal.style.display = 'flex';
 
             try {
@@ -443,7 +448,7 @@
                     if (subEl) subEl.textContent = `${holdings.length} tracked equity positions · Category: ${holdings[0]?.fund_type || 'Institutional'}`;
 
                     if (!holdings.length) {
-                        tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#64748b;">No recent holdings filed for this fund.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="11" style="padding:2rem;text-align:center;color:#64748b;">No recent holdings filed for this fund.</td></tr>';
                         return;
                     }
 
@@ -451,17 +456,23 @@
                         const isBuy = h.action === 'ACCUMULATED' || h.action === 'NEW BUY';
                         const actCol = isBuy ? '#34d399' : h.action === 'TRIMMED' || h.action === 'SOLD OUT' ? '#f87171' : '#cbd5e1';
                         const actBg = isBuy ? 'rgba(16,185,129,0.15)' : h.action === 'TRIMMED' || h.action === 'SOLD OUT' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)';
+                        const ret30Str = h.return_30d_pct != null ? (h.return_30d_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${h.return_30d_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${h.return_30d_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+                        const ret1yStr = h.return_1y_pct != null ? (h.return_1y_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${h.return_1y_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${h.return_1y_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+                        const compName = h.company_name && h.company_name !== h.ticker ? `<div style="font-size:0.68rem;color:#94a3b8;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${h.company_name}</div>` : '';
 
                         return `
                             <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);font-weight:700;">
                                     <a href="javascript:void(0)" onclick="app.closeFundModal(); app.searchInstitutionalStock('${h.ticker}')" style="color:#38bdf8;text-decoration:none;">${h.ticker}</a>
+                                    ${compName}
                                 </td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">${h.quarter}</td>
                                 <td style="padding:0.55rem 0.8rem;">
                                     <span class="signal-badge" style="background:${actBg};color:${actCol};font-size:0.65rem;padding:0.1rem 0.4rem;">${h.action}</span>
                                 </td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${h.stake_pct}%</td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);">${ret30Str}</td>
+                                <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);">${ret1yStr}</td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#38bdf8;font-weight:600;">₹${h.avg_price != null ? Number(h.avg_price).toFixed(2) : '—'}</td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#a7f3d0;font-weight:600;">₹${h.recent_buy_price != null ? Number(h.recent_buy_price).toFixed(2) : '—'}</td>
                                 <td style="padding:0.55rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;">₹${(h.holding_value_cr || 0).toLocaleString()} Cr</td>
@@ -473,11 +484,11 @@
                         `;
                     }).join('');
                 } else {
-                    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#f87171;">Failed fetching fund details.</td></tr>';
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="padding:2rem;text-align:center;color:#f87171;">Failed fetching fund details.</td></tr>';
                 }
             } catch (e) {
                 console.error('Error inspecting fund:', e);
-                if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="padding:2rem;text-align:center;color:#f87171;">Error: ${e.message}</td></tr>`;
+                if (tbody) tbody.innerHTML = `<tr><td colspan="11" style="padding:2rem;text-align:center;color:#f87171;">Error: ${e.message}</td></tr>`;
             }
         },
 

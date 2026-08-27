@@ -249,13 +249,15 @@
                             <th style="padding:0.6rem 0.8rem;">TRACKED HOLDINGS</th>
                             <th style="padding:0.6rem 0.8rem;">BUYING ACTIONS</th>
                             <th style="padding:0.6rem 0.8rem;">SELLING ACTIONS</th>
+                            <th style="padding:0.6rem 0.8rem;">30D RETURN</th>
+                            <th style="padding:0.6rem 0.8rem;">1Y RETURN</th>
                             <th style="padding:0.6rem 0.8rem;">TRACKED VALUE (₹ CR)</th>
                             <th style="padding:0.6rem 0.8rem;text-align:center;">ACTIONS</th>
                         </tr>
                     </thead>
                     <tbody id="instFundsTableBody">
                         <tr>
-                            <td colspan="7" style="padding:2rem;text-align:center;color:#64748b;">
+                            <td colspan="9" style="padding:2rem;text-align:center;color:#64748b;">
                                 <div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Loading institutional directory...
                             </td>
                         </tr>
@@ -269,14 +271,14 @@
     <!-- INVESTOR PORTFOLIO MODAL (FULL HOLDINGS BREAKDOWN) -->
     <!-- ========================================================================= -->
     <div id="instFundModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(6px);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
-        <div class="card" style="background:#090d1a;border:1px solid rgba(56,189,248,0.4);border-radius:12px;width:100%;max-width:960px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 60px -15px rgba(0,0,0,0.9);">
+        <div class="card" style="background:#090d1a;border:1px solid rgba(56,189,248,0.4);border-radius:12px;width:100%;max-width:980px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 60px -15px rgba(0,0,0,0.9);">
             <div style="padding:1rem 1.25rem;border-bottom:1px solid rgba(255,255,255,0.08);background:#0f172a;display:flex;justify-content:space-between;align-items:center;">
                 <div>
                     <div id="instFundModalTitle" style="font-size:1.1rem;font-weight:800;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
                         <span>💼</span> Nippon India Small Cap Fund
                     </div>
                     <div id="instFundModalSubtitle" style="font-size:0.72rem;color:#94a3b8;margin-top:0.15rem;">
-                        Equity portfolio disclosures and quarterly allocations
+                        Equity portfolio disclosures, performance returns, and quarterly allocations
                     </div>
                 </div>
                 <button type="button" onclick="app.closeFundModal()" class="btn btn-secondary btn-sm" style="font-size:0.75rem;padding:0.25rem 0.6rem;">✕ Close</button>
@@ -287,10 +289,12 @@
                     <table style="width:100%;border-collapse:collapse;font-size:0.76rem;text-align:left;">
                         <thead>
                             <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:0.7rem;">
-                                <th style="padding:0.55rem 0.8rem;">TICKER</th>
+                                <th style="padding:0.55rem 0.8rem;">TICKER / COMPANY</th>
                                 <th style="padding:0.55rem 0.8rem;">QUARTER</th>
                                 <th style="padding:0.55rem 0.8rem;">ACTION</th>
                                 <th style="padding:0.55rem 0.8rem;">STAKE %</th>
+                                <th style="padding:0.55rem 0.8rem;">30D RET</th>
+                                <th style="padding:0.55rem 0.8rem;">1Y RET</th>
                                 <th style="padding:0.55rem 0.8rem;">AVG PRICE</th>
                                 <th style="padding:0.55rem 0.8rem;">RECENT BUY</th>
                                 <th style="padding:0.55rem 0.8rem;">HOLDING VALUE</th>
