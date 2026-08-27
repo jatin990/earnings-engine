@@ -1818,37 +1818,102 @@
                     const retClass = ret >= 0 ? 'price-positive' : 'price-negative';
                     const retSign = ret >= 0 ? '+' : '';
 
-                    const volMult = c.volume_multiple ? Number(c.volume_multiple).toFixed(1) : '—';
-                    const volColor = c.volume_multiple >= 3.0 ? '#f87171' : (c.volume_multiple >= 2.0 ? '#fbbf24' : '#34d399');
+                    // Price formatters
+                    const sigPrice = c.signal_price || c.current_price;
+                    const sigPriceStr = sigPrice ? '₹' + Number(sigPrice).toFixed(2) : '—';
+                    const curPriceStr = c.current_price ? '₹' + Number(c.current_price).toFixed(2) : '—';
+                    const triggerStr = c.trigger_level ? '₹' + Number(c.trigger_level).toFixed(2) : '—';
+                    const targetStr = c.target_price ? '₹' + Number(c.target_price).toFixed(2) : '—';
+                    const stopStr = c.stop_loss ? '₹' + Number(c.stop_loss).toFixed(2) : '—';
+
+                    // News Date and Published Time
+                    const newsDate = c.signal_date || (c.published_at ? c.published_at.substring(0, 10) : 'Today');
+                    const newsHeadline = c.headline || c.catalyst_summary || c.why_it_matches || 'Market Catalyst';
+
+                    // Severity Styling
+                    const sev = (c.severity || 'MEDIUM').toUpperCase();
+                    let sevBg = 'rgba(59,130,246,0.15)';
+                    let sevText = '#60a5fa';
+                    let sevBorder = 'rgba(59,130,246,0.3)';
+                    let sevLabel = '📈 MEDIUM';
+
+                    if (sev === 'HIGH') {
+                        sevBg = 'rgba(234,179,8,0.18)';
+                        sevText = '#fde68a';
+                        sevBorder = 'rgba(234,179,8,0.4)';
+                        sevLabel = '⚡ HIGH';
+                    } else if (sev === 'RISK' || c.category_id === 'risk_alerts') {
+                        sevBg = 'rgba(239,68,68,0.2)';
+                        sevText = '#f87171';
+                        sevBorder = 'rgba(239,68,68,0.5)';
+                        sevLabel = '⚠️ RISK';
+                    } else if (sev === 'LOW') {
+                        sevBg = 'rgba(148,163,184,0.12)';
+                        sevText = '#cbd5e1';
+                        sevBorder = 'rgba(148,163,184,0.25)';
+                        sevLabel = '⚖️ LOW';
+                    }
+
+                    // Outcome Badge Styling
+                    const outcomeBadge = c.outcome_badge || 'blue';
+                    const outcomeLabel = c.outcome_label || 'In Play ⏳';
+                    const badgeStyles = {
+                        emerald: 'background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.35);',
+                        amber: 'background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);',
+                        rose: 'background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.35);',
+                        blue: 'background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);',
+                    };
+                    const outcomeStyle = badgeStyles[outcomeBadge] || badgeStyles.blue;
 
                     const confScore = c.confidence_score || 75;
                     const confColor = confScore >= 85 ? '#34d399' : (confScore >= 70 ? '#38bdf8' : '#fbbf24');
 
-                    const triggerText = c.trigger_level ? '₹' + Number(c.trigger_level).toFixed(2) : '—';
-
                     return '<tr>' +
                         '<td style="text-align:center;color:var(--muted);font-weight:700;">' + rank + '</td>' +
-                        '<td>' +
+                        '<td style="padding:0.5rem 0.65rem;">' +
                             '<div><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="font-weight:700;font-size:0.85rem;color:var(--light);text-decoration:none;">' + (c.stock_name || c.ticker) + '</a></div>' +
-                            '<div style="font-size:0.72rem;color:var(--muted);"><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + c.ticker + '</a><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
+                            '<div style="font-size:0.72rem;color:var(--muted);margin-top:1px;"><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + c.ticker + '</a><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
                         '</td>' +
-                        '<td style="text-align:right;"><strong style="font-family:var(--font-mono);">₹' + (c.current_price ? Number(c.current_price).toFixed(2) : '—') + '</strong></td>' +
-                        '<td style="text-align:right;"><strong class="' + retClass + '" style="font-size:0.88rem;font-family:var(--font-mono);">' + retSign + ret.toFixed(2) + '%</strong></td>' +
-                        '<td style="text-align:center;"><strong style="color:' + volColor + ';font-family:var(--font-mono);">' + volMult + 'x</strong> <span style="font-size:0.68rem;color:var(--muted);">20D Avg</span></td>' +
-                        '<td style="text-align:right;"><strong style="color:#fbbf24;font-size:0.85rem;font-family:var(--font-mono);">' + triggerText + '</strong></td>' +
-                        '<td style="text-align:center;"><span style="color:' + confColor + ';font-weight:700;font-size:0.85rem;font-family:var(--font-mono);">' + confScore + '%</span></td>' +
-                        '<td style="text-align:center;"><span style="font-size:0.75rem;color:var(--muted);white-space:nowrap;">' + (c.expected_horizon || '1-3 Days') + '</span></td>' +
-                        '<td style="min-width:240px;max-width:380px;">' +
-                            (c.category_name ? '<div style="margin-bottom:0.2rem;"><span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#93c5fd;font-size:0.62rem;padding:0.08rem 0.35rem;border:1px solid rgba(59,130,246,0.3);border-radius:0.25rem;font-weight:600;">' + c.category_name + '</span></div>' : '') +
-                            '<div style="font-size:0.75rem;color:#cbd5e1;line-height:1.4;white-space:normal;word-break:break-word;">' + (c.why_it_matches || c.catalyst_summary || '') + '</div>' +
+                        '<td style="padding:0.5rem 0.65rem;max-width:340px;">' +
+                            '<div style="display:flex;align-items:center;gap:0.35rem;margin-bottom:0.2rem;">' +
+                                '<span style="font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);font-weight:600;">📅 ' + newsDate + '</span>' +
+                                (c.category_badge ? '<span class="signal-badge" style="background:rgba(59,130,246,0.12);color:#93c5fd;font-size:0.6rem;padding:0.04rem 0.3rem;border:1px solid rgba(59,130,246,0.25);border-radius:0.25rem;">' + c.category_badge + '</span>' : '') +
+                            '</div>' +
+                            '<div style="font-size:0.75rem;color:#f1f5f9;line-height:1.35;font-weight:500;white-space:normal;word-break:break-word;">' + newsHeadline + '</div>' +
+                            (c.why_it_matches && c.why_it_matches !== newsHeadline ? '<div style="font-size:0.68rem;color:#94a3b8;margin-top:0.2rem;line-height:1.3;">' + c.why_it_matches + '</div>' : '') +
                         '</td>' +
-                        '<td style="text-align:center;white-space:nowrap;min-width:120px;">' + this.renderConsensusBadge(c.ticker, 'ALL') + '</td>' +
-                        '<td style="text-align:center;white-space:nowrap;min-width:125px;">' +
+                        '<td style="text-align:right;padding:0.5rem 0.65rem;font-family:var(--font-mono);color:#93c5fd;font-size:0.76rem;white-space:nowrap;">' +
+                            '<div style="font-weight:700;">' + sigPriceStr + '</div>' +
+                            '<div style="font-size:0.62rem;color:#64748b;">Signal Base</div>' +
+                        '</td>' +
+                        '<td style="text-align:right;padding:0.5rem 0.65rem;font-family:var(--font-mono);font-size:0.76rem;white-space:nowrap;">' +
+                            '<div style="font-weight:800;color:#f8fafc;font-size:0.84rem;">' + curPriceStr + '</div>' +
+                            '<div style="font-size:0.62rem;color:#94a3b8;">Live Price</div>' +
+                        '</td>' +
+                        '<td style="text-align:right;padding:0.5rem 0.65rem;font-family:var(--font-mono);color:#fca5a5;font-size:0.76rem;white-space:nowrap;">' +
+                            '<div style="font-weight:600;">' + triggerStr + '</div>' +
+                            '<div style="font-size:0.62rem;color:#64748b;">Breakout Res</div>' +
+                        '</td>' +
+                        '<td style="text-align:right;padding:0.5rem 0.65rem;font-family:var(--font-mono);font-size:0.72rem;white-space:nowrap;">' +
+                            '<div style="color:#34d399;font-weight:700;" title="Target Price">T: ' + targetStr + '</div>' +
+                            '<div style="color:#f87171;font-weight:600;" title="Stop Loss">SL: ' + stopStr + '</div>' +
+                        '</td>' +
+                        '<td style="text-align:right;padding:0.5rem 0.65rem;font-family:var(--font-mono);white-space:nowrap;">' +
+                            '<strong class="' + retClass + '" style="font-size:0.84rem;">' + retSign + ret.toFixed(2) + '%</strong>' +
+                            (c.volume_multiple ? '<div style="font-size:0.62rem;color:#94a3b8;">Vol: ' + Number(c.volume_multiple).toFixed(1) + 'x</div>' : '') +
+                        '</td>' +
+                        '<td style="text-align:center;padding:0.5rem 0.65rem;white-space:nowrap;">' +
+                            '<span style="display:inline-block;font-size:0.68rem;font-weight:700;padding:0.12rem 0.45rem;border-radius:4px;' + outcomeStyle + '">' + outcomeLabel + '</span>' +
+                        '</td>' +
+                        '<td style="text-align:center;padding:0.5rem 0.65rem;white-space:nowrap;">' +
+                            '<div style="margin-bottom:0.15rem;"><span style="display:inline-block;background:' + sevBg + ';color:' + sevText + ';border:1px solid ' + sevBorder + ';font-size:0.62rem;font-weight:800;padding:0.08rem 0.35rem;border-radius:3px;font-family:var(--font-mono);">' + sevLabel + '</span></div>' +
+                            '<div style="font-size:0.72rem;color:' + confColor + ';font-weight:700;font-family:var(--font-mono);">' + confScore + '% Conviction</div>' +
+                        '</td>' +
+                        '<td style="text-align:center;padding:0.5rem 0.65rem;white-space:nowrap;">' +
                             '<div style="display:inline-flex;gap:0.3rem;justify-content:center;align-items:center;">' +
                                 '<button type="button" onclick="event.stopPropagation(); app.openAddToWatchlistModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐</button>' +
                                 '<button type="button" onclick="event.stopPropagation(); app.runConsensusForStock(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(99,102,241,0.2);color:#c7d2fe;border:1px solid rgba(99,102,241,0.4);border-radius:0.3rem;" title="Run AI Consensus">🧠</button>' +
                                 '<button type="button" onclick="event.stopPropagation(); app.showOhlcvBenchmarkModal(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="14D OHLCV Benchmark">📊</button>' +
-                                '<button type="button" onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + c.ticker + '\')" class="btn btn-sm" style="padding:0.2rem 0.4rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Forecast">🔮</button>' +
                             '</div>' +
                         '</td>' +
                     '</tr>';

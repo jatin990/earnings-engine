@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -141,11 +142,19 @@ def _connect_scanner_db(settings: Settings) -> sqlite3.Connection:
             category_badge TEXT,
             ticker TEXT NOT NULL,
             stock_name TEXT,
+            signal_date TEXT,
+            signal_price REAL,
             current_price REAL,
             return_pct REAL,
             volume_multiple REAL,
             trigger_level REAL,
+            target_price REAL,
+            stop_loss REAL,
             confidence_score INTEGER,
+            severity TEXT,
+            outcome TEXT,
+            outcome_label TEXT,
+            outcome_badge TEXT,
             expected_horizon TEXT,
             volatility_est TEXT,
             headline TEXT,
@@ -158,6 +167,25 @@ def _connect_scanner_db(settings: Settings) -> sqlite3.Connection:
         )
         """
     )
+    # Self-healing column additions for existing tables
+    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(scanner_candidates)").fetchall()}
+    col_defs = {
+        "signal_date": "TEXT",
+        "signal_price": "REAL",
+        "target_price": "REAL",
+        "stop_loss": "REAL",
+        "severity": "TEXT",
+        "outcome": "TEXT",
+        "outcome_label": "TEXT",
+        "outcome_badge": "TEXT",
+    }
+    for col, col_type in col_defs.items():
+        if col not in existing_cols:
+            try:
+                conn.execute(f"ALTER TABLE scanner_candidates ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass
+
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_scanner_univ_cat ON scanner_candidates(universe, category_id)"
     )
@@ -198,7 +226,7 @@ def _compute_category_candidates_live(
     limit: int = 50,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Internal calculation engine for a specific category (called by background sweep)."""
+    """Internal calculation engine for a specific category with quantitative target, SL, and severity."""
     settings = settings or Settings()
     cat_id = category_id.lower().strip()
     cat_meta = SCANNER_CATEGORIES.get(cat_id)
@@ -207,6 +235,7 @@ def _compute_category_candidates_live(
 
     tickers = _resolve_universe_tickers(universe_or_watchlist, settings)
     candidates: list[dict[str, Any]] = []
+    today_str = pd.Timestamp.now().strftime("%Y-%m-%d")
 
     # 1. Fundamental News Categories
     if cat_meta["type"] in ("FUNDAMENTAL_CATALYST", "RISK_WARNING"):
@@ -234,11 +263,79 @@ def _compute_category_candidates_live(
             telem = compute_stock_daily_telemetry(t, df) if not df.empty and len(df) >= 2 else None
 
             curr_price = telem["close"] if telem else 0.0
-            ret_pct = telem["return_pct"] if telem else 0.0
             vol_mult = telem["volume_multiple"] if telem else 1.5
+            impact_score = item.get("impact_score", 75)
 
-            trigger_price = round(curr_price * 1.02, 2) if curr_price > 0 else 0.0
-            confidence = item.get("impact_score", 75)
+            # Extract date of news
+            raw_pub = item.get("published_at") or today_str
+            signal_date = raw_pub[:10] if len(raw_pub) >= 10 else today_str
+
+            # Determine signal price at news publication
+            signal_price = curr_price
+            if telem and telem.get("prev_close") and curr_price > 0:
+                signal_price = telem["prev_close"] if signal_date < today_str else curr_price
+
+            # News Severity Classification
+            if cat_id == "risk_alerts" or item.get("direction") == "BEARISH":
+                severity = "RISK"
+                severity_label = "⚠️ HIGH RISK"
+            elif impact_score >= 80:
+                severity = "HIGH"
+                severity_label = "⚡ HIGH IMPACT"
+            elif impact_score >= 55:
+                severity = "MEDIUM"
+                severity_label = "📈 MEDIUM"
+            else:
+                severity = "LOW"
+                severity_label = "⚖️ LOW / NORMAL"
+
+            # Compute Target Price and Stop Loss based on severity & category
+            if severity == "HIGH":
+                target_upside = 0.08 + (impact_score - 80) * 0.003
+                target_price = round(signal_price * (1 + target_upside), 2) if signal_price > 0 else 0.0
+                trigger_price = round(signal_price * 1.018, 2) if signal_price > 0 else 0.0
+                stop_loss = round(signal_price * 0.965, 2) if signal_price > 0 else 0.0
+            elif severity == "MEDIUM":
+                target_upside = 0.045 + (impact_score - 55) * 0.001
+                target_price = round(signal_price * (1 + target_upside), 2) if signal_price > 0 else 0.0
+                trigger_price = round(signal_price * 1.015, 2) if signal_price > 0 else 0.0
+                stop_loss = round(signal_price * 0.97, 2) if signal_price > 0 else 0.0
+            elif severity == "RISK":
+                target_price = round(signal_price * 0.92, 2) if signal_price > 0 else 0.0
+                trigger_price = round(signal_price * 0.985, 2) if signal_price > 0 else 0.0
+                stop_loss = round(signal_price * 1.03, 2) if signal_price > 0 else 0.0
+            else:
+                target_price = round(signal_price * 1.03, 2) if signal_price > 0 else 0.0
+                trigger_price = round(signal_price * 1.01, 2) if signal_price > 0 else 0.0
+                stop_loss = round(signal_price * 0.975, 2) if signal_price > 0 else 0.0
+
+            # Realized return from signal
+            if signal_price > 0:
+                ret_pct = round(((curr_price - signal_price) / signal_price) * 100, 2)
+            else:
+                ret_pct = telem["return_pct"] if telem else 0.0
+
+            # Compute Outcome Status
+            if cat_id == "risk_alerts":
+                outcome = "RISK_ALERT"
+                outcome_label = "Risk Alert ⚠️"
+                outcome_badge = "rose"
+            elif target_price > 0 and curr_price >= target_price:
+                outcome = "TARGET_HIT"
+                outcome_label = "Target Hit 🎯"
+                outcome_badge = "emerald"
+            elif trigger_price > 0 and curr_price >= trigger_price:
+                outcome = "TRIGGERED"
+                outcome_label = "Triggered ⚡"
+                outcome_badge = "amber"
+            elif stop_loss > 0 and curr_price <= stop_loss and severity != "RISK":
+                outcome = "STOP_HIT"
+                outcome_label = "Stop Hit 🛑"
+                outcome_badge = "rose"
+            else:
+                outcome = "ACTIVE"
+                outcome_label = "In Play ⏳"
+                outcome_badge = "blue"
 
             candidates.append({
                 "universe": universe_or_watchlist,
@@ -247,11 +344,19 @@ def _compute_category_candidates_live(
                 "category_badge": cat_meta["badge"],
                 "ticker": t,
                 "stock_name": item.get("stock_name") or get_name(t, settings) or t,
+                "signal_date": signal_date,
+                "signal_price": signal_price,
                 "current_price": curr_price,
                 "return_pct": ret_pct,
                 "volume_multiple": vol_mult,
                 "trigger_level": trigger_price,
-                "confidence_score": confidence,
+                "target_price": target_price,
+                "stop_loss": stop_loss,
+                "confidence_score": impact_score,
+                "severity": severity,
+                "outcome": outcome,
+                "outcome_label": outcome_label,
+                "outcome_badge": outcome_badge,
                 "expected_horizon": item.get("expected_horizon", cat_meta["target_horizon"]),
                 "volatility_est": item.get("volatility_est", "±4% to ±8%"),
                 "headline": item.get("title", ""),
@@ -278,9 +383,20 @@ def _compute_category_candidates_live(
                 vol_mult = telem["volume_multiple"]
                 ret = telem["return_pct"]
                 close = telem["close"]
+                signal_date = telem.get("date") or today_str
+                signal_price = close
 
                 if cat_id == "squeeze_coils" and c_range <= 6.5:
                     trigger = round(close * 1.025, 2)
+                    target = round(close * (1 + max(0.06, c_range * 1.5 / 100)), 2)
+                    stop = round(close * 0.965, 2)
+                    conf = min(95, int(82 + (6.5 - c_range) * 2))
+                    sev = "HIGH" if conf >= 88 else "MEDIUM"
+                    
+                    outcome = "TARGET_HIT" if close >= target else ("TRIGGERED" if close >= trigger else ("STOP_HIT" if close <= stop else "ACTIVE"))
+                    outcome_label = "Target Hit 🎯" if outcome == "TARGET_HIT" else ("Triggered ⚡" if outcome == "TRIGGERED" else ("Stop Hit 🛑" if outcome == "STOP_HIT" else "In Play ⏳"))
+                    outcome_badge = "emerald" if outcome == "TARGET_HIT" else ("amber" if outcome == "TRIGGERED" else ("rose" if outcome == "STOP_HIT" else "blue"))
+
                     candidates.append({
                         "universe": universe_or_watchlist,
                         "category_id": cat_id,
@@ -288,11 +404,19 @@ def _compute_category_candidates_live(
                         "category_badge": cat_meta["badge"],
                         "ticker": t,
                         "stock_name": name,
+                        "signal_date": signal_date,
+                        "signal_price": signal_price,
                         "current_price": close,
                         "return_pct": ret,
                         "volume_multiple": vol_mult,
                         "trigger_level": trigger,
-                        "confidence_score": min(95, int(82 + (6.5 - c_range) * 2)),
+                        "target_price": target,
+                        "stop_loss": stop,
+                        "confidence_score": conf,
+                        "severity": sev,
+                        "outcome": outcome,
+                        "outcome_label": outcome_label,
+                        "outcome_badge": outcome_badge,
                         "expected_horizon": "⚡ 1-3 Days",
                         "volatility_est": "±5% to ±10%",
                         "catalyst_summary": f"Coiling tightly within a {c_range}% 14-day price band with compression.",
@@ -301,6 +425,15 @@ def _compute_category_candidates_live(
 
                 elif cat_id == "blue_sky_52w" and (telem["is_52w_high"] or -3.0 <= dist_52w <= 0.0):
                     trigger = telem["high_52w"]
+                    target = round(trigger * 1.08, 2)
+                    stop = round(close * 0.965, 2)
+                    conf = min(96, int(85 + (vol_mult * 2)))
+                    sev = "HIGH"
+
+                    outcome = "TARGET_HIT" if close >= target else ("TRIGGERED" if close >= trigger else ("STOP_HIT" if close <= stop else "ACTIVE"))
+                    outcome_label = "Target Hit 🎯" if outcome == "TARGET_HIT" else ("Triggered ⚡" if outcome == "TRIGGERED" else ("Stop Hit 🛑" if outcome == "STOP_HIT" else "In Play ⏳"))
+                    outcome_badge = "emerald" if outcome == "TARGET_HIT" else ("amber" if outcome == "TRIGGERED" else ("rose" if outcome == "STOP_HIT" else "blue"))
+
                     candidates.append({
                         "universe": universe_or_watchlist,
                         "category_id": cat_id,
@@ -308,11 +441,19 @@ def _compute_category_candidates_live(
                         "category_badge": cat_meta["badge"],
                         "ticker": t,
                         "stock_name": name,
+                        "signal_date": signal_date,
+                        "signal_price": signal_price,
                         "current_price": close,
                         "return_pct": ret,
                         "volume_multiple": vol_mult,
                         "trigger_level": trigger,
-                        "confidence_score": min(96, int(85 + (vol_mult * 2))),
+                        "target_price": target,
+                        "stop_loss": stop,
+                        "confidence_score": conf,
+                        "severity": sev,
+                        "outcome": outcome,
+                        "outcome_label": outcome_label,
+                        "outcome_badge": outcome_badge,
                         "expected_horizon": "📅 3-7 Days",
                         "volatility_est": "±4% to ±9%",
                         "catalyst_summary": f"Trading within {abs(dist_52w)}% of 52-week high (₹{trigger}).",
@@ -321,6 +462,15 @@ def _compute_category_candidates_live(
 
                 elif cat_id == "sector_waves" and (ret >= 4.0 or vol_mult >= 2.5):
                     trigger = round(close * 1.02, 2)
+                    target = round(close * 1.075, 2)
+                    stop = round(close * 0.965, 2)
+                    conf = min(92, int(75 + ret))
+                    sev = "MEDIUM" if conf < 85 else "HIGH"
+
+                    outcome = "TARGET_HIT" if close >= target else ("TRIGGERED" if close >= trigger else ("STOP_HIT" if close <= stop else "ACTIVE"))
+                    outcome_label = "Target Hit 🎯" if outcome == "TARGET_HIT" else ("Triggered ⚡" if outcome == "TRIGGERED" else ("Stop Hit 🛑" if outcome == "STOP_HIT" else "In Play ⏳"))
+                    outcome_badge = "emerald" if outcome == "TARGET_HIT" else ("amber" if outcome == "TRIGGERED" else ("rose" if outcome == "STOP_HIT" else "blue"))
+
                     candidates.append({
                         "universe": universe_or_watchlist,
                         "category_id": cat_id,
@@ -328,11 +478,19 @@ def _compute_category_candidates_live(
                         "category_badge": cat_meta["badge"],
                         "ticker": t,
                         "stock_name": name,
+                        "signal_date": signal_date,
+                        "signal_price": signal_price,
                         "current_price": close,
                         "return_pct": ret,
                         "volume_multiple": vol_mult,
                         "trigger_level": trigger,
-                        "confidence_score": min(92, int(75 + ret)),
+                        "target_price": target,
+                        "stop_loss": stop,
+                        "confidence_score": conf,
+                        "severity": sev,
+                        "outcome": outcome,
+                        "outcome_label": outcome_label,
+                        "outcome_badge": outcome_badge,
                         "expected_horizon": "📅 2-5 Days",
                         "volatility_est": "±4% to ±8%",
                         "catalyst_summary": f"Moving +{ret}% on strong {vol_mult}x volume surge with institutional accumulation.",
@@ -341,6 +499,15 @@ def _compute_category_candidates_live(
 
                 elif cat_id == "oversold_reversals" and (ret > 0 and c_range >= 9.0 and dist_52w <= -10.0):
                     trigger = round(close * 1.015, 2)
+                    target = round(close * 1.055, 2)
+                    stop = round(close * 0.965, 2)
+                    conf = 78
+                    sev = "MEDIUM"
+
+                    outcome = "TARGET_HIT" if close >= target else ("TRIGGERED" if close >= trigger else ("STOP_HIT" if close <= stop else "ACTIVE"))
+                    outcome_label = "Target Hit 🎯" if outcome == "TARGET_HIT" else ("Triggered ⚡" if outcome == "TRIGGERED" else ("Stop Hit 🛑" if outcome == "STOP_HIT" else "In Play ⏳"))
+                    outcome_badge = "emerald" if outcome == "TARGET_HIT" else ("amber" if outcome == "TRIGGERED" else ("rose" if outcome == "STOP_HIT" else "blue"))
+
                     candidates.append({
                         "universe": universe_or_watchlist,
                         "category_id": cat_id,
@@ -348,11 +515,19 @@ def _compute_category_candidates_live(
                         "category_badge": cat_meta["badge"],
                         "ticker": t,
                         "stock_name": name,
+                        "signal_date": signal_date,
+                        "signal_price": signal_price,
                         "current_price": close,
                         "return_pct": ret,
                         "volume_multiple": vol_mult,
                         "trigger_level": trigger,
-                        "confidence_score": 78,
+                        "target_price": target,
+                        "stop_loss": stop,
+                        "confidence_score": conf,
+                        "severity": sev,
+                        "outcome": outcome,
+                        "outcome_label": outcome_label,
+                        "outcome_badge": outcome_badge,
                         "expected_horizon": "📅 3-5 Days",
                         "volatility_est": "±4% to ±7%",
                         "catalyst_summary": f"Pullback of {abs(dist_52w)}% from 52W highs showing initial bounce +{ret}%.",
@@ -399,19 +574,27 @@ def compute_and_save_scanner_universe(
                     """
                     INSERT INTO scanner_candidates (
                         universe, category_id, category_name, category_badge, ticker, stock_name,
-                        current_price, return_pct, volume_multiple, trigger_level,
-                        confidence_score, expected_horizon, volatility_est, headline,
-                        catalyst_summary, why_it_matches, published_at, link, scanned_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        signal_date, signal_price, current_price, return_pct, volume_multiple, trigger_level,
+                        target_price, stop_loss, confidence_score, severity, outcome, outcome_label, outcome_badge,
+                        expected_horizon, volatility_est, headline, catalyst_summary, why_it_matches, published_at, link, scanned_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(universe, category_id, ticker) DO UPDATE SET
                         category_name = excluded.category_name,
                         category_badge = excluded.category_badge,
                         stock_name = excluded.stock_name,
+                        signal_date = excluded.signal_date,
+                        signal_price = excluded.signal_price,
                         current_price = excluded.current_price,
                         return_pct = excluded.return_pct,
                         volume_multiple = excluded.volume_multiple,
                         trigger_level = excluded.trigger_level,
+                        target_price = excluded.target_price,
+                        stop_loss = excluded.stop_loss,
                         confidence_score = excluded.confidence_score,
+                        severity = excluded.severity,
+                        outcome = excluded.outcome,
+                        outcome_label = excluded.outcome_label,
+                        outcome_badge = excluded.outcome_badge,
                         expected_horizon = excluded.expected_horizon,
                         volatility_est = excluded.volatility_est,
                         headline = excluded.headline,
@@ -428,11 +611,19 @@ def compute_and_save_scanner_universe(
                         c.get("category_badge"),
                         c.get("ticker"),
                         c.get("stock_name"),
+                        c.get("signal_date"),
+                        c.get("signal_price"),
                         c.get("current_price"),
                         c.get("return_pct"),
                         c.get("volume_multiple"),
                         c.get("trigger_level"),
+                        c.get("target_price"),
+                        c.get("stop_loss"),
                         c.get("confidence_score"),
+                        c.get("severity"),
+                        c.get("outcome"),
+                        c.get("outcome_label"),
+                        c.get("outcome_badge"),
                         c.get("expected_horizon"),
                         c.get("volatility_est"),
                         c.get("headline"),
@@ -450,10 +641,73 @@ def compute_and_save_scanner_universe(
         universe_or_watchlist,
     )
     return {
-        "status": "success",
+        "success": True,
         "universe": universe_or_watchlist,
         "total_saved": len(all_candidates),
         "scanned_at": now_iso,
+    }
+
+
+def scheduled_category_scanner_job(
+    universes: list[str] | None = None,
+    limit_per_category: int = 15,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Execute scheduled sweep across primary universes and record execution in automation_schedules."""
+    settings = settings or Settings()
+    t_start = time.perf_counter()
+    now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
+    target_universes = universes or ["NSE_TOP", "NSE_LARGE_CAP", "US_TOP"]
+    total_candidates = 0
+    results = []
+
+    for u in target_universes:
+        try:
+            res = compute_and_save_scanner_universe(u, limit_per_category=limit_per_category, settings=settings)
+            total_candidates += (res or {}).get("total_saved", 0)
+            results.append(res)
+        except Exception as e:
+            logger.warning("[SCANNER-SCHEDULE] Error sweeping universe %s: %s", u, e)
+
+
+    duration = round(time.perf_counter() - t_start, 2)
+    next_iso = (now_dt + timedelta(seconds=1800)).isoformat()
+
+    # Update automation_schedules
+    try:
+        with _connect(settings) as conn:
+            conn.execute(
+                """
+                UPDATE automation_schedules
+                SET last_run_at = ?,
+                    next_run_at = ?,
+                    status = 'active',
+                    last_duration_s = ?,
+                    total_runs = total_runs + 1,
+                    last_summary = ?,
+                    updated_at = ?
+                WHERE job_id = 'category_scanner_sweep'
+                """,
+                (
+                    now_iso,
+                    next_iso,
+                    duration,
+                    f"Swept {total_candidates} setups across {len(universes)} universes based on news severity & technical targets.",
+                    now_iso,
+                ),
+            )
+            conn.commit()
+    except Exception as e:
+        logger.debug("[SCANNER-SCHEDULE] Could not update automation_schedules: %s", e)
+
+    return {
+        "job_id": "category_scanner_sweep",
+        "status": "success",
+        "total_candidates": total_candidates,
+        "results": results,
+        "duration_seconds": round(duration, 2),
+        "timestamp": now_iso,
     }
 
 
@@ -469,9 +723,9 @@ def scan_category(
 
     columns = [
         "category_id", "category_name", "category_badge", "ticker", "stock_name",
-        "current_price", "return_pct", "volume_multiple", "trigger_level",
-        "confidence_score", "expected_horizon", "volatility_est", "headline",
-        "catalyst_summary", "why_it_matches", "published_at", "link", "scanned_at"
+        "signal_date", "signal_price", "current_price", "return_pct", "volume_multiple", "trigger_level",
+        "target_price", "stop_loss", "confidence_score", "severity", "outcome", "outcome_label", "outcome_badge",
+        "expected_horizon", "volatility_est", "headline", "catalyst_summary", "why_it_matches", "published_at", "link", "scanned_at"
     ]
     col_str = ", ".join(columns)
 

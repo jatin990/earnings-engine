@@ -107,3 +107,27 @@ def test_scanner_api_endpoints():
     sweep_data = res_sweep.json()
     assert sweep_data["success"] is True
     assert "total_candidates_found" in sweep_data
+
+
+def test_scheduled_category_scanner_job_and_fields():
+    """Verify scheduled_category_scanner_job executes and populates breakout-style fields."""
+    from earnings_engine.data.category_scanner import scheduled_category_scanner_job, scan_category
+
+    # Run scheduled sweep
+    res = scheduled_category_scanner_job(universes=["NSE_TOP"], limit_per_category=5)
+    assert res["status"] == "success"
+    assert "total_candidates" in res
+
+    # Check candidates for presence of breakout fields
+    candidates = scan_category("squeeze_coils", universe_or_watchlist="NSE_TOP", limit=5)
+    if candidates:
+        cand = candidates[0]
+        assert "signal_date" in cand
+        assert "signal_price" in cand
+        assert "target_price" in cand
+        assert "stop_loss" in cand
+        assert "severity" in cand
+        assert "outcome" in cand
+        assert "outcome_label" in cand
+        assert "outcome_badge" in cand
+
