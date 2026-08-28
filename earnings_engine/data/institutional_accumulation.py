@@ -26,6 +26,16 @@ CORE_BENCHMARK_UNIVERSE: list[str] = [
 ]
 
 
+def init_institutional_db(settings: Settings | None = None) -> None:
+    """Ensure institutional database tables and schema migrations are applied."""
+    settings = settings or Settings()
+    try:
+        from earnings_engine.data.migrations import apply_migrations
+        apply_migrations(settings)
+    except Exception as e:
+        logger.debug("[INSTITUTIONAL] DB init migrations warning: %s", e)
+
+
 def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]:
     """Retrieve live corporate ownership breakdown from yfinance and local SQLite cache."""
     promoter_pct: float | None = None
