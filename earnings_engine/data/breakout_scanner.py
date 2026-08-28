@@ -1309,6 +1309,42 @@ def score_breakout(
         days_elapsed = 0
         post_high = signal_price
 
+    # One-liner narrative explaining what happened post-signal
+    if outcome == "TARGET_HIT":
+        one_liner = f"🎯 Target Hit: Reached peak ₹{post_high:,.2f} (+{max_gain_pct}%) in {days_elapsed}d; crossed trigger ₹{breakout_trigger:,.2f} with strong follow-through."
+    elif outcome == "BREAKOUT_SUCCEEDED":
+        one_liner = f"🚀 Breakout Succeeded: Breached trigger ₹{breakout_trigger:,.2f}, hit peak ₹{post_high:,.2f} (+{max_gain_pct}%), currently holding gains at ₹{current_price:,.2f} ({realized_return_pct:+.1f}%)."
+    elif outcome == "BREAKOUT_RETRACED":
+        one_liner = f"⚠️ Breakout Retraced: Triggered breakout to peak ₹{post_high:,.2f} (+{max_gain_pct}%) but retraced to ₹{current_price:,.2f} ({realized_return_pct:+.1f}%) on profit taking."
+    elif outcome == "STOP_LOSS_HIT":
+        one_liner = f"🛑 Stop Hit: Breached trigger but slipped below SL ₹{stop_loss:,.2f} ({realized_return_pct:+.1f}%) after hitting peak ₹{post_high:,.2f}."
+    elif outcome == "SETUP_FAILED":
+        one_liner = f"❌ Setup Failed: Never crossed breakout trigger ₹{breakout_trigger:,.2f}; broke below SL ₹{stop_loss:,.2f} ({realized_return_pct:+.1f}%)."
+    elif outcome == "COILING_IN_PROFIT":
+        one_liner = f"🟢 Coiling Green: Trading above signal price at ₹{current_price:,.2f} ({realized_return_pct:+.1f}%), awaiting trigger breach at ₹{breakout_trigger:,.2f}."
+    elif outcome == "COILING_IN_RANGE":
+        one_liner = f"🗜️ Coiling In Range: Consolidating near ₹{current_price:,.2f} ({realized_return_pct:+.1f}%), holding above SL ₹{stop_loss:,.2f}."
+    else:
+        one_liner = f"⏳ Active Setup: Monitoring for resistance breach at ₹{breakout_trigger:,.2f} with SL at ₹{stop_loss:,.2f}."
+
+    # Anti-Fakeout & Volume Confirmation Parameters
+    vol_expansion_str = f"{vol_ratio:.1f}x Vol" if (vol_ratio is not None and not np.isnan(vol_ratio)) else "1.0x Vol"
+    is_vol_confirmed = bool(vol_ratio is not None and vol_ratio >= 1.5)
+    is_fakeout_risk = bool(vol_ratio is not None and vol_ratio < 1.3 and (breakout_fired or (pct_from_high is not None and pct_from_high >= -1.0)))
+
+    if is_vol_confirmed and res_score >= 25:
+        confirmation_badge = f"⭐ High-Conviction Vol ({vol_expansion_str})"
+        confirmation_color = "#34d399"
+    elif is_fakeout_risk:
+        confirmation_badge = f"⚠️ Low Vol Warning ({vol_expansion_str})"
+        confirmation_color = "#fbbf24"
+    elif vol_ratio is not None and vol_ratio >= 1.2:
+        confirmation_badge = f"🔊 {vol_expansion_str} Expansion"
+        confirmation_color = "#38bdf8"
+    else:
+        confirmation_badge = f"📊 Normal Vol ({vol_expansion_str})"
+        confirmation_color = "#94a3b8"
+
     # Mathematical Calculation & Reasoning Notes
     res_note = (
         f"Price ₹{signal_price:,.2f} is {pct_from_high:+.1f}% from 52W/recent high of ₹{resistance_high:,.2f} (awarding {res_score:.1f}/30 pts for proximity)"
@@ -1383,6 +1419,9 @@ def score_breakout(
         "institutional_flow": inst_flow,
         "current_price": round(current_price, 2),
         "current_date": current_date,
+        "post_high": round(post_high, 2) if post_high is not None else round(signal_price, 2),
+        "peak_price": round(post_high, 2) if post_high is not None else round(signal_price, 2),
+        "peak_gain_pct": max_gain_pct,
         "realized_return_pct": realized_return_pct,
         "max_gain_pct": max_gain_pct,
         "breakout_happened": breakout_happened,
@@ -1390,6 +1429,13 @@ def score_breakout(
         "outcome": outcome,
         "outcome_label": outcome_label,
         "outcome_badge": outcome_badge,
+        "explanation_one_liner": one_liner,
+        "what_happened_summary": one_liner,
+        "confirmation_badge": confirmation_badge,
+        "confirmation_color": confirmation_color,
+        "vol_expansion_str": vol_expansion_str,
+        "is_fakeout_risk": is_fakeout_risk,
+        "is_vol_confirmed": is_vol_confirmed,
         "days_elapsed": days_elapsed,
         "composite_score": composite,
         "resistance_score": res_score,

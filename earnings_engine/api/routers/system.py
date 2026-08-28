@@ -81,16 +81,30 @@ async def get_sidebar_badges_endpoint():
             except Exception:
                 pass
 
-        # 2. Breakout Radar active candidates count (hot + warm setups)
+        # 2. Breakout Radar active / breached candidates count (hot + warm + breached setups)
         bo_count = 0
         try:
             from earnings_engine.data import breakout_scanner as breakout_scanner_mod
-            candidates = breakout_scanner_mod.get_cached_scan_results(settings=_settings)
+            candidates = breakout_scanner_mod.get_cached_scan_results(universe="all", settings=_settings)
             if candidates:
-                # Count hot and warm setups with composite score >= 35
-                bo_count = sum(1 for c in candidates if (c.get("composite_score") or 0) >= 35.0)
-        except Exception:
-            pass
+                # Count hot and warm setups with composite score >= 35 or breached setups
+                bo_count = sum(1 for c in candidates if (c.get("composite_score") or 0) >= 35.0 or c.get("is_breaking_out") or c.get("breakout_fired"))
+            
+            # Also check permanently tracked active/triggered breakouts
+            try:
+                row_tracked = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM breakout_tracked_signals
+                    WHERE outcome IN ('ACTIVE', 'TRIGGERED', 'TARGET_HIT', 'BREAKOUT_SUCCEEDED', 'COILING_IN_PROFIT')
+                      OR breakout_happened = 1
+                    """
+                ).fetchone()
+                if row_tracked and int(row_tracked[0]) > 0:
+                    bo_count = max(bo_count, int(row_tracked[0]))
+            except Exception:
+                pass
+        except Exception as e:
+            logger.debug("[SIDEBAR-BADGES] Error calculating breakout badge count: %s", e)
 
         return {
             "success": True,

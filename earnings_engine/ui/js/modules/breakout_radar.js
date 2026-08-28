@@ -393,7 +393,7 @@
             const tbody = document.getElementById('breakoutTableBody');
             if (badge && !silent) badge.style.display = 'inline-block';
 
-            const universe = document.getElementById('breakoutUniverseSelect')?.value || 'nifty_50';
+            const universe = document.getElementById('breakoutUniverseSelect')?.value || 'all';
             const sortBy = document.getElementById('breakoutSortBy')?.value || 'composite_score';
             const minScore = document.getElementById('breakoutMinScore')?.value || 35;
             const asofDate = app._breakoutAsofDate || document.getElementById('breakoutDateInput')?.value || null;
@@ -543,7 +543,7 @@
         const BREAKOUT_COLUMNS = {
             stock: {
                 id: 'stock',
-                label: 'Stock',
+                label: 'Stock & Quality',
                 sortKey: 'ticker',
                 align: 'left',
                 headerStyle: 'color:#94a3b8;',
@@ -553,7 +553,15 @@
                             <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:nowrap;">
                                 <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="font-weight:800;color:#ffffff;font-family:var(--font-mono);font-size:0.82rem;text-decoration:none;letter-spacing:-0.01em;" title="Open ${ctx.ticker} stock intelligence in new tab" onmouseenter="this.style.color='#38bdf8'" onmouseleave="this.style.color='#ffffff'">${ctx.ticker}</a>
                                 <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-size:0.7rem;opacity:0.8;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
-                                ${ctx.isBreakingOut ? '<span style="font-size:0.58rem;background:rgba(239,68,68,0.25);color:#f87171;border:1px solid rgba(239,68,68,0.5);padding:0.02rem 0.35rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;"><span class="fire-flame-icon">🔥</span> FIRED</span>' : ''}
+                                ${c.confirmation_badge ? `
+                                    <span style="font-size:0.58rem;background:rgba(255,255,255,0.05);color:${c.confirmation_color || '#38bdf8'};border:1px solid ${c.confirmation_color || '#38bdf8'}40;padding:0.04rem 0.35rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Volume expansion and fakeout protection indicator">
+                                        ${c.confirmation_badge}
+                                    </span>
+                                ` : (ctx.isBreakingOut ? `
+                                    <span style="font-size:0.58rem;background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.04rem 0.35rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Price crossed above resistance trigger">
+                                        🚀 Resistance Breached
+                                    </span>
+                                ` : '')}
                             </div>
                             <div style="font-size:0.67rem;color:#94a3b8;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.company_name || ctx.ticker}">${ctx.company}</div>
                             <div style="margin-top:0.1rem;display:flex;gap:0.25rem;flex-wrap:wrap;align-items:center;">
@@ -628,28 +636,49 @@
             },
             return: {
                 id: 'return',
-                label: 'Return %',
+                label: 'Return & Peak',
                 sortKey: 'realized_return_pct',
                 align: 'right',
                 headerStyle: 'color:#34d399;',
-                render: (c, ctx) => `
+                render: (c, ctx) => {
+                    const peakP = c.post_high != null ? c.post_high : (c.peak_price != null ? c.peak_price : null);
+                    const peakGain = c.max_gain_pct != null ? c.max_gain_pct : (c.peak_gain_pct != null ? c.peak_gain_pct : null);
+                    const peakStr = peakP != null
+                        ? `₹${Number(peakP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}`
+                        : '—';
+                    return `
                     <td style="padding:0.46rem 0.65rem;text-align:right;font-size:0.75rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
                         ${ctx.retStr}
-                        ${c.max_gain_pct != null ? `<div style="font-size:0.60rem;color:#94a3b8;font-family:var(--font-mono);margin-top:2px;" title="Peak high price reached post-signal">Peak: <span style="color:#34d399;font-weight:700;">+${c.max_gain_pct}%</span> ${c.post_high != null ? '<span style="color:#64748b;">(₹' + Number(c.post_high).toLocaleString('en-IN', {maximumFractionDigits:2}) + ')</span>' : ''}</div>` : ''}
+                        ${peakGain != null ? `
+                            <div style="font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);margin-top:2px;" title="Peak price reached after breakout signal">
+                                Peak: <span style="color:#34d399;font-weight:800;">+${peakGain}%</span> <span style="color:#cbd5e1;">(${peakStr})</span>
+                            </div>
+                        ` : ''}
                     </td>
-                `
+                    `;
+                }
             },
             outcome: {
                 id: 'outcome',
-                label: 'Breakout Outcome',
+                label: 'Outcome & Summary',
                 sortKey: null,
-                align: 'center',
+                align: 'left',
                 headerStyle: 'color:#fbbf24;',
-                render: (c, ctx) => `
-                    <td style="padding:0.46rem 0.65rem;text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
-                        ${ctx.outcomeBadgeHtml(c)}
+                render: (c, ctx) => {
+                    const expl = c.what_happened_summary || c.explanation_one_liner;
+                    return `
+                    <td style="padding:0.46rem 0.65rem;border-right:1px solid rgba(255,255,255,0.03);min-width:190px;">
+                        <div style="display:flex;align-items:center;gap:0.35rem;">
+                            ${ctx.outcomeBadgeHtml(c)}
+                        </div>
+                        ${expl ? `
+                            <div style="font-size:0.63rem;color:#cbd5e1;line-height:1.25;margin-top:0.25rem;max-width:270px;" title="${expl}">
+                                ${expl}
+                            </div>
+                        ` : ''}
                     </td>
-                `
+                    `;
+                }
             },
             score: {
                 id: 'score',
