@@ -15790,6 +15790,7 @@
         if (window.schedulesModule || window.SchedulesModule) Object.assign(app, window.schedulesModule || window.SchedulesModule);
         if (window.newAdditionsModule) Object.assign(app, window.newAdditionsModule);
         if (window.catalystsModule) Object.assign(app, window.catalystsModule);
+        if (window.premarketModule || window.PremarketModule) Object.assign(app, window.premarketModule || window.PremarketModule);
         if (window.consensusModule) Object.assign(app, window.consensusModule);
         if (window.swingModule) Object.assign(app, window.swingModule);
 

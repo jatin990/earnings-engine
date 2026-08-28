@@ -317,6 +317,7 @@
 
     // Export module
     window.PremarketModule = premarketModule;
+    window.premarketModule = premarketModule;
     if (window.app) {
         Object.assign(window.app, premarketModule);
     }
