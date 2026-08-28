@@ -1,0 +1,124 @@
+{% import 'dashboard/_components.html' as comps %}
+        <div id="tab-swing" class="tab-content" style="width: 100%; max-width: 100%;">
+            
+            <!-- ⚡ Top Metric KPI Cards with Soft Under-Glow -->
+            <div id="swingSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Monitored Universe</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Active Setups</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><span id="count-all">0</span> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Tickers</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Cycle Oscillators & Ranges</div>
+                </div>
+
+                <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">In Buy Zone</span>
+                        <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Support Bounce</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);"><span id="count-buyzone">0</span> <span style="font-size:0.85rem;color:#6ee7b7;font-weight:500;">Setups</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Near Horizontal Channel Floor</div>
+                </div>
+
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Strong Buy (High Quality)</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Grade A+</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);"><span id="count-strongbuy">0</span> <span style="font-size:0.85rem;color:#93c5fd;font-weight:500;">Stocks</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">High Beat Rate + Buy Zone</div>
+                </div>
+
+                <div class="card card-glow-amber" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#fbbf24;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Custom Ranges</span>
+                        <span class="signal-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;font-size:0.62rem;">User Locked</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#fbbf24;font-family:var(--font-heading);"><span id="count-custom">0</span> <span style="font-size:0.85rem;color:#fde68a;font-weight:500;">Custom</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Protected Trading Channels</div>
+                </div>
+            </div>
+
+            <!-- 📊 Main Swing Trading Section -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+                
+                <!-- Header & Action Controls Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
+                            <span>🔄 Swing Trading & Cycle Oscillators</span>
+                            <span id="swingCountBadge" class="signal-badge" style="font-size:0.68rem;display:none;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.3);padding:0.12rem 0.45rem;"></span>
+                        </h3>
+                        <p class="timestamp" style="margin:0.15rem 0 0 0;font-size:0.72rem;color:var(--text-muted);">Horizontal trading bands, multi-cycle support floors, and real-time buy zone detection across universes.</p>
+                    </div>
+
+                    <!-- Right Controls -->
+                    <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                        {{ comps.market_dropdown('swingMarket', 'ALL', 'app.onGlobalWatchlistChange(this.value); app.loadSwing();') }}
+                        <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" title="Load and refresh swing setups">🔄 Refresh Setups</button>
+                        <button type="button" onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-sm" title="Compute Kronos AI predictions for all stocks in the selected watchlist">🔮 Predict All</button>
+                        <button type="button" onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-sm" title="Run Multi-Modal AI News & Synthesis">🧠 AI Thesis</button>
+                        <button type="button" onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-sm" title="Run 4-Model AI Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral)">🤖 Consensus</button>
+                    </div>
+                </div>
+
+                <!-- 🛠️ Operations Toolbar: Filter Pills, Search, View Switcher -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.45rem;">
+                    
+                    <!-- Filter Pills -->
+                    <div id="swingFilterPills" style="display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center;">
+                        <button type="button" onclick="app.filterSwing('all')" id="swingFilter-all" class="btn btn-primary btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;font-weight:700;">🌐 All (<span id="count-all-pill">0</span>)</button>
+                        <button type="button" onclick="app.filterSwing('buyzone')" id="swingFilter-buyzone" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#34d399;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);">🟢 In Buy Zone (<span id="count-buyzone-pill">0</span>)</button>
+                        <button type="button" onclick="app.filterSwing('strongbuy')" id="swingFilter-strongbuy" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#38bdf8;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);">⭐ Strong Buy (<span id="count-strongbuy-pill">0</span>)</button>
+                        <button type="button" onclick="app.filterSwing('custom')" id="swingFilter-custom" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#38bdf8;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);">🔒 Custom (<span id="count-custom-pill">0</span>)</button>
+                    </div>
+
+                    <!-- Search & View Toggle -->
+                    <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                        <input type="text" id="swingSearchInput" oninput="app.filterSwingTable(this.value)" placeholder="🔍 Search symbol, zone, signal..." style="width: 190px; padding: 0.25rem 0.5rem; background: #030305; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.35rem; color: #ffffff; font-size: 0.72rem; font-family: var(--font-mono); outline: none;">
+                        <div style="display: flex; align-items: center; background: #030305; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.35rem; padding: 1px;">
+                            <button type="button" onclick="app.setSwingView('table')" id="swingViewBtn-table" class="btn-micro" style="background:rgba(255,255,255,0.12);color:#ffffff;font-size:0.65rem;" title="Table View">📋 Table</button>
+                            <button type="button" onclick="app.setSwingView('cards')" id="swingViewBtn-cards" class="btn-micro" style="background:transparent;color:#71717a;font-size:0.65rem;" title="Cards View">🎴 Cards</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table View Container -->
+                <div id="swingTableContainer" class="table-wrapper" style="margin-top: 0;">
+                    <table class="results-table" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th onclick="app.sortSwing('ticker')" style="cursor:pointer;">Ticker ⇅</th>
+                                <th onclick="app.sortSwing('current_price')" style="cursor:pointer;">Live Price ⇅</th>
+                                <th onclick="app.sortSwing('swing_signal')" style="cursor:pointer;">Signal / Zone ⇅</th>
+                                <th onclick="app.sortSwing('current_support')" style="cursor:pointer;">Support (Buy) ⇅</th>
+                                <th onclick="app.sortSwing('next_resistance')" style="cursor:pointer;">Resistance (Sell) ⇅</th>
+                                <th>Trading Band / Spread</th>
+                                <th>Dist. to Support</th>
+                                <th onclick="app.sortSwing('thirty_day_return_pct')" style="cursor:pointer;">30D Return ⇅</th>
+                                <th onclick="app.sortSwing('prev_quarter_earnings_score')" style="cursor:pointer;">Quality ⇅</th>
+                                <th onclick="app.sortSwing('kronos_return')" style="cursor:pointer;">Kronos Trend ⇅</th>
+                                <th onclick="app.sortSwing('ai_sentiment')" style="cursor:pointer;">AI Synthesis ⇅</th>
+                                <th onclick="app.sortSwing('consensus_strength')" style="cursor:pointer;" title="DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model AI Consensus">🤖 AI Consensus ⇅</th>
+                                <th onclick="app.sortSwing('earnings_date')" style="cursor:pointer;">Next Earnings ⇅</th>
+                                <th style="text-align:right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="swingTableBody">
+                            <tr>
+                                <td colspan="14" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);">
+                                    <div style="font-size:2rem;margin-bottom:0.5rem;">🔄</div>
+                                    <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;">Swing Trading Matrix Ready</h4>
+                                    <p style="font-size:0.8rem;margin:0 0 1rem 0;color:var(--text-muted);">Select your universe above and click <strong>Load Setups</strong> to scan trading bands and buy zones.</p>
+                                    <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Load Swing Setups</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Cards View Container (hidden by default) -->
+                <div id="swingWidgets" class="widget-grid" style="display:none;margin-top:0.75rem;"></div>
+            </section>
+        </div>

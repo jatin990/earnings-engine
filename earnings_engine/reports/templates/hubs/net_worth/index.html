@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Net Worth & Asset Allocation // Nexus Wealth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-heading: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+
+            --bg-base: #f8fafc;
+            --card-surface: #ffffff;
+            --border-soft: #e2e8f0;
+            --border-highlight: #cbd5e1;
+            
+            --emerald: #059669;
+            --emerald-light: #d1fae5;
+            --indigo: #4f46e5;
+            --indigo-light: #e0e7ff;
+            --sky: #0284c7;
+            --sky-light: #e0f2fe;
+            --amber: #d97706;
+            --amber-light: #fef3c7;
+            --purple: #7c3aed;
+            --purple-light: #ede9fe;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-base);
+            color: #1e293b;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(5, 150, 105, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(79, 70, 229, 0.04) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(217, 119, 6, 0.03) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        .heading-title {
+            font-family: var(--font-heading);
+        }
+
+        .font-mono-code {
+            font-family: var(--font-mono);
+        }
+
+        .soft-card {
+            background: #ffffff;
+            border: 1px solid var(--border-soft);
+            box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .soft-card:hover {
+            box-shadow: 0 10px 25px -3px rgba(15, 23, 42, 0.07), 0 4px 10px -2px rgba(15, 23, 42, 0.03);
+            border-color: var(--border-highlight);
+        }
+
+        /* Universal Sticky Table Headers */
+        table thead th,
+        table th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 10 !important;
+            background: #f8fafc !important;
+            box-shadow: 0 1px 0 #e2e8f0;
+        }
+
+        .hero-wealth-card {
+            background: linear-gradient(135deg, #064e3b 0%, #065f46 45%, #0f172a 100%);
+            border-radius: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            color: #ffffff;
+            box-shadow: 0 20px 30px -10px rgba(5, 150, 105, 0.25);
+        }
+
+        .hero-wealth-card::before {
+            content: '';
+            position: absolute;
+            top: 0; right: 0; bottom: 0; left: 0;
+            background: radial-gradient(circle at top right, rgba(255,255,255,0.12), transparent 70%);
+            pointer-events: none;
+        }
+
+        .modal-overlay {
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-8">
+
+        <!-- Header Nav -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+            <div class="flex items-center gap-4">
+                <a href="/portal" class="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:border-slate-300 transition shadow-sm" title="Back to Nexus Portal">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke_linecap="round" stroke_linejoin="round" stroke_width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">🏛️</span>
+                        <h1 class="heading-title text-2xl font-black tracking-tight text-slate-900">NET WORTH & WEALTH ALLOCATION</h1>
+                        <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider bg-emerald-100 text-emerald-700 border border-emerald-200">Nexus Wealth</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium mt-0.5">High-level net worth bands, multi-asset allocation distribution, and compound growth trajectory</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div id="userBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="userNameLabel">Loading access...</span>
+                </div>
+
+                <button type="button" id="updateSnapshotBtn" onclick="openUpdateSnapshotModal()" class="hidden items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm shadow-emerald-500/20">
+                    <span>+ Update Snapshot</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Hero Net Worth Band Showcase -->
+        <div class="hero-wealth-card p-6 md:p-8 space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <span class="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[11px] font-bold tracking-wider uppercase text-emerald-100">Private Wealth Tier</span>
+                        <span id="growthBadge" class="px-3 py-1 bg-emerald-400 text-emerald-950 rounded-full text-[11px] font-bold tracking-wider uppercase shadow-sm">+24.8% YoY 📈</span>
+                    </div>
+                    <h2 id="heroNetWorthBand" class="heading-title text-3xl md:text-5xl font-black tracking-tight text-white mt-1">₹1.5Cr – ₹2.5Cr Band</h2>
+                    <p class="text-xs text-emerald-100/90 font-medium flex items-center gap-2">
+                        <span>🔒 High-level aggregated portfolio valuation</span>
+                        <span>•</span>
+                        <span id="heroLastUpdated">Updated August 2026</span>
+                    </p>
+                </div>
+
+                <div class="flex flex-col items-start md:items-end gap-2">
+                    <div class="bg-white/10 backdrop-blur-md px-4 py-3 rounded-xl border border-white/15 text-left md:text-right">
+                        <span class="text-[10px] text-emerald-200 uppercase font-bold tracking-wider block">Portfolio Health</span>
+                        <span class="text-sm font-bold text-white">Zero Debt • Defensive Yield</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visual Multi-Asset Allocation Progress Bar -->
+            <div class="space-y-2">
+                <div class="flex items-center justify-between text-xs font-bold text-emerald-200">
+                    <span>Asset Class Proportions</span>
+                    <span id="totalAllocationCheck">100% Allocated</span>
+                </div>
+                <div id="allocationBar" class="h-4 w-full bg-white/10 rounded-full overflow-hidden flex p-0.5 border border-white/20 gap-0.5">
+                    <!-- Dynamic segments -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Asset Allocation Cards Breakdown -->
+        <section class="space-y-4">
+            <div>
+                <h2 class="heading-title text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <span>📊 Multi-Asset Class Breakdown</span>
+                </h2>
+                <p class="text-xs text-slate-500">Diversified distribution across equities, global markets, liquid reserves, and hard assets</p>
+            </div>
+
+            <div id="assetCardsGrid" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <!-- Populated via JS -->
+            </div>
+        </section>
+
+        <!-- Historical Trajectory & YoY Growth Milestones -->
+        <section class="soft-card p-6 rounded-2xl space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="heading-title text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <span>📈 Net Worth Progression & History</span>
+                    </h2>
+                    <p class="text-xs text-slate-500">Historical quarterly valuation snapshots and YoY compounded growth</p>
+                </div>
+            </div>
+
+            <div id="historyTableContainer" class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-slate-700">
+                    <thead class="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                        <tr>
+                            <th class="py-3 px-4">As of Date</th>
+                            <th class="py-3 px-4">Valuation Band</th>
+                            <th class="py-3 px-4">YoY Growth Rate</th>
+                            <th class="py-3 px-4">Primary Driver</th>
+                            <th class="py-3 px-4 text-right">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody" class="divide-y divide-slate-100">
+                        <!-- Populated via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Financial Independence & Freedom Simulator -->
+        <section class="soft-card p-6 rounded-2xl space-y-6">
+            <div>
+                <h2 class="heading-title text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <span>🎯 Financial Independence (FIRE) Compass</span>
+                </h2>
+                <p class="text-xs text-slate-500">Compound interest projection & passive withdrawal sustainability calculator</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                            <span>Monthly Surplus / SIP</span>
+                            <span id="sipVal" class="text-emerald-600 font-mono">₹1,50,000</span>
+                        </div>
+                        <input type="range" id="sipSlider" min="25000" max="500000" step="25000" value="150000" oninput="calculateFire()" class="w-full accent-emerald-600">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                            <span>Expected Annual Return</span>
+                            <span id="returnVal" class="text-emerald-600 font-mono">14% CAGR</span>
+                        </div>
+                        <input type="range" id="returnSlider" min="8" max="22" step="1" value="14" oninput="calculateFire()" class="w-full accent-emerald-600">
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-1">
+                    <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider block">Target Corpus in 5 Years</span>
+                    <div id="targetCorpus5yr" class="heading-title text-2xl font-black text-slate-900">₹4.8 Cr</div>
+                    <span class="text-[11px] text-emerald-600 font-semibold">At current compounding pace</span>
+                </div>
+
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-1">
+                    <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider block">Safe Annual Withdrawal (4%)</span>
+                    <div id="swrAmount" class="heading-title text-2xl font-black text-indigo-600">₹19.2 L / yr</div>
+                    <span class="text-[11px] text-slate-500 font-semibold">Passive perpetual cashflow</span>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ================= MODAL: UPDATE NET WORTH (Owner) ================= -->
+    <div id="updateSnapshotModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-white border border-slate-200 w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🏛️</span>
+                    <h3 class="heading-title text-base font-bold text-slate-900">Record Net Worth Snapshot</h3>
+                </div>
+                <button type="button" onclick="closeUpdateSnapshotModal()" class="text-slate-400 hover:text-slate-700 font-bold p-1">✕</button>
+            </div>
+
+            <form id="updateSnapshotForm" onsubmit="submitNewSnapshot(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">As-of Date</label>
+                        <input type="date" id="snapDate" required class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">YoY Growth (%)</label>
+                        <input type="number" step="0.1" id="snapGrowth" value="24.8" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Valuation Band Label</label>
+                    <input type="text" id="snapBand" required placeholder="e.g. ₹2.0Cr – ₹3.0Cr Band" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="space-y-2 pt-2 border-t border-slate-100">
+                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Asset Allocation Percentages (%)</label>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <span class="text-slate-500">Indian Equities</span>
+                            <input type="number" id="allocEquities" value="58" class="w-full bg-slate-50 border border-slate-300 px-2 py-1.5 rounded-lg text-xs font-semibold">
+                        </div>
+                        <div>
+                            <span class="text-slate-500">US Tech / Global</span>
+                            <input type="number" id="allocUsTech" value="18" class="w-full bg-slate-50 border border-slate-300 px-2 py-1.5 rounded-lg text-xs font-semibold">
+                        </div>
+                        <div>
+                            <span class="text-slate-500">Debt & Liquid</span>
+                            <input type="number" id="allocDebt" value="14" class="w-full bg-slate-50 border border-slate-300 px-2 py-1.5 rounded-lg text-xs font-semibold">
+                        </div>
+                        <div>
+                            <span class="text-slate-500">Gold & SGBs</span>
+                            <input type="number" id="allocGold" value="7" class="w-full bg-slate-50 border border-slate-300 px-2 py-1.5 rounded-lg text-xs font-semibold">
+                        </div>
+                        <div class="col-span-2">
+                            <span class="text-slate-500">Crypto / Sandbox</span>
+                            <input type="number" id="allocCrypto" value="3" class="w-full bg-slate-50 border border-slate-300 px-2 py-1.5 rounded-lg text-xs font-semibold">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                    <button type="button" onclick="closeUpdateSnapshotModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md">Save Snapshot</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JS Logic -->
+    <script>
+        let currentSnapshot = null;
+        let historySnapshots = [];
+        let isOwner = false;
+
+        const ASSET_THEMES = {
+            "Indian Equities": { color: "bg-emerald-500", light: "bg-emerald-50 border-emerald-200 text-emerald-800", icon: "📈", desc: "Large & Mid-cap leaders, alpha momentum" },
+            "US Tech": { color: "bg-indigo-500", light: "bg-indigo-50 border-indigo-200 text-indigo-800", icon: "🌐", desc: "Mag7, Cloud, Semiconductor pioneers" },
+            "Debt & Liquid Funds": { color: "bg-sky-500", light: "bg-sky-50 border-sky-200 text-sky-800", icon: "🛡️", desc: "Arbitrage, Liquid yield, emergency reserves" },
+            "Gold & Sovereign Bonds": { color: "bg-amber-500", light: "bg-amber-50 border-amber-200 text-amber-800", icon: "🪙", desc: "Physical bullion & RBI Sovereign Gold Bonds" },
+            "Crypto & Sandbox": { color: "bg-purple-500", light: "bg-purple-50 border-purple-200 text-purple-800", icon: "⚡", desc: "Bitcoin, Ethereum, asymmetric experimental" }
+        };
+
+        async function fetchNetWorthData() {
+            try {
+                const res = await fetch('/api/v1/net-worth');
+                if (!res.ok) throw new Error('Failed loading net worth snapshot');
+                const data = await res.json();
+                currentSnapshot = data.snapshot;
+                isOwner = Boolean(data.is_owner);
+
+                // Update UI badges
+                const userBadge = document.getElementById('userNameLabel');
+                const updateBtn = document.getElementById('updateSnapshotBtn');
+                if (isOwner) {
+                    userBadge.textContent = 'Vault Owner (Full Admin)';
+                    userBadge.className = 'text-emerald-700 font-bold';
+                    updateBtn.classList.remove('hidden');
+                    updateBtn.classList.add('flex');
+                } else {
+                    userBadge.textContent = 'Friend Access (Safe Band View)';
+                    userBadge.className = 'text-sky-700 font-bold';
+                }
+
+                renderHeroBand();
+                fetchHistory();
+                calculateFire();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function fetchHistory() {
+            try {
+                const res = await fetch('/api/v1/net-worth/history');
+                if (res.ok) {
+                    const data = await res.json();
+                    historySnapshots = data.history || [];
+                    renderHistoryTable();
+                }
+            } catch (e) {}
+        }
+
+        function renderHeroBand() {
+            if (!currentSnapshot) return;
+            document.getElementById('heroNetWorthBand').textContent = currentSnapshot.total_net_worth_band || '₹1.5Cr – ₹2.5Cr Band';
+            if (currentSnapshot.yoy_growth_pct) {
+                document.getElementById('growthBadge').textContent = `+${currentSnapshot.yoy_growth_pct}% YoY 📈`;
+            }
+            document.getElementById('heroLastUpdated').textContent = `As of ${currentSnapshot.as_of_date || 'August 2026'}`;
+
+            const alloc = currentSnapshot.allocation_pct || {
+                "Indian Equities": 58,
+                "US Tech": 18,
+                "Debt & Liquid Funds": 14,
+                "Gold & Sovereign Bonds": 7,
+                "Crypto & Sandbox": 3
+            };
+
+            // Allocation Bar
+            const bar = document.getElementById('allocationBar');
+            bar.innerHTML = Object.entries(alloc).map(([key, val]) => {
+                const meta = ASSET_THEMES[key] || { color: "bg-slate-400" };
+                return `<div style="width: ${val}%" class="${meta.color} h-full rounded-sm" title="${key}: ${val}%"></div>`;
+            }).join('');
+
+            // Asset Cards Grid
+            const grid = document.getElementById('assetCardsGrid');
+            grid.innerHTML = Object.entries(alloc).map(([key, val]) => {
+                const meta = ASSET_THEMES[key] || { color: "bg-slate-500", light: "bg-slate-50 border-slate-200 text-slate-800", icon: "💼", desc: "Asset class" };
+                return `
+                    <div class="soft-card p-4 rounded-2xl space-y-2 border">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xl">${meta.icon}</span>
+                            <span class="heading-title text-xl font-black text-slate-900">${val}%</span>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-bold text-slate-900">${key}</h3>
+                            <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">${meta.desc}</p>
+                        </div>
+                        <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-2">
+                            <div class="${meta.color} h-full" style="width: ${val}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderHistoryTable() {
+            const tbody = document.getElementById('historyTableBody');
+            if (!historySnapshots.length) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">No previous snapshots recorded.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = historySnapshots.slice().reverse().map(s => `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="py-3 px-4 font-mono font-semibold text-slate-900">${s.as_of_date}</td>
+                    <td class="py-3 px-4 font-bold text-emerald-700">${s.total_net_worth_band}</td>
+                    <td class="py-3 px-4 font-semibold text-emerald-600">+${s.yoy_growth_pct || 0}%</td>
+                    <td class="py-3 px-4 text-slate-500 text-[11px]">Equities & Capital Compounding</td>
+                    <td class="py-3 px-4 text-right">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Verified</span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function calculateFire() {
+            const sip = parseFloat(document.getElementById('sipSlider').value);
+            const rate = parseFloat(document.getElementById('returnSlider').value) / 100;
+
+            document.getElementById('sipVal').textContent = '₹' + sip.toLocaleString('en-IN');
+            document.getElementById('returnVal').textContent = `${(rate * 100).toFixed(0)}% CAGR`;
+
+            // Future value of current band approx + 5yr SIP
+            const baseCorpus = 20000000; // 2 Cr baseline
+            const monthlyRate = rate / 12;
+            const months = 60;
+
+            let fvSip = 0;
+            for (let i = 1; i <= months; i++) {
+                fvSip += sip * Math.pow(1 + monthlyRate, months - i + 1);
+            }
+            const fvBase = baseCorpus * Math.pow(1 + rate, 5);
+            const totalCorpus = fvBase + fvSip;
+
+            const corpusCr = (totalCorpus / 10000000).toFixed(1);
+            document.getElementById('targetCorpus5yr').textContent = `₹${corpusCr} Cr`;
+
+            const swr = (totalCorpus * 0.04) / 100000;
+            document.getElementById('swrAmount').textContent = `₹${swr.toFixed(1)} L / yr`;
+        }
+
+        // Modals
+        function openUpdateSnapshotModal() {
+            document.getElementById('snapDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('updateSnapshotModal').style.display = 'flex';
+        }
+        function closeUpdateSnapshotModal() {
+            document.getElementById('updateSnapshotModal').style.display = 'none';
+        }
+
+        async function submitNewSnapshot(e) {
+            e.preventDefault();
+            const payload = {
+                as_of_date: document.getElementById('snapDate').value,
+                total_net_worth_band: document.getElementById('snapBand').value,
+                yoy_growth_pct: parseFloat(document.getElementById('snapGrowth').value || 0),
+                allocation_pct: {
+                    "Indian Equities": parseFloat(document.getElementById('allocEquities').value || 0),
+                    "US Tech": parseFloat(document.getElementById('allocUsTech').value || 0),
+                    "Debt & Liquid Funds": parseFloat(document.getElementById('allocDebt').value || 0),
+                    "Gold & Sovereign Bonds": parseFloat(document.getElementById('allocGold').value || 0),
+                    "Crypto & Sandbox": parseFloat(document.getElementById('allocCrypto').value || 0)
+                }
+            };
+
+            try {
+                const res = await fetch('/api/v1/net-worth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error((await res.json()).detail || 'Failed updating snapshot');
+                closeUpdateSnapshotModal();
+                fetchNetWorthData();
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchNetWorthData();
+        });
+    </script>
+</body>
+</html>

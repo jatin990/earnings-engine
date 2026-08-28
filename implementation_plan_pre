@@ -1,0 +1,379 @@
+# Dashboard Modularization & HTML Template Reorganization
+
+## Background
+
+`dashboard.js` has grown to **16,104 lines / 1.04 MB** containing **137 `app.*` functions** across 20+ distinct feature domains. The dashboard `templates/` folder mixes standalone hub pages (`credit_card.html`, `trips.html`, `portal.html`, `net_worth.html`, `stock_detail.html`) with the dashboard partial system (`dashboard/` subdirectory). We need to:
+
+1. Split `dashboard.js` into feature-scoped modules loaded as `<script>` tags.
+2. Reorganize the HTML templates into a clear, hub-oriented folder hierarchy.
+3. Extract reusable modal/component partials shared across hubs.
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Module Loading Strategy**: The current architecture injects all functions onto a **global `app` object** (no ES module `import/export`). The modularization strategy here **preserves that pattern** — each module file appends its functions to `window.app` via `app.xxx = function(){}` style, so no HTML `type="module"` or bundler is needed. This is the safe, zero-risk path.
+
+> [!IMPORTANT]
+> **`_body_footer.html` contains both modal HTML and `<script>` includes.** As part of reorganization, the 609-line `_body_footer.html` will be split into:
+> - `_modals.html` — all floating modals (swing range, stock rating, audit, watchlist, stock note, breakout notes)
+> - `_stock_modal.html` — the full-screen stock intelligence iframe modal
+> - `_script_tags.html` — the `<script src="...">` block only
+
+---
+
+## Part 1: `dashboard.js` Split — Module Map
+
+Current `dashboard.js` sections (by line range) map to new module files:
+
+| Current Lines | Section / Domain | New Module File |
+|---|---|---|
+| 1 – 1695 | `app` object core: `watchlistTab`, consensus modal, search autocomplete | `modules/watchlist.js` (EXISTING — augment) |
+| 1696 – 1970 | Active Multi-Category Stock Scanner Hub | **`modules/scanner.js`** [NEW] |
+| 1971 – 2537 | Short-Term Catalysts & High-Impact News | `modules/catalysts.js` (EXISTING) |
+| 2538 – 3659 | Top Gainers, "Why It Rose" & Pattern Discovery | **`modules/gainers.js`** [NEW] |
+| 3660 – 3886 | Ticker On-Demand Recalculate & Audit Trail | **`modules/recalculate.js`** [NEW] |
+| 3887 – 5267 | Month Filter & Earnings Calendar | **`modules/month_filter.js`** [NEW] |
+| 5268 – 6729 | Multi-Model AI Consensus Engine & Post-Mortems | `modules/consensus.js` (EXISTING — augment) |
+| 6730 – 7377 | Swing Range Modal Controller | **`modules/swing_range.js`** [NEW] |
+| 7378 – 7471 | Data Coverage Tab | **`modules/coverage.js`** [NEW] |
+| 7472 – 7588 | Industries Tab | **`modules/industries.js`** [NEW] |
+| 7589 – 7788 | Buy-the-Dip Tab | **`modules/buy_dip.js`** [NEW] |
+| 7789 – 7968 | Patterns Tab | **`modules/patterns.js`** [NEW] |
+| 7969 – 8240 | Playground Tab (API Console) | **`modules/playground.js`** [NEW] |
+| 8241 – 8531 | Backtest Tab | **`modules/backtest.js`** [NEW] |
+| 8532 – 9033 | AI Consensus stock modal inner logic | merge into `modules/consensus.js` |
+| 9034 – 10040 | Dashboard Control Center, Themes & .ENV Manager | **`modules/customizer.js`** [NEW] |
+| 10041 – 10340 | Stock Rating & Diff Modal | **`modules/stock_rating.js`** [NEW] |
+| 10341 – 10600 | Add-to-Watchlist / Playlist Selector Modal | **`modules/watchlist_modal.js`** [NEW] |
+| 10601 – 11430 | Catalyst AI Consensus Intelligence Modal | **`modules/catalyst_consensus.js`** [NEW] |
+| 11431 – 11811 | Comprehensive Page Guide & Tab Architecture | **`modules/page_guide.js`** [NEW] |
+| 11812 – 13930 | Breakout Radar + Tracked Breakouts History | **`modules/breakout.js`** [NEW] |
+| 13931 – 14382 | Quarter Repeaters & AI Forward Radar | **`modules/repeaters.js`** [NEW] |
+| 14383 – 15025 | Universal Stock Intelligence & Deep Dive Note Engine | **`modules/stock_note.js`** [NEW] |
+| 15026 – 15680 | Automation Schedules & Background Job Monitor | `modules/schedules.js` (EXISTING) |
+| 15681 – 15852 | Full-Screen Stock Intelligence Modal Controller | **`modules/stock_modal.js`** [NEW] |
+| 15853 – 15930 | Global Ticker Price Refresh Engine | **`modules/price_refresh.js`** [NEW] |
+| 15931 – 16104 | Downstream & AI API Call Tracker | **`modules/playground.js`** (merge) |
+
+### Resulting Module File Tree (final target)
+
+```
+earnings_engine/ui/js/
+├── app_core.js               # RENAMED from dashboard.js (lines 1-1695 only)
+├── autocomplete.js           # EXISTING — keep
+├── charts.js                 # EXISTING — keep
+├── strategy_auditor.js       # EXISTING — keep
+└── modules/
+    ├── market_pulse.js       # EXISTING
+    ├── institutional.js      # EXISTING
+    ├── schedules.js          # EXISTING (automation only)
+    ├── new_additions.js      # EXISTING
+    ├── catalysts.js          # EXISTING
+    ├── premarket.js          # EXISTING
+    ├── consensus.js          # EXISTING — augmented
+    ├── swing.js              # EXISTING
+    ├── scanner.js            # NEW
+    ├── gainers.js            # NEW
+    ├── recalculate.js        # NEW
+    ├── month_filter.js       # NEW
+    ├── swing_range.js        # NEW
+    ├── coverage.js           # NEW
+    ├── industries.js         # NEW
+    ├── buy_dip.js            # NEW
+    ├── patterns.js           # NEW
+    ├── playground.js         # NEW
+    ├── backtest.js           # NEW
+    ├── customizer.js         # NEW
+    ├── stock_rating.js       # NEW
+    ├── watchlist_modal.js    # NEW
+    ├── catalyst_consensus.js # NEW
+    ├── page_guide.js         # NEW
+    ├── breakout.js           # NEW
+    ├── repeaters.js          # NEW
+    ├── stock_note.js         # NEW
+    ├── stock_modal.js        # NEW
+    ├── price_refresh.js      # NEW
+    └── sidebar_badges.js     # NEW
+```
+
+---
+
+## Part 2: HTML Template Reorganization
+
+### Current Structure (flat):
+```
+templates/
+├── credit_card.html          # 67KB standalone hub
+├── dashboard/                # 27 partial files
+├── dashboard.html            # 1.6KB entry point
+├── net_worth.html            # 28KB standalone hub
+├── portal.html               # 59KB auth portal
+├── stock_detail.html         # 211KB stock hub
+├── trips.html                # 93KB standalone hub
+└── [other small files]
+```
+
+### Target Structure (organized):
+```
+templates/
+├── hubs/
+│   ├── dashboard/            # MOVED from templates/dashboard/
+│   │   ├── _head.html
+│   │   ├── _sidebar.html
+│   │   ├── _body_header.html
+│   │   ├── _modals.html      # NEW — split from _body_footer.html (lines 1-530)
+│   │   ├── _stock_modal.html # NEW — split from _body_footer.html (lines 530-598)
+│   │   ├── _script_tags.html # NEW — split from _body_footer.html (lines 599-609)
+│   │   ├── _results.html
+│   │   ├── _market_pulse.html
+│   │   ├── _monthfilter.html
+│   │   ├── _category_scanner.html
+│   │   ├── _catalysts.html
+│   │   ├── _premarket.html
+│   │   ├── _gainers_patterns.html
+│   │   ├── _breakout.html
+│   │   ├── _institutional.html
+│   │   ├── _new_additions.html
+│   │   ├── _repeaters.html
+│   │   ├── _swing.html
+│   │   ├── _kronos.html
+│   │   ├── _consensus.html
+│   │   ├── _coverage.html
+│   │   ├── _industries.html
+│   │   ├── _patterns.html
+│   │   ├── _buydip.html
+│   │   ├── _backtest.html
+│   │   ├── _playground.html
+│   │   ├── _watchlist.html
+│   │   └── _customizer_modal.html
+│   ├── credit_cards/
+│   │   └── index.html        # MOVED from credit_card.html
+│   ├── net_worth/
+│   │   └── index.html        # MOVED from net_worth.html
+│   ├── trips/
+│   │   └── index.html        # MOVED from trips.html
+│   ├── stock/
+│   │   └── detail.html       # MOVED from stock_detail.html
+│   └── portal/
+│       └── index.html        # MOVED from portal.html
+│
+├── components/               # NEW — reusable cross-hub snippets
+│   ├── _modal_base.html
+│   ├── _kpi_card.html
+│   └── _empty_state.html
+│
+├── shared/
+│   └── _scripts_common.html  # CDN script includes (Chart.js etc.)
+│
+├── dashboard.html            # UPDATED entry point
+├── earnings_report_page.html # Keep as-is
+├── predictions_page.html     # Keep as-is
+├── result_row.html           # Keep as-is
+├── card.html                 # Keep as-is
+└── popup.html                # Keep as-is
+```
+
+### `_body_footer.html` Split:
+- **`_modals.html`** (lines 1–530): `#swingRangeModal`, `#stockRatingModal`, `#tickerAuditModal`, `#addToWatchlistModal`, `#breakoutNotesModal`, `#dashboardLocalModelModal`, `#dashboardRawModal`, `#stockNoteDrawer`
+- **`_stock_modal.html`** (lines ~530–598): `#stockModal` full-screen iframe
+- **`_script_tags.html`** (lines ~599–609): all `<script src>` tags
+
+---
+
+## Part 3: Jinja2 / FastAPI Route Updates
+
+Update all `TemplateResponse(...)` calls in [`api/server.py`](file:///d:/earnings-engine/earnings_engine/api/server.py):
+
+| Old path | New path |
+|---|---|
+| `credit_card.html` | `hubs/credit_cards/index.html` |
+| `net_worth.html` | `hubs/net_worth/index.html` |
+| `trips.html` | `hubs/trips/index.html` |
+| `stock_detail.html` | `hubs/stock/detail.html` |
+| `portal.html` | `hubs/portal/index.html` |
+| `dashboard/_*.html` | `hubs/dashboard/_*.html` |
+
+Also update `dashboard.html` includes: `{% include 'dashboard/...' %}` → `{% include 'hubs/dashboard/...' %}`
+
+---
+
+## Key Implementation Rules
+
+1. **Module file header** (every new module must start with this):
+```javascript
+// =========================================================================
+// [Module Name] — Nexus Dashboard Module
+// Extracted from dashboard.js — modularization 2026-08-28
+// =========================================================================
+(function() {
+    const API_BASE = window.API_BASE || window.location.origin;
+    const app = window.app;
+    if (!app) { console.error('[MODULE] window.app not initialized'); return; }
+```
+
+2. **Module file footer**:
+```javascript
+})(); // end IIFE
+```
+
+3. **No function renames** — all `app.functionName` must stay identical to avoid breaking HTML inline handlers.
+
+4. **`BREAKOUT_COLUMNS` and `DEFAULT_BREAKOUT_COLS`** are local consts in `dashboard.js`. When extracting `modules/breakout.js`, move them to module-scope (inside the IIFE, before any functions that reference them).
+
+5. **After each extraction from `dashboard.js`** replace the extracted block with:
+```javascript
+// [section name] → extracted to modules/xxx.js
+```
+
+6. **Cache busting**: Update `?v=` on all script tags to `20260828_v22_modular`.
+
+---
+
+## Final Script Load Order (`_script_tags.html`)
+
+```html
+<!-- Foundation (no app deps) -->
+<script src="/static/js/autocomplete.js?v=20260828_v22_modular"></script>
+<script src="/static/js/charts.js?v=20260828_v22_modular"></script>
+
+<!-- Core app object (must be first — defines window.app) -->
+<script src="/static/js/app_core.js?v=20260828_v22_modular"></script>
+
+<!-- Independent tab/feature modules -->
+<script src="/static/js/modules/market_pulse.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/institutional.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/new_additions.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/catalysts.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/premarket.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/swing.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/price_refresh.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/coverage.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/industries.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/buy_dip.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/patterns.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/backtest.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/scanner.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/gainers.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/month_filter.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/page_guide.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/sidebar_badges.js?v=20260828_v22_modular"></script>
+
+<!-- Modal/drawer modules -->
+<script src="/static/js/modules/swing_range.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/recalculate.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/stock_rating.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/watchlist_modal.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/stock_note.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/stock_modal.js?v=20260828_v22_modular"></script>
+
+<!-- Complex feature modules -->
+<script src="/static/js/modules/consensus.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/catalyst_consensus.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/breakout.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/repeaters.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/schedules.js?v=20260828_v22_modular"></script>
+<script src="/static/js/modules/playground.js?v=20260828_v22_modular"></script>
+
+<!-- Customizer last (reads state from others) -->
+<script src="/static/js/modules/customizer.js?v=20260828_v22_modular"></script>
+<script src="/static/js/strategy_auditor.js?v=20260828_v22_modular"></script>
+```
+
+---
+
+## Phased Execution Checklist
+
+> [!NOTE]
+> Mark each task `[x]` when done. If tokens run out, the next agent continues from the first `[ ]` item.
+
+### Phase 0 — Pre-flight
+- [ ] **0.1** `python scripts/error_ledger.py open` — baseline error count
+- [ ] **0.2** `python scripts/smart_test.py` — all green
+- [ ] **0.3** Server starts: `earnings-engine dashboard`
+
+### Phase 1 — HTML Template Reorganization
+- [ ] **1.1** Create `templates/hubs/dashboard/` — copy (not move) all `templates/dashboard/_*.html` files
+- [ ] **1.2** Update `templates/dashboard.html` include paths: `'dashboard/...'` → `'hubs/dashboard/...'`
+- [ ] **1.3** Split `_body_footer.html` → `_modals.html` + `_stock_modal.html` + `_script_tags.html` in `hubs/dashboard/`
+- [ ] **1.4** Update `dashboard.html` to `{% include 'hubs/dashboard/_modals.html' %}` + `{% include 'hubs/dashboard/_stock_modal.html' %}` + `{% include 'hubs/dashboard/_script_tags.html' %}`
+- [ ] **1.5** `cp credit_card.html → hubs/credit_cards/index.html`
+- [ ] **1.6** `cp net_worth.html → hubs/net_worth/index.html`
+- [ ] **1.7** `cp trips.html → hubs/trips/index.html`
+- [ ] **1.8** `cp stock_detail.html → hubs/stock/detail.html`
+- [ ] **1.9** `cp portal.html → hubs/portal/index.html`
+- [ ] **1.10** Update all `TemplateResponse(...)` in `api/server.py` with new hub paths
+- [ ] **1.11** Create `templates/components/` stub files
+- [ ] **1.12** Smoke test: `/dashboard`, `/credit-cards`, `/net-worth`, `/trips`, `/stock/TCS.NS`, `/portal`
+- [ ] **1.13** Delete old top-level files once routes confirmed working
+- [ ] **1.14** Commit: `refactor(templates): reorganize HTML into hubs/ components/ structure`
+
+### Phase 2 — Extract Small JS Modules
+- [ ] **2.1** `modules/price_refresh.js` ← lines 15853–15930
+- [ ] **2.2** `modules/stock_modal.js` ← lines 15681–15852
+- [ ] **2.3** `modules/sidebar_badges.js` ← `app.updateSidebarBadges` + any global init lines
+- [ ] **2.4** `modules/coverage.js` ← lines 7378–7471
+- [ ] **2.5** `modules/industries.js` ← lines 7472–7588
+- [ ] **2.6** `modules/buy_dip.js` ← lines 7589–7788
+- [ ] **2.7** `modules/patterns.js` ← lines 7789–7968
+- [ ] **2.8** `modules/backtest.js` ← lines 8241–8531
+- [ ] **2.9** `modules/page_guide.js` ← lines 11431–11811
+- [ ] **2.10** `modules/recalculate.js` ← lines 3660–3886
+- [ ] **2.11** Add all 10 new modules to `_script_tags.html` (before dashboard.js)
+- [ ] **2.12** Replace extracted sections in `dashboard.js` with comment stubs
+- [ ] **2.13** Smoke test all 10 extracted features, `smart_test.py`
+- [ ] **2.14** Commit: `refactor(js): extract 10 small modules from dashboard.js`
+
+### Phase 3 — Extract Medium JS Modules
+- [ ] **3.1** `modules/scanner.js` ← lines 1696–1970
+- [ ] **3.2** `modules/gainers.js` ← lines 2538–3659
+- [ ] **3.3** `modules/month_filter.js` ← lines 3887–5267
+- [ ] **3.4** `modules/swing_range.js` ← lines 6730–7377
+- [ ] **3.5** `modules/playground.js` ← lines 7969–8240 + 15931–16104
+- [ ] **3.6** Add 5 new modules to `_script_tags.html`
+- [ ] **3.7** Replace extracted sections in `dashboard.js` with comment stubs
+- [ ] **3.8** Smoke test, `smart_test.py`
+- [ ] **3.9** Commit: `refactor(js): extract scanner, gainers, month_filter, swing_range, playground`
+
+### Phase 4 — Extract Large JS Modules
+- [ ] **4.1** `modules/customizer.js` ← lines 9034–10040 (themes + ENV + passcodes + rate limits)
+- [ ] **4.2** `modules/stock_rating.js` ← lines 10041–10340
+- [ ] **4.3** `modules/watchlist_modal.js` ← lines 10341–10600
+- [ ] **4.4** `modules/catalyst_consensus.js` ← lines 10601–11430
+- [ ] **4.5** `modules/breakout.js` ← lines 11812–13930 (includes tracked breakouts)
+  - **NOTE**: Move `BREAKOUT_COLUMNS` and `DEFAULT_BREAKOUT_COLS` consts inside the IIFE
+- [ ] **4.6** `modules/repeaters.js` ← lines 13931–14382
+- [ ] **4.7** `modules/stock_note.js` ← lines 14383–15025
+- [ ] **4.8** Add 7 new modules to `_script_tags.html`
+- [ ] **4.9** Replace extracted sections in `dashboard.js` with comment stubs
+- [ ] **4.10** Full dashboard smoke test (all 19 tabs, breakout, stock modal, repeaters)
+- [ ] **4.11** `smart_test.py`
+- [ ] **4.12** Commit: `refactor(js): extract customizer, modals, breakout, repeaters, stock_note`
+
+### Phase 5 — Core Cleanup
+- [ ] **5.1** Verify `dashboard.js` only contains lines 1–1695 (app object core + search)
+- [ ] **5.2** Rename file to `app_core.js`
+- [ ] **5.3** Update `_script_tags.html` to reference `app_core.js` instead of `dashboard.js`
+- [ ] **5.4** Run full `pytest` suite
+- [ ] **5.5** Commit: `refactor(js): finalize — dashboard.js → app_core.js + 22 modules`
+
+### Phase 6 — Documentation
+- [ ] **6.1** `python scripts/error_ledger.py scan`
+- [ ] **6.2** Update `AGENTS.md` Section 2 with new JS file paths
+- [ ] **6.3** Update `AGENTS.md` Section 6 with new module modification points
+- [ ] **6.4** Update `walkthrough.md`
+
+---
+
+## Progress Log
+
+| Phase | Status | Commit | Notes |
+|---|---|---|---|
+| 0 (Pre-flight) | ⏳ Pending | — | — |
+| 1 (HTML) | ⏳ Pending | — | — |
+| 2 (Small JS) | ⏳ Pending | — | — |
+| 3 (Medium JS) | ⏳ Pending | — | — |
+| 4 (Large JS) | ⏳ Pending | — | — |
+| 5 (Core) | ⏳ Pending | — | — |
+| 6 (Docs) | ⏳ Pending | — | — |

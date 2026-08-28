@@ -1,0 +1,142 @@
+        <div id="tab-watchlist" class="tab-content" style="width: 100%; max-width: 100%;">
+            
+            <!-- ⚡ Top Watchlists KPI Cards with Soft Under-Glow -->
+            <div id="watchlistSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Custom Watchlists</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">User Created</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="wlCustomCount">0</strong> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Lists</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Curated target portfolios</div>
+                </div>
+
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Built-in Universes</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Exchange</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);">NSE & US Top</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Nifty 50, Large Caps & Equities</div>
+                </div>
+
+                <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Sync & Coverage</span>
+                        <span id="wlLiveSyncBadge" class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Live Quotes</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);">OHLCV & Vol</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Auto-synced for &lt; 10 stocks</div>
+                </div>
+            </div>
+
+            <!-- Main Watchlist Manager & List View Toolbar -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <h3 style="margin:0; font-size:1.05rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">⭐ Watchlists & Universes</h3>
+                        <span id="wlTotalBadge" class="signal-badge" style="background:rgba(59,130,246,0.15);color:#93c5fd;font-size:0.68rem;padding:0.12rem 0.45rem;border:1px solid rgba(59,130,246,0.3);">--</span>
+                        
+                        <!-- Active View Mode Switcher -->
+                        <div style="display:inline-flex;background:#000000;border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:2px;gap:2px;margin-left:0.35rem;">
+                            <button type="button" id="wlViewModeList" onclick="app.watchlistTab.setViewMode('list')" class="btn-micro" style="padding:0.2rem 0.6rem;font-weight:700;border-radius:4px;background:rgba(59,130,246,0.25);color:#93c5fd;border:none;" title="List view with detailed OHLCV data">📋 List View (OHLCV)</button>
+                            <button type="button" id="wlViewModeCards" onclick="app.watchlistTab.setViewMode('cards')" class="btn-micro" style="padding:0.2rem 0.6rem;font-weight:500;border-radius:4px;background:transparent;color:#a1a1aa;border:none;" title="Grid & chips summary view">🗂️ Cards View</button>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                        <button type="button" id="wlLiveToggleBtn" onclick="app.watchlistTab.toggleLiveTracking()" class="btn btn-sm" style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-weight:700;display:flex;align-items:center;gap:0.35rem;" title="Start/Stop live real-time price tracking">
+                            <span id="wlLiveIndicator" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f87171;"></span>
+                            <span id="wlLiveBtnText">🔴 Track Live Prices</span>
+                        </button>
+                        <select id="wlLiveIntervalSelect" onchange="app.watchlistTab.setLiveInterval(this.value)" style="height:28px;padding:0 0.45rem;font-size:0.72rem;background:#000000;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:4px;outline:none;" title="Select auto-refresh interval for live prices">
+                            <option value="30000">⏱️ 30s</option>
+                            <option value="60000">⏱️ 1 min</option>
+                            <option value="120000">⏱️ 2 min</option>
+                            <option value="300000" selected>⏱️ 5 min (Default)</option>
+                            <option value="600000">⏱️ 10 min</option>
+                            <option value="900000">⏱️ 15 min</option>
+                        </select>
+                        <button type="button" id="wlFetchLiveBtn" onclick="app.watchlistTab.fetchLiveQuotes()" class="btn btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-weight:600;display:flex;align-items:center;gap:0.3rem;" title="Fetch latest intraday OHLCV once">⚡ Refresh Live</button>
+                        <button type="button" onclick="app.watchlistTab.load(true)" class="btn btn-sm" title="Reload from cache">🔄 Reload</button>
+                        <button type="button" onclick="app.watchlistTab.addWatchlist()" class="btn btn-primary btn-sm" style="font-weight:600;">＋ New Watchlist</button>
+                    </div>
+                </div>
+
+                <!-- Filter Sub-Tabs, List Selector and Search Bar -->
+                <div style="display: flex; gap: 0.45rem; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: 0.65rem; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem;">
+                    <div id="wlFilterPills" style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap;">
+                        <!-- Active Watchlist Selector Dropdown (for List View) -->
+                        <div id="wlActiveSelectWrap" style="display: flex; align-items: center; gap: 0.3rem;">
+                            <span style="font-size:0.72rem;color:#a1a1aa;font-weight:600;">Selected List:</span>
+                            <select id="wlActiveSelect" onchange="app.watchlistTab.selectActiveWatchlist(this.value)" style="height:28px;padding:0 0.55rem;font-size:0.75rem;background:#000000;color:#f8fafc;border:1px solid rgba(59,130,246,0.4);border-radius:4px;font-weight:600;outline:none;">
+                                <option value="my_watchlist" selected>⭐ my_watchlist (Default)</option>
+                            </select>
+                        </div>
+                        
+                        <div id="wlFilterPillsInner" style="display: flex; gap: 0.25rem; flex-wrap: wrap; margin-left: 0.35rem;">
+                            <button type="button" class="btn btn-sm active" id="wlFilterAll" onclick="app.watchlistTab.setFilter('all')" style="padding:0.18rem 0.5rem;border-radius:0.35rem;font-size:0.72rem;">🌐 All</button>
+                            <button type="button" class="btn btn-sm" id="wlFilterUnder100" onclick="app.watchlistTab.setFilter('under_100')" style="padding:0.18rem 0.5rem;border-radius:0.35rem;font-size:0.72rem;color:#fde68a;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);">⚡ &lt; 100</button>
+                            <button type="button" class="btn btn-sm" id="wlFilterUniverses" onclick="app.watchlistTab.setFilter('universes')" style="padding:0.18rem 0.5rem;border-radius:0.35rem;font-size:0.72rem;color:#93c5fd;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);">🏛️ Universes</button>
+                            <button type="button" class="btn btn-sm" id="wlFilterCustom" onclick="app.watchlistTab.setFilter('custom')" style="padding:0.18rem 0.5rem;border-radius:0.35rem;font-size:0.72rem;color:#60a5fa;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);">⭐ Custom</button>
+                        </div>
+                    </div>
+                    
+                    <div style="flex:1; min-width: 180px; max-width: 280px;">
+                        <input id="wlSearchInput" oninput="app.watchlistTab.handleSearch(this.value)" placeholder="🔍 Filter list or symbol..." style="width:100%;padding:0.25rem 0.55rem;border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;background:#030305;color:var(--light);font-size:0.75rem;outline:none;" autocomplete="off">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 📋 Redesigned List View (Detailed OHLCV & Action Table) -->
+            <div id="watchlistTableView" style="display: block; margin-bottom: 1rem;">
+                <div class="card" style="padding: 0; background: #060609; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.75rem; overflow: hidden;">
+                    <!-- Table Header & Quick Add bar -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); flex-wrap: wrap; gap: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <span id="wlTableTitle" style="font-weight: 700; font-size: 0.92rem; color: #ffffff;">⭐ my_watchlist</span>
+                            <span id="wlTableCount" class="signal-badge" style="background:rgba(59,130,246,0.15);color:#93c5fd;font-size:0.68rem;">0 stocks</span>
+                            <span id="wlTableStatusBadge" class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.65rem;display:none;">⚡ Live Fed</span>
+                        </div>
+                        
+                        <!-- Quick Add Bar for Current Watchlist -->
+                        <div id="wlTableQuickAdd" style="display: flex; align-items: center; gap: 0.35rem; position: relative;">
+                            <input id="wlListAddInput" placeholder="＋ Add symbol to list..." style="height:28px;padding:0 0.55rem;font-size:0.75rem;background:#000000;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:4px;outline:none;width:180px;" autocomplete="off">
+                            <div id="wlListAddDropdown" class="dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:220px;overflow-y:auto;z-index:9999;box-shadow:0 12px 30px rgba(0,0,0,0.8);"></div>
+                            <button type="button" onclick="app.watchlistTab.addQuickTicker()" class="btn btn-primary btn-sm" style="padding:0.15rem 0.6rem;font-size:0.75rem;height:28px;">＋ Add</button>
+                        </div>
+                    </div>
+
+                    <!-- OHLCV Data Table -->
+                    <div class="table-wrapper" style="max-height: 65vh; overflow-y: auto;">
+                        <table class="results-table" id="wlQuotesTable" style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 140px; text-align: left;">Symbol & Company</th>
+                                    <th style="text-align: right;">Price</th>
+                                    <th style="text-align: right;">Day Chg %</th>
+                                    <th style="text-align: right;">Open</th>
+                                    <th style="text-align: right;">High</th>
+                                    <th style="text-align: right;">Low</th>
+                                    <th style="text-align: right;">Volume</th>
+                                    <th style="text-align: right;">52W Range / % High</th>
+                                    <th style="text-align: right;">Market Cap</th>
+                                    <th style="text-align: center; min-width: 140px;">Swing Range & Signal</th>
+                                    <th style="text-align: center; min-width: 120px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="wlQuotesTableBody">
+                                <tr>
+                                    <td colspan="11" style="text-align:center;padding:2rem;color:var(--muted);">Loading watchlist quotes...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🗂️ Cards View (Multi-Card Universe & Custom Lists Grid) -->
+            <div id="watchlistCards" style="display: none; flex-direction: column; gap: 0.75rem; padding: 0.25rem; min-height: 50vh;"></div>
+        </div>
+    </div>
+

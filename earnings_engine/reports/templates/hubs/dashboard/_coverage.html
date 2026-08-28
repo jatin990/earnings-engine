@@ -1,0 +1,77 @@
+{% import 'dashboard/_components.html' as comps %}
+        <div id="tab-coverage" class="tab-content" style="width: 100%; max-width: 100%;">
+            
+            <!-- ⚡ Top Coverage KPI Cards with Soft Under-Glow -->
+            <div id="coverageSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Price History</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">OHLCV</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);">Database Freshness</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Continuously synced daily candles</div>
+                </div>
+
+                <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Earnings Registry</span>
+                        <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Filings</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);">Quarterly Results</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Revenue, EPS beat/miss & date audits</div>
+                </div>
+
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Coverage Health</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Audit</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);">Universe Complete</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Zero gap validation on active tickers</div>
+                </div>
+            </div>
+
+            <!-- Main Coverage Section -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">📋 Universe Data Coverage & Freshness</h3>
+                        <p class="timestamp" style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--text-muted);">Inspect data availability, missing dates, and fresh quarterly reports across markets.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                        {{ comps.market_dropdown('coverageMarket', 'ALL', 'app.loadDataCoverage();') }}
+                        <input type="text" id="coverageSearch" placeholder="Filter ticker..." style="width: 140px; height: 30px; padding: 0 0.5rem; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; background: #000000; color: #ededed; font-size:0.75rem; font-family:var(--font-mono); outline:none;" oninput="app.renderCoverageTable()">
+                        <button type="button" onclick="app.loadDataCoverage()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Refresh</button>
+                        <button type="button" onclick="app.runIncrementalEarnings()" id="coverageFetchMissingBtn" data-master-only="true" class="btn btn-sm" title="Fetch earnings for missing tickers (Master only)">⚡ Fetch Missing</button>
+                    </div>
+                </div>
+                <div id="coverageSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;"></div>
+                <div class="table-wrapper">
+                    <table class="results-table" style="font-size:0.78rem;">
+                        <thead><tr>
+                            <th>Ticker</th>
+                            <th>Listing Date</th>
+                            <th>Price Start</th>
+                            <th>Price End</th>
+                            <th>Price Rows</th>
+                            <th>Earnings Start</th>
+                            <th>Earnings End</th>
+                            <th>Earnings Rows</th>
+                            <th>Earnings Fresh</th>
+                        </tr></thead>
+                        <tbody id="coverageTable">
+                            <tr>
+                                <td colspan="9" style="padding:2.5rem 1.5rem;text-align:center;color:var(--muted);">
+                                    <div style="font-size:2rem;margin-bottom:0.5rem;">📋</div>
+                                    <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;">Data Coverage Ready</h4>
+                                    <p style="font-size:0.8rem;margin:0;color:var(--text-muted);">Select your market above and click <strong>🔄 Refresh</strong> in the top toolbar to inspect universe data coverage.</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="coverageStatus" class="timestamp" style="margin-top: 0.5rem;"></div>
+            </section>
+        </div>
+
+        <!-- ================= INDUSTRIES TAB ================= -->

@@ -1,0 +1,105 @@
+{% import 'dashboard/_components.html' as comps %}
+        <!-- endpoint: /api/v1/dashboard/patterns -->
+        <div id="tab-patterns" class="tab-content" style="width: 100%; max-width: 100%;">
+            
+            <!-- ⚡ Top Patterns KPI Cards with Soft Under-Glow -->
+            <div id="patternsSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Pattern Archetypes</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Reaction Matrix</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);">Industry Rollup</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">First session post-earnings close</div>
+                </div>
+
+                <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Comeback ≥ 50%</span>
+                        <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Reversal</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);">Dip Recoveries</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Recovered over half of opening drop</div>
+                </div>
+
+                <div class="card card-glow-amber" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#fbbf24;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Kept Dipping</span>
+                        <span class="signal-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;font-size:0.62rem;">Weakness</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#fbbf24;font-family:var(--font-heading);">Sustained Drops</div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Follow-through selling pressure</div>
+                </div>
+            </div>
+
+            <!-- Main Patterns Section -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">📊 Patterns — Results by Industry & Buy-the-Dip</h3>
+                        <p class="timestamp" style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--text-muted);">
+                            Classifies each result by price reaction and rolls it up by industry.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                        {{ comps.market_dropdown('patternsMarket', 'IN', 'app.loadPatterns();') }}
+                        <select id="patPreset" onchange="app.applyPatternsPreset()" style="height:30px;padding:0 0.5rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.15);border-radius:6px;outline:none;" title="Quick date range preset">
+                            <option value="7">Last 7 days</option>
+                            <option value="30">Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="">Custom / All history</option>
+                        </select>
+                        <button type="button" onclick="app.loadPatterns()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Refresh</button>
+                    </div>
+                </div>
+
+                <!-- Parameters Toolbar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.45rem;">
+                    <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap; font-size: 0.72rem; color: var(--muted);">
+                        <label style="display:flex;align-items:center;gap:0.25rem;">From:
+                            <input type="date" id="patStartDate" style="padding:0.15rem 0.35rem;border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;background:#030305;color-scheme:dark;color:#fff;font-size:0.72rem;">
+                        </label>
+                        <label style="display:flex;align-items:center;gap:0.25rem;">To:
+                            <input type="date" id="patEndDate" style="padding:0.15rem 0.35rem;border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;background:#030305;color-scheme:dark;color:#fff;font-size:0.72rem;">
+                        </label>
+                    </div>
+                </div>
+
+                <div id="patSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;"></div>
+                <div id="patTodayCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;"></div>
+
+                <div id="patStocksSection">
+                    <h4 style="margin: 0.4rem 0 0.25rem 0; font-size: 0.95rem; font-family:'Space Grotesk',sans-serif; color:#f8fafc;">📋 Today's Earnings — Stocks</h4>
+                    <div class="table-wrapper">
+                        <table class="results-table" style="font-size:0.78rem;">
+                            <thead><tr>
+                                <th onclick="app.patStocksSort('ticker')" style="cursor:pointer">Ticker</th>
+                                <th onclick="app.patStocksSort('industry')" style="cursor:pointer">Industry</th>
+                                <th onclick="app.patStocksSort('result_class')" style="cursor:pointer">Result</th>
+                                <th onclick="app.patStocksSort('reaction_return_pct')" style="cursor:pointer">Reaction %</th>
+                                <th>Day Open</th><th>Day High</th><th>Day Low</th><th>Day Close</th>
+                                <th style="text-align:center;">AI Consensus</th>
+                                <th onclick="app.patStocksSort('dipped')" style="cursor:pointer">Dipped</th>
+                                <th onclick="app.patStocksSort('comeback_50')" style="cursor:pointer">Comeback≥50%</th>
+                                <th onclick="app.patStocksSort('kept_dipping')" style="cursor:pointer">Kept Dipping</th>
+                            </tr></thead>
+                            <tbody id="patStocksTable">
+                                <tr>
+                                    <td colspan="13" style="padding:2.5rem 1.5rem;text-align:center;color:var(--muted);">
+                                        <div style="font-size:2rem;margin-bottom:0.5rem;">📊</div>
+                                        <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;">Patterns Scanner Ready</h4>
+                                        <p style="font-size:0.8rem;margin:0;color:var(--text-muted);">Select your market and date range above, then click <strong>🔄 Refresh</strong> in the top toolbar to load patterns.</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="patDip"></div>
+                <div id="patKept"></div>
+                <div id="patIndustries"></div>
+                <div id="patStatus" class="timestamp" style="margin-top: 0.5rem;"></div>
+            </section>
+        </div>
+
+        <!-- ================= BUY THE DIP TAB ================= -->

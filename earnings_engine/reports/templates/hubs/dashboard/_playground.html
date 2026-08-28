@@ -1,0 +1,582 @@
+        <div id="tab-playground" class="tab-content" style="width: 100%; max-width: 100%;">
+            
+            <!-- 📊 CENTRALIZED DOWNSTREAM & AI API CALL TRACKER HUB -->
+            <section class="card" style="padding: 1.15rem; border: 1px solid rgba(59, 130, 246, 0.25); background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(9, 13, 26, 0.98) 100%); border-radius: 0.85rem; margin-bottom: 1rem; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);">
+                <!-- Tracker Header & Action Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">📊</div>
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: #ffffff; letter-spacing: -0.01em;">Downstream &amp; AI API Call Tracker</h3>
+                                <span class="signal-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.65rem; padding: 0.12rem 0.45rem; border-radius: 4px;">🟢 LIVE COUNTING</span>
+                            </div>
+                            <p style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: #94a3b8;">Real-time call tracking across Yahoo Finance, NSE India, Jugaad Data, and all local / cloud AI models.</p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                        <span id="pgApiUsageAsOf" style="font-size: 0.70rem; color: #94a3b8; font-family: var(--font-mono);">As of --:-- IST</span>
+                        <button type="button" onclick="app.loadPlaygroundApiUsage()" class="btn btn-secondary btn-sm" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-color: rgba(255,255,255,0.15);">
+                            🔄 Refresh Counters
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 4 Top KPI Mini-Cards -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.85rem;">
+                    <div class="card card-glow-blue" style="padding: 0.65rem 0.85rem; margin-bottom: 0; background: rgba(59,130,246,0.06);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+                            <span style="font-size: 0.68rem; color: #60a5fa; text-transform: uppercase; font-weight: 700;">📈 Yahoo Finance</span>
+                            <span id="pgYfStatusBadge" class="signal-badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 0.60rem;">🟢 Ready</span>
+                        </div>
+                        <div style="font-size: 1.35rem; font-weight: 800; color: #ffffff; font-family: var(--font-heading);"><strong id="pgYfTotalCalls">0</strong> <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 500;">All-Time</span></div>
+                        <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 0.15rem;">Today (IST): <strong id="pgYfTodayCalls" style="color: #38bdf8;">0</strong> calls</div>
+                    </div>
+
+                    <div class="card card-glow-orange" style="padding: 0.65rem 0.85rem; margin-bottom: 0; background: rgba(249,115,22,0.06);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+                            <span style="font-size: 0.68rem; color: #fb923c; text-transform: uppercase; font-weight: 700;">🏛️ NSE India</span>
+                            <span id="pgNseStatusBadge" class="signal-badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 0.60rem;">🟢 Ready</span>
+                        </div>
+                        <div style="font-size: 1.35rem; font-weight: 800; color: #ffffff; font-family: var(--font-heading);"><strong id="pgNseTotalCalls">0</strong> <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 500;">All-Time</span></div>
+                        <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 0.15rem;">Today (IST): <strong id="pgNseTodayCalls" style="color: #fb923c;">0</strong> calls</div>
+                    </div>
+
+                    <div class="card card-glow-purple" style="padding: 0.65rem 0.85rem; margin-bottom: 0; background: rgba(168,85,247,0.06);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+                            <span style="font-size: 0.68rem; color: #c084fc; text-transform: uppercase; font-weight: 700;">📦 Jugaad Data</span>
+                            <span id="pgJugaadStatusBadge" class="signal-badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 0.60rem;">🟢 Ready</span>
+                        </div>
+                        <div style="font-size: 1.35rem; font-weight: 800; color: #ffffff; font-family: var(--font-heading);"><strong id="pgJugaadTotalCalls">0</strong> <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 500;">All-Time</span></div>
+                        <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 0.15rem;">Today (IST): <strong id="pgJugaadTodayCalls" style="color: #c084fc;">0</strong> calls</div>
+                    </div>
+
+                    <div class="card card-glow-emerald" style="padding: 0.65rem 0.85rem; margin-bottom: 0; background: rgba(16,185,129,0.06);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+                            <span style="font-size: 0.68rem; color: #34d399; text-transform: uppercase; font-weight: 700;">🤖 AI Models Suite</span>
+                            <span id="pgAiStatusBadge" class="signal-badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 0.60rem;">🟢 Ready</span>
+                        </div>
+                        <div style="font-size: 1.35rem; font-weight: 800; color: #34d399; font-family: var(--font-heading);"><strong id="pgAiTotalCalls">0</strong> <span style="font-size: 0.75rem; color: #94a3b8; font-weight: 500;">Inferences</span></div>
+                        <div style="font-size: 0.68rem; color: #94a3b8; margin-top: 0.15rem;">Today (IST): <strong id="pgAiTodayCalls" style="color: #34d399;">0</strong> inferences</div>
+                    </div>
+                </div>
+
+                <!-- Detailed Downstream & Model Breakdown Table -->
+                <div style="border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow-x: auto; background: #030305;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.74rem; text-align: left;">
+                        <thead>
+                            <tr style="background: #0f172a; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.08); font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase;">
+                                <th style="padding: 0.5rem 0.7rem;">Service / Provider / Model</th>
+                                <th style="padding: 0.5rem 0.55rem; text-align: right;">All-Time Calls</th>
+                                <th style="padding: 0.5rem 0.55rem; text-align: right;">Today (IST)</th>
+                                <th style="padding: 0.5rem 0.55rem; text-align: right;">Past 1 Hour</th>
+                                <th style="padding: 0.5rem 0.55rem; text-align: right;">Past 1 Min</th>
+                                <th style="padding: 0.5rem 0.65rem; text-align: right;">Rate Quota Limits</th>
+                                <th style="padding: 0.5rem 0.65rem; text-align: center;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pgApiUsageTableBody">
+                            <tr>
+                                <td colspan="7" style="padding: 1.5rem; text-align: center; color: #64748b;">
+                                    <div class="spinner" style="display:inline-block; margin-right: 0.35rem;"></div> Loading API call counters...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ⏱️ CENTRALIZED AUTOMATION & SCANNER SCHEDULER STUDIO -->
+            <section class="card" style="padding: 1.15rem; border: 1px solid rgba(56, 189, 248, 0.25); background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(9, 13, 26, 0.98) 100%); border-radius: 0.85rem; margin-bottom: 1rem; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);">
+                <!-- Scheduler Header & Action Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">⏱️</div>
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: #ffffff; letter-spacing: -0.01em;">Centralized Flow & Scanner Scheduler</h3>
+                                <span id="pgEngineStatusBadge" class="signal-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.65rem; padding: 0.12rem 0.45rem; border-radius: 4px;">🟢 ENGINE ACTIVE</span>
+                            </div>
+                            <p style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: #94a3b8;">Manage, modify, pause, delete, and monitor all automated engine flows (Breakout Radar, News Harvester, Multi-Category Scanner, Repeaters, Institutional Sync).</p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                        <button type="button" id="pgToggleEngineBtn" onclick="app.toggleMasterSchedulerEngine()" class="btn btn-secondary btn-sm" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-color: rgba(255,255,255,0.15);">
+                            ⏸️ Pause Engine
+                        </button>
+                        <button type="button" onclick="app.openCreateScheduleModal()" class="btn btn-primary btn-sm" style="font-size: 0.72rem; padding: 0.25rem 0.65rem; font-weight: 700; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
+                            ＋ Add Scheduled Flow
+                        </button>
+                        <button type="button" onclick="app.openScheduleLogsModal()" class="btn btn-secondary btn-sm" style="font-size: 0.72rem; padding: 0.25rem 0.55rem; color: #93c5fd; border-color: rgba(59,130,246,0.3);">
+                            📜 Run Logs
+                        </button>
+                        <button type="button" onclick="app.loadAutomationSchedules()" class="btn btn-secondary btn-sm" style="font-size: 0.72rem; padding: 0.25rem 0.45rem;" title="Refresh schedules">
+                            🔄
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Mini-Cards -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem; margin-bottom: 0.85rem;">
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 0.45rem 0.65rem;">
+                        <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase;">Total Flows</div>
+                        <div id="pgSchedKpiTotal" style="font-size: 1.1rem; font-weight: 800; color: #f8fafc; font-family: var(--font-mono);">6</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 0.45rem 0.65rem;">
+                        <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase;">Active / Enabled</div>
+                        <div id="pgSchedKpiActive" style="font-size: 1.1rem; font-weight: 800; color: #34d399; font-family: var(--font-mono);">6</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 0.45rem 0.65rem;">
+                        <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase;">Currently Running</div>
+                        <div id="pgSchedKpiRunning" style="font-size: 1.1rem; font-weight: 800; color: #38bdf8; font-family: var(--font-mono);">0</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; padding: 0.45rem 0.65rem;">
+                        <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase;">Total Runs Executed</div>
+                        <div id="pgSchedKpiRuns" style="font-size: 1.1rem; font-weight: 800; color: #fbbf24; font-family: var(--font-mono);">0</div>
+                    </div>
+                </div>
+
+                <!-- Schedules Interactive Grid -->
+                <div style="border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow-x: auto; background: #030305;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                        <thead>
+                            <tr style="background: #0f172a; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.08); font-family: var(--font-mono); font-size: 0.68rem; text-transform: uppercase;">
+                                <th style="padding: 0.55rem 0.75rem;">Scheduled Flow & Category</th>
+                                <th style="padding: 0.55rem 0.55rem;">Cadence / Interval</th>
+                                <th style="padding: 0.55rem 0.55rem;">Next Execution</th>
+                                <th style="padding: 0.55rem 0.55rem;">Status</th>
+                                <th style="padding: 0.55rem 0.55rem;">Last Run & Duration</th>
+                                <th style="padding: 0.55rem 0.65rem;">Last Execution Summary</th>
+                <!-- Schedules Interactive Grid -->
+                <div style="border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow-x: auto; background: #030305;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                        <thead>
+                            <tr style="background: #0f172a; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.08); font-family: var(--font-mono); font-size: 0.68rem; text-transform: uppercase;">
+                                <th style="padding: 0.55rem 0.75rem;">Scheduled Flow & Category</th>
+                                <th style="padding: 0.55rem 0.65rem;">Target Stocklist & Parameters</th>
+                                <th style="padding: 0.55rem 0.55rem;">Cadence</th>
+                                <th style="padding: 0.55rem 0.55rem;">Next Execution</th>
+                                <th style="padding: 0.55rem 0.55rem;">Status</th>
+                                <th style="padding: 0.55rem 0.55rem;">Last Run & Duration</th>
+                                <th style="padding: 0.55rem 0.65rem;">Execution Summary</th>
+                                <th style="padding: 0.55rem 0.65rem; text-align: center;">Controls</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pgSchedulesTableBody">
+                            <tr>
+                                <td colspan="8" style="padding: 2rem; text-align: center; color: #64748b;">
+                                    <div class="spinner" style="display:inline-block; margin-right: 0.35rem;"></div> Loading automation schedules...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- MODAL: CREATE / EDIT AUTOMATION SCHEDULE -->
+            <div id="pgScheduleModal" onclick="if(event.target === this) app.closeScheduleModal();" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:2750; padding:1.5rem; overflow-y:auto;">
+                <div class="card card-glow-blue" style="max-width:620px; width:95%; margin:4vh auto; position:relative; background:#060609; border:1px solid rgba(56,189,248,0.35); border-radius:14px; box-shadow:0 30px 80px rgba(0,0,0,0.9); padding:1.5rem;">
+                    <button type="button" onclick="app.closeScheduleModal()" class="btn-icon" style="position:absolute; top:1.15rem; right:1.15rem;" title="Close">✕</button>
+                    
+                    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.3rem;">
+                        <span style="font-size:1.4rem;">⏱️</span>
+                        <h3 id="pgSchedModalTitle" style="margin:0; font-size:1.15rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">Configure Scheduled Flow</h3>
+                    </div>
+                    <p style="margin:0 0 1rem 0; font-size:0.72rem; color:#94a3b8;">Configure target stocklists, execution parameters, intervals, and trigger rules.</p>
+
+                    <form onsubmit="event.preventDefault(); app.submitScheduleModal();" style="display:flex; flex-direction:column; gap:0.75rem;">
+                        <!-- Job ID & Name -->
+                        <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:0.5rem;">
+                            <div>
+                                <label style="display:block; font-size:0.68rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.25rem;">Flow ID (Unique key)</label>
+                                <input type="text" id="pgSchedInputJobId" placeholder="e.g. custom_scanner" style="width:100%; height:32px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:#ffffff; font-family:var(--font-mono); font-size:0.75rem; padding:0 0.65rem; outline:none;" required>
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.68rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.25rem;">Display Name</label>
+                                <input type="text" id="pgSchedInputJobName" placeholder="e.g. 🔍 High Growth Scanner" style="width:100%; height:32px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:#ffffff; font-size:0.75rem; padding:0 0.65rem; outline:none;" required>
+                            </div>
+                        </div>
+
+                        <!-- Target Stocklist / Universe Selector -->
+                        <div style="background:rgba(56,189,248,0.04); border:1px solid rgba(56,189,248,0.2); border-radius:8px; padding:0.75rem;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.35rem;">
+                                <label style="font-size:0.7rem; font-weight:700; color:#38bdf8; text-transform:uppercase; display:flex; align-items:center; gap:0.3rem;">
+                                    <span>🎯</span> Target Stocklist / Universe
+                                </label>
+                                <span style="font-size:0.65rem; color:#94a3b8;">Target for this automated scan</span>
+                            </div>
+                            
+                            <select id="pgSchedInputTargetList" onchange="app.onSchedTargetListChange(this.value)" style="width:100%; height:34px; background:#0b1329; border:1px solid rgba(56,189,248,0.3); border-radius:6px; color:#ffffff; font-size:0.78rem; font-weight:600; padding:0 0.6rem; outline:none;">
+                                <optgroup id="pgSchedOptgroupWatchlists" label="⭐ User Watchlists & Playlists">
+                                    <option value="watchlist:my_watchlist" selected>⭐ My Watchlist (Default)</option>
+                                    <option value="watchlist:swing">📈 Swing Trading Watchlist</option>
+                                    <option value="watchlist:News track">📰 News Track Playlist</option>
+                                </optgroup>
+                                <optgroup label="🌐 Market Universes">
+                                    <option value="universe:NSE_ALL">🌐 NSE All Equities (Full Market)</option>
+                                    <option value="universe:NSE_TOP">🚀 NSE Top 500 / Liquid</option>
+                                    <option value="universe:NIFTY_50">🏛️ Nifty 50 Index Equities</option>
+                                    <option value="universe:NSE_LARGE_CAP">💎 Large Cap Universe</option>
+                                    <option value="universe:NSE_MID_CAP">⚡ Mid Cap Universe</option>
+                                    <option value="universe:NSE_SMALL_CAP">🎯 Small Cap Universe</option>
+                                    <option value="universe:IN">🇮🇳 All India Equities (NSE + BSE)</option>
+                                    <option value="universe:US">🇺🇸 US Universe (S&P 500)</option>
+                                </optgroup>
+                                <optgroup label="✏️ Custom Selection">
+                                    <option value="custom_tickers">✏️ Custom Ticker List...</option>
+                                </optgroup>
+                            </select>
+
+                            <!-- Custom Tickers Input Row (hidden unless selected) -->
+                            <div id="pgSchedCustomTickersRow" style="display:none; margin-top:0.5rem;">
+                                <label style="display:block; font-size:0.68rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.2rem;">Custom Tickers (comma-separated)</label>
+                                <input type="text" id="pgSchedInputCustomTickers" placeholder="e.g. TCS.NS, INFY.NS, RELIANCE.NS, KAYNES.NS" style="width:100%; height:32px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:#38bdf8; font-family:var(--font-mono); font-size:0.75rem; padding:0 0.65rem; outline:none;">
+                            </div>
+                        </div>
+
+                        <!-- Category, Interval Cadence & Market Hours Timing -->
+                        <div style="display:grid; grid-template-columns: 1fr 1fr 1.3fr; gap:0.5rem;">
+                            <div>
+                                <label style="display:block; font-size:0.68rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.25rem;">Category</label>
+                                <select id="pgSchedInputCategory" style="width:100%; height:32px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:#f8fafc; font-size:0.75rem; padding:0 0.5rem; outline:none;">
+                                    <option value="Breakout Radar">⚡ Breakout Radar</option>
+                                    <option value="Market Catalysts">📰 Market Catalysts</option>
+                                    <option value="Scanner">🔍 Scanner</option>
+                                    <option value="Institutional">🏛️ Institutional</option>
+                                    <option value="Seasonality">🔁 Seasonality</option>
+                                    <option value="Custom">✏️ Custom</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.68rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.25rem;">Interval Cadence</label>
+                                <select id="pgSchedInputIntervalPreset" onchange="app.onSchedIntervalPresetChange(this.value)" style="width:100%; height:32px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:#38bdf8; font-weight:700; font-size:0.75rem; padding:0 0.5rem; outline:none; font-family:var(--font-mono);">
+                                    <option value="30">Every 30 Seconds</option>
+                                    <option value="60">Every 1 Minute (60s)</option>
+                                    <option value="300" selected>Every 5 Minutes (300s)</option>
+                                    <option value="600">Every 10 Minutes (600s)</option>
+                                    <option value="1800">Every 30 Minutes (1800s)</option>
+                                    <option value="3600">Every 1 Hour (3600s)</option>
+                                    <option value="7200">Every 2 Hours (7200s)</option>
+                                    <option value="86400">Every 24 Hours (Daily)</option>
+                                    <option value="custom">✏️ Custom Seconds...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.68rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.25rem;">Market Session / Timing</label>
+                                <select id="pgSchedInputMarketSession" style="width:100%; height:32px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:#34d399; font-weight:700; font-size:0.75rem; padding:0 0.5rem; outline:none;">
+                                    <option value="all" selected>🌐 24/7 (Run Always / After-Hours)</option>
+                                    <option value="market_hours_only">🏛️ Market Hours Only (09:15–15:30 IST)</option>
+                                    <option value="after_hours_only">🌙 After-Hours Only (Post-15:30 IST)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Custom Interval Seconds (hidden unless custom) -->
+                        <div id="pgSchedCustomIntervalRow" style="display:none;">
+                            <label style="display:block; font-size:0.68rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.25rem;">Custom Interval (Seconds)</label>
+                            <input type="number" id="pgSchedInputIntervalSeconds" min="5" value="300" style="width:100%; height:32px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:#ffffff; font-family:var(--font-mono); font-size:0.78rem; padding:0 0.65rem; outline:none;">
+                        </div>
+
+                        <!-- Structured Execution Parameters Grid -->
+                        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:0.65rem; display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:0.5rem;">
+                            <div>
+                                <label style="display:block; font-size:0.65rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.2rem;">Batch / Scan Limit</label>
+                                <select id="pgSchedInputLimit" onchange="app.syncSchedParamsJson()" style="width:100%; height:28px; background:#0f172a; border:1px solid rgba(255,255,255,0.12); border-radius:5px; color:#f1f5f9; font-size:0.72rem; padding:0 0.4rem;">
+                                    <option value="10">Top 10</option>
+                                    <option value="25">Top 25</option>
+                                    <option value="50">Top 50</option>
+                                    <option value="100" selected>Top 100</option>
+                                    <option value="250">Top 250</option>
+                                    <option value="0">All / Unlimited</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.65rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.2rem;">Min Score Filter</label>
+                                <input type="number" id="pgSchedInputMinScore" placeholder="e.g. 35" oninput="app.syncSchedParamsJson()" style="width:100%; height:28px; background:#0f172a; border:1px solid rgba(255,255,255,0.12); border-radius:5px; color:#f1f5f9; font-size:0.72rem; padding:0 0.4rem; font-family:var(--font-mono);">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.65rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.2rem;">Candidate Pool</label>
+                                <select id="pgSchedInputPool" onchange="app.syncSchedParamsJson()" style="width:100%; height:28px; background:#0f172a; border:1px solid rgba(255,255,255,0.12); border-radius:5px; color:#f1f5f9; font-size:0.72rem; padding:0 0.4rem;">
+                                    <option value="all" selected>All Candidates</option>
+                                    <option value="hot">🔥 Hot Pool Only</option>
+                                    <option value="warm">⚡ Warm Pool Only</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.65rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.2rem;">ML / Compute Device</label>
+                                <select id="pgSchedInputDevice" onchange="app.syncSchedParamsJson()" style="width:100%; height:28px; background:#0f172a; border:1px solid rgba(255,255,255,0.12); border-radius:5px; color:#f1f5f9; font-size:0.72rem; padding:0 0.4rem;">
+                                    <option value="auto" selected>Auto</option>
+                                    <option value="cuda:0">GPU (cuda:0)</option>
+                                    <option value="cpu">CPU</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Parameters JSON (Editable / Synced) -->
+                        <div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
+                                <label style="font-size:0.68rem; font-weight:700; color:#94a3b8; text-transform:uppercase;">Run Parameters JSON (Auto-Generated / Override)</label>
+                                <span style="font-size:0.62rem; color:#64748b; font-family:var(--font-mono);">Params dispatched to flow</span>
+                            </div>
+                            <input type="text" id="pgSchedInputParams" placeholder='{"universe": "NSE_ALL", "limit": 100}' style="width:100%; height:32px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:#38bdf8; font-family:var(--font-mono); font-size:0.75rem; padding:0 0.65rem; outline:none;">
+                        </div>
+
+                        <!-- Enabled Status Checkbox -->
+                        <div style="display:flex; align-items:center; gap:0.5rem; margin-top:0.25rem;">
+                            <input type="checkbox" id="pgSchedInputEnabled" checked style="accent-color:#38bdf8; width:15px; height:15px; cursor:pointer;">
+                            <label for="pgSchedInputEnabled" style="font-size:0.75rem; color:#e2e8f0; cursor:pointer; font-weight:600;">Enable scheduled execution immediately</label>
+                        </div>
+
+                        <!-- Modal Actions -->
+                        <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.75rem;">
+                            <button type="button" onclick="app.closeScheduleModal()" class="btn btn-secondary btn-sm">Cancel</button>
+                            <button type="submit" id="pgSchedSubmitBtn" class="btn btn-primary btn-sm" style="font-weight:700;">💾 Save Schedule</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL: SCHEDULE EXECUTION RUN LOGS -->
+            <div id="pgScheduleLogsModal" onclick="if(event.target === this) app.closeScheduleLogsModal();" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:2750; padding:1.5rem; overflow-y:auto;">
+                <div class="card card-glow-blue" style="max-width:820px; width:95%; margin:5vh auto; position:relative; background:#060609; border:1px solid rgba(56,189,248,0.35); border-radius:14px; box-shadow:0 30px 90px rgba(0,0,0,0.9); padding:1.5rem;">
+                    <button type="button" onclick="app.closeScheduleLogsModal()" class="btn-icon" style="position:absolute; top:1.15rem; right:1.15rem;" title="Close">✕</button>
+                    
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:0.65rem;">
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <span style="font-size:1.3rem;">📜</span>
+                            <h3 style="margin:0; font-size:1.15rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">Automation Execution Logs</h3>
+                        </div>
+                        <div style="display:flex; gap:0.4rem; align-items:center;">
+                            <select id="pgLogsJobFilter" onchange="app.loadScheduleLogs(this.value)" style="height:28px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:5px; color:#38bdf8; font-size:0.72rem; padding:0 0.5rem; outline:none;">
+                                <option value="">All Background Jobs</option>
+                            </select>
+                            <button type="button" onclick="app.loadScheduleLogs(document.getElementById('pgLogsJobFilter')?.value)" class="btn btn-secondary btn-sm" style="font-size:0.72rem; padding:0.15rem 0.45rem;">🔄</button>
+                        </div>
+                    </div>
+
+                    <div style="max-height:420px; overflow-y:auto; border:1px solid rgba(255,255,255,0.08); border-radius:8px; background:#030305;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.72rem; text-align:left;">
+                            <thead>
+                                <tr style="background:#0f172a; color:#94a3b8; border-bottom:1px solid rgba(255,255,255,0.08); font-family:var(--font-mono); font-size:0.66rem; text-transform:uppercase;">
+                                    <th style="padding:0.45rem 0.65rem;">Timestamp</th>
+                                    <th style="padding:0.45rem 0.55rem;">Job Name</th>
+                                    <th style="padding:0.45rem 0.45rem;">Status</th>
+                                    <th style="padding:0.45rem 0.45rem;">Duration</th>
+                                    <th style="padding:0.45rem 0.65rem;">Summary Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pgLogsTableBody">
+                                <tr>
+                                    <td colspan="5" style="padding:2rem; text-align:center; color:#64748b;">Loading logs...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end; margin-top:0.85rem;">
+                        <button type="button" onclick="app.closeScheduleLogsModal()" class="btn btn-secondary btn-sm">Close</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🤖 LOCAL AI MULTI-MODEL BATCH INTELLIGENCE STUDIO -->
+            <section class="card" style="padding: 1.1rem; border: 1px solid rgba(99, 102, 241, 0.25); background: linear-gradient(180deg, rgba(17, 19, 26, 0.95) 0%, rgba(9, 10, 15, 0.98) 100%); border-radius: 0.85rem; margin-bottom: 1rem; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);">
+                <!-- Studio Header & Title -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">⚡</div>
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: #ffffff; letter-spacing: -0.01em;">Local AI Parallel Multi-Model Studio</h3>
+                                <span style="font-size: 0.65rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.1rem 0.45rem; border-radius: 4px;">GPU BOUND • OLLAMA + KRONOS</span>
+                            </div>
+                            <p style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: #94a3b8;">Batch-generate quantitative AI thesis notes and price forecasts across stocks using local models bound to GPU concurrency limits.</p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <span id="pgBatchGpuStatus" style="font-size: 0.7rem; font-family: var(--font-mono); color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); padding: 0.2rem 0.55rem; border-radius: 4px;">🖥️ GPU: Idle / Ready</span>
+                    </div>
+                </div>
+
+                <!-- Controls Toolbar -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.85rem; background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                    <!-- 1. Universe / Stock List -->
+                    <div>
+                        <label style="display: block; font-size: 0.68rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.25rem;">Stock List Source</label>
+                        <select id="pgBatchSource" onchange="app.pgLocalAi.onSourceChange(this.value)" style="width: 100%; height: 32px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12); color: #f1f5f9; font-size: 0.75rem; border-radius: 6px; padding: 0 0.5rem; outline: none; font-family: var(--font-mono);">
+                            <optgroup id="pgBatchWatchlistsGroup" label="⭐ User & App Watchlists">
+                                <option value="watchlist:my_watchlist" selected>⭐ My Watchlist</option>
+                                <option value="watchlist:swing">⭐ Swing Setups</option>
+                            </optgroup>
+                            <optgroup label="⚡ Radar & AI Strategies">
+                                <option value="breakout">⚡ Breakout Radar Setups</option>
+                                <option value="repeaters">🚀 Quarter Repeaters</option>
+                            </optgroup>
+                            <optgroup label="🏛️ Market Universes">
+                                <option value="nifty_50">🇮🇳 Nifty Top 50</option>
+                                <option value="nse_large_cap">🏛️ NSE Large Cap</option>
+                                <option value="all">🌐 All Monitored Tickers</option>
+                            </optgroup>
+                            <optgroup label="✏️ Custom">
+                                <option value="custom">✏️ Custom Ticker List</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <!-- 2. Stock Count (Top N) -->
+                    <div>
+                        <label style="display: block; font-size: 0.68rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.25rem;">Stock Count (Top N)</label>
+                        <select id="pgBatchCount" onchange="app.pgLocalAi.loadCandidates()" style="width: 100%; height: 32px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12); color: #38bdf8; font-size: 0.75rem; font-weight: 700; border-radius: 6px; padding: 0 0.5rem; outline: none; font-family: var(--font-mono);">
+                            <option value="2">Top 2 Stocks</option>
+                            <option value="5" selected>Top 5 Stocks</option>
+                            <option value="10">Top 10 Stocks</option>
+                            <option value="20">Top 20 Stocks</option>
+                            <option value="all">All Available</option>
+                        </select>
+                    </div>
+
+                    <!-- 3. Local Model Selector -->
+                    <div>
+                        <label style="display: block; font-size: 0.68rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.25rem;">Primary Local Model</label>
+                        <select id="pgBatchModel" style="width: 100%; height: 32px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12); color: #a78bfa; font-size: 0.75rem; font-weight: 700; border-radius: 6px; padding: 0 0.5rem; outline: none; font-family: var(--font-mono);">
+                            <option value="llama3.2:3b" selected>🦙 llama3.2:3b (Ollama Local)</option>
+                            <option value="deepseek-r1:8b">🐋 deepseek-r1:8b (Ollama Local)</option>
+                            <option value="qwen2.5-coder:7b">🌐 qwen2.5-coder (Ollama Local)</option>
+                            <option value="kronos_only">⚡ Kronos AI Sequence (PyTorch GPU)</option>
+                        </select>
+                    </div>
+
+                    <!-- 4. GPU Throttle / Concurrency -->
+                    <div>
+                        <label style="display: block; font-size: 0.68rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.25rem;">GPU VRAM Concurrency</label>
+                        <select id="pgBatchConcurrency" style="width: 100%; height: 32px; background: #0f172a; border: 1px solid rgba(255,255,255,0.12); color: #fbbf24; font-size: 0.75rem; border-radius: 6px; padding: 0 0.5rem; outline: none; font-family: var(--font-mono);">
+                            <option value="1" selected>Bounded 1-at-a-time (VRAM Safe)</option>
+                            <option value="2">2 Concurrent (Dual GPU Stream)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Custom Ticker Input Row (hidden by default) -->
+                <div id="pgBatchCustomRow" style="display: none; margin-bottom: 0.85rem;">
+                    <input type="text" id="pgBatchCustomTickers" placeholder="Enter comma-separated tickers (e.g. TCS.NS, INFY.NS, RELIANCE.NS, BAJAJ-AUTO.NS)" style="width: 100%; height: 34px; background: #0f172a; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #ffffff; font-family: var(--font-mono); font-size: 0.78rem; padding: 0 0.75rem; outline: none;" onchange="app.pgLocalAi.loadCandidates()">
+                </div>
+
+                <!-- Action Buttons & Run Trigger -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div id="pgBatchSummaryText" style="font-size: 0.75rem; color: #94a3b8; font-family: var(--font-mono);">
+                        Selected: <strong id="pgBatchSelectedCount" style="color: #ffffff;">0 stocks</strong> ready for inference.
+                    </div>
+                    <div style="display: flex; gap: 0.45rem;">
+                        <button type="button" id="pgBatchStopBtn" onclick="app.pgLocalAi.stopBatch()" class="btn btn-secondary" style="display: none; padding: 0.35rem 0.85rem; font-size: 0.78rem; color: #f87171; border-color: rgba(248,113,113,0.3);">
+                            ⏹ Stop Run
+                        </button>
+                        <button type="button" id="pgBatchRunBtn" onclick="app.pgLocalAi.runBatch()" class="btn btn-primary" style="padding: 0.35rem 1rem; font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 0.4rem; background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);">
+                            <span id="pgBatchRunIcon">⚡</span> Run Local AI Notes
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Animated Progress & Metrics Bar -->
+                <div id="pgBatchProgressCard" style="display: none; background: rgba(0,0,0,0.4); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; margin-bottom: 0.4rem; font-family: var(--font-mono);">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="spinner" style="width: 14px; height: 14px; border: 2px solid rgba(99,102,241,0.3); border-top-color: #6366f1;"></span>
+                            <span id="pgBatchActivity" style="color: #f1f5f9; font-weight: 600;">Starting local GPU inference...</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.85rem;">
+                            <span style="color: #94a3b8;">⏱️ <strong id="pgBatchElapsed" style="color: #ffffff;">00:00</strong></span>
+                            <span style="color: #94a3b8;">⏳ <strong id="pgBatchEta" style="color: #38bdf8;">ETA: Calculating...</strong></span>
+                            <span id="pgBatchPercent" style="color: #34d399; font-weight: 700;">0%</span>
+                        </div>
+                    </div>
+                    <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                        <div id="pgBatchProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #6366f1, #38bdf8, #34d399); border-radius: 3px; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+
+                <!-- Live Stocks & Predictions List -->
+                <div style="border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden; background: #030305;">
+                    <div style="padding: 0.55rem 0.85rem; background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">
+                        <span>Stock Candidate & Technical Profile</span>
+                        <span>Local AI Prediction Verdict & Actions</span>
+                    </div>
+                    <div id="pgBatchListContainer" style="display: flex; flex-direction: column; max-height: 550px; overflow-y: auto;">
+                        <div style="padding: 2rem; text-align: center; color: #64748b; font-size: 0.8rem;">
+                            Select a stock list source above and click <strong>⚡ Run Local AI Notes</strong> to generate parallel predictions.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Request builder -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">🧪 API Console</h3>
+                        <p class="timestamp" style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--text-muted);">Raw JSON explorer for Market Data / NSE / yfinance / Kronos</p>
+                    </div>
+                    <div style="display: flex; gap: 0.35rem; align-items: center;">
+                        <label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.75rem;color:var(--muted);cursor:pointer;" title="Always hit live source">
+                            <input type="checkbox" id="pgLive" checked style="accent-color:var(--accent);"> LIVE</label>
+                        <button type="button" id="pgSendBtn" onclick="app.pg.send()" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Send</button>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center;">
+                    <div class="search-wrap" style="flex:1;min-width:180px;position:relative;">
+                        <input type="text" id="pgSymbol" placeholder="Symbol (e.g., RELIANCE.NS, ZOMATO.NS, AAPL)" value="RELIANCE.NS" style="width:100%;height:30px;padding:0 0.55rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;background:#000000;color:#ededed;font-size:0.75rem;font-family:var(--font-mono);outline:none;" autocomplete="off">
+                        <div id="pgSymbolDropdown" class="dropdown"></div>
+                    </div>
+                    <select id="pgGroup" style="height:30px;padding:0 0.5rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;background:#000000;color:#ededed;font-size:0.75rem;outline:none;">
+                        <option value="Market Data">Market Data</option>
+                        <option value="NSE">NSE</option>
+                        <option value="yfinance">yfinance</option>
+                        <option value="Kronos">Kronos</option>
+                    </select>
+                    <select id="pgEndpoint" style="flex:1;min-width:200px;height:30px;padding:0 0.5rem;border:1px solid rgba(255,255,255,0.15);border-radius:6px;background:#000000;color:#ededed;font-size:0.75rem;outline:none;"></select>
+                </div>
+                <div id="pgParams" style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.4rem;"></div>
+                <p id="pgRequestLine" class="timestamp" style="margin:0.4rem 0 0 0;font-size:0.72rem;color:var(--text-muted);">Select an endpoint and click Send.</p>
+            </section>
+
+            <!-- Response viewer -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <h4 style="margin: 0; font-size: 0.95rem; font-family:'Space Grotesk',sans-serif; color:#ffffff;">📦 Raw JSON Response</h4>
+                    <div style="display: flex; gap: 0.35rem; align-items: center;">
+                        <span id="pgStatus" class="timestamp" style="font-size:0.72rem;"></span>
+                        <button type="button" onclick="app.pg.copyJson()" class="btn btn-sm" style="padding:0.25rem 0.55rem;font-size:0.75rem;">📋 Copy</button>
+                    </div>
+                </div>
+                <div id="pgResponse" class="table-wrapper" style="max-height:460px;overflow:auto;background:#030305;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;padding:0.75rem;font-family:var(--font-mono);font-size:0.75rem;white-space:pre-wrap;word-break:break-word;color:#38bdf8;">
+                    <span class="timestamp">No request sent yet.</span>
+                </div>
+            </section>
+
+            <!-- Secondary: NSE universe stats + Kronos quick run -->
+            <details style="background:#060609;border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:0.6rem 0.85rem;">
+                <summary style="cursor:pointer;color:#38bdf8;font-weight:700;font-size:0.78rem;">📁 NSE Universe Stats & 🤖 Kronos Quick Run (Secondary Utilities)</summary>
+                <div style="margin-top:0.65rem;display:flex;flex-direction:column;gap:0.75rem;">
+                    <div class="card" style="padding:0.75rem;background:#0a0a10;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <h4 style="margin: 0; font-size:0.9rem; color:#ffffff;">🇮🇳 NSE Universe Stats</h4>
+                            <button type="button" onclick="app.loadPlaygroundNse()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Load</button>
+                        </div>
+                        <p class="timestamp" style="margin: 0 0 0.5rem 0; font-size:0.72rem;">Universe sizes from nsetools (<code>NSE_ALL</code>) and yfinance fast_info (<code>NSE_LARGE_CAP</code>, > 1000 cr).</p>
+                        <div id="pgNseStats" class="widget-grid"></div>
+                    </div>
+                    <div class="card" style="padding:0.75rem;background:#0a0a10;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                            <h4 style="margin: 0; font-size:0.9rem; color:#ffffff;">🤖 Kronos Quick Run</h4>
+                            <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                                <input type="text" id="pgKronosTickers" placeholder="Comma-separated tickers (blank = watchlist)" style="min-width:180px;height:28px;padding:0 0.5rem;border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;background:#030305;color:#fff;font-size:0.75rem;font-family:var(--font-mono);outline:none;">
+                                <button type="button" id="pgKronosRunBtn" onclick="app.runPlaygroundKronos()" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Run</button>
+                            </div>
+                        </div>
+                        <div id="pgKronosStatus" class="timestamp" style="font-size:0.72rem;"></div>
+                    </div>
+                </div>
+            </details>
+        </div>

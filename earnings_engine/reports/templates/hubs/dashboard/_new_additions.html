@@ -1,0 +1,95 @@
+<!-- ========================================================================= -->
+<!-- 🆕 RECENT MARKET ADDITIONS, IPOS & DEBUT EARNINGS TRACKER -->
+<!-- ========================================================================= -->
+<div id="tab-new-additions" class="tab-content" style="width:100%;max-width:100%;">
+
+    <!-- Header Toolbar -->
+    <div class="terminal-subnav" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;padding:0.75rem 1rem;background:#080808;border:1px solid rgba(255,255,255,0.08);border-radius:8px;margin-bottom:1rem;">
+        
+        <!-- Left: Title & Subtitle -->
+        <div style="display:flex;align-items:center;gap:0.6rem;min-width:240px;">
+            <div style="width:34px;height:34px;border-radius:8px;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">
+                🆕
+            </div>
+            <div>
+                <div style="font-weight:700;font-size:0.92rem;color:#f1f5f9;display:flex;align-items:center;gap:0.4rem;">
+                    <span>Recent Market Additions &amp; IPO Tracker</span>
+                    <span id="newAdditionsCountBadge" class="sidebar-pill" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);">NSE REAL-TIME</span>
+                </div>
+                <div style="font-size:0.72rem;color:#94a3b8;">Official NSE newly listed companies, IPO debut dates, watchlist sync, and 1st/2nd quarterly earnings alerts.</div>
+            </div>
+        </div>
+
+        <!-- Right: Filter Controls & Actions -->
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            
+            <!-- Lookback Window Selector -->
+            <select id="newAdditionsDaysSelect" onchange="app.loadRecentAdditions()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;font-size:0.76rem;padding:0.35rem 0.6rem;border-radius:6px;outline:none;cursor:pointer;">
+                <option value="30">Last 30 Days Listings</option>
+                <option value="90">Last 90 Days Listings</option>
+                <option value="180" selected>Last 6 Months Listings</option>
+                <option value="365">Last 1 Year Listings</option>
+            </select>
+
+            <!-- Series Filter -->
+            <select id="newAdditionsSeriesSelect" onchange="app.filterRecentAdditionsTable()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;font-size:0.76rem;padding:0.35rem 0.6rem;border-radius:6px;outline:none;cursor:pointer;">
+                <option value="ALL">All Series (EQ + SME)</option>
+                <option value="MAIN">Mainboard (EQ)</option>
+                <option value="SME">SME Segment (SM/ST)</option>
+            </select>
+
+            <!-- Refresh Button -->
+            <button type="button" onclick="app.loadRecentAdditions()" class="btn btn-sm" style="background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);font-weight:600;font-size:0.76rem;padding:0.35rem 0.75rem;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:0.35rem;">
+                <span>🔄 Refresh NSE List</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Metrics Row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:0.75rem;margin-bottom:1rem;">
+        <div class="card" style="padding:0.75rem 1rem;background:#0d1117;border:1px solid rgba(255,255,255,0.08);border-radius:6px;">
+            <div style="font-size:0.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">New Listings Found</div>
+            <div id="metricTotalNewListings" style="font-size:1.4rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);margin-top:0.2rem;">—</div>
+        </div>
+        <div class="card" style="padding:0.75rem 1rem;background:#0d1117;border:1px solid rgba(255,255,255,0.08);border-radius:6px;">
+            <div style="font-size:0.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">🌟 1st Result (Debut)</div>
+            <div id="metricFirstResultCount" style="font-size:1.4rem;font-weight:700;color:#fbbf24;font-family:var(--font-mono);margin-top:0.2rem;">—</div>
+        </div>
+        <div class="card" style="padding:0.75rem 1rem;background:#0d1117;border:1px solid rgba(255,255,255,0.08);border-radius:6px;">
+            <div style="font-size:0.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">🌱 2nd Public Result</div>
+            <div id="metricSecondResultCount" style="font-size:1.4rem;font-weight:700;color:#34d399;font-family:var(--font-mono);margin-top:0.2rem;">—</div>
+        </div>
+        <div class="card" style="padding:0.75rem 1rem;background:#0d1117;border:1px solid rgba(255,255,255,0.08);border-radius:6px;">
+            <div style="font-size:0.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">In My Watchlist</div>
+            <div id="metricInWatchlistCount" style="font-size:1.4rem;font-weight:700;color:#38bdf8;font-family:var(--font-mono);margin-top:0.2rem;">—</div>
+        </div>
+    </div>
+
+    <!-- Main Table Card -->
+    <div class="card" style="background:#0b0f19;border:1px solid rgba(255,255,255,0.08);border-radius:8px;overflow:hidden;">
+        <div style="overflow-x:auto;">
+            <table style="width:100%;font-size:0.76rem;text-align:left;border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#070a10;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.5px;">
+                        <th style="padding:0.65rem 0.8rem;">TICKER</th>
+                        <th style="padding:0.65rem 0.8rem;">COMPANY NAME</th>
+                        <th style="padding:0.65rem 0.8rem;">SERIES</th>
+                        <th style="padding:0.65rem 0.8rem;">LISTING DATE</th>
+                        <th style="padding:0.65rem 0.8rem;">MARKET AGE</th>
+                        <th style="padding:0.65rem 0.8rem;">EARNINGS SEQUENCE</th>
+                        <th style="padding:0.65rem 0.8rem;">WATCHLIST</th>
+                        <th style="padding:0.65rem 0.8rem;text-align:center;">ACTIONS</th>
+                    </tr>
+                </thead>
+                <tbody id="newAdditionsTableBody">
+                    <tr>
+                        <td colspan="8" style="padding:2.5rem;text-align:center;color:#60a5fa;">
+                            <span class="spinner"></span> Loading official NSE recent listings...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>

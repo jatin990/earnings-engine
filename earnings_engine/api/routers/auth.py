@@ -33,7 +33,7 @@ async def serve_portal():
     """Serve the Nexus Passcode Portal, Join Onboarding & App Launcher."""
     try:
         env = get_template_env()
-        template = env.get_template("portal.html")
+        template = env.get_template("hubs/portal/index.html")
         html = template.render()
         return HTMLResponse(html)
     except Exception as exc:
@@ -325,3 +325,4 @@ async def update_friend_access_endpoint(user_id: str, request: Request):
     if not success:
         raise HTTPException(status_code=404, detail="Friend not found.")
     return {"success": True, "user_id": user_id, "updated_scopes": scopes_dict}
+

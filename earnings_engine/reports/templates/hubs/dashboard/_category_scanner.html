@@ -1,0 +1,130 @@
+        <!-- ================= ACTIVE MULTI-CATEGORY SCANNER TAB ================= -->
+        <div id="tab-scanner" class="tab-content" style="width: 100%; max-width: 100%;">
+            
+            <!-- ⚡ Top Scanner Metrics KPI Cards with Soft Under-Glow -->
+            <div id="scannerSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Order Wins & Deals</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Fundamental</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><span id="scannerCount-order_wins">0</span> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Catalysts</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Contract Wins, M&A, Approvals</div>
+                </div>
+
+                <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Squeeze & Coils</span>
+                        <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Pre-Breakout</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);"><span id="scannerCount-squeeze_breakout">0</span> <span style="font-size:0.85rem;color:#6ee7b7;font-weight:500;">Setups</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Bollinger Band Contraction</div>
+                </div>
+
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">52W High Momentum</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">All-Time High</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);"><span id="scannerCount-high_52w">0</span> <span style="font-size:0.85rem;color:#93c5fd;font-weight:500;">Stocks</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Within 3% of 52W Peak</div>
+                </div>
+
+                <div class="card card-glow-amber" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#fbbf24;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Sector Momentum</span>
+                        <span class="signal-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;font-size:0.62rem;">Institutional</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#fbbf24;font-family:var(--font-heading);"><span id="scannerCount-sector_momentum">0</span> <span style="font-size:0.85rem;color:#fde68a;font-weight:500;">Leaders</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Industry Group Breakouts</div>
+                </div>
+            </div>
+
+            <!-- Scanner Header & Deep Sweep Control -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.6rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
+                            <span>🔍 Multi-Category Stock Scanner</span>
+                            <span id="scannerTotalBadge" class="signal-badge" style="font-size:0.68rem;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.3);padding:0.12rem 0.45rem;"></span>
+                        </h3>
+                        <p class="timestamp" style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--text-muted);">
+                            Unified scanner across Fundamental News Catalysts, Technical Squeeze Coils, 52W High Breakouts & Sector Momentum.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 0.45rem; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.35rem; background: #000000; padding: 0.15rem 0.5rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);">
+                            <span style="font-size: 0.72rem; color: #a1a1aa;">⭐</span>
+                            <select id="scannerWatchlistSelect" onchange="app.onScannerWatchlistChange(this.value)" style="border: none; background: transparent; color: #ededed; font-size: 0.76rem; font-weight: 500; cursor: pointer; outline: none;" title="Select Watchlist or Universe to scan">
+                                <option value="NSE_TOP">NSE_TOP (Top Active ~50)</option>
+                                <option value="NSE_LARGE_CAP">NSE_LARGE_CAP (> 1000 Cr)</option>
+                                <option value="NSE_ALL">NSE_ALL (All Traded Equities)</option>
+                                <option value="US_TOP">US_TOP (US Mega-Caps)</option>
+                            </select>
+                        </div>
+                        <button type="button" onclick="app.deepSweepScanner()" id="scannerSweepBtn" class="btn btn-primary btn-sm" style="font-weight: 600;">
+                            <span>⚡</span> Deep Sweep All Categories
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Category Pills Bar -->
+            <section class="card" style="padding: 0.65rem 0.9rem; margin-bottom: 0.75rem; background: #08080e;">
+                <div style="font-size: 0.7rem; color: var(--muted); text-transform: uppercase; margin-bottom: 0.4rem; font-weight: 700; letter-spacing: 0.04em;">
+                    ⚡ Select Category to Scan:
+                </div>
+                <div id="scannerCategoryPills" style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                    <!-- Category pills populated by JS -->
+                </div>
+            </section>
+
+            <!-- Active Category Banner & Candidates Section -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+                <div id="activeCategoryBanner" style="background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; padding: 0.6rem 0.85rem; margin-bottom: 0.65rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <h4 id="activeCatTitle" style="margin: 0; font-size: 0.95rem; font-family: 'Space Grotesk', sans-serif; color: #f8fafc;">Category Candidates</h4>
+                            <span id="activeCatCountBadge" class="signal-badge" style="font-size: 0.68rem; background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3);">0 stocks</span>
+                        </div>
+                        <p id="activeCatDescription" style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--muted);"></p>
+                    </div>
+                    <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="scannerSearchInput" oninput="app.filterScannerCandidates()" placeholder="🔍 Filter ticker or name..." style="padding:0.25rem 0.55rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;min-width:170px;font-family:var(--font-mono);outline:none;">
+                        <select id="scannerSortBy" onchange="app.filterScannerCandidates()" style="padding:0.25rem 0.55rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
+                            <option value="confidence">Sort by Confidence Score</option>
+                            <option value="gain">Sort by Daily Gain (%)</option>
+                            <option value="volume">Sort by Volume Surge</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Candidates Table View -->
+                <div class="table-wrapper" style="overflow-x: auto;">
+                    <table class="results-table" style="font-size:0.78rem; width: 100%; border-collapse: collapse;">
+                        <thead><tr>
+                            <th style="width: 36px; text-align: center;">#</th>
+                            <th style="min-width: 150px; text-align: left;">Stock / Ticker</th>
+                            <th style="min-width: 240px; max-width: 360px; text-align: left;">News Date & Headline</th>
+                            <th style="min-width: 90px; text-align: right;">Signal Price</th>
+                            <th style="min-width: 100px; text-align: right;">Current Price</th>
+                            <th style="min-width: 95px; text-align: right;">Trigger (Res)</th>
+                            <th style="min-width: 100px; text-align: right;">Target / Stop</th>
+                            <th style="min-width: 80px; text-align: right;">Return %</th>
+                            <th style="min-width: 110px; text-align: center;">Outcome</th>
+                            <th style="min-width: 100px; text-align: center;">Severity / Score</th>
+                            <th style="min-width: 120px; text-align: center;">Actions</th>
+                        </tr></thead>
+                        <tbody id="scannerCandidatesTableBody">
+                            <tr>
+                                <td colspan="11" style="padding:2.5rem 1.5rem;text-align:center;color:var(--muted);">
+                                    <div style="font-size:2rem;margin-bottom:0.5rem;">🔍</div>
+                                    <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;">Scanner Ready</h4>
+                                    <p style="font-size:0.8rem;margin:0;color:var(--text-muted);">Select your watchlist / universe above and click <strong>Deep Sweep</strong> in the top toolbar to scan candidates.</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>

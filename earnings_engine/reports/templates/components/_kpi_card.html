@@ -1,0 +1,6 @@
+{# KPI metric card. Params: title, value, delta, color #}
+<div class="kpi-card" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.6rem;padding:0.75rem;">
+    <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;font-weight:600;margin-bottom:0.25rem;">{{ title }}</div>
+    <div style="font-size:1.2rem;font-weight:700;color:{{ color | default('var(--light)') }};">{{ value }}</div>
+    {% if delta %}<div style="font-size:0.72rem;color:#94a3b8;margin-top:2px;">{{ delta }}</div>{% endif %}
+</div>

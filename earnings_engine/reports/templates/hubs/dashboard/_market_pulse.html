@@ -1,0 +1,287 @@
+<!-- ========================================================================= -->
+<!-- 🏠 MARKET PULSE & MACRO COMMAND CENTER (HOMEPAGE) -->
+<!-- ========================================================================= -->
+<div id="tab-home" class="tab-content active" style="width: 100%; max-width: 100%;">
+
+    <!-- Top Header Bar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.25rem;background:#090d1a;padding:0.9rem 1.15rem;border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div style="width:36px;height:36px;border-radius:8px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.3);display:flex;align-items:center;justify-content:center;font-size:1.15rem;">
+                🌐
+            </div>
+            <div>
+                <div style="font-size:1.15rem;font-weight:800;color:#f8fafc;display:flex;align-items:center;gap:0.5rem;letter-spacing:-0.02em;">
+                    Daily Market Pulse & Macro Radar
+                    <span id="pulseLiveBadge" class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.65rem;padding:0.15rem 0.5rem;">● LIVE TICK</span>
+                </div>
+                <div style="font-size:0.74rem;color:#94a3b8;margin-top:0.15rem;">
+                    Real-time market sentiment, India VIX volatility matrix, fear & greed gauge, institutional liquidity, and algorithmic predictions.
+                </div>
+            </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+            <span id="pulseAsOfTime" style="font-size:0.7rem;color:#64748b;font-family:var(--font-mono);">Updated: just now</span>
+            <button type="button" onclick="app.loadMarketPulseData(true)" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.3rem 0.65rem;display:flex;align-items:center;gap:0.3rem;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);">
+                <span>🔄</span> Refresh Pulse
+            </button>
+        </div>
+    </div>
+
+    <!-- 1. Major Benchmark Indices Grid -->
+    <div id="pulseIndicesGrid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(175px, 1fr));gap:0.75rem;margin-bottom:1.25rem;">
+        <!-- Dynamic Index Cards -->
+    </div>
+
+    <!-- 2. Primary 3-Column Macro Grid: Fear/Greed + Volatility + Market Prediction -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:1rem;margin-bottom:1.25rem;">
+        
+        <!-- Card 1: Fear & Greed Index -->
+        <div class="card" style="padding:1rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+                    <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+                        <span>🧭</span> Fear & Greed Index
+                    </div>
+                    <span id="pulseFgBadge" class="signal-badge" style="background:rgba(52,211,153,0.15);color:#34d399;font-size:0.72rem;">Greed / Bullish</span>
+                </div>
+
+                <!-- Big Meter Score Display -->
+                <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.5rem;">
+                    <span id="pulseFgScore" style="font-size:2.5rem;font-weight:900;color:#34d399;font-family:var(--font-mono);line-height:1;">68.5</span>
+                    <span style="font-size:0.85rem;color:#64748b;font-weight:600;">/ 100</span>
+                </div>
+
+                <!-- Multi-tier Visual Gradient Progress Bar -->
+                <div style="width:100%;height:8px;background:#1e293b;border-radius:4px;overflow:hidden;position:relative;margin-bottom:0.75rem;">
+                    <div id="pulseFgBar" style="width:68.5%;height:100%;background:linear-gradient(90deg, #f43f5e 0%, #f97316 35%, #fbbf24 50%, #34d399 75%, #10b981 100%);border-radius:4px;transition:width 0.5s ease;"></div>
+                </div>
+
+                <div id="pulseFgDesc" style="font-size:0.72rem;color:#cbd5e1;line-height:1.45;margin-bottom:0.85rem;">
+                    Constructive risk appetite with strong institutional liquidity and rising sector participation.
+                </div>
+            </div>
+
+            <!-- Sub-factor Breakdown Bars -->
+            <div style="background:#060a16;padding:0.65rem 0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);display:flex;flex-direction:column;gap:0.4rem;font-size:0.68rem;">
+                <div style="display:flex;justify-content:space-between;color:#94a3b8;">
+                    <span>Price Momentum</span>
+                    <strong id="pulseFgMom" style="color:#34d399;font-family:var(--font-mono);">72.0</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;color:#94a3b8;">
+                    <span>Volatility Inversion (VIX)</span>
+                    <strong id="pulseFgVix" style="color:#38bdf8;font-family:var(--font-mono);">74.5</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;color:#94a3b8;">
+                    <span>Market Breadth Surge</span>
+                    <strong id="pulseFgBreadth" style="color:#fbbf24;font-family:var(--font-mono);">62.0</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: India VIX & Volatility Matrix -->
+        <div class="card" style="padding:1rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+                    <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+                        <span>⚡</span> India VIX Volatility Matrix
+                    </div>
+                    <span id="pulseVixRegimeBadge" class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.72rem;">🔵 Calm / Trend Friendly</span>
+                </div>
+
+                <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.5rem;">
+                    <span id="pulseVixLevel" style="font-size:2.5rem;font-weight:900;color:#38bdf8;font-family:var(--font-mono);line-height:1;">13.82</span>
+                    <span id="pulseVixChange" style="font-size:0.85rem;color:#34d399;font-weight:700;font-family:var(--font-mono);">-2.14% 1D</span>
+                </div>
+
+                <div id="pulseVixDesc" style="font-size:0.72rem;color:#cbd5e1;line-height:1.45;margin-bottom:0.85rem;">
+                    Complacent or strong trending market; momentum breakouts have higher follow-through with minimal tail risk.
+                </div>
+            </div>
+
+            <!-- VIX Regimes Grid -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;font-size:0.68rem;">
+                <div style="background:#060a16;padding:0.5rem;border-radius:5px;border:1px solid rgba(255,255,255,0.05);">
+                    <div style="color:#94a3b8;">Market Regime</div>
+                    <div id="pulseVixStance" style="font-weight:800;color:#34d399;margin-top:0.15rem;">BULLISH TREND</div>
+                </div>
+                <div style="background:#060a16;padding:0.5rem;border-radius:5px;border:1px solid rgba(255,255,255,0.05);">
+                    <div style="color:#94a3b8;">Tail Risk Probability</div>
+                    <div style="font-weight:800;color:#38bdf8;margin-top:0.15rem;font-family:var(--font-mono);">LOW (&lt; 8%)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: AI Macro Directional Prediction -->
+        <div class="card" style="padding:1rem;background:#0f172a;border:1px solid rgba(56,189,248,0.3);display:flex;flex-direction:column;justify-content:space-between;">
+            <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+                    <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+                        <span>🤖</span> Macro Directional Prediction
+                    </div>
+                    <span id="pulseConvictionPill" class="badge" style="background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-size:0.68rem;padding:0.15rem 0.45rem;">84% CONVICTION</span>
+                </div>
+
+                <div id="pulsePredictionRegime" style="font-size:1.05rem;font-weight:800;color:#34d399;margin-bottom:0.4rem;">
+                    🟢 Bullish Momentum Expansion
+                </div>
+
+                <div id="pulsePredictionCommentary" style="font-size:0.72rem;color:#cbd5e1;line-height:1.5;margin-bottom:0.85rem;">
+                    Broad market is operating in a high-liquidity expansion phase with India VIX calm below 15. Institutional DII + FII cash participation remains positive, and high market breadth favors dip-buying in momentum earnings beaters.
+                </div>
+            </div>
+
+            <!-- Key Levels -->
+            <div style="background:#060a16;padding:0.6rem 0.75rem;border-radius:6px;border:1px solid rgba(56,189,248,0.2);display:flex;justify-content:space-between;font-size:0.7rem;">
+                <div>
+                    <span style="color:#94a3b8;">Nifty Major Support:</span>
+                    <strong id="pulseNiftySupport" style="color:#f8fafc;font-family:var(--font-mono);margin-left:0.3rem;">24,650</strong>
+                </div>
+                <div>
+                    <span style="color:#94a3b8;">Nifty Target Resistance:</span>
+                    <strong id="pulseNiftyResistance" style="color:#38bdf8;font-family:var(--font-mono);margin-left:0.3rem;">25,200</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Market Breadth & Institutional Net Cash Flows (2-Column Grid) -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(360px, 1fr));gap:1rem;margin-bottom:1.25rem;">
+        
+        <!-- Breadth & DMA Distribution -->
+        <div class="card" style="padding:1rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;margin-bottom:0.75rem;">
+                <span>📊</span> NSE Market Breadth & Technical Participation
+            </div>
+
+            <!-- Advances vs Declines Bar -->
+            <div style="margin-bottom:0.85rem;">
+                <div style="display:flex;justify-content:space-between;font-size:0.72rem;margin-bottom:0.3rem;">
+                    <span style="color:#34d399;font-weight:700;">🟢 <span id="pulseAdvancesCount">1,240</span> Advances</span>
+                    <span style="color:#94a3b8;"><span id="pulseUnchangedCount">110</span> Unchanged</span>
+                    <span style="color:#f87171;font-weight:700;">🔴 <span id="pulseDeclinesCount">860</span> Declines</span>
+                </div>
+                <div style="width:100%;height:7px;background:#1e293b;border-radius:4px;overflow:hidden;display:flex;">
+                    <div id="pulseAdvBar" style="width:58%;height:100%;background:#10b981;"></div>
+                    <div id="pulseUnchBar" style="width:5%;height:100%;background:#64748b;"></div>
+                    <div id="pulseDecBar" style="width:37%;height:100%;background:#ef4444;"></div>
+                </div>
+            </div>
+
+            <!-- DMA Metrics -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.72rem;">
+                <div style="background:#060a16;padding:0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                    <div style="color:#94a3b8;font-size:0.68rem;">Stocks > 20-DMA (Short-term)</div>
+                    <div id="pulsePct20dma" style="font-size:1.1rem;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:0.2rem;">64.5%</div>
+                </div>
+                <div style="background:#060a16;padding:0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
+                    <div style="color:#94a3b8;font-size:0.68rem;">Stocks > 50-DMA (Medium-term)</div>
+                    <div id="pulsePct50dma" style="font-size:1.1rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:0.2rem;">58.2%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Institutional Net Cash Flows (FII/DII) -->
+        <!-- Institutional Net Cash Flows (FII/DII) -->
+        <div class="card" style="padding:1rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+                <div style="display:flex;align-items:center;gap:0.4rem;">
+                    <span>🏦</span> Institutional Net Cash Liquidity (FII + DII)
+                </div>
+                <span id="pulse7dTotalBadge" style="font-size:0.68rem;padding:0.15rem 0.5rem;border-radius:4px;background:rgba(56,189,248,0.12);color:#38bdf8;font-family:var(--font-mono);font-weight:700;border:1px solid rgba(56,189,248,0.25);">
+                    7D Net: —
+                </span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin-bottom:0.75rem;">
+                <div style="background:#060a16;padding:0.55rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);text-align:center;">
+                    <div style="color:#94a3b8;font-size:0.68rem;">Today FII Net</div>
+                    <div id="pulseFiiNet" style="font-size:0.95rem;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:0.15rem;">+₹850.5 Cr</div>
+                </div>
+                <div style="background:#060a16;padding:0.55rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);text-align:center;">
+                    <div style="color:#94a3b8;font-size:0.68rem;">Today DII Net</div>
+                    <div id="pulseDiiNet" style="font-size:0.95rem;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:0.15rem;">+₹1,420.0 Cr</div>
+                </div>
+                <div style="background:#060a16;padding:0.55rem;border-radius:6px;border:1px solid rgba(56,189,248,0.2);text-align:center;">
+                    <div style="color:#94a3b8;font-size:0.68rem;">Today Combined</div>
+                    <div id="pulseTotalNet" style="font-size:0.95rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:0.15rem;">+₹2,270.5 Cr</div>
+                </div>
+            </div>
+
+            <div style="font-size:0.72rem;color:#cbd5e1;background:#060a16;padding:0.45rem 0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+                <span>Today's Liquidity Stance:</span>
+                <strong id="pulseInstBias" style="color:#34d399;font-weight:800;">NET INFLOWS (BULLISH)</strong>
+            </div>
+
+            <!-- Past 7 Days / 30 Days Flow History Table -->
+            <div style="margin-top:0.5rem;">
+                <div style="font-size:0.72rem;font-weight:700;color:#94a3b8;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;flex-wrap:wrap;gap:0.35rem;">
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                        <span>📅</span> <span id="pulseFlowHistoryTitle">Past 7 Days Activity</span>
+                        <span id="pulseFlowHistoryCountBadge" style="font-size:0.60rem;padding:0.08rem 0.35rem;border-radius:3px;background:rgba(255,255,255,0.06);color:#94a3b8;font-family:var(--font-mono);">7 Sessions</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.45rem;">
+                        <span id="pulse7dFiiDiiSummary" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">FII vs DII Daily Breakdown</span>
+                        <button type="button" id="pulseToggleFlowHistoryBtn" onclick="marketPulseModule.toggleFlowHistory()" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.62rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:0.25rem;transition:all 0.15s ease;">
+                            🔽 Show More (30D)
+                        </button>
+                    </div>
+                </div>
+                <div id="pulseFlowsTableContainer" style="overflow-x:auto;max-height:180px;overflow-y:auto;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:#060a16;transition:max-height 0.25s ease;">
+                    <table style="width:100%;border-collapse:collapse;font-size:0.68rem;text-align:left;">
+                        <thead>
+                            <tr style="background:#0a0f1d;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-size:0.65rem;text-transform:uppercase;letter-spacing:0.03em;position:sticky;top:0;z-index:2;">
+                                <th style="padding:0.35rem 0.5rem;">Date</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:right;">FII Net</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:right;">DII Net</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:right;">Total Net</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:center;">Stance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pulse7dFlowsTableBody">
+                            <!-- Populated dynamically via market_pulse.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Sector Relative Strength Heatmap -->
+    <div class="card" style="padding:1rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);margin-bottom:1.25rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+            <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+                <span>🔥</span> Key NSE Sectoral Heatmap & Relative Performance
+            </div>
+            <div style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">
+                1D / 7D / 30D Returns
+            </div>
+        </div>
+
+        <div id="pulseSectorsGrid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:0.6rem;">
+            <!-- Dynamic Sector Tiles -->
+        </div>
+    </div>
+
+    <!-- 5. Quick Launchpad Shortcuts -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:0.75rem;">
+        <div class="card" style="padding:0.85rem;background:#0f172a;border:1px solid rgba(56,189,248,0.25);cursor:pointer;transition:transform 0.15s;" onclick="app.switchTab('breakout')">
+            <div style="font-size:0.8rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
+                <span>⚡</span> Breakout Radar Scanner
+            </div>
+            <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">Screen high-conviction compression breakouts with volume surge.</div>
+        </div>
+        <div class="card" style="padding:0.85rem;background:#0f172a;border:1px solid rgba(16,185,129,0.25);cursor:pointer;transition:transform 0.15s;" onclick="app.switchTab('institutional')">
+            <div style="font-size:0.8rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
+                <span>🏛️</span> Institutional Accumulation Hub
+            </div>
+            <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">Track mutual funds, FIIs & smart money buying pressure.</div>
+        </div>
+        <div class="card" style="padding:0.85rem;background:#0f172a;border:1px solid rgba(168,85,247,0.25);cursor:pointer;transition:transform 0.15s;" onclick="app.switchTab('results')">
+            <div style="font-size:0.8rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
+                <span>📊</span> Corporate Results Ledger
+            </div>
+            <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">Upcoming earnings dates and AI surprise forecasting.</div>
+        </div>
+    </div>
+</div>

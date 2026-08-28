@@ -27,7 +27,7 @@ async def serve_net_worth():
     """Serve the Net Worth & Asset Allocation Hub page."""
     try:
         env = get_template_env()
-        template = env.get_template("net_worth.html")
+        template = env.get_template("hubs/net_worth/index.html")
         html = template.render()
         return HTMLResponse(html)
     except Exception as exc:
@@ -144,3 +144,4 @@ async def get_net_worth_history(session: dict = Depends(require_scope("can_view_
         })
 
     return {"success": True, "count": len(history), "history": history}
+

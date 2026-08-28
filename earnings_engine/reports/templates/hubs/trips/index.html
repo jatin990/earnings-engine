@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trips & Expeditions Hub // Nexus</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-heading: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+
+            --bg-void: #030712;
+            --bg-surface: #0b101b;
+            --bg-elevated: #111827;
+            --bg-card: rgba(15, 23, 42, 0.75);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-highlight: rgba(56, 189, 248, 0.35);
+
+            --accent-cyan: #38bdf8;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-indigo: #6366f1;
+            --accent-rose: #f43f5e;
+            --accent-purple: #a855f7;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-void);
+            color: #f1f5f9;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.07) 0%, transparent 45%),
+                radial-gradient(circle at 90% 15%, rgba(99, 102, 241, 0.06) 0%, transparent 45%),
+                radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.04) 0%, transparent 50%),
+                linear-gradient(180deg, #030712 0%, #080d1a 100%);
+            background-attachment: fixed;
+            margin: 0;
+            padding: 0;
+        }
+
+        .heading-title {
+            font-family: var(--font-heading);
+            letter-spacing: -0.02em;
+        }
+
+        .font-mono-code {
+            font-family: var(--font-mono);
+        }
+
+        /* Glassmorphic Obsidian Card */
+        .glass-card {
+            background: linear-gradient(180deg, rgba(17, 24, 39, 0.75) 0%, rgba(11, 16, 27, 0.85) 100%);
+            border: 1px solid var(--border-subtle);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.02) inset;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .glass-card:hover {
+            border-color: rgba(56, 189, 248, 0.25);
+            box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), 0 0 20px -5px rgba(56, 189, 248, 0.15);
+            transform: translateY(-2px);
+        }
+
+        /* Interactive Filter Chip */
+        .filter-chip {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            user-select: none;
+        }
+        .filter-chip.active {
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+            font-weight: 700;
+        }
+
+        /* Featured Hero Canvas */
+        .hero-banner {
+            position: relative;
+            border-radius: 1.5rem;
+            overflow: hidden;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(14, 116, 144, 0.4) 50%, rgba(3, 7, 18, 0.98) 100%);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            box-shadow: 0 25px 50px -15px rgba(0, 0, 0, 0.8), 0 0 30px -5px rgba(14, 116, 144, 0.3);
+        }
+
+        .hero-banner::before {
+            content: '';
+            position: absolute;
+            top: 0; right: 0; bottom: 0; left: 0;
+            background: radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.15), transparent 60%);
+            pointer-events: none;
+        }
+
+        /* Modals & Backdrops */
+        .modal-overlay {
+            background: rgba(3, 7, 18, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .modal-card {
+            background: linear-gradient(180deg, #0f172a 0%, #0b1120 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 30px rgba(56, 189, 248, 0.1);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.4); }
+
+        /* Reactive Upvote Button */
+        .btn-vote {
+            transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s;
+        }
+        .btn-vote:active {
+            transform: scale(0.9);
+        }
+        .btn-vote.voted {
+            background: rgba(244, 63, 94, 0.2) !important;
+            border-color: rgba(244, 63, 94, 0.5) !important;
+            color: #fb7185 !important;
+        }
+
+        /* Pulse glow animation */
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+        .glow-pulse {
+            animation: pulse-glow 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 text-slate-200">
+
+    <div class="max-w-7xl mx-auto space-y-8">
+
+        <!-- ================= MASTER HEADER NAV ================= -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/[0.08]">
+            <div class="flex items-center gap-4">
+                <a href="/portal" class="p-2.5 rounded-xl border border-white/10 bg-slate-900/80 text-slate-400 hover:text-white hover:border-sky-500/50 hover:bg-sky-500/10 transition shadow-sm" title="Back to Nexus Portal">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </a>
+                <div>
+                    <div class="flex items-center gap-2.5 flex-wrap">
+                        <span class="text-2xl">✈️</span>
+                        <h1 class="heading-title text-2xl md:text-3xl font-black tracking-tight text-white">TRIPS & EXPEDITIONS</h1>
+                        <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider bg-sky-500/15 text-sky-400 border border-sky-500/30">Nexus Travel Vault</span>
+                    </div>
+                    <p class="text-xs text-slate-400 font-medium mt-0.5">Global itineraries, flight manifests, luxury resort stays, and collaborative member excursions</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div id="userBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-white/10 text-xs font-semibold text-slate-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="userNameLabel">Verifying access...</span>
+                </div>
+
+                <button type="button" id="addTripBtn" onclick="openAddTripModal()" class="hidden items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-bold transition shadow-lg shadow-sky-500/25">
+                    <span>+ Add Trip</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- ================= STATS OVERVIEW CARDS ================= -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-sky-500 to-transparent"></div>
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+                    <span>Active Expeditions</span>
+                    <span class="text-sky-400 text-sm">🌏</span>
+                </div>
+                <div id="statTotalTrips" class="heading-title text-2xl font-extrabold text-white">--</div>
+                <div class="text-[11px] text-emerald-400 font-semibold mt-1 flex items-center gap-1">
+                    <span>●</span> <span>Scheduled & Confirmed</span>
+                </div>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 to-transparent"></div>
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+                    <span>Next Departure</span>
+                    <span class="text-amber-400 text-sm">⏳</span>
+                </div>
+                <div id="statNextDate" class="heading-title text-xl font-extrabold text-white">--</div>
+                <div id="statNextCity" class="text-[11px] text-amber-300 font-semibold mt-1 truncate">Kyoto, Japan</div>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 to-transparent"></div>
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+                    <span>Group Budget Est.</span>
+                    <span class="text-indigo-400 text-sm">💳</span>
+                </div>
+                <div id="statTotalBudget" class="heading-title text-2xl font-extrabold text-white">--</div>
+                <div class="text-[11px] text-indigo-300 font-semibold mt-1">Total estimated across plans</div>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden">
+                <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-transparent"></div>
+                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+                    <span>Community Ideas</span>
+                    <span class="text-purple-400 text-sm">💡</span>
+                </div>
+                <div id="statActivitiesCount" class="heading-title text-2xl font-extrabold text-white">--</div>
+                <div class="text-[11px] text-purple-300 font-semibold mt-1">Voted member excursions</div>
+            </div>
+        </div>
+
+        <!-- ================= FEATURED NEXT EXPEDITION HERO ================= -->
+        <div id="featuredHeroCard" class="hero-banner p-6 md:p-8 space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                <div class="space-y-1.5">
+                    <div class="flex items-center gap-2">
+                        <span class="px-3 py-0.5 bg-sky-500/20 border border-sky-400/30 backdrop-blur-md rounded-full text-[10px] font-bold tracking-wider uppercase text-sky-300">Featured Expedition</span>
+                        <span id="heroStatusBadge" class="px-3 py-0.5 bg-emerald-500/20 border border-emerald-400/30 backdrop-blur-md rounded-full text-[10px] font-bold tracking-wider uppercase text-emerald-300">Confirmed</span>
+                    </div>
+                    <h2 id="heroTripTitle" class="heading-title text-2xl md:text-3xl font-black tracking-tight text-white">Kyoto & Tokyo Cherry Blossom Expedition</h2>
+                    <p id="heroTripDates" class="text-xs md:text-sm font-medium text-slate-300 flex items-center gap-2 flex-wrap">
+                        <span>🗓️ Oct 10, 2026 – Oct 22, 2026</span>
+                        <span>•</span>
+                        <span>📍 Japan (Kyoto & Tokyo)</span>
+                    </p>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button type="button" onclick="openActivityModalForFeatured()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-sky-500/20 flex items-center gap-2">
+                        <span>💡 Suggest Activity</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Flight and Hotel Fast Info -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+                <div class="bg-slate-900/70 backdrop-blur-md p-4 rounded-xl border border-white/10 space-y-2">
+                    <div class="flex items-center justify-between text-xs font-bold text-sky-400 uppercase tracking-wider">
+                        <span class="flex items-center gap-1.5"><span>✈️</span> <span>Flight Manifest</span></span>
+                        <span class="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded">Confirmed</span>
+                    </div>
+                    <div id="heroFlightDetails" class="text-sm font-semibold text-white">ANA All Nippon NH-830 (BOM -> HND)</div>
+                    <div class="text-xs text-slate-400">Baggage: 2x 23kg included • Terminal 2</div>
+                </div>
+
+                <div class="bg-slate-900/70 backdrop-blur-md p-4 rounded-xl border border-white/10 space-y-2">
+                    <div class="flex items-center justify-between text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                        <span class="flex items-center gap-1.5"><span>🏨</span> <span>Luxury Accommodation</span></span>
+                        <span class="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">Reserved</span>
+                    </div>
+                    <div id="heroHotelDetails" class="text-sm font-semibold text-white">Hyatt Regency Kyoto & Cerulean Tower Shibuya</div>
+                    <div class="text-xs text-slate-400">Breakfast included • Mountain & City Skyline view</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TRAVEL GROUPS & CIRCLES TOOLBAR ================= -->
+        <div class="glass-card p-4 rounded-2xl space-y-3">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-xl">👥</span>
+                    <div>
+                        <h3 class="heading-title text-sm font-bold text-white">Travel Groups & Circles</h3>
+                        <p class="text-[11px] text-slate-400">Collaborative travel pods, member directories, and scoped group itineraries</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="manageGroupBtn" onclick="openManageCurrentGroupModal()" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 border border-white/10 text-slate-300 hover:text-white hover:bg-slate-700 text-xs font-bold transition">
+                        <span>⚙️ Manage Group & Roster</span>
+                    </button>
+                    <button type="button" id="createGroupBtn" onclick="openCreateGroupModal()" class="hidden items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition shadow-sm shadow-sky-500/20">
+                        <span>+ Create Group</span>
+                    </button>
+                </div>
+            </div>
+            <div id="groupTabsContainer" class="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                <!-- Group tabs rendered via JS -->
+            </div>
+        </div>
+
+        <!-- ================= TRIPS LIST & ITINERARIES ================= -->
+        <section class="space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="heading-title text-lg font-bold text-white flex items-center gap-2">
+                        <span id="tripsSectionIcon">🗺️</span>
+                        <span id="tripsSectionTitle">All Expeditions & Itineraries</span>
+                    </h2>
+                    <p class="text-xs text-slate-400" id="tripsSectionSubtitle">Upcoming travel schedules and destinations</p>
+                </div>
+                <div class="text-xs text-slate-400 font-semibold" id="tripsCountLabel">Loading trips...</div>
+            </div>
+
+            <div id="tripsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Trips rendered via JS -->
+            </div>
+        </section>
+
+        <!-- ================= REDESIGNED SUGGESTIONS & ACTIVITIES SECTION ================= -->
+        <section class="glass-card p-6 rounded-2xl space-y-6 relative overflow-hidden">
+            <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 via-sky-500 to-purple-500"></div>
+
+            <!-- Header & Action Bar -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">💡</span>
+                        <h2 class="heading-title text-lg font-bold text-white">Community Suggestions & Excursions</h2>
+                        <span id="activitiesTotalBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">0</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-0.5">Collaborative spots, hidden gems, and dining recommendations proposed by friends</p>
+                </div>
+                <button type="button" onclick="openActivityModal()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-500 hover:to-sky-500 text-white text-xs font-bold transition flex items-center gap-2 self-start md:self-auto shadow-md shadow-indigo-500/20">
+                    <span>+ Suggest New Activity</span>
+                </button>
+            </div>
+
+            <!-- Controls & Filters Strip (Clean & Uncluttered) -->
+            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-white/[0.06]">
+                <!-- Category Filter Chips -->
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 text-xs">
+                    <button type="button" onclick="setActivityCategoryFilter('ALL')" id="catChip_ALL" class="filter-chip active px-3 py-1 rounded-lg border border-white/10 text-slate-400 hover:text-white whitespace-nowrap">
+                        🌟 All (<span id="catCount_ALL">0</span>)
+                    </button>
+                    <button type="button" onclick="setActivityCategoryFilter('DINING')" id="catChip_DINING" class="filter-chip px-3 py-1 rounded-lg border border-white/10 text-slate-400 hover:text-white whitespace-nowrap">
+                        🍽️ Food & Dining (<span id="catCount_DINING">0</span>)
+                    </button>
+                    <button type="button" onclick="setActivityCategoryFilter('ADVENTURE')" id="catChip_ADVENTURE" class="filter-chip px-3 py-1 rounded-lg border border-white/10 text-slate-400 hover:text-white whitespace-nowrap">
+                        🏔️ Adventure (<span id="catCount_ADVENTURE">0</span>)
+                    </button>
+                    <button type="button" onclick="setActivityCategoryFilter('SIGHTSEEING')" id="catChip_SIGHTSEEING" class="filter-chip px-3 py-1 rounded-lg border border-white/10 text-slate-400 hover:text-white whitespace-nowrap">
+                        🏛️ Culture (<span id="catCount_SIGHTSEEING">0</span>)
+                    </button>
+                    <button type="button" onclick="setActivityCategoryFilter('NIGHTLIFE')" id="catChip_NIGHTLIFE" class="filter-chip px-3 py-1 rounded-lg border border-white/10 text-slate-400 hover:text-white whitespace-nowrap">
+                        🍸 Nightlife (<span id="catCount_NIGHTLIFE">0</span>)
+                    </button>
+                </div>
+
+                <!-- Search & Sort Controls -->
+                <div class="flex items-center gap-2">
+                    <!-- Target Trip Selector -->
+                    <select id="actTripFilterSelect" onchange="applyActivityFilters()" class="bg-slate-800 border border-white/10 text-slate-200 text-xs font-semibold px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-sky-500 max-w-[160px] truncate">
+                        <option value="ALL">All Itineraries</option>
+                        <!-- Populated by JS -->
+                    </select>
+
+                    <!-- Sort Selector -->
+                    <select id="actSortSelect" onchange="applyActivityFilters()" class="bg-slate-800 border border-white/10 text-slate-200 text-xs font-semibold px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-sky-500">
+                        <option value="votes">🔥 Most Voted</option>
+                        <option value="newest">✨ Newest</option>
+                        <option value="cost_asc">💰 Budget: Low to High</option>
+                        <option value="cost_desc">💎 Luxury: High to Low</option>
+                    </select>
+
+                    <!-- Search Input -->
+                    <div class="relative min-w-[160px]">
+                        <input type="text" id="actSearchInput" oninput="applyActivityFilters()" placeholder="Search..." class="w-full bg-slate-800 border border-white/10 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-sky-500 placeholder-slate-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activities Clean Grid -->
+            <div id="activitiesListContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Rendered dynamically via JS -->
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ================= MODAL: CREATE GROUP (Owner) ================= -->
+    <div id="createGroupModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="modal-card w-full max-w-xl rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🌴</span>
+                    <h3 class="heading-title text-base font-bold text-white">Create New Travel Group</h3>
+                </div>
+                <button type="button" onclick="closeCreateGroupModal()" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            </div>
+
+            <form id="createGroupForm" onsubmit="submitNewGroup(event)" class="space-y-4">
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Group Name</label>
+                        <input type="text" id="grpName" required placeholder="e.g. Bali Expedition 2026" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Icon</label>
+                        <select id="grpIcon" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                            <option value="🌴">🌴 Tropical</option>
+                            <option value="⛰️">⛰️ Mountains</option>
+                            <option value="✈️">✈️ Global</option>
+                            <option value="⛵">⛵ Sailing</option>
+                            <option value="🌸">🌸 Japan</option>
+                            <option value="🍷">🍷 Europe</option>
+                            <option value="🌌">🌌 Arctic</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Description</label>
+                    <textarea id="grpDescription" rows="2" placeholder="Brief note about this group or travel circle..." class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500"></textarea>
+                </div>
+
+                <!-- Add Friends Section -->
+                <div class="bg-slate-900/80 p-4 rounded-xl border border-white/10 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">👥 Add Friends & Dispatch Invites</label>
+                        <span class="text-[10px] text-slate-500 font-semibold">Auto-links friend codes</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="memberInputName" placeholder="Friend Name (e.g. Alice)" class="bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500">
+                        <input type="email" id="memberInputEmail" oninput="checkFriendEmailLookup(this.value)" placeholder="Friend Email (e.g. alice@...)" class="bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500">
+                    </div>
+
+                    <div id="emailLookupStatus" class="hidden text-[11px] font-semibold px-2 py-1 rounded-lg"></div>
+
+                    <button type="button" onclick="addMemberToStaging()" class="w-full py-1.5 bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/25 rounded-xl text-xs font-bold transition">
+                        + Add Friend to Group Roster
+                    </button>
+
+                    <!-- Staged members list -->
+                    <div id="stagedMembersList" class="space-y-1.5 pt-1"></div>
+                </div>
+
+                <!-- Attach Trips Section -->
+                <div class="bg-slate-900/80 p-4 rounded-xl border border-white/10 space-y-2">
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">🗺️ Attach Existing Trips</label>
+                    <div id="tripCheckboxesContainer" class="space-y-1.5 max-h-32 overflow-y-auto text-xs">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                    <button type="button" onclick="closeCreateGroupModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-sky-500/20">Create Group & Dispatch Invites</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL: MANAGE GROUP & MEMBER ROSTER ================= -->
+    <div id="manageGroupModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="modal-card w-full max-w-2xl rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                <div class="flex items-center gap-2">
+                    <span id="manageGroupIcon" class="text-xl">🌴</span>
+                    <div>
+                        <h3 id="manageGroupName" class="heading-title text-base font-bold text-white">Group Management</h3>
+                        <p id="manageGroupDesc" class="text-xs text-slate-400"></p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeManageGroupModal()" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            </div>
+
+            <!-- Group Invite Link & Share Card -->
+            <div class="bg-gradient-to-r from-sky-950/40 to-indigo-950/40 p-4 rounded-xl border border-sky-500/30 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-sky-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>🔗 Personalized Group Invite Link</span>
+                    </span>
+                    <span id="manageGroupCodeBadge" class="text-xs font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-sky-400/40 text-sky-400">NEXUS-GRP-XXXX</span>
+                </div>
+                <p class="text-xs text-slate-400">
+                    Friends using this link or code land directly on this group's trip page with verified access.
+                </p>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="manageGroupInviteUrl" readonly class="flex-1 bg-slate-900 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono text-slate-300 select-all">
+                    <button type="button" onclick="copyGroupInviteUrl()" class="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                        Copy Link
+                    </button>
+                    <button type="button" onclick="shareGroupOnWhatsApp()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                        WhatsApp
+                    </button>
+                </div>
+            </div>
+
+            <!-- Members Directory & Personal Passcodes -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>👥 Member Directory & Passcodes</span>
+                    </h4>
+                    <span id="manageMemberCount" class="text-xs font-semibold text-slate-400">0 members</span>
+                </div>
+
+                <div id="manageMembersContainer" class="space-y-2 max-h-56 overflow-y-auto">
+                    <!-- Member items rendered via JS -->
+                </div>
+
+                <!-- Add Member Form inside Manage Modal (Owner only) -->
+                <div id="manageAddMemberForm" class="bg-slate-900/80 p-3.5 rounded-xl border border-white/10 space-y-2">
+                    <span class="text-xs font-bold text-slate-300 block">Add Friend to Group</span>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="quickAddName" placeholder="Name (e.g. Bob)" class="bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500">
+                        <input type="email" id="quickAddEmail" oninput="checkQuickFriendEmailLookup(this.value)" placeholder="Email (e.g. bob@...)" class="bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div id="quickLookupStatus" class="hidden text-[11px] font-semibold px-2 py-1 rounded-lg"></div>
+                    <button type="button" onclick="submitQuickAddMember()" class="w-full py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                        + Add Member & Send Email Invite
+                    </button>
+                </div>
+            </div>
+
+            <!-- Attached Trips in Manage Modal -->
+            <div class="space-y-2 pt-2 border-t border-white/10">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">🗺️ Attached Trips</h4>
+                    <button type="button" id="btnSaveAttachedTrips" onclick="saveAttachedTripsForCurrentGroup()" class="text-xs text-sky-400 hover:text-sky-300 font-bold">
+                        Save Attached Trips
+                    </button>
+                </div>
+                <div id="manageGroupTripsChecklist" class="space-y-1.5 max-h-36 overflow-y-auto text-xs">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-3 border-t border-white/10">
+                <button type="button" id="btnDeleteCurrentGroup" onclick="deleteCurrentGroup()" class="text-xs text-rose-400 hover:text-rose-300 font-semibold">
+                    Delete Group
+                </button>
+                <button type="button" onclick="closeManageGroupModal()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MODAL: ADD TRIP (Owner) ================= -->
+    <div id="addTripModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="modal-card w-full max-w-lg rounded-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">✈️</span>
+                    <h3 class="heading-title text-base font-bold text-white">Add New Trip Itinerary</h3>
+                </div>
+                <button type="button" onclick="closeAddTripModal()" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            </div>
+
+            <form id="addTripForm" onsubmit="submitNewTrip(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Trip Title</label>
+                    <input type="text" id="tripTitle" required placeholder="e.g. Iceland Northern Lights & Glacier Tour" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Destination</label>
+                        <input type="text" id="tripDestination" required placeholder="e.g. Reykjavik, Iceland" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Status</label>
+                        <select id="tripStatus" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                            <option value="planning">Planning (Draft)</option>
+                            <option value="confirmed" selected>Confirmed</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Start Date</label>
+                        <input type="date" id="tripStartDate" required class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">End Date</label>
+                        <input type="date" id="tripEndDate" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Estimated Budget (₹)</label>
+                        <input type="number" id="tripBudget" value="250000" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Cover Theme</label>
+                        <select id="tripCover" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                            <option value="japan">🌸 Japan / Asian Garden</option>
+                            <option value="swiss">🏔️ Swiss Alps / Mountains</option>
+                            <option value="amalfi">⛵ Mediterranean Coast</option>
+                            <option value="aurora">🌌 Northern Lights / Arctic</option>
+                            <option value="safari">🦁 Safari & Wilderness</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Flight Details (Optional)</label>
+                    <input type="text" id="tripFlights" placeholder="e.g. Qatar Airways QR-556 (BOM -> DOH -> KEF)" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Accommodation / Hotel (Optional)</label>
+                    <input type="text" id="tripHotels" placeholder="e.g. The Reykjavik EDITION & Ion Adventure Hotel" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Trip Notes & Highlights</label>
+                    <textarea id="tripNotes" rows="2" placeholder="Key landmarks, visa guidelines, packing notes..." class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500"></textarea>
+                </div>
+
+                <div class="flex items-center gap-2 p-3 bg-sky-950/40 rounded-xl border border-sky-500/30">
+                    <input type="checkbox" id="tripShared" checked class="w-4 h-4 rounded text-sky-500 focus:ring-0 bg-slate-900 border-white/20">
+                    <label for="tripShared" class="text-xs font-semibold text-sky-300 cursor-pointer">
+                        Share this trip itinerary with verified friends
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                    <button type="button" onclick="closeAddTripModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-sky-500/20">Create Trip</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= MODAL: SUGGEST ACTIVITY ================= -->
+    <div id="suggestActivityModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="modal-card w-full max-w-md rounded-2xl p-6 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">💡</span>
+                    <h3 class="heading-title text-base font-bold text-white">Suggest Activity</h3>
+                </div>
+                <button type="button" onclick="closeActivityModal()" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            </div>
+
+            <form id="suggestActivityForm" onsubmit="submitActivitySuggestion(event)" class="space-y-3">
+                <input type="hidden" id="actTripId">
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Target Itinerary</label>
+                    <select id="actTripSelect" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Your Name</label>
+                        <input type="text" id="actMemberName" required placeholder="e.g. Rohan / Sarah" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Category</label>
+                        <select id="actCategorySelect" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                            <option value="DINING">🍽️ Food & Dining</option>
+                            <option value="ADVENTURE">🏔️ Adventure & Outdoors</option>
+                            <option value="SIGHTSEEING" selected>🏛️ Sightseeing & Heritage</option>
+                            <option value="NIGHTLIFE">🍸 Nightlife & Social</option>
+                            <option value="TRANSIT">🚗 Transit & Stays</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Activity Title</label>
+                    <input type="text" id="actTitle" required placeholder="e.g. Helicopter tour over Mount Fuji" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Location / Spot</label>
+                        <input type="text" id="actLocation" placeholder="e.g. Tokyo, Japan" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Approx Cost (₹)</label>
+                        <input type="number" id="actCost" value="5000" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                    <button type="button" onclick="closeActivityModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-sky-500 hover:from-indigo-400 hover:to-sky-400 text-white text-xs font-bold shadow-md shadow-indigo-500/20">Submit Suggestion</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= JS ENGINE ================= -->
+    <script>
+        let allTrips = [];
+        let allGroups = [];
+        let allActivities = [];
+        let activeGroupId = 'all';
+        let activeActivityCategory = 'ALL';
+        let isOwner = false;
+        let stagedMembers = [];
+        let userVotedActivityIds = new Set();
+
+        // Load local voted IDs
+        try {
+            const savedVotes = JSON.parse(localStorage.getItem('nexus_trip_voted_activities') || '[]');
+            userVotedActivityIds = new Set(savedVotes);
+        } catch(e) {}
+
+        async function fetchTripsData() {
+            try {
+                // Fetch trips and groups in parallel
+                const [tripsRes, groupsRes] = await Promise.all([
+                    fetch('/api/v1/trips'),
+                    fetch('/api/v1/trips/groups')
+                ]);
+
+                if (!tripsRes.ok) throw new Error('Failed loading trips');
+                const data = await tripsRes.json();
+                allTrips = data.trips || [];
+                isOwner = Boolean(data.is_owner);
+
+                if (groupsRes.ok) {
+                    const grpData = await groupsRes.json();
+                    allGroups = grpData.groups || [];
+                }
+
+                // Update UI badges & action buttons
+                const userBadge = document.getElementById('userNameLabel');
+                const addBtn = document.getElementById('addTripBtn');
+                const createGrpBtn = document.getElementById('createGroupBtn');
+
+                if (isOwner) {
+                    userBadge.textContent = 'Vault Owner (Full Admin)';
+                    userBadge.className = 'text-emerald-400 font-bold';
+                    addBtn.classList.remove('hidden');
+                    addBtn.classList.add('flex');
+                    createGrpBtn.classList.remove('hidden');
+                    createGrpBtn.classList.add('flex');
+                } else {
+                    userBadge.textContent = 'Friend Access (Shared Trips)';
+                    userBadge.className = 'text-sky-400 font-bold';
+                }
+
+                renderGroupTabs();
+                renderStats();
+                renderFeaturedHero();
+                renderTripsGrid();
+                populateActivityTripFilterOptions();
+                await fetchActivitiesForTrips();
+            } catch (err) {
+                console.error(err);
+                document.getElementById('tripsGrid').innerHTML = `
+                    <div class="col-span-3 text-center py-12 text-slate-500 text-xs">
+                        Failed to fetch trips. Please ensure your access passcode is active.
+                    </div>
+                `;
+            }
+        }
+
+        function renderGroupTabs() {
+            const container = document.getElementById('groupTabsContainer');
+            const manageBtn = document.getElementById('manageGroupBtn');
+
+            if (activeGroupId !== 'all') {
+                manageBtn.classList.remove('hidden');
+                manageBtn.classList.add('flex');
+            } else {
+                manageBtn.classList.add('hidden');
+                manageBtn.classList.remove('flex');
+            }
+
+            let tabsHtml = `
+                <button type="button" onclick="selectGroupTab('all')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${activeGroupId === 'all' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm shadow-sky-500/10' : 'bg-slate-900 border border-white/10 text-slate-400 hover:text-white hover:bg-slate-800'}">
+                    <span>🌟 All Expeditions</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full ${activeGroupId === 'all' ? 'bg-sky-500/30 text-sky-200' : 'bg-slate-800 text-slate-400'}">${allTrips.length}</span>
+                </button>
+            `;
+
+            tabsHtml += allGroups.map(g => {
+                const isActive = activeGroupId === g.id;
+                return `
+                    <button type="button" onclick="selectGroupTab('${g.id}')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 whitespace-nowrap ${isActive ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm shadow-sky-500/10' : 'bg-slate-900 border border-white/10 text-slate-400 hover:text-white hover:bg-slate-800'}">
+                        <span>${g.icon || '🌴'} ${g.name}</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-sky-500/30 text-sky-200' : 'bg-slate-800 text-slate-400'}">${g.trip_count || 0}</span>
+                    </button>
+                `;
+            }).join('');
+
+            container.innerHTML = tabsHtml;
+        }
+
+        function selectGroupTab(groupId) {
+            activeGroupId = groupId;
+            renderGroupTabs();
+            renderTripsGrid();
+
+            const secTitle = document.getElementById('tripsSectionTitle');
+            const secIcon = document.getElementById('tripsSectionIcon');
+            const secSub = document.getElementById('tripsSectionSubtitle');
+
+            if (groupId === 'all') {
+                secIcon.textContent = '🗺️';
+                secTitle.textContent = 'All Expeditions & Itineraries';
+                secSub.textContent = 'Upcoming travel schedules and destinations';
+            } else {
+                const grp = allGroups.find(g => g.id === groupId);
+                if (grp) {
+                    secIcon.textContent = grp.icon || '🌴';
+                    secTitle.textContent = `${grp.name} Itineraries`;
+                    secSub.textContent = grp.description || `Attached itineraries for ${grp.name} (${grp.member_count} members)`;
+                }
+            }
+        }
+
+        function renderStats() {
+            document.getElementById('statTotalTrips').textContent = allTrips.length;
+            const totalBudget = allTrips.reduce((acc, t) => acc + (t.estimated_budget || 0), 0);
+            document.getElementById('statTotalBudget').textContent = '₹' + (totalBudget / 100000).toFixed(1) + 'L';
+
+            if (allTrips.length > 0) {
+                const nextTrip = allTrips[0];
+                document.getElementById('statNextDate').textContent = nextTrip.start_date || 'TBD';
+                document.getElementById('statNextCity').textContent = nextTrip.destination || '--';
+            }
+        }
+
+        function renderFeaturedHero() {
+            if (!allTrips.length) return;
+            const t = allTrips[0];
+            document.getElementById('heroTripTitle').textContent = t.title;
+            document.getElementById('heroTripDates').innerHTML = `
+                <span>🗓️ ${t.start_date} ${t.end_date ? '– ' + t.end_date : ''}</span>
+                <span>•</span>
+                <span>📍 ${t.destination}</span>
+            `;
+            document.getElementById('heroFlightDetails').textContent = t.flight_details || 'Flight bookings in progress';
+            document.getElementById('heroHotelDetails').textContent = t.hotel_details || 'Luxury resorts and boutique stays';
+        }
+
+        function renderTripsGrid() {
+            const container = document.getElementById('tripsGrid');
+            
+            // Filter trips based on active group tab
+            let displayTrips = allTrips;
+            if (activeGroupId !== 'all') {
+                const grp = allGroups.find(g => g.id === activeGroupId);
+                const attachedIds = grp ? grp.attached_trips.map(at => at.id) : [];
+                displayTrips = allTrips.filter(t => attachedIds.includes(t.id));
+            }
+
+            document.getElementById('tripsCountLabel').textContent = `${displayTrips.length} active itineraries`;
+
+            if (!displayTrips.length) {
+                container.innerHTML = `
+                    <div class="col-span-3 text-center py-12 text-slate-500 text-xs font-semibold">
+                        No scheduled trips found ${activeGroupId !== 'all' ? 'in this group' : ''}.
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = displayTrips.map(t => {
+                const statusBg = t.status === 'confirmed' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
+                                 t.status === 'completed' ? 'bg-slate-800 text-slate-400 border-white/10' :
+                                 'bg-amber-500/15 text-amber-400 border-amber-500/30';
+
+                // Cover icon
+                const coverIcon = t.cover_image === 'japan' ? '🌸' :
+                                  t.cover_image === 'swiss' ? '🏔️' :
+                                  t.cover_image === 'amalfi' ? '⛵' :
+                                  t.cover_image === 'aurora' ? '🌌' :
+                                  t.cover_image === 'safari' ? '🦁' : '🌴';
+
+                // Group badge chips
+                const groupChips = (t.groups || []).map(g => `
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                        ${g.icon || '🌴'} ${g.name}
+                    </span>
+                `).join('');
+
+                return `
+                    <div class="glass-card rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between flex-wrap gap-2">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${statusBg}">
+                                        ${t.status}
+                                    </span>
+                                    ${groupChips}
+                                </div>
+                                <span class="text-xs text-slate-400 font-mono">₹${((t.estimated_budget || 0) / 1000).toLocaleString('en-IN')}k</span>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-xl">${coverIcon}</span>
+                                    <h3 class="heading-title text-base font-extrabold text-white tracking-tight leading-snug">${t.title}</h3>
+                                </div>
+                                <p class="text-xs text-sky-400 font-semibold">📍 ${t.destination}</p>
+                            </div>
+
+                            <div class="bg-slate-900/80 border border-white/[0.08] rounded-xl p-3 text-xs text-slate-300 space-y-1.5">
+                                <div class="flex items-center justify-between text-slate-400 font-semibold">
+                                    <span>🗓️ Dates</span>
+                                    <span class="text-white">${t.start_date} ${t.end_date ? '→ ' + t.end_date : ''}</span>
+                                </div>
+                                ${t.flight_details ? `
+                                    <div class="flex items-center justify-between text-slate-400 font-semibold truncate">
+                                        <span>✈️ Flight</span>
+                                        <span class="text-slate-200 truncate ml-2">${t.flight_details}</span>
+                                    </div>
+                                ` : ''}
+                                ${t.hotel_details ? `
+                                    <div class="flex items-center justify-between text-slate-400 font-semibold truncate">
+                                        <span>🏨 Stay</span>
+                                        <span class="text-slate-200 truncate ml-2">${t.hotel_details}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+
+                            ${t.notes ? `
+                                <p class="text-xs text-slate-400 line-clamp-2 italic">"${t.notes}"</p>
+                            ` : ''}
+                        </div>
+
+                        <div class="flex items-center justify-between pt-3 border-t border-white/[0.08]">
+                            <button type="button" onclick="openActivityModalForTrip('${t.id}')" class="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-xs font-bold transition flex items-center gap-1.5">
+                                <span>💡 Suggest Idea</span>
+                            </button>
+
+                            ${isOwner ? `
+                                <button type="button" onclick="deleteTrip('${t.id}')" class="text-xs text-rose-400 hover:text-rose-300 font-semibold px-2 py-1">
+                                    Delete
+                                </button>
+                            ` : `
+                                <span class="text-[11px] text-emerald-400 font-semibold">✓ Verified Shared</span>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ================= ACTIVITIES & SUGGESTIONS LOGIC =================
+        function populateActivityTripFilterOptions() {
+            const select = document.getElementById('actTripFilterSelect');
+            if (!select) return;
+            select.innerHTML = `<option value="ALL">All Itineraries</option>` + allTrips.map(t => `
+                <option value="${t.id}">${t.title} (${t.destination})</option>
+            `).join('');
+        }
+
+        async function fetchActivitiesForTrips() {
+            if (!allTrips.length) return;
+            allActivities = [];
+
+            for (const t of allTrips) {
+                try {
+                    const res = await fetch(`/api/v1/trips/${t.id}/activities`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.activities) {
+                            allActivities = allActivities.concat(data.activities.map(a => ({
+                                ...a,
+                                trip_id: t.id,
+                                trip_title: t.title,
+                                trip_dest: t.destination,
+                                category: inferActivityCategory(a.activity_title, a.location)
+                            })));
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            document.getElementById('statActivitiesCount').textContent = allActivities.length;
+            const badge = document.getElementById('activitiesTotalBadge');
+            if (badge) badge.textContent = allActivities.length;
+
+            updateCategoryCounts();
+            applyActivityFilters();
+        }
+
+        function inferActivityCategory(title = '', location = '') {
+            const text = (title + ' ' + location).toLowerCase();
+            if (text.includes('food') || text.includes('dining') || text.includes('ramen') || text.includes('sushi') || text.includes('dinner') || text.includes('lunch') || text.includes('cafe') || text.includes('restaurant') || text.includes('tasting') || text.includes('wine') || text.includes('pizza') || text.includes('bbq')) {
+                return 'DINING';
+            }
+            if (text.includes('hike') || text.includes('climb') || text.includes('glacier') || text.includes('helicopter') || text.includes('boat') || text.includes('scuba') || text.includes('dive') || text.includes('safari') || text.includes('kayak') || text.includes('ski') || text.includes('trek') || text.includes('surf')) {
+                return 'ADVENTURE';
+            }
+            if (text.includes('bar') || text.includes('club') || text.includes('night') || text.includes('cocktail') || text.includes('lounge') || text.includes('pub') || text.includes('party')) {
+                return 'NIGHTLIFE';
+            }
+            if (text.includes('temple') || text.includes('shrine') || text.includes('museum') || text.includes('palace') || text.includes('castle') || text.includes('art') || text.includes('historic') || text.includes('tower') || text.includes('garden') || text.includes('tour') || text.includes('sight')) {
+                return 'SIGHTSEEING';
+            }
+            return 'SIGHTSEEING';
+        }
+
+        function updateCategoryCounts() {
+            const counts = { ALL: allActivities.length, DINING: 0, ADVENTURE: 0, SIGHTSEEING: 0, NIGHTLIFE: 0 };
+            allActivities.forEach(a => {
+                if (counts[a.category] !== undefined) counts[a.category]++;
+            });
+            Object.keys(counts).forEach(k => {
+                const el = document.getElementById(`catCount_${k}`);
+                if (el) el.textContent = counts[k];
+            });
+        }
+
+        function setActivityCategoryFilter(cat) {
+            activeActivityCategory = cat;
+            ['ALL', 'DINING', 'ADVENTURE', 'SIGHTSEEING', 'NIGHTLIFE'].forEach(k => {
+                const el = document.getElementById(`catChip_${k}`);
+                if (el) {
+                    if (k === cat) el.classList.add('active');
+                    else el.classList.remove('active');
+                }
+            });
+            applyActivityFilters();
+        }
+
+        function applyActivityFilters() {
+            const tripFilter = document.getElementById('actTripFilterSelect')?.value || 'ALL';
+            const sortMode = document.getElementById('actSortSelect')?.value || 'votes';
+            const searchQuery = (document.getElementById('actSearchInput')?.value || '').toLowerCase().trim();
+            const container = document.getElementById('activitiesListContainer');
+
+            if (!container) return;
+
+            let filtered = allActivities.slice();
+
+            // 1. Trip filter
+            if (tripFilter !== 'ALL') {
+                filtered = filtered.filter(a => a.trip_id === tripFilter);
+            }
+
+            // 2. Category filter
+            if (activeActivityCategory !== 'ALL') {
+                filtered = filtered.filter(a => a.category === activeActivityCategory);
+            }
+
+            // 3. Search query
+            if (searchQuery) {
+                filtered = filtered.filter(a => 
+                    (a.activity_title || '').toLowerCase().includes(searchQuery) ||
+                    (a.location || '').toLowerCase().includes(searchQuery) ||
+                    (a.suggested_by_name || '').toLowerCase().includes(searchQuery) ||
+                    (a.trip_title || '').toLowerCase().includes(searchQuery)
+                );
+            }
+
+            // 4. Sorting
+            if (sortMode === 'votes') {
+                filtered.sort((a, b) => (b.votes_count || 1) - (a.votes_count || 1));
+            } else if (sortMode === 'newest') {
+                filtered.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+            } else if (sortMode === 'cost_asc') {
+                filtered.sort((a, b) => (a.approx_cost || 0) - (b.approx_cost || 0));
+            } else if (sortMode === 'cost_desc') {
+                filtered.sort((a, b) => (b.approx_cost || 0) - (a.approx_cost || 0));
+            }
+
+            if (!filtered.length) {
+                container.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-slate-500 text-xs">
+                        <div class="text-2xl mb-2">🔍</div>
+                        <div class="font-bold text-slate-400">No suggestions match the selected criteria.</div>
+                        <p class="mt-1">Try switching category tabs or click "+ Suggest New Activity".</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(a => {
+                const isVoted = userVotedActivityIds.has(a.id);
+                const catIcon = a.category === 'DINING' ? '🍽️' :
+                                a.category === 'ADVENTURE' ? '🏔️' :
+                                a.category === 'NIGHTLIFE' ? '🍸' : '🏛️';
+                const catLabel = a.category === 'DINING' ? 'Food & Dining' :
+                                 a.category === 'ADVENTURE' ? 'Adventure' :
+                                 a.category === 'NIGHTLIFE' ? 'Nightlife' : 'Culture';
+
+                return `
+                    <div class="glass-card rounded-2xl p-4 flex flex-col justify-between space-y-3 relative overflow-hidden group">
+                        <div class="space-y-2">
+                            <!-- Top metadata pill row -->
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider flex items-center gap-1">
+                                    <span>${catIcon}</span> <span>${catLabel}</span>
+                                </span>
+                                <span class="text-[10px] text-slate-400 font-mono">
+                                    ₹${Number(a.approx_cost || 0).toLocaleString('en-IN')}
+                                </span>
+                            </div>
+
+                            <!-- Title & Location -->
+                            <div>
+                                <h4 class="text-sm font-bold text-white tracking-tight leading-snug group-hover:text-sky-300 transition">${a.activity_title}</h4>
+                                <p class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1 truncate">
+                                    <span>📍</span> <span class="truncate">${a.location || a.trip_dest || 'Local area'}</span>
+                                </p>
+                            </div>
+
+                            <!-- Trip Tag -->
+                            <div class="text-[10px] text-slate-500 flex items-center gap-1 truncate">
+                                <span class="text-slate-400 font-semibold truncate">Trip:</span>
+                                <span class="text-sky-400/90 truncate">${a.trip_title}</span>
+                            </div>
+                        </div>
+
+                        <!-- Footer Actions -->
+                        <div class="flex items-center justify-between pt-2.5 border-t border-white/[0.06] text-xs">
+                            <div class="flex items-center gap-1.5 text-slate-400 text-[11px]">
+                                <span class="w-4 h-4 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-[8px] text-slate-300 font-bold">@</span>
+                                <span>${a.suggested_by_name}</span>
+                            </div>
+
+                            <div class="flex items-center gap-1.5">
+                                ${isOwner ? `
+                                    <button type="button" onclick="deleteActivity('${a.trip_id}', '${a.id}')" class="text-slate-500 hover:text-rose-400 p-1 text-[11px] transition" title="Delete suggestion">
+                                        🗑️
+                                    </button>
+                                ` : ''}
+
+                                <button type="button" onclick="voteForActivity('${a.trip_id}', '${a.id}', this)" class="btn-vote ${isVoted ? 'voted' : ''} flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800/90 border border-white/10 hover:border-sky-500/40 text-xs font-bold text-slate-200 shadow-sm">
+                                    <span>👍</span>
+                                    <span class="vote-count font-mono">${a.votes_count || 1}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function voteForActivity(tripId, actId, btn) {
+            try {
+                const countSpan = btn.querySelector('.vote-count');
+                const current = parseInt(countSpan.textContent || '1', 10);
+                
+                // Optimistic UI update
+                btn.classList.add('voted');
+                countSpan.textContent = current + 1;
+                userVotedActivityIds.add(actId);
+                localStorage.setItem('nexus_trip_voted_activities', JSON.stringify(Array.from(userVotedActivityIds)));
+
+                const res = await fetch(`/api/v1/trips/${tripId}/activities/${actId}/vote`, { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.votes_count) countSpan.textContent = data.votes_count;
+                }
+            } catch(e) {
+                console.error('Vote error:', e);
+            }
+        }
+
+        async function deleteActivity(tripId, actId) {
+            if (!confirm('Are you sure you want to remove this suggestion?')) return;
+            try {
+                const res = await fetch(`/api/v1/trips/${tripId}/activities/${actId}`, { method: 'DELETE' });
+                if (res.ok) {
+                    allActivities = allActivities.filter(a => a.id !== actId);
+                    updateCategoryCounts();
+                    applyActivityFilters();
+                }
+            } catch(e) {
+                console.error('Delete activity error:', e);
+            }
+        }
+
+        // ================= GROUP MANAGEMENT MODALS & LOGIC =================
+        function openCreateGroupModal() {
+            stagedMembers = [];
+            renderStagedMembers();
+            populateTripsCheckboxes('tripCheckboxesContainer');
+            document.getElementById('createGroupModal').style.display = 'flex';
+        }
+        function closeCreateGroupModal() {
+            document.getElementById('createGroupModal').style.display = 'none';
+        }
+
+        function populateTripsCheckboxes(containerId, checkedTripIds = []) {
+            const container = document.getElementById(containerId);
+            if (!allTrips.length) {
+                container.innerHTML = `<span class="text-slate-500">No trips available to attach.</span>`;
+                return;
+            }
+            container.innerHTML = allTrips.map(t => `
+                <label class="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-800 cursor-pointer">
+                    <input type="checkbox" value="${t.id}" ${checkedTripIds.includes(t.id) ? 'checked' : ''} class="trip-checkbox rounded text-sky-500 focus:ring-0 bg-slate-900 border-white/20">
+                    <span class="font-medium text-slate-300">${t.title} (${t.destination})</span>
+                </label>
+            `).join('');
+        }
+
+        let lookupTimeout = null;
+        async function checkFriendEmailLookup(email) {
+            clearTimeout(lookupTimeout);
+            const statusEl = document.getElementById('emailLookupStatus');
+            if (!email || !email.includes('@')) {
+                statusEl.classList.add('hidden');
+                return;
+            }
+            lookupTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/v1/trips/friends/lookup?email=${encodeURIComponent(email.trim())}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        statusEl.classList.remove('hidden');
+                        if (data.exists) {
+                            statusEl.className = 'text-[11px] font-semibold px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+                            statusEl.textContent = `✨ Existing Friend Code: ${data.passcode} (${data.name || 'Friend'})`;
+                        } else {
+                            statusEl.className = 'text-[11px] font-semibold px-2 py-1 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30';
+                            statusEl.textContent = `⚡ New personal passcode will be generated automatically on invite`;
+                        }
+                    }
+                } catch(e) {}
+            }, 300);
+        }
+
+        async function checkQuickFriendEmailLookup(email) {
+            clearTimeout(lookupTimeout);
+            const statusEl = document.getElementById('quickLookupStatus');
+            if (!email || !email.includes('@')) {
+                statusEl.classList.add('hidden');
+                return;
+            }
+            lookupTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/v1/trips/friends/lookup?email=${encodeURIComponent(email.trim())}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        statusEl.classList.remove('hidden');
+                        if (data.exists) {
+                            statusEl.className = 'text-[11px] font-semibold px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+                            statusEl.textContent = `✨ Existing Friend Code: ${data.passcode} (${data.name || 'Friend'})`;
+                        } else {
+                            statusEl.className = 'text-[11px] font-semibold px-2 py-1 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30';
+                            statusEl.textContent = `⚡ New personal passcode will be generated automatically on invite`;
+                        }
+                    }
+                } catch(e) {}
+            }, 300);
+        }
+
+        function addMemberToStaging() {
+            const name = document.getElementById('memberInputName').value.trim();
+            const email = document.getElementById('memberInputEmail').value.trim();
+            if (!email) {
+                alert('Please enter friend email');
+                return;
+            }
+            stagedMembers.push({ name: name || email.split('@')[0], email: email, role: 'member' });
+            document.getElementById('memberInputName').value = '';
+            document.getElementById('memberInputEmail').value = '';
+            document.getElementById('emailLookupStatus').classList.add('hidden');
+            renderStagedMembers();
+        }
+
+        function removeStagedMember(index) {
+            stagedMembers.splice(index, 1);
+            renderStagedMembers();
+        }
+
+        function renderStagedMembers() {
+            const container = document.getElementById('stagedMembersList');
+            if (!stagedMembers.length) {
+                container.innerHTML = `<span class="text-[11px] text-slate-500">No friends added to roster yet.</span>`;
+                return;
+            }
+            container.innerHTML = stagedMembers.map((m, idx) => `
+                <div class="flex items-center justify-between p-2 rounded-lg bg-slate-800 border border-white/10 text-xs">
+                    <div>
+                        <span class="font-bold text-white">${m.name}</span>
+                        <span class="text-slate-400 font-mono ml-1">&lt;${m.email}&gt;</span>
+                    </div>
+                    <button type="button" onclick="removeStagedMember(${idx})" class="text-rose-400 hover:text-rose-300 font-bold px-1.5">✕</button>
+                </div>
+            `).join('');
+        }
+
+        async function submitNewGroup(e) {
+            e.preventDefault();
+            const selectedTrips = Array.from(document.querySelectorAll('#tripCheckboxesContainer input[type="checkbox"]:checked')).map(cb => cb.value);
+
+            const payload = {
+                name: document.getElementById('grpName').value.trim(),
+                description: document.getElementById('grpDescription').value.trim(),
+                icon: document.getElementById('grpIcon').value,
+                trip_ids: selectedTrips,
+                members: stagedMembers
+            };
+
+            try {
+                const res = await fetch('/api/v1/trips/groups', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed creating group');
+                closeCreateGroupModal();
+                await fetchTripsData();
+                selectGroupTab(data.group.id);
+            } catch(err) {
+                alert('Error creating group: ' + err.message);
+            }
+        }
+
+        // Manage Current Group Modal
+        function openManageCurrentGroupModal() {
+            if (activeGroupId === 'all') return;
+            const grp = allGroups.find(g => g.id === activeGroupId);
+            if (!grp) return;
+
+            document.getElementById('manageGroupIcon').textContent = grp.icon || '🌴';
+            document.getElementById('manageGroupName').textContent = grp.name;
+            document.getElementById('manageGroupDesc').textContent = grp.description || 'Collaborative Travel Group';
+            document.getElementById('manageGroupCodeBadge').textContent = grp.group_invite_code;
+
+            // Direct 1-click URL
+            const inviteUrl = `${window.location.origin}/portal?code=${grp.group_invite_code}&redirect=/trips`;
+            document.getElementById('manageGroupInviteUrl').value = inviteUrl;
+
+            // Render members
+            renderManageGroupMembers(grp);
+
+            // Populate trips checklist
+            const attachedTripIds = grp.attached_trips.map(at => at.id);
+            populateTripsCheckboxes('manageGroupTripsChecklist', attachedTripIds);
+
+            // Hide add member form for non-owners
+            const addForm = document.getElementById('manageAddMemberForm');
+            const delBtn = document.getElementById('btnDeleteCurrentGroup');
+            const saveTripsBtn = document.getElementById('btnSaveAttachedTrips');
+
+            if (!isOwner) {
+                addForm.classList.add('hidden');
+                delBtn.classList.add('hidden');
+                saveTripsBtn.classList.add('hidden');
+            } else {
+                addForm.classList.remove('hidden');
+                delBtn.classList.remove('hidden');
+                saveTripsBtn.classList.remove('hidden');
+            }
+
+            document.getElementById('manageGroupModal').style.display = 'flex';
+        }
+
+        function closeManageGroupModal() {
+            document.getElementById('manageGroupModal').style.display = 'none';
+        }
+
+        function renderManageGroupMembers(grp) {
+            const container = document.getElementById('manageMembersContainer');
+            const countEl = document.getElementById('manageMemberCount');
+            countEl.textContent = `${(grp.members || []).length} members`;
+
+            if (!grp.members || !grp.members.length) {
+                container.innerHTML = `<div class="text-xs text-slate-500 py-3 text-center">No members in this group yet. Add friends below.</div>`;
+                return;
+            }
+
+            container.innerHTML = grp.members.map(m => `
+                <div class="p-3 rounded-xl border border-white/10 bg-slate-900 flex items-center justify-between gap-3">
+                    <div class="space-y-0.5">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-white">${m.name}</span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${m.role === 'owner' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'}">${m.role}</span>
+                        </div>
+                        <div class="text-[11px] text-slate-400 font-mono">${m.email}</div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1.5 bg-slate-800 border border-white/10 px-2 py-1 rounded-lg">
+                            <span class="text-[10px] text-slate-500 font-bold uppercase">Code:</span>
+                            <span class="text-xs font-mono font-bold text-sky-300">${m.passcode}</span>
+                            <button type="button" onclick="copyText('${m.passcode}')" class="text-slate-400 hover:text-sky-300 ml-1" title="Copy Passcode">📋</button>
+                        </div>
+
+                        ${isOwner ? `
+                            <button type="button" onclick="removeGroupMember('${grp.id}', '${m.id}')" class="text-xs text-rose-400 hover:text-rose-300 font-bold px-1.5 py-1" title="Remove Member">✕</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function submitQuickAddMember() {
+            const name = document.getElementById('quickAddName').value.trim();
+            const email = document.getElementById('quickAddEmail').value.trim();
+            if (!email) {
+                alert('Please enter friend email');
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/v1/trips/groups/${activeGroupId}/members`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name || email.split('@')[0],
+                        email: email,
+                        role: 'member',
+                        send_email: true
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed adding member');
+
+                document.getElementById('quickAddName').value = '';
+                document.getElementById('quickAddEmail').value = '';
+                document.getElementById('quickLookupStatus').classList.add('hidden');
+
+                await fetchTripsData();
+                const grp = allGroups.find(g => g.id === activeGroupId);
+                if (grp) renderManageGroupMembers(grp);
+                alert(`Friend added! Direct email invite sent to ${email} with passcode ${data.member.passcode}.`);
+            } catch(err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function removeGroupMember(groupId, memberId) {
+            if (!confirm('Are you sure you want to remove this member from the group?')) return;
+            try {
+                const res = await fetch(`/api/v1/trips/groups/${groupId}/members/${memberId}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed removing member');
+                await fetchTripsData();
+                const grp = allGroups.find(g => g.id === activeGroupId);
+                if (grp) renderManageGroupMembers(grp);
+            } catch(err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function saveAttachedTripsForCurrentGroup() {
+            const selectedTrips = Array.from(document.querySelectorAll('#manageGroupTripsChecklist input[type="checkbox"]:checked')).map(cb => cb.value);
+            try {
+                const res = await fetch(`/api/v1/trips/groups/${activeGroupId}/attach-trips`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trip_ids: selectedTrips })
+                });
+                if (!res.ok) throw new Error('Failed updating attached trips');
+                await fetchTripsData();
+                selectGroupTab(activeGroupId);
+                alert('Attached trips updated successfully!');
+            } catch(err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function deleteCurrentGroup() {
+            if (!confirm('Are you sure you want to delete this group? (Trips will not be deleted)')) return;
+            try {
+                const res = await fetch(`/api/v1/trips/groups/${activeGroupId}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed deleting group');
+                closeManageGroupModal();
+                activeGroupId = 'all';
+                await fetchTripsData();
+            } catch(err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        function copyGroupInviteUrl() {
+            const input = document.getElementById('manageGroupInviteUrl');
+            copyText(input.value);
+            alert('Group Invite Link copied to clipboard!');
+        }
+
+        function shareGroupOnWhatsApp() {
+            const grp = allGroups.find(g => g.id === activeGroupId);
+            const name = grp ? grp.name : 'Travel Group';
+            const url = document.getElementById('manageGroupInviteUrl').value;
+            const text = `Hey! Join our travel group "${name}" on Nexus Trips & Expeditions. View flight manifests, luxury stays, and itinerary here: ${url}`;
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        function copyText(text) {
+            navigator.clipboard.writeText(text).catch(() => {
+                const temp = document.createElement('textarea');
+                temp.value = text;
+                document.body.appendChild(temp);
+                temp.select();
+                document.execCommand('copy');
+                document.body.removeChild(temp);
+            });
+        }
+
+        // ================= BASE TRIP MODALS & HANDLERS =================
+        function openAddTripModal() {
+            document.getElementById('addTripModal').style.display = 'flex';
+        }
+        function closeAddTripModal() {
+            document.getElementById('addTripModal').style.display = 'none';
+        }
+
+        function openActivityModal() {
+            populateTripSelect();
+            document.getElementById('suggestActivityModal').style.display = 'flex';
+        }
+        function openActivityModalForFeatured() {
+            if (allTrips.length) openActivityModalForTrip(allTrips[0].id);
+        }
+        function openActivityModalForTrip(tripId) {
+            populateTripSelect(tripId);
+            document.getElementById('suggestActivityModal').style.display = 'flex';
+        }
+        function closeActivityModal() {
+            document.getElementById('suggestActivityModal').style.display = 'none';
+        }
+
+        function populateTripSelect(selectedTripId = null) {
+            const select = document.getElementById('actTripSelect');
+            select.innerHTML = allTrips.map(t => `
+                <option value="${t.id}" ${t.id === selectedTripId ? 'selected' : ''}>${t.title} (${t.destination})</option>
+            `).join('');
+        }
+
+        async function submitNewTrip(e) {
+            e.preventDefault();
+            const payload = {
+                title: document.getElementById('tripTitle').value,
+                destination: document.getElementById('tripDestination').value,
+                start_date: document.getElementById('tripStartDate').value,
+                end_date: document.getElementById('tripEndDate').value || null,
+                status: document.getElementById('tripStatus').value,
+                estimated_budget: parseFloat(document.getElementById('tripBudget').value || 0),
+                cover_image: document.getElementById('tripCover').value,
+                flight_details: document.getElementById('tripFlights').value || null,
+                hotel_details: document.getElementById('tripHotels').value || null,
+                notes: document.getElementById('tripNotes').value || null,
+                is_shared_with_friends: document.getElementById('tripShared').checked,
+                packing_list: ["Passport & ID", "Universal Adapter", "Travel Insurance"]
+            };
+
+            try {
+                const res = await fetch('/api/v1/trips', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed creating trip');
+
+                // If created inside an active group, auto-attach it to that group
+                if (activeGroupId !== 'all') {
+                    await fetch(`/api/v1/trips/groups/${activeGroupId}/attach-trips`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ trip_ids: [data.trip_id] })
+                    });
+                }
+
+                closeAddTripModal();
+                await fetchTripsData();
+            } catch(err) {
+                alert('Error creating trip: ' + err.message);
+            }
+        }
+
+        async function submitActivitySuggestion(e) {
+            e.preventDefault();
+            const tripId = document.getElementById('actTripSelect').value;
+            const payload = {
+                suggested_by_name: document.getElementById('actMemberName').value,
+                activity_title: document.getElementById('actTitle').value,
+                location: document.getElementById('actLocation').value || null,
+                approx_cost: parseFloat(document.getElementById('actCost').value || 0)
+            };
+
+            try {
+                const res = await fetch(`/api/v1/trips/${tripId}/activities`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error((await res.json()).detail || 'Failed submitting suggestion');
+                closeActivityModal();
+                await fetchActivitiesForTrips();
+            } catch(err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function deleteTrip(tripId) {
+            if (!confirm('Are you sure you want to delete this trip itinerary?')) return;
+            try {
+                const res = await fetch(`/api/v1/trips/${tripId}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed deleting trip');
+                fetchTripsData();
+            } catch(err) {
+                alert('Error deleting trip: ' + err.message);
+            }
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', fetchTripsData);
+    </script>
+</body>
+</html>

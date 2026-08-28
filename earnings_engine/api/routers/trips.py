@@ -34,7 +34,7 @@ async def serve_trips():
     """Serve the Trips & Travel Hub page."""
     try:
         env = get_template_env()
-        template = env.get_template("trips.html")
+        template = env.get_template("hubs/trips/index.html")
         html = template.render()
         return HTMLResponse(html)
     except Exception as exc:
@@ -413,3 +413,4 @@ async def delete_trip_activity_endpoint(
         conn.execute("DELETE FROM trip_activities WHERE id = ? AND trip_id = ?", (activity_id, trip_id))
         conn.commit()
     return {"success": True, "message": f"Activity {activity_id} removed."}
+

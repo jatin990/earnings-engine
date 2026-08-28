@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Gateway // Personal Access & Scoped Hubs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --font-sans: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
+            --font-heading: 'Geist', 'Space Grotesk', sans-serif;
+
+            --bg: #030712;
+            --card-bg: rgba(15, 23, 42, 0.85);
+            --card-border: rgba(59, 130, 246, 0.22);
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.35);
+            --cyan: #38bdf8;
+            --green: #10b981;
+            --purple: #60a5fa;
+            --amber: #fbbf24;
+            --red: #f43f5e;
+            --light: #f8fafc;
+            --muted: #94a3b8;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(circle at 50% -20%, rgba(59, 130, 246, 0.18), transparent 60%),
+                radial-gradient(circle at 0% 100%, rgba(56, 189, 248, 0.08), transparent 50%),
+                radial-gradient(circle at 100% 50%, rgba(37, 99, 235, 0.12), transparent 50%);
+            color: var(--light);
+            font-family: var(--font-sans);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Subtle cyber grid lines */
+        body::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(rgba(59, 130, 246, 0.04) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .portal-wrapper {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 1180px;
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(28px) saturate(190%);
+            -webkit-backdrop-filter: blur(28px) saturate(190%);
+            border: 1px solid var(--card-border);
+            border-radius: 1.25rem;
+            box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 45px -10px var(--accent-glow);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .glass-card:hover {
+            border-color: rgba(96, 165, 250, 0.65);
+            box-shadow: 0 35px 80px -15px rgba(0, 0, 0, 0.95), 0 0 50px rgba(59, 130, 246, 0.35);
+        }
+
+        .brand-title {
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #ffffff 0%, #bae6fd 45%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .input-box {
+            background: rgba(6, 11, 25, 0.88);
+            border: 1px solid rgba(59, 130, 246, 0.28);
+            color: var(--light);
+            transition: all 0.22s ease;
+        }
+
+        .input-box:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3), 0 0 25px rgba(59, 130, 246, 0.25);
+        }
+
+        .glow-btn {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: #ffffff;
+            font-weight: 700;
+            border: 1px solid rgba(191, 219, 254, 0.3);
+            box-shadow: 0 4px 22px rgba(37, 99, 235, 0.5);
+            transition: all 0.2s ease;
+        }
+
+        .glow-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(37, 99, 235, 0.75), 0 0 16px rgba(96, 165, 250, 0.5);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+
+        .app-card {
+            background: rgba(10, 16, 32, 0.75);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 1.15rem;
+            padding: 1.6rem;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 230px;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .app-card.authorized {
+            cursor: pointer;
+        }
+
+        .app-card.authorized:hover {
+            transform: translateY(-5px);
+            border-color: rgba(96, 165, 250, 0.8);
+            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.9), 0 0 35px rgba(59, 130, 246, 0.45);
+            background: rgba(15, 23, 42, 0.92);
+        }
+
+        .app-card.restricted {
+            opacity: 0.55;
+            filter: grayscale(40%);
+            cursor: not-allowed;
+            border-style: dashed;
+        }
+
+        /* Universal Sticky Table Headers */
+        table thead th,
+        table th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 10 !important;
+            background: #0b1329 !important;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12);
+        }
+
+        .shake {
+            animation: shakeAnim 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+        }
+
+        @keyframes shakeAnim {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .tab-switch-btn.active {
+            background: rgba(59, 130, 246, 0.28);
+            color: #ffffff;
+            border-color: rgba(96, 165, 250, 0.6);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="portal-wrapper">
+
+        <!-- Top Header Bar (when authenticated) -->
+        <header id="portalHeader" class="w-full mb-8 flex justify-between items-center px-4 py-3 glass-card" style="display: none;">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold text-sm">
+                    ⬡
+                </div>
+                <div>
+                    <h1 class="brand-title text-base font-bold text-white tracking-wide leading-none">NEXUS GATEWAY</h1>
+                    <span class="text-[11px] text-slate-400">Authenticated Access Session</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <span id="userLabelBadge" class="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-semibold text-xs mono">
+                    Loading...
+                </span>
+                <button type="button" onclick="portal.lockSession()" class="px-3 py-1 rounded-lg bg-white/5 hover:bg-rose-500/20 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 text-xs font-semibold transition flex items-center gap-1.5">
+                    <span>🔒</span> Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- ================= PHASE 1: ACCESS GATE & JOIN FLOW ================= -->
+        <div id="gateSection" class="w-full max-w-md glass-card p-8 text-center relative overflow-hidden">
+            <!-- Ambient top glow -->
+            <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="w-16 h-16 mx-auto mb-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-3xl shadow-inner">
+                🔐
+            </div>
+
+            <h2 class="brand-title text-2xl font-extrabold text-white mb-1">Nexus Command Hub</h2>
+            <p class="text-xs text-slate-400 mb-6">Enter your personal access passcode to unlock your personalized command deck.</p>
+
+            <!-- Error Banner -->
+            <div id="errorAlert" class="hidden mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium flex items-center gap-2 text-left">
+                <span>⚠️</span>
+                <span id="errorMessage">Invalid access credentials.</span>
+            </div>
+
+            <!-- UNIFIED PASSCODE FORM -->
+            <form id="passcodeForm" onsubmit="portal.handleVerify(event)" class="space-y-4">
+                <div class="relative">
+                    <input 
+                        type="password" 
+                        id="passcodeInput" 
+                        placeholder="ENTER ACCESS CODE..." 
+                        autocomplete="off"
+                        class="input-box w-full px-4 py-3.5 rounded-xl mono text-center font-bold tracking-widest text-sm text-indigo-200 placeholder:text-slate-600 uppercase"
+                    >
+                    <button type="button" onclick="portal.toggleShowPasscode()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 text-xs">
+                        👁️
+                    </button>
+                </div>
+
+                <button type="submit" id="btnUnlock" class="glow-btn w-full py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm font-bold">
+                    <span>Unlock Command Deck</span>
+                    <span class="text-lg">→</span>
+                </button>
+
+                <!-- Optional Email OTP Collapsible Toggle -->
+                <div class="pt-2">
+                    <button type="button" onclick="portal.toggleEmailOtpView()" class="text-[11px] font-semibold text-slate-400 hover:text-indigo-300 transition">
+                        ✉️ Have an Email Invite Code? Click here to verify via OTP
+                    </button>
+                </div>
+
+                <!-- Collapsible Email OTP Drawer -->
+                <div id="emailOtpCollapsible" class="pt-3 border-t border-white/5 space-y-2.5 text-left" style="display: none;">
+                    <span class="text-[11px] font-semibold text-slate-400 block">Enter your registered email for one-time code:</span>
+                    <input 
+                        type="email" 
+                        id="friendEmailInput" 
+                        placeholder="your.email@example.com" 
+                        class="input-box w-full px-3 py-2 rounded-lg text-xs text-white placeholder:text-slate-600"
+                    >
+                    <button type="button" onclick="portal.handleRequestOtp(event)" id="btnRequestOtp" class="w-full py-2.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 transition">
+                        <span>Send Email OTP</span>
+                        <span>✉️</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        </div>
+
+
+        <!-- ================= PHASE 2: AUTHORIZED APP COMMAND DECK ================= -->
+        <div id="deckSection" class="w-full space-y-6" style="display: none;">
+
+            <div class="flex justify-between items-end mb-2">
+                <div>
+                    <h2 class="brand-title text-2xl font-extrabold text-white">Your Authorized Command Deck</h2>
+                    <p class="text-xs text-slate-400">Applications and hubs unlocked for your profile.</p>
+                </div>
+            </div>
+
+            <!-- Dynamic Apps Grid -->
+            <div id="appsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- App cards injected via JS -->
+            </div>
+
+            <!-- OWNER / ADMIN FRIEND & PASSCODE MANAGER -->
+            <div id="adminKeyManagerCard" class="glass-card p-6 border-indigo-500/30 relative" style="display: none;">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="brand-title text-lg font-bold text-white flex items-center gap-2">
+                            <span>🔑</span> Friend Permissions & Scoped Invites
+                        </h3>
+                        <p class="text-xs text-slate-400">Generate invite codes with specific section scopes and manage friend access.</p>
+                    </div>
+
+                    <button type="button" onclick="portal.toggleGeneratorForm()" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition">
+                        <span>➕</span> Create Scoped Invite
+                    </button>
+                </div>
+
+                <!-- Create Invite Drawer -->
+                <div id="generatorDrawer" class="p-4 rounded-xl bg-black/40 border border-white/10 mb-4" style="display: none;">
+                    <h4 class="text-xs font-bold text-indigo-300 uppercase tracking-wider mb-3">Create Scoped Invite</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1 font-semibold">Friend Name / Label</label>
+                            <input type="text" id="newCodeLabel" placeholder="e.g. Alex, VIP Trader Group" class="input-box w-full px-3 py-2 rounded-lg text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1 font-semibold">Restrict to Email (Optional)</label>
+                            <input type="email" id="newCodeEmailLock" placeholder="alex@gmail.com (Lock to single email)" class="input-box w-full px-3 py-2 rounded-lg text-xs">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1 font-semibold">Usage Limit (Max Uses):</label>
+                            <select id="newCodeMaxUses" class="input-box w-full px-3 py-2 rounded-lg text-xs bg-slate-900 border border-white/15 text-white">
+                                <option value="1" selected>1 Use (Single-Use)</option>
+                                <option value="5">5 Uses</option>
+                                <option value="10">10 Uses</option>
+                                <option value="25">25 Uses</option>
+                                <option value="100">100 Uses</option>
+                                <option value="0">♾️ Unlimited / Multi-Use</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1 font-semibold">Validity Timeframe (Expiry):</label>
+                            <select id="newCodeExpiry" class="input-box w-full px-3 py-2 rounded-lg text-xs bg-slate-900 border border-white/15 text-white">
+                                <option value="0.0416">1 Hour (Quick Trial)</option>
+                                <option value="1">24 Hours (1 Day)</option>
+                                <option value="7" selected>7 Days (1 Week)</option>
+                                <option value="30">30 Days (1 Month)</option>
+                                <option value="90">90 Days (3 Months)</option>
+                                <option value="365">365 Days (1 Year)</option>
+                                <option value="0">♾️ Never / Permanent</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-400 mb-1 font-semibold">Custom Code (Optional):</label>
+                            <input type="text" id="newCustomCode" placeholder="e.g. VIP-ALEX-2026" class="input-box w-full px-3 py-2 rounded-lg text-xs mono uppercase">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="block text-[11px] text-slate-400 mb-1.5 font-semibold">Allowed Section Scopes:</label>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
+                                <input type="checkbox" id="scope_trips" checked>
+                                <span>✈️ Trips & Plans</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
+                                <input type="checkbox" id="scope_cards" checked>
+                                <span>💳 Credit Cards</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
+                                <input type="checkbox" id="scope_net_worth" checked>
+                                <span>💰 Net Worth</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
+                                <input type="checkbox" id="scope_dashboard">
+                                <span>📈 Trading Terminal</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                        <button type="button" onclick="portal.toggleGeneratorForm()" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 text-xs font-semibold">Cancel</button>
+                        <button type="button" onclick="portal.submitCreateInvite()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">Generate Scoped Invite</button>
+                    </div>
+                </div>
+
+                <!-- Active Invites List -->
+                <div class="mb-6">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                        <span>Active Scoped Invites & Passcodes</span>
+                        <span id="inviteCountBadge" class="text-[10px] text-indigo-400 font-mono">0 active</span>
+                    </h4>
+                    <div class="overflow-x-auto rounded-lg border border-white/5">
+                        <table class="w-full text-left text-xs">
+                            <thead>
+                                <tr class="bg-black/50 text-slate-400 font-semibold border-b border-white/10">
+                                    <th class="py-2 px-3">Invite Code</th>
+                                    <th class="py-2 px-3">Label / Recipient</th>
+                                    <th class="py-2 px-3">Allowed Scopes</th>
+                                    <th class="py-2 px-3">Uses / Max</th>
+                                    <th class="py-2 px-3">Valid Until</th>
+                                    <th class="py-2 px-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invitesTableBody" class="divide-y divide-white/5">
+                                <tr><td colspan="6" class="text-center py-3 text-slate-500">Loading active invites...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Registered Friends Table -->
+                <div>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Registered Friends & Access Permissions</h4>
+                    <div class="overflow-x-auto rounded-lg border border-white/5">
+                        <table class="w-full text-left text-xs">
+                            <thead>
+                                <tr class="bg-black/50 text-slate-400 font-semibold border-b border-white/10">
+                                    <th class="py-2 px-3">Friend / Email</th>
+                                    <th class="py-2 px-3">Role</th>
+                                    <th class="py-2 px-3">Trips Scope</th>
+                                    <th class="py-2 px-3">Cards Scope</th>
+                                    <th class="py-2 px-3">Net Worth Scope</th>
+                                    <th class="py-2 px-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="friendsTableBody" class="divide-y divide-white/5">
+                                <tr><td colspan="6" class="text-center py-4 text-slate-500">Loading registered friends...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ================= OTP VERIFICATION MODAL ================= -->
+    <div id="otpModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;">
+        <div class="glass-card max-w-sm w-full p-6 text-center border-indigo-500/50">
+            <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-2xl mx-auto mb-3">
+                ✉️
+            </div>
+            <h3 class="brand-title text-lg font-bold text-white mb-1">Enter 6-Digit OTP</h3>
+            <p id="otpModalSubtitle" class="text-xs text-slate-400 mb-4">We sent a verification code to your email.</p>
+
+            <div class="mb-4">
+                <input 
+                    type="text" 
+                    id="otpInput" 
+                    maxlength="6" 
+                    placeholder="------" 
+                    class="input-box w-full px-4 py-3 rounded-xl mono text-center font-extrabold text-2xl tracking-[0.5em] text-cyan-300"
+                >
+            </div>
+
+            <div class="flex gap-2">
+                <button type="button" onclick="document.getElementById('otpModal').style.display='none'" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 text-xs font-semibold">Cancel</button>
+                <button type="button" onclick="portal.submitVerifyOtp()" id="btnSubmitOtp" class="glow-btn flex-1 py-2.5 rounded-xl text-xs font-bold">Verify & Unlock</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= TRIPS & TRAVEL PLANS MODAL ================= -->
+    <div id="tripsModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; align-items: center; justify-content: center; padding: 1.5rem;">
+        <div class="glass-card max-w-2xl w-full p-6 border-indigo-500/40 max-h-[85vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl">✈️</span>
+                    <div>
+                        <h3 class="brand-title text-lg font-bold text-white">Trips & Personal Travel Itineraries</h3>
+                        <p class="text-xs text-slate-400">Upcoming journeys and curated travel plans.</p>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('tripsModal').style.display='none'" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            </div>
+            <div id="tripsListContainer" class="space-y-3">
+                <p class="text-xs text-slate-500 text-center py-6">Loading itineraries...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= NET WORTH & WEALTH ALLOCATION MODAL ================= -->
+    <div id="netWorthModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; align-items: center; justify-content: center; padding: 1.5rem;">
+        <div class="glass-card max-w-xl w-full p-6 border-indigo-500/40">
+            <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl">💰</span>
+                    <div>
+                        <h3 class="brand-title text-lg font-bold text-white">High-Level Net Worth & Asset Allocation</h3>
+                        <p class="text-xs text-slate-400">Category breakdown and portfolio distribution.</p>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('netWorthModal').style.display='none'" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            </div>
+            <div id="netWorthContainer" class="space-y-4">
+                <p class="text-xs text-slate-500 text-center py-6">Loading net worth snapshot...</p>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const portal = {
+            session: null,
+            pendingOtpData: null,
+
+            async init() {
+                // Check if invite/passcode was passed in URL query (e.g. /join?code=... or /portal?code=...)
+                const urlParams = new URLSearchParams(window.location.search);
+                const codeParam = urlParams.get('code') || urlParams.get('invite') || urlParams.get('passcode');
+
+                if (codeParam) {
+                    this.fillCode(codeParam);
+                    await this.verifyCode(codeParam, false);
+                    return;
+                }
+
+                // Check stored session
+                const storedCode = localStorage.getItem('ee_passcode');
+                if (storedCode) {
+                    await this.verifyCode(storedCode, true);
+                } else {
+                    // Try session cookie
+                    await this.checkActiveSession();
+                }
+            },
+
+            fillCode(code) {
+                const el = document.getElementById('passcodeInput');
+                if (el) {
+                    el.value = code;
+                    el.focus();
+                }
+            },
+
+            toggleShowPasscode() {
+                const el = document.getElementById('passcodeInput');
+                if (!el) return;
+                el.type = el.type === 'password' ? 'text' : 'password';
+            },
+
+            async handleVerify(e) {
+                e.preventDefault();
+                const code = (document.getElementById('passcodeInput')?.value || '').trim();
+                if (!code) return;
+                await this.verifyCode(code, false);
+            },
+
+            async verifyCode(code, silent = false) {
+                const btn = document.getElementById('btnUnlock');
+                const errBox = document.getElementById('errorAlert');
+                const errMsg = document.getElementById('errorMessage');
+                const card = document.getElementById('gateSection');
+
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="inline-block animate-spin mr-2">⟳</span> Authenticating...';
+                }
+                if (errBox) errBox.classList.add('hidden');
+
+                try {
+                    const res = await fetch('/api/v1/auth/verify-code', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code })
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok) {
+                        throw new Error(data.detail || 'Authentication failed');
+                    }
+
+                    // Save session
+                    this.session = data.user || data;
+                    localStorage.setItem('ee_passcode', code);
+                    localStorage.setItem('ee_friend_name', this.session.name || this.session.label || 'Nexus User');
+
+                    // Check for direct redirect (e.g. /portal?code=...&redirect=/trips or group invite)
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const redirectUrl = urlParams.get('redirect');
+                    if (redirectUrl && (redirectUrl.startsWith('/') || redirectUrl.startsWith(window.location.origin))) {
+                        window.location.href = redirectUrl;
+                        return;
+                    } else if (this.session.is_group_invite || (this.session.allowed_routes && this.session.allowed_routes.length === 1 && this.session.allowed_routes[0] === 'trips')) {
+                        window.location.href = '/trips';
+                        return;
+                    }
+
+                    this.renderDeck(this.session);
+                } catch (err) {
+                    if (!silent) {
+                        if (errBox && errMsg) {
+                            errMsg.textContent = err.message || 'Invalid passcode.';
+                            errBox.classList.remove('hidden');
+                        }
+                        if (card) {
+                            card.classList.add('shake');
+                            setTimeout(() => card.classList.remove('shake'), 500);
+                        }
+                    }
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<span>Unlock Command Deck</span><span class="text-lg">→</span>';
+                    }
+                }
+            },
+
+            async handleRequestOtp(e) {
+                if (e && e.preventDefault) e.preventDefault();
+                const code = (document.getElementById('passcodeInput')?.value || '').trim() || 'VIP-ALL-ACCESS';
+                const email = (document.getElementById('friendEmailInput')?.value || '').trim();
+                const btn = document.getElementById('btnRequestOtp');
+                const errBox = document.getElementById('errorAlert');
+                const errMsg = document.getElementById('errorMessage');
+
+                if (!email) {
+                    alert('Please enter your email address to receive an OTP.');
+                    return;
+                }
+
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="inline-block animate-spin mr-2">⟳</span> Sending Code...';
+                }
+                if (errBox) errBox.classList.add('hidden');
+
+                try {
+                    const res = await fetch('/api/v1/auth/request-otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ invite_code: code, email: email })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.detail || 'Failed to dispatch OTP');
+
+                    this.pendingOtpData = { code, email };
+                    document.getElementById('otpModalSubtitle').textContent = `We sent a 6-digit code to ${email}`;
+                    document.getElementById('otpModal').style.display = 'flex';
+                    
+                    // Auto-fill dev code if returned
+                    if (data.dev_otp) {
+                        document.getElementById('otpInput').value = data.dev_otp;
+                    }
+                } catch (err) {
+                    if (errBox && errMsg) {
+                        errMsg.textContent = err.message;
+                        errBox.classList.remove('hidden');
+                    }
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<span>Send Verification Code (OTP)</span><span>✉️</span>';
+                    }
+                }
+            },
+
+            async submitVerifyOtp() {
+                if (!this.pendingOtpData) return;
+                const otp = (document.getElementById('otpInput')?.value || '').trim();
+                const btn = document.getElementById('btnSubmitOtp');
+                if (!otp || otp.length < 6) {
+                    alert('Please enter the full 6-digit code.');
+                    return;
+                }
+
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = 'Verifying...';
+                }
+
+                try {
+                    const res = await fetch('/api/v1/auth/verify-otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            invite_code: this.pendingOtpData.code,
+                            email: this.pendingOtpData.email,
+                            otp: otp,
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.detail || 'Incorrect OTP code');
+
+                    document.getElementById('otpModal').style.display = 'none';
+                    this.session = data.user;
+                    localStorage.setItem('ee_passcode', this.pendingOtpData.code);
+                    localStorage.setItem('ee_friend_name', data.user.name);
+
+                    this.renderDeck(data.user);
+                } catch (err) {
+                    alert(err.message);
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = 'Verify & Unlock';
+                    }
+                }
+            },
+
+            async checkActiveSession() {
+                try {
+                    const res = await fetch('/api/v1/auth/me');
+                    const data = await res.json();
+                    if (data.authenticated && data.user) {
+                        this.session = data.user;
+                        this.renderDeck(data.user);
+                    }
+                } catch (e) {
+                    console.debug('No active session');
+                }
+            },
+
+            renderDeck(user) {
+                document.getElementById('gateSection').style.display = 'none';
+                document.getElementById('deckSection').style.display = 'block';
+                document.getElementById('portalHeader').style.display = 'flex';
+                
+                const isOwner = user.role === 'owner' || (user.scopes && user.scopes.includes('admin'));
+                document.getElementById('userLabelBadge').textContent = `${user.name || user.label} [${user.role || 'user'}]`;
+
+                const grid = document.getElementById('appsGrid');
+                if (!grid) return;
+
+                const scopes = user.scopes || [];
+
+                const apps = [
+                    {
+                        id: 'dashboard',
+                        name: 'Earnings Terminal',
+                        icon: '📈',
+                        description: 'AI Multi-Model Consensus, Earnings Surprise Classifier & Scanner.',
+                        badge: 'Quantum Engine',
+                        path: '/dashboard',
+                        is_auth: isOwner || scopes.includes('dashboard'),
+                        is_modal: false,
+                    },
+                    {
+                        id: 'credit_card',
+                        name: 'Credit Card & Wealth Hub',
+                        icon: '💳',
+                        description: 'Luxury obsidian card mockup, reward multiplier matrix, and spend simulator.',
+                        badge: 'Luxury Finance',
+                        path: '/credit-card',
+                        is_auth: isOwner || scopes.includes('can_view_cards') || scopes.includes('credit_card'),
+                        is_modal: false,
+                    },
+                    {
+                        id: 'trips',
+                        name: 'Trips & Travel Plans',
+                        icon: '✈️',
+                        description: 'Curated personal travel itineraries, flight manifests, stays, and member activities.',
+                        badge: 'Lifestyle',
+                        path: '/trips',
+                        is_auth: isOwner || scopes.includes('can_view_trips') || scopes.includes('trips'),
+                        is_modal: false,
+                    },
+                    {
+                        id: 'net_worth',
+                        name: 'Net Worth Overview',
+                        icon: '🏛️',
+                        description: 'High-level portfolio allocation, asset distribution, and FIRE trajectory.',
+                        badge: 'Wealth Radar',
+                        path: '/net-worth',
+                        is_auth: isOwner || scopes.includes('can_view_net_worth') || scopes.includes('net_worth'),
+                        is_modal: false,
+                    },
+                ];
+
+                grid.innerHTML = apps.map(app => {
+                    const actionBadge = app.is_auth
+                        ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-xs">🟢 Authorized</span>'
+                        : '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 font-bold text-xs">🔒 Restricted</span>';
+
+                    const onclick = app.is_auth
+                        ? (app.is_modal ? `onclick="${app.path}"` : `onclick="portal.launchApp('${app.path}')"`)
+                        : '';
+
+                    return `
+                        <div class="app-card ${app.is_auth ? 'authorized' : 'restricted'}" ${onclick}>
+                            <div>
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-2xl">
+                                        ${app.icon}
+                                    </div>
+                                    ${actionBadge}
+                                </div>
+                                <h3 class="brand-title text-lg font-bold text-white mb-1.5">${app.name}</h3>
+                                <p class="text-xs text-slate-400 leading-relaxed mb-6">${app.description}</p>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-4 border-t border-white/5 mt-auto">
+                                <span class="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">${app.badge}</span>
+                                <span class="text-xs font-bold ${app.is_auth ? 'text-indigo-300' : 'text-slate-500'} flex items-center gap-1">
+                                    ${app.is_auth ? (app.is_modal ? 'View Hub ↗' : 'Launch App →') : 'Scope Missing'}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                // If owner, show friend manager
+                const adminCard = document.getElementById('adminKeyManagerCard');
+                if (isOwner) {
+                    adminCard.style.display = 'block';
+                    this.loadFriendsList();
+                } else {
+                    adminCard.style.display = 'none';
+                }
+            },
+
+            launchApp(path) {
+                window.location.href = path;
+            },
+
+            async showTripsModal() {
+                document.getElementById('tripsModal').style.display = 'flex';
+                const container = document.getElementById('tripsListContainer');
+                try {
+                    const res = await fetch('/api/v1/trips');
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.detail || 'Failed fetching trips');
+
+                    const trips = data.trips || [];
+                    if (!trips.length) {
+                        container.innerHTML = '<p class="text-xs text-slate-500 text-center py-6">No trips scheduled.</p>';
+                        return;
+                    }
+
+                    container.innerHTML = trips.map(t => `
+                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10 hover:border-indigo-500/30 transition">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <h4 class="brand-title text-base font-bold text-white">${t.title}</h4>
+                                    <span class="text-xs text-cyan-400 font-semibold">📍 ${t.destination}</span>
+                                </div>
+                                <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${t.status === 'confirmed' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'} capitalize">
+                                    ${t.status}
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-4 text-xs text-slate-400 mb-2 mono">
+                                <span>📅 ${t.start_date} ${t.end_date ? '→ ' + t.end_date : ''}</span>
+                            </div>
+                            <p class="text-xs text-slate-300 bg-black/30 p-2.5 rounded-lg border border-white/5">${t.notes || 'No extra notes.'}</p>
+                        </div>
+                    `).join('');
+                } catch (err) {
+                    container.innerHTML = `<p class="text-xs text-rose-400 text-center py-4">Error: ${err.message}</p>`;
+                }
+            },
+
+            async showNetWorthModal() {
+                document.getElementById('netWorthModal').style.display = 'flex';
+                const container = document.getElementById('netWorthContainer');
+                try {
+                    const res = await fetch('/api/v1/net-worth');
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.detail || 'Failed fetching net worth');
+
+                    const snap = data.snapshot;
+                    if (!snap) {
+                        container.innerHTML = '<p class="text-xs text-slate-500 text-center py-6">No snapshot available.</p>';
+                        return;
+                    }
+
+                    const alloc = snap.allocation_pct || {};
+                    let allocHtml = Object.entries(alloc).map(([k, v]) => `
+                        <div class="flex justify-between items-center py-2 border-b border-white/5 text-xs">
+                            <span class="text-slate-300 font-medium">${k}</span>
+                            <span class="mono font-bold text-cyan-300">${v}%</span>
+                        </div>
+                    `).join('');
+
+                    container.innerHTML = `
+                        <div class="p-5 rounded-2xl bg-gradient-to-br from-indigo-950/40 to-slate-900/60 border border-indigo-500/30 text-center">
+                            <span class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block mb-1">Total Net Worth Range</span>
+                            <h3 class="brand-title text-3xl font-extrabold text-white mb-2">${snap.total_net_worth_band}</h3>
+                            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
+                                🚀 +${snap.yoy_growth_pct}% YoY Portfolio Growth
+                            </span>
+                        </div>
+
+                        <div>
+                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Asset Allocation Matrix</h4>
+                            <div class="bg-black/30 p-3 rounded-xl border border-white/5">
+                                ${allocHtml}
+                            </div>
+                        </div>
+                    `;
+                } catch (err) {
+                    container.innerHTML = `<p class="text-xs text-rose-400 text-center py-4">Error: ${err.message}</p>`;
+                }
+            },
+
+            async loadFriendsList() {
+                this.loadInvitesList();
+                const tbody = document.getElementById('friendsTableBody');
+                if (!tbody) return;
+
+                try {
+                    const res = await fetch('/api/v1/friends');
+                    const data = await res.json();
+                    const friends = data.friends || [];
+
+                    if (!friends.length) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-slate-500">No friends onboarded yet. Create an invite above.</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = friends.map(f => `
+                        <tr class="hover:bg-white/[0.02] transition">
+                            <td class="py-2.5 px-3">
+                                <div class="font-bold text-white">${f.name}</div>
+                                <div class="text-[11px] text-slate-400 mono">${f.email}</div>
+                            </td>
+                            <td class="py-2.5 px-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${f.role === 'owner' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}">${f.role}</span>
+                            </td>
+                            <td class="py-2.5 px-3">
+                                <input type="checkbox" onchange="portal.toggleFriendScope('${f.id}', 'can_view_trips', this.checked)" ${f.scopes.can_view_trips ? 'checked' : ''} class="cursor-pointer">
+                            </td>
+                            <td class="py-2.5 px-3">
+                                <input type="checkbox" onchange="portal.toggleFriendScope('${f.id}', 'can_view_cards', this.checked)" ${f.scopes.can_view_cards ? 'checked' : ''} class="cursor-pointer">
+                            </td>
+                            <td class="py-2.5 px-3">
+                                <input type="checkbox" onchange="portal.toggleFriendScope('${f.id}', 'can_view_net_worth', this.checked)" ${f.scopes.can_view_net_worth ? 'checked' : ''} class="cursor-pointer">
+                            </td>
+                            <td class="py-2.5 px-3 text-right">
+                                <button type="button" onclick="portal.revokeFriend('${f.id}')" class="text-rose-400 hover:text-rose-300 font-semibold" title="Revoke Friend Access">Revoke</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                } catch (e) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-rose-400">Failed loading friends: ${e.message}</td></tr>`;
+                }
+            },
+
+            async loadInvitesList() {
+                const tbody = document.getElementById('invitesTableBody');
+                const countBadge = document.getElementById('inviteCountBadge');
+                if (!tbody) return;
+
+                try {
+                    const res = await fetch('/api/v1/invites');
+                    const data = await res.json();
+                    const invites = data.invites || [];
+
+                    if (countBadge) countBadge.textContent = `${invites.length} active`;
+
+                    if (!invites.length) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3 text-slate-500">No active invites. Click "Create Scoped Invite" to create one.</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = invites.map(inv => {
+                        const maxStr = inv.max_uses ? `${inv.uses_count} / ${inv.max_uses}` : `${inv.uses_count} / ♾️`;
+                        let expDisplay = '<span class="text-emerald-400 font-mono">♾️ Permanent</span>';
+                        if (inv.expires_at) {
+                            const expDate = new Date(inv.expires_at);
+                            const now = new Date();
+                            const diffMs = expDate - now;
+                            if (diffMs <= 0) {
+                                expDisplay = '<span class="text-rose-400 font-bold font-mono">⚠️ Expired</span>';
+                            } else {
+                                const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+                                if (diffHours < 24) {
+                                    expDisplay = `<span class="text-amber-300 font-mono">⏳ ${diffHours}h left</span>`;
+                                } else {
+                                    const diffDays = Math.round(diffHours / 24);
+                                    expDisplay = `<span class="text-indigo-300 font-mono">⏳ ${diffDays}d left</span>`;
+                                }
+                            }
+                        }
+
+                        const scopesHtml = (inv.scopes || []).map(s => {
+                            let label = s.replace('can_view_', '');
+                            return `<span class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] text-indigo-300">${label}</span>`;
+                        }).join(' ');
+
+                        return `
+                            <tr class="hover:bg-white/[0.02] transition">
+                                <td class="py-2.5 px-3 font-mono font-bold text-indigo-400">${inv.code}</td>
+                                <td class="py-2.5 px-3">
+                                    <div class="font-semibold text-white">${inv.label}</div>
+                                    ${inv.allowed_email ? `<div class="text-[10px] text-slate-400 mono">🔒 ${inv.allowed_email}</div>` : ''}
+                                </td>
+                                <td class="py-2.5 px-3">${scopesHtml || '<span class="text-slate-500">None</span>'}</td>
+                                <td class="py-2.5 px-3 font-mono text-slate-300">${maxStr}</td>
+                                <td class="py-2.5 px-3">${expDisplay}</td>
+                                <td class="py-2.5 px-3 text-right">
+                                    <button type="button" onclick="portal.copyInviteLink('${inv.code}')" class="px-2 py-1 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold text-xs" title="Copy join link">📋 Copy Link</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                } catch (e) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-rose-400">Failed loading invites: ${e.message}</td></tr>`;
+                }
+            },
+
+            copyInviteLink(code) {
+                const link = `${window.location.origin}/join?code=${code}`;
+                navigator.clipboard.writeText(link);
+                alert(`📋 Direct Join Link Copied to Clipboard!\n\n${link}`);
+            },
+
+            async toggleFriendScope(userId, scopeName, isChecked) {
+                try {
+                    const req = {
+                        can_view_trips: scopeName === 'can_view_trips' ? isChecked : false,
+                        can_view_cards: scopeName === 'can_view_cards' ? isChecked : false,
+                        can_view_net_worth: scopeName === 'can_view_net_worth' ? isChecked : false,
+                    };
+                    await fetch(`/api/v1/friends/${encodeURIComponent(userId)}/access`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(req)
+                    });
+                } catch (err) {
+                    alert('Error updating permissions: ' + err.message);
+                }
+            },
+
+            async revokeFriend(userId) {
+                if (!confirm('Are you sure you want to revoke this friend account?')) return;
+                try {
+                    await fetch(`/api/v1/friends/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+                    this.loadFriendsList();
+                } catch (err) {
+                    alert(err.message);
+                }
+            },
+
+            toggleGeneratorForm() {
+                const drawer = document.getElementById('generatorDrawer');
+                if (!drawer) return;
+                drawer.style.display = drawer.style.display === 'none' ? 'block' : 'none';
+            },
+
+            async submitCreateInvite() {
+                const label = (document.getElementById('newCodeLabel')?.value || '').trim();
+                const emailLock = (document.getElementById('newCodeEmailLock')?.value || '').trim();
+                const maxUsesVal = parseInt(document.getElementById('newCodeMaxUses')?.value || '1', 10);
+                const expiryVal = parseFloat(document.getElementById('newCodeExpiry')?.value || '7');
+                const customCode = (document.getElementById('newCustomCode')?.value || '').trim() || null;
+
+                if (!label) {
+                    alert('Please enter a friend name or label.');
+                    return;
+                }
+
+                const scopes = [];
+                if (document.getElementById('scope_trips')?.checked) scopes.push('can_view_trips');
+                if (document.getElementById('scope_cards')?.checked) scopes.push('can_view_cards');
+                if (document.getElementById('scope_net_worth')?.checked) scopes.push('can_view_net_worth');
+                if (document.getElementById('scope_dashboard')?.checked) scopes.push('dashboard');
+
+                if (!scopes.length) {
+                    alert('Please select at least one scope.');
+                    return;
+                }
+
+                try {
+                    const res = await fetch('/api/v1/invites', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            label: label,
+                            scopes: scopes,
+                            allowed_email: emailLock || null,
+                            max_uses: maxUsesVal > 0 ? maxUsesVal : null,
+                            expires_in_days: expiryVal > 0 ? expiryVal : null,
+                            code: customCode,
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.detail || 'Failed creating invite');
+
+                    const link = `${window.location.origin}/join?code=${data.code}`;
+                    navigator.clipboard.writeText(link);
+                    const expNotice = data.expires_at ? `Expires: ${new Date(data.expires_at).toLocaleString()}` : 'Validity: Permanent (Never Expire)';
+                    const usesNotice = data.max_uses ? `Max Uses: ${data.max_uses}` : 'Max Uses: Unlimited';
+                    alert(`✅ Scoped invite created for ${label}!\n\nInvite Code: ${data.code}\n${usesNotice}\n${expNotice}\n\nDirect Join Link: ${link}\n\n(Copied to clipboard)`);
+
+                    this.toggleGeneratorForm();
+                    this.loadFriendsList();
+                } catch (err) {
+                    alert(err.message);
+                }
+            },
+
+            lockSession() {
+                localStorage.removeItem('ee_passcode');
+                localStorage.removeItem('ee_friend_name');
+                document.cookie = "nexus_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+                this.session = null;
+                document.getElementById('gateSection').style.display = 'block';
+                document.getElementById('deckSection').style.display = 'none';
+                document.getElementById('portalHeader').style.display = 'none';
+                const el = document.getElementById('passcodeInput');
+                if (el) { el.value = ''; el.focus(); }
+            }
+        };
+
+        window.portal = portal;
+        document.addEventListener('DOMContentLoaded', () => portal.init());
+    </script>
+</body>
+</html>

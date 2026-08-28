@@ -1,0 +1,145 @@
+        <!-- ================= TOP GAINERS & PATTERNS TAB ================= -->
+        <div id="tab-gainers" class="tab-content" style="width: 100%; max-width: 100%;">
+            
+            <!-- ⚡ Top Metric KPI Cards with Soft Under-Glow -->
+            <div id="gainersSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                <div class="card card-glow-emerald" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Top Gainers Scanned</span>
+                        <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Top Momentum</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);"><strong id="gainersStatScanned">10</strong> <span style="font-size:0.85rem;color:#6ee7b7;font-weight:500;">Leaders</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Daily Outperformers & Drivers</div>
+                </div>
+
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">52W High Breakouts</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">ATH Range</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);"><strong id="gainersStatAth">Active</strong></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Multi-month high breakouts</div>
+                </div>
+
+                <div class="card card-glow-blue" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Pattern Archetypes</span>
+                        <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Mined Win-Rates</span>
+                    </div>
+                    <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="gainersStatArchetypes">6</strong> <span style="font-size:0.85rem;color:#93c5fd;font-weight:500;">Models</span></div>
+                    <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">High continuation setups</div>
+                </div>
+            </div>
+
+            <!-- Section Header & Sub-Tab Navigation -->
+            <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
+                            <span>🚀 Top 10 Gainers & Pattern Discovery Engine</span>
+                        </h3>
+                        <p class="timestamp" style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--text-muted);">Analyze daily top price surges, multi-source driver attribution, and discover recurring pre-breakout patterns.</p>
+                    </div>
+                    <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.35rem; background: #000000; padding: 0.15rem 0.5rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);">
+                            <span style="font-size: 0.72rem; color: #34d399;">⭐</span>
+                            <select id="gainersMarketSelect" onchange="app.onGainersMarketChange(this.value)" style="border: none; background: transparent; color: #ededed; font-size: 0.76rem; font-weight: 500; cursor: pointer; outline: none;" title="Select Market / Universe for Top Gainers">
+                                <optgroup label="🇮🇳 Indian Markets">
+                                    <option value="NSE_TOP">🇮🇳 NSE Top Active (~50)</option>
+                                    <option value="NSE_LARGE_CAP">🇮🇳 NSE Large Cap (> 1000 Cr)</option>
+                                    <option value="NSE_ALL">🇮🇳 All NSE Equities</option>
+                                </optgroup>
+                                <optgroup label="🇺🇸 US Markets">
+                                    <option value="US_TOP">🇺🇸 US Mega-Caps</option>
+                                    <option value="US">🇺🇸 All US Equities</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <button type="button" class="tab-btn tab-btn-sm active" onclick="app.switchGainersSubTab('gainers')" id="gainersSubTabBtn_gainers" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🏆 Top 10 Gainers</button>
+                        <button type="button" class="tab-btn tab-btn-sm" onclick="app.switchGainersSubTab('patterns')" id="gainersSubTabBtn_patterns" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🧩 Pattern Archetypes</button>
+                        <button type="button" class="tab-btn tab-btn-sm" onclick="app.switchGainersSubTab('setups')" id="gainersSubTabBtn_setups" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🔮 Watchlist Setups</button>
+                        <button type="button" onclick="app.refreshGainersTab()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Refresh</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 1. Top 10 Gainers Sub-View -->
+            <div id="gainersSubView_gainers">
+                <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <h4 style="margin: 0; font-size: 0.95rem; font-family: 'Space Grotesk', sans-serif; color: #f8fafc;">🏆 Top 10 Gaining Stocks & Surge Driver Attribution</h4>
+                            <span id="gainersCountBadge" class="signal-badge" style="font-size:0.68rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.12rem 0.45rem;">Top 10</span>
+                        </div>
+                        <div class="timestamp" style="font-size: 0.72rem; color: var(--text-muted);">Sorted by Daily % Gain &middot; Multi-Source Catalyst Attribution</div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="results-table" style="width: 100%; font-size: 0.78rem;">
+                            <thead><tr>
+                                <th style="width: 45px; text-align:center;">#</th>
+                                <th>Stock / Ticker</th>
+                                <th>Close Price</th>
+                                <th>Daily Gain (%)</th>
+                                <th>Volume Surge</th>
+                                <th>52W High Status</th>
+                                <th>Primary Driver Attribution</th>
+                                <th>Matching Pattern</th>
+                                <th style="text-align:center;">AI Consensus</th>
+                                <th style="text-align:center;">Action</th>
+                            </tr></thead>
+                            <tbody id="topGainersTableBody">
+                                <tr>
+                                    <td colspan="10" style="padding:2.5rem 1.5rem;text-align:center;color:var(--muted);">
+                                        <div style="font-size:2rem;margin-bottom:0.5rem;">🚀</div>
+                                        <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;">Gainers Engine Ready</h4>
+                                        <p style="font-size:0.8rem;margin:0;color:var(--text-muted);">Select your market above and click <strong>🔄 Refresh</strong> in the top toolbar to analyze daily top price surges.</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 2. Pattern Archetypes & Statistics Sub-View -->
+            <div id="gainersSubView_patterns" style="display:none;">
+                <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+                    <div style="margin-bottom: 0.85rem;">
+                        <h4 style="margin: 0 0 0.25rem 0; font-size: 0.95rem; font-family: 'Space Grotesk', sans-serif; color: #f8fafc;">🧩 Discovered Recurring Pre-Breakout Pattern Archetypes</h4>
+                        <p class="timestamp" style="margin: 0; font-size: 0.72rem; color: var(--text-muted);">
+                            Mined from historical top movers. These 6 technical and catalyst archetypes produce the highest multi-day continuation and win rates.
+                        </p>
+                    </div>
+                    <div id="patternArchetypesGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.75rem;"></div>
+                </section>
+            </div>
+
+            <!-- 3. Watchlist Breakout Setups Sub-View -->
+            <div id="gainersSubView_setups" style="display:none;">
+                <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <div>
+                            <h4 style="margin: 0; font-size: 0.95rem; font-family: 'Space Grotesk', sans-serif; color: #f8fafc;">🔮 Upcoming Breakout Candidates (Watchlist Scanner)</h4>
+                            <p class="timestamp" style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--text-muted);">Stocks currently coiling in tight consolidation channels matching high-win-rate pre-breakout patterns.</p>
+                        </div>
+                        <button type="button" onclick="app.loadUpcomingSetups()" class="btn btn-primary btn-sm" style="font-weight:600;">🔍 Scan Watchlist</button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="results-table" style="font-size:0.78rem;">
+                            <thead><tr>
+                                <th>Stock / Ticker</th>
+                                <th>Current Price</th>
+                                <th>Matching Pattern</th>
+                                <th>Setup Stage</th>
+                                <th>Breakout Trigger Level</th>
+                                <th>Confidence</th>
+                                <th>Technical Setup Rationale</th>
+                                <th style="text-align:center;">AI Consensus</th>
+                                <th style="text-align:center;">Action</th>
+                            </tr></thead>
+                            <tbody id="upcomingSetupsTableBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>

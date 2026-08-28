@@ -33,7 +33,7 @@ async def serve_credit_card():
     """Serve the Credit Card & Wealth Hub page."""
     try:
         env = get_template_env()
-        template = env.get_template("credit_card.html")
+        template = env.get_template("hubs/credit_cards/index.html")
         html = template.render()
         return HTMLResponse(html)
     except Exception as exc:
@@ -333,3 +333,4 @@ async def reject_card_otp_request_endpoint(
 
     logger.info("[CARDS-OTP] Rejected OTP request %s for %s", request_id, row[1])
     return {"success": True, "request_id": request_id, "status": "rejected", "message": "OTP request declined."}
+

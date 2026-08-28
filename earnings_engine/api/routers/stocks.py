@@ -26,7 +26,7 @@ async def serve_stock_detail(ticker: str):
     """Serve the dedicated Stock Detail & AI Consensus Engine page."""
     try:
         env = get_template_env()
-        template = env.get_template("stock_detail.html")
+        template = env.get_template("hubs/stock/detail.html")
         html = template.render(ticker=ticker.upper())
         return HTMLResponse(html)
     except Exception as exc:
@@ -287,3 +287,4 @@ async def resolve_audit_log_endpoint(request: dict):
     except Exception as e:
         logger.exception("Error in resolve_audit_log_entry: %s", e)
         raise HTTPException(status_code=500, detail=f"Audit resolve error: {str(e)}")
+
