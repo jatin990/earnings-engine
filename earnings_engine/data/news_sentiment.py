@@ -247,10 +247,14 @@ def fetch_yahoo_rss_news(ticker: str) -> list[dict[str, Any]]:
     return articles
 
 
-def fetch_google_news_rss(ticker: str, market: str = "IN") -> list[dict[str, Any]]:
+def fetch_google_news_rss(ticker: str, market: str = "IN", company_name: str | None = None) -> list[dict[str, Any]]:
     """Fetch recent news headlines via Google News RSS search with strict recency filter."""
     base_sym = ticker.replace(".NS", "").replace(".BO", "").strip().upper()
-    query = f"{base_sym} stock news when:7d" if market == "IN" else f"{base_sym} stock earnings when:7d"
+    if company_name and len(company_name.strip()) > 2 and company_name.strip().upper() != base_sym:
+        search_term = f'"{company_name.strip()}"'
+    else:
+        search_term = base_sym
+    query = f"{search_term} stock news when:7d" if market == "IN" else f"{search_term} stock earnings when:7d"
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query)}&hl=en-IN&gl=IN&ceid=IN:en"
     articles: list[dict[str, Any]] = []
 

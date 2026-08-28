@@ -38,6 +38,22 @@
     <!-- Right: Freshness Status, Rate Quota, Control Center -->
     <div class="topbar-right-actions" style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
         
+        <!-- Global Price Refresh Control & Freshness Pill -->
+        <div id="topPriceRefreshContainer" style="display: flex; align-items: center; gap: 0.3rem; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 0.2rem 0.45rem;" title="Global Ticker Price Auto-Refresh Interval">
+            <span style="font-size: 0.72rem;">⏱️</span>
+            <select id="globalPriceRefreshSelect" onchange="app.setGlobalPriceRefreshInterval(this.value)" style="background: transparent; color: #38bdf8; border: none; font-size: 0.7rem; font-weight: 700; font-family: var(--font-mono); outline: none; cursor: pointer; padding: 0;" title="Select global ticker price refresh interval">
+                <option value="60">1m</option>
+                <option value="120">2m</option>
+                <option value="300" selected>5m (Default)</option>
+                <option value="600">10m</option>
+                <option value="900">15m</option>
+                <option value="0">Manual</option>
+            </select>
+            <button type="button" onclick="app.triggerGlobalPriceRefresh(true)" id="topRefreshPricesBtn" class="btn-micro" style="padding: 0.08rem 0.3rem; font-size: 0.62rem; margin-left: 0.15rem; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); border-radius: 4px; cursor: pointer;" title="Refresh prices now across active page">
+                ↻
+            </button>
+        </div>
+
         <!-- Earnings Freshness Pill -->
         <div id="topEarningsFreshnessPill" style="display: flex; align-items: center; gap: 0.3rem; background: #0a0a0a; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 0.2rem 0.45rem;" title="Last updated timestamp for active universe/watchlist earnings">
             <span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 6px #34d399;"></span>

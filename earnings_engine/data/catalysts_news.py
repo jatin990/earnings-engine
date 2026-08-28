@@ -168,8 +168,110 @@ def _connect(settings: Settings) -> Any:
     except Exception:
         pass
 
+    # Self-healing: Correct any misattributed Apollo Tyres headlines from APOLLO.NS to APOLLOTYRE.NS
+    try:
+        conn.execute(
+            """
+            DELETE FROM news_catalysts
+            WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
+            AND title IN (SELECT title FROM news_catalysts WHERE ticker = 'APOLLOTYRE.NS')
+            """
+        )
+        conn.execute(
+            """
+            UPDATE news_catalysts
+            SET ticker = 'APOLLOTYRE.NS', stock_name = 'Apollo Tyres'
+            WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
+            """
+        )
+        conn.execute(
+            """
+            DELETE FROM news_catalyst_outcomes
+            WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
+            AND title IN (SELECT title FROM news_catalyst_outcomes WHERE ticker = 'APOLLOTYRE.NS')
+            """
+        )
+        conn.execute(
+            """
+            UPDATE news_catalyst_outcomes
+            SET ticker = 'APOLLOTYRE.NS', stock_name = 'Apollo Tyres'
+            WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
+            """
+        )
+    except Exception:
+        pass
+
     conn.commit()
     return conn
+
+
+def disambiguate_ticker_for_headline(ticker: str, title: str, summary: str = "") -> str:
+    """Disambiguate ticker when broad search keywords match separate corporate entities."""
+    full_text = (title + " " + summary).lower()
+    clean_sym = ticker.replace(".NS", "").replace(".BO", "").strip().upper()
+
+    # 1. Apollo group disambiguation
+    if clean_sym in ("APOLLO", "APOLLOTYRE", "APOLLOHOSP", "APOLLOPIPE"):
+        if re.search(r"\b(apollo\s+tyres?|tyres?)\b", full_text):
+            return "APOLLOTYRE.NS" if ticker.endswith(".NS") else ("APOLLOTYRE.BO" if ticker.endswith(".BO") else "APOLLOTYRE.NS")
+        if re.search(r"\b(apollo\s+hospitals?|hospital|healthcare)\b", full_text):
+            return "APOLLOHOSP.NS" if ticker.endswith(".NS") else ("APOLLOHOSP.BO" if ticker.endswith(".BO") else "APOLLOHOSP.NS")
+        if re.search(r"\b(apollo\s+pipes?|pipes?)\b", full_text):
+            return "APOLLOPIPE.NS" if ticker.endswith(".NS") else ("APOLLOPIPE.BO" if ticker.endswith(".BO") else "APOLLOPIPE.NS")
+        if re.search(r"\b(apollo\s+micro|micro\s+systems?)\b", full_text):
+            return "APOLLO.NS" if ticker.endswith(".NS") else ("APOLLO.BO" if ticker.endswith(".BO") else "APOLLO.NS")
+
+    # 2. Tata group disambiguation
+    if clean_sym in ("TATA", "TATAMOTORS", "TATASTEEL", "TATAPOWER", "TATACONSUM", "TATACOMM", "TATACHEM", "TATAELXSI"):
+        if re.search(r"\b(tata\s+motors?|jlr|ev\s+curvv|harrier|safari)\b", full_text):
+            return "TATAMOTORS.NS"
+        if re.search(r"\b(tata\s+steel)\b", full_text):
+            return "TATASTEEL.NS"
+        if re.search(r"\b(tata\s+power|solar\s+roof)\b", full_text):
+            return "TATAPOWER.NS"
+        if re.search(r"\b(tata\s+consumer|tata\s+tea|sampann)\b", full_text):
+            return "TATACONSUM.NS"
+        if re.search(r"\b(tata\s+elxsi)\b", full_text):
+            return "TATAELXSI.NS"
+        if re.search(r"\b(tata\s+comm|tata\s+communications?)\b", full_text):
+            return "TATACOMM.NS"
+        if re.search(r"\b(tata\s+chem|tata\s+chemicals?)\b", full_text):
+            return "TATACHEM.NS"
+
+    # 3. Bajaj group disambiguation
+    if clean_sym in ("BAJAJ", "BAJFINANCE", "BAJAJFINSV", "BAJAJ-AUTO", "BAJAJHLDNG"):
+        if re.search(r"\b(bajaj\s+finance|bajfinance)\b", full_text):
+            return "BAJFINANCE.NS"
+        if re.search(r"\b(bajaj\s+finserv)\b", full_text):
+            return "BAJAJFINSV.NS"
+        if re.search(r"\b(bajaj\s+auto|pulsar|chetak)\b", full_text):
+            return "BAJAJ-AUTO.NS"
+
+    # 4. HDFC group disambiguation
+    if clean_sym in ("HDFC", "HDFCBANK", "HDFCLIFE", "HDFCAMC"):
+        if re.search(r"\b(hdfc\s+bank)\b", full_text):
+            return "HDFCBANK.NS"
+        if re.search(r"\b(hdfc\s+life|insurance)\b", full_text):
+            return "HDFCLIFE.NS"
+        if re.search(r"\b(hdfc\s+amc|mutual\s+fund)\b", full_text):
+            return "HDFCAMC.NS"
+
+    # 5. Adani group disambiguation
+    if clean_sym in ("ADANI", "ADANIENT", "ADANIPORTS", "ADANIGREEN", "ADANIPOWER", "ADANIENSOL", "AWL"):
+        if re.search(r"\b(adani\s+ports?|port)\b", full_text):
+            return "ADANIPORTS.NS"
+        if re.search(r"\b(adani\s+green|renewable)\b", full_text):
+            return "ADANIGREEN.NS"
+        if re.search(r"\b(adani\s+power)\b", full_text):
+            return "ADANIPOWER.NS"
+        if re.search(r"\b(adani\s+energy|transmission)\b", full_text):
+            return "ADANIENSOL.NS"
+        if re.search(r"\b(adani\s+wilmar|fortune)\b", full_text):
+            return "AWL.NS"
+        if re.search(r"\b(adani\s+enterprises?|flagship)\b", full_text):
+            return "ADANIENT.NS"
+
+    return ticker
 
 
 def score_catalyst_headline(title: str, summary: str = "") -> dict[str, Any]:
@@ -350,7 +452,7 @@ def fetch_ticker_catalysts(
         return fetch_yfinance_news(ticker)
 
     def _get_google():
-        return fetch_google_news_rss(ticker, market=market)
+        return fetch_google_news_rss(ticker, market=market, company_name=name)
 
     executor = ThreadPoolExecutor(max_workers=3)
     try:
@@ -394,10 +496,12 @@ def fetch_ticker_catalysts(
                 continue
 
             scored = score_catalyst_headline(title, summary)
+            effective_ticker = disambiguate_ticker_for_headline(ticker, title, summary)
+            effective_name = get_name(effective_ticker, settings) if effective_ticker != ticker else name
 
             record = {
-                "ticker": ticker,
-                "stock_name": name,
+                "ticker": effective_ticker,
+                "stock_name": effective_name or name,
                 "title": title,
                 "publisher": publisher,
                 "link": link,
@@ -498,6 +602,58 @@ def get_short_term_catalysts(
 
         rows = conn.execute(query, params).fetchall()
         valid = [dict(r) for r in rows if is_headline_current(r["title"], dict(r).get("summary") or "", r["published_at"])]
+
+        # Fast price enrichment: compute signal_price and current_price for each catalyst item
+        if valid:
+            tickers = list({v["ticker"] for v in valid if v.get("ticker")})
+            if tickers:
+                placeholders = ",".join("?" for _ in tickers)
+                try:
+                    latest_rows = conn.execute(
+                        f"""
+                        SELECT ticker, close, date FROM price_history 
+                        WHERE ticker IN ({placeholders}) 
+                        AND date = (SELECT MAX(date) FROM price_history p2 WHERE p2.ticker = price_history.ticker)
+                        """,
+                        tickers,
+                    ).fetchall()
+                    latest_map = {r[0]: (float(r[1]), r[2]) for r in latest_rows if r[1] is not None}
+                except Exception:
+                    latest_map = {}
+
+                for v in valid:
+                    t = v.get("ticker")
+                    pub_d = (v.get("published_at") or "")[:10]
+                    cur_price, _ = latest_map.get(t, (None, None))
+                    v["current_price"] = cur_price
+
+                    # Look up signal price on or right before published_at date
+                    if t and pub_d:
+                        try:
+                            sig_row = conn.execute(
+                                "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? ORDER BY date DESC LIMIT 1",
+                                (t, pub_d),
+                            ).fetchone()
+                            if sig_row and sig_row[0] is not None:
+                                v["signal_price"] = float(sig_row[0])
+                                v["signal_date"] = sig_row[1]
+                            else:
+                                v["signal_price"] = cur_price
+                                v["signal_date"] = pub_d
+                        except Exception:
+                            v["signal_price"] = cur_price
+                            v["signal_date"] = pub_d
+                    else:
+                        v["signal_price"] = cur_price
+                        v["signal_date"] = pub_d
+
+                    if v.get("signal_price") and v.get("current_price") and v["signal_price"] > 0:
+                        v["price_change_pct"] = round(
+                            ((v["current_price"] - v["signal_price"]) / v["signal_price"]) * 100.0, 2
+                        )
+                    else:
+                        v["price_change_pct"] = 0.0
+
         return valid
 
 

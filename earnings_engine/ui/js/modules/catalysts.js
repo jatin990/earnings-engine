@@ -98,6 +98,15 @@
                 const dirColor = isBull ? '#34d399' : (isBear ? '#f87171' : '#94a3b8');
                 const dirBorder = isBull ? 'rgba(16,185,129,0.3)' : (isBear ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)');
 
+                const sigPrice = (c.signal_price != null && c.signal_price > 0) ? '₹' + Number(c.signal_price).toFixed(1) : null;
+                const curPrice = (c.current_price != null && c.current_price > 0) ? '₹' + Number(c.current_price).toFixed(1) : null;
+                const chgPct = c.price_change_pct || 0;
+                const chgColor = chgPct > 0 ? '#34d399' : (chgPct < 0 ? '#f87171' : '#94a3b8');
+                const chgSign = chgPct > 0 ? '+' : '';
+                const priceCell = (sigPrice && curPrice) 
+                    ? `<div style="font-size:0.72rem;font-family:var(--font-mono);">${sigPrice} → <strong style="color:#38bdf8;">${curPrice}</strong> <span style="color:${chgColor};font-weight:700;">(${chgSign}${chgPct.toFixed(1)}%)</span></div>`
+                    : (curPrice ? `<div style="font-size:0.72rem;font-family:var(--font-mono);color:#38bdf8;">${curPrice}</div>` : '<div style="color:#64748b;">—</div>');
+
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);font-weight:700;">
@@ -109,10 +118,13 @@
                         </td>
                         <td style="padding:0.65rem 0.8rem;color:#94a3b8;font-size:0.72rem;">${c.category || 'Corporate'}</td>
                         <td style="padding:0.65rem 0.8rem;">
+                            ${priceCell}
+                        </td>
+                        <td style="padding:0.65rem 0.8rem;">
                             <span class="signal-badge" style="background:${dirBg};color:${dirColor};border:1px solid ${dirBorder};font-size:0.68rem;padding:0.12rem 0.45rem;">${c.direction || 'NEUTRAL'}</span>
                         </td>
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#38bdf8;">${c.impact_score || 50}/100</td>
-                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#64748b;font-size:0.7rem;">${c.published_date || c.detected_at || '—'}</td>
+                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#64748b;font-size:0.7rem;">${c.published_at || c.published_date || c.detected_at || '—'}</td>
                         <td style="padding:0.65rem 0.8rem;text-align:center;">
                             <button type="button" onclick="app.openStockNote('${c.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.55rem;">Analysis</button>
                         </td>

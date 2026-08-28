@@ -2393,12 +2393,31 @@
 
                     const dateDisplay = this.formatNewsDate(c.published_at);
 
+                    const sigPrice = (c.signal_price != null && c.signal_price > 0) ? '₹' + Number(c.signal_price).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : null;
+                    const curPrice = (c.current_price != null && c.current_price > 0) ? '₹' + Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : null;
+                    const chgPct = c.price_change_pct || 0;
+                    const chgColor = chgPct > 0 ? '#34d399' : (chgPct < 0 ? '#f87171' : '#94a3b8');
+                    const chgSign = chgPct > 0 ? '+' : '';
+                    const priceBadge = (sigPrice && curPrice) ? `
+                        <div style="display:inline-flex;align-items:center;gap:0.4rem;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.12);border-radius:5px;padding:0.12rem 0.5rem;font-size:0.72rem;" title="Price at time of news disclosure vs latest quote">
+                            <span style="color:#94a3b8;">Signal Price: <strong style="color:#f8fafc;font-family:var(--font-mono);">${sigPrice}</strong></span>
+                            <span style="color:#64748b;">→</span>
+                            <span style="color:#94a3b8;">Now: <strong style="color:#38bdf8;font-family:var(--font-mono);">${curPrice}</strong></span>
+                            <span style="color:${chgColor};font-weight:700;font-family:var(--font-mono);margin-left:0.2rem;">(${chgSign}${chgPct.toFixed(2)}%)</span>
+                        </div>
+                    ` : (curPrice ? `
+                        <div style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.08);border-radius:5px;padding:0.12rem 0.45rem;font-size:0.72rem;">
+                            <span style="color:#94a3b8;">Live Price: <strong style="color:#38bdf8;font-family:var(--font-mono);">${curPrice}</strong></span>
+                        </div>
+                    ` : '');
+
                     return '<div class="card" style="margin:0;padding:1rem;background:rgba(255,255,255,0.03);' + cardBorder + 'transition:transform 0.15s ease;">' +
                         '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.45rem;">' +
                             '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">' +
                                 ((c.stock_name && c.stock_name.trim().toUpperCase() !== c.ticker.trim().toUpperCase())
                                     ? '<strong style="font-size:1.05rem;color:#f8fafc;">' + c.stock_name + '</strong><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" class="signal-badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;font-size:0.72rem;text-decoration:none;" title="Open stock intelligence">' + c.ticker + ' ↗</a>'
                                     : '<a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="font-size:1.05rem;font-weight:700;color:#60a5fa;text-decoration:none;">' + c.ticker + ' ↗</a>') +
+                                priceBadge +
                                 '<span style="background:' + impactBadgeBg + ';color:' + impactBadgeColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + impactLabel + '</span>' +
                                 '<span style="background:' + dirBadgeBg + ';color:' + dirColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + dirIcon + '</span>' +
                                 '<span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;">' + c.category + '</span>' +
@@ -15366,10 +15385,93 @@
             }
         };
 
+        // =========================================================================
+        // ⏱️ Global Ticker Price Refresh Engine (Configurable Interval, Default 5m)
+        // =========================================================================
+        app._globalPriceRefreshTimer = null;
+        app._lastGlobalPriceRefresh = null;
+
+        app.initGlobalPriceRefresh = function() {
+            const stored = localStorage.getItem('nexus_price_refresh_interval') || '300';
+            const selectEl = document.getElementById('globalPriceRefreshSelect');
+            if (selectEl) selectEl.value = stored;
+            this.startGlobalPriceRefreshLoop(parseInt(stored, 10));
+        };
+
+        app.setGlobalPriceRefreshInterval = function(secondsStr) {
+            const seconds = parseInt(secondsStr, 10) || 0;
+            localStorage.setItem('nexus_price_refresh_interval', String(seconds));
+            const selectEl = document.getElementById('globalPriceRefreshSelect');
+            if (selectEl && selectEl.value !== String(seconds)) selectEl.value = String(seconds);
+            this.startGlobalPriceRefreshLoop(seconds);
+            const label = seconds === 0 ? 'Manual (Auto-refresh Off)' : `${Math.round(seconds / 60)} min${seconds > 60 ? 's' : ''}`;
+            if (typeof this.showToast === 'function') {
+                this.showToast(`⏱️ Price refresh interval set to ${label}`, 'success');
+            }
+        };
+
+        app.startGlobalPriceRefreshLoop = function(intervalSeconds) {
+            if (this._globalPriceRefreshTimer) {
+                clearInterval(this._globalPriceRefreshTimer);
+                this._globalPriceRefreshTimer = null;
+            }
+            const sec = (intervalSeconds !== undefined) ? intervalSeconds : (parseInt(localStorage.getItem('nexus_price_refresh_interval') || '300', 10) || 300);
+            if (sec > 0) {
+                this._globalPriceRefreshTimer = setInterval(() => {
+                    this.triggerGlobalPriceRefresh(false);
+                }, sec * 1000);
+            }
+        };
+
+        app.triggerGlobalPriceRefresh = async function(manual = false) {
+            const btn = document.getElementById('topRefreshPricesBtn');
+            if (btn) {
+                btn.style.animation = 'spin 1s linear infinite';
+                btn.disabled = true;
+            }
+            try {
+                const activeTab = this.currentTab || window.app?.currentTab || 'home';
+                if (activeTab === 'catalysts') {
+                    await this.loadCatalysts();
+                } else if (activeTab === 'breakout') {
+                    if (typeof this.loadBreakoutRadar === 'function') await this.loadBreakoutRadar();
+                } else if (activeTab === 'gainers') {
+                    if (typeof this.loadGainers === 'function') await this.loadGainers();
+                } else if (activeTab === 'watchlist') {
+                    if (typeof this.loadWatchlist === 'function') await this.loadWatchlist();
+                    if (typeof this.watchlistTab?.loadActiveQuotes === 'function') await this.watchlistTab.loadActiveQuotes();
+                } else if (activeTab === 'swing') {
+                    if (typeof this.loadSwingRanges === 'function') await this.loadSwingRanges();
+                } else if (activeTab === 'home') {
+                    if (typeof this.loadPulseData === 'function') await this.loadPulseData();
+                } else if (activeTab === 'results' || activeTab === 'monthfilter') {
+                    if (typeof this.loadUpcoming === 'function') await this.loadUpcoming();
+                } else if (activeTab === 'institutional') {
+                    if (typeof this.loadInstitutionalFlows === 'function') await this.loadInstitutionalFlows();
+                }
+                this._lastGlobalPriceRefresh = new Date();
+                if (manual && typeof this.showToast === 'function') {
+                    this.showToast('🟢 Ticker prices refreshed across active page', 'success');
+                }
+            } catch (e) {
+                console.debug('[PRICE-REFRESH] Auto-refresh error:', e);
+            } finally {
+                if (btn) {
+                    btn.style.animation = '';
+                    btn.disabled = false;
+                }
+            }
+        };
+
         // Initialize & export to window
         window.app = app;
         if (typeof app.init === 'function') {
             try { app.init(); } catch (e) { console.warn('app.init:', e); }
+        }
+        try {
+            app.initGlobalPriceRefresh();
+        } catch (e) {
+            console.warn('Initial price refresh setup:', e);
         }
         try {
             app.updateResultsMonthSummaryCards();
