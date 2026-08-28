@@ -608,8 +608,18 @@ def get_tracked_breakouts(
 
         # 3. Outcome Filtering
         if outcome and outcome.upper() not in ("ALL", ""):
-            query_clauses.append("UPPER(outcome) = ?")
-            params.append(outcome.upper())
+            out_up = outcome.upper()
+            if out_up in ("STOP_HIT", "STOP_LOSS_HIT"):
+                query_clauses.append("UPPER(outcome) IN ('STOP_HIT', 'STOP_LOSS_HIT')")
+            elif out_up in ("SETUP_FAILED", "BREAKOUT_FAILED"):
+                query_clauses.append("UPPER(outcome) IN ('SETUP_FAILED', 'BREAKOUT_FAILED')")
+            elif out_up in ("TRIGGERED", "BREAKOUT_SUCCEEDED"):
+                query_clauses.append("UPPER(outcome) IN ('TRIGGERED', 'BREAKOUT_SUCCEEDED')")
+            elif out_up in ("ACTIVE", "COILING_IN_PROFIT", "COILING_IN_RANGE"):
+                query_clauses.append("UPPER(outcome) IN ('ACTIVE', 'COILING_IN_PROFIT', 'COILING_IN_RANGE')")
+            else:
+                query_clauses.append("UPPER(outcome) = ?")
+                params.append(out_up)
 
         where_clause = " AND ".join(query_clauses)
 
@@ -725,29 +735,52 @@ def get_tracked_breakouts(
                                 ret_pct = round(((cur_p - sig_p) / sig_p) * 100, 2)
                                 item_d["realized_return_pct"] = ret_pct
 
+                            post_high = cur_p
+                            post_low = cur_p
                             if sig_date and sig_date in df.index:
                                 post_df = df.loc[df.index >= sig_date]
-                                if not post_df.empty and "high" in post_df.columns:
-                                    highs = pd.to_numeric(post_df["high"], errors="coerce").dropna()
-                                    if not highs.empty and sig_p and sig_p > 0:
-                                        max_gain = round(((float(highs.max()) - sig_p) / sig_p) * 100, 2)
-                                        item_d["max_gain_pct"] = max_gain
-                                item_d["days_elapsed"] = len(post_df)
+                                if not post_df.empty:
+                                    if "high" in post_df.columns:
+                                        highs = pd.to_numeric(post_df["high"], errors="coerce").dropna()
+                                        if not highs.empty:
+                                            post_high = float(highs.max())
+                                            if sig_p and sig_p > 0:
+                                                max_gain = round(((post_high - sig_p) / sig_p) * 100, 2)
+                                                item_d["max_gain_pct"] = max_gain
+                                    if "low" in post_df.columns:
+                                        lows = pd.to_numeric(post_df["low"], errors="coerce").dropna()
+                                        if not lows.empty:
+                                            post_low = float(lows.min())
+                                    item_d["days_elapsed"] = len(post_df)
 
-                            if target_p and cur_p >= target_p:
+                            breakout_triggered = bool(trig_p and (cur_p >= trig_p or post_high >= trig_p))
+
+                            if target_p and (cur_p >= target_p or post_high >= target_p):
                                 item_d["outcome"] = "TARGET_HIT"
                                 item_d["outcome_label"] = "Target Hit 🎯"
                                 item_d["outcome_badge"] = "TARGET_HIT"
                                 item_d["breakout_happened"] = True
-                            elif trig_p and cur_p >= trig_p:
-                                item_d["outcome"] = "TRIGGERED"
-                                item_d["outcome_label"] = "Breakout Fired 🚀"
-                                item_d["outcome_badge"] = "TRIGGERED"
-                                item_d["breakout_happened"] = True
-                            elif stop_p and cur_p <= stop_p:
-                                item_d["outcome"] = "STOP_HIT"
-                                item_d["outcome_label"] = "Stop Loss Hit 🛑"
-                                item_d["outcome_badge"] = "STOP_HIT"
+                            elif breakout_triggered:
+                                if stop_p and (cur_p <= stop_p or post_low <= stop_p):
+                                    item_d["outcome"] = "STOP_HIT"
+                                    item_d["outcome_label"] = "Stop Hit 🛑"
+                                    item_d["outcome_badge"] = "STOP_HIT"
+                                    item_d["breakout_happened"] = False
+                                elif cur_p >= sig_p:
+                                    item_d["outcome"] = "TRIGGERED"
+                                    item_d["outcome_label"] = "Breakout Fired 🚀"
+                                    item_d["outcome_badge"] = "TRIGGERED"
+                                    item_d["breakout_happened"] = True
+                                else:
+                                    item_d["outcome"] = "BREAKOUT_RETRACED"
+                                    item_d["outcome_label"] = "Breakout Retraced ⚠️"
+                                    item_d["outcome_badge"] = "BREAKOUT_RETRACED"
+                                    item_d["breakout_happened"] = False
+                            elif stop_p and (cur_p <= stop_p or post_low <= stop_p):
+                                item_d["outcome"] = "SETUP_FAILED"
+                                item_d["outcome_label"] = "Setup Failed ❌"
+                                item_d["outcome_badge"] = "SETUP_FAILED"
+                                item_d["breakout_happened"] = False
                             else:
                                 item_d["outcome"] = "ACTIVE"
                                 item_d["outcome_label"] = "Active Coiling"
@@ -771,9 +804,10 @@ def get_tracked_breakouts(
         max_return_ticker = best_item.get("ticker", "—") if best_item else "—"
 
         target_hit_count = sum(1 for it in items if it.get("outcome") == "TARGET_HIT")
-        triggered_count = sum(1 for it in items if it.get("outcome") == "TRIGGERED")
-        stop_hit_count = sum(1 for it in items if it.get("outcome") == "STOP_HIT")
-        active_count = sum(1 for it in items if it.get("outcome") == "ACTIVE")
+        triggered_count = sum(1 for it in items if it.get("outcome") in ("TRIGGERED", "BREAKOUT_SUCCEEDED"))
+        stop_hit_count = sum(1 for it in items if it.get("outcome") in ("STOP_HIT", "STOP_LOSS_HIT"))
+        setup_failed_count = sum(1 for it in items if it.get("outcome") in ("SETUP_FAILED", "BREAKOUT_FAILED"))
+        active_count = sum(1 for it in items if it.get("outcome") in ("ACTIVE", "COILING_IN_PROFIT", "COILING_IN_RANGE"))
 
         return {
             "success": True,
@@ -794,6 +828,7 @@ def get_tracked_breakouts(
                 "triggered_count": triggered_count,
                 "target_hit_count": target_hit_count,
                 "stop_hit_count": stop_hit_count,
+                "setup_failed_count": setup_failed_count,
             },
             "items": items,
         }
@@ -1230,8 +1265,14 @@ def score_breakout(
             outcome = "TARGET_HIT"
             outcome_label = f"Target Hit 🎯 (+{max_gain_pct}%)"
             outcome_badge = "emerald"
-        elif post_high >= breakout_trigger:
-            if current_price >= signal_price:
+        elif breakout_fired:
+            # Setup triggered breakout above resistance level
+            if post_low <= stop_loss or current_price <= stop_loss:
+                breakout_happened = False
+                outcome = "STOP_LOSS_HIT"
+                outcome_label = f"Stop Hit 🛑 ({realized_return_pct:+0.1f}%)"
+                outcome_badge = "rose"
+            elif current_price >= signal_price:
                 breakout_happened = True
                 outcome = "BREAKOUT_SUCCEEDED"
                 outcome_label = f"Breakout Succeeded ✅ ({realized_return_pct:+0.1f}%)"
@@ -1241,10 +1282,11 @@ def score_breakout(
                 outcome = "BREAKOUT_RETRACED"
                 outcome_label = f"Breakout Retraced ⚠️ ({realized_return_pct:+0.1f}%)"
                 outcome_badge = "amber"
-        elif post_low <= stop_loss:
+        elif post_low <= stop_loss or current_price <= stop_loss:
+            # Setup NEVER crossed trigger level and dropped into stop loss
             breakout_happened = False
-            outcome = "STOP_LOSS_HIT"
-            outcome_label = f"Stop Loss Hit 🛑 ({realized_return_pct:+0.1f}%)"
+            outcome = "SETUP_FAILED"
+            outcome_label = f"Setup Failed ❌ ({realized_return_pct:+0.1f}%)"
             outcome_badge = "rose"
         elif current_price >= signal_price:
             breakout_happened = False

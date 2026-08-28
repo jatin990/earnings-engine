@@ -13771,13 +13771,28 @@
                     outcomeColor = '#38bdf8';
                     outcomeBg = 'rgba(56,189,248,0.18)';
                     outcomeBorder = 'rgba(56,189,248,0.45)';
-                } else if (outcome === 'STOP_HIT') {
+                } else if (outcome === 'STOP_HIT' || outcome === 'STOP_LOSS_HIT') {
                     outcomeLabel = '🛑 Stop Hit';
                     outcomeColor = '#f87171';
                     outcomeBg = 'rgba(239,68,68,0.18)';
                     outcomeBorder = 'rgba(239,68,68,0.45)';
-                } else if (outcome === 'ACTIVE') {
-                    outcomeLabel = '⏳ Active Setup';
+                } else if (outcome === 'SETUP_FAILED' || outcome === 'BREAKOUT_FAILED') {
+                    outcomeLabel = '❌ Setup Failed';
+                    outcomeColor = '#f87171';
+                    outcomeBg = 'rgba(239,68,68,0.14)';
+                    outcomeBorder = 'rgba(239,68,68,0.38)';
+                } else if (outcome === 'BREAKOUT_RETRACED') {
+                    outcomeLabel = '⚠️ Retraced';
+                    outcomeColor = '#fbbf24';
+                    outcomeBg = 'rgba(245,158,11,0.15)';
+                    outcomeBorder = 'rgba(245,158,11,0.35)';
+                } else if (outcome === 'COILING_IN_PROFIT') {
+                    outcomeLabel = '🟢 In Green';
+                    outcomeColor = '#34d399';
+                    outcomeBg = 'rgba(16,185,129,0.15)';
+                    outcomeBorder = 'rgba(16,185,129,0.35)';
+                } else {
+                    outcomeLabel = '⏳ Active Coiling';
                     outcomeColor = '#fbbf24';
                     outcomeBg = 'rgba(245,158,11,0.15)';
                     outcomeBorder = 'rgba(245,158,11,0.35)';
@@ -13787,7 +13802,9 @@
                 let rowClass = 'bk-table-row';
                 if (outcome === 'TARGET_HIT' || outcome === 'BREAKOUT_SUCCEEDED') {
                     rowClass += ' bk-row-success';
-                } else if (outcome === 'STOP_HIT') {
+                } else if (outcome === 'STOP_HIT' || outcome === 'STOP_LOSS_HIT') {
+                    rowClass += ' bk-row-stop';
+                } else if (outcome === 'SETUP_FAILED' || outcome === 'BREAKOUT_FAILED') {
                     rowClass += ' bk-row-stop';
                 } else if (tier === 'HOT' || outcome === 'TRIGGERED') {
                     rowClass += ' bk-row-hot';

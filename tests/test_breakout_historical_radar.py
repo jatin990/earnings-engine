@@ -168,3 +168,46 @@ def test_api_breakout_ai_reasoning_endpoint(client):
     assert "accumulation_analysis" in r
     assert "execution_plan" in r
 
+
+def test_score_breakout_setup_failed_vs_stop_hit():
+    """Verify distinction between SETUP_FAILED (never triggered) and STOP_LOSS_HIT (triggered then stopped)."""
+    dates = pd.date_range("2026-01-01", periods=50, freq="B")
+    asof_date = dates[29].strftime("%Y-%m-%d")
+
+    # Case 1: Setup Failed (price never reached trigger level, dropped straight below stop loss)
+    # Signal price ~100, Trigger ~103, Stop Loss ~95. Post-period drops to 90 without ever exceeding 101.
+    prices_fail = [100.0] * 30 + [98.0, 96.0, 94.0, 92.0, 90.0] + [90.0] * 15
+    df_fail = pd.DataFrame({
+        "open": prices_fail,
+        "high": [p + 0.5 for p in prices_fail],
+        "low": [p - 0.5 for p in prices_fail],
+        "close": prices_fail,
+        "volume": [10000] * 50,
+    }, index=dates)
+
+    res_fail = score_breakout("FAIL.NS", df_fail, quality_scores=[8.0, 8.0, 8.0], asof_date=asof_date)
+    assert res_fail is not None
+    assert res_fail["outcome"] == "SETUP_FAILED"
+    assert "Setup Failed ❌" in res_fail["outcome_label"]
+    assert res_fail["outcome_badge"] == "rose"
+    assert res_fail["breakout_happened"] is False
+
+    # Case 2: Stop Loss Hit (price triggered above resistance high, but later reversed and hit stop loss)
+    # Signal price ~100, Trigger ~103, Stop Loss ~95. Post-period rallies to 105 (trigger breached), then crashes to 92.
+    prices_stop = [100.0] * 30 + [104.0, 105.0, 98.0, 94.0, 91.0] + [91.0] * 15
+    df_stop = pd.DataFrame({
+        "open": prices_stop,
+        "high": [p + 0.5 for p in prices_stop],
+        "low": [p - 0.5 for p in prices_stop],
+        "close": prices_stop,
+        "volume": [10000] * 50,
+    }, index=dates)
+
+    res_stop = score_breakout("STOP.NS", df_stop, quality_scores=[8.0, 8.0, 8.0], asof_date=asof_date)
+    assert res_stop is not None
+    assert res_stop["outcome"] == "STOP_LOSS_HIT"
+    assert "Stop Hit 🛑" in res_stop["outcome_label"]
+    assert res_stop["outcome_badge"] == "rose"
+    assert res_stop["breakout_happened"] is False
+
+

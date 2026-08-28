@@ -158,7 +158,8 @@ async def get_breakout_radar_endpoint(
                 targets_hit = [c for c in evaluated if c.get("outcome") == "TARGET_HIT"]
                 breakouts_succeeded = [c for c in evaluated if c.get("outcome") == "BREAKOUT_SUCCEEDED"]
                 breakouts_retraced = [c for c in evaluated if c.get("outcome") == "BREAKOUT_RETRACED"]
-                stop_losses_hit = [c for c in evaluated if c.get("outcome") == "STOP_LOSS_HIT"]
+                stop_losses_hit = [c for c in evaluated if c.get("outcome") in ("STOP_LOSS_HIT", "STOP_HIT")]
+                setups_failed = [c for c in evaluated if c.get("outcome") in ("SETUP_FAILED", "BREAKOUT_FAILED")]
 
                 returns = [c.get("realized_return_pct", 0) for c in evaluated if c.get("realized_return_pct") is not None]
                 avg_return = round(sum(returns) / len(returns), 2) if returns else 0.0
@@ -185,6 +186,7 @@ async def get_breakout_radar_endpoint(
                     "breakouts_succeeded_count": len(breakouts_succeeded),
                     "breakouts_retraced_count": len(breakouts_retraced),
                     "stop_losses_hit_count": len(stop_losses_hit),
+                    "setups_failed_count": len(setups_failed),
                     "avg_return_pct": avg_return,
                     "avg_fired_return_pct": avg_fired_return,
                     "avg_peak_gain_pct": avg_peak_gain,
