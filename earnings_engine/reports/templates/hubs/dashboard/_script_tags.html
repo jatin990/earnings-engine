@@ -1,10 +1,31 @@
+    <!-- ================================================================ -->
+    <!-- Nexus Dashboard — Modular Script Loader v20260828_v22_modular   -->
+    <!-- Load order: foundation → core → features → modals → complex     -->
+    <!-- ================================================================ -->
 
-    <script src="/static/js/modules/market_pulse.js?v=20260828_v1"></script>
-    <script src="/static/js/modules/institutional.js?v=20260828_v1"></script>
-    <script src="/static/js/modules/schedules.js?v=20260828_v1"></script>
-    <script src="/static/js/modules/new_additions.js?v=20260828_v1"></script>
-    <script src="/static/js/modules/catalysts.js?v=20260828_v1"></script>
-    <script src="/static/js/modules/premarket.js?v=20260828_v1"></script>
-    <script src="/static/js/modules/consensus.js?v=20260828_v1"></script>
-    <script src="/static/js/modules/swing.js?v=20260828_v1"></script>
-    <script src="/static/js/dashboard.js?v=20260828_v21_premarket"></script>
+    <!-- Existing modules (Phase 1) -->
+    <script src="/static/js/modules/market_pulse.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/institutional.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/new_additions.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/catalysts.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/premarket.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/swing.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/consensus.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/schedules.js?v=20260828_v22_modular"></script>
+
+    <!-- Phase 2 — Small extracted modules -->
+    <script src="/static/js/modules/coverage.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/industries.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/buy_dip.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/patterns.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/backtest.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/recalculate.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/page_guide.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/price_refresh.js?v=20260828_v22_modular"></script>
+    <script src="/static/js/modules/stock_modal.js?v=20260828_v22_modular"></script>
+
+    <!-- Core monolith (still active — being progressively extracted) -->
+    <script src="/static/js/dashboard.js?v=20260828_v22_modular"></script>
+
+    <!-- Phase 2 — Sidebar badges (loads after app is initialized by dashboard.js) -->
+    <script src="/static/js/modules/sidebar_badges.js?v=20260828_v22_modular"></script>
