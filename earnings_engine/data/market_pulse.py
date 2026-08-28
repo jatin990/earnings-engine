@@ -174,30 +174,72 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
     except Exception:
         pass
 
-    # 4. Institutional Net Flow Estimates & Past 7 Days Daily Breakdown
-    # Retrieve past 7 trading dates from price_history or business calendar
+    # 4. Institutional Net Flow Estimates & Past 7D / 30D Daily Breakdown with Delta-Only Ingestion
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS institutional_net_flows (
+            date TEXT PRIMARY KEY,
+            day_label TEXT NOT NULL,
+            fii_buy_cr REAL NOT NULL,
+            fii_sell_cr REAL NOT NULL,
+            fii_net_cr REAL NOT NULL,
+            dii_buy_cr REAL NOT NULL,
+            dii_sell_cr REAL NOT NULL,
+            dii_net_cr REAL NOT NULL,
+            total_net_cr REAL NOT NULL,
+            stance TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_flows_date ON institutional_net_flows(date DESC)")
+    conn.commit()
+
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Load existing saved flows from database (to only calculate deltas for missing dates)
+    saved_flows_rows = conn.execute(
+        "SELECT date, day_label, fii_buy_cr, fii_sell_cr, fii_net_cr, dii_buy_cr, dii_sell_cr, dii_net_cr, total_net_cr, stance FROM institutional_net_flows ORDER BY date DESC LIMIT 90"
+    ).fetchall()
+    saved_flows: dict[str, dict[str, Any]] = {
+        r[0]: {
+            "date": r[0],
+            "day_label": r[1],
+            "fii_buy_cr": float(r[2]),
+            "fii_sell_cr": float(r[3]),
+            "fii_net_cr": float(r[4]),
+            "dii_buy_cr": float(r[5]),
+            "dii_sell_cr": float(r[6]),
+            "dii_net_cr": float(r[7]),
+            "total_net_cr": float(r[8]),
+            "stance": r[9],
+        }
+        for r in saved_flows_rows
+    }
+
+    # Retrieve past 30 trading dates from price_history or business calendar
     trading_dates_raw: list[str] = []
     try:
         rows_dates = conn.execute(
-            "SELECT DISTINCT date FROM price_history WHERE date <= ? ORDER BY date DESC LIMIT 7",
+            "SELECT DISTINCT date FROM price_history WHERE date <= ? ORDER BY date DESC LIMIT 30",
             (today_str,),
         ).fetchall()
         trading_dates_raw = [r[0] for r in rows_dates if r[0]]
     except Exception:
         pass
 
-    if len(trading_dates_raw) < 7:
-        # Fallback to generating past 7 trading sessions
+    if len(trading_dates_raw) < 30:
+        # Fallback to generating past 30 business trading sessions
         today_dt = datetime.now(timezone.utc).date()
         trading_dates_raw = []
         curr_dt = today_dt
-        while len(trading_dates_raw) < 7:
+        while len(trading_dates_raw) < 30:
             if curr_dt.weekday() < 5:  # Mon-Fri
                 trading_dates_raw.append(curr_dt.strftime("%Y-%m-%d"))
             curr_dt -= timedelta(days=1)
 
-    history_7d: list[dict[str, Any]] = []
+    history_full: list[dict[str, Any]] = []
+    delta_inserts: list[tuple[Any, ...]] = []
+    now_iso = datetime.now(timezone.utc).isoformat()
+
     for idx, dt_str in enumerate(trading_dates_raw):
         try:
             dt_obj = datetime.strptime(dt_str, "%Y-%m-%d")
@@ -205,7 +247,16 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
         except Exception:
             day_fmt = dt_str
 
-        # Check block deals on this date
+        day_label = f"Today ({day_fmt})" if idx == 0 else day_fmt
+
+        # If date is already saved in SQLite and not today's live session, reuse saved data directly (delta skip!)
+        if dt_str in saved_flows and idx != 0:
+            rec = dict(saved_flows[dt_str])
+            rec["day_label"] = day_label
+            history_full.append(rec)
+            continue
+
+        # Otherwise calculate delta for this date
         deal_row = None
         try:
             deal_row = conn.execute(
@@ -234,10 +285,11 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
         fii_day_net = round(base_fii_buy - base_fii_sell, 1)
         dii_day_net = round(base_dii_buy - base_dii_sell, 1)
         tot_day_net = round(fii_day_net + dii_day_net, 1)
+        stance_str = "NET INFLOW (BULLISH)" if tot_day_net > 0 else "NET OUTFLOW (DEFENSIVE)"
 
-        history_7d.append({
+        record_dict = {
             "date": dt_str,
-            "day_label": f"Today ({day_fmt})" if idx == 0 else day_fmt,
+            "day_label": day_label,
             "fii_buy_cr": base_fii_buy,
             "fii_sell_cr": base_fii_sell,
             "fii_net_cr": fii_day_net,
@@ -245,8 +297,36 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
             "dii_sell_cr": base_dii_sell,
             "dii_net_cr": dii_day_net,
             "total_net_cr": tot_day_net,
-            "stance": "NET INFLOW (BULLISH)" if tot_day_net > 0 else "NET OUTFLOW (DEFENSIVE)",
-        })
+            "stance": stance_str,
+        }
+        history_full.append(record_dict)
+
+        delta_inserts.append((
+            dt_str, day_fmt, base_fii_buy, base_fii_sell, fii_day_net,
+            base_dii_buy, base_dii_sell, dii_day_net, tot_day_net,
+            stance_str, now_iso
+        ))
+
+    # Persist newly calculated deltas into SQLite database
+    if delta_inserts:
+        try:
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO institutional_net_flows (
+                    date, day_label, fii_buy_cr, fii_sell_cr, fii_net_cr,
+                    dii_buy_cr, dii_sell_cr, dii_net_cr, total_net_cr,
+                    stance, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                delta_inserts,
+            )
+            conn.commit()
+            logger.info("Saved %d new institutional flow delta record(s) to institutional_net_flows", len(delta_inserts))
+        except Exception as e_ins:
+            logger.debug("Failed saving institutional delta records: %s", e_ins)
+
+    history_7d = history_full[:7]
+    history_extended = history_full
 
     fii_net_cr = history_7d[0]["fii_net_cr"] if history_7d else 850.5
     dii_net_cr = history_7d[0]["dii_net_cr"] if history_7d else 1420.0
@@ -255,6 +335,10 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
     fii_7d_total = round(sum(h["fii_net_cr"] for h in history_7d), 1)
     dii_7d_total = round(sum(h["dii_net_cr"] for h in history_7d), 1)
     combined_7d_total = round(sum(h["total_net_cr"] for h in history_7d), 1)
+
+    fii_30d_total = round(sum(h["fii_net_cr"] for h in history_extended), 1)
+    dii_30d_total = round(sum(h["dii_net_cr"] for h in history_extended), 1)
+    combined_30d_total = round(sum(h["total_net_cr"] for h in history_extended), 1)
 
     # 5. Sectoral Heatmap Data
     sectors = [
@@ -339,8 +423,14 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
             "fii_7d_total_cr": fii_7d_total,
             "dii_7d_total_cr": dii_7d_total,
             "total_7d_total_cr": combined_7d_total,
+            "fii_30d_total_cr": fii_30d_total,
+            "dii_30d_total_cr": dii_30d_total,
+            "total_30d_total_cr": combined_30d_total,
             "history_7d": history_7d,
             "past_7_days": history_7d,
+            "history_extended": history_extended,
+            "history_30d": history_extended,
+            "total_stored_records": len(history_extended),
         },
         "prediction": {
             "regime": prediction_regime,

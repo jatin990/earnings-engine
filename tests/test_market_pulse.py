@@ -39,7 +39,7 @@ def test_market_pulse_data_structure():
     assert breadth["advances"] >= 0
     assert breadth["declines"] >= 0
 
-    # Check Institutional Flows & Past 7 Days History
+    # Check Institutional Flows & Past 7 Days / 30 Days History & Delta Persistence
     inst = data["institutional_flows"]
     assert "fii_net_cr" in inst
     assert "dii_net_cr" in inst
@@ -47,15 +47,25 @@ def test_market_pulse_data_structure():
     assert "fii_7d_total_cr" in inst
     assert "dii_7d_total_cr" in inst
     assert "total_7d_total_cr" in inst
+    assert "fii_30d_total_cr" in inst
+    assert "dii_30d_total_cr" in inst
+    assert "total_30d_total_cr" in inst
     assert "history_7d" in inst
     assert len(inst["history_7d"]) == 7
-    for row in inst["history_7d"]:
+    assert "history_extended" in inst
+    assert len(inst["history_extended"]) >= 7
+    for row in inst["history_extended"]:
         assert "date" in row
         assert "day_label" in row
         assert "fii_net_cr" in row
         assert "dii_net_cr" in row
         assert "total_net_cr" in row
         assert "stance" in row
+
+    # Subsequent call should fetch delta from DB seamlessly
+    data2 = get_market_pulse_data(force_refresh=True)
+    inst2 = data2["institutional_flows"]
+    assert len(inst2["history_extended"]) >= 7
 
     # Check Prediction
     pred = data["prediction"]
@@ -76,6 +86,8 @@ def test_market_pulse_api_endpoint(client):
     inst = payload["institutional_flows"]
     assert "history_7d" in inst
     assert len(inst["history_7d"]) >= 5
+    assert "history_extended" in inst
+    assert len(inst["history_extended"]) >= 5
     json_data = res.json()
     assert json_data["success"] is True
     assert "fear_and_greed" in json_data

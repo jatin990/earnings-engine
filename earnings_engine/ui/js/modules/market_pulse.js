@@ -193,6 +193,12 @@
             const badge7d = document.getElementById('pulse7dTotalBadge');
             const summary7d = document.getElementById('pulse7dFiiDiiSummary');
             const tbody7d = document.getElementById('pulse7dFlowsTableBody');
+            const titleEl = document.getElementById('pulseFlowHistoryTitle');
+            const countBadge = document.getElementById('pulseFlowHistoryCountBadge');
+            const toggleBtn = document.getElementById('pulseToggleFlowHistoryBtn');
+            const containerEl = document.getElementById('pulseFlowsTableContainer');
+
+            this._lastFlowsData = flows;
 
             if (fiiEl) {
                 const s = flows.fii_net_cr >= 0 ? '+' : '';
@@ -214,25 +220,51 @@
                 biasEl.style.color = flows.bias.includes('BULLISH') ? '#34d399' : '#f87171';
             }
 
-            // 7-Day Cumulative Total Badge
-            if (badge7d && flows.total_7d_total_cr != null) {
-                const s = flows.total_7d_total_cr >= 0 ? '+' : '';
-                badge7d.textContent = `7D Net: ${s}₹${Math.abs(flows.total_7d_total_cr).toLocaleString()} Cr`;
-                badge7d.style.color = flows.total_7d_total_cr >= 0 ? '#38bdf8' : '#f87171';
-                badge7d.style.background = flows.total_7d_total_cr >= 0 ? 'rgba(56,189,248,0.12)' : 'rgba(248,113,113,0.12)';
-                badge7d.style.borderColor = flows.total_7d_total_cr >= 0 ? 'rgba(56,189,248,0.25)' : 'rgba(248,113,113,0.25)';
+            const isExpanded = !!this._isFlowHistoryExpanded;
+            const history = isExpanded
+                ? (flows.history_extended || flows.history_30d || flows.history_7d || [])
+                : (flows.history_7d || flows.past_7_days || []);
+
+            // Dynamic Timeframe Total Badge (7D vs 30D)
+            if (badge7d) {
+                const totalVal = isExpanded
+                    ? (flows.total_30d_total_cr ?? flows.total_7d_total_cr ?? 0)
+                    : (flows.total_7d_total_cr ?? 0);
+                const label = isExpanded ? '30D Net' : '7D Net';
+                const s = totalVal >= 0 ? '+' : '';
+                badge7d.textContent = `${label}: ${s}₹${Math.abs(totalVal).toLocaleString()} Cr`;
+                badge7d.style.color = totalVal >= 0 ? '#38bdf8' : '#f87171';
+                badge7d.style.background = totalVal >= 0 ? 'rgba(56,189,248,0.12)' : 'rgba(248,113,113,0.12)';
+                badge7d.style.borderColor = totalVal >= 0 ? 'rgba(56,189,248,0.25)' : 'rgba(248,113,113,0.25)';
             }
 
-            // 7-Day FII / DII Sub-Summary
-            if (summary7d && flows.fii_7d_total_cr != null && flows.dii_7d_total_cr != null) {
-                const fSign = flows.fii_7d_total_cr >= 0 ? '+' : '';
-                const dSign = flows.dii_7d_total_cr >= 0 ? '+' : '';
-                summary7d.textContent = `FII: ${fSign}₹${flows.fii_7d_total_cr.toLocaleString()} Cr | DII: ${dSign}₹${flows.dii_7d_total_cr.toLocaleString()} Cr`;
+            // Sub-Summary Breakdown
+            if (summary7d) {
+                const fVal = isExpanded ? (flows.fii_30d_total_cr ?? flows.fii_7d_total_cr ?? 0) : (flows.fii_7d_total_cr ?? 0);
+                const dVal = isExpanded ? (flows.dii_30d_total_cr ?? flows.dii_7d_total_cr ?? 0) : (flows.dii_7d_total_cr ?? 0);
+                const fSign = fVal >= 0 ? '+' : '';
+                const dSign = dVal >= 0 ? '+' : '';
+                summary7d.textContent = `FII: ${fSign}₹${fVal.toLocaleString()} Cr | DII: ${dSign}₹${dVal.toLocaleString()} Cr`;
             }
 
-            // Past 7 Days Table Rows
+            // Update Header & Controls
+            if (titleEl) {
+                titleEl.textContent = isExpanded ? 'Past 30 Days Activity' : 'Past 7 Days Activity';
+            }
+            if (countBadge) {
+                countBadge.textContent = `${history.length} Sessions`;
+                countBadge.style.color = isExpanded ? '#38bdf8' : '#94a3b8';
+                countBadge.style.background = isExpanded ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.06)';
+            }
+            if (toggleBtn) {
+                toggleBtn.innerHTML = isExpanded ? '🔼 Show Less (7D)' : '🔽 Show More (30D)';
+            }
+            if (containerEl) {
+                containerEl.style.maxHeight = isExpanded ? '380px' : '180px';
+            }
+
+            // Flow History Table Rows
             if (tbody7d) {
-                const history = flows.history_7d || flows.past_7_days || [];
                 if (!history.length) {
                     tbody7d.innerHTML = '<tr><td colspan="5" style="padding:1rem;text-align:center;color:#64748b;">No recent institutional flow history found.</td></tr>';
                     return;
@@ -275,6 +307,12 @@
                     `;
                 }).join('');
             }
+        },
+
+        toggleFlowHistory() {
+            this._isFlowHistoryExpanded = !this._isFlowHistoryExpanded;
+            const flows = this._lastFlowsData || this.pulseData?.institutional_flows || {};
+            this.renderInstitutionalFlows(flows);
         },
 
         renderSectors(sectors) {

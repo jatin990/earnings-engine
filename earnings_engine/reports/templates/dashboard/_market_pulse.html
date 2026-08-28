@@ -213,16 +213,24 @@
                 <strong id="pulseInstBias" style="color:#34d399;font-weight:800;">NET INFLOWS (BULLISH)</strong>
             </div>
 
-            <!-- Past 7 Days Flow History Table -->
+            <!-- Past 7 Days / 30 Days Flow History Table -->
             <div style="margin-top:0.5rem;">
-                <div style="font-size:0.72rem;font-weight:700;color:#94a3b8;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
-                    <span>📅 Past 7 Days Activity</span>
-                    <span id="pulse7dFiiDiiSummary" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">FII vs DII Daily Breakdown</span>
+                <div style="font-size:0.72rem;font-weight:700;color:#94a3b8;display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;flex-wrap:wrap;gap:0.35rem;">
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                        <span>📅</span> <span id="pulseFlowHistoryTitle">Past 7 Days Activity</span>
+                        <span id="pulseFlowHistoryCountBadge" style="font-size:0.60rem;padding:0.08rem 0.35rem;border-radius:3px;background:rgba(255,255,255,0.06);color:#94a3b8;font-family:var(--font-mono);">7 Sessions</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.45rem;">
+                        <span id="pulse7dFiiDiiSummary" style="font-size:0.64rem;color:#64748b;font-family:var(--font-mono);">FII vs DII Daily Breakdown</span>
+                        <button type="button" id="pulseToggleFlowHistoryBtn" onclick="marketPulseModule.toggleFlowHistory()" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.62rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:0.25rem;transition:all 0.15s ease;">
+                            🔽 Show More (30D)
+                        </button>
+                    </div>
                 </div>
-                <div style="overflow-x:auto;max-height:180px;overflow-y:auto;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:#060a16;">
+                <div id="pulseFlowsTableContainer" style="overflow-x:auto;max-height:180px;overflow-y:auto;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:#060a16;transition:max-height 0.25s ease;">
                     <table style="width:100%;border-collapse:collapse;font-size:0.68rem;text-align:left;">
                         <thead>
-                            <tr style="background:#0a0f1d;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-size:0.65rem;text-transform:uppercase;letter-spacing:0.03em;">
+                            <tr style="background:#0a0f1d;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-size:0.65rem;text-transform:uppercase;letter-spacing:0.03em;position:sticky;top:0;z-index:2;">
                                 <th style="padding:0.35rem 0.5rem;">Date</th>
                                 <th style="padding:0.35rem 0.5rem;text-align:right;">FII Net</th>
                                 <th style="padding:0.35rem 0.5rem;text-align:right;">DII Net</th>
