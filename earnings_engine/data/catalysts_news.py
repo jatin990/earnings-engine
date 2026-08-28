@@ -556,6 +556,7 @@ def get_short_term_catalysts(
     category_filter: str | None = None,
     direction_filter: str | None = None,
     search_query: str | None = None,
+    days: int = 14,
     limit: int = 50,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
@@ -564,7 +565,10 @@ def get_short_term_catalysts(
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
 
-        query = "SELECT * FROM news_catalysts WHERE published_at >= datetime('now', '-14 days')"
+        if days and days > 0:
+            query = f"SELECT * FROM news_catalysts WHERE published_at >= datetime('now', '-{days} days')"
+        else:
+            query = "SELECT * FROM news_catalysts WHERE 1=1"
         params: list[Any] = []
 
         # Filter by watchlist / universe if supplied
@@ -657,23 +661,55 @@ def get_short_term_catalysts(
         return valid
 
 
-def get_catalyst_summary_stats(settings: Settings | None = None) -> dict[str, Any]:
-    """Return high-level summary counts for catalyst distribution."""
+def get_catalyst_summary_stats(
+    watchlist_or_universe: str | None = None,
+    days: int = 14,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Return high-level summary counts for catalyst distribution filtered by timeframe and universe."""
+    if isinstance(watchlist_or_universe, Settings):
+        settings = watchlist_or_universe
+        watchlist_or_universe = None
     settings = settings or Settings()
     with _connect(settings) as conn:
-        total = conn.execute("SELECT COUNT(*) FROM news_catalysts").fetchone()[0]
-        high = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_level = 'HIGH'").fetchone()[0]
-        bullish = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE direction = 'BULLISH'").fetchone()[0]
-        bearish = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE direction = 'BEARISH'").fetchone()[0]
+        where_clauses: list[str] = []
+        params: list[Any] = []
+
+        if days and days > 0:
+            where_clauses.append(f"published_at >= datetime('now', '-{days} days')")
+
+        if watchlist_or_universe and isinstance(watchlist_or_universe, str) and watchlist_or_universe.upper() not in ("", "ALL", "GLOBAL", "NSE_ALL"):
+            from earnings_engine.data.watchlists import get_watchlist
+            from earnings_engine.data.universe import get_universe
+
+            tickers = get_watchlist(watchlist_or_universe, settings) or get_universe(watchlist_or_universe, settings)
+            if tickers:
+                placeholders = ",".join("?" for _ in tickers)
+                where_clauses.append(f"ticker IN ({placeholders})")
+                params.extend(tickers)
+
+        where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        total = conn.execute(f"SELECT COUNT(*) FROM news_catalysts {where_sql}", params).fetchone()[0]
+        high_sql = (where_sql + " AND impact_level = 'HIGH'") if where_sql else " WHERE impact_level = 'HIGH'"
+        high = conn.execute(f"SELECT COUNT(*) FROM news_catalysts {high_sql}", params).fetchone()[0]
+
+        bull_sql = (where_sql + " AND direction = 'BULLISH'") if where_sql else " WHERE direction = 'BULLISH'"
+        bullish = conn.execute(f"SELECT COUNT(*) FROM news_catalysts {bull_sql}", params).fetchone()[0]
+
+        bear_sql = (where_sql + " AND direction = 'BEARISH'") if where_sql else " WHERE direction = 'BEARISH'"
+        bearish = conn.execute(f"SELECT COUNT(*) FROM news_catalysts {bear_sql}", params).fetchone()[0]
 
         top_cats = conn.execute(
-            """
+            f"""
             SELECT category, COUNT(*) as c
             FROM news_catalysts
+            {where_sql}
             GROUP BY category
             ORDER BY c DESC
             LIMIT 5
-            """
+            """,
+            params,
         ).fetchall()
 
         return {
@@ -732,7 +768,7 @@ def scan_watchlist_catalysts(
     elapsed = time.perf_counter() - t0
     logger.info("[CATALYSTS] Scanned %d tickers in %.2fs (found %d catalysts, %d high impact)", len(tickers), elapsed, all_found, high_impact_found)
 
-    stats = get_catalyst_summary_stats(settings)
+    stats = get_catalyst_summary_stats(watchlist_or_universe=watchlist_name, settings=settings)
     return {
         "scanned_tickers": len(tickers),
         "catalysts_fetched": all_found,

@@ -103,6 +103,14 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.45rem;">
                         <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
                             <input type="text" id="catSearchInput" oninput="app.filterCatalysts()" placeholder="🔍 Search stock, order, FDA..." style="padding:0.25rem 0.55rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;min-width:180px;font-family:var(--font-mono);outline:none;">
+                            <select id="catDaysFilter" onchange="app.onCatDaysFilterChange(this.value)" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.35rem;outline:none;font-weight:600;" title="Filter by publication recency timeframe">
+                                <option value="1">⏱️ Last 24 Hours</option>
+                                <option value="3">📅 Last 3 Days</option>
+                                <option value="7">📅 Last 7 Days</option>
+                                <option value="14" selected>📅 Last 14 Days (Default)</option>
+                                <option value="30">📅 Last 30 Days</option>
+                                <option value="0">🌐 All Time</option>
+                            </select>
                             <select id="catImpactFilter" onchange="app.filterCatalysts()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;outline:none;">
                                 <option value="ALL">All Impact Levels</option>
                                 <option value="HIGH">🔥 High Impact (≥75%)</option>

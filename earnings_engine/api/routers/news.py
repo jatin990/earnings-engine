@@ -38,6 +38,7 @@ async def get_news_catalysts_endpoint(
     min_impact: int | None = Query(None),
     direction: str | None = Query(None),
     search: str | None = Query(None),
+    days: int = Query(14, ge=0, le=365, description="Lookback window in days (1, 3, 7, 14, 30, 0 for all)"),
     limit: int = Query(100, ge=1, le=500),
 ):
     """Retrieve structured news catalysts (order wins, expansions, regulatory approvals)."""
@@ -57,6 +58,7 @@ async def get_news_catalysts_endpoint(
             category_filter=category,
             direction_filter=direction,
             search_query=search,
+            days=days,
             limit=limit,
             settings=_settings,
         )
@@ -67,10 +69,22 @@ async def get_news_catalysts_endpoint(
 
 
 @router.get("/api/v1/news/catalyst-stats")
-async def get_news_catalyst_stats():
+async def get_news_catalyst_stats(
+    watchlist_or_universe: str | None = Query(None),
+    watchlist: str | None = Query(None),
+    universe: str | None = Query(None),
+    market: str | None = Query(None),
+    days: int = Query(14, ge=0, le=365),
+):
     """Retrieve aggregated counts and category distribution of news catalysts."""
     try:
-        stats = await asyncio.to_thread(get_catalyst_summary_stats, settings=_settings)
+        effective_market = watchlist_or_universe or universe or watchlist or market or "ALL"
+        stats = await asyncio.to_thread(
+            get_catalyst_summary_stats,
+            watchlist_or_universe=effective_market,
+            days=days,
+            settings=_settings,
+        )
         return {"success": True, "stats": stats, **(stats or {})}
     except Exception as e:
         logger.exception("Error in get_news_catalyst_stats: %s", e)

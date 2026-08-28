@@ -1992,19 +1992,22 @@
                 }
             },
 
-            async loadCatalysts(watchlist) {
+            async loadCatalysts(watchlist, days) {
                 const feedGrid = document.getElementById('catalystsFeedGrid');
                 if (!feedGrid) return;
                 const wlSelect = document.getElementById('catWatchlistSelect');
+                const daysSelect = document.getElementById('catDaysFilter');
                 const wl = watchlist || (wlSelect ? wlSelect.value : (localStorage.getItem('selectedGlobalWatchlist') || 'GLOBAL'));
-                const wlParam = (wl && wl !== 'GLOBAL') ? '?watchlist=' + encodeURIComponent(wl) + '&limit=200' : '?limit=200';
+                const d = (days !== undefined && days !== null) ? days : (daysSelect ? daysSelect.value : '14');
+                const wlParam = (wl && wl !== 'GLOBAL') ? '?watchlist=' + encodeURIComponent(wl) + '&limit=200&days=' + encodeURIComponent(d) : '?limit=200&days=' + encodeURIComponent(d);
+                const statsParam = (wl && wl !== 'GLOBAL') ? '?watchlist=' + encodeURIComponent(wl) + '&days=' + encodeURIComponent(d) : '?days=' + encodeURIComponent(d);
                 feedGrid.innerHTML = '<div class="card" style="padding:1.5rem;text-align:center;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading short-term market moving catalysts' + (wl ? ' for "' + wl + '"' : '') + '...</div>';
                 
                 try {
                     // Fetch stats and items in parallel
                     const [itemsRes, statsRes] = await Promise.all([
                         fetch(API_BASE + '/api/v1/news/catalysts' + wlParam),
-                        fetch(API_BASE + '/api/v1/news/catalyst-stats')
+                        fetch(API_BASE + '/api/v1/news/catalyst-stats' + statsParam)
                     ]);
                     const itemsData = await itemsRes.json();
                     const statsData = await statsRes.json();
@@ -2274,7 +2277,15 @@
             },
 
             onCatWatchlistChange(val) {
-                this.loadCatalysts(val);
+                const daysSelect = document.getElementById('catDaysFilter');
+                const d = daysSelect ? daysSelect.value : '14';
+                this.loadCatalysts(val, d);
+            },
+
+            onCatDaysFilterChange(val) {
+                const wlSelect = document.getElementById('catWatchlistSelect');
+                const wl = wlSelect ? wlSelect.value : (localStorage.getItem('selectedGlobalWatchlist') || 'GLOBAL');
+                this.loadCatalysts(wl, val);
             },
 
             renderCatalystsStats(stats) {
@@ -2334,11 +2345,27 @@
                 if (!feedGrid) return;
 
                 const searchQ = (document.getElementById('catSearchInput')?.value || '').toLowerCase().trim();
+                const daysFilter = parseInt(document.getElementById('catDaysFilter')?.value || '14', 10);
                 const impactFilter = document.getElementById('catImpactFilter')?.value || 'ALL';
                 const dirFilter = document.getElementById('catDirectionFilter')?.value || 'ALL';
                 const catFilter = document.getElementById('catCategoryFilter')?.value || 'ALL';
 
+                // STRICT CHRONOLOGICAL SORT: Newest news always on top
+                const _toTime = (dStr) => {
+                    if (!dStr) return 0;
+                    const clean = dStr.includes('T') ? dStr : dStr.replace(' ', 'T') + 'Z';
+                    const t = new Date(clean).getTime();
+                    return isNaN(t) ? new Date(dStr).getTime() || 0 : t;
+                };
+
+                const nowMs = Date.now();
+                const cutoffMs = (daysFilter > 0) ? (nowMs - (daysFilter * 24 * 60 * 60 * 1000)) : 0;
+
                 let filtered = (this.catalystsData || []).filter(item => {
+                    if (daysFilter > 0) {
+                        const itemTime = _toTime(item.published_at || item.created_at);
+                        if (itemTime > 0 && itemTime < cutoffMs) return false;
+                    }
                     if (searchQ) {
                         const mTicker = (item.ticker || '').toLowerCase().includes(searchQ);
                         const mName = (item.stock_name || '').toLowerCase().includes(searchQ);
@@ -2352,14 +2379,6 @@
                     return true;
                 });
 
-                // STRICT CHRONOLOGICAL SORT: Newest news always on top
-                const _toTime = (dStr) => {
-                    if (!dStr) return 0;
-                    const clean = dStr.includes('T') ? dStr : dStr.replace(' ', 'T') + 'Z';
-                    const t = new Date(clean).getTime();
-                    return isNaN(t) ? new Date(dStr).getTime() || 0 : t;
-                };
-
                 filtered.sort((a, b) => {
                     const ta = _toTime(a.published_at || a.created_at);
                     const tb = _toTime(b.published_at || b.created_at);
@@ -2368,6 +2387,36 @@
                 });
 
                 if (countBadge) countBadge.textContent = filtered.length + ' headlines';
+
+                // Synchronously update top KPI summary cards based on the filtered dataset
+                const totalCount = filtered.length;
+                const highCount = filtered.filter(c => c.impact_level === 'HIGH').length;
+                const bullCount = filtered.filter(c => c.direction === 'BULLISH').length;
+                const bearCount = filtered.filter(c => c.direction === 'BEARISH').length;
+
+                const catCounts = {};
+                filtered.forEach(c => {
+                    const cat = c.category || 'Order Wins & Contracts';
+                    catCounts[cat] = (catCounts[cat] || 0) + 1;
+                });
+                let topCat = '—';
+                let maxCnt = 0;
+                for (const [cat, cnt] of Object.entries(catCounts)) {
+                    if (cnt > maxCnt) {
+                        maxCnt = cnt;
+                        topCat = cat;
+                    }
+                }
+
+                const totalEl = document.getElementById('catStatTotal');
+                const highEl = document.getElementById('catStatHigh');
+                const biasEl = document.getElementById('catStatBias');
+                const topCatEl = document.getElementById('catStatTopCat');
+
+                if (totalEl) totalEl.textContent = totalCount;
+                if (highEl) highEl.textContent = highCount;
+                if (biasEl) biasEl.innerHTML = '<span style="color:#34d399;">' + bullCount + '</span> / <span style="color:#f87171;">' + bearCount + '</span>';
+                if (topCatEl) topCatEl.textContent = topCat;
 
                 if (!filtered.length) {
                     feedGrid.innerHTML = '<div class="card" style="padding:1.5rem;text-align:center;color:var(--muted);">No catalysts matching selected filter criteria. Click "⚡ Scan Feeds" to discover live headlines.</div>';
