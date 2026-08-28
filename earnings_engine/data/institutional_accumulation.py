@@ -584,12 +584,62 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             (sym,),
         ).fetchall()
 
+        # Retrieve live / latest close price from price history
+        latest_p_row = conn.execute(
+            "SELECT close, date FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 1",
+            (sym,),
+        ).fetchone()
+        latest_close_price = round(float(latest_p_row[0]), 2) if latest_p_row and latest_p_row[0] else None
+        latest_price_date = str(latest_p_row[1]) if latest_p_row and latest_p_row[1] else None
+
+        import re
+
+        def _get_quarter_start_date(q_str: str) -> str:
+            m = re.search(r'Q([1-4])\s*FY(\d{2,4})', q_str, re.IGNORECASE)
+            if not m:
+                return "2026-01-01"
+            q_num = int(m.group(1))
+            fy_num = int(m.group(2))
+            if fy_num < 100:
+                fy_num += 2000
+            if q_num == 1:
+                return f"{fy_num - 1}-04-01"
+            elif q_num == 2:
+                return f"{fy_num - 1}-07-01"
+            elif q_num == 3:
+                return f"{fy_num - 1}-10-01"
+            elif q_num == 4:
+                return f"{fy_num}-01-01"
+            return f"{fy_num}-01-01"
+
+        def _get_quarter_start_price(q_date: str) -> tuple[float | None, str | None]:
+            row = conn.execute(
+                "SELECT close, date FROM price_history WHERE ticker = ? AND date >= ? ORDER BY date ASC LIMIT 1",
+                (sym, q_date),
+            ).fetchone()
+            if not row or not row[0]:
+                row = conn.execute(
+                    "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? ORDER BY date DESC LIMIT 1",
+                    (sym, q_date),
+                ).fetchone()
+            if row and row[0]:
+                return round(float(row[0]), 2), str(row[1])
+            return None, None
+
         patterns: list[dict[str, Any]] = []
-        for p in p_rows:
+        for idx, p in enumerate(p_rows):
+            q_name = p[0]
             dii_val = round(float(p[3]), 2)
             pub_val = round(float(p[4]), 2)
+            q_sdate = _get_quarter_start_date(q_name)
+            q_sprice, q_act_date = _get_quarter_start_price(q_sdate)
+            is_present_q = (idx == 0)
+
+            # Price to display: live current price for present quarter, start price for historical quarters
+            stock_price_display = latest_close_price if (is_present_q and latest_close_price is not None) else q_sprice
+
             patterns.append({
-                "quarter": p[0],
+                "quarter": q_name,
                 "promoter_pct": round(float(p[1]), 2),
                 "fii_pct": round(float(p[2]), 2),
                 "dii_mf_pct": dii_val,
@@ -597,6 +647,13 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
                 "public_retail_pct": pub_val,
                 "public_pct": pub_val,
                 "other_pct": round(float(p[5]), 2),
+                "quarter_start_date": q_sdate,
+                "quarter_start_price": q_sprice,
+                "quarter_price_date": q_act_date,
+                "current_price": latest_close_price,
+                "latest_price_date": latest_price_date,
+                "stock_price": stock_price_display,
+                "is_current_quarter": is_present_q,
             })
 
         # Compute total institutional stake (FII + DII)

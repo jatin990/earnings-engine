@@ -1075,6 +1075,7 @@
                         <thead>
                             <tr>
                                 <th>Quarter</th>
+                                <th style="text-align:right;">Stock Price</th>
                                 <th>Promoter %</th>
                                 <th>FII %</th>
                                 <th>DII/MF %</th>
@@ -1083,7 +1084,7 @@
                             </tr>
                         </thead>
                         <tbody id="tblShareholdingBody">
-                            <tr><td colspan="6" style="text-align:center;color:var(--text-tertiary);">Loading shareholding data...</td></tr>
+                            <tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);">Loading shareholding data...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1719,13 +1720,34 @@
             const patterns = inst.shareholding_patterns || [];
             if (tbody) {
                 if (!patterns.length) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-tertiary);">No historical shareholding patterns</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);">No historical shareholding patterns</td></tr>';
                 } else {
-                    tbody.innerHTML = patterns.map(p => {
+                    tbody.innerHTML = patterns.map((p, idx) => {
                         const dii = p.dii_pct != null ? p.dii_pct : p.dii_mf_pct;
                         const pub = p.public_pct != null ? p.public_pct : p.public_retail_pct;
+
+                        const isCurrentQ = p.is_current_quarter || idx === 0;
+                        let priceHtml = '—';
+                        if (isCurrentQ) {
+                            const curP = p.current_price != null ? p.current_price : p.stock_price;
+                            const startP = p.quarter_start_price;
+                            const retQ = (curP && startP) ? (((curP - startP) / startP) * 100) : null;
+                            const retStr = retQ != null ? `<span style="color:${retQ >= 0 ? '#34d399' : '#f87171'};font-size:0.65rem;font-weight:700;">(${retQ >= 0 ? '+' : ''}${retQ.toFixed(1)}%)</span>` : '';
+                            priceHtml = `
+                                <div style="font-weight:800;color:#f8fafc;">₹${curP != null ? Number(curP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'} <span style="font-size:0.60rem;color:#38bdf8;background:rgba(56,189,248,0.15);padding:0.02rem 0.3rem;border-radius:3px;font-weight:700;">Live</span></div>
+                                ${startP ? `<div style="font-size:0.65rem;color:#64748b;">Start: ₹${Number(startP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})} ${retStr}</div>` : ''}
+                            `;
+                        } else {
+                            const startP = p.quarter_start_price != null ? p.quarter_start_price : p.stock_price;
+                            priceHtml = `
+                                <div style="font-weight:700;color:#93c5fd;">₹${startP != null ? Number(startP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}</div>
+                                <div style="font-size:0.65rem;color:#64748b;">Quarter Start</div>
+                            `;
+                        }
+
                         return `<tr>
                             <td><strong>${p.quarter || '—'}</strong></td>
+                            <td style="text-align:right;font-family:var(--font-mono);">${priceHtml}</td>
                             <td>${p.promoter_pct != null ? p.promoter_pct.toFixed(1) + '%' : '—'}</td>
                             <td>${p.fii_pct != null ? p.fii_pct.toFixed(1) + '%' : '—'}</td>
                             <td>${dii != null ? dii.toFixed(1) + '%' : '—'}</td>

@@ -36,11 +36,17 @@ def test_allcargo_institutional_breakdown():
     actions = [h["action"] for h in holdings]
     assert "ACCUMULATED" in actions or "NEW BUY" in actions
 
-    # Verify shareholding pattern trend
+    # Verify shareholding pattern trend with quarterly start and live prices
     patterns = activity["shareholding_patterns"]
     assert len(patterns) >= 2
     assert "fii_pct" in patterns[0]
     assert "dii_mf_pct" in patterns[0]
+    assert "quarter_start_date" in patterns[0]
+    assert "is_current_quarter" in patterns[0]
+    assert patterns[0]["is_current_quarter"] is True
+    assert "stock_price" in patterns[0]
+    assert patterns[0]["stock_price"] is not None
+    assert patterns[0]["stock_price"] > 0
 
     # Verify block deals
     block_deals = activity["block_deals"]

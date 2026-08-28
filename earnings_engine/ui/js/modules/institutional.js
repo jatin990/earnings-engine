@@ -747,10 +747,11 @@
                             <thead>
                                 <tr style="color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.06);font-family:var(--font-mono);font-size:0.65rem;">
                                     <th style="padding:0.3rem 0.4rem;">QUARTER</th>
-                                    <th style="padding:0.3rem 0.4rem;">PROMOTER</th>
-                                    <th style="padding:0.3rem 0.4rem;">FII / FPI</th>
-                                    <th style="padding:0.3rem 0.4rem;">DII / MUTUAL FUNDS</th>
-                                    <th style="padding:0.3rem 0.4rem;">RETAIL</th>
+                                    <th style="padding:0.3rem 0.4rem;text-align:right;">STOCK PRICE</th>
+                                    <th style="padding:0.3rem 0.4rem;text-align:right;">PROMOTER</th>
+                                    <th style="padding:0.3rem 0.4rem;text-align:right;">FII / FPI</th>
+                                    <th style="padding:0.3rem 0.4rem;text-align:right;">DII / MUTUAL FUNDS</th>
+                                    <th style="padding:0.3rem 0.4rem;text-align:right;">RETAIL</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -761,13 +762,35 @@
                                     const fiiDeltaStr = prevP ? (fiiDelta >= 0 ? `<span style="color:#34d399;font-size:0.62rem;">(+${fiiDelta.toFixed(2)}%)</span>` : `<span style="color:#f87171;font-size:0.62rem;">(${fiiDelta.toFixed(2)}%)</span>`) : '';
                                     const diiDeltaStr = prevP ? (diiDelta >= 0 ? `<span style="color:#34d399;font-size:0.62rem;">(+${diiDelta.toFixed(2)}%)</span>` : `<span style="color:#f87171;font-size:0.62rem;">(${diiDelta.toFixed(2)}%)</span>`) : '';
 
+                                    // Stock Price presentation: Present quarter vs historical quarter start
+                                    const isCurrentQ = p.is_current_quarter || idx === 0;
+                                    let priceHtml = '—';
+                                    if (isCurrentQ) {
+                                        const curP = p.current_price != null ? p.current_price : p.stock_price;
+                                        const startP = p.quarter_start_price;
+                                        const retQ = (curP && startP) ? (((curP - startP) / startP) * 100) : null;
+                                        const retStr = retQ != null ? `<span style="color:${retQ >= 0 ? '#34d399' : '#f87171'};font-size:0.60rem;font-weight:700;">(${retQ >= 0 ? '+' : ''}${retQ.toFixed(1)}%)</span>` : '';
+                                        
+                                        priceHtml = `
+                                            <div style="font-weight:800;color:#f8fafc;">₹${curP != null ? Number(curP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'} <span style="font-size:0.58rem;color:#38bdf8;background:rgba(56,189,248,0.15);padding:0.02rem 0.25rem;border-radius:3px;font-weight:700;">Live</span></div>
+                                            ${startP ? `<div style="font-size:0.60rem;color:#64748b;">Start: ₹${Number(startP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})} ${retStr}</div>` : ''}
+                                        `;
+                                    } else {
+                                        const startP = p.quarter_start_price != null ? p.quarter_start_price : p.stock_price;
+                                        priceHtml = `
+                                            <div style="font-weight:700;color:#93c5fd;">₹${startP != null ? Number(startP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}</div>
+                                            <div style="font-size:0.60rem;color:#64748b;">Quarter Start</div>
+                                        `;
+                                    }
+
                                     return `
                                         <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
                                              <td style="padding:0.35rem 0.4rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${p.quarter}</td>
-                                             <td style="padding:0.35rem 0.4rem;color:#cbd5e1;font-family:var(--font-mono);">${p.promoter_pct}%</td>
-                                             <td style="padding:0.35rem 0.4rem;color:#38bdf8;font-weight:700;font-family:var(--font-mono);">${p.fii_pct}% ${fiiDeltaStr}</td>
-                                             <td style="padding:0.35rem 0.4rem;color:#34d399;font-weight:700;font-family:var(--font-mono);">${p.dii_mf_pct}% ${diiDeltaStr}</td>
-                                             <td style="padding:0.35rem 0.4rem;color:#94a3b8;font-family:var(--font-mono);">${p.public_retail_pct}%</td>
+                                             <td style="padding:0.35rem 0.4rem;text-align:right;font-family:var(--font-mono);">${priceHtml}</td>
+                                             <td style="padding:0.35rem 0.4rem;text-align:right;color:#cbd5e1;font-family:var(--font-mono);">${p.promoter_pct}%</td>
+                                             <td style="padding:0.35rem 0.4rem;text-align:right;color:#38bdf8;font-weight:700;font-family:var(--font-mono);">${p.fii_pct}% ${fiiDeltaStr}</td>
+                                             <td style="padding:0.35rem 0.4rem;text-align:right;color:#34d399;font-weight:700;font-family:var(--font-mono);">${p.dii_mf_pct}% ${diiDeltaStr}</td>
+                                             <td style="padding:0.35rem 0.4rem;text-align:right;color:#94a3b8;font-family:var(--font-mono);">${p.public_retail_pct}%</td>
                                         </tr>
                                     `;
                                 }).join('')}
