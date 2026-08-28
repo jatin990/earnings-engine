@@ -1745,7 +1745,7 @@ def _resolve_universe_tickers(settings: Settings, universe: str | None = None) -
     return sorted(tickers)
 
 
-def run_cold_scan(settings: Settings, universe: str | None = None) -> None:
+def run_cold_scan(settings: Settings, universe: str | None = None, min_score: float | None = None, **kwargs: Any) -> None:
     """T0 Cold Scan: score the entire universe and populate warm/hot pools."""
     t0 = time.perf_counter()
     _pool["status"] = "running"

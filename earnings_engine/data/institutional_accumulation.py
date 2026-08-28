@@ -1170,3 +1170,34 @@ def get_top_stake_additions(
             "historical_additions": [],
         }
 
+
+def scan_watchlist_institutional(
+    watchlist_name: str | None = None,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Scan and synchronize institutional ownership and accumulation data for all stocks in a watchlist/universe."""
+    settings = settings or Settings()
+    from earnings_engine.data.watchlists import get_watchlist
+    from earnings_engine.data.universe import get_universe
+
+    tickers: list[str] = []
+    if watchlist_name and watchlist_name.upper() not in ("", "ALL", "GLOBAL"):
+        tickers = get_watchlist(watchlist_name, settings)
+        if not tickers:
+            tickers = get_universe(watchlist_name, settings)
+
+    if not tickers:
+        tickers = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS", "BHARTIARTL.NS", "SBIN.NS", "LT.NS"]
+
+    results: list[dict[str, Any]] = []
+    for t in tickers:
+        try:
+            act = get_stock_institutional_activity(t, settings)
+            if act and act.get("success"):
+                results.append(act)
+        except Exception as ex:
+            logger.debug("[INSTITUTIONAL] Failed syncing %s: %s", t, ex)
+
+    return results
+
+
