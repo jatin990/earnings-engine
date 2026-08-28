@@ -146,7 +146,20 @@ async def calculate_eps_endpoint(ticker: str, req: CalculateEpsRequest):
         )
     except Exception as e:
         logger.exception("Error in calculate_eps for %s: %s", ticker, e)
-        raise HTTPException(status_code=500, detail=f"Error calculating EPS: {str(e)}")
+@router.post("/api/v1/stock/{ticker}/refresh-earnings-source")
+@router.post("/api/v1/earnings/{ticker}/refresh-from-source")
+async def refresh_earnings_source_endpoint(ticker: str):
+    """Force re-fetch official earnings calendar and reported EPS from authentic sources (yfinance & NSE)."""
+    try:
+        from earnings_engine.data.earnings import refresh_earnings_from_source
+        return await asyncio.to_thread(
+            refresh_earnings_from_source,
+            ticker=ticker.upper(),
+            settings=_settings,
+        )
+    except Exception as e:
+        logger.exception("Error in refresh_earnings_source for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error refreshing earnings from source: {str(e)}")
 
 
 @router.post("/api/v1/ticker/recalculate")

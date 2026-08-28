@@ -18,6 +18,7 @@ from earnings_engine.data.market_context import _week_high_low_around, detect_sw
 from earnings_engine.data.swing_ranges import get_swing_range
 from earnings_engine.data.catalysts_news import get_short_term_catalysts
 from earnings_engine.consensus.storage import get_predictions
+from earnings_engine.data.earnings import refresh_earnings_from_source
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +234,19 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
             (sym,),
         ).fetchall()
 
-        # If earnings history is empty or missing reported EPS for past dates, auto-hydrate from quarterly income stmt
+        # If earnings history is empty or missing reported EPS for past dates, attempt authentic fetch from source first
+        if not e_rows or all(r[2] is None for r in e_rows):
+            try:
+                from earnings_engine.data.earnings import fetch_earnings
+                fetch_earnings(sym, settings=settings, force=True)
+                e_rows = conn.execute(
+                    "SELECT earnings_date, eps_estimate, eps_reported, surprise_pct, source FROM earnings_history WHERE ticker = ? ORDER BY earnings_date DESC LIMIT 12",
+                    (sym,),
+                ).fetchall()
+            except Exception as src_err:
+                logger.debug("Source earnings fetch in get_stock_overview for %s: %s", sym, src_err)
+
+        # Fallback to calculation ONLY if still missing reported EPS from official source
         if not e_rows or all(r[2] is None for r in e_rows):
             try:
                 calculate_or_fetch_eps(sym, settings=settings)
@@ -803,8 +816,21 @@ def calculate_or_fetch_eps(
         if eps_rep is not None and eps_est is not None and abs(eps_est) > 0.0001:
             surprise_pct = round(((eps_rep - eps_est) / abs(eps_est)) * 100.0, 2)
 
-        # Save target quarter to SQLite database
-        if eps_rep is not None or eps_est is not None:
+        # Guard Rail 1: Do not overwrite authentic yfinance/nse source data with calculated heuristics unless it is an explicit user override
+        is_manual_override = (override_estimate is not None or override_reported is not None)
+        existing_auth = None
+        try:
+            existing_auth = conn.execute(
+                "SELECT source, eps_reported, eps_estimate FROM earnings_history WHERE ticker = ? AND earnings_date = ?",
+                (sym, target_ed),
+            ).fetchone()
+        except Exception:
+            pass
+
+        if existing_auth and existing_auth[0] in ("yfinance", "nse") and not is_manual_override:
+            logger.info("[CALC-EPS] Preserving authentic %s record for %s (%s)", existing_auth[0], sym, target_ed)
+        elif eps_rep is not None or eps_est is not None:
+            save_source = "manual_override" if is_manual_override else (method or "calculated")
             try:
                 with conn:
                     conn.execute("""
@@ -815,18 +841,33 @@ def calculate_or_fetch_eps(
                             eps_reported = COALESCE(excluded.eps_reported, earnings_history.eps_reported),
                             surprise_pct = COALESCE(excluded.surprise_pct, earnings_history.surprise_pct),
                             source = excluded.source
-                    """, (sym, target_ed, eps_est, eps_rep, surprise_pct, method or "calculated"))
+                    """, (sym, target_ed, eps_est, eps_rep, surprise_pct, save_source))
                     conn.commit()
-                logger.info("[CALC-EPS] Successfully saved EPS for %s (%s): est=%s, rep=%s, surp=%s (method=%s)", sym, target_ed, eps_est, eps_rep, surprise_pct, method)
+                logger.info("[CALC-EPS] Successfully saved EPS for %s (%s): est=%s, rep=%s, surp=%s (source=%s)", sym, target_ed, eps_est, eps_rep, surprise_pct, save_source)
             except Exception as e:
                 logger.warning("[CALC-EPS] Error saving target EPS to DB for %s: %s", sym, e)
 
-    # Save discovered quarterly income statements under their exact statement dates
+    # Guard Rail 2: Save discovered quarterly income statements ONLY when NO authentic yfinance/nse row exists within 60 days
     if inc_stmt_cols_data:
         try:
+            auth_dates = []
+            try:
+                auth_dates = [r[0] for r in conn.execute(
+                    "SELECT earnings_date FROM earnings_history WHERE ticker = ? AND source IN ('yfinance', 'nse')",
+                    (sym,),
+                ).fetchall()]
+            except Exception:
+                pass
+
             with conn:
                 for i, (col_ts, col_eps) in enumerate(inc_stmt_cols_data):
                     col_dt_str = col_ts.strftime("%Y-%m-%d")
+                    # Check if an authentic source date exists within 60 days
+                    has_auth_near = any(abs((pd.Timestamp(a_ed) - col_ts).days) <= 60 for a_ed in auth_dates)
+                    if has_auth_near:
+                        logger.debug("[CALC-EPS] Skipping quarterly_income_stmt for %s (%s) - authentic source date exists nearby", sym, col_dt_str)
+                        continue
+
                     if not target_ed or col_dt_str != target_ed:
                         prior_subset = [e for _, e in inc_stmt_cols_data[i+1:]]
                         q_est = round(sum(prior_subset[:4]) / len(prior_subset[:4]), 2) if prior_subset else round(col_eps * 0.95, 2)

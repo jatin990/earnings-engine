@@ -957,3 +957,97 @@ def refresh_watchlist_earnings(
         "freshness": freshness,
     }
 
+
+def refresh_earnings_from_source(
+    ticker: str,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Force re-fetch official earnings calendar and reported EPS from authentic sources (yfinance & NSE).
+
+    Enforces strict guard rails:
+    1. Fetches authentic historical earnings from yfinance with force=True.
+    2. Purges any stale/spurious synthetic or duplicate records for this ticker.
+    3. Recalculates metrics and updates tickers master table.
+    """
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if not sym:
+        return {"success": False, "error": "Ticker symbol is required"}
+
+    try:
+        # 1. Force refresh from yfinance
+        df = fetch_earnings(sym, settings, force=True)
+
+        # 2. If NSE stock, ingest NSE calendar as well
+        if sym.endswith(".NS"):
+            try:
+                ingest_nse_calendar(settings)
+            except Exception as nse_err:
+                logger.debug("NSE calendar refresh error for %s: %s", sym, nse_err)
+
+        # 3. Clean up any synthetic/spurious duplicate records for this ticker
+        with _connect(settings) as connection:
+            connection.execute(
+                "DELETE FROM earnings_history WHERE ticker = ? AND source IN ('derived_historical_average', 'quarterly_income_stmt_diluted+yfinance')",
+                (sym,),
+            )
+            # Remove quarterly_income_stmt if authentic yfinance/nse exists within 60 days
+            stmt_rows = connection.execute(
+                "SELECT earnings_date FROM earnings_history WHERE ticker = ? AND source = 'quarterly_income_stmt'",
+                (sym,),
+            ).fetchall()
+            for (s_ed,) in stmt_rows:
+                auth_row = connection.execute(
+                    """
+                    SELECT earnings_date FROM earnings_history
+                    WHERE ticker = ? AND source IN ('yfinance', 'nse')
+                    AND abs(julianday(earnings_date) - julianday(?)) <= 60
+                    """,
+                    (sym, s_ed),
+                ).fetchone()
+                if auth_row:
+                    connection.execute(
+                        "DELETE FROM earnings_history WHERE ticker = ? AND earnings_date = ? AND source = 'quarterly_income_stmt'",
+                        (sym, s_ed),
+                    )
+            connection.commit()
+
+        # 4. Trigger metric recalculation
+        recalc_result: dict[str, Any] = {}
+        try:
+            from earnings_engine.api.recalculate_api import recalculate_ticker_metrics
+            recalc_result = recalculate_ticker_metrics(sym, settings=settings)
+        except Exception as e:
+            logger.debug("Recalculate metrics in refresh_earnings_from_source failed for %s: %s", sym, e)
+
+        # 5. Load updated earnings records with clean JSON serialization
+        updated_df = load_earnings(sym, settings)
+        records = []
+        if not updated_df.empty:
+            for _, r in updated_df.iterrows():
+                ed_val = r.get("earnings_date")
+                ed_str = ed_val.strftime("%Y-%m-%d") if hasattr(ed_val, "strftime") else str(ed_val)[:10]
+                eps_est = float(r["eps_estimate"]) if pd.notna(r.get("eps_estimate")) else None
+                eps_rep = float(r["eps_reported"]) if pd.notna(r.get("eps_reported")) else None
+                surp = float(r["surprise_pct"]) if pd.notna(r.get("surprise_pct")) else None
+                records.append({
+                    "earnings_date": ed_str,
+                    "eps_estimate": eps_est,
+                    "eps_reported": eps_rep,
+                    "surprise_pct": surp,
+                })
+
+        return {
+            "success": True,
+            "ticker": sym,
+            "source": "yfinance/nse",
+            "message": f"Successfully refreshed authoritative earnings from source for {sym} ({len(records)} events)",
+            "events_count": len(records),
+            "records": records,
+            "recalculate": recalc_result,
+        }
+    except Exception as e:
+        logger.exception("Error in refresh_earnings_from_source for %s: %s", sym, e)
+        return {"success": False, "ticker": sym, "error": str(e)}
+
+

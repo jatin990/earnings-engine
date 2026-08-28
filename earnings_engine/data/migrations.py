@@ -956,6 +956,38 @@ def _migration_016_automation_schedule_logs_and_flow_controls(conn: Any) -> None
         pass
 
 
+def _migration_017_clean_fabricated_earnings_and_guard_rails(conn: Any) -> None:
+    """Clean up synthetic, duplicate, and fabricated earnings records to restore pure source provenance."""
+    # 1. Delete derived/synthetic test rows
+    try:
+        conn.execute("DELETE FROM earnings_history WHERE source IN ('derived_historical_average', 'quarterly_income_stmt_diluted+yfinance')")
+    except Exception:
+        pass
+
+    # 2. Delete known synthetic date entries
+    try:
+        conn.execute("DELETE FROM earnings_history WHERE ticker = 'JIOFIN.NS' AND earnings_date IN ('2025-11-10', '2026-02-15', '2026-05-20')")
+        conn.execute("DELETE FROM earnings_history WHERE ticker = 'RELIANCE.NS' AND earnings_date = '2026-10-16'")
+        conn.execute("DELETE FROM earnings_history WHERE ticker IN ('TCS.NS', 'INFY.NS') AND earnings_date = '2026-08-07'")
+    except Exception:
+        pass
+
+    # 3. Clean up quarterly_income_stmt duplicates where an authentic yfinance/nse row already exists
+    try:
+        stmt_rows = conn.execute("SELECT ticker, earnings_date FROM earnings_history WHERE source = 'quarterly_income_stmt'").fetchall()
+        for sym, s_ed in stmt_rows:
+            # Check if there is an authentic row within 60 days
+            auth_row = conn.execute("""
+                SELECT earnings_date FROM earnings_history
+                WHERE ticker = ? AND source IN ('yfinance', 'nse')
+                AND abs(julianday(earnings_date) - julianday(?)) <= 60
+            """, (sym, s_ed)).fetchone()
+            if auth_row:
+                conn.execute("DELETE FROM earnings_history WHERE ticker = ? AND earnings_date = ? AND source = 'quarterly_income_stmt'", (sym, s_ed))
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -974,6 +1006,7 @@ MIGRATIONS: list[Migration] = [
     Migration(14, "014_institutional_avg_and_recent_price", _migration_014_institutional_avg_and_recent_price),
     Migration(15, "015_scanner_candidates_schema", _migration_015_scanner_candidates_schema),
     Migration(16, "016_automation_schedule_logs_and_flow_controls", _migration_016_automation_schedule_logs_and_flow_controls),
+    Migration(17, "017_clean_fabricated_earnings_and_guard_rails", _migration_017_clean_fabricated_earnings_and_guard_rails),
 ]
 
 

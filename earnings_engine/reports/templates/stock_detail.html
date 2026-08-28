@@ -1156,11 +1156,16 @@
             
             <!-- Earnings History -->
             <section class="card">
-                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                     <div class="card-title">📅 Quarterly Earnings Track Record</div>
-                    <button type="button" id="btnCalcAllEps" onclick="calculateEpsAll()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;" title="Recalculate and fill missing EPS for past earnings">
-                        ⚡ Calculate Missing EPS
-                    </button>
+                    <div style="display: flex; gap: 0.4rem; align-items: center;">
+                        <button type="button" id="btnRefreshSourceEps" onclick="refreshEarningsFromSource()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" title="Fetch authoritative corporate calendar and reported EPS directly from official source (NSE / yfinance)">
+                            🔄 Refresh from Source
+                        </button>
+                        <button type="button" id="btnCalcAllEps" onclick="calculateEpsAll()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;" title="Recalculate and fill missing EPS for past earnings">
+                            ⚡ Calculate Missing EPS
+                        </button>
+                    </div>
                 </div>
                 <div style="overflow-x: auto;">
                     <table class="clean-table">
@@ -2281,6 +2286,31 @@
                 if (btn) {
                     btn.disabled = false;
                     btn.innerHTML = '⚡ Calculate Missing EPS';
+                }
+            }
+        }
+
+        async function refreshEarningsFromSource() {
+            const btn = document.getElementById('btnRefreshSourceEps');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner"></span> Fetching Source...';
+            }
+
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/refresh-earnings-source`, {
+                    method: 'POST'
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || data.error || 'Failed to refresh from source');
+                await fetchStockDetails();
+                alert(`✅ ${data.message || 'Authoritative earnings refreshed from source!'}`);
+            } catch (err) {
+                alert('Error refreshing earnings from source: ' + err.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '🔄 Refresh from Source';
                 }
             }
         }
