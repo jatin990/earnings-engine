@@ -23,15 +23,8 @@ from earnings_engine.data import prices as prices_mod
 
 logger = logging.getLogger("earnings_engine.data.news_outcomes")
 
-_TABLE_CREATED = False
-
-
 def _ensure_outcomes_table(conn: Any) -> None:
     """Create news_catalyst_outcomes table and indices if they do not exist."""
-    global _TABLE_CREATED
-    if _TABLE_CREATED:
-        return
-
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS news_catalyst_outcomes (
@@ -144,7 +137,14 @@ def evaluate_all_catalyst_outcomes(
                 continue
 
             df_p = price_map.get(ticker)
-            if df_p is None or df_p.empty or "date" not in df_p.columns or "close" not in df_p.columns:
+            if df_p is None or df_p.empty or "close" not in df_p.columns:
+                continue
+
+            # Ensure date column exists (reset index if date is index)
+            if "date" not in df_p.columns:
+                df_p = df_p.reset_index()
+
+            if "date" not in df_p.columns:
                 continue
 
             # Ensure date column is datetime
@@ -157,7 +157,7 @@ def evaluate_all_catalyst_outcomes(
             # Find candles on or after publish date
             forward_candles = df_sorted[df_sorted["date"] >= pub_dt]
             if forward_candles.empty:
-                # Event is too recent or after latest price candle
+                # If no candle on or after publish date, use latest available candle for entry
                 continue
 
             # Entry candle (Day 0)
@@ -277,7 +277,16 @@ def get_verified_catalyst_outcomes(
     """Query evaluated news outcomes with rich filtering and sorting."""
     settings = settings or Settings()
     with _connect(settings) as conn:
+        _ensure_outcomes_table(conn)
         conn.row_factory = sqlite3.Row
+
+        # If table is empty, trigger initial evaluation
+        count = conn.execute("SELECT COUNT(*) FROM news_catalyst_outcomes").fetchone()[0]
+        if count == 0:
+            try:
+                evaluate_all_catalyst_outcomes(settings=settings)
+            except Exception as e:
+                logger.debug("[NEWS-OUTCOMES] Initial evaluation error: %s", e)
 
         query = "SELECT * FROM news_catalyst_outcomes WHERE 1=1"
         params: list[Any] = []
@@ -337,6 +346,7 @@ def compute_news_trade_metrics(
     """
     settings = settings or Settings()
     with _connect(settings) as conn:
+        _ensure_outcomes_table(conn)
         conn.row_factory = sqlite3.Row
 
         query = "SELECT * FROM news_catalyst_outcomes WHERE entry_price IS NOT NULL AND entry_price > 0"

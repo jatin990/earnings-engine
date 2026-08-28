@@ -64,7 +64,7 @@
             const tbody = document.getElementById('catalystsTableBody');
             const totalEl = document.getElementById('catStatTotal');
             try {
-                const res = await fetch(API_BASE + `/api/v1/catalysts?watchlist_or_universe=${encodeURIComponent(this.activeCatUniverse)}&limit=60`);
+                const res = await fetch(API_BASE + `/api/v1/catalysts?watchlist_or_universe=${encodeURIComponent(this.activeCatUniverse)}&limit=200`);
                 if (res.ok) {
                     const data = await res.json();
                     this.catalystsData = data.catalysts || [];

@@ -28,19 +28,28 @@ router = APIRouter(tags=["News Catalysts & Filings"])
 @router.get("/api/v1/news/catalysts")
 @router.get("/api/v1/catalysts")
 async def get_news_catalysts_endpoint(
-    market: str | None = Query("ALL"),
+    market: str | None = Query(None),
     watchlist: str | None = Query(None),
+    universe: str | None = Query(None),
+    watchlist_or_universe: str | None = Query(None),
     category: str | None = Query(None),
     impact: str | None = Query(None),
     impact_level: str | None = Query(None),
+    min_impact: int | None = Query(None),
     direction: str | None = Query(None),
     search: str | None = Query(None),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(100, ge=1, le=500),
 ):
     """Retrieve structured news catalysts (order wins, expansions, regulatory approvals)."""
     try:
-        effective_market = watchlist or market
+        effective_market = watchlist_or_universe or universe or watchlist or market or "ALL"
         effective_impact = impact_level or impact
+        if not effective_impact and min_impact is not None:
+            if min_impact >= 75:
+                effective_impact = "HIGH"
+            elif min_impact >= 50:
+                effective_impact = "MEDIUM+"
+
         items = await asyncio.to_thread(
             get_short_term_catalysts,
             watchlist_or_universe=effective_market,
