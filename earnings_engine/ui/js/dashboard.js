@@ -1498,7 +1498,7 @@
 
             switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'home').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'gainers', 'breakout', 'institutional', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'home';
 
                 this.currentTab = name;
@@ -1537,6 +1537,7 @@
                         'monthfilter': 'Month Filter',
                         'scanner': 'Scanner',
                         'catalysts': 'Catalysts & News',
+                        'premarket': '🌅 Pre-Market Setups',
                         'gainers': 'Gainers & Breakouts',
                         'breakout': '⚡ Breakout Radar',
                         'institutional': '🏛️ Institutional Flows',
@@ -1655,6 +1656,11 @@
                 }
                 if (name === 'catalysts') {
                     this.loadAutomationSchedules();
+                }
+                if (name === 'premarket') {
+                    if (typeof this.loadPremarketSetups === 'function') {
+                        this.loadPremarketSetups();
+                    }
                 }
                 if (name === 'institutional') {
                     if (!this._institutionalLoaded) {

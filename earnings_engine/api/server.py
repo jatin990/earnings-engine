@@ -29,6 +29,7 @@ from earnings_engine.api.routers import (
     kronos,
     news,
     playground,
+    premarket,
     repeaters,
     scanner,
     stocks,
@@ -437,6 +438,7 @@ app.include_router(consensus.router)
 app.include_router(kronos.router)
 app.include_router(breakout.router)
 app.include_router(news.router)
+app.include_router(premarket.router)
 app.include_router(scanner.router)
 app.include_router(repeaters.router)
 app.include_router(institutional.router)
