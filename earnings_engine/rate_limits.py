@@ -645,9 +645,9 @@ class RateLimitTracker:
                     "allowed_24h": allowed_24h,
                     "remaining_24h": rem_24h,
                     "is_rate_limited": (rem_1m <= 0 or rem_24h <= 0),
-                    "is_degraded": bool(avg_1h_ms and avg_1h_ms > 8000),
-                    "degraded_reason": f"High latency degradation (1h avg {avg_1h_ms:.0f}ms > 8000ms threshold)" if (avg_1h_ms and avg_1h_ms > 8000) else None,
-                    "status": "rate_limited" if (rem_1m <= 0 or rem_24h <= 0) else ("degraded" if (avg_1h_ms and avg_1h_ms > 8000) else "ready"),
+                    "is_degraded": False,
+                    "degraded_reason": None,
+                    "status": "rate_limited" if (rem_1m <= 0 or rem_24h <= 0) else "ready",
                     # Multi-horizon Generation Latency & Success Rate Metrics
                     "total_generations": len(dedup_gens),
                     "has_empirical_runs": has_empirical_runs,
@@ -884,18 +884,8 @@ class RateLimitTracker:
         return None
 
     def is_degraded(self, model_key: str) -> str | None:
-        """Check whether a model is currently experiencing high latency degradation (>8000ms 1h avg).
-
-        Returns:
-            A human-readable degradation reason string if degraded, or ``None`` if normal.
-        """
-        m_key = model_key.lower().strip()
-        if m_key.startswith("local") or m_key.startswith("ollama") or m_key.startswith("lmstudio"):
-            return None
-
-        avg_1h = self.get_average_latency(m_key, window_seconds=3600)
-        if avg_1h > 8000:
-            return f"High latency degradation (1h avg {avg_1h:.0f}ms > 8000ms threshold)"
+        """Check whether a model is currently experiencing high latency degradation.
+        Returns None so models are never blocked or prevented from calculating."""
         return None
 
     def get_api_usage_summary(self, settings: Settings | None = None) -> dict[str, Any]:

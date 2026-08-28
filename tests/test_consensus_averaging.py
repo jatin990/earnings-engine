@@ -118,21 +118,19 @@ class TestIsRateLimited:
         assert result is not None
         assert "24h quota" in result.lower()
 
-    def test_high_latency_does_not_block_rate_limit_but_flags_degraded(self):
+    def test_high_latency_does_not_block_rate_limit_or_degrade(self):
         tracker = _make_tracker()
         key = "mistralai/mistral-large"
         now = time.time()
-        # Inject a very high latency record in the last hour (15s)
+        # Inject a high latency record in the last hour (15s)
         tracker._generation_history[key].append({"timestamp": now, "latency_ms": 15000.0, "success": True})
 
-        # High latency must NOT trigger a hard rate-limit block
+        # High latency must NOT trigger a hard rate-limit block or degradation block
         rl_res = tracker.is_rate_limited(key)
         assert rl_res is None
 
-        # But it MUST trigger is_degraded
         deg_res = tracker.is_degraded(key)
-        assert deg_res is not None
-        assert "latency" in deg_res.lower()
+        assert deg_res is None
 
     def test_local_models_never_rate_limited(self):
         tracker = _make_tracker()

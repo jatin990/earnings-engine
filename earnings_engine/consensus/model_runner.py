@@ -182,7 +182,7 @@ def _query_local_model(
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.3,
-                    "max_tokens": 4096,
+                    "max_tokens": 1200,
                 },
                 timeout=timeout,
             )
@@ -212,7 +212,7 @@ def _query_local_model(
                     "format": "json",
                     "stream": False,
                     "options": {
-                        "num_ctx": 4096,
+                        "num_ctx": 2048,
                         "temperature": 0.3,
                     },
                 },
@@ -341,10 +341,11 @@ def _query_single_model(
 
     display_name = MODEL_DISPLAY_NAMES.get(model_id, model_id.split("/")[-1])
     current_model = model_id
+    current_max_tokens = int(os.getenv("OPENROUTER_MAX_TOKENS", "1000"))
 
     # --- Pre-flight rate-limit check (only blocks on genuine quota exhaustion) ---
     try:
-        from earnings_engine.rate_limits import is_rate_limited as _is_rl, is_degraded as _is_deg
+        from earnings_engine.rate_limits import is_rate_limited as _is_rl
         rl_reason = _is_rl(model_id)
         if rl_reason:
             logger.warning("[CONSENSUS] Skipping %s — %s", display_name, rl_reason)
@@ -363,15 +364,12 @@ def _query_single_model(
                 "raw_response": f"Skipped: {rl_reason}",
                 "latency_ms": 0,
             }
-        deg_reason = _is_deg(model_id)
-        if deg_reason:
-            logger.info("[CONSENSUS] %s is experiencing high latency degradation (%s); proceeding with execution...", display_name, deg_reason)
     except Exception:
         pass
 
     for attempt in range(max_retries + 1):
         start = time.perf_counter()
-        logger.info("[CONSENSUS] Querying %s (%s, attempt %d/%d)...", display_name, current_model, attempt + 1, max_retries + 1)
+        logger.info("[CONSENSUS] Querying %s (%s, attempt %d/%d, max_tokens=%d)...", display_name, current_model, attempt + 1, max_retries + 1, current_max_tokens)
         try:
             # Record request BEFORE the HTTP call so the sliding window is updated
             # even if the request errors or times out.
@@ -398,7 +396,7 @@ def _query_single_model(
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.3,
-                    "max_tokens": 4096,
+                    "max_tokens": current_max_tokens,
                 },
                 timeout=timeout,
             )
@@ -410,6 +408,27 @@ def _query_single_model(
                 pass
 
             elapsed_ms = (time.perf_counter() - start) * 1000
+
+            # If HTTP 402 "credit or fewer max_tokens" error:
+            if resp.status_code == 402:
+                import re
+                err_text = resp.text
+                logger.warning(
+                    "[CONSENSUS] %s returned HTTP 402 credit/token limit (attempt %d/%d): %.200s",
+                    display_name, attempt + 1, max_retries + 1, err_text
+                )
+                afford_match = re.search(r"can only afford (\d+)", err_text)
+                if afford_match and attempt < max_retries:
+                    afford_tokens = int(afford_match.group(1))
+                    # Adjust max_tokens to safe affordable limit
+                    current_max_tokens = max(250, min(afford_tokens - 20, 800))
+                    logger.info("[CONSENSUS] Retrying %s with lowered max_tokens=%d (affordable: %d)...", display_name, current_max_tokens, afford_tokens)
+                    time.sleep(0.4)
+                    continue
+                elif attempt < max_retries and current_max_tokens > 400:
+                    current_max_tokens = 400
+                    time.sleep(0.4)
+                    continue
 
             # If rate limited (429), temporary server overload (502, 503), or model endpoint not found (404)
             if resp.status_code in (404, 429, 502, 503):
