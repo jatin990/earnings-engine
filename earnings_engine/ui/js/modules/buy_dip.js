@@ -4,9 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[buy_dip] window.app not initialized'); return; }
-    Object.assign(app, {
+Object.assign(app, {
 // ---------- Buy the Dip tab ----------
 
             async loadRecentResults() {

@@ -4,10 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[catalysts] window.app not initialized'); return; }
-
-    Object.assign(app, {
+Object.assign(app, {
             // =========================================================================
             // 📰 Short-Term Catalysts & High-Impact News Tab
             // =========================================================================

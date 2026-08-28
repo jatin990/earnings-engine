@@ -4,9 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[price_refresh] window.app not initialized'); return; }
-        // =========================================================================
+// =========================================================================
         // ⏱️ Global Ticker Price Refresh Engine (Configurable Interval, Default 5m)
         // =========================================================================
         app._globalPriceRefreshTimer = null;

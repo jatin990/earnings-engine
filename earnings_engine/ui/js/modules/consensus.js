@@ -4,10 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[consensus] window.app not initialized'); return; }
-
-    Object.assign(app, {            // =========================================================================
+Object.assign(app, {            // =========================================================================
             // 🤖 AI Multi-Model Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral)
             // =========================================================================
             async loadConsensusCache() {

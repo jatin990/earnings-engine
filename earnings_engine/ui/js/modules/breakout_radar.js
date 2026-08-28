@@ -4,10 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[breakout_radar] window.app not initialized'); return; }
-
-        // =========================================================================
+// =========================================================================
         // ⚡ BREAKOUT RADAR MODULE (ENHANCED WITH DATE PICKER & OUTCOME TRACKING)
         // =========================================================================
         app._breakoutLoaded = false;

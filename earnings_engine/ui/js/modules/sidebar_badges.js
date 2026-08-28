@@ -5,10 +5,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[sidebar_badges] window.app not initialized'); return; }
-
-        app.updateSidebarBadges = async function() {
+app.updateSidebarBadges = async function() {
             try {
                 const res = await fetch(API_BASE + '/api/v1/sidebar/badges');
                 if (res.ok) {

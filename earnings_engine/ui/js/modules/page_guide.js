@@ -4,9 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[page_guide] window.app not initialized'); return; }
-        // =========================================================================
+// =========================================================================
         // 💡 COMPREHENSIVE CALCULATION LOGIC & DATA SOURCE ARCHITECTURE (19 TABS)
         // =========================================================================
         app.PAGE_GUIDES = {

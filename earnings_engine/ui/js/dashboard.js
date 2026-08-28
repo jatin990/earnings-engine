@@ -1,6 +1,9 @@
-        const API_BASE = window.location.origin;
+const API_BASE = window.location.origin;
 
-        const app = {
+        window.app = window.app || {};
+        const app = window.app;
+
+        Object.assign(app, {
             allTickers: [],
             resultsData: [],
             swingData: [],
@@ -1656,25 +1659,22 @@
         // [catalyst_consensus] -> extracted to modules/catalyst_consensus.js
         // [breakout_radar] -> extracted to modules/breakout_radar.js
         // [tracked_breakouts] -> extracted to modules/tracked_breakouts.js
-        // [repeaters] -> extracted to modules/repeaters.js
-        // [stock_note] -> extracted to modules/stock_note.js
         // [schedules] -> extracted to modules/schedules.js
         // [breakout_audit] -> extracted to modules/breakout_audit.js
         // [institutional] -> extracted to modules/institutional.js
-    };
+        });
 
-        // Initialize & export to window
-        window.app = app;
-        if (typeof app.init === 'function') {
-            try { app.init(); } catch (e) { console.warn('app.init:', e); }
+        // Safe boot sequence: ensures all 33 modular script tags have loaded & attached to window.app
+        function bootApp() {
+            if (typeof app.init === 'function' && !app._initialized) {
+                app._initialized = true;
+                try { app.init(); } catch (e) { console.warn('[dashboard] app.init error:', e); }
+                try { app.updateResultsMonthSummaryCards(); } catch (e) { console.warn('[dashboard] Month summary fetch error:', e); }
+            }
         }
-        // initGlobalPriceRefresh -> handled by modules/price_refresh.js
-        try {
-            app.updateResultsMonthSummaryCards();
-        } catch (e) {
-            console.warn('Initial month summary fetch:', e);
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bootApp);
+        } else {
+            bootApp();
         }
-        // updateSidebarBadges + 45s interval -> handled by modules/sidebar_badges.js
-
-
-

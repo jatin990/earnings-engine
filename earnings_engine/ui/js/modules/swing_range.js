@@ -4,9 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[swing_range] window.app not initialized'); return; }
-    Object.assign(app, {
+Object.assign(app, {
 // ---------- Swing Range Modal Controller ----------
 
             _detectedRange: null,

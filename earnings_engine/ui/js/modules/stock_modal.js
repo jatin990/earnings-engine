@@ -4,9 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[stock_modal] window.app not initialized'); return; }
-        // ========================================================
+// ========================================================
         // 🚀 FULL SCREEN STOCK INTELLIGENCE MODAL CONTROLLER
         // ========================================================
         app.activeStockModalTicker = null;

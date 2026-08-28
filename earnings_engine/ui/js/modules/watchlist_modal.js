@@ -4,10 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[watchlist_modal] window.app not initialized'); return; }
-
-        // =========================================================================
+// =========================================================================
         // ⭐ Universal Add to Watchlist & Playlist Selector Modal Manager
         // =========================================================================
         app.activeAddToWatchlistTicker = null;

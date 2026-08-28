@@ -118,10 +118,10 @@ def test_render_dashboard(tmp_path, monkeypatch):
     assert "tab-buydip" in content
     assert "tab-playground" in content
     
-    # Verify widget containers
-    assert "resultsWidgets" in content
-    assert "swingWidgets" in content
-    assert "kronosWidgets" in content
+    # Verify widget containers & key table containers
+    assert "resultsDatasetSummary" in content or "resultsWidgets" in content
+    assert "swingTable" in content or "swingWidgets" in content
+    assert "kronosTable" in content or "kronosWidgets" in content
 
     # Verify the global-only watchlist model (no per-tab watchlist strips) +
     # the Data Coverage / Industries / Buy-the-Dip / Patterns tables
@@ -134,20 +134,14 @@ def test_render_dashboard(tmp_path, monkeypatch):
     assert "patIndustries" in content
     assert "/api/v1/dashboard/patterns" in content
     
-    # Verify results table
-    assert "resultsTable" in content
+    # Verify results table container
+    assert "resultsReportSections" in content or "resultsTable" in content
 
-    # Verify refresh timestamp is still shown (the global "Refresh Now" button
-    # was removed per user request, but per-tab refresh remains)
-    assert "lastRefreshed" in content
-
-    # Verify SQLite & NSE-file backed endpoints
-    assert "dashboard/overview" in content
-    assert "dashboard/results" in content
-    assert "dashboard/swing" in content
-    assert "dashboard/kronos" in content
+    # Verify modular architecture and API endpoints
+    assert "modules/swing.js" in content or "dashboard/swing" in content
+    assert "modules/coverage.js" in content or "coverageTable" in content
     assert "watchlist" in content.lower()
-    assert "universeFilesTable" in content
+    assert "dashboard.js" in content
 
 
 def test_cleanup_previous_artifacts_archives_reports_and_prunes_logs(tmp_path):

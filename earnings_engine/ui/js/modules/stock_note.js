@@ -4,10 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[stock_note] window.app not initialized'); return; }
-
-        // ========================================================
+// ========================================================
         // 🧠 UNIVERSAL STOCK INTELLIGENCE & DEEP DIVE NOTE ENGINE
         // ========================================================
         app.closeStockNote = function() {

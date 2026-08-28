@@ -4,9 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[gainers] window.app not initialized'); return; }
-    Object.assign(app, {
+Object.assign(app, {
 // =========================================================================
             // 🚀 Top Gainers, "Why It Rose" Attribution & Pattern Discovery Tab
             // =========================================================================

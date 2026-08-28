@@ -4,10 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[watchlist] window.app not initialized'); return; }
-
-    app.watchlistTab = {
+app.watchlistTab = {
                 names: {},       // symbol -> display name cache for chip tooltips / autocomplete
                 ranges: {},      // watchlist:ticker -> swing range object
                 customLists: [], // Custom user watchlists

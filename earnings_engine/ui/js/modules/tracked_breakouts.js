@@ -4,10 +4,9 @@
 // =========================================================================
 (function() {
     const API_BASE = window.API_BASE || window.location.origin;
+    window.app = window.app || {};
     const app = window.app;
-    if (!app) { console.error('[tracked_breakouts] window.app not initialized'); return; }
-
-        // =========================================================================
+// =========================================================================
         // 📜 TRACKED BREAKOUTS HISTORY CONTROLLER
         // =========================================================================
         app._trackedBreakoutsData = [];
