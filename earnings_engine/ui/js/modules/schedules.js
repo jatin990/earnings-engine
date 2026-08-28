@@ -506,8 +506,16 @@
     };
 
     // Export module and attach to global app
+    window.schedulesModule = schedulesModule;
     window.SchedulesModule = schedulesModule;
+
     if (window.app) {
         Object.assign(window.app, schedulesModule);
+    } else {
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.app) {
+                Object.assign(window.app, schedulesModule);
+            }
+        });
     }
 })();
