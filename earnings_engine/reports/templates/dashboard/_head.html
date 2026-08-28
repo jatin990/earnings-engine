@@ -588,7 +588,16 @@
 
         /* Universal Sticky Table Wrapper & Container */
         .table-wrapper,
-        .table-container,
+        .table-container {
+            max-height: calc(100vh - 220px);
+            min-height: auto;
+            overflow: auto !important;
+            position: relative;
+            border-radius: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: #000000;
+        }
+
         .breakout-table-wrapper {
             max-height: calc(100vh - 220px);
             min-height: 280px;
