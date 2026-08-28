@@ -12315,8 +12315,7 @@
                     try {
                         const d = new Date(status.last_scan_at);
                         const uniLabel = universe === 'nifty_50' ? 'Nifty 50' : (universe === 'all' ? 'All' : universe);
-                        const tierInfo = hotCount > 0 ? ` · 🔴${hotCount} Hot · 🟡${warmCount} Warm` : '';
-                        lastScanEl.textContent = `${uniLabel} • ${asofDate ? 'As-Of ' + asofDate : 'Live • Last scan: ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}${tierInfo}`;
+                        lastScanEl.textContent = `${uniLabel} • ${asofDate ? 'As-Of ' + asofDate : 'Live • Last scan: ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
                     } catch { lastScanEl.textContent = 'Last scan: ' + status.last_scan_at; }
                 } else if (lastScanEl) {
                     lastScanEl.textContent = status.status === 'running' ? 'Scanning now\u2026' : (asofDate ? `As-Of ${asofDate}` : 'Waiting for first scan\u2026');
@@ -12341,19 +12340,19 @@
                 label: 'Stock',
                 sortKey: 'ticker',
                 align: 'left',
-                headerStyle: 'color:#64748b;',
+                headerStyle: 'color:#94a3b8;',
                 render: (c, ctx) => `
-                    <td style="padding:0.55rem 0.75rem;">
-                        <div style="display:flex;flex-direction:column;gap:0.05rem;">
-                            <div style="display:flex;align-items:center;gap:0.25rem;">
-                                <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="font-weight:700;color:#f1f5f9;font-family:var(--font-mono);font-size:0.78rem;text-decoration:none;" title="Open ${ctx.ticker} stock intelligence in new tab">${ctx.ticker}</a>
-                                <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-size:0.75rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
-                                ${ctx.isBreakingOut ? '<span style="font-size:0.58rem;background:rgba(239,68,68,0.25);color:#f87171;border:1px solid rgba(239,68,68,0.5);padding:0.04rem 0.35rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;"><span class="fire-flame-icon">🔥</span> BREAKING OUT</span>' : ''}
+                    <td style="padding:0.46rem 0.65rem;border-right:1px solid rgba(255,255,255,0.03);">
+                        <div style="display:flex;flex-direction:column;gap:0.12rem;">
+                            <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:nowrap;">
+                                <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="font-weight:800;color:#ffffff;font-family:var(--font-mono);font-size:0.82rem;text-decoration:none;letter-spacing:-0.01em;" title="Open ${ctx.ticker} stock intelligence in new tab" onmouseenter="this.style.color='#38bdf8'" onmouseleave="this.style.color='#ffffff'">${ctx.ticker}</a>
+                                <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-size:0.7rem;opacity:0.8;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
+                                ${ctx.isBreakingOut ? '<span style="font-size:0.58rem;background:rgba(239,68,68,0.25);color:#f87171;border:1px solid rgba(239,68,68,0.5);padding:0.02rem 0.35rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;"><span class="fire-flame-icon">🔥</span> FIRED</span>' : ''}
                             </div>
-                            <span style="font-size:0.65rem;color:#475569;" title="${c.company_name || ctx.ticker}">${ctx.company}</span>
-                            <div style="margin-top:0.2rem;display:flex;gap:0.25rem;flex-wrap:wrap;align-items:center;">
-                                <span style="font-size:0.62rem;background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.25);padding:0.08rem 0.35rem;border-radius:3px;">${ctx.archetype}</span>
-                                ${(c.institutional_flow && c.institutional_flow.funds_in > 0) ? `<span style="font-size:0.6rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.06rem 0.3rem;border-radius:3px;font-weight:700;" title="Institutional Accumulation: +${c.institutional_flow.funds_in} Funds Buying">🏛️ +${c.institutional_flow.funds_in} Funds</span>` : ''}
+                            <div style="font-size:0.67rem;color:#94a3b8;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.company_name || ctx.ticker}">${ctx.company}</div>
+                            <div style="margin-top:0.1rem;display:flex;gap:0.25rem;flex-wrap:wrap;align-items:center;">
+                                <span style="font-size:0.60rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;">${ctx.archetype}</span>
+                                ${(c.institutional_flow && c.institutional_flow.funds_in > 0) ? `<span style="font-size:0.60rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.04rem 0.3rem;border-radius:3px;font-weight:700;" title="Institutional Accumulation: +${c.institutional_flow.funds_in} Funds Buying">🏛️ +${c.institutional_flow.funds_in}</span>` : ''}
                             </div>
                         </div>
                     </td>
@@ -12366,8 +12365,8 @@
                 align: 'right',
                 headerStyle: 'color:#60a5fa;',
                 render: (c, ctx) => `
-                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);color:#93c5fd;font-size:0.74rem;white-space:nowrap;">
-                        <div style="font-weight:700;">${ctx.sigPriceStr}</div>
+                    <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
+                        <div style="font-weight:700;color:#93c5fd;">${ctx.sigPriceStr}</div>
                         <div style="font-size:0.62rem;color:#64748b;margin-top:1px;" title="Signal detection date">📅 ${c.signal_date || c.entry_date || 'Signal'}</div>
                     </td>
                 `
@@ -12383,11 +12382,11 @@
                     const timeStr = c.scanned_at ? new Date(c.scanned_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
                     const asOfLabel = asOfDate ? `as of ${asOfDate}` : (timeStr ? `as of ${timeStr}` : 'Today');
                     return `
-                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);font-size:0.74rem;white-space:nowrap;">
-                        <div style="font-weight:800;color:${ctx.curPriceColor};font-size:0.82rem;">${ctx.curPriceStr}</div>
-                        <div style="font-size:0.62rem;color:#94a3b8;font-weight:500;margin-top:1px;" title="Price as of date/time">🕒 ${asOfLabel}</div>
-                        <div style="margin-top:0.15rem;">
-                            <span class="signal-badge" style="background:${ctx.curPriceBadgeBg};border:1px solid ${ctx.curPriceBadgeBorder};color:${ctx.curPriceBadgeText};font-size:0.62rem;font-weight:700;padding:0.08rem 0.35rem;border-radius:3px;">${ctx.curPriceBadgeLabel}</span>
+                    <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
+                        <div style="font-weight:800;color:${ctx.curPriceColor};font-size:0.80rem;">${ctx.curPriceStr}</div>
+                        <div style="font-size:0.60rem;color:#94a3b8;font-weight:500;margin-top:1px;" title="Price as of date/time">🕒 ${asOfLabel}</div>
+                        <div style="margin-top:0.12rem;">
+                            <span class="signal-badge" style="background:${ctx.curPriceBadgeBg};border:1px solid ${ctx.curPriceBadgeBorder};color:${ctx.curPriceBadgeText};font-size:0.60rem;font-weight:700;padding:0.06rem 0.32rem;border-radius:3px;display:inline-block;">${ctx.curPriceBadgeLabel}</span>
                         </div>
                     </td>
                     `;
@@ -12398,11 +12397,11 @@
                 label: 'Trigger (Res)',
                 sortKey: 'breakout_trigger',
                 align: 'right',
-                headerStyle: 'color:#f87171;',
+                headerStyle: 'color:#fbbf24;',
                 render: (c, ctx) => `
-                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);color:#fca5a5;font-size:0.74rem;white-space:nowrap;">
-                        <div>${ctx.triggerStr}</div>
-                        <div>${ctx.gapPct}</div>
+                    <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
+                        <div style="font-weight:700;color:#fde047;">${ctx.triggerStr}</div>
+                        <div style="font-size:0.62rem;margin-top:1px;">${ctx.gapPct}</div>
                     </td>
                 `
             },
@@ -12413,22 +12412,24 @@
                 align: 'right',
                 headerStyle: 'color:#38bdf8;',
                 render: (c, ctx) => `
-                    <td style="padding:0.55rem 0.75rem;text-align:right;font-family:var(--font-mono);font-size:0.7rem;white-space:nowrap;">
-                        <div style="color:#34d399;" title="Target Price">T: ${ctx.targetStr}</div>
-                        <div style="color:#f87171;" title="Stop Loss">SL: ${ctx.stopStr}</div>
+                    <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-size:0.70rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
+                        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:0.2rem 0.4rem;border-radius:4px;display:inline-flex;flex-direction:column;gap:1px;text-align:right;">
+                            <div style="color:#34d399;font-weight:700;" title="Target Price">T: ${ctx.targetStr}</div>
+                            <div style="color:#f87171;font-weight:600;" title="Stop Loss">SL: ${ctx.stopStr}</div>
+                        </div>
                     </td>
                 `
             },
             return: {
                 id: 'return',
-                label: 'Return % & Price',
+                label: 'Return %',
                 sortKey: 'realized_return_pct',
                 align: 'right',
                 headerStyle: 'color:#34d399;',
                 render: (c, ctx) => `
-                    <td style="padding:0.55rem 0.75rem;text-align:right;font-size:0.76rem;white-space:nowrap;">
+                    <td style="padding:0.46rem 0.65rem;text-align:right;font-size:0.75rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
                         ${ctx.retStr}
-                        ${c.max_gain_pct != null ? `<div style="font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);margin-top:2px;" title="Peak high price reached post-signal">Peak: <span style="color:#34d399;font-weight:700;">+${c.max_gain_pct}%</span> ${c.post_high != null ? '<span style="color:#64748b;">(₹' + Number(c.post_high).toLocaleString('en-IN', {maximumFractionDigits:2}) + ')</span>' : ''}</div>` : ''}
+                        ${c.max_gain_pct != null ? `<div style="font-size:0.60rem;color:#94a3b8;font-family:var(--font-mono);margin-top:2px;" title="Peak high price reached post-signal">Peak: <span style="color:#34d399;font-weight:700;">+${c.max_gain_pct}%</span> ${c.post_high != null ? '<span style="color:#64748b;">(₹' + Number(c.post_high).toLocaleString('en-IN', {maximumFractionDigits:2}) + ')</span>' : ''}</div>` : ''}
                     </td>
                 `
             },
@@ -12439,7 +12440,7 @@
                 align: 'center',
                 headerStyle: 'color:#fbbf24;',
                 render: (c, ctx) => `
-                    <td style="padding:0.55rem 0.75rem;text-align:center;">
+                    <td style="padding:0.46rem 0.65rem;text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
                         ${ctx.outcomeBadgeHtml(c)}
                     </td>
                 `
@@ -12448,13 +12449,13 @@
                 id: 'score',
                 label: '⚡ Score',
                 sortKey: 'composite_score',
-                align: 'right',
+                align: 'center',
                 headerStyle: 'color:#f1f5f9;',
                 render: (c, ctx) => `
-                    <td style="padding:0.55rem 0.75rem;text-align:right;">
-                        <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.4rem;">
-                            <span style="background:${ctx.scoreBg};color:${ctx.scoreColor};font-size:0.8rem;font-weight:800;font-family:var(--font-mono);padding:0.12rem 0.45rem;border-radius:5px;">${ctx.score}</span>
-                        </div>
+                    <td style="padding:0.46rem 0.65rem;text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
+                        <span style="display:inline-block;background:${ctx.scoreBg};color:${ctx.scoreColor};border:1px solid ${ctx.scoreColor}44;font-size:0.78rem;font-weight:800;font-family:var(--font-mono);padding:0.12rem 0.45rem;border-radius:5px;" title="Resistance: ${c.resistance_score || 0} • Volume: ${c.volume_score || 0} • Compression: ${c.compression_score || 0} • Momentum: ${c.momentum_score || 0} • Fundamental: ${c.fundamental_score || 0}">
+                            ${ctx.score}
+                        </span>
                     </td>
                 `
             },
@@ -12465,15 +12466,15 @@
                 align: 'center',
                 headerStyle: 'color:#64748b;',
                 render: (c, ctx) => `
-                    <td style="padding:0.55rem 0.75rem;text-align:center;white-space:nowrap;">
-                        <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">
-                            <button type="button" id="btnReeval-${ctx.ticker.replace(/[^a-zA-Z0-9]/g, '_')}" onclick="app.reevaluateBreakoutStock('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(234,179,8,0.15);color:#fbbf24;border:1px solid rgba(234,179,8,0.35);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:5px;cursor:pointer;" title="Re-evaluate with fresh market prices and recalculate conviction">
+                    <td style="padding:0.46rem 0.65rem;text-align:center;white-space:nowrap;">
+                        <div style="display:flex;align-items:center;justify-content:center;gap:0.25rem;">
+                            <button type="button" id="btnReeval-${ctx.ticker.replace(/[^a-zA-Z0-9]/g, '_')}" onclick="app.reevaluateBreakoutStock('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(234,179,8,0.15);color:#fbbf24;border:1px solid rgba(234,179,8,0.3);font-size:0.65rem;padding:0.18rem 0.42rem;border-radius:4px;cursor:pointer;" title="Re-evaluate with fresh market prices and recalculate conviction">
                                 ⚡ Re-eval
                             </button>
-                            <button type="button" onclick="app.openBreakoutNotesModal('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-size:0.68rem;padding:0.2rem 0.5rem;border-radius:5px;cursor:pointer;" title="View Mathematical Calculation Notes & Ollama AI Reasoning">
+                            <button type="button" onclick="app.openBreakoutNotesModal('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);font-size:0.65rem;padding:0.18rem 0.45rem;border-radius:4px;cursor:pointer;" title="View Mathematical Calculation Notes & Ollama AI Reasoning">
                                 🧠 Reasoning
                             </button>
-                            <button type="button" onclick="app.openSwingRangeModal('ALL','${ctx.ticker}')" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:5px;" title="Analyse ${ctx.ticker}">
+                            <button type="button" onclick="app.openSwingRangeModal('ALL','${ctx.ticker}')" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.65rem;padding:0.18rem 0.42rem;border-radius:4px;" title="Analyse ${ctx.ticker}">
                                 📊
                             </button>
                         </div>
@@ -12535,7 +12536,7 @@
             }
         };
 
-        app.handleBreakoutColDragLeave = function(e, targetColKey) {
+        app.handleBreakoutColLeave = function(e, targetColKey) {
             const th = e.currentTarget;
             th.style.borderLeft = '';
             th.style.background = '';
@@ -12562,10 +12563,9 @@
         app.handleBreakoutColDragEnd = function(e) {
             app._draggedColKey = null;
             e.currentTarget.style.opacity = '1';
-            document.querySelectorAll('#breakoutTable thead th').forEach(th => {
+            document.querySelectorAll('#breakoutTableHeaderRow th').forEach(th => {
                 th.style.borderLeft = '';
                 th.style.background = '';
-                th.style.opacity = '1';
             });
         };
 
@@ -12617,11 +12617,11 @@
                         data-col-key="${colKey}"
                         ondragstart="app.handleBreakoutColDragStart(event, '${colKey}')"
                         ondragover="app.handleBreakoutColDragOver(event, '${colKey}')"
-                        ondragleave="app.handleBreakoutColDragLeave(event, '${colKey}')"
+                        ondragleave="app.handleBreakoutColLeave(event, '${colKey}')"
                         ondrop="app.handleBreakoutColDrop(event, '${colKey}')"
                         ondragend="app.handleBreakoutColDragEnd(event)"
                         onclick="${def.sortKey ? `app.sortBreakoutTable('${def.sortKey}')` : ''}"
-                        style="position:sticky;top:0;z-index:30;background:#090e1a;padding:0.6rem 0.75rem;text-align:${def.align};${def.headerStyle || ''}${sortColor ? `color:${sortColor};` : ''}font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;cursor:${def.sortKey ? 'pointer' : 'grab'};white-space:nowrap;user-select:none;border-bottom:1px solid rgba(56,189,248,0.3);box-shadow:0 2px 6px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.12);transition:background 0.15s, border-color 0.15s;"
+                        style="position:sticky;top:0;z-index:30;background:#090e1a;padding:0.55rem 0.65rem;text-align:${def.align};${def.headerStyle || ''}${sortColor ? `color:${sortColor};` : ''}font-weight:700;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;cursor:${def.sortKey ? 'pointer' : 'grab'};white-space:nowrap;user-select:none;border-bottom:1px solid rgba(56,189,248,0.3);box-shadow:0 2px 6px rgba(0,0,0,0.7);transition:background 0.15s, border-color 0.15s;"
                         title="Drag to move column${def.sortKey ? ' • Click to sort' : ''}"
                     >
                         <span style="opacity:0.4;font-size:0.65rem;margin-right:0.25rem;cursor:grab;" title="Drag to move column">⋮⋮</span>
@@ -12654,13 +12654,13 @@
                     blue: { bg: 'rgba(59,130,246,0.15)', text: '#60a5fa', border: 'rgba(59,130,246,0.3)' }
                 };
                 const style = colors[badge] || colors.blue;
-                return `<span style="display:inline-block;background:${style.bg};color:${style.text};border:1px solid ${style.border};font-size:0.68rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:4px;white-space:nowrap;">${label}</span>`;
+                return `<span style="display:inline-block;background:${style.bg};color:${style.text};border:1px solid ${style.border};font-size:0.65rem;font-weight:700;padding:0.12rem 0.45rem;border-radius:4px;white-space:nowrap;">${label}</span>`;
             };
 
             const rows = candidates.map((c) => {
                 const score = c.composite_score || 0;
                 const scoreColor = score >= 75 ? '#fde68a' : score >= 55 ? '#34d399' : '#60a5fa';
-                const scoreBg = score >= 75 ? 'rgba(234,179,8,0.15)' : score >= 55 ? 'rgba(16,185,129,0.12)' : 'rgba(59,130,246,0.1)';
+                const scoreBg = score >= 75 ? 'rgba(234,179,8,0.18)' : score >= 55 ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.12)';
 
                 const ticker = c.ticker || '\u2014';
                 const company = (c.company_name || ticker).substring(0, 20);
@@ -12721,15 +12721,15 @@
                 }
 
                 const retPct = c.realized_return_pct;
-                const retColor = retPct > 0 ? '#34d399' : retPct < 0 ? '#f87171' : '#94a3b8';
-                const curPriceFormatted = c.current_price != null ? `₹${Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '';
+                const retColor = retPct > 0 ? '#34d399' : (retPct < 0 ? '#f87171' : '#94a3b8');
+                const retBg = retPct > 0 ? 'rgba(16,185,129,0.15)' : (retPct < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)');
+                const retBorder = retPct > 0 ? 'rgba(16,185,129,0.3)' : (retPct < 0 ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)');
                 const retStr = retPct != null
-                    ? `<div style="font-weight:800;color:${retColor};font-family:var(--font-mono);font-size:0.82rem;">${retPct >= 0 ? '+' : ''}${Number(retPct).toFixed(2)}%</div>
-                       <div style="font-size:0.68rem;color:#cbd5e1;font-weight:600;font-family:var(--font-mono);margin-top:1px;">${curPriceFormatted}</div>`
-                    : '<span style="color:#475569;">\u2014</span>';
+                    ? `<span style="display:inline-block;font-weight:800;color:${retColor};background:${retBg};border:1px solid ${retBorder};font-family:var(--font-mono);font-size:0.76rem;padding:0.12rem 0.42rem;border-radius:4px;">${retPct >= 0 ? '+' : ''}${Number(retPct).toFixed(2)}%</span>`
+                    : '<span style="color:#64748b;">—</span>';
 
                 const gapPct = c.pct_from_high != null
-                    ? `<span style="font-size:0.62rem;color:${c.pct_from_high >= 0 ? '#34d399' : '#f87171'};">(${c.pct_from_high >= 0 ? '+' : ''}${c.pct_from_high.toFixed(1)}%)</span>`
+                    ? `<span style="font-size:0.62rem;color:${c.pct_from_high >= 0 ? '#34d399' : '#f87171'};font-weight:600;">(${c.pct_from_high >= 0 ? '+' : ''}${c.pct_from_high.toFixed(1)}%)</span>`
                     : '';
 
                 const archetype = c.setup_archetype || (score >= 60 ? '🔥 Strong Breakout' : '📈 Resistance Coil');
@@ -12767,12 +12767,18 @@
                     isBreakingOut
                 };
 
-                const cellsHtml = cols.map(colKey => {
-                    const colDef = BREAKOUT_COLUMNS[colKey];
-                    return colDef ? colDef.render(c, cellCtx) : '';
-                }).join('');
+                let rowClass = 'bk-table-row';
+                if (c.outcome === 'TARGET_HIT' || c.outcome === 'BREAKOUT_SUCCEEDED') {
+                    rowClass += ' bk-row-success';
+                } else if (c.outcome === 'STOP_HIT') {
+                    rowClass += ' bk-row-stop';
+                } else if (isBreakingOut || c.tier === 'HOT') {
+                    rowClass += ' bk-row-hot';
+                } else {
+                    rowClass += ' bk-row-warm';
+                }
 
-                return `<tr class="${isBreakingOut ? 'breakout-row-on-fire' : ''}" style="border-bottom:1px solid rgba(255,255,255,0.05);" data-ticker="${ticker}">${cellsHtml}</tr>`;
+                return `<tr class="${rowClass}${isBreakingOut ? ' breakout-row-on-fire' : ''}" data-ticker="${ticker}">${cellsHtml}</tr>`;
             });
 
             tbody.innerHTML = rows.join('');
@@ -13741,11 +13747,12 @@
                 const ret = c.realized_return_pct;
                 const retColor = ret > 0 ? '#34d399' : (ret < 0 ? '#f87171' : '#94a3b8');
                 const retBg = ret > 0 ? 'rgba(16,185,129,0.15)' : (ret < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)');
+                const retBorder = ret > 0 ? 'rgba(16,185,129,0.3)' : (ret < 0 ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)');
                 const retFormatted = ret != null ? `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%` : '—';
 
                 // Peak Max Gain
                 const maxGain = c.max_gain_pct;
-                const maxGainStr = maxGain != null ? `<span style="color:#34d399;font-weight:700;font-family:var(--font-mono);">+${maxGain.toFixed(2)}%</span>` : '<span style="color:#64748b;">—</span>';
+                const maxGainStr = maxGain != null ? `<span style="color:#34d399;font-weight:700;font-family:var(--font-mono);font-size:0.75rem;">+${maxGain.toFixed(2)}%</span>` : '<span style="color:#64748b;">—</span>';
 
                 // Outcome badge
                 const outcome = c.outcome || 'ACTIVE';
@@ -13759,7 +13766,7 @@
                     outcomeColor = '#34d399';
                     outcomeBg = 'rgba(16,185,129,0.18)';
                     outcomeBorder = 'rgba(16,185,129,0.45)';
-                } else if (outcome === 'TRIGGERED') {
+                } else if (outcome === 'TRIGGERED' || outcome === 'BREAKOUT_SUCCEEDED') {
                     outcomeLabel = '🚀 Breakout Fired';
                     outcomeColor = '#38bdf8';
                     outcomeBg = 'rgba(56,189,248,0.18)';
@@ -13776,94 +13783,107 @@
                     outcomeBorder = 'rgba(245,158,11,0.35)';
                 }
 
+                // Row Tier Accent Class
+                let rowClass = 'bk-table-row';
+                if (outcome === 'TARGET_HIT' || outcome === 'BREAKOUT_SUCCEEDED') {
+                    rowClass += ' bk-row-success';
+                } else if (outcome === 'STOP_HIT') {
+                    rowClass += ' bk-row-stop';
+                } else if (tier === 'HOT' || outcome === 'TRIGGERED') {
+                    rowClass += ' bk-row-hot';
+                } else {
+                    rowClass += ' bk-row-warm';
+                }
+
                 // Score
                 const score = c.composite_score || 0;
                 const scoreColor = score >= 75 ? '#fde68a' : (score >= 55 ? '#34d399' : '#60a5fa');
+                const scoreBg = score >= 75 ? 'rgba(234,179,8,0.18)' : (score >= 55 ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.12)');
 
                 const archetype = c.setup_archetype || (score >= 60 ? '🔥 Breakout Setup' : '📈 Resistance Coil');
 
                 return `
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;">
+                    <tr class="${rowClass}" data-ticker="${sym}">
                         <!-- Stock & Archetype -->
-                        <td style="padding:0.6rem 0.85rem;">
-                            <div style="display:flex;align-items:center;gap:0.45rem;">
-                                <a href="/stock/${encodeURIComponent(sym)}" target="_blank" style="font-weight:800;color:#f8fafc;font-family:var(--font-mono);font-size:0.8rem;text-decoration:none;" onmouseenter="this.style.color='#38bdf8'" onmouseleave="this.style.color='#f8fafc'">
+                        <td style="padding:0.46rem 0.65rem;border-right:1px solid rgba(255,255,255,0.03);">
+                            <div style="display:flex;align-items:center;gap:0.35rem;">
+                                <a href="/stock/${encodeURIComponent(sym)}" target="_blank" style="font-weight:800;color:#ffffff;font-family:var(--font-mono);font-size:0.82rem;text-decoration:none;letter-spacing:-0.01em;" onmouseenter="this.style.color='#38bdf8'" onmouseleave="this.style.color='#ffffff'">
                                     ${sym}
                                 </a>
-                                <span style="font-size:0.62rem;color:#38bdf8;background:rgba(56,189,248,0.1);padding:0.08rem 0.35rem;border-radius:3px;font-weight:600;">${archetype}</span>
+                                <span style="font-size:0.60rem;color:#38bdf8;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;">${archetype}</span>
                             </div>
-                            <div style="font-size:0.68rem;color:#94a3b8;margin-top:2px;">${name} &middot; <span style="color:#64748b;">${ind}</span></div>
+                            <div style="font-size:0.67rem;color:#94a3b8;margin-top:2px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.company_name || sym}">${name} &middot; <span style="color:#64748b;">${ind}</span></div>
                         </td>
 
                         <!-- Signal Date & Age -->
-                        <td style="padding:0.6rem 0.85rem;white-space:nowrap;">
+                        <td style="padding:0.46rem 0.65rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
                             <div style="font-family:var(--font-mono);font-weight:700;color:#f1f5f9;font-size:0.75rem;">${sigDate}</div>
-                            <div style="font-size:0.65rem;color:#64748b;font-family:var(--font-mono);margin-top:1px;">🕒 ${ageLabel}</div>
+                            <div style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);margin-top:1px;">🕒 ${ageLabel}</div>
                         </td>
 
                         <!-- Tier -->
-                        <td style="padding:0.6rem 0.6rem;text-align:center;">
-                            <span style="font-size:0.65rem;font-weight:800;background:${tierBg};color:${tierColor};border:1px solid ${tierColor}44;padding:0.12rem 0.45rem;border-radius:4px;">${tier}</span>
+                        <td style="padding:0.46rem 0.5rem;text-align:center;border-right:1px solid rgba(255,255,255,0.03);">
+                            <span style="font-size:0.65rem;font-weight:800;background:${tierBg};color:${tierColor};border:1px solid ${tierColor}44;padding:0.1rem 0.42rem;border-radius:4px;">${tier}</span>
                         </td>
 
                         <!-- Signal Price -->
-                        <td style="padding:0.6rem 0.75rem;text-align:right;font-family:var(--font-mono);font-weight:600;color:#cbd5e1;">
+                        <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#93c5fd;font-size:0.75rem;border-right:1px solid rgba(255,255,255,0.03);">
                             ${sigP}
                         </td>
 
                         <!-- Trigger Level -->
-                        <td style="padding:0.6rem 0.75rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#fcd34d;">
+                        <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#fde047;font-size:0.75rem;border-right:1px solid rgba(255,255,255,0.03);">
                             ${trigP}
                         </td>
 
                         <!-- Target Price -->
-                        <td style="padding:0.6rem 0.75rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#34d399;">
+                        <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#34d399;font-size:0.75rem;border-right:1px solid rgba(255,255,255,0.03);">
                             ${targetP}
                         </td>
 
                         <!-- Stop Loss -->
-                        <td style="padding:0.6rem 0.75rem;text-align:right;font-family:var(--font-mono);font-weight:600;color:#f87171;">
+                        <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-weight:600;color:#f87171;font-size:0.75rem;border-right:1px solid rgba(255,255,255,0.03);">
                             ${stopP}
                         </td>
 
                         <!-- Current Price -->
-                        <td style="padding:0.6rem 0.75rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">
+                        <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-weight:800;color:#f8fafc;font-size:0.80rem;border-right:1px solid rgba(255,255,255,0.03);">
                             ${curP}
                         </td>
 
                         <!-- Return % -->
-                        <td style="padding:0.6rem 0.75rem;text-align:right;">
-                            <span style="display:inline-block;font-family:var(--font-mono);font-weight:800;font-size:0.75rem;color:${retColor};background:${retBg};padding:0.15rem 0.45rem;border-radius:4px;">
+                        <td style="padding:0.46rem 0.65rem;text-align:right;border-right:1px solid rgba(255,255,255,0.03);">
+                            <span style="display:inline-block;font-family:var(--font-mono);font-weight:800;font-size:0.76rem;color:${retColor};background:${retBg};border:1px solid ${retBorder};padding:0.12rem 0.42rem;border-radius:4px;">
                                 ${retFormatted}
                             </span>
                         </td>
 
                         <!-- Max Gain % -->
-                        <td style="padding:0.6rem 0.75rem;text-align:right;font-size:0.75rem;">
+                        <td style="padding:0.46rem 0.65rem;text-align:right;font-size:0.75rem;border-right:1px solid rgba(255,255,255,0.03);">
                             ${maxGainStr}
                         </td>
 
                         <!-- Outcome Status -->
-                        <td style="padding:0.6rem 0.75rem;text-align:center;white-space:nowrap;">
-                            <span style="display:inline-block;font-size:0.68rem;font-weight:700;background:${outcomeBg};color:${outcomeColor};border:1px solid ${outcomeBorder};padding:0.15rem 0.5rem;border-radius:4px;">
+                        <td style="padding:0.46rem 0.65rem;text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
+                            <span style="display:inline-block;font-size:0.65rem;font-weight:700;background:${outcomeBg};color:${outcomeColor};border:1px solid ${outcomeBorder};padding:0.12rem 0.45rem;border-radius:4px;">
                                 ${outcomeLabel}
                             </span>
                         </td>
 
                         <!-- Score -->
-                        <td style="padding:0.6rem 0.6rem;text-align:center;">
-                            <span style="font-family:var(--font-mono);font-weight:800;font-size:0.78rem;color:${scoreColor};background:rgba(59,130,246,0.15);padding:0.12rem 0.45rem;border-radius:4px;" title="Volume: ${c.volume_score || 0} • Resistance: ${c.resistance_score || 0} • Compression: ${c.compression_score || 0}">
+                        <td style="padding:0.46rem 0.5rem;text-align:center;border-right:1px solid rgba(255,255,255,0.03);">
+                            <span style="display:inline-block;font-family:var(--font-mono);font-weight:800;font-size:0.78rem;color:${scoreColor};background:${scoreBg};border:1px solid ${scoreColor}44;padding:0.12rem 0.45rem;border-radius:5px;" title="Volume: ${c.volume_score || 0} • Resistance: ${c.resistance_score || 0} • Compression: ${c.compression_score || 0}">
                                 ${score.toFixed(0)}
                             </span>
                         </td>
 
                         <!-- Actions -->
-                        <td style="padding:0.6rem 0.75rem;text-align:center;white-space:nowrap;">
-                            <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">
-                                <a href="/stock/${encodeURIComponent(sym)}" target="_blank" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:4px;text-decoration:none;" title="Open Stock Intelligence">
+                        <td style="padding:0.46rem 0.65rem;text-align:center;white-space:nowrap;">
+                            <div style="display:flex;align-items:center;justify-content:center;gap:0.25rem;">
+                                <a href="/stock/${encodeURIComponent(sym)}" target="_blank" class="btn btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);font-size:0.65rem;padding:0.18rem 0.45rem;border-radius:4px;text-decoration:none;" title="Open Stock Intelligence">
                                     📊 Intel
                                 </a>
-                                <button type="button" onclick="app.openBreakoutNotesModal('${sym}')" class="btn btn-sm" style="background:#1e293b;color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:4px;" title="View AI Notes">
+                                <button type="button" onclick="app.openBreakoutNotesModal('${sym}')" class="btn btn-sm" style="background:#1e293b;color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);font-size:0.65rem;padding:0.18rem 0.42rem;border-radius:4px;" title="View AI Notes">
                                     🧠
                                 </button>
                             </div>

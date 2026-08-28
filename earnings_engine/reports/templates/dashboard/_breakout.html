@@ -572,9 +572,70 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
 }
-#breakoutTable tbody tr:hover, #breakoutTrackedTable tbody tr:hover {
-    background: rgba(59,130,246,0.06);
+
+/* Modern Compact Table Aesthetics & Zebra Striping */
+#breakoutTable, #breakoutTrackedTable {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.73rem;
 }
+
+#breakoutTable tbody tr, #breakoutTrackedTable tbody tr {
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#breakoutTable tbody tr:nth-child(even), #breakoutTrackedTable tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.018);
+}
+
+#breakoutTable tbody tr:nth-child(odd), #breakoutTrackedTable tbody tr:nth-child(odd) {
+    background: rgba(10, 15, 28, 0.4);
+}
+
+#breakoutTable tbody tr:hover, #breakoutTrackedTable tbody tr:hover {
+    background: rgba(56, 189, 248, 0.09) !important;
+    box-shadow: inset 3px 0 0 #38bdf8, 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+/* Row Tier Indicators */
+.bk-row-hot {
+    border-left: 3px solid #ef4444 !important;
+}
+.bk-row-warm {
+    border-left: 3px solid #f59e0b !important;
+}
+.bk-row-success {
+    border-left: 3px solid #10b981 !important;
+}
+.bk-row-stop {
+    border-left: 3px solid #f43f5e !important;
+}
+
+/* Compact Table Headers */
+#breakoutTable thead th, #breakoutTrackedTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #090e1a;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    user-select: none;
+}
+
+/* Table Cells */
+#breakoutTable tbody td, #breakoutTrackedTable tbody td {
+    padding: 0.46rem 0.65rem;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
 /* Sub-tab button styles */
 .bk-subtab-btn {
     background: rgba(255,255,255,0.04);
@@ -592,6 +653,7 @@
     border-color: rgba(56,189,248,0.45) !important;
     box-shadow: 0 0 0 1px rgba(56,189,248,0.25);
 }
+
 /* Date preset button states */
 .bk-preset-btn, .bk-tracked-preset {
     background: rgba(255,255,255,0.05);
