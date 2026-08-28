@@ -6,7 +6,8 @@
     const API_BASE = window.API_BASE || window.location.origin;
     const app = window.app;
     if (!app) { console.error('[patterns] window.app not initialized'); return; }
-            // ---------- Patterns tab ----------
+    Object.assign(app, {
+// ---------- Patterns tab ----------
 
             _restorePatternsControls() {
                 try {
@@ -184,6 +185,8 @@
                     this.patStocksSortDir = 'asc';
                 }
                 this.renderPatStocksTable();
-            },
-
+            
+    
+        }
+});
 })(); // end patterns IIFE

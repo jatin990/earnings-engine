@@ -6,7 +6,8 @@
     const API_BASE = window.API_BASE || window.location.origin;
     const app = window.app;
     if (!app) { console.error('[coverage] window.app not initialized'); return; }
-            // ---------- Data Coverage tab ----------
+    Object.assign(app, {
+// ---------- Data Coverage tab ----------
 
             async loadDataCoverage() {
                 const market = document.getElementById('coverageMarket').value;
@@ -98,6 +99,7 @@
                     btn.disabled = false;
                     btn.textContent = originalText;
                 }
-            },
-
-})(); // end coverage IIFE
+            
+        }
+    });
+})();

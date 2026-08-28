@@ -6,7 +6,8 @@
     const API_BASE = window.API_BASE || window.location.origin;
     const app = window.app;
     if (!app) { console.error('[backtest] window.app not initialized'); return; }
-            // ---------- Backtest Tab ----------
+    Object.assign(app, {
+// ---------- Backtest Tab ----------
 
             initBacktestTab() {
                 // Populate watchlist dropdown for backtest tab
@@ -295,6 +296,8 @@
                     '<thead><tr>' +
                     '<th>Ticker</th><th>Entry</th><th>Entry ₹</th><th>Exit</th><th>Exit ₹</th><th>PnL %</th><th>PnL ₹</th><th>Hold</th><th>Reason</th>' +
                     '</tr></thead><tbody>' + rows + '</tbody></table>';
-            },
-
+            
+    
+        }
+});
 })(); // end backtest IIFE

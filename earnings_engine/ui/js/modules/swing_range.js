@@ -6,7 +6,8 @@
     const API_BASE = window.API_BASE || window.location.origin;
     const app = window.app;
     if (!app) { console.error('[swing_range] window.app not initialized'); return; }
-            // ---------- Swing Range Modal Controller ----------
+    Object.assign(app, {
+// ---------- Swing Range Modal Controller ----------
 
             _detectedRange: null,
 
@@ -658,4 +659,5 @@
         // [] → extracted to modules/industries.js
         // [] → extracted to modules/buy_dip.js
         // [] → extracted to modules/patterns.js
+    });
 })(); // end swing_range IIFE

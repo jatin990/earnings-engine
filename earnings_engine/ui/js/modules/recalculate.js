@@ -6,7 +6,8 @@
     const API_BASE = window.API_BASE || window.location.origin;
     const app = window.app;
     if (!app) { console.error('[recalculate] window.app not initialized'); return; }
-            // =========================================================================
+    Object.assign(app, {
+// =========================================================================
             // 🔄 Ticker On-Demand Recalculate & Audit Trail
             // =========================================================================
             async recalculateRow(ticker, btn) {
@@ -231,6 +232,8 @@
                     const bodyEl = document.getElementById('auditModalBody');
                     if (bodyEl) bodyEl.innerHTML = '<div style="color:#f87171;padding:1rem;">Failed to load audit history: ' + e.message + '</div>';
                 }
-            },
-
+            
+    
+        }
+});
 })(); // end recalculate IIFE

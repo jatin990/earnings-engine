@@ -6,7 +6,8 @@
     const API_BASE = window.API_BASE || window.location.origin;
     const app = window.app;
     if (!app) { console.error('[scanner] window.app not initialized'); return; }
-            // =========================================================================
+    Object.assign(app, {
+// =========================================================================
             // 🔍 Active Multi-Category Stock Scanner Hub
             // =========================================================================
             activeScannerCategory: 'order_wins',
@@ -279,6 +280,8 @@
                         btn.innerHTML = '⚡ Deep Sweep All Categories';
                     }
                 }
-            },
-
+            
+    
+        }
+});
 })(); // end scanner IIFE

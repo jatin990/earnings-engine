@@ -6,7 +6,8 @@
     const API_BASE = window.API_BASE || window.location.origin;
     const app = window.app;
     if (!app) { console.error('[month_filter] window.app not initialized'); return; }
-            // =========================================================================
+    Object.assign(app, {
+// =========================================================================
             // 🗓️ Month Filter & Earnings Calendar Dedicated Tab
             // =========================================================================
             async loadMonthFilterTab(forceSync = false) {
@@ -1385,6 +1386,8 @@
                         btn.innerHTML = origHtml;
                     }
                 }
-            },
-
+            
+    
+        }
+});
 })(); // end month_filter IIFE

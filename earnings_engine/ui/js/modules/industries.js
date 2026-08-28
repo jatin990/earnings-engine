@@ -6,7 +6,8 @@
     const API_BASE = window.API_BASE || window.location.origin;
     const app = window.app;
     if (!app) { console.error('[industries] window.app not initialized'); return; }
-            // ---------- Industries tab ----------
+    Object.assign(app, {
+// ---------- Industries tab ----------
 
             industryColors: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#14b8a6', '#6366f1', '#d946ef', '#a3e635', '#0ea5e9', '#f43f5e', '#22c55e', '#eab308', '#38bdf8', '#fb7185', '#2dd4bf'],
 
@@ -121,6 +122,8 @@
                     btn.disabled = false;
                     btn.textContent = original;
                 }
-            },
-
+            
+    
+        }
+});
 })(); // end industries IIFE

@@ -6,7 +6,8 @@
     const API_BASE = window.API_BASE || window.location.origin;
     const app = window.app;
     if (!app) { console.error('[buy_dip] window.app not initialized'); return; }
-            // ---------- Buy the Dip tab ----------
+    Object.assign(app, {
+// ---------- Buy the Dip tab ----------
 
             async loadRecentResults() {
                 const market = document.getElementById('bdMarket').value;
@@ -204,6 +205,8 @@
                 const hidden = body.style.display === 'none';
                 body.style.display = hidden ? '' : 'none';
                 toggle.textContent = hidden ? '▼' : '▶';
-            },
-
+            
+    
+        }
+});
 })(); // end buy_dip IIFE

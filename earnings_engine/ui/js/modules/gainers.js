@@ -6,7 +6,8 @@
     const API_BASE = window.API_BASE || window.location.origin;
     const app = window.app;
     if (!app) { console.error('[gainers] window.app not initialized'); return; }
-            // =========================================================================
+    Object.assign(app, {
+// =========================================================================
             // 🚀 Top Gainers, "Why It Rose" Attribution & Pattern Discovery Tab
             // =========================================================================
             gainersSubTab: 'gainers',
@@ -252,6 +253,8 @@
                     return k + ': ' + time + ' (' + v.rows + ')';
                 });
                 el.textContent = 'Last refreshed — ' + parts.join(' · ');
-            },
-
+            
+    
+        }
+});
 })(); // end gainers IIFE
