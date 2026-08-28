@@ -10619,11 +10619,19 @@
                     const btn = document.getElementById('modalBtn-' + btnKey);
                     if (btn) {
                         const succPct = m.success_rate_pct != null ? m.success_rate_pct : (m.benchmark_success_rate_pct || 99.5);
+                        const isDegraded = m.is_degraded || (m.avg_latency_1h_ms && m.avg_latency_1h_ms > 8000);
                         btn.title = `${m.name} (${m.badge}): ${m.remaining_1m}/${m.allowed_1m} RPM | ${m.remaining_24h}/${m.allowed_24h} RPD remaining.\n⚡ Avg Return: ~${m.avg_return_time_s || 2.0}s | 🎯 ${succPct}% Success`;
-                        if (m.remaining_1m <= 0 || m.remaining_24h <= 0) {
+                        if (m.is_rate_limited || m.remaining_1m <= 0 || m.remaining_24h <= 0) {
                             btn.style.opacity = '0.5';
+                            btn.style.filter = 'none';
+                            btn.title += ' (Quota Exhausted - Cooldown)';
+                        } else if (isDegraded) {
+                            btn.style.opacity = '0.85';
+                            btn.style.filter = 'grayscale(0.4)';
+                            btn.title += ` (⏱️ High Latency: ~${m.avg_return_time_s || 2.0}s - Click to run)`;
                         } else {
                             btn.style.opacity = '1';
+                            btn.style.filter = 'none';
                         }
                     }
                 });

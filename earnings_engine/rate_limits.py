@@ -568,6 +568,10 @@ class RateLimitTracker:
                     "count_24h": count_24h,
                     "allowed_24h": allowed_24h,
                     "remaining_24h": rem_24h,
+                    "is_rate_limited": (rem_1m <= 0 or rem_24h <= 0),
+                    "is_degraded": bool(avg_1h_ms and avg_1h_ms > 8000),
+                    "degraded_reason": f"High latency degradation (1h avg {avg_1h_ms:.0f}ms > 8000ms threshold)" if (avg_1h_ms and avg_1h_ms > 8000) else None,
+                    "status": "rate_limited" if (rem_1m <= 0 or rem_24h <= 0) else ("degraded" if (avg_1h_ms and avg_1h_ms > 8000) else "ready"),
                     # Multi-horizon Generation Latency & Success Rate Metrics
                     "total_generations": len(dedup_gens),
                     "has_empirical_runs": has_empirical_runs,
@@ -757,16 +761,16 @@ class RateLimitTracker:
         return 5000.0  # 5s generic default
 
     def is_rate_limited(self, model_key: str) -> str | None:
-        """Check whether a model is currently rate-limited on the 1m or 24h window.
+        """Check whether a model is currently hard rate-limited on the 1m or 24h quota window.
 
-        Also considers high-latency back-off: if the 1-hour average latency exceeds
-        8 seconds, the model is treated as degraded and callers should back off.
+        Note: Latency degradation does NOT block execution or trigger rate-limiting;
+        call is_degraded() to check for high latency warnings.
 
         Args:
             model_key: Model ID, display name, or short tag (case-insensitive).
 
         Returns:
-            A human-readable reason string if rate-limited/degraded, or ``None`` if OK.
+            A human-readable reason string if hard quota is exhausted, or ``None`` if OK to execute.
         """
         m_key = model_key.lower().strip()
         now = time.time()
@@ -795,17 +799,27 @@ class RateLimitTracker:
         if count_24h >= allowed_24h:
             return f"24h quota exhausted ({count_24h}/{allowed_24h} requests today)"
 
-        # High-latency degradation check: 1h average > 8000ms → back off
-        avg_1h = self.get_average_latency(m_key, window_seconds=3600)
-        if avg_1h > 8000:
-            return f"High latency degradation (1h avg {avg_1h:.0f}ms > 8000ms threshold)"
-
         # Also honour live OpenRouter remaining header if available
         with self._lock:
             or_remaining = self._openrouter_headers.get("remaining")
         if or_remaining is not None and or_remaining <= 0:
             return "OpenRouter global quota exhausted (x-ratelimit-remaining=0)"
 
+        return None
+
+    def is_degraded(self, model_key: str) -> str | None:
+        """Check whether a model is currently experiencing high latency degradation (>8000ms 1h avg).
+
+        Returns:
+            A human-readable degradation reason string if degraded, or ``None`` if normal.
+        """
+        m_key = model_key.lower().strip()
+        if m_key.startswith("local") or m_key.startswith("ollama") or m_key.startswith("lmstudio"):
+            return None
+
+        avg_1h = self.get_average_latency(m_key, window_seconds=3600)
+        if avg_1h > 8000:
+            return f"High latency degradation (1h avg {avg_1h:.0f}ms > 8000ms threshold)"
         return None
 
 
@@ -852,8 +866,16 @@ def get_average_latency(model_key: str, window_seconds: int = 3600) -> float:
 
 
 def is_rate_limited(model_key: str) -> str | None:
-    """Check whether a model is currently rate-limited or degraded.
+    """Check whether a model is currently hard rate-limited on quota (1m or 24h).
 
-    Returns a human-readable reason string if yes, or ``None`` if the model is OK to call.
+    Returns a human-readable reason string if hard-limited, or ``None`` if the model is OK to call.
     """
     return tracker.is_rate_limited(model_key)
+
+
+def is_degraded(model_key: str) -> str | None:
+    """Check whether a model is currently experiencing high latency degradation.
+
+    Returns a reason string if degraded, or ``None`` if latency is within normal thresholds.
+    """
+    return tracker.is_degraded(model_key)

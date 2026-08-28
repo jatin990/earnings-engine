@@ -342,9 +342,9 @@ def _query_single_model(
     display_name = MODEL_DISPLAY_NAMES.get(model_id, model_id.split("/")[-1])
     current_model = model_id
 
-    # --- Pre-flight rate-limit check ---
+    # --- Pre-flight rate-limit check (only blocks on genuine quota exhaustion) ---
     try:
-        from earnings_engine.rate_limits import is_rate_limited as _is_rl
+        from earnings_engine.rate_limits import is_rate_limited as _is_rl, is_degraded as _is_deg
         rl_reason = _is_rl(model_id)
         if rl_reason:
             logger.warning("[CONSENSUS] Skipping %s — %s", display_name, rl_reason)
@@ -363,6 +363,9 @@ def _query_single_model(
                 "raw_response": f"Skipped: {rl_reason}",
                 "latency_ms": 0,
             }
+        deg_reason = _is_deg(model_id)
+        if deg_reason:
+            logger.info("[CONSENSUS] %s is experiencing high latency degradation (%s); proceeding with execution...", display_name, deg_reason)
     except Exception:
         pass
 

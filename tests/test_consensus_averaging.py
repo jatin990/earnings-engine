@@ -12,7 +12,7 @@ import time
 import collections
 import pytest
 
-from earnings_engine.rate_limits import RateLimitTracker, get_average_latency, is_rate_limited
+from earnings_engine.rate_limits import RateLimitTracker, get_average_latency, is_rate_limited, is_degraded
 from earnings_engine.consensus.aggregator import compute_latency_average
 
 
@@ -85,7 +85,7 @@ class TestGetAverageLatency:
 
 
 # ---------------------------------------------------------------------------
-# is_rate_limited
+# is_rate_limited & is_degraded
 # ---------------------------------------------------------------------------
 
 class TestIsRateLimited:
@@ -118,16 +118,21 @@ class TestIsRateLimited:
         assert result is not None
         assert "24h quota" in result.lower()
 
-    def test_detects_high_latency_degradation(self):
+    def test_high_latency_does_not_block_rate_limit_but_flags_degraded(self):
         tracker = _make_tracker()
         key = "mistralai/mistral-large"
         now = time.time()
-        # Inject a very high latency record in the last hour
+        # Inject a very high latency record in the last hour (15s)
         tracker._generation_history[key].append({"timestamp": now, "latency_ms": 15000.0, "success": True})
 
-        result = tracker.is_rate_limited(key)
-        assert result is not None
-        assert "latency" in result.lower()
+        # High latency must NOT trigger a hard rate-limit block
+        rl_res = tracker.is_rate_limited(key)
+        assert rl_res is None
+
+        # But it MUST trigger is_degraded
+        deg_res = tracker.is_degraded(key)
+        assert deg_res is not None
+        assert "latency" in deg_res.lower()
 
     def test_local_models_never_rate_limited(self):
         tracker = _make_tracker()
@@ -143,6 +148,9 @@ class TestIsRateLimited:
         result = is_rate_limited("meta-llama/llama-3.3-70b-instruct")
         # Returns None (ok) or a string (limited); both are valid types
         assert result is None or isinstance(result, str)
+
+        deg_res = is_degraded("meta-llama/llama-3.3-70b-instruct")
+        assert deg_res is None or isinstance(deg_res, str)
 
 
 # ---------------------------------------------------------------------------
