@@ -198,6 +198,7 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             ticker = r.get("ticker")
             if not ticker:
                 continue
+            sig_date = str(r.get("signal_date") or r.get("asof_date") or now_iso[:10]).strip()
             rows_to_insert.append((
                 ticker,
                 r.get("tier", "WARM"),
@@ -209,9 +210,9 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
                 float(r.get("compression_score", 0) or 0),
                 float(r.get("momentum_score", 0) or 0),
                 float(r.get("fundamental_score", 0) or 0),
-                str(r.get("signal_date") or ""),
-                float(r.get("signal_price")) if r.get("signal_price") is not None else None,
-                float(r.get("predicted_value") or r.get("signal_price")) if (r.get("predicted_value") or r.get("signal_price")) is not None else None,
+                sig_date,
+                float(r["signal_price"]) if r.get("signal_price") is not None else (float(r["predicted_value"]) if r.get("predicted_value") is not None else (float(r["current_price"]) if r.get("current_price") is not None else None)),
+                float(r["predicted_value"]) if r.get("predicted_value") is not None else (float(r["signal_price"]) if r.get("signal_price") is not None else (float(r["current_price"]) if r.get("current_price") is not None else None)),
                 float(r.get("breakout_trigger")) if r.get("breakout_trigger") is not None else None,
                 float(r.get("target_price")) if r.get("target_price") is not None else None,
                 float(r.get("stop_loss")) if r.get("stop_loss") is not None else None,
@@ -291,10 +292,81 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
 
         if hasattr(conn, "executemany"):
             conn.executemany(upsert_sql, rows_to_insert)
+
+        # 2. Also persist / upsert to permanent historical archive: breakout_tracked_signals
+        upsert_tracked_sql = """
+        INSERT INTO breakout_tracked_signals (
+            ticker, tier, company_name, industry, composite_score,
+            resistance_score, volume_score, compression_score, momentum_score, fundamental_score,
+            signal_date, signal_price, predicted_value, breakout_trigger, target_price,
+            stop_loss, risk_reward_ratio, current_price, current_date, realized_return_pct,
+            max_gain_pct, breakout_happened, outcome, outcome_label, outcome_badge,
+            days_elapsed, setup_archetype, volume_ratio, atr_pct, pct_from_high,
+            avg_quality_score, scanned_at, data_json, created_at, updated_at
+        ) VALUES (
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?
+        )
+        ON CONFLICT(ticker, signal_date) DO UPDATE SET
+            tier = excluded.tier,
+            company_name = excluded.company_name,
+            industry = excluded.industry,
+            composite_score = excluded.composite_score,
+            resistance_score = excluded.resistance_score,
+            volume_score = excluded.volume_score,
+            compression_score = excluded.compression_score,
+            momentum_score = excluded.momentum_score,
+            fundamental_score = excluded.fundamental_score,
+            signal_price = excluded.signal_price,
+            predicted_value = excluded.predicted_value,
+            breakout_trigger = excluded.breakout_trigger,
+            target_price = excluded.target_price,
+            stop_loss = excluded.stop_loss,
+            risk_reward_ratio = excluded.risk_reward_ratio,
+            current_price = excluded.current_price,
+            current_date = excluded.current_date,
+            realized_return_pct = excluded.realized_return_pct,
+            max_gain_pct = excluded.max_gain_pct,
+            breakout_happened = excluded.breakout_happened,
+            outcome = excluded.outcome,
+            outcome_label = excluded.outcome_label,
+            outcome_badge = excluded.outcome_badge,
+            days_elapsed = excluded.days_elapsed,
+            setup_archetype = excluded.setup_archetype,
+            volume_ratio = excluded.volume_ratio,
+            atr_pct = excluded.atr_pct,
+            pct_from_high = excluded.pct_from_high,
+            avg_quality_score = excluded.avg_quality_score,
+            scanned_at = excluded.scanned_at,
+            data_json = excluded.data_json,
+            updated_at = excluded.updated_at
+        """
+        rows_for_tracked = []
+        for r_tuple in rows_to_insert:
+            # Tuple: ticker, tier, company_name, ..., updated_at (34 items)
+            # For tracked, we need created_at and updated_at (35 items)
+            # signal_date is index 10; ensure non-empty
+            t_list = list(r_tuple)
+            if not t_list[10]:
+                t_list[10] = t_list[31][:10] if t_list[31] else now_iso[:10]
+            # Add created_at, updated_at
+            rows_for_tracked.append(tuple(t_list + [now_iso]))
+
+        if hasattr(conn, "executemany"):
+            try:
+                conn.executemany(upsert_tracked_sql, rows_for_tracked)
+            except Exception as e_track:
+                logger.debug("[BREAKOUT-DB] Tracked signals archive upsert notice: %s", e_track)
+
         if hasattr(conn, "commit"):
             conn.commit()
 
-        logger.debug("[BREAKOUT-DB] Persisted %d candidates to breakout_radar table.", len(rows_to_insert))
+        logger.debug("[BREAKOUT-DB] Persisted %d candidates to breakout_radar and breakout_tracked_signals.", len(rows_to_insert))
     except Exception as e:
         logger.warning("[BREAKOUT-DB] Failed to persist breakout pool to DB: %s", e)
 
@@ -485,6 +557,255 @@ def get_breakout_audit_log(
     except Exception as e:
         logger.warning("[BREAKOUT-AUDIT] Failed querying audit log: %s", e)
     return logs
+
+
+def get_tracked_breakouts(
+    days: int | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    tier: str | None = None,
+    outcome: str | None = None,
+    sort_by: str = "signal_date",
+    limit: int = 200,
+    live: bool = False,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Query permanently tracked breakout signals from breakout_tracked_signals with filtering and summary metrics."""
+    settings = settings or Settings()
+    try:
+        from earnings_engine.data.migrations import apply_migrations
+        apply_migrations(settings)
+        conn = get_db_connection(settings)
+
+        query_clauses = ["1=1"]
+        params: list[Any] = []
+
+        # 1. Date Filtering
+        preset_days_int = None
+        if days is not None and str(days).strip().lower() not in ("all", "all_time", "none", "", "0"):
+            try:
+                preset_days_int = int(days)
+            except (ValueError, TypeError):
+                preset_days_int = None
+
+        if start_date and end_date:
+            query_clauses.append("signal_date BETWEEN ? AND ?")
+            params.extend([start_date, end_date])
+        elif start_date:
+            query_clauses.append("signal_date >= ?")
+            params.append(start_date)
+        elif end_date:
+            query_clauses.append("signal_date <= ?")
+            params.append(end_date)
+        elif preset_days_int is not None and preset_days_int > 0:
+            query_clauses.append("signal_date >= DATE('now', ?)")
+            params.append(f"-{preset_days_int} days")
+
+        # 2. Tier Filtering
+        if tier and tier.upper() not in ("ALL", ""):
+            query_clauses.append("UPPER(tier) = ?")
+            params.append(tier.upper())
+
+        # 3. Outcome Filtering
+        if outcome and outcome.upper() not in ("ALL", ""):
+            query_clauses.append("UPPER(outcome) = ?")
+            params.append(outcome.upper())
+
+        where_clause = " AND ".join(query_clauses)
+
+        # 4. Sorting
+        order_by = "signal_date DESC, composite_score DESC"
+        if sort_by == "return_pct":
+            order_by = "realized_return_pct DESC"
+        elif sort_by == "max_gain":
+            order_by = "max_gain_pct DESC"
+        elif sort_by in ("score", "composite_score"):
+            order_by = "composite_score DESC"
+        elif sort_by == "days_elapsed":
+            order_by = "days_elapsed ASC"
+        elif sort_by == "signal_date_asc":
+            order_by = "signal_date ASC"
+
+        sql = f"""
+            SELECT id, ticker, company_name, industry, tier, signal_date,
+                   signal_price, predicted_value, breakout_trigger, target_price, stop_loss,
+                   risk_reward_ratio, composite_score, resistance_score, volume_score, compression_score,
+                   momentum_score, fundamental_score, volume_ratio, atr_pct, pct_from_high,
+                   setup_archetype, current_price, current_date, realized_return_pct, max_gain_pct,
+                   breakout_happened, outcome, outcome_label, outcome_badge, days_elapsed,
+                   scanned_at, data_json, created_at, updated_at
+            FROM breakout_tracked_signals
+            WHERE {where_clause}
+            ORDER BY {order_by}
+            LIMIT ?
+        """
+        params.append(limit)
+
+        cur = conn.execute(sql, tuple(params))
+        rows = cur.fetchall()
+
+        items: list[dict[str, Any]] = []
+        for r in rows:
+            raw_json = r[32]
+            parsed_data = {}
+            if raw_json:
+                try:
+                    parsed_data = json.loads(raw_json)
+                except Exception:
+                    pass
+
+            item = {
+                "id": r[0],
+                "ticker": r[1],
+                "company_name": r[2] or r[1].replace(".NS", ""),
+                "industry": r[3] or "—",
+                "tier": r[4],
+                "signal_date": r[5],
+                "signal_price": r[6],
+                "predicted_value": r[7],
+                "breakout_trigger": r[8],
+                "target_price": r[9],
+                "stop_loss": r[10],
+                "risk_reward_ratio": r[11] or 2.0,
+                "composite_score": r[12],
+                "resistance_score": r[13],
+                "volume_score": r[14],
+                "compression_score": r[15],
+                "momentum_score": r[16],
+                "fundamental_score": r[17],
+                "volume_ratio": r[18],
+                "atr_pct": r[19],
+                "pct_from_high": r[20],
+                "setup_archetype": r[21] or "Breakout Setup",
+                "current_price": r[22] or r[6],
+                "current_date": r[23] or r[5],
+                "realized_return_pct": r[24] or 0.0,
+                "max_gain_pct": r[25] or 0.0,
+                "breakout_happened": bool(r[26]),
+                "outcome": r[27] or "ACTIVE",
+                "outcome_label": r[28] or "Active Setup",
+                "outcome_badge": r[29] or "ACTIVE",
+                "days_elapsed": r[30] or 0,
+                "scanned_at": r[31],
+                "created_at": r[33],
+                "updated_at": r[34],
+            }
+            if parsed_data:
+                for k, v in parsed_data.items():
+                    if k not in item and v is not None:
+                        item[k] = v
+            items.append(item)
+
+        # 5. Optional live update
+        if live and items:
+            from concurrent.futures import ThreadPoolExecutor
+            from earnings_engine.data.prices import fetch_prices
+            import pandas as pd
+
+            def _refresh_item(item_d: dict[str, Any]) -> None:
+                t = item_d.get("ticker")
+                sig_p = item_d.get("signal_price")
+                trig_p = item_d.get("breakout_trigger")
+                target_p = item_d.get("target_price")
+                stop_p = item_d.get("stop_loss")
+                sig_date = item_d.get("signal_date")
+
+                if not t:
+                    return
+                try:
+                    df = fetch_prices(t, settings, force=True)
+                    if not df.empty and "close" in df.columns:
+                        closes = pd.to_numeric(df["close"], errors="coerce").dropna()
+                        if not closes.empty:
+                            cur_p = round(float(closes.iloc[-1]), 2)
+                            item_d["current_price"] = cur_p
+                            item_d["current_date"] = str(df.index[-1])[:10]
+
+                            if sig_p and sig_p > 0:
+                                ret_pct = round(((cur_p - sig_p) / sig_p) * 100, 2)
+                                item_d["realized_return_pct"] = ret_pct
+
+                            if sig_date and sig_date in df.index:
+                                post_df = df.loc[df.index >= sig_date]
+                                if not post_df.empty and "high" in post_df.columns:
+                                    highs = pd.to_numeric(post_df["high"], errors="coerce").dropna()
+                                    if not highs.empty and sig_p and sig_p > 0:
+                                        max_gain = round(((float(highs.max()) - sig_p) / sig_p) * 100, 2)
+                                        item_d["max_gain_pct"] = max_gain
+                                item_d["days_elapsed"] = len(post_df)
+
+                            if target_p and cur_p >= target_p:
+                                item_d["outcome"] = "TARGET_HIT"
+                                item_d["outcome_label"] = "Target Hit 🎯"
+                                item_d["outcome_badge"] = "TARGET_HIT"
+                                item_d["breakout_happened"] = True
+                            elif trig_p and cur_p >= trig_p:
+                                item_d["outcome"] = "TRIGGERED"
+                                item_d["outcome_label"] = "Breakout Fired 🚀"
+                                item_d["outcome_badge"] = "TRIGGERED"
+                                item_d["breakout_happened"] = True
+                            elif stop_p and cur_p <= stop_p:
+                                item_d["outcome"] = "STOP_HIT"
+                                item_d["outcome_label"] = "Stop Loss Hit 🛑"
+                                item_d["outcome_badge"] = "STOP_HIT"
+                            else:
+                                item_d["outcome"] = "ACTIVE"
+                                item_d["outcome_label"] = "Active Coiling"
+                                item_d["outcome_badge"] = "ACTIVE"
+                except Exception as ex:
+                    logger.debug("Failed refreshing tracked breakout for %s: %s", t, ex)
+
+            with ThreadPoolExecutor(max_workers=min(10, len(items))) as pool:
+                list(pool.map(_refresh_item, items))
+
+        # 6. Summary metrics calculation
+        total_tracked = len(items)
+        positive_count = sum(1 for it in items if (it.get("realized_return_pct") or 0) > 0 or it.get("outcome") in ("TARGET_HIT", "TRIGGERED"))
+        win_rate_pct = round((positive_count / total_tracked) * 100, 1) if total_tracked > 0 else 0.0
+
+        all_rets = [it.get("realized_return_pct") or 0.0 for it in items]
+        avg_return_pct = round(sum(all_rets) / len(all_rets), 2) if all_rets else 0.0
+
+        best_item = max(items, key=lambda x: x.get("realized_return_pct") or -999) if items else None
+        max_return_pct = best_item.get("realized_return_pct", 0.0) if best_item else 0.0
+        max_return_ticker = best_item.get("ticker", "—") if best_item else "—"
+
+        target_hit_count = sum(1 for it in items if it.get("outcome") == "TARGET_HIT")
+        triggered_count = sum(1 for it in items if it.get("outcome") == "TRIGGERED")
+        stop_hit_count = sum(1 for it in items if it.get("outcome") == "STOP_HIT")
+        active_count = sum(1 for it in items if it.get("outcome") == "ACTIVE")
+
+        return {
+            "success": True,
+            "total_count": total_tracked,
+            "timeframe": {
+                "preset_days": days,
+                "start_date": start_date,
+                "end_date": end_date,
+                "as_of": datetime.now(timezone.utc).isoformat(),
+            },
+            "summary": {
+                "total_tracked": total_tracked,
+                "win_rate_pct": win_rate_pct,
+                "avg_return_pct": avg_return_pct,
+                "max_return_pct": max_return_pct,
+                "max_return_ticker": max_return_ticker,
+                "active_count": active_count,
+                "triggered_count": triggered_count,
+                "target_hit_count": target_hit_count,
+                "stop_hit_count": stop_hit_count,
+            },
+            "items": items,
+        }
+    except Exception as e:
+        logger.exception("[BREAKOUT-TRACKED] Failed fetching tracked breakouts: %s", e)
+        return {
+            "success": False,
+            "error": str(e),
+            "total_count": 0,
+            "summary": {},
+            "items": [],
+        }
 
 
 def _promote(ticker: str, result: dict, settings: Settings | None = None) -> None:

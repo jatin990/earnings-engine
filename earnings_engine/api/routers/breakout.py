@@ -294,6 +294,38 @@ async def get_breakout_audit_log_endpoint(
         raise HTTPException(status_code=500, detail=f"Error fetching breakout audit log: {str(e)}")
 
 
+@router.get("/api/v1/breakout/tracked")
+@router.get("/api/v1/breakout-radar/tracked")
+async def get_tracked_breakouts_endpoint(
+    days: int | None = Query(None, description="Preset window in days (e.g. 1, 3, 7, 14, 30)"),
+    start_date: str | None = Query(None, description="Start date filter in YYYY-MM-DD format"),
+    end_date: str | None = Query(None, description="End date filter in YYYY-MM-DD format"),
+    tier: str | None = Query(None, description="Filter by tier: ALL, HOT, WARM"),
+    outcome: str | None = Query(None, description="Filter by outcome: ALL, TRIGGERED, TARGET_HIT, ACTIVE, STOP_HIT"),
+    sort_by: str = Query("signal_date", description="Sort field (signal_date, return_pct, max_gain, score, days_elapsed)"),
+    limit: int = Query(200, ge=1, le=500, description="Max records to return"),
+    live: bool = Query(False, description="Optionally refresh current prices and realized returns"),
+):
+    """Retrieve permanently tracked breakout setups over customizable timeframes and date ranges."""
+    try:
+        data = await asyncio.to_thread(
+            breakout_scanner_mod.get_tracked_breakouts,
+            days=days,
+            start_date=start_date,
+            end_date=end_date,
+            tier=tier,
+            outcome=outcome,
+            sort_by=sort_by,
+            limit=limit,
+            live=live,
+            settings=_settings,
+        )
+        return data
+    except Exception as e:
+        logger.exception("Error in get_tracked_breakouts_endpoint: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching tracked breakouts: {str(e)}")
+
+
 @router.get("/api/v1/breakout-radar/backtest")
 async def run_breakout_historical_backtest(
     universe: str | None = Query(None, description="Universe or watchlist to run backtest on"),

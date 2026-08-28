@@ -988,6 +988,93 @@ def _migration_017_clean_fabricated_earnings_and_guard_rails(conn: Any) -> None:
         pass
 
 
+def _migration_018_breakout_tracked_signals(conn: Any) -> None:
+    """Create permanent breakout_tracked_signals archive table and backfill existing setups."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS breakout_tracked_signals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            company_name TEXT,
+            industry TEXT,
+            tier TEXT NOT NULL DEFAULT 'HOT',
+            signal_date TEXT NOT NULL,
+            signal_price REAL,
+            predicted_value REAL,
+            breakout_trigger REAL,
+            target_price REAL,
+            stop_loss REAL,
+            risk_reward_ratio REAL,
+            composite_score REAL,
+            resistance_score REAL,
+            volume_score REAL,
+            compression_score REAL,
+            momentum_score REAL,
+            fundamental_score REAL,
+            volume_ratio REAL,
+            atr_pct REAL,
+            pct_from_high REAL,
+            avg_quality_score REAL,
+            setup_archetype TEXT,
+            current_price REAL,
+            current_date TEXT,
+            realized_return_pct REAL DEFAULT 0.0,
+            max_gain_pct REAL DEFAULT 0.0,
+            breakout_happened INTEGER DEFAULT 0,
+            outcome TEXT DEFAULT 'ACTIVE',
+            outcome_label TEXT,
+            outcome_badge TEXT,
+            days_elapsed INTEGER DEFAULT 0,
+            scanned_at TEXT NOT NULL,
+            data_json TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(ticker, signal_date)
+        )
+    """)
+    try:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(breakout_tracked_signals)").fetchall()}
+        if "avg_quality_score" not in cols:
+            conn.execute("ALTER TABLE breakout_tracked_signals ADD COLUMN avg_quality_score REAL")
+    except Exception:
+        pass
+
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bk_tracked_date ON breakout_tracked_signals (signal_date DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bk_tracked_ticker ON breakout_tracked_signals (ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bk_tracked_tier ON breakout_tracked_signals (tier)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bk_tracked_score ON breakout_tracked_signals (composite_score DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_bk_tracked_scanned ON breakout_tracked_signals (scanned_at DESC)")
+    except Exception:
+        pass
+
+    # Backfill from existing breakout_radar if rows exist
+    try:
+        conn.execute("""
+            INSERT OR IGNORE INTO breakout_tracked_signals (
+                ticker, company_name, industry, tier, signal_date,
+                signal_price, predicted_value, breakout_trigger, target_price, stop_loss,
+                risk_reward_ratio, composite_score, resistance_score, volume_score, compression_score,
+                momentum_score, fundamental_score, volume_ratio, atr_pct, pct_from_high,
+                setup_archetype, current_price, current_date, realized_return_pct, max_gain_pct,
+                breakout_happened, outcome, outcome_label, outcome_badge, days_elapsed,
+                scanned_at, data_json, created_at, updated_at
+            )
+            SELECT 
+                ticker, company_name, industry, tier, 
+                COALESCE(NULLIF(signal_date, ''), SUBSTR(scanned_at, 1, 10), DATE('now')) AS signal_date,
+                signal_price, predicted_value, breakout_trigger, target_price, stop_loss,
+                risk_reward_ratio, composite_score, resistance_score, volume_score, compression_score,
+                momentum_score, fundamental_score, volume_ratio, atr_pct, pct_from_high,
+                setup_archetype, current_price, current_date, realized_return_pct, max_gain_pct,
+                breakout_happened, outcome, outcome_label, outcome_badge, days_elapsed,
+                scanned_at, data_json, created_at, updated_at
+            FROM breakout_radar
+            WHERE ticker IS NOT NULL
+        """)
+    except Exception as e:
+        logger.debug("[MIGRATION-018] Backfill from breakout_radar notice: %s", e)
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1007,6 +1094,7 @@ MIGRATIONS: list[Migration] = [
     Migration(15, "015_scanner_candidates_schema", _migration_015_scanner_candidates_schema),
     Migration(16, "016_automation_schedule_logs_and_flow_controls", _migration_016_automation_schedule_logs_and_flow_controls),
     Migration(17, "017_clean_fabricated_earnings_and_guard_rails", _migration_017_clean_fabricated_earnings_and_guard_rails),
+    Migration(18, "018_breakout_tracked_signals", _migration_018_breakout_tracked_signals),
 ]
 
 

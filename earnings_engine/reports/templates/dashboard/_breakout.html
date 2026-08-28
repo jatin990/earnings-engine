@@ -3,359 +3,547 @@
         <!-- ================================================================= -->
         <div id="tab-breakout" class="tab-content" style="width:100%;max-width:100%;">
 
-            <!-- Header & Controls Row -->
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.6rem;margin-bottom:0.85rem;">
-                <div style="display:flex;align-items:center;gap:0.6rem;">
-                    <span style="font-size:1.3rem;">⚡</span>
-                    <div>
+            <!-- Breakout Sub-Tab Navigation Bar -->
+            <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0.6rem;margin-bottom:0.85rem;flex-wrap:wrap;gap:0.5rem;">
+                <div style="display:flex;align-items:center;gap:0.45rem;">
+                    <button type="button" id="btnBreakoutSubtabScanner" onclick="app.switchBreakoutSubtab('scanner')" class="bk-subtab-btn bk-subtab-active" style="padding:0.4rem 0.85rem;font-size:0.78rem;font-weight:700;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:0.35rem;">
+                        <span>⚡</span> Live Scanner
+                    </button>
+                    <button type="button" id="btnBreakoutSubtabTracked" onclick="app.switchBreakoutSubtab('tracked')" class="bk-subtab-btn" style="padding:0.4rem 0.85rem;font-size:0.78rem;font-weight:700;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:0.35rem;">
+                        <span>📜</span> Tracked Breakouts History
+                        <span id="bkTrackedCountBadge" style="font-size:0.65rem;background:rgba(56,189,248,0.2);color:#38bdf8;padding:0.05rem 0.4rem;border-radius:10px;font-family:var(--font-mono);font-weight:700;">0</span>
+                    </button>
+                </div>
+                <div id="bkSubtabContextLabel" style="font-size:0.7rem;color:#64748b;font-family:var(--font-mono);">
+                    ⚡ Active Breakout Radar & Point-in-Time Setup Engine
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- SUBTAB 1: ⚡ LIVE SCANNER & REAL-TIME RADAR                  -->
+            <!-- ============================================================= -->
+            <div id="breakoutLiveScannerContainer" class="breakout-subview">
+                <!-- Header & Controls Row -->
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.6rem;margin-bottom:0.85rem;">
+                    <div style="display:flex;align-items:center;gap:0.6rem;">
+                        <span style="font-size:1.3rem;">⚡</span>
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.45rem;">
+                                <div style="font-size:1rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.01em;">Breakout Radar</div>
+                                <span id="breakoutModeBadge" style="font-size:0.65rem;font-weight:700;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.1rem 0.45rem;border-radius:4px;">LIVE SCAN</span>
+                            </div>
+                            <div id="breakoutLastScanTime" style="font-size:0.7rem;color:#64748b;font-family:var(--font-mono);">Scanning…</div>
+                        </div>
+                        <!-- Animated pulse badge when scan is running -->
+                        <span id="breakoutScanningBadge" style="display:none;background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);font-size:0.65rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:20px;animation:breakoutPulse 1.4s ease-in-out infinite;">● Scanning</span>
+                    </div>
+
+                    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <!-- Universe Selector -->
+                        <div style="display:flex;align-items:center;gap:0.35rem;background:#0f172a;border:1px solid rgba(255,255,255,0.12);padding:0.15rem 0.5rem;border-radius:6px;">
+                            <span style="font-size:0.75rem;">🏛️</span>
+                            <select id="breakoutUniverseSelect" onchange="app.onBreakoutUniverseChange(this.value)" style="background:transparent;border:none;color:#38bdf8;font-size:0.74rem;font-weight:600;font-family:var(--font-mono);cursor:pointer;outline:none;">
+                                <optgroup label="🇮🇳 Benchmark Indices">
+                                    <option value="nifty_50" selected>🇮🇳 Nifty 50</option>
+                                    <option value="nifty_next_50">🇮🇳 Nifty Next 50</option>
+                                    <option value="nifty_100">🇮🇳 Nifty 100</option>
+                                    <option value="nifty_200">🇮🇳 Nifty 200</option>
+                                    <option value="nifty_500">🇮🇳 Nifty 500</option>
+                                </optgroup>
+                                <optgroup label="🚀 Market Cap Segments">
+                                    <option value="nse_large_cap">🏛️ NSE Large Cap</option>
+                                    <option value="nse_mid_cap">🚀 NSE Mid Cap</option>
+                                    <option value="nse_small_cap">⚡ NSE Small Cap</option>
+                                    <option value="all">🌐 All Monitored</option>
+                                </optgroup>
+                                <optgroup label="⭐ Portfolios & Global">
+                                    <option value="my_watchlist">⭐ My Watchlist</option>
+                                    <option value="us_top">🇺🇸 US Top 50</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <!-- Date Picker (Historical Backtest / Point-in-Time) -->
+                        <div style="display:flex;align-items:center;gap:0.35rem;background:#0f172a;border:1px solid rgba(59,130,246,0.3);padding:0.15rem 0.5rem;border-radius:6px;">
+                            <span style="font-size:0.75rem;">📅</span>
+                            <span style="font-size:0.7rem;color:#94a3b8;font-weight:600;">As Of:</span>
+                            <input id="breakoutDateInput" type="date" onchange="app.onBreakoutDateChange(this.value)" style="background:transparent;border:none;color:#f8fafc;font-size:0.74rem;font-family:var(--font-mono);cursor:pointer;outline:none;" />
+                            <button type="button" onclick="app.setBreakoutDatePreset(0)" title="Reset to today" style="background:rgba(255,255,255,0.06);border:none;color:#38bdf8;cursor:pointer;font-size:0.65rem;padding:0.15rem 0.35rem;border-radius:4px;">Today</button>
+                        </div>
+
+                        <!-- Sort control -->
+                        <select id="breakoutSortBy" onchange="app.loadBreakoutRadar()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#cbd5e1;font-size:0.74rem;padding:0.35rem 0.55rem;border-radius:6px;font-family:var(--font-mono);cursor:pointer;">
+                            <option value="composite_score">↓ Composite Score</option>
+                            <option value="realized_return_pct">↓ Realized Return %</option>
+                            <option value="fundamental_score">↓ Fundamental</option>
+                            <option value="resistance_score">↓ Resistance</option>
+                            <option value="volume_score">↓ Volume Surge</option>
+                            <option value="momentum_score">↓ Momentum</option>
+                        </select>
+
+                        <!-- Min score filter -->
+                        <div style="display:flex;align-items:center;gap:0.3rem;">
+                            <span style="font-size:0.72rem;color:#64748b;">Min Score</span>
+                            <input id="breakoutMinScore" type="number" min="0" max="100" value="35" onchange="app.loadBreakoutRadar()" style="width:52px;background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;font-size:0.74rem;padding:0.35rem 0.4rem;border-radius:6px;font-family:var(--font-mono);text-align:center;">
+                        </div>
+
+                        <!-- Top N Selector (Top 2, 5, 10, 20, All) -->
+                        <div style="display:flex;align-items:center;gap:0.3rem;">
+                            <span style="font-size:0.72rem;color:#64748b;">Show</span>
+                            <select id="breakoutLimitSelect" onchange="app.loadBreakoutRadar()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#38bdf8;font-size:0.74rem;font-weight:700;padding:0.35rem 0.55rem;border-radius:6px;font-family:var(--font-mono);cursor:pointer;" title="Limit number of top breakout candidates displayed">
+                                <option value="2">Top 2</option>
+                                <option value="5">Top 5</option>
+                                <option value="10" selected>Top 10</option>
+                                <option value="20">Top 20</option>
+                                <option value="50">Top 50</option>
+                                <option value="all">All</option>
+                            </select>
+                        </div>
+
+                        <!-- Live Tracking & Auto-Refresh Interval Controls -->
+                        <button type="button" id="breakoutLiveToggleBtn" onclick="app.toggleBreakoutLiveTracking()" class="btn btn-sm" style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-weight:700;display:flex;align-items:center;gap:0.35rem;" title="Start/Stop live real-time price tracking for breakout setups">
+                            <span id="breakoutLiveIndicator" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f87171;"></span>
+                            <span id="breakoutLiveBtnText">🔴 Track Live Prices</span>
+                        </button>
+                        <select id="breakoutLiveIntervalSelect" onchange="app.setBreakoutLiveInterval(this.value)" style="height:28px;padding:0 0.45rem;font-size:0.72rem;background:#000000;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:4px;outline:none;" title="Select auto-refresh interval for live breakout prices">
+                            <option value="30000">⏱️ 30s</option>
+                            <option value="60000">⏱️ 1 min</option>
+                            <option value="120000">⏱️ 2 min</option>
+                            <option value="300000" selected>⏱️ 5 min (Default)</option>
+                            <option value="600000">⏱️ 10 min</option>
+                            <option value="900000">⏱️ 15 min</option>
+                        </select>
+                        <button type="button" id="breakoutFetchLiveBtn" onclick="app.fetchLiveBreakoutQuotes()" class="btn btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-weight:600;display:flex;align-items:center;gap:0.3rem;" title="Fetch latest intraday breakout prices once">⚡ Refresh Live</button>
+
+                        <!-- Reset Columns Button -->
+                        <button type="button" onclick="app.resetBreakoutColumnOrder()" class="btn btn-secondary btn-sm" style="padding:0.35rem 0.65rem;font-size:0.72rem;display:flex;align-items:center;gap:0.25rem;" title="Reset columns to default layout">
+                            <span>🔄</span> Reset Cols
+                        </button>
+
+                        <!-- Formula breakdown toggle -->
+                        <button type="button" onclick="app.toggleBreakoutExplainer()" class="btn btn-secondary" style="padding:0.35rem 0.65rem;font-size:0.74rem;display:flex;align-items:center;gap:0.25rem;">
+                            <span>📐</span> Formula & Logic
+                        </button>
+
+                        <!-- Refresh button -->
+                        <button type="button" id="breakoutRefreshBtn" onclick="app.refreshBreakoutScan()" class="btn btn-primary" style="padding:0.35rem 0.85rem;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;">
+                            <span id="breakoutRefreshIcon">⚡</span> Scan Now
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ⏱️ Live Breakout Schedules & Automation Status Bar -->
+                <div id="breakoutSchedulesBar" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:0.6rem;margin-bottom:0.85rem;">
+                    <div class="card" style="padding:0.55rem 0.85rem;background:#090d16;border:1px solid rgba(239,68,68,0.25);display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.35rem;">
+                                <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ef4444;"></span>
+                                <span style="font-size:0.72rem;font-weight:700;color:#f87171;">Hot Pool Rescore</span>
+                                <span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);">(60s)</span>
+                            </div>
+                            <div id="schedBreakoutHotTimer" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.15rem;">
+                                Next run: <strong style="color:#38bdf8;">--</strong> | Last: --
+                            </div>
+                        </div>
+                        <button type="button" onclick="app.triggerScheduleJob('breakout_hot_rescore')" class="btn btn-sm" style="padding:0.2rem 0.5rem;font-size:0.68rem;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.35);">⚡ Run</button>
+                    </div>
+
+                    <div class="card" style="padding:0.55rem 0.85rem;background:#090d16;border:1px solid rgba(245,158,11,0.25);display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.35rem;">
+                                <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#fbbf24;"></span>
+                                <span style="font-size:0.72rem;font-weight:700;color:#fbbf24;">Warm Pool Rescore</span>
+                                <span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);">(5m)</span>
+                            </div>
+                            <div id="schedBreakoutWarmTimer" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.15rem;">
+                                Next run: <strong style="color:#38bdf8;">--</strong> | Last: --
+                            </div>
+                        </div>
+                        <button type="button" onclick="app.triggerScheduleJob('breakout_warm_rescore')" class="btn btn-sm" style="padding:0.2rem 0.5rem;font-size:0.68rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);">⚡ Run</button>
+                    </div>
+
+                    <div class="card" style="padding:0.55rem 0.85rem;background:#090d16;border:1px solid rgba(59,130,246,0.25);display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.35rem;">
+                                <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#60a5fa;"></span>
+                                <span style="font-size:0.72rem;font-weight:700;color:#60a5fa;">Universe Sweep</span>
+                                <span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);">(60m)</span>
+                            </div>
+                            <div id="schedBreakoutColdTimer" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.15rem;">
+                                Next run: <strong style="color:#38bdf8;">--</strong> | Last: --
+                            </div>
+                        </div>
+                        <button type="button" onclick="app.triggerScheduleJob('breakout_cold_scan')" class="btn btn-sm" style="padding:0.2rem 0.5rem;font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">🌐 Scan</button>
+                    </div>
+                </div>
+
+                <!-- 🔄 Breakout Movement & Activity Audit Feed ("What Changed & Why") -->
+                <div id="breakoutAuditPanel" class="card" style="padding:0.75rem 1rem;background:#080d1a;border:1px solid rgba(56,189,248,0.2);margin-bottom:0.85rem;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="app.toggleBreakoutAuditLog()">
                         <div style="display:flex;align-items:center;gap:0.45rem;">
-                            <div style="font-size:1rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.01em;">Breakout Radar</div>
-                            <span id="breakoutModeBadge" style="font-size:0.65rem;font-weight:700;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.1rem 0.45rem;border-radius:4px;">LIVE SCAN</span>
+                            <span style="font-size:0.95rem;">🔄</span>
+                            <span style="font-size:0.82rem;font-weight:700;color:#f8fafc;">Breakout Activity & Tier Movements</span>
+                            <span style="font-size:0.65rem;background:rgba(56,189,248,0.15);color:#38bdf8;padding:0.1rem 0.4rem;border-radius:4px;font-weight:600;">What Changed & Why</span>
+                            <span id="breakoutAuditBadgeCount" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">(0 events)</span>
                         </div>
-                        <div id="breakoutLastScanTime" style="font-size:0.7rem;color:#64748b;font-family:var(--font-mono);">Scanning…</div>
+                        <div style="display:flex;align-items:center;gap:0.4rem;">
+                            <span id="breakoutAuditToggleIcon" style="font-size:0.75rem;color:#94a3b8;">▼ Show Log</span>
+                        </div>
                     </div>
-                    <!-- Animated pulse badge when scan is running -->
-                    <span id="breakoutScanningBadge" style="display:none;background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);font-size:0.65rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:20px;animation:breakoutPulse 1.4s ease-in-out infinite;">● Scanning</span>
+
+                    <div id="breakoutAuditContainer" style="display:none;margin-top:0.75rem;max-height:260px;overflow-y:auto;border-top:1px solid rgba(255,255,255,0.08);padding-top:0.6rem;">
+                        <div id="breakoutAuditList" style="display:flex;flex-direction:column;gap:0.45rem;">
+                            <div style="text-align:center;color:#64748b;font-size:0.72rem;padding:0.5rem;">Loading movement audit logs...</div>
+                        </div>
+                    </div>
                 </div>
 
-                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                    <!-- Universe Selector -->
-                    <div style="display:flex;align-items:center;gap:0.35rem;background:#0f172a;border:1px solid rgba(255,255,255,0.12);padding:0.15rem 0.5rem;border-radius:6px;">
-                        <span style="font-size:0.75rem;">🏛️</span>
-                        <select id="breakoutUniverseSelect" onchange="app.onBreakoutUniverseChange(this.value)" style="background:transparent;border:none;color:#38bdf8;font-size:0.74rem;font-weight:600;font-family:var(--font-mono);cursor:pointer;outline:none;">
-                            <optgroup label="🇮🇳 Benchmark Indices">
-                                <option value="nifty_50" selected>🇮🇳 Nifty 50</option>
-                                <option value="nifty_next_50">🇮🇳 Nifty Next 50</option>
-                                <option value="nifty_100">🇮🇳 Nifty 100</option>
-                                <option value="nifty_200">🇮🇳 Nifty 200</option>
-                                <option value="nifty_500">🇮🇳 Nifty 500</option>
-                            </optgroup>
-                            <optgroup label="🚀 Market Cap Segments">
-                                <option value="nse_large_cap">🏛️ NSE Large Cap</option>
-                                <option value="nse_mid_cap">🚀 NSE Mid Cap</option>
-                                <option value="nse_small_cap">⚡ NSE Small Cap</option>
-                                <option value="all">🌐 All Monitored</option>
-                            </optgroup>
-                            <optgroup label="⭐ Portfolios & Global">
-                                <option value="my_watchlist">⭐ My Watchlist</option>
-                                <option value="us_top">🇺🇸 US Top 50</option>
-                            </optgroup>
-                        </select>
+                <!-- 🎯 Interactive Stock Evaluator with Live Autocomplete -->
+                <div style="background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.85)); border: 1px solid rgba(59,130,246,0.35); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.85rem; box-shadow: 0 4px 20px -2px rgba(0,0,0,0.4);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.45rem;">
+                        <div style="display:flex;align-items:center;gap:0.45rem;font-size:0.82rem;font-weight:700;color:#f8fafc;">
+                            <span style="font-size:1.05rem;">🎯</span> Evaluate Stock for Breakout
+                            <span style="font-size:0.65rem;font-weight:600;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.1rem 0.4rem;border-radius:4px;">ON-DEMAND RADAR</span>
+                        </div>
+                        <div style="font-size:0.68rem;color:#94a3b8;">
+                            Instant technical compression, volume surge multiple, 52W resistance & upside target calculation
+                        </div>
                     </div>
 
-                    <!-- Date Picker (Historical Backtest / Point-in-Time) -->
-                    <div style="display:flex;align-items:center;gap:0.35rem;background:#0f172a;border:1px solid rgba(59,130,246,0.3);padding:0.15rem 0.5rem;border-radius:6px;">
-                        <span style="font-size:0.75rem;">📅</span>
-                        <span style="font-size:0.7rem;color:#94a3b8;font-weight:600;">As Of:</span>
-                        <input id="breakoutDateInput" type="date" onchange="app.onBreakoutDateChange(this.value)" style="background:transparent;border:none;color:#f8fafc;font-size:0.74rem;font-family:var(--font-mono);cursor:pointer;outline:none;" />
-                        <button type="button" onclick="app.setBreakoutDatePreset(0)" title="Reset to today" style="background:rgba(255,255,255,0.06);border:none;color:#38bdf8;cursor:pointer;font-size:0.65rem;padding:0.15rem 0.35rem;border-radius:4px;">Today</button>
+                    <!-- Search Input & Action Button Container -->
+                    <div style="display:flex;align-items:center;gap:0.5rem;position:relative;">
+                        <div style="position:relative;flex:1;min-width:240px;">
+                            <span style="position:absolute;left:0.65rem;top:50%;transform:translateY(-50%);font-size:0.85rem;color:#64748b;pointer-events:none;">🔍</span>
+                            <input 
+                                id="breakoutTickerInput" 
+                                type="text" 
+                                placeholder="Enter stock ticker or company name (e.g. RELIANCE, TCS, INFY, TATAMOTORS, NVDA)..." 
+                                autocomplete="off" 
+                                style="width:100%;padding:0.45rem 2rem 0.45rem 2rem;background:#030712;border:1px solid rgba(255,255,255,0.18);border-radius:6px;color:#f8fafc;font-size:0.8rem;font-family:var(--font-mono);outline:none;transition:border-color 0.2s;"
+                                onfocus="this.style.borderColor='#38bdf8'"
+                                onblur="this.style.borderColor='rgba(255,255,255,0.18)'"
+                            />
+                            <button type="button" id="breakoutClearInputBtn" onclick="app.clearBreakoutEvaluator()" style="display:none;position:absolute;right:0.6rem;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#64748b;font-size:0.75rem;cursor:pointer;">✕</button>
+
+                            <!-- Dynamic Autocomplete Dropdown -->
+                            <div id="breakoutAutocompleteDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#090d16;border:1px solid rgba(59,130,246,0.4);border-radius:6px;box-shadow:0 12px 28px rgba(0,0,0,0.8);z-index:999;max-height:260px;overflow-y:auto;">
+                            </div>
+                        </div>
+
+                        <button type="button" id="breakoutEvaluateBtn" onclick="app.evaluateCurrentBreakoutInput()" class="btn btn-primary" style="padding:0.45rem 1.1rem;font-size:0.8rem;font-weight:700;display:flex;align-items:center;gap:0.35rem;white-space:nowrap;background:linear-gradient(135deg, #2563eb, #3b82f6);border:1px solid rgba(96,165,250,0.5);">
+                            <span id="breakoutEvaluateIcon">⚡</span> Evaluate Breakout
+                        </button>
                     </div>
+                </div>
 
-                    <!-- Sort control -->
-                    <select id="breakoutSortBy" onchange="app.loadBreakoutRadar()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#cbd5e1;font-size:0.74rem;padding:0.35rem 0.55rem;border-radius:6px;font-family:var(--font-mono);cursor:pointer;">
-                        <option value="composite_score">↓ Composite Score</option>
-                        <option value="realized_return_pct">↓ Realized Return %</option>
-                        <option value="fundamental_score">↓ Fundamental</option>
-                        <option value="resistance_score">↓ Resistance</option>
-                        <option value="volume_score">↓ Volume Surge</option>
-                        <option value="momentum_score">↓ Momentum</option>
-                    </select>
+                <!-- 📊 Deep Evaluated Stock Intelligence Result Card -->
+                <div id="breakoutEvaluatedStockCard" style="display:none;background:#090d16;border:1px solid rgba(59,130,246,0.4);border-radius:8px;padding:1rem 1.2rem;margin-bottom:0.85rem;box-shadow:0 12px 30px -5px rgba(0,0,0,0.6);">
+                </div>
 
-                    <!-- Min score filter -->
-                    <div style="display:flex;align-items:center;gap:0.3rem;">
-                        <span style="font-size:0.72rem;color:#64748b;">Min Score</span>
-                        <input id="breakoutMinScore" type="number" min="0" max="100" value="35" onchange="app.loadBreakoutRadar()" style="width:52px;background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;font-size:0.74rem;padding:0.35rem 0.4rem;border-radius:6px;font-family:var(--font-mono);text-align:center;">
-                    </div>
-
-                    <!-- Top N Selector (Top 2, 5, 10, 20, All) -->
-                    <div style="display:flex;align-items:center;gap:0.3rem;">
-                        <span style="font-size:0.72rem;color:#64748b;">Show</span>
-                        <select id="breakoutLimitSelect" onchange="app.loadBreakoutRadar()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#38bdf8;font-size:0.74rem;font-weight:700;padding:0.35rem 0.55rem;border-radius:6px;font-family:var(--font-mono);cursor:pointer;" title="Limit number of top breakout candidates displayed">
-                            <option value="2">Top 2</option>
-                            <option value="5">Top 5</option>
-                            <option value="10" selected>Top 10</option>
-                            <option value="20">Top 20</option>
-                            <option value="50">Top 50</option>
-                            <option value="all">All</option>
-                        </select>
-                    </div>
-
-                    <!-- Live Tracking & Auto-Refresh Interval Controls -->
-                    <button type="button" id="breakoutLiveToggleBtn" onclick="app.toggleBreakoutLiveTracking()" class="btn btn-sm" style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-weight:700;display:flex;align-items:center;gap:0.35rem;" title="Start/Stop live real-time price tracking for breakout setups">
-                        <span id="breakoutLiveIndicator" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f87171;"></span>
-                        <span id="breakoutLiveBtnText">🔴 Track Live Prices</span>
-                    </button>
-                    <select id="breakoutLiveIntervalSelect" onchange="app.setBreakoutLiveInterval(this.value)" style="height:28px;padding:0 0.45rem;font-size:0.72rem;background:#000000;color:#94a3b8;border:1px solid rgba(255,255,255,0.15);border-radius:4px;outline:none;" title="Select auto-refresh interval for live breakout prices">
-                        <option value="30000">⏱️ 30s</option>
-                        <option value="60000">⏱️ 1 min</option>
-                        <option value="120000">⏱️ 2 min</option>
-                        <option value="300000" selected>⏱️ 5 min (Default)</option>
-                        <option value="600000">⏱️ 10 min</option>
-                        <option value="900000">⏱️ 15 min</option>
-                    </select>
-                    <button type="button" id="breakoutFetchLiveBtn" onclick="app.fetchLiveBreakoutQuotes()" class="btn btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-weight:600;display:flex;align-items:center;gap:0.3rem;" title="Fetch latest intraday breakout prices once">⚡ Refresh Live</button>
-
-                    <!-- Reset Columns Button -->
-                    <button type="button" onclick="app.resetBreakoutColumnOrder()" class="btn btn-secondary btn-sm" style="padding:0.35rem 0.65rem;font-size:0.72rem;display:flex;align-items:center;gap:0.25rem;" title="Reset columns to default layout (Current Price next to Signal Price)">
-                        <span>🔄</span> Reset Cols
-                    </button>
-
-                    <!-- Formula breakdown toggle -->
-                    <button type="button" onclick="app.toggleBreakoutExplainer()" class="btn btn-secondary" style="padding:0.35rem 0.65rem;font-size:0.74rem;display:flex;align-items:center;gap:0.25rem;">
-                        <span>📐</span> Formula & Logic
-                    </button>
-
-                    <!-- Refresh button -->
-                    <button type="button" id="breakoutRefreshBtn" onclick="app.refreshBreakoutScan()" class="btn btn-primary" style="padding:0.35rem 0.85rem;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;">
-                        <span id="breakoutRefreshIcon">⚡</span> Scan Now
+                <!-- Historical Date Quick Presets Toolbar -->
+                <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.75rem;padding:0.4rem 0.6rem;background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-size:0.7rem;">
+                    <span style="color:#64748b;font-weight:600;">⚡ Quick Date Backtest:</span>
+                    <button id="bkPreset_0"  type="button" onclick="app.setBreakoutDatePreset(0)"  class="btn-micro bk-preset-btn bk-preset-active" data-days="0">📍 Today (Live)</button>
+                    <button id="bkPreset_7"  type="button" onclick="app.setBreakoutDatePreset(7)"  class="btn-micro bk-preset-btn" data-days="7">7 Days Ago</button>
+                    <button id="bkPreset_14" type="button" onclick="app.setBreakoutDatePreset(14)" class="btn-micro bk-preset-btn" data-days="14">14 Days Ago</button>
+                    <button id="bkPreset_30" type="button" onclick="app.setBreakoutDatePreset(30)" class="btn-micro bk-preset-btn" data-days="30">30 Days Ago</button>
+                    <button id="bkPreset_60" type="button" onclick="app.setBreakoutDatePreset(60)" class="btn-micro bk-preset-btn" data-days="60">60 Days Ago</button>
+                    <button id="bkPreset_90" type="button" onclick="app.setBreakoutDatePreset(90)" class="btn-micro bk-preset-btn" data-days="90">90 Days Ago</button>
+                    <span id="breakoutHistoricalNotice" style="color:#38bdf8;font-size:0.68rem;font-weight:600;display:none;">📅 Evaluating point-in-time signal vs subsequent realized market outcomes</span>
+                    <button id="btnRunBreakoutBacktest" type="button" onclick="app.runAdhocBreakoutBacktest()" class="btn btn-sm btn-primary" style="margin-left:auto;padding:0.25rem 0.65rem;font-size:0.7rem;font-weight:700;background:linear-gradient(135deg, #0284c7, #0369a1);border:1px solid rgba(56,189,248,0.35);color:#f0f9ff;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:0.3rem;" title="Run full multi-period backtest audit on active universe">
+                        <span>🔬</span> Run Backtest Audit
                     </button>
                 </div>
-            </div>
 
-            <!-- ⏱️ Live Breakout Schedules & Automation Status Bar -->
-            <div id="breakoutSchedulesBar" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:0.6rem;margin-bottom:0.85rem;">
-                <div class="card" style="padding:0.55rem 0.85rem;background:#090d16;border:1px solid rgba(239,68,68,0.25);display:flex;align-items:center;justify-content:space-between;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:0.35rem;">
-                            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ef4444;"></span>
-                            <span style="font-size:0.72rem;font-weight:700;color:#f87171;">Hot Pool Rescore</span>
-                            <span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);">(60s)</span>
+                <!-- Expandable Formula & Calculation Breakdown Card -->
+                <div id="breakoutExplainerCard" style="display:none;background:#090d16;border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:0.9rem 1.1rem;margin-bottom:0.85rem;box-shadow:0 10px 25px -5px rgba(0,0,0,0.5);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+                        <div style="font-weight:700;font-size:0.88rem;color:#60a5fa;display:flex;align-items:center;gap:0.4rem;">
+                            <span>📐</span> Mathematical Calculation & Breakout Scoring Engine (0 – 100 Pts)
                         </div>
-                        <div id="schedBreakoutHotTimer" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.15rem;">
-                            Next run: <strong style="color:#38bdf8;">--</strong> | Last: --
-                        </div>
+                        <button type="button" onclick="app.toggleBreakoutExplainer()" style="background:transparent;border:none;color:#64748b;font-size:0.9rem;cursor:pointer;">✕</button>
                     </div>
-                    <button type="button" onclick="app.triggerScheduleJob('breakout_hot_rescore')" class="btn btn-sm" style="padding:0.2rem 0.5rem;font-size:0.68rem;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.35);">⚡ Run</button>
-                </div>
-
-                <div class="card" style="padding:0.55rem 0.85rem;background:#090d16;border:1px solid rgba(245,158,11,0.25);display:flex;align-items:center;justify-content:space-between;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:0.35rem;">
-                            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#fbbf24;"></span>
-                            <span style="font-size:0.72rem;font-weight:700;color:#fbbf24;">Warm Pool Rescore</span>
-                            <span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);">(5m)</span>
+                    <p style="font-size:0.75rem;color:#94a3b8;line-height:1.45;margin-bottom:0.7rem;">
+                        Breakout Radar scans the price sequence point-in-time and scores stocks based on volatility compression (coiling), volume expansion, resistance proximity, trend momentum, and fundamental earnings quality.
+                    </p>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.6rem;font-size:0.72rem;">
+                        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);padding:0.6rem;border-radius:6px;">
+                            <div style="font-weight:700;color:#f87171;margin-bottom:0.2rem;">1. 🎯 Resistance Proximity (0–40 Pts)</div>
+                            <div style="color:#cbd5e1;">Distance to 20-Day or 52-Week ceiling: <code>(Price - High) / High × 100</code>. Prices within 0% to -3% award 25–40 pts. Close proximity indicates higher breakout probability.</div>
                         </div>
-                        <div id="schedBreakoutWarmTimer" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.15rem;">
-                            Next run: <strong style="color:#38bdf8;">--</strong> | Last: --
+                        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);padding:0.6rem;border-radius:6px;">
+                            <div style="font-weight:700;color:#60a5fa;margin-bottom:0.2rem;">2. 📊 Volume Surge (0–10 Pts)</div>
+                            <div style="color:#cbd5e1;">Volume expansion vs 20-Day moving average: <code>Today Vol / 20D Avg Vol</code>. Ratios of 1.0x to 1.5x award 10 pts; extreme spikes (>2.0x) are penalized to 4 pts to filter fakeout/churn.</div>
                         </div>
-                    </div>
-                    <button type="button" onclick="app.triggerScheduleJob('breakout_warm_rescore')" class="btn btn-sm" style="padding:0.2rem 0.5rem;font-size:0.68rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);">⚡ Run</button>
-                </div>
-
-                <div class="card" style="padding:0.55rem 0.85rem;background:#090d16;border:1px solid rgba(59,130,246,0.25);display:flex;align-items:center;justify-content:space-between;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:0.35rem;">
-                            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#60a5fa;"></span>
-                            <span style="font-size:0.72rem;font-weight:700;color:#60a5fa;">Universe Sweep</span>
-                            <span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);">(60m)</span>
+                        <div style="background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);padding:0.6rem;border-radius:6px;">
+                            <div style="font-weight:700;color:#fbbf24;margin-bottom:0.2rem;">3. 🗜️ Price Compression (0–10 Pts)</div>
+                            <div style="color:#cbd5e1;">ATR(14) volatility squeeze: <code>ATR(14) / Price</code>. Low ATR% indicates coiling price energy ready for expansion.</div>
                         </div>
-                        <div id="schedBreakoutColdTimer" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.15rem;">
-                            Next run: <strong style="color:#38bdf8;">--</strong> | Last: --
+                        <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);padding:0.6rem;border-radius:6px;">
+                            <div style="font-weight:700;color:#34d399;margin-bottom:0.2rem;">4. 🚀 Trend Momentum (0–25 Pts)</div>
+                            <div style="color:#cbd5e1;">Positive 30-day slope with price trading above the 20-Day SMA (<code>Close > SMA20 & Ret30D > 0</code>). Strong trend continuation yields up to 25 pts.</div>
+                        </div>
+                        <div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);padding:0.6rem;border-radius:6px;">
+                            <div style="font-weight:700;color:#a78bfa;margin-bottom:0.2rem;">5. 📈 Fundamental Quality (0–15 Pts)</div>
+                            <div style="color:#cbd5e1;">Normalized 3-Quarter EPS surprise streak (<code>Q1/Q2/Q3 Quality Score 1-9</code> mapped to 0-15 pts).</div>
+                        </div>
+                        <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);padding:0.6rem;border-radius:6px;">
+                            <div style="font-weight:700;color:#38bdf8;margin-bottom:0.2rem;">6. 🎯 Target & Stop Loss Levels</div>
+                            <div style="color:#cbd5e1;">Trigger = Resistance High; Target = <code>Trigger + max(8%, 2×ATR)</code>; Stop Loss = <code>Signal Price - min(5%, 1.5×ATR)</code>.</div>
                         </div>
                     </div>
-                    <button type="button" onclick="app.triggerScheduleJob('breakout_cold_scan')" class="btn btn-sm" style="padding:0.2rem 0.5rem;font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">🌐 Scan</button>
+                </div>
+
+                <!-- KPI Summary Cards -->
+                <div id="breakoutKpiCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.65rem;margin-bottom:0.85rem;">
+                    <!-- Active Breaking Out Card (On Fire) -->
+                    <div id="breakoutCardOnFire" class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(249,115,22,0.3);border-top:2px solid #f97316;transition:all 0.3s ease;">
+                        <div id="breakoutKpiLabelFire" style="font-size:0.68rem;color:#fb923c;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;display:flex;align-items:center;gap:0.3rem;">
+                            <span class="fire-flame-icon" style="font-size:0.85rem;">🔥</span> <span id="breakoutKpiTextFire">Breaking Out</span>
+                        </div>
+                        <div style="font-size:1.6rem;font-weight:800;color:#fdba74;font-family:var(--font-mono);display:flex;align-items:baseline;gap:0.35rem;">
+                            <span id="breakoutStatBreakingCount">0</span>
+                            <span id="breakoutStatBreakingSub" style="font-size:0.72rem;font-weight:700;color:#f97316;">Active</span>
+                        </div>
+                        <div id="breakoutKpiSubFire" style="font-size:0.67rem;color:#c2410c;margin-top:0.15rem;">Price &ge; Trigger Level</div>
+                    </div>
+                    <!-- Total Candidates -->
+                    <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(59,130,246,0.25);border-top:2px solid #3b82f6;">
+                        <div id="breakoutKpiLabel1" style="font-size:0.68rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Candidates</div>
+                        <div style="font-size:1.6rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);"><span id="breakoutStatTotal">—</span></div>
+                        <div id="breakoutKpiSub1" style="font-size:0.67rem;color:#475569;margin-top:0.15rem;">Setups Identified</div>
+                    </div>
+                    <!-- Top Score or Win Rate -->
+                    <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(234,179,8,0.25);border-top:2px solid #eab308;">
+                        <div id="breakoutKpiLabel2" style="font-size:0.68rem;color:#fbbf24;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Top Score</div>
+                        <div style="font-size:1.6rem;font-weight:800;color:#fde68a;font-family:var(--font-mono);"><span id="breakoutStatTopScore">—</span></div>
+                        <div id="breakoutStatTopTicker" style="font-size:0.67rem;color:#92400e;margin-top:0.15rem;">—</div>
+                    </div>
+                    <!-- Avg Score or Avg Return -->
+                    <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(16,185,129,0.25);border-top:2px solid #10b981;">
+                        <div id="breakoutKpiLabel3" style="font-size:0.68rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Avg Score</div>
+                        <div style="font-size:1.6rem;font-weight:800;color:#6ee7b7;font-family:var(--font-mono);"><span id="breakoutStatAvg">—</span></div>
+                        <div id="breakoutKpiSub3" style="font-size:0.67rem;color:#065f46;margin-top:0.15rem;">Composite Average</div>
+                    </div>
+                    <!-- Tickers Scanned -->
+                    <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(148,163,184,0.15);border-top:2px solid #475569;">
+                        <div id="breakoutKpiLabel4" style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Universe</div>
+                        <div style="font-size:1.6rem;font-weight:800;color:#cbd5e1;font-family:var(--font-mono);"><span id="breakoutStatScanned">—</span></div>
+                        <div id="breakoutKpiSub4" style="font-size:0.67rem;color:#334155;margin-top:0.15rem;">Tickers Scanned</div>
+                    </div>
+                    <!-- Last Duration / As-Of Date -->
+                    <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(139,92,246,0.2);border-top:2px solid #8b5cf6;">
+                        <div id="breakoutKpiLabel5" style="font-size:0.68rem;color:#a78bfa;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Scan Mode</div>
+                        <div style="font-size:1.6rem;font-weight:800;color:#c4b5fd;font-family:var(--font-mono);"><span id="breakoutStatDuration">—</span></div>
+                        <div id="breakoutKpiSub5" style="font-size:0.67rem;color:#3b0764;margin-top:0.15rem;">Point-in-Time Status</div>
+                    </div>
+                </div>
+
+                <!-- Score Breakdown Legend -->
+                <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.65rem;font-size:0.68rem;color:#64748b;">
+                    <span style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.25);padding:0.1rem 0.45rem;border-radius:4px;">🎯 Proximity 0-40</span>
+                    <span style="background:rgba(59,130,246,0.12);color:#60a5fa;border:1px solid rgba(59,130,246,0.25);padding:0.1rem 0.45rem;border-radius:4px;">📊 Volume 0-10</span>
+                    <span style="background:rgba(234,179,8,0.12);color:#fbbf24;border:1px solid rgba(234,179,8,0.25);padding:0.1rem 0.45rem;border-radius:4px;">🗜️ Compression 0-10</span>
+                    <span style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25);padding:0.1rem 0.45rem;border-radius:4px;">🚀 Momentum 0-25</span>
+                    <span style="background:rgba(139,92,246,0.12);color:#a78bfa;border:1px solid rgba(139,92,246,0.25);padding:0.1rem 0.45rem;border-radius:4px;">📈 Fundamental 0-15</span>
+                    <span style="margin-left:auto;font-style:italic;">Max composite = 100</span>
+                </div>
+
+                <!-- Candidates Table -->
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;font-size:0.68rem;color:#64748b;">
+                    <span>💡 <strong>Moveable Columns:</strong> Drag & drop column headers to reorder • Click headers to sort</span>
+                    <span id="breakoutColOrderNotice" style="color:#38bdf8;font-weight:600;display:none;">Custom Layout Saved</span>
+                </div>
+                <div class="table-wrapper breakout-table-wrapper" style="overflow:auto;max-height:calc(100vh - 240px);min-height:360px;border-radius:0.6rem;border:1px solid rgba(255,255,255,0.08);background:#000000;">
+                    <table id="breakoutTable" style="width:100%;border-collapse:collapse;font-size:0.74rem;">
+                        <thead>
+                            <tr id="breakoutTableHeaderRow" style="background:#0a0f1e;border-bottom:1px solid rgba(255,255,255,0.1);">
+                                <!-- Rendered dynamically by app.renderBreakoutTableHeader() -->
+                            </tr>
+                        </thead>
+                        <tbody id="breakoutTableBody">
+                            <tr>
+                                <td colspan="9" style="padding:2.5rem;text-align:center;color:#334155;font-size:0.85rem;">
+                                    ⚡ Background scanner is warming up… Switch back in 30 seconds.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Footer note -->
+                <div style="margin-top:0.55rem;font-size:0.68rem;color:#334155;display:flex;align-items:center;gap:0.4rem;">
+                    <span>🔄 Real-time scanner refreshes periodically.</span>
+                    <span>·</span>
+                    <span>Select any historical date using the date picker above to audit past breakout setup performance.</span>
                 </div>
             </div>
 
-            <!-- 🔄 Breakout Movement & Activity Audit Feed ("What Changed & Why") -->
-            <div id="breakoutAuditPanel" class="card" style="padding:0.75rem 1rem;background:#080d1a;border:1px solid rgba(56,189,248,0.2);margin-bottom:0.85rem;">
-                <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="app.toggleBreakoutAuditLog()">
-                    <div style="display:flex;align-items:center;gap:0.45rem;">
-                        <span style="font-size:0.95rem;">🔄</span>
-                        <span style="font-size:0.82rem;font-weight:700;color:#f8fafc;">Breakout Activity & Tier Movements</span>
-                        <span style="font-size:0.65rem;background:rgba(56,189,248,0.15);color:#38bdf8;padding:0.1rem 0.4rem;border-radius:4px;font-weight:600;">What Changed & Why</span>
-                        <span id="breakoutAuditBadgeCount" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">(0 events)</span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:0.4rem;">
-                        <span id="breakoutAuditToggleIcon" style="font-size:0.75rem;color:#94a3b8;">▼ Show Log</span>
-                    </div>
-                </div>
-
-                <div id="breakoutAuditContainer" style="display:none;margin-top:0.75rem;max-height:260px;overflow-y:auto;border-top:1px solid rgba(255,255,255,0.08);padding-top:0.6rem;">
-                    <div id="breakoutAuditList" style="display:flex;flex-direction:column;gap:0.45rem;">
-                        <div style="text-align:center;color:#64748b;font-size:0.72rem;padding:0.5rem;">Loading movement audit logs...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 🎯 Interactive Stock Evaluator with Live Autocomplete -->
-            <div style="background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.85)); border: 1px solid rgba(59,130,246,0.35); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.85rem; box-shadow: 0 4px 20px -2px rgba(0,0,0,0.4);">
-                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.45rem;">
-                    <div style="display:flex;align-items:center;gap:0.45rem;font-size:0.82rem;font-weight:700;color:#f8fafc;">
-                        <span style="font-size:1.05rem;">🎯</span> Evaluate Stock for Breakout
-                        <span style="font-size:0.65rem;font-weight:600;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.1rem 0.4rem;border-radius:4px;">ON-DEMAND RADAR</span>
-                    </div>
-                    <div style="font-size:0.68rem;color:#94a3b8;">
-                        Instant technical compression, volume surge multiple, 52W resistance & upside target calculation
-                    </div>
-                </div>
-
-                <!-- Search Input & Action Button Container -->
-                <div style="display:flex;align-items:center;gap:0.5rem;position:relative;">
-                    <div style="position:relative;flex:1;min-width:240px;">
-                        <span style="position:absolute;left:0.65rem;top:50%;transform:translateY(-50%);font-size:0.85rem;color:#64748b;pointer-events:none;">🔍</span>
-                        <input 
-                            id="breakoutTickerInput" 
-                            type="text" 
-                            placeholder="Enter stock ticker or company name (e.g. RELIANCE, TCS, INFY, TATAMOTORS, NVDA)..." 
-                            autocomplete="off" 
-                            style="width:100%;padding:0.45rem 2rem 0.45rem 2rem;background:#030712;border:1px solid rgba(255,255,255,0.18);border-radius:6px;color:#f8fafc;font-size:0.8rem;font-family:var(--font-mono);outline:none;transition:border-color 0.2s;"
-                            onfocus="this.style.borderColor='#38bdf8'"
-                            onblur="this.style.borderColor='rgba(255,255,255,0.18)'"
-                        />
-                        <button type="button" id="breakoutClearInputBtn" onclick="app.clearBreakoutEvaluator()" style="display:none;position:absolute;right:0.6rem;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#64748b;font-size:0.75rem;cursor:pointer;">✕</button>
-
-                        <!-- Dynamic Autocomplete Dropdown -->
-                        <div id="breakoutAutocompleteDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#090d16;border:1px solid rgba(59,130,246,0.4);border-radius:6px;box-shadow:0 12px 28px rgba(0,0,0,0.8);z-index:999;max-height:260px;overflow-y:auto;">
+            <!-- ============================================================= -->
+            <!-- SUBTAB 2: 📜 TRACKED BREAKOUTS HISTORY ARCHIVE                -->
+            <!-- ============================================================= -->
+            <div id="breakoutTrackedContainer" class="breakout-subview" style="display:none;">
+                <!-- Controls & Filters Row -->
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.6rem;margin-bottom:0.85rem;">
+                    <div style="display:flex;align-items:center;gap:0.6rem;">
+                        <span style="font-size:1.3rem;">📜</span>
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.45rem;">
+                                <div style="font-size:1rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.01em;">Tracked Breakouts History</div>
+                                <span style="font-size:0.65rem;font-weight:700;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.1rem 0.45rem;border-radius:4px;">AUDITED ARCHIVE</span>
+                            </div>
+                            <div id="breakoutTrackedTimeframeLabel" style="font-size:0.7rem;color:#64748b;font-family:var(--font-mono);">
+                                All-time tracked signals repository
+                            </div>
                         </div>
                     </div>
 
-                    <button type="button" id="breakoutEvaluateBtn" onclick="app.evaluateCurrentBreakoutInput()" class="btn btn-primary" style="padding:0.45rem 1.1rem;font-size:0.8rem;font-weight:700;display:flex;align-items:center;gap:0.35rem;white-space:nowrap;background:linear-gradient(135deg, #2563eb, #3b82f6);border:1px solid rgba(96,165,250,0.5);">
-                        <span id="breakoutEvaluateIcon">⚡</span> Evaluate Breakout
-                    </button>
-                </div>
-            </div>
+                    <!-- Right Controls (Tier, Outcome, Sort, Refresh) -->
+                    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <!-- Tier Filter -->
+                        <div style="display:flex;align-items:center;gap:0.3rem;">
+                            <span style="font-size:0.72rem;color:#64748b;">Tier</span>
+                            <select id="breakoutTrackedTierFilter" onchange="app.loadTrackedBreakouts()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#cbd5e1;font-size:0.74rem;padding:0.35rem 0.55rem;border-radius:6px;font-family:var(--font-mono);cursor:pointer;">
+                                <option value="ALL">All Tiers</option>
+                                <option value="HOT">🔥 HOT Only (>=70)</option>
+                                <option value="WARM">⚡ WARM Only (50-69)</option>
+                            </select>
+                        </div>
 
-            <!-- 📊 Deep Evaluated Stock Intelligence Result Card -->
-            <div id="breakoutEvaluatedStockCard" style="display:none;background:#090d16;border:1px solid rgba(59,130,246,0.4);border-radius:8px;padding:1rem 1.2rem;margin-bottom:0.85rem;box-shadow:0 12px 30px -5px rgba(0,0,0,0.6);">
-            </div>
+                        <!-- Outcome Filter -->
+                        <div style="display:flex;align-items:center;gap:0.3rem;">
+                            <span style="font-size:0.72rem;color:#64748b;">Status</span>
+                            <select id="breakoutTrackedOutcomeFilter" onchange="app.loadTrackedBreakouts()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#cbd5e1;font-size:0.74rem;padding:0.35rem 0.55rem;border-radius:6px;font-family:var(--font-mono);cursor:pointer;">
+                                <option value="ALL">All Outcomes</option>
+                                <option value="TARGET_HIT">🎯 Target Hit</option>
+                                <option value="TRIGGERED">🚀 Breakout Fired</option>
+                                <option value="ACTIVE">⏳ Active Coiling</option>
+                                <option value="STOP_HIT">🛑 Stopped Out</option>
+                            </select>
+                        </div>
 
-            <!-- Historical Date Quick Presets Toolbar -->
-            <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.75rem;padding:0.4rem 0.6rem;background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-size:0.7rem;">
-                <span style="color:#64748b;font-weight:600;">⚡ Quick Date Backtest:</span>
-                <button id="bkPreset_0"  type="button" onclick="app.setBreakoutDatePreset(0)"  class="btn-micro bk-preset-btn bk-preset-active" data-days="0">📍 Today (Live)</button>
-                <button id="bkPreset_7"  type="button" onclick="app.setBreakoutDatePreset(7)"  class="btn-micro bk-preset-btn" data-days="7">7 Days Ago</button>
-                <button id="bkPreset_14" type="button" onclick="app.setBreakoutDatePreset(14)" class="btn-micro bk-preset-btn" data-days="14">14 Days Ago</button>
-                <button id="bkPreset_30" type="button" onclick="app.setBreakoutDatePreset(30)" class="btn-micro bk-preset-btn" data-days="30">30 Days Ago</button>
-                <button id="bkPreset_60" type="button" onclick="app.setBreakoutDatePreset(60)" class="btn-micro bk-preset-btn" data-days="60">60 Days Ago</button>
-                <button id="bkPreset_90" type="button" onclick="app.setBreakoutDatePreset(90)" class="btn-micro bk-preset-btn" data-days="90">90 Days Ago</button>
-                <span id="breakoutHistoricalNotice" style="color:#38bdf8;font-size:0.68rem;font-weight:600;display:none;">📅 Evaluating point-in-time signal vs subsequent realized market outcomes</span>
-                <button id="btnRunBreakoutBacktest" type="button" onclick="app.runAdhocBreakoutBacktest()" class="btn btn-sm btn-primary" style="margin-left:auto;padding:0.25rem 0.65rem;font-size:0.7rem;font-weight:700;background:linear-gradient(135deg, #0284c7, #0369a1);border:1px solid rgba(56,189,248,0.35);color:#f0f9ff;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:0.3rem;" title="Run full multi-period backtest audit on active universe">
-                    <span>🔬</span> Run Backtest Audit
-                </button>
-            </div>
+                        <!-- Sort By -->
+                        <div style="display:flex;align-items:center;gap:0.3rem;">
+                            <span style="font-size:0.72rem;color:#64748b;">Sort</span>
+                            <select id="breakoutTrackedSortBy" onchange="app.loadTrackedBreakouts()" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#38bdf8;font-size:0.74rem;font-weight:700;padding:0.35rem 0.55rem;border-radius:6px;font-family:var(--font-mono);cursor:pointer;">
+                                <option value="signal_date">↓ Signal Date (Newest)</option>
+                                <option value="return_pct">↓ Realized Return %</option>
+                                <option value="max_gain">↓ Peak Max Gain %</option>
+                                <option value="composite_score">↓ Composite Score</option>
+                                <option value="days_elapsed">↓ Days Elapsed</option>
+                                <option value="signal_date_asc">↑ Signal Date (Oldest)</option>
+                            </select>
+                        </div>
 
-            <!-- Expandable Formula & Calculation Breakdown Card -->
-            <div id="breakoutExplainerCard" style="display:none;background:#090d16;border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:0.9rem 1.1rem;margin-bottom:0.85rem;box-shadow:0 10px 25px -5px rgba(0,0,0,0.5);">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
-                    <div style="font-weight:700;font-size:0.88rem;color:#60a5fa;display:flex;align-items:center;gap:0.4rem;">
-                        <span>📐</span> Mathematical Calculation & Breakout Scoring Engine (0 – 100 Pts)
-                    </div>
-                    <button type="button" onclick="app.toggleBreakoutExplainer()" style="background:transparent;border:none;color:#64748b;font-size:0.9rem;cursor:pointer;">✕</button>
-                </div>
-                <p style="font-size:0.75rem;color:#94a3b8;line-height:1.45;margin-bottom:0.7rem;">
-                    Breakout Radar scans the price sequence point-in-time and scores stocks based on volatility compression (coiling), volume expansion, resistance proximity, trend momentum, and fundamental earnings quality.
-                </p>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.6rem;font-size:0.72rem;">
-                    <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);padding:0.6rem;border-radius:6px;">
-                        <div style="font-weight:700;color:#f87171;margin-bottom:0.2rem;">1. 🎯 Resistance Proximity (0–40 Pts)</div>
-                        <div style="color:#cbd5e1;">Distance to 20-Day or 52-Week ceiling: <code>(Price - High) / High × 100</code>. Prices within 0% to -3% award 25–40 pts. Close proximity indicates higher breakout probability.</div>
-                    </div>
-                    <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);padding:0.6rem;border-radius:6px;">
-                        <div style="font-weight:700;color:#60a5fa;margin-bottom:0.2rem;">2. 📊 Volume Surge (0–10 Pts)</div>
-                        <div style="color:#cbd5e1;">Volume expansion vs 20-Day moving average: <code>Today Vol / 20D Avg Vol</code>. Ratios of 1.0x to 1.5x award 10 pts; extreme spikes (>2.0x) are penalized to 4 pts to filter fakeout/churn.</div>
-                    </div>
-                    <div style="background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);padding:0.6rem;border-radius:6px;">
-                        <div style="font-weight:700;color:#fbbf24;margin-bottom:0.2rem;">3. 🗜️ Price Compression (0–10 Pts)</div>
-                        <div style="color:#cbd5e1;">ATR(14) volatility squeeze: <code>ATR(14) / Price</code>. Low ATR% indicates coiling price energy ready for expansion.</div>
-                    </div>
-                    <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);padding:0.6rem;border-radius:6px;">
-                        <div style="font-weight:700;color:#34d399;margin-bottom:0.2rem;">4. 🚀 Trend Momentum (0–25 Pts)</div>
-                        <div style="color:#cbd5e1;">Positive 30-day slope with price trading above the 20-Day SMA (<code>Close > SMA20 & Ret30D > 0</code>). Strong trend continuation yields up to 25 pts.</div>
-                    </div>
-                    <div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);padding:0.6rem;border-radius:6px;">
-                        <div style="font-weight:700;color:#a78bfa;margin-bottom:0.2rem;">5. 📈 Fundamental Quality (0–15 Pts)</div>
-                        <div style="color:#cbd5e1;">Normalized 3-Quarter EPS surprise streak (<code>Q1/Q2/Q3 Quality Score 1-9</code> mapped to 0-15 pts).</div>
-                    </div>
-                    <div style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);padding:0.6rem;border-radius:6px;">
-                        <div style="font-weight:700;color:#38bdf8;margin-bottom:0.2rem;">6. 🎯 Target & Stop Loss Levels</div>
-                        <div style="color:#cbd5e1;">Trigger = Resistance High; Target = <code>Trigger + max(8%, 2×ATR)</code>; Stop Loss = <code>Signal Price - min(5%, 1.5×ATR)</code>.</div>
+                        <!-- Live Refresh Toggle -->
+                        <button type="button" id="btnTrackedLiveRefresh" onclick="app.loadTrackedBreakouts(true)" class="btn btn-secondary btn-sm" style="padding:0.35rem 0.75rem;font-size:0.74rem;display:flex;align-items:center;gap:0.3rem;border-color:rgba(56,189,248,0.4);color:#38bdf8;" title="Recalculate live returns and target hits against latest market quotes">
+                            <span>⚡</span> Refresh Live Quotes
+                        </button>
                     </div>
                 </div>
-            </div>
 
-            <!-- KPI Summary Cards -->
-            <div id="breakoutKpiCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.65rem;margin-bottom:0.85rem;">
-                <!-- Active Breaking Out Card (On Fire) -->
-                <div id="breakoutCardOnFire" class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(249,115,22,0.3);border-top:2px solid #f97316;transition:all 0.3s ease;">
-                    <div id="breakoutKpiLabelFire" style="font-size:0.68rem;color:#fb923c;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;display:flex;align-items:center;gap:0.3rem;">
-                        <span class="fire-flame-icon" style="font-size:0.85rem;">🔥</span> <span id="breakoutKpiTextFire">Breaking Out</span>
+                <!-- Presets & Custom Date Range Toolbar -->
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.6rem;padding:0.55rem 0.75rem;background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.25);border-radius:8px;margin-bottom:0.85rem;">
+                    <!-- Quick Presets -->
+                    <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                        <span style="color:#64748b;font-size:0.72rem;font-weight:700;margin-right:0.2rem;">⏱️ Presets:</span>
+                        <button type="button" id="btnBkTrackedPreset_1" onclick="app.setTrackedBreakoutPreset(1)" class="btn-micro bk-tracked-preset" data-days="1">📍 1 Day (24h)</button>
+                        <button type="button" id="btnBkTrackedPreset_3" onclick="app.setTrackedBreakoutPreset(3)" class="btn-micro bk-tracked-preset" data-days="3">⚡ 3 Days</button>
+                        <button type="button" id="btnBkTrackedPreset_7" onclick="app.setTrackedBreakoutPreset(7)" class="btn-micro bk-tracked-preset bk-preset-active" data-days="7">⚡ 7 Days</button>
+                        <button type="button" id="btnBkTrackedPreset_14" onclick="app.setTrackedBreakoutPreset(14)" class="btn-micro bk-tracked-preset" data-days="14">⚡ 14 Days</button>
+                        <button type="button" id="btnBkTrackedPreset_30" onclick="app.setTrackedBreakoutPreset(30)" class="btn-micro bk-tracked-preset" data-days="30">⚡ 30 Days</button>
+                        <button type="button" id="btnBkTrackedPreset_all" onclick="app.setTrackedBreakoutPreset('all')" class="btn-micro bk-tracked-preset" data-days="all">🌐 All Time</button>
                     </div>
-                    <div style="font-size:1.6rem;font-weight:800;color:#fdba74;font-family:var(--font-mono);display:flex;align-items:baseline;gap:0.35rem;">
-                        <span id="breakoutStatBreakingCount">0</span>
-                        <span id="breakoutStatBreakingSub" style="font-size:0.72rem;font-weight:700;color:#f97316;">Active</span>
+
+                    <!-- Custom Date Range Picker -->
+                    <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                        <span style="font-size:0.72rem;color:#94a3b8;font-weight:600;">📅 Date Range:</span>
+                        <input id="breakoutTrackedStartDate" type="date" style="background:#030712;border:1px solid rgba(255,255,255,0.18);border-radius:4px;color:#f8fafc;font-size:0.72rem;padding:0.2rem 0.4rem;font-family:var(--font-mono);outline:none;" />
+                        <span style="color:#64748b;font-size:0.72rem;">to</span>
+                        <input id="breakoutTrackedEndDate" type="date" style="background:#030712;border:1px solid rgba(255,255,255,0.18);border-radius:4px;color:#f8fafc;font-size:0.72rem;padding:0.2rem 0.4rem;font-family:var(--font-mono);outline:none;" />
+                        <button type="button" onclick="app.applyTrackedBreakoutDateRange()" class="btn btn-primary btn-sm" style="padding:0.25rem 0.65rem;font-size:0.72rem;font-weight:700;">
+                            Apply Range
+                        </button>
+                        <button type="button" onclick="app.clearTrackedBreakoutDateRange()" class="btn btn-secondary btn-sm" style="padding:0.25rem 0.45rem;font-size:0.72rem;" title="Reset date filters">
+                            ✕
+                        </button>
                     </div>
-                    <div id="breakoutKpiSubFire" style="font-size:0.67rem;color:#c2410c;margin-top:0.15rem;">Price &ge; Trigger Level</div>
                 </div>
-                <!-- Total Candidates -->
-                <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(59,130,246,0.25);border-top:2px solid #3b82f6;">
-                    <div id="breakoutKpiLabel1" style="font-size:0.68rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Candidates</div>
-                    <div style="font-size:1.6rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);"><span id="breakoutStatTotal">—</span></div>
-                    <div id="breakoutKpiSub1" style="font-size:0.67rem;color:#475569;margin-top:0.15rem;">Setups Identified</div>
-                </div>
-                <!-- Top Score or Win Rate -->
-                <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(234,179,8,0.25);border-top:2px solid #eab308;">
-                    <div id="breakoutKpiLabel2" style="font-size:0.68rem;color:#fbbf24;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Top Score</div>
-                    <div style="font-size:1.6rem;font-weight:800;color:#fde68a;font-family:var(--font-mono);"><span id="breakoutStatTopScore">—</span></div>
-                    <div id="breakoutStatTopTicker" style="font-size:0.67rem;color:#92400e;margin-top:0.15rem;">—</div>
-                </div>
-                <!-- Avg Score or Avg Return -->
-                <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(16,185,129,0.25);border-top:2px solid #10b981;">
-                    <div id="breakoutKpiLabel3" style="font-size:0.68rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Avg Score</div>
-                    <div style="font-size:1.6rem;font-weight:800;color:#6ee7b7;font-family:var(--font-mono);"><span id="breakoutStatAvg">—</span></div>
-                    <div id="breakoutKpiSub3" style="font-size:0.67rem;color:#065f46;margin-top:0.15rem;">Composite Average</div>
-                </div>
-                <!-- Tickers Scanned -->
-                <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(148,163,184,0.15);border-top:2px solid #475569;">
-                    <div id="breakoutKpiLabel4" style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Universe</div>
-                    <div style="font-size:1.6rem;font-weight:800;color:#cbd5e1;font-family:var(--font-mono);"><span id="breakoutStatScanned">—</span></div>
-                    <div id="breakoutKpiSub4" style="font-size:0.67rem;color:#334155;margin-top:0.15rem;">Tickers Scanned</div>
-                </div>
-                <!-- Last Duration / As-Of Date -->
-                <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(139,92,246,0.2);border-top:2px solid #8b5cf6;">
-                    <div id="breakoutKpiLabel5" style="font-size:0.68rem;color:#a78bfa;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Scan Mode</div>
-                    <div style="font-size:1.6rem;font-weight:800;color:#c4b5fd;font-family:var(--font-mono);"><span id="breakoutStatDuration">—</span></div>
-                    <div id="breakoutKpiSub5" style="font-size:0.67rem;color:#3b0764;margin-top:0.15rem;">Point-in-Time Status</div>
-                </div>
-            </div>
 
-            <!-- Score Breakdown Legend -->
-            <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.65rem;font-size:0.68rem;color:#64748b;">
-                <span style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.25);padding:0.1rem 0.45rem;border-radius:4px;">🎯 Proximity 0-40</span>
-                <span style="background:rgba(59,130,246,0.12);color:#60a5fa;border:1px solid rgba(59,130,246,0.25);padding:0.1rem 0.45rem;border-radius:4px;">📊 Volume 0-10</span>
-                <span style="background:rgba(234,179,8,0.12);color:#fbbf24;border:1px solid rgba(234,179,8,0.25);padding:0.1rem 0.45rem;border-radius:4px;">🗜️ Compression 0-10</span>
-                <span style="background:rgba(16,185,129,0.12);color:#34d399;border:1px solid rgba(16,185,129,0.25);padding:0.1rem 0.45rem;border-radius:4px;">🚀 Momentum 0-25</span>
-                <span style="background:rgba(139,92,246,0.12);color:#a78bfa;border:1px solid rgba(139,92,246,0.25);padding:0.1rem 0.45rem;border-radius:4px;">📈 Fundamental 0-15</span>
-                <span style="margin-left:auto;font-style:italic;">Max composite = 100</span>
-            </div>
+                <!-- KPI Performance Summary Cards for Tracked Signals -->
+                <div id="breakoutTrackedKpiCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.65rem;margin-bottom:0.85rem;">
+                    <!-- Total Tracked Setups -->
+                    <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(56,189,248,0.3);border-top:2px solid #38bdf8;">
+                        <div style="font-size:0.68rem;color:#38bdf8;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Total Tracked</div>
+                        <div style="font-size:1.6rem;font-weight:800;color:#f0f9ff;font-family:var(--font-mono);"><span id="bkTrackedKpiTotal">—</span></div>
+                        <div id="bkTrackedKpiPeriodSub" style="font-size:0.67rem;color:#64748b;margin-top:0.15rem;">In Selected Window</div>
+                    </div>
 
-            <!-- Candidates Table -->
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;font-size:0.68rem;color:#64748b;">
-                <span>💡 <strong>Moveable Columns:</strong> Drag & drop column headers to reorder • Click headers to sort</span>
-                <span id="breakoutColOrderNotice" style="color:#38bdf8;font-weight:600;display:none;">Custom Layout Saved</span>
-            </div>
-            <div class="table-wrapper breakout-table-wrapper" style="overflow:auto;max-height:calc(100vh - 240px);min-height:360px;border-radius:0.6rem;border:1px solid rgba(255,255,255,0.08);background:#000000;">
-                <table id="breakoutTable" style="width:100%;border-collapse:collapse;font-size:0.74rem;">
-                    <thead>
-                        <tr id="breakoutTableHeaderRow" style="background:#0a0f1e;border-bottom:1px solid rgba(255,255,255,0.1);">
-                            <!-- Rendered dynamically by app.renderBreakoutTableHeader() -->
-                        </tr>
-                    </thead>
-                    <tbody id="breakoutTableBody">
-                        <tr>
-                            <td colspan="9" style="padding:2.5rem;text-align:center;color:#334155;font-size:0.85rem;">
-                                ⚡ Background scanner is warming up… Switch back in 30 seconds.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                    <!-- Win Rate / Target Hit % -->
+                    <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(16,185,129,0.3);border-top:2px solid #10b981;">
+                        <div style="font-size:0.68rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Win Rate / Target Hit</div>
+                        <div style="font-size:1.6rem;font-weight:800;color:#6ee7b7;font-family:var(--font-mono);"><span id="bkTrackedKpiWinRate">—</span></div>
+                        <div id="bkTrackedKpiWinSub" style="font-size:0.67rem;color:#065f46;margin-top:0.15rem;">Hit Target / Positive Return</div>
+                    </div>
 
-            <!-- Footer note -->
-            <div style="margin-top:0.55rem;font-size:0.68rem;color:#334155;display:flex;align-items:center;gap:0.4rem;">
-                <span>🔄 Real-time scanner refreshes periodically.</span>
-                <span>·</span>
-                <span>Select any historical date using the date picker above to audit past breakout setup performance.</span>
+                    <!-- Avg Realized Return % -->
+                    <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(59,130,246,0.3);border-top:2px solid #3b82f6;">
+                        <div style="font-size:0.68rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Avg Return</div>
+                        <div style="font-size:1.6rem;font-weight:800;color:#93c5fd;font-family:var(--font-mono);"><span id="bkTrackedKpiAvgReturn">—</span></div>
+                        <div style="font-size:0.67rem;color:#1e3a8a;margin-top:0.15rem;">Post-Signal Mean Return</div>
+                    </div>
+
+                    <!-- Top Peak Performer -->
+                    <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(234,179,8,0.3);border-top:2px solid #eab308;">
+                        <div style="font-size:0.68rem;color:#fbbf24;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Top Return</div>
+                        <div style="font-size:1.6rem;font-weight:800;color:#fde68a;font-family:var(--font-mono);"><span id="bkTrackedKpiMaxReturn">—</span></div>
+                        <div id="bkTrackedKpiTopTicker" style="font-size:0.67rem;color:#92400e;margin-top:0.15rem;">—</div>
+                    </div>
+
+                    <!-- Active vs Triggered Count -->
+                    <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(249,115,22,0.3);border-top:2px solid #f97316;">
+                        <div style="font-size:0.68rem;color:#fb923c;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Fired & Active</div>
+                        <div style="font-size:1.6rem;font-weight:800;color:#fed7aa;font-family:var(--font-mono);"><span id="bkTrackedKpiActiveCount">—</span></div>
+                        <div id="bkTrackedKpiActiveSub" style="font-size:0.67rem;color:#9a3412;margin-top:0.15rem;">Live Breakouts</div>
+                    </div>
+                </div>
+
+                <!-- Tracked Signals Archive Data Table -->
+                <div class="table-wrapper" style="overflow:auto;max-height:calc(100vh - 270px);min-height:380px;border-radius:0.6rem;border:1px solid rgba(255,255,255,0.08);background:#000000;">
+                    <table id="breakoutTrackedTable" style="width:100%;border-collapse:collapse;font-size:0.74rem;">
+                        <thead>
+                            <tr style="background:#0a0f1e;border-bottom:1px solid rgba(255,255,255,0.1);">
+                                <th style="padding:0.65rem 0.85rem;text-align:left;color:#94a3b8;font-weight:700;">Stock & Archetype</th>
+                                <th style="padding:0.65rem 0.85rem;text-align:left;color:#94a3b8;font-weight:700;">Signal Date & Age</th>
+                                <th style="padding:0.65rem 0.6rem;text-align:center;color:#94a3b8;font-weight:700;">Tier</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Signal Price</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Trigger Level</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Target Price</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Stop Loss</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Current Price</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Return %</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Max Gain %</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:center;color:#94a3b8;font-weight:700;">Outcome Status</th>
+                                <th style="padding:0.65rem 0.6rem;text-align:center;color:#94a3b8;font-weight:700;">Score</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:center;color:#94a3b8;font-weight:700;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="breakoutTrackedTableBody">
+                            <tr>
+                                <td colspan="13" style="padding:3rem;text-align:center;color:#64748b;font-size:0.85rem;">
+                                    📜 Loading tracked breakouts archive...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Footer note -->
+                <div style="margin-top:0.55rem;font-size:0.68rem;color:#475569;display:flex;align-items:center;gap:0.4rem;">
+                    <span>🛡️ Permanent archive tracks real-world outcome accuracy from the moment a breakout setup was identified.</span>
+                    <span>·</span>
+                    <span>Click on any stock to open deep multi-model consensus and quantitative trajectory matrix.</span>
+                </div>
             </div>
         </div>
 
@@ -384,21 +572,40 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
 }
-#breakoutTable tbody tr:hover {
+#breakoutTable tbody tr:hover, #breakoutTrackedTable tbody tr:hover {
     background: rgba(59,130,246,0.06);
 }
+/* Sub-tab button styles */
+.bk-subtab-btn {
+    background: rgba(255,255,255,0.04);
+    color: #94a3b8;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.2s ease;
+}
+.bk-subtab-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: #f8fafc;
+}
+.bk-subtab-btn.bk-subtab-active {
+    background: rgba(56,189,248,0.15) !important;
+    color: #38bdf8 !important;
+    border-color: rgba(56,189,248,0.45) !important;
+    box-shadow: 0 0 0 1px rgba(56,189,248,0.25);
+}
 /* Date preset button states */
-.bk-preset-btn {
+.bk-preset-btn, .bk-tracked-preset {
     background: rgba(255,255,255,0.05);
     color: #64748b;
     border: 1px solid rgba(255,255,255,0.08);
     transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    cursor: pointer;
+    font-weight: 600;
 }
-.bk-preset-btn:hover {
+.bk-preset-btn:hover, .bk-tracked-preset:hover {
     background: rgba(255,255,255,0.09);
     color: #94a3b8;
 }
-.bk-preset-btn.bk-preset-active {
+.bk-preset-btn.bk-preset-active, .bk-tracked-preset.bk-preset-active {
     background: rgba(59,130,246,0.2) !important;
     color: #60a5fa !important;
     border-color: rgba(59,130,246,0.45) !important;

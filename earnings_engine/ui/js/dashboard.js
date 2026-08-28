@@ -1625,14 +1625,22 @@
                     // Lazy-load on first visit; start auto-polling while active
                     if (!this._breakoutLoaded) {
                         this._breakoutLoaded = true;
-                        this.loadBreakoutRadar();
+                        if (this._activeBreakoutSubtab === 'tracked') {
+                            this.loadTrackedBreakouts();
+                        } else {
+                            this.loadBreakoutRadar();
+                        }
                     }
                     this.loadAutomationSchedules();
                     this.loadBreakoutAuditLog();
                     // Start 5-minute auto-poll (cleared when leaving the tab)
                     this._breakoutPollTimer = setInterval(() => {
                         if (document.getElementById('tab-breakout')?.classList.contains('active')) {
-                            this.loadBreakoutRadar();
+                            if (this._activeBreakoutSubtab === 'tracked') {
+                                this.loadTrackedBreakouts();
+                            } else {
+                                this.loadBreakoutRadar();
+                            }
                             this.loadAutomationSchedules();
                         } else {
                             clearInterval(this._breakoutPollTimer);
@@ -13547,7 +13555,322 @@
                 }, 150);
             } else {
                 window.open('/stock/' + encodeURIComponent(ticker) + '#kronos', '_blank');
+        // =========================================================================
+        // 📜 TRACKED BREAKOUTS HISTORY CONTROLLER
+        // =========================================================================
+        app._trackedBreakoutsData = [];
+        app._trackedBreakoutPresetDays = 7;
+        app._activeBreakoutSubtab = 'scanner';
+
+        app.switchBreakoutSubtab = function(subtab) {
+            app._activeBreakoutSubtab = subtab;
+            const scannerView = document.getElementById('breakoutLiveScannerContainer');
+            const trackedView = document.getElementById('breakoutTrackedContainer');
+            const btnScanner = document.getElementById('btnBreakoutSubtabScanner');
+            const btnTracked = document.getElementById('btnBreakoutSubtabTracked');
+            const contextLabel = document.getElementById('bkSubtabContextLabel');
+
+            if (subtab === 'tracked') {
+                if (scannerView) scannerView.style.display = 'none';
+                if (trackedView) trackedView.style.display = 'block';
+                if (btnScanner) btnScanner.classList.remove('bk-subtab-active');
+                if (btnTracked) btnTracked.classList.add('bk-subtab-active');
+                if (contextLabel) contextLabel.textContent = '📜 Permanent Tracked Breakout Signals & Audited Outcome Matrix';
+                app.loadTrackedBreakouts();
+            } else {
+                if (scannerView) scannerView.style.display = 'block';
+                if (trackedView) trackedView.style.display = 'none';
+                if (btnScanner) btnScanner.classList.add('bk-subtab-active');
+                if (btnTracked) btnTracked.classList.remove('bk-subtab-active');
+                if (contextLabel) contextLabel.textContent = '⚡ Active Breakout Radar & Point-in-Time Setup Engine';
             }
+        };
+
+        app.setTrackedBreakoutPreset = function(days) {
+            app._trackedBreakoutPresetDays = days;
+            const startInput = document.getElementById('breakoutTrackedStartDate');
+            const endInput = document.getElementById('breakoutTrackedEndDate');
+            if (startInput) startInput.value = '';
+            if (endInput) endInput.value = '';
+
+            document.querySelectorAll('.bk-tracked-preset').forEach(btn => {
+                const btnDays = btn.getAttribute('data-days');
+                if (String(btnDays) === String(days)) {
+                    btn.classList.add('bk-preset-active');
+                } else {
+                    btn.classList.remove('bk-preset-active');
+                }
+            });
+
+            app.loadTrackedBreakouts();
+        };
+
+        app.applyTrackedBreakoutDateRange = function() {
+            const startInput = document.getElementById('breakoutTrackedStartDate');
+            const endInput = document.getElementById('breakoutTrackedEndDate');
+            if (!startInput?.value && !endInput?.value) {
+                alert('Please pick a start or end date.');
+                return;
+            }
+            // Deselect preset buttons
+            document.querySelectorAll('.bk-tracked-preset').forEach(btn => btn.classList.remove('bk-preset-active'));
+            app._trackedBreakoutPresetDays = null;
+            app.loadTrackedBreakouts();
+        };
+
+        app.clearTrackedBreakoutDateRange = function() {
+            const startInput = document.getElementById('breakoutTrackedStartDate');
+            const endInput = document.getElementById('breakoutTrackedEndDate');
+            if (startInput) startInput.value = '';
+            if (endInput) endInput.value = '';
+            app.setTrackedBreakoutPreset(7);
+        };
+
+        app.loadTrackedBreakouts = async function(isLive = false) {
+            const tbody = document.getElementById('breakoutTrackedTableBody');
+            const liveBtn = document.getElementById('btnTrackedLiveRefresh');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="13" style="text-align:center;padding:2.5rem;color:#64748b;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading permanently tracked breakouts...</td></tr>`;
+            }
+            if (isLive && liveBtn) {
+                liveBtn.disabled = true;
+                liveBtn.innerHTML = '<span>⏳</span> Refreshing Quotes...';
+            }
+
+            const tier = document.getElementById('breakoutTrackedTierFilter')?.value || 'ALL';
+            const outcome = document.getElementById('breakoutTrackedOutcomeFilter')?.value || 'ALL';
+            const sortBy = document.getElementById('breakoutTrackedSortBy')?.value || 'signal_date';
+            const startVal = document.getElementById('breakoutTrackedStartDate')?.value || '';
+            const endVal = document.getElementById('breakoutTrackedEndDate')?.value || '';
+
+            const params = new URLSearchParams();
+            if (startVal) params.set('start_date', startVal);
+            if (endVal) params.set('end_date', endVal);
+            if (!startVal && !endVal && app._trackedBreakoutPresetDays && app._trackedBreakoutPresetDays !== 'all') {
+                params.set('days', String(app._trackedBreakoutPresetDays));
+            }
+            if (tier && tier !== 'ALL') params.set('tier', tier);
+            if (outcome && outcome !== 'ALL') params.set('outcome', outcome);
+            if (sortBy) params.set('sort_by', sortBy);
+            if (isLive) params.set('live', 'true');
+            params.set('limit', '200');
+
+            try {
+                const res = await fetch(API_BASE + '/api/v1/breakout/tracked?' + params.toString());
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+
+                app._trackedBreakoutsData = data.items || [];
+                const summary = data.summary || {};
+                const timeframe = data.timeframe || {};
+
+                // Update badge count
+                const badgeCount = document.getElementById('bkTrackedCountBadge');
+                if (badgeCount) badgeCount.textContent = String(data.total_count || 0);
+
+                // Update Timeframe label
+                const tfLabel = document.getElementById('breakoutTrackedTimeframeLabel');
+                if (tfLabel) {
+                    if (timeframe.start_date && timeframe.end_date) {
+                        tfLabel.textContent = `Filtered range: ${timeframe.start_date} to ${timeframe.end_date} (${data.total_count || 0} setups)`;
+                    } else if (timeframe.preset_days) {
+                        tfLabel.textContent = `Last ${timeframe.preset_days} Day(s) window (${data.total_count || 0} setups) • As of ${new Date().toLocaleTimeString()}`;
+                    } else {
+                        tfLabel.textContent = `All-Time Tracked Archive (${data.total_count || 0} setups) • As of ${new Date().toLocaleTimeString()}`;
+                    }
+                }
+
+                // Update KPI Cards
+                const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+                setEl('bkTrackedKpiTotal', summary.total_tracked != null ? summary.total_tracked : '—');
+                setEl('bkTrackedKpiWinRate', summary.win_rate_pct != null ? `${summary.win_rate_pct}%` : '—');
+                setEl('bkTrackedKpiAvgReturn', summary.avg_return_pct != null ? `${summary.avg_return_pct >= 0 ? '+' : ''}${summary.avg_return_pct}%` : '—');
+                setEl('bkTrackedKpiMaxReturn', summary.max_return_pct != null ? `${summary.max_return_pct >= 0 ? '+' : ''}${summary.max_return_pct}%` : '—');
+                setEl('bkTrackedKpiTopTicker', summary.max_return_ticker || '—');
+                setEl('bkTrackedKpiActiveCount', `${summary.active_count || 0} active / ${summary.triggered_count || 0} fired`);
+
+                app.renderTrackedBreakoutsTable(app._trackedBreakoutsData);
+            } catch (e) {
+                console.error('[BREAKOUT-TRACKED] Load error:', e);
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="13" style="text-align:center;padding:2rem;color:#f87171;">Failed to load tracked breakouts: ${e.message}</td></tr>`;
+                }
+            } finally {
+                if (isLive && liveBtn) {
+                    liveBtn.disabled = false;
+                    liveBtn.innerHTML = '<span>⚡</span> Refresh Live Quotes';
+                }
+            }
+        };
+
+        app.renderTrackedBreakoutsTable = function(items) {
+            const tbody = document.getElementById('breakoutTrackedTableBody');
+            if (!tbody) return;
+
+            if (!items || items.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="13" style="padding:3rem;text-align:center;color:#64748b;font-size:0.85rem;">
+                            📜 No breakout signals found in the selected timeframe or filter.<br>
+                            <span style="font-size:0.75rem;color:#475569;margin-top:0.3rem;display:inline-block;">Try selecting "⚡ 7 Days" or "🌐 All Time" presets to view historical setups.</span>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = items.map(c => {
+                const sym = c.ticker || '—';
+                const name = (c.company_name || sym).substring(0, 22);
+                const ind = (c.industry || 'Equities').substring(0, 16);
+                const tier = (c.tier || 'WARM').toUpperCase();
+                const tierColor = tier === 'HOT' ? '#f87171' : '#fbbf24';
+                const tierBg = tier === 'HOT' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)';
+
+                const sigDate = c.signal_date || '—';
+                const daysElapsed = c.days_elapsed != null ? c.days_elapsed : 0;
+                const ageLabel = daysElapsed === 0 ? 'Today' : `${daysElapsed}d ago`;
+
+                const sigP = c.signal_price != null ? `₹${Number(c.signal_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+                const trigP = c.breakout_trigger != null ? `₹${Number(c.breakout_trigger).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+                const targetP = c.target_price != null ? `₹${Number(c.target_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+                const stopP = c.stop_loss != null ? `₹${Number(c.stop_loss).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+                const curP = c.current_price != null ? `₹${Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+
+                // Return styling
+                const ret = c.realized_return_pct;
+                const retColor = ret > 0 ? '#34d399' : (ret < 0 ? '#f87171' : '#94a3b8');
+                const retBg = ret > 0 ? 'rgba(16,185,129,0.15)' : (ret < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)');
+                const retFormatted = ret != null ? `${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%` : '—';
+
+                // Peak Max Gain
+                const maxGain = c.max_gain_pct;
+                const maxGainStr = maxGain != null ? `<span style="color:#34d399;font-weight:700;font-family:var(--font-mono);">+${maxGain.toFixed(2)}%</span>` : '<span style="color:#64748b;">—</span>';
+
+                // Outcome badge
+                const outcome = c.outcome || 'ACTIVE';
+                let outcomeLabel = '⏳ Coiling';
+                let outcomeColor = '#94a3b8';
+                let outcomeBg = 'rgba(148,163,184,0.12)';
+                let outcomeBorder = 'rgba(148,163,184,0.25)';
+
+                if (outcome === 'TARGET_HIT') {
+                    outcomeLabel = '🎯 Target Hit';
+                    outcomeColor = '#34d399';
+                    outcomeBg = 'rgba(16,185,129,0.18)';
+                    outcomeBorder = 'rgba(16,185,129,0.45)';
+                } else if (outcome === 'TRIGGERED') {
+                    outcomeLabel = '🚀 Breakout Fired';
+                    outcomeColor = '#38bdf8';
+                    outcomeBg = 'rgba(56,189,248,0.18)';
+                    outcomeBorder = 'rgba(56,189,248,0.45)';
+                } else if (outcome === 'STOP_HIT') {
+                    outcomeLabel = '🛑 Stop Hit';
+                    outcomeColor = '#f87171';
+                    outcomeBg = 'rgba(239,68,68,0.18)';
+                    outcomeBorder = 'rgba(239,68,68,0.45)';
+                } else if (outcome === 'ACTIVE') {
+                    outcomeLabel = '⏳ Active Setup';
+                    outcomeColor = '#fbbf24';
+                    outcomeBg = 'rgba(245,158,11,0.15)';
+                    outcomeBorder = 'rgba(245,158,11,0.35)';
+                }
+
+                // Score
+                const score = c.composite_score || 0;
+                const scoreColor = score >= 75 ? '#fde68a' : (score >= 55 ? '#34d399' : '#60a5fa');
+
+                const archetype = c.setup_archetype || (score >= 60 ? '🔥 Breakout Setup' : '📈 Resistance Coil');
+
+                return `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;">
+                        <!-- Stock & Archetype -->
+                        <td style="padding:0.6rem 0.85rem;">
+                            <div style="display:flex;align-items:center;gap:0.45rem;">
+                                <a href="/stock/${encodeURIComponent(sym)}" target="_blank" style="font-weight:800;color:#f8fafc;font-family:var(--font-mono);font-size:0.8rem;text-decoration:none;" onmouseenter="this.style.color='#38bdf8'" onmouseleave="this.style.color='#f8fafc'">
+                                    ${sym}
+                                </a>
+                                <span style="font-size:0.62rem;color:#38bdf8;background:rgba(56,189,248,0.1);padding:0.08rem 0.35rem;border-radius:3px;font-weight:600;">${archetype}</span>
+                            </div>
+                            <div style="font-size:0.68rem;color:#94a3b8;margin-top:2px;">${name} &middot; <span style="color:#64748b;">${ind}</span></div>
+                        </td>
+
+                        <!-- Signal Date & Age -->
+                        <td style="padding:0.6rem 0.85rem;white-space:nowrap;">
+                            <div style="font-family:var(--font-mono);font-weight:700;color:#f1f5f9;font-size:0.75rem;">${sigDate}</div>
+                            <div style="font-size:0.65rem;color:#64748b;font-family:var(--font-mono);margin-top:1px;">🕒 ${ageLabel}</div>
+                        </td>
+
+                        <!-- Tier -->
+                        <td style="padding:0.6rem 0.6rem;text-align:center;">
+                            <span style="font-size:0.65rem;font-weight:800;background:${tierBg};color:${tierColor};border:1px solid ${tierColor}44;padding:0.12rem 0.45rem;border-radius:4px;">${tier}</span>
+                        </td>
+
+                        <!-- Signal Price -->
+                        <td style="padding:0.6rem 0.75rem;text-align:right;font-family:var(--font-mono);font-weight:600;color:#cbd5e1;">
+                            ${sigP}
+                        </td>
+
+                        <!-- Trigger Level -->
+                        <td style="padding:0.6rem 0.75rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#fcd34d;">
+                            ${trigP}
+                        </td>
+
+                        <!-- Target Price -->
+                        <td style="padding:0.6rem 0.75rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#34d399;">
+                            ${targetP}
+                        </td>
+
+                        <!-- Stop Loss -->
+                        <td style="padding:0.6rem 0.75rem;text-align:right;font-family:var(--font-mono);font-weight:600;color:#f87171;">
+                            ${stopP}
+                        </td>
+
+                        <!-- Current Price -->
+                        <td style="padding:0.6rem 0.75rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">
+                            ${curP}
+                        </td>
+
+                        <!-- Return % -->
+                        <td style="padding:0.6rem 0.75rem;text-align:right;">
+                            <span style="display:inline-block;font-family:var(--font-mono);font-weight:800;font-size:0.75rem;color:${retColor};background:${retBg};padding:0.15rem 0.45rem;border-radius:4px;">
+                                ${retFormatted}
+                            </span>
+                        </td>
+
+                        <!-- Max Gain % -->
+                        <td style="padding:0.6rem 0.75rem;text-align:right;font-size:0.75rem;">
+                            ${maxGainStr}
+                        </td>
+
+                        <!-- Outcome Status -->
+                        <td style="padding:0.6rem 0.75rem;text-align:center;white-space:nowrap;">
+                            <span style="display:inline-block;font-size:0.68rem;font-weight:700;background:${outcomeBg};color:${outcomeColor};border:1px solid ${outcomeBorder};padding:0.15rem 0.5rem;border-radius:4px;">
+                                ${outcomeLabel}
+                            </span>
+                        </td>
+
+                        <!-- Score -->
+                        <td style="padding:0.6rem 0.6rem;text-align:center;">
+                            <span style="font-family:var(--font-mono);font-weight:800;font-size:0.78rem;color:${scoreColor};background:rgba(59,130,246,0.15);padding:0.12rem 0.45rem;border-radius:4px;" title="Volume: ${c.volume_score || 0} • Resistance: ${c.resistance_score || 0} • Compression: ${c.compression_score || 0}">
+                                ${score.toFixed(0)}
+                            </span>
+                        </td>
+
+                        <!-- Actions -->
+                        <td style="padding:0.6rem 0.75rem;text-align:center;white-space:nowrap;">
+                            <div style="display:flex;align-items:center;justify-content:center;gap:0.3rem;">
+                                <a href="/stock/${encodeURIComponent(sym)}" target="_blank" class="btn btn-sm" style="background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:4px;text-decoration:none;" title="Open Stock Intelligence">
+                                    📊 Intel
+                                </a>
+                                <button type="button" onclick="app.openBreakoutNotesModal('${sym}')" class="btn btn-sm" style="background:#1e293b;color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);font-size:0.68rem;padding:0.2rem 0.45rem;border-radius:4px;" title="View AI Notes">
+                                    🧠
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         };
 
         // =========================================================================
