@@ -1501,6 +1501,9 @@
                 const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'gainers', 'breakout', 'institutional', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'home';
 
+                this.currentTab = name;
+                if (window.app) window.app.currentTab = name;
+
                 // Abort any pending fetch requests when switching tabs
                 this.cancelAllPendingRequests('Tab switched to ' + name);
 
@@ -11601,8 +11604,28 @@
         };
 
         app.openPageGuideModal = function(tabName) {
-            const currentTab = tabName || app.currentTab || 'results';
-            const guide = app.PAGE_GUIDES[currentTab] || app.PAGE_GUIDES['results'];
+            let currentTab = tabName || app.currentTab;
+            if (!currentTab) {
+                const activeNav = document.querySelector('.sidebar-nav-item.active');
+                if (activeNav) currentTab = activeNav.getAttribute('data-tab');
+            }
+            if (!currentTab) {
+                const activeContent = document.querySelector('.tab-content.active');
+                if (activeContent && activeContent.id) {
+                    currentTab = activeContent.id.replace('tab-', '');
+                }
+            }
+            if (!currentTab && window.location.hash) {
+                currentTab = window.location.hash.replace('#', '').replace('tab=', '');
+            }
+            currentTab = (currentTab || 'home').toLowerCase();
+
+            const guide = (app.PAGE_GUIDES && app.PAGE_GUIDES[currentTab]) 
+                ? app.PAGE_GUIDES[currentTab] 
+                : (app.PAGE_GUIDES ? (app.PAGE_GUIDES['home'] || app.PAGE_GUIDES['results']) : null);
+
+            if (!guide) return;
+
             const modal = document.getElementById('pageGuideModal');
             const titleEl = document.getElementById('pageGuideTitle');
             const iconEl = document.getElementById('pageGuideIcon');
@@ -11610,7 +11633,7 @@
             const bodyEl = document.getElementById('pageGuideBody');
 
             if (titleEl) titleEl.textContent = guide.title;
-            if (iconEl) iconEl.textContent = guide.icon;
+            if (iconEl) iconEl.textContent = guide.icon || '💡';
             if (subtitleEl) subtitleEl.textContent = `Nexus Quantitative Architecture & Calculations (${currentTab.toUpperCase()})`;
 
             if (bodyEl) {
