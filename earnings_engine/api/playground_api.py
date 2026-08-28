@@ -331,6 +331,12 @@ def get_ticker_overview(ticker: str) -> dict[str, Any]:
         "error": None,
     }
 
+    try:
+        from earnings_engine.rate_limits import record_request
+        record_request("yfinance")
+    except Exception:
+        pass
+
     yt = yf.Ticker(ticker)
 
     # --- name / currency / market cap via fast_info then .info fallback ---
@@ -403,6 +409,12 @@ def get_ticker_overview(ticker: str) -> dict[str, Any]:
 def get_ticker_history(ticker: str, period: str = "1mo", interval: str = "1d") -> list[dict[str, Any]]:
     """Fetch OHLCV history for one ticker as a list of row dicts."""
     import yfinance as yf
+
+    try:
+        from earnings_engine.rate_limits import record_request
+        record_request("yfinance")
+    except Exception:
+        pass
 
     try:
         df = yf.Ticker(ticker).history(period=period, interval=interval)

@@ -131,3 +131,16 @@ async def playground_nse_financial_calendar(
     except Exception as e:
         logger.exception("Error fetching NSE financial calendar for %s: %s", symbol, e)
         raise HTTPException(status_code=500, detail=f"Error fetching NSE financial calendar: {str(e)}")
+
+
+@router.get("/api/v1/playground/api-usage")
+async def playground_api_usage():
+    """Retrieve tracked API call counts and metrics for yfinance, nse, jugaad_data, and AI models."""
+    try:
+        from earnings_engine.rate_limits import get_api_usage_summary
+        data = await asyncio.to_thread(get_api_usage_summary, _settings)
+        return data
+    except Exception as e:
+        logger.exception("Error fetching playground API usage: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching API usage metrics: {str(e)}")
+

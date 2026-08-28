@@ -509,6 +509,13 @@ def predict_single_stock(
         proj_close = float(pred_df["close"].iloc[-1])
         support = round(float(pred_df["low"].min()), 2)
         resistance = round(float(pred_df["high"].max()), 2)
+
+        try:
+            from earnings_engine.rate_limits import record_request, record_generation
+            record_request("kronos")
+            record_generation("kronos", 500.0, is_local=True, success=True, ticker=symbol)
+        except Exception:
+            pass
         
         logger.info(
             "[PRED] %s | current=%s | projected=%s | support=%s | resistance=%s",

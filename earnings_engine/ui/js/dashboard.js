@@ -1608,10 +1608,13 @@
                     this.maybeShowKronosPrompt();
                 }
                 if (name === 'playground') {
+                    if (typeof this.loadPlaygroundApiUsage === 'function') {
+                        this.loadPlaygroundApiUsage();
+                    }
                     if (typeof this.loadAutomationSchedules === 'function') {
                         this.loadAutomationSchedules();
                     }
-                    if (!this.pg._initialized) {
+                    if (this.pg && !this.pg._initialized) {
                         this.pg.init();
                         this.pg._initialized = true;
                     }
@@ -15916,6 +15919,151 @@
                     btn.style.animation = '';
                     btn.disabled = false;
                 }
+            }
+        };
+
+        // =========================================================================
+        // 📊 Downstream & AI API Call Tracker Engine
+        // =========================================================================
+        app.loadPlaygroundApiUsage = async function() {
+            const tableBody = document.getElementById('pgApiUsageTableBody');
+            const asOfEl = document.getElementById('pgApiUsageAsOf');
+            try {
+                const res = await fetch(API_BASE + '/api/v1/playground/api-usage');
+                if (!res.ok) {
+                    if (tableBody) tableBody.innerHTML = '<tr><td colspan="7" style="padding:1.5rem;text-align:center;color:#ef4444;">Failed loading API usage metrics (HTTP ' + res.status + ')</td></tr>';
+                    return;
+                }
+                const data = await res.json();
+                if (asOfEl && data.as_of) {
+                    asOfEl.textContent = `As of ${data.as_of}`;
+                }
+
+                // Update Mini-Cards
+                const totals = data.totals || {};
+                const yfTotalEl = document.getElementById('pgYfTotalCalls');
+                const yfTodayEl = document.getElementById('pgYfTodayCalls');
+                if (yfTotalEl) yfTotalEl.textContent = (totals.yfinance_total || 0).toLocaleString();
+                if (yfTodayEl) yfTodayEl.textContent = (totals.yfinance_today || 0).toLocaleString();
+
+                const nseTotalEl = document.getElementById('pgNseTotalCalls');
+                const nseTodayEl = document.getElementById('pgNseTodayCalls');
+                if (nseTotalEl) nseTotalEl.textContent = (totals.nse_total || 0).toLocaleString();
+                if (nseTodayEl) nseTodayEl.textContent = (totals.nse_today || 0).toLocaleString();
+
+                const jugaadTotalEl = document.getElementById('pgJugaadTotalCalls');
+                const jugaadTodayEl = document.getElementById('pgJugaadTodayCalls');
+                if (jugaadTotalEl) jugaadTotalEl.textContent = (totals.jugaad_total || 0).toLocaleString();
+                if (jugaadTodayEl) jugaadTodayEl.textContent = (totals.jugaad_today || 0).toLocaleString();
+
+                const aiTotalEl = document.getElementById('pgAiTotalCalls');
+                const aiTodayEl = document.getElementById('pgAiTodayCalls');
+                if (aiTotalEl) aiTotalEl.textContent = (totals.ai_total || 0).toLocaleString();
+                if (aiTodayEl) aiTodayEl.textContent = (totals.ai_today || 0).toLocaleString();
+
+                if (!tableBody) return;
+
+                let html = '';
+
+                // Downstreams Header Group
+                html += `<tr style="background: rgba(30, 41, 59, 0.6); font-weight: 700; color: #94a3b8; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                    <td colspan="7" style="padding: 0.4rem 0.7rem; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06);">
+                        🏛️ Market Data &amp; Corporate Filings Downstreams
+                    </td>
+                </tr>`;
+
+                const downstreams = data.downstreams || [];
+                downstreams.forEach(d => {
+                    const statusColor = d.status === 'throttled' ? '#ef4444' : (d.status === 'warning' ? '#f59e0b' : '#34d399');
+                    const statusBg = d.status === 'throttled' ? 'rgba(239,68,68,0.15)' : (d.status === 'warning' ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)');
+                    const statusBorder = d.status === 'throttled' ? 'rgba(239,68,68,0.3)' : (d.status === 'warning' ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)');
+
+                    html += `<tr style="border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s ease;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='transparent'">
+                        <td style="padding: 0.55rem 0.7rem;">
+                            <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                <span style="font-size: 1.05rem;">${d.icon || '📦'}</span>
+                                <div>
+                                    <div style="font-weight: 700; color: #ffffff; font-size: 0.78rem;">${d.name}</div>
+                                    <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.05rem;">${d.description}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="padding: 0.55rem 0.55rem; text-align: right; font-family: var(--font-mono); font-weight: 700; color: #ffffff;">
+                            ${(d.total_calls || 0).toLocaleString()}
+                        </td>
+                        <td style="padding: 0.55rem 0.55rem; text-align: right; font-family: var(--font-mono); font-weight: 700; color: #38bdf8;">
+                            ${(d.calls_today || 0).toLocaleString()}
+                        </td>
+                        <td style="padding: 0.55rem 0.55rem; text-align: right; font-family: var(--font-mono); color: #cbd5e1;">
+                            ${(d.calls_1h || 0).toLocaleString()}
+                        </td>
+                        <td style="padding: 0.55rem 0.55rem; text-align: right; font-family: var(--font-mono); color: #94a3b8;">
+                            ${(d.calls_1m || 0).toLocaleString()}
+                        </td>
+                        <td style="padding: 0.55rem 0.65rem; text-align: right; font-family: var(--font-mono); font-size: 0.68rem; color: #94a3b8;">
+                            ${d.limit_1m}/min &bull; ${d.limit_24h}/day
+                        </td>
+                        <td style="padding: 0.55rem 0.65rem; text-align: center;">
+                            <span class="signal-badge" style="background: ${statusBg}; color: ${statusColor}; border: 1px solid ${statusBorder}; font-size: 0.62rem; padding: 0.12rem 0.45rem; border-radius: 4px;">
+                                ${d.status_badge || '🟢 Ready'}
+                            </span>
+                        </td>
+                    </tr>`;
+                });
+
+                // AI Models Header Group
+                html += `<tr style="background: rgba(30, 41, 59, 0.6); font-weight: 700; color: #94a3b8; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                    <td colspan="7" style="padding: 0.4rem 0.7rem; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06);">
+                        🤖 AI Reasoning &amp; Sequence Forecasting Models
+                    </td>
+                </tr>`;
+
+                const aiModels = data.ai_models || [];
+                aiModels.forEach(m => {
+                    const statusColor = m.status === 'throttled' ? '#ef4444' : (m.status === 'warning' ? '#f59e0b' : '#34d399');
+                    const statusBg = m.status === 'throttled' ? 'rgba(239,68,68,0.15)' : (m.status === 'warning' ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)');
+                    const statusBorder = m.status === 'throttled' ? 'rgba(239,68,68,0.3)' : (m.status === 'warning' ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)');
+
+                    html += `<tr style="border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s ease;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='transparent'">
+                        <td style="padding: 0.55rem 0.7rem;">
+                            <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                <span style="font-size: 1.05rem;">${m.icon || '🤖'}</span>
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                        <span style="font-weight: 700; color: #ffffff; font-size: 0.78rem;">${m.name}</span>
+                                        <span style="font-size: 0.60rem; padding: 0.05rem 0.3rem; border-radius: 3px; background: rgba(255,255,255,0.08); color: ${m.color || '#38bdf8'}; font-weight: 600;">${m.badge || m.id}</span>
+                                    </div>
+                                    <div style="font-size: 0.65rem; color: #64748b; margin-top: 0.05rem;">${m.description || m.id}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="padding: 0.55rem 0.55rem; text-align: right; font-family: var(--font-mono); font-weight: 700; color: #34d399;">
+                            ${(m.total_calls || 0).toLocaleString()}
+                        </td>
+                        <td style="padding: 0.55rem 0.55rem; text-align: right; font-family: var(--font-mono); font-weight: 700; color: #38bdf8;">
+                            ${(m.calls_today || 0).toLocaleString()}
+                        </td>
+                        <td style="padding: 0.55rem 0.55rem; text-align: right; font-family: var(--font-mono); color: #cbd5e1;">
+                            ${(m.calls_1h || 0).toLocaleString()}
+                        </td>
+                        <td style="padding: 0.55rem 0.55rem; text-align: right; font-family: var(--font-mono); color: #94a3b8;">
+                            ${(m.calls_1m || 0).toLocaleString()}
+                        </td>
+                        <td style="padding: 0.55rem 0.65rem; text-align: right; font-family: var(--font-mono); font-size: 0.68rem; color: #94a3b8;">
+                            ${m.remaining_1m !== undefined ? m.remaining_1m + ' rem/min' : '20/min'} &bull; ${m.remaining_24h !== undefined ? m.remaining_24h + ' rem/day' : '200/day'}
+                        </td>
+                        <td style="padding: 0.55rem 0.65rem; text-align: center;">
+                            <span class="signal-badge" style="background: ${statusBg}; color: ${statusColor}; border: 1px solid ${statusBorder}; font-size: 0.62rem; padding: 0.12rem 0.45rem; border-radius: 4px;">
+                                ${m.status_badge || '🟢 Ready'}
+                            </span>
+                        </td>
+                    </tr>`;
+                });
+
+                tableBody.innerHTML = html;
+            } catch (e) {
+                console.error('[API-USAGE] Error loading playground API usage:', e);
+                if (tableBody) tableBody.innerHTML = '<tr><td colspan="7" style="padding:1.5rem;text-align:center;color:#ef4444;">Error fetching API usage metrics</td></tr>';
             }
         };
 

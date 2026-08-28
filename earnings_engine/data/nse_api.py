@@ -81,6 +81,11 @@ def fetch_result_calendar(
             params={"from": _fmt(f), "to": _fmt(t), "index": "equities"},
             timeout=15,
         )
+        try:
+            from earnings_engine.rate_limits import record_request
+            record_request("nse", status_code=resp.status_code)
+        except Exception:
+            pass
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
@@ -103,6 +108,11 @@ def fetch_event_calendar(
             params={"from": _fmt(f), "to": _fmt(t), "index": "equities"},
             timeout=15,
         )
+        try:
+            from earnings_engine.rate_limits import record_request
+            record_request("nse", status_code=resp.status_code)
+        except Exception:
+            pass
         resp.raise_for_status()
         return resp.json()
     except Exception as e:

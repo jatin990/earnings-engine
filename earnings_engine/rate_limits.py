@@ -9,7 +9,7 @@ import collections
 import os
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 import requests
@@ -21,23 +21,6 @@ logger = get_logger("earnings_engine.rate_limits")
 
 # Downstream default criteria definition (Free tier and standard limits)
 DOWNSTREAM_CRITERIA: dict[str, dict[str, Any]] = {
-    "openrouter": {
-        "service_name": "OpenRouter AI (Consensus & LLMs)",
-        "icon": "🤖",
-        "description": "Multi-model reasoning via DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large.",
-        "free_tier_limits": {
-            "1m": 20,      # 20 requests per minute
-            "1h": 100,     # 100 requests per hour
-            "24h": 200,    # 200 requests per day (Free tier cap)
-        },
-        "default_limits": {
-            "1m": 60,
-            "1h": 500,
-            "24h": 2000,
-        },
-        "unit": "requests",
-        "docs_url": "https://openrouter.ai/docs/limits",
-    },
     "yfinance": {
         "service_name": "Yahoo Finance (Market & Price Data)",
         "icon": "📈",
@@ -89,22 +72,56 @@ DOWNSTREAM_CRITERIA: dict[str, dict[str, Any]] = {
         "unit": "requests",
         "docs_url": "https://jugaad-data.readthedocs.io/",
     },
-    "bse": {
-        "service_name": "BSE India (Corporate Actions & Filings)",
-        "icon": "🏢",
-        "description": "Bombay Stock Exchange corporate announcements, financial results, and insider trade disclosures.",
+    "openrouter": {
+        "service_name": "OpenRouter AI (Consensus & LLMs)",
+        "icon": "🤖",
+        "description": "Multi-model reasoning via DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large.",
         "free_tier_limits": {
-            "1m": 15,
-            "1h": 150,
-            "24h": 600,
+            "1m": 20,      # 20 requests per minute
+            "1h": 100,     # 100 requests per hour
+            "24h": 200,    # 200 requests per day (Free tier cap)
         },
         "default_limits": {
-            "1m": 30,
-            "1h": 300,
-            "24h": 1200,
+            "1m": 60,
+            "1h": 500,
+            "24h": 2000,
         },
         "unit": "requests",
-        "docs_url": "https://www.bseindia.com",
+        "docs_url": "https://openrouter.ai/docs/limits",
+    },
+    "kronos": {
+        "service_name": "Kronos AI (14-Day Sequence Forecaster)",
+        "icon": "⚡",
+        "description": "Deep sequence transformer generating 14-day price trajectories and support/resistance zones.",
+        "free_tier_limits": {
+            "1m": 60,
+            "1h": 500,
+            "24h": 2000,
+        },
+        "default_limits": {
+            "1m": 120,
+            "1h": 1000,
+            "24h": 5000,
+        },
+        "unit": "inferences",
+        "docs_url": "https://pytorch.org",
+    },
+    "local_ai": {
+        "service_name": "Local AI (Ollama / DeepSeek-R1 / Llama-3)",
+        "icon": "💻",
+        "description": "Offline on-device GPU inference. Free, unlimited, and private.",
+        "free_tier_limits": {
+            "1m": 9999,
+            "1h": 9999,
+            "24h": 9999,
+        },
+        "default_limits": {
+            "1m": 9999,
+            "1h": 9999,
+            "24h": 9999,
+        },
+        "unit": "inferences",
+        "docs_url": "https://ollama.com",
     },
     "gemini": {
         "service_name": "Google Gemini (Multimodal & News)",
@@ -122,6 +139,23 @@ DOWNSTREAM_CRITERIA: dict[str, dict[str, Any]] = {
         },
         "unit": "requests",
         "docs_url": "https://ai.google.dev/pricing",
+    },
+    "bse": {
+        "service_name": "BSE India (Corporate Actions & Filings)",
+        "icon": "🏢",
+        "description": "Bombay Stock Exchange corporate announcements, financial results, and insider trade disclosures.",
+        "free_tier_limits": {
+            "1m": 15,
+            "1h": 150,
+            "24h": 600,
+        },
+        "default_limits": {
+            "1m": 30,
+            "1h": 300,
+            "24h": 1200,
+        },
+        "unit": "requests",
+        "docs_url": "https://www.bseindia.com",
     },
 }
 
@@ -260,7 +294,7 @@ class RateLimitTracker:
             pass
 
     def hydrate_from_db(self, force: bool = False) -> None:
-        """Load all historical real model generation latencies from SQLite database table."""
+        """Load all historical real model generation latencies and API call counts from SQLite database."""
         if self._is_hydrated and not force:
             return
         try:
@@ -287,6 +321,19 @@ class RateLimitTracker:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_model ON ai_model_telemetry(model_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_ts ON ai_model_telemetry(timestamp)")
+
+            # Ensure downstream_api_calls table exists
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS downstream_api_calls (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    service TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    timestamp REAL NOT NULL,
+                    status_code INTEGER DEFAULT 200
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_api_calls_service ON downstream_api_calls(service)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_api_calls_ts ON downstream_api_calls(timestamp)")
             conn.commit()
 
             # Backfill from consensus_predictions if telemetry table is empty
@@ -346,8 +393,21 @@ class RateLimitTracker:
                         self._request_timestamps[m_id] = collections.deque(maxlen=10000)
                     self._request_timestamps[m_id].append(float(r[2]))
 
+            # Hydrate downstream API call timestamps from past 7 days
+            seven_days_ago = time.time() - 604800
+            call_rows = conn.execute(
+                "SELECT service, timestamp FROM downstream_api_calls WHERE timestamp >= ? ORDER BY timestamp ASC",
+                (seven_days_ago,)
+            ).fetchall()
+            with self._lock:
+                for s_name, s_ts in call_rows:
+                    s_key = str(s_name).lower().strip()
+                    if s_key not in self._request_timestamps:
+                        self._request_timestamps[s_key] = collections.deque(maxlen=10000)
+                    self._request_timestamps[s_key].append(float(s_ts))
+
             self._is_hydrated = True
-            logger.info("Hydrated %d empirical model generation records from ai_model_telemetry", len(rows))
+            logger.info("Hydrated %d empirical model generation records and %d API calls from DB", len(rows), len(call_rows))
         except Exception as e:
             logger.warning("Failed hydrating AI model telemetry from DB: %s", e)
 
@@ -359,6 +419,22 @@ class RateLimitTracker:
             if service_key not in self._request_timestamps:
                 self._request_timestamps[service_key] = collections.deque(maxlen=10000)
             self._request_timestamps[service_key].append(now)
+
+        # Asynchronously persist to downstream_api_calls
+        def _persist_call():
+            try:
+                from earnings_engine.config import Settings
+                from earnings_engine.data.db import get_db_connection
+                conn = get_db_connection(Settings())
+                created_at = datetime.now(timezone.utc).isoformat()
+                conn.execute(
+                    "INSERT INTO downstream_api_calls (service, created_at, timestamp, status_code) VALUES (?, ?, ?, ?)",
+                    (service_key, created_at, now, status_code)
+                )
+                conn.commit()
+            except Exception:
+                pass
+        threading.Thread(target=_persist_call, daemon=True).start()
 
     def record_generation(
         self,
@@ -822,6 +898,124 @@ class RateLimitTracker:
             return f"High latency degradation (1h avg {avg_1h:.0f}ms > 8000ms threshold)"
         return None
 
+    def get_api_usage_summary(self, settings: Settings | None = None) -> dict[str, Any]:
+        """Aggregate total API calls, today's calls (IST), 1h calls, and status for yfinance, nse, jugaad, and AI models."""
+        self.hydrate_from_db()
+        now = time.time()
+        ist_offset = timezone(timedelta(hours=5, minutes=30))
+        now_ist = datetime.now(ist_offset)
+        today_start_ist = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start_ts = today_start_ist.timestamp()
+
+        from earnings_engine.config import Settings
+        from earnings_engine.data.db import get_db_connection
+        settings = settings or Settings()
+
+        all_time_counts: dict[str, int] = {}
+        today_db_counts: dict[str, int] = {}
+        try:
+            conn = get_db_connection(settings)
+            rows = conn.execute("SELECT service, COUNT(*) FROM downstream_api_calls GROUP BY service").fetchall()
+            for s, c in rows:
+                all_time_counts[str(s).lower().strip()] = int(c)
+
+            today_rows = conn.execute("SELECT service, COUNT(*) FROM downstream_api_calls WHERE timestamp >= ? GROUP BY service", (today_start_ts,)).fetchall()
+            for s, c in today_rows:
+                today_db_counts[str(s).lower().strip()] = int(c)
+        except Exception as e:
+            logger.debug("Failed querying downstream_api_calls counts: %s", e)
+
+        downstreams: list[dict[str, Any]] = []
+        with self._lock:
+            for key, meta in DOWNSTREAM_CRITERIA.items():
+                ts_list = list(self._request_timestamps.get(key, []))
+                count_1m = sum(1 for t in ts_list if now - t <= 60)
+                count_1h = sum(1 for t in ts_list if now - t <= 3600)
+                count_today_mem = sum(1 for t in ts_list if t >= today_start_ts)
+
+                total_calls = max(len(ts_list), all_time_counts.get(key, 0))
+                calls_today = max(count_today_mem, today_db_counts.get(key, 0))
+
+                allowed_1m = meta["default_limits"].get("1m", 60)
+                allowed_1h = meta["default_limits"].get("1h", 500)
+                allowed_24h = meta["default_limits"].get("24h", 2000)
+
+                status = "ready"
+                status_badge = "🟢 Normal / Ready"
+                if count_1m >= allowed_1m:
+                    status = "throttled"
+                    status_badge = "🔴 Throttled (1m)"
+                elif count_1m >= allowed_1m * 0.8:
+                    status = "warning"
+                    status_badge = "🟡 High Traffic"
+
+                downstreams.append({
+                    "id": key,
+                    "name": meta["service_name"],
+                    "icon": meta["icon"],
+                    "description": meta["description"],
+                    "total_calls": total_calls,
+                    "calls_today": calls_today,
+                    "calls_1h": count_1h,
+                    "calls_1m": count_1m,
+                    "limit_1m": allowed_1m,
+                    "limit_1h": allowed_1h,
+                    "limit_24h": allowed_24h,
+                    "status": status,
+                    "status_badge": status_badge,
+                    "unit": meta.get("unit", "requests"),
+                    "docs_url": meta.get("docs_url", ""),
+                })
+
+        # AI Models summary
+        models_summary = self.get_models_summary()
+        ai_models: list[dict[str, Any]] = []
+        for m in models_summary:
+            m_id = m["id"].lower()
+            m_short = m_id.split("/")[-1]
+            all_calls = max(m.get("total_generations", 0), all_time_counts.get(m_id, 0), all_time_counts.get(m_short, 0))
+            today_calls = max(m.get("count_24h", 0), today_db_counts.get(m_id, 0), today_db_counts.get(m_short, 0))
+            ai_models.append({
+                "id": m["id"],
+                "name": m["name"],
+                "icon": m["icon"],
+                "badge": m["badge"],
+                "description": m["description"],
+                "color": m["color"],
+                "total_calls": all_calls,
+                "calls_today": today_calls,
+                "calls_1h": m.get("count_1h", 0),
+                "calls_1m": m.get("count_1m", 0),
+                "remaining_1m": m.get("remaining_1m", 20),
+                "remaining_24h": m.get("remaining_24h", 200),
+                "avg_latency_s": m.get("avg_return_time_s"),
+                "success_rate_pct": m.get("success_rate_pct", 100.0),
+                "status": m.get("status", "ready"),
+                "status_badge": m.get("status_badge", "🟢 Ready"),
+            })
+
+        total_all_time = sum(d["total_calls"] for d in downstreams) + sum(a["total_calls"] for a in ai_models)
+        total_today = sum(d["calls_today"] for d in downstreams) + sum(a["calls_today"] for a in ai_models)
+
+        return {
+            "success": True,
+            "as_of": now_ist.strftime("%Y-%m-%d %H:%M:%S IST"),
+            "totals": {
+                "total_calls_all_time": total_all_time,
+                "total_calls_today": total_today,
+                "yfinance_total": next((d["total_calls"] for d in downstreams if d["id"] == "yfinance"), 0),
+                "yfinance_today": next((d["calls_today"] for d in downstreams if d["id"] == "yfinance"), 0),
+                "nse_total": next((d["total_calls"] for d in downstreams if d["id"] == "nse"), 0),
+                "nse_today": next((d["calls_today"] for d in downstreams if d["id"] == "nse"), 0),
+                "jugaad_total": next((d["total_calls"] for d in downstreams if d["id"] == "jugaad_data"), 0),
+                "jugaad_today": next((d["calls_today"] for d in downstreams if d["id"] == "jugaad_data"), 0),
+                "ai_total": sum(a["total_calls"] for a in ai_models),
+                "ai_today": sum(a["calls_today"] for a in ai_models),
+            },
+            "downstreams": downstreams,
+            "ai_models": ai_models,
+        }
+
 
 # Global singleton instance
 tracker = RateLimitTracker()
@@ -840,6 +1034,11 @@ def update_openrouter_headers(headers: dict[str, Any]) -> None:
 def get_ratelimits_summary(settings: Settings | None = None) -> dict[str, Any]:
     """Retrieve the unified rate limit & quota payload."""
     return tracker.get_downstream_summary(settings)
+
+
+def get_api_usage_summary(settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve API usage and count metrics for yfinance, nse, jugaad_data, and AI models."""
+    return tracker.get_api_usage_summary(settings)
 
 
 def record_generation(
