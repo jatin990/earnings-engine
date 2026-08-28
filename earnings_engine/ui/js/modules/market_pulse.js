@@ -2,11 +2,15 @@
 // 🌐 Market Pulse & Macro Command Center Frontend Module
 // =========================================================================
 (function() {
-    const API_BASE = window.API_BASE || '';
+    const API_BASE = window.API_BASE || (window.location && window.location.origin) || '';
+    window.app = window.app || {};
+    const app = window.app;
 
     const marketPulseModule = {
         pulseData: null,
         _pulseLoaded: false,
+        _isFlowHistoryExpanded: false,
+        _lastFlowsData: null,
 
         async loadMarketPulseData(forceRefresh = false) {
             const timeEl = document.getElementById('pulseAsOfTime');
@@ -21,6 +25,10 @@
                 const data = await res.json();
                 this.pulseData = data;
                 this._pulseLoaded = true;
+                if (window.app) {
+                    window.app.pulseData = data;
+                    window.app._pulseLoaded = true;
+                }
 
                 if (timeEl) {
                     const now = new Date();
@@ -198,21 +206,31 @@
             const toggleBtn = document.getElementById('pulseToggleFlowHistoryBtn');
             const containerEl = document.getElementById('pulseFlowsTableContainer');
 
-            this._lastFlowsData = flows;
+            // Resolve robust flows data from whatever source is available
+            if (!flows || Object.keys(flows).length === 0) {
+                flows = this._lastFlowsData
+                    || (window.app && window.app._lastFlowsData)
+                    || (this.pulseData && this.pulseData.institutional_flows)
+                    || (window.app && window.app.pulseData && window.app.pulseData.institutional_flows)
+                    || {};
+            }
 
-            if (fiiEl) {
+            this._lastFlowsData = flows;
+            if (window.app) window.app._lastFlowsData = flows;
+
+            if (fiiEl && flows.fii_net_cr !== undefined && flows.fii_net_cr !== null) {
                 const s = flows.fii_net_cr >= 0 ? '+' : '';
-                fiiEl.textContent = `${s}₹${(flows.fii_net_cr || 0).toLocaleString()} Cr`;
+                fiiEl.textContent = `${s}₹${flows.fii_net_cr.toLocaleString()} Cr`;
                 fiiEl.style.color = flows.fii_net_cr >= 0 ? '#34d399' : '#f87171';
             }
-            if (diiEl) {
+            if (diiEl && flows.dii_net_cr !== undefined && flows.dii_net_cr !== null) {
                 const s = flows.dii_net_cr >= 0 ? '+' : '';
-                diiEl.textContent = `${s}₹${(flows.dii_net_cr || 0).toLocaleString()} Cr`;
+                diiEl.textContent = `${s}₹${flows.dii_net_cr.toLocaleString()} Cr`;
                 diiEl.style.color = flows.dii_net_cr >= 0 ? '#34d399' : '#f87171';
             }
-            if (totEl) {
+            if (totEl && flows.total_net_cr !== undefined && flows.total_net_cr !== null) {
                 const s = flows.total_net_cr >= 0 ? '+' : '';
-                totEl.textContent = `${s}₹${(flows.total_net_cr || 0).toLocaleString()} Cr`;
+                totEl.textContent = `${s}₹${flows.total_net_cr.toLocaleString()} Cr`;
                 totEl.style.color = flows.total_net_cr >= 0 ? '#38bdf8' : '#f87171';
             }
             if (biasEl && flows.bias) {
@@ -220,7 +238,7 @@
                 biasEl.style.color = flows.bias.includes('BULLISH') ? '#34d399' : '#f87171';
             }
 
-            const isExpanded = !!this._isFlowHistoryExpanded;
+            const isExpanded = !!(this._isFlowHistoryExpanded || (window.app && window.app._isFlowHistoryExpanded));
             const history = isExpanded
                 ? (flows.history_extended || flows.history_30d || flows.history_7d || [])
                 : (flows.history_7d || flows.past_7_days || []);
@@ -273,13 +291,16 @@
                 tbody7d.innerHTML = history.map((row, idx) => {
                     const isToday = idx === 0;
                     const rowBg = isToday ? 'rgba(56,189,248,0.06)' : 'transparent';
-                    const fiiSign = row.fii_net_cr >= 0 ? '+' : '';
-                    const diiSign = row.dii_net_cr >= 0 ? '+' : '';
-                    const totSign = row.total_net_cr >= 0 ? '+' : '';
-                    const fiiCol = row.fii_net_cr >= 0 ? '#34d399' : '#f87171';
-                    const diiCol = row.dii_net_cr >= 0 ? '#34d399' : '#f87171';
-                    const totCol = row.total_net_cr >= 0 ? '#38bdf8' : '#f87171';
-                    const isBull = row.total_net_cr >= 0;
+                    const fiiVal = row.fii_net_cr ?? 0;
+                    const diiVal = row.dii_net_cr ?? 0;
+                    const totVal = row.total_net_cr ?? (fiiVal + diiVal);
+                    const fiiSign = fiiVal >= 0 ? '+' : '';
+                    const diiSign = diiVal >= 0 ? '+' : '';
+                    const totSign = totVal >= 0 ? '+' : '';
+                    const fiiCol = fiiVal >= 0 ? '#34d399' : '#f87171';
+                    const diiCol = diiVal >= 0 ? '#34d399' : '#f87171';
+                    const totCol = totVal >= 0 ? '#38bdf8' : '#f87171';
+                    const isBull = totVal >= 0;
                     const badgeCol = isBull ? '#34d399' : '#f87171';
                     const badgeBg = isBull ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)';
                     const badgeText = isBull ? '🟢 Inflow' : '🔴 Outflow';
@@ -290,13 +311,13 @@
                                 ${row.day_label || row.date}
                             </td>
                             <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${fiiCol};font-weight:600;">
-                                ${fiiSign}₹${row.fii_net_cr.toLocaleString()}
+                                ${fiiSign}₹${fiiVal.toLocaleString()}
                             </td>
                             <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${diiCol};font-weight:600;">
-                                ${diiSign}₹${row.dii_net_cr.toLocaleString()}
+                                ${diiSign}₹${diiVal.toLocaleString()}
                             </td>
                             <td style="padding:0.35rem 0.5rem;text-align:right;font-family:var(--font-mono);color:${totCol};font-weight:700;">
-                                ${totSign}₹${row.total_net_cr.toLocaleString()}
+                                ${totSign}₹${totVal.toLocaleString()}
                             </td>
                             <td style="padding:0.35rem 0.5rem;text-align:center;">
                                 <span style="font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;background:${badgeBg};color:${badgeCol};font-weight:700;font-family:var(--font-mono);">
@@ -311,7 +332,12 @@
 
         toggleFlowHistory() {
             this._isFlowHistoryExpanded = !this._isFlowHistoryExpanded;
-            const flows = this._lastFlowsData || this.pulseData?.institutional_flows || {};
+            if (window.app) window.app._isFlowHistoryExpanded = this._isFlowHistoryExpanded;
+            const flows = this._lastFlowsData
+                || (window.app && window.app._lastFlowsData)
+                || this.pulseData?.institutional_flows
+                || (window.app && window.app.pulseData?.institutional_flows)
+                || {};
             this.renderInstitutionalFlows(flows);
         },
 
@@ -348,13 +374,5 @@
     };
 
     window.marketPulseModule = marketPulseModule;
-
-    // Attach onto window.app namespace
-    if (window.app) {
-        Object.assign(window.app, marketPulseModule);
-    } else {
-        window.addEventListener('DOMContentLoaded', () => {
-            if (window.app) Object.assign(window.app, marketPulseModule);
-        });
-    }
+    Object.assign(window.app, marketPulseModule);
 })();
