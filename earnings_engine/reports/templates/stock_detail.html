@@ -2902,34 +2902,210 @@
             });
         }
 
+        // =========================================================================
+        // ⭐ Stock Detail Multi-Playlist / Watchlist Modal
+        // =========================================================================
+        let stockAllPlaylists = [];
+
         async function toggleWatchlist() {
-            const isIn = !!(stockState && stockState.is_in_watchlist);
-            const btnW = document.getElementById('btnWatchlist');
-            if (btnW) btnW.disabled = true;
+            openStockWatchlistModal();
+        }
+
+        async function openStockWatchlistModal() {
+            const modal = document.getElementById('stockWatchlistModal');
+            const listContainer = document.getElementById('stockWlPlaylistsList');
+            const statusMsg = document.getElementById('stockWlStatusMsg');
+            const newNameInput = document.getElementById('stockWlNewName');
+
+            if (!modal) return;
+            if (newNameInput) newNameInput.value = '';
+            if (statusMsg) statusMsg.textContent = '';
+
+            modal.style.display = 'flex';
+
+            if (listContainer) {
+                listContainer.innerHTML = '<div style="padding:1rem;text-align:center;color:#64748b;font-size:0.75rem;"><div class="spinner" style="display:inline-block;margin-right:0.35rem;"></div> Fetching your playlists...</div>';
+            }
+
             try {
-                const endpoint = isIn ? '/api/v1/watchlist/remove' : '/api/v1/watchlist/add';
+                const res = await fetch('/api/v1/watchlist/all');
+                if (res.ok) {
+                    const data = await res.json();
+                    stockAllPlaylists = data.custom_lists || [];
+                } else {
+                    const resN = await fetch('/api/v1/watchlist/names');
+                    if (resN.ok) {
+                        const dataN = await resN.json();
+                        stockAllPlaylists = (dataN.watchlists || []).map(w => ({ name: w.name, tickers: [] }));
+                    }
+                }
+            } catch (e) {
+                console.warn('[STOCK-WATCHLIST] Error loading playlists:', e);
+            }
+
+            if (!stockAllPlaylists.length) {
+                stockAllPlaylists = [
+                    { name: 'my_watchlist', tickers: [] },
+                    { name: 'swing', tickers: [] }
+                ];
+            }
+
+            renderStockPlaylistsList();
+        }
+
+        function closeStockWatchlistModal() {
+            const modal = document.getElementById('stockWatchlistModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function renderStockPlaylistsList() {
+            const listContainer = document.getElementById('stockWlPlaylistsList');
+            if (!listContainer) return;
+
+            const ticker = ACTIVE_SYM;
+            const lists = stockAllPlaylists || [];
+
+            if (!lists.length) {
+                listContainer.innerHTML = '<div style="padding:0.75rem;text-align:center;color:#94a3b8;font-size:0.75rem;">No playlists found. Create one below!</div>';
+                return;
+            }
+
+            let isMemberAny = false;
+
+            listContainer.innerHTML = lists.map(w => {
+                const isMember = (w.tickers || []).includes(ticker);
+                if (isMember) isMemberAny = true;
+                const count = (w.tickers || []).length;
+                const displayName = w.name === 'my_watchlist' ? '⭐ my_watchlist (Default)' : (w.name === 'swing' ? '📈 swing (Setups)' : `📁 ${w.name}`);
+                const bg = isMember ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.02)';
+                const border = isMember ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.06)';
+                const badgeColor = isMember ? '#34d399' : '#94a3b8';
+                const badgeText = isMember ? '✓ In Playlist' : 'Click to Add';
+
+                return `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.55rem 0.75rem;background:${bg};border:1px solid ${border};border-radius:8px;cursor:pointer;transition:all 0.15s ease;" onclick="toggleStockPlaylistMembership('${w.name.replace(/'/g, "\\'")}')" onmouseover="this.style.borderColor='rgba(59,130,246,0.6)'" onmouseout="this.style.borderColor='${border}'">
+                        <div style="display:flex;align-items:center;gap:0.6rem;">
+                            <input type="checkbox" ${isMember ? 'checked' : ''} style="accent-color:#38bdf8;cursor:pointer;width:15px;height:15px;" onclick="event.stopPropagation(); toggleStockPlaylistMembership('${w.name.replace(/'/g, "\\'")}')">
+                            <div>
+                                <div style="font-size:0.82rem;font-weight:700;color:#f8fafc;">${displayName}</div>
+                                <div style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">${count} stock${count === 1 ? '' : 's'}</div>
+                            </div>
+                        </div>
+                        <span class="signal-badge" style="background:${isMember ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)'};color:${badgeColor};font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;">
+                            ${badgeText}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+
+            // Update topbar button text
+            const btnW = document.getElementById('btnWatchlist');
+            if (btnW) {
+                btnW.textContent = isMemberAny ? '★ In Watchlist' : '☆ Add to Watchlist';
+                btnW.classList.toggle('active', isMemberAny);
+            }
+        }
+
+        async function toggleStockPlaylistMembership(playlistName) {
+            if (!ACTIVE_SYM || !playlistName) return;
+            const ticker = ACTIVE_SYM;
+            const statusMsg = document.getElementById('stockWlStatusMsg');
+
+            const listObj = (stockAllPlaylists || []).find(w => w.name === playlistName);
+            const isCurrentlyMember = listObj ? (listObj.tickers || []).includes(ticker) : false;
+            const endpoint = isCurrentlyMember ? '/api/v1/watchlist/remove' : '/api/v1/watchlist/add';
+
+            if (statusMsg) {
+                statusMsg.style.color = '#38bdf8';
+                statusMsg.textContent = isCurrentlyMember ? `Removing from ${playlistName}...` : `Adding to ${playlistName}...`;
+            }
+
+            try {
                 const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ticker: ACTIVE_SYM, name: 'my_watchlist' })
+                    body: JSON.stringify({ ticker: ticker, name: playlistName })
                 });
-                if (!res.ok) {
-                    const err = await res.json().catch(() => ({}));
-                    throw new Error(err.detail || 'Failed to update watchlist');
-                }
-                const newStatus = !isIn;
-                if (stockState) {
-                    stockState.is_in_watchlist = newStatus;
-                }
-                if (btnW) {
-                    btnW.textContent = newStatus ? '★ In Watchlist' : '☆ Add to Watchlist';
-                    btnW.classList.toggle('active', newStatus);
+                const data = await res.json();
+                if (data.success) {
+                    if (listObj) {
+                        if (isCurrentlyMember) {
+                            listObj.tickers = (listObj.tickers || []).filter(t => t !== ticker);
+                        } else {
+                            if (!listObj.tickers) listObj.tickers = [];
+                            listObj.tickers.push(ticker);
+                        }
+                    }
+                    renderStockPlaylistsList();
+
+                    if (statusMsg) {
+                        statusMsg.style.color = '#34d399';
+                        statusMsg.textContent = isCurrentlyMember ? `✓ Removed from ${playlistName}` : `✓ Added to ${playlistName}!`;
+                        setTimeout(() => { if (statusMsg) statusMsg.textContent = ''; }, 2500);
+                    }
+                } else {
+                    if (statusMsg) {
+                        statusMsg.style.color = '#f87171';
+                        statusMsg.textContent = data.error || 'Operation failed';
+                    }
+                    alert(data.error || 'Failed to update playlist');
                 }
             } catch (e) {
-                console.error('Watchlist toggle error:', e);
-                alert('Error updating watchlist: ' + e.message);
-            } finally {
-                if (btnW) btnW.disabled = false;
+                console.error('[STOCK-WATCHLIST-TOGGLE] error:', e);
+                if (statusMsg) {
+                    statusMsg.style.color = '#f87171';
+                    statusMsg.textContent = 'Network error updating playlist';
+                }
+            }
+        }
+
+        async function createAndAddStockWatchlist() {
+            if (!ACTIVE_SYM) return;
+            const input = document.getElementById('stockWlNewName');
+            const name = (input ? input.value : '').trim();
+            const statusMsg = document.getElementById('stockWlStatusMsg');
+
+            if (!name) {
+                if (statusMsg) {
+                    statusMsg.style.color = '#fbbf24';
+                    statusMsg.textContent = 'Please enter a playlist name';
+                }
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/v1/watchlist/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        tickers: [ACTIVE_SYM]
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (input) input.value = '';
+                    stockAllPlaylists.push({
+                        name: name,
+                        tickers: [ACTIVE_SYM]
+                    });
+                    renderStockPlaylistsList();
+
+                    if (statusMsg) {
+                        statusMsg.style.color = '#34d399';
+                        statusMsg.textContent = `✓ Created "${name}" with ${ACTIVE_SYM}!`;
+                        setTimeout(() => { if (statusMsg) statusMsg.textContent = ''; }, 2500);
+                    }
+                } else {
+                    if (statusMsg) {
+                        statusMsg.style.color = '#f87171';
+                        statusMsg.textContent = data.error || 'Failed to create playlist';
+                    }
+                    alert(data.error || 'Failed to create watchlist.');
+                }
+            } catch (e) {
+                console.error('createAndAddStockWatchlist error:', e);
+                alert('Error creating new watchlist.');
             }
         }
 
@@ -3196,6 +3372,43 @@
             <div style="padding: 0.75rem 1.25rem; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; background: rgba(15,23,42,0.5); font-size: 0.72rem; color: #64748b;">
                 <span>💡 Nexus Quantitative Intelligence System</span>
                 <button type="button" onclick="closeStockCalcGuideModal()" class="btn btn-secondary" style="padding: 0.35rem 0.85rem; font-size: 0.75rem;">Got it</button>
+            </div>
+        </div>
+    <!-- MODAL: PLAYLIST / WATCHLIST SELECTOR FOR STOCK DETAIL -->
+    <div id="stockWatchlistModal" onclick="if(event.target === this) closeStockWatchlistModal();" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 1.25rem;">
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); width: 100%; max-width: 520px; border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; gap: 1rem; position: relative;">
+            <button type="button" onclick="closeStockWatchlistModal()" style="position: absolute; top: 1.15rem; right: 1.15rem; background: transparent; border: none; color: var(--text-tertiary); font-size: 1rem; cursor: pointer;">✕</button>
+            
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 1.3rem;">⭐</span>
+                <h3 style="margin: 0; font-size: 1.15rem; font-family: var(--font-heading); color: #ffffff;">Manage Watchlists & Playlists</h3>
+            </div>
+            
+            <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 0.65rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <span style="font-size: 1.15rem; font-weight: 800; font-family: var(--font-mono); color: #38bdf8;">{{ ticker }}</span>
+                <span style="font-size: 0.72rem; color: #94a3b8;">Choose target playlists below</span>
+            </div>
+
+            <!-- Playlists Checklist -->
+            <div>
+                <label style="display: block; font-size: 0.72rem; text-transform: uppercase; color: #94a3b8; margin-bottom: 0.45rem; font-weight: 700; letter-spacing: 0.04em;">Your Playlists:</label>
+                <div id="stockWlPlaylistsList" style="display: flex; flex-direction: column; gap: 0.45rem; max-height: 220px; overflow-y: auto; padding-right: 0.25rem;">
+                    <div style="padding: 1rem; text-align: center; color: #64748b; font-size: 0.75rem;">Loading playlists...</div>
+                </div>
+            </div>
+
+            <!-- Create New List Option -->
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 0.75rem;">
+                <label style="display: block; font-size: 0.72rem; color: #cbd5e1; margin-bottom: 0.35rem; font-weight: 600;">＋ Create New Playlist:</label>
+                <div style="display: flex; gap: 0.4rem;">
+                    <input id="stockWlNewName" placeholder="e.g. Breakout High Conviction" style="flex: 1; height: 32px; padding: 0 0.65rem; background: #000000; color: #ffffff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-size: 0.8rem; outline: none;" onkeydown="if(event.key==='Enter') createAndAddStockWatchlist();">
+                    <button type="button" onclick="createAndAddStockWatchlist()" class="btn btn-sm" style="height: 32px; font-size: 0.75rem; background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.4); white-space: nowrap;">＋ Create & Add</button>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; justify-content: space-between; align-items: center;">
+                <span id="stockWlStatusMsg" style="font-size: 0.72rem; color: #34d399; font-family: var(--font-mono);"></span>
+                <button type="button" onclick="closeStockWatchlistModal()" class="btn btn-secondary btn-sm">Done</button>
             </div>
         </div>
     </div>

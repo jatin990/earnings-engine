@@ -163,8 +163,11 @@
                                 Accumulation Score: <strong style="color:#38bdf8;">84.5 / 100</strong> · Inflow: <strong style="color:#34d399;">+₹450.2 Cr</strong> · Outflow: <strong style="color:#f87171;">-₹129.7 Cr</strong> · Net: <strong style="color:#34d399;">+₹320.5 Cr</strong>
                             </div>
                         </div>
-                        <div>
-                            <button type="button" onclick="window.open('/stock/' + encodeURIComponent(document.getElementById('instSelectedTicker').textContent || 'ALLCARGO.NS'), '_blank')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.25rem 0.5rem;display:flex;align-items:center;gap:0.25rem;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);">
+                        <div style="display:flex;align-items:center;gap:0.4rem;">
+                            <button type="button" onclick="app.openAddToWatchlistModal(document.getElementById('instSelectedTicker')?.innerText?.split(' ')[0] || app.institutionalModule._selectedTicker || 'ALLCARGO.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.25rem 0.5rem;display:flex;align-items:center;gap:0.25rem;background:rgba(245,158,11,0.12);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);" title="Manage Watchlists & Playlists">
+                                <span>⭐</span> Watchlist
+                            </button>
+                            <button type="button" onclick="window.open('/stock/' + encodeURIComponent(document.getElementById('instSelectedTicker')?.innerText?.split(' ')[0] || app.institutionalModule._selectedTicker || 'ALLCARGO.NS'), '_blank')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.25rem 0.5rem;display:flex;align-items:center;gap:0.25rem;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);">
                                 <span>📈</span> Open Full Intel
                             </button>
                         </div>
