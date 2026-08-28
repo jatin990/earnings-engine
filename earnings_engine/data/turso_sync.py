@@ -54,21 +54,33 @@ SYNC_TABLES = [
 ]
 
 
-def _get_table_columns(conn: Any, table_name: str) -> list[str]:
-    """Return list of column names for a table."""
+def _get_table_columns_info(conn: Any, table_name: str) -> dict[str, str]:
+    """Return dict of {column_name: column_type} for a table."""
     try:
         cur = conn.execute(f"PRAGMA table_info({table_name})")
         rows = cur.fetchall()
-        cols = []
+        cols = {}
         for r in rows:
             if hasattr(r, "get"):
-                cols.append(r.get("name"))
-            elif isinstance(r, (tuple, list)) and len(r) > 1:
-                cols.append(r[1])
-        return [c for c in cols if c]
+                col_name = r.get("name")
+                col_type = r.get("type", "TEXT") or "TEXT"
+                if col_name:
+                    cols[col_name] = col_type
+            elif isinstance(r, (tuple, list)) and len(r) > 2:
+                col_name = r[1]
+                col_type = r[2] or "TEXT"
+                if col_name:
+                    cols[col_name] = col_type
+        return cols
     except Exception as e:
-        logger.debug("[TURSO-SYNC] Failed to get schema for %s: %s", table_name, e)
-        return []
+        logger.debug("[TURSO-SYNC] Failed to get schema info for %s: %s", table_name, e)
+        return {}
+
+
+def _get_table_columns(conn: Any, table_name: str) -> list[str]:
+    """Return list of column names for a table."""
+    info = _get_table_columns_info(conn, table_name)
+    return list(info.keys())
 
 
 def sync_local_to_upstream(settings: Settings | None = None) -> dict[str, Any]:
@@ -133,17 +145,41 @@ def sync_local_to_upstream(settings: Settings | None = None) -> dict[str, Any]:
                 except Exception as e:
                     logger.debug("[TURSO-SYNC] Could not create local table %s: %s", table, e)
 
-            cols = _get_table_columns(local_conn if table in local_tables else remote_conn, table)
-            if not cols:
+            local_col_info = _get_table_columns_info(local_conn, table) if table in local_tables else {}
+            remote_col_info = _get_table_columns_info(remote_conn, table) if table in remote_tables else {}
+
+            # Self-heal missing columns on Remote Turso
+            if table in local_tables and table in remote_tables:
+                for col_name, col_type in local_col_info.items():
+                    if col_name not in remote_col_info:
+                        try:
+                            remote_conn.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col_name}" {col_type}')
+                            remote_col_info[col_name] = col_type
+                        except Exception as e:
+                            logger.debug("[TURSO-SYNC] Remote ALTER TABLE ADD COLUMN %s on %s: %s", col_name, table, e)
+
+                # Self-heal missing columns on Local SQLite
+                for col_name, col_type in remote_col_info.items():
+                    if col_name not in local_col_info:
+                        try:
+                            with local_conn:
+                                local_conn.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col_name}" {col_type}')
+                            local_col_info[col_name] = col_type
+                        except Exception as e:
+                            logger.debug("[TURSO-SYNC] Local ALTER TABLE ADD COLUMN %s on %s: %s", col_name, table, e)
+
+            # Common columns present in BOTH local and remote
+            common_cols = [c for c in local_col_info.keys() if c in remote_col_info]
+            if not common_cols:
                 continue
 
-            col_str = ", ".join([f'"{c}"' for c in cols])
-            placeholders = ", ".join(["?" for _ in cols])
+            col_str = ", ".join([f'"{c}"' for c in common_cols])
+            placeholders = ", ".join(["?" for _ in common_cols])
             
             # Lossless Merge Query: INSERT OR IGNORE guarantees existing records are never overwritten
             merge_sql = f'INSERT OR IGNORE INTO "{table}" ({col_str}) VALUES ({placeholders})'
 
-            # 1. Fetch Local Rows
+            # 1. Fetch Local Rows (only common columns)
             local_rows = []
             if table in local_tables:
                 local_rows = local_conn.execute(f'SELECT {col_str} FROM "{table}"').fetchall()

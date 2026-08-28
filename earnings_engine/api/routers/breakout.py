@@ -124,32 +124,73 @@ async def get_breakout_radar_endpoint(
         # Compute historical outcome metrics if evaluating an older asof_date
         backtest_summary = {}
         if asof_date and candidates:
-            evaluated = [c for c in candidates if c.get("breakout_happened") is not None]
+            evaluated = [c for c in candidates if c.get("outcome") is not None and c.get("outcome") != "PENDING"]
             if evaluated:
-                successes = [c for c in evaluated if c.get("breakout_happened") is True]
+                # 1. Breakouts that actually fired (crossed / touched resistance trigger)
+                fired_candidates = [
+                    c for c in evaluated
+                    if c.get("breakout_fired") is True
+                    or (c.get("post_high") is not None and c.get("breakout_trigger") is not None and c.get("post_high") >= c.get("breakout_trigger"))
+                    or (c.get("current_price") is not None and c.get("breakout_trigger") is not None and c.get("current_price") >= c.get("breakout_trigger"))
+                    or c.get("outcome") in ("TARGET_HIT", "BREAKOUT_SUCCEEDED", "BREAKOUT_RETRACED")
+                ]
+
+                # Fired breakouts that succeeded / remain in profit (>= signal price or target)
+                fired_successes = [
+                    c for c in fired_candidates
+                    if c.get("outcome") in ("TARGET_HIT", "BREAKOUT_SUCCEEDED")
+                    or (c.get("current_price") is not None and c.get("signal_price") is not None and c.get("current_price") >= c.get("signal_price"))
+                    or (c.get("realized_return_pct") or 0) >= 0
+                ]
+                fired_failures = [c for c in fired_candidates if c not in fired_successes]
+
+                # Fired Win Rate % (strictly for setups that broke out)
+                fired_win_rate = round(len(fired_successes) / len(fired_candidates) * 100, 1) if fired_candidates else 0.0
+
+                # 2. Coiling setups (never reached trigger price)
+                coiling_candidates = [c for c in evaluated if c not in fired_candidates]
+                coiling_in_profit = [
+                    c for c in coiling_candidates
+                    if (c.get("realized_return_pct") or 0) >= 0 or c.get("outcome") == "COILING_IN_PROFIT"
+                ]
+
+                # Sub-category counts
                 targets_hit = [c for c in evaluated if c.get("outcome") == "TARGET_HIT"]
                 breakouts_succeeded = [c for c in evaluated if c.get("outcome") == "BREAKOUT_SUCCEEDED"]
+                breakouts_retraced = [c for c in evaluated if c.get("outcome") == "BREAKOUT_RETRACED"]
                 stop_losses_hit = [c for c in evaluated if c.get("outcome") == "STOP_LOSS_HIT"]
-                no_breakouts = [c for c in evaluated if c.get("outcome") in ("NO_BREAKOUT", "FAILED")]
-                win_rate = round(len(successes) / len(evaluated) * 100, 1)
-                returns = [c.get("realized_return_pct", 0) for c in evaluated]
-                avg_return = round(sum(returns) / len(returns), 2)
+
+                returns = [c.get("realized_return_pct", 0) for c in evaluated if c.get("realized_return_pct") is not None]
+                avg_return = round(sum(returns) / len(returns), 2) if returns else 0.0
+
+                fired_returns = [c.get("realized_return_pct", 0) for c in fired_candidates if c.get("realized_return_pct") is not None]
+                avg_fired_return = round(sum(fired_returns) / len(fired_returns), 2) if fired_returns else 0.0
+
                 max_gains = [c.get("max_gain_pct", 0) for c in evaluated if c.get("max_gain_pct") is not None]
                 avg_peak_gain = round(sum(max_gains) / len(max_gains), 2) if max_gains else 0.0
                 top_winner = max(evaluated, key=lambda x: x.get("realized_return_pct", -999))
+
                 backtest_summary = {
                     "asof_date": asof_date,
                     "total_evaluated": len(evaluated),
-                    "success_count": len(successes),
+                    "breakout_fired_count": len(fired_candidates),
+                    "breakout_fired_success_count": len(fired_successes),
+                    "breakout_fired_failure_count": len(fired_failures),
+                    "breakout_fired_win_rate_pct": fired_win_rate,
+                    "win_rate_pct": fired_win_rate,
+                    "success_count": len(fired_successes),
+                    "coiling_count": len(coiling_candidates),
+                    "coiling_in_profit_count": len(coiling_in_profit),
                     "targets_hit_count": len(targets_hit),
                     "breakouts_succeeded_count": len(breakouts_succeeded),
+                    "breakouts_retraced_count": len(breakouts_retraced),
                     "stop_losses_hit_count": len(stop_losses_hit),
-                    "no_breakout_count": len(no_breakouts),
-                    "win_rate_pct": win_rate,
                     "avg_return_pct": avg_return,
+                    "avg_fired_return_pct": avg_fired_return,
                     "avg_peak_gain_pct": avg_peak_gain,
                     "top_winner_ticker": top_winner.get("ticker"),
                     "top_winner_gain_pct": top_winner.get("realized_return_pct"),
+                    "top_winner_price": top_winner.get("current_price"),
                 }
 
         # Limit

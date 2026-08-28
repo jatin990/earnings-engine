@@ -128,3 +128,49 @@ def test_institutional_api_endpoints(client):
     assert res_fund.json()["success"] is True
     assert len(res_fund.json()["holdings"]) >= 1
     assert "return_30d_pct" in res_fund.json()["holdings"][0]
+
+
+def test_fii_interest_and_always_held_fallback():
+    # 1. Constantly held stock (e.g. ALLCARGO.NS or TCS.NS)
+    act_allcargo = get_stock_institutional_activity("ALLCARGO.NS")
+    assert act_allcargo["fii_always_held"] is True
+    assert "Had" in act_allcargo["fii_interest_summary"]
+    assert "on Dec 2025" in act_allcargo["fii_interest_summary"]
+
+    # 2. Stock with simulated FII interest start within 8M window (e.g. WIPRO.NS)
+    act_wipro = get_stock_institutional_activity("WIPRO.NS")
+    assert "fii_interest_summary" in act_wipro
+    assert "is_new_fii_entry" in act_wipro
+    assert "is_new_dii_entry" in act_wipro
+    if not act_wipro["fii_always_held"]:
+        assert act_wipro["fii_interest_quarter"] is not None
+        assert act_wipro["fii_interest_date"] is not None
+        assert "Interest:" in act_wipro["fii_interest_summary"]
+
+
+def test_new_entry_badges_in_api(client):
+    res_acc = client.get("/api/v1/institutional/accumulating")
+    assert res_acc.status_code == 200
+    items = res_acc.json()["items"]
+    assert len(items) >= 1
+    # Check that new entry fields are exposed in table API items
+    assert "is_new_fii_entry" in items[0]
+    assert "is_new_dii_entry" in items[0]
+    assert "fii_interest_summary" in items[0]
+
+
+def test_top_stake_additions_endpoint(client):
+    res = client.get("/api/v1/institutional/top-additions?min_delta=3.0")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "latest_additions" in data
+    assert "historical_additions" in data
+    assert len(data["latest_additions"]) >= 1
+    top1 = data["latest_additions"][0]
+    assert "inst_addition_pct" in top1
+    assert "fii_delta_pct" in top1
+    assert "dii_delta_pct" in top1
+    assert "total_institutional_stake_pct" in top1
+    assert top1["inst_addition_pct"] >= 3.0
+

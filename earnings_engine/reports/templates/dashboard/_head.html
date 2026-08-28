@@ -586,15 +586,43 @@
             white-space: nowrap;
         }
 
-        /* Universal Sticky Table Headers across all Dashboard Tables */
+        /* Universal Sticky Table Wrapper & Container */
+        .table-wrapper,
+        .table-container,
+        .breakout-table-wrapper {
+            max-height: calc(100vh - 220px);
+            min-height: 280px;
+            overflow: auto !important;
+            position: relative;
+            border-radius: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: #000000;
+        }
+
+        /* Universal Sticky Table Headers across all Dashboard Tables & Hubs */
+        table thead,
+        .results-table thead,
+        .clean-table thead,
+        .table thead {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 25 !important;
+        }
+
         table thead th,
         table thead tr th,
+        table th,
         .results-table thead th,
         .results-table th,
+        .clean-table thead th,
+        .clean-table th,
         .table thead th,
         .table th,
         #breakoutTable thead th,
-        #breakoutTable th {
+        #breakoutTable th,
+        #wlQuotesTable thead th,
+        #tblShareholding thead th,
+        #kronosListTable thead th {
             color: #94a3b8;
             font-size: 0.68rem;
             font-weight: 700;
@@ -602,19 +630,20 @@
             letter-spacing: 0.05em;
             cursor: pointer;
             user-select: none;
-            background: #09090f !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+            background: #090e1a !important;
+            border-bottom: 1px solid rgba(56, 189, 248, 0.3) !important;
             position: sticky !important;
             top: 0 !important;
-            z-index: 10 !important;
+            z-index: 30 !important;
             line-height: 1.2;
-            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.12);
         }
 
         table thead th:hover,
-        .results-table th:hover {
+        .results-table th:hover,
+        .clean-table th:hover {
             color: #38bdf8;
-            background: #10101a !important;
+            background: #0f172a !important;
         }
 
         table thead th.sort-asc::after,

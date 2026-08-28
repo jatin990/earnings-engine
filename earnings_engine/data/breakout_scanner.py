@@ -902,18 +902,21 @@ def score_breakout(
         max_gain_pct = round(((post_high - signal_price) / signal_price) * 100, 2)
         days_elapsed = len(future_df)
 
+        breakout_fired = bool(post_high >= breakout_trigger or current_price >= breakout_trigger)
+
         if post_high >= target_price:
             breakout_happened = True
             outcome = "TARGET_HIT"
             outcome_label = f"Target Hit 🎯 (+{max_gain_pct}%)"
             outcome_badge = "emerald"
         elif post_high >= breakout_trigger:
-            breakout_happened = True
             if current_price >= signal_price:
+                breakout_happened = True
                 outcome = "BREAKOUT_SUCCEEDED"
                 outcome_label = f"Breakout Succeeded ✅ ({realized_return_pct:+0.1f}%)"
                 outcome_badge = "emerald"
             else:
+                breakout_happened = False
                 outcome = "BREAKOUT_RETRACED"
                 outcome_label = f"Breakout Retraced ⚠️ ({realized_return_pct:+0.1f}%)"
                 outcome_badge = "amber"
@@ -922,12 +925,18 @@ def score_breakout(
             outcome = "STOP_LOSS_HIT"
             outcome_label = f"Stop Loss Hit 🛑 ({realized_return_pct:+0.1f}%)"
             outcome_badge = "rose"
+        elif current_price >= signal_price:
+            breakout_happened = False
+            outcome = "COILING_IN_PROFIT"
+            outcome_label = f"Coiling In Green 🟢 ({realized_return_pct:+0.1f}%)"
+            outcome_badge = "emerald"
         else:
             breakout_happened = False
-            outcome = "NO_BREAKOUT"
-            outcome_label = f"Failed / In Range ❌ ({realized_return_pct:+0.1f}%)"
+            outcome = "COILING_IN_RANGE"
+            outcome_label = f"Coiling In Range 🗜️ ({realized_return_pct:+0.1f}%)"
             outcome_badge = "slate"
     else:
+        breakout_fired = False
         breakout_happened = None
         outcome = "PENDING"
         outcome_label = "Pending Breakout ⏳"
@@ -1014,6 +1023,7 @@ def score_breakout(
         "realized_return_pct": realized_return_pct,
         "max_gain_pct": max_gain_pct,
         "breakout_happened": breakout_happened,
+        "breakout_fired": breakout_fired,
         "outcome": outcome,
         "outcome_label": outcome_label,
         "outcome_badge": outcome_badge,

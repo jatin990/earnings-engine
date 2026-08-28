@@ -12067,45 +12067,47 @@
                 };
                 const breakingCount = (app._breakoutData || []).filter(isItemBreaking).length;
                 const fireCard = document.getElementById('breakoutCardOnFire');
-                setEl('breakoutStatBreakingCount', breakingCount);
 
-                if (breakingCount > 0) {
+                if (asofDate && summary && summary.total_evaluated != null) {
+                    // Backtest Mode KPIs (Breakouts Fired vs Coiling)
+                    const firedCount = summary.breakout_fired_count != null ? summary.breakout_fired_count : (summary.success_count || breakingCount);
+                    const firedSuccess = summary.breakout_fired_success_count != null ? summary.breakout_fired_success_count : (summary.success_count || 0);
+                    const firedWinRate = summary.breakout_fired_win_rate_pct != null ? summary.breakout_fired_win_rate_pct : (summary.win_rate_pct || 0);
+                    const targetsHit = summary.targets_hit_count || 0;
+                    const breakoutsSucceeded = summary.breakouts_succeeded_count || 0;
+                    const breakoutsRetraced = summary.breakouts_retraced_count || 0;
+                    const stopCount = summary.stop_losses_hit_count || 0;
+                    const coilingCount = summary.coiling_count != null ? summary.coiling_count : Math.max(0, summary.total_evaluated - firedCount);
+
+                    setEl('breakoutStatBreakingCount', firedCount);
                     if (fireCard) fireCard.classList.add('card-on-fire');
-                    setEl('breakoutStatBreakingSub', asofDate ? 'Succeeded' : 'Breached');
-                    setEl('breakoutKpiSubFire', asofDate 
-                        ? `🎯 ${summary.targets_hit_count || 0} Targets · 🛑 ${summary.stop_losses_hit_count || 0} Stops`
-                        : `🔥 ${breakingCount} setup(s) crossed trigger!`
-                    );
-                } else {
-                    if (fireCard) fireCard.classList.remove('card-on-fire');
-                    setEl('breakoutStatBreakingSub', 'Active');
-                    setEl('breakoutKpiSubFire', 'All setups coiling below trigger');
-                }
+                    setEl('breakoutStatBreakingSub', 'Fired');
+                    setEl('breakoutKpiSubFire', `🎯 ${targetsHit} Targets · 🟢 ${breakoutsSucceeded} Green · ⚠️ ${breakoutsRetraced} Retraced · 🛑 ${stopCount} Stops`);
 
-                // Pool tier badge for scanned count
-                const hotCount = status.hot_count || 0;
-                const warmCount = status.warm_count || 0;
-                const coldScanned = status.cold_tickers_scanned || total || '\u2014';
-                setEl('breakoutStatScanned', coldScanned);
-                const scannedSub = document.getElementById('breakoutKpiSub4');
-                if (scannedSub) {
-                    scannedSub.innerHTML = `<span style="color:#ef4444">🔴 ${hotCount}</span> <span style="color:#eab308">🟡 ${warmCount}</span>`;
-                }
-
-                if (asofDate && summary.win_rate_pct != null) {
-                    // Backtest Mode KPIs
-                    setEl('breakoutKpiLabel2', 'Win Rate %');
-                    setEl('breakoutStatTopScore', `${summary.win_rate_pct}%`);
-                    setEl('breakoutStatTopTicker', `${summary.success_count}/${summary.total_evaluated} Breakouts Succeeded`);
+                    setEl('breakoutKpiLabel2', 'Breakout Win Rate %');
+                    setEl('breakoutStatTopScore', `${firedWinRate}%`);
+                    setEl('breakoutStatTopTicker', `${firedSuccess}/${firedCount} Fired Succeeded · ${coilingCount} Coiling`);
 
                     setEl('breakoutKpiLabel3', 'Avg Realized Return');
                     setEl('breakoutStatAvg', `${summary.avg_return_pct >= 0 ? '+' : ''}${summary.avg_return_pct}%`);
-                    setEl('breakoutKpiSub3', summary.top_winner_ticker ? `Top: ${summary.top_winner_ticker} (${summary.top_winner_gain_pct >= 0 ? '+' : ''}${summary.top_winner_gain_pct}%)` : 'Across candidates');
+                    const topPriceStr = summary.top_winner_price != null ? ` @ ₹${Number(summary.top_winner_price).toLocaleString('en-IN', {maximumFractionDigits:2})}` : '';
+                    setEl('breakoutKpiSub3', summary.top_winner_ticker ? `Top: ${summary.top_winner_ticker} (${summary.top_winner_gain_pct >= 0 ? '+' : ''}${summary.top_winner_gain_pct}%${topPriceStr})` : 'Across candidates');
 
                     setEl('breakoutKpiLabel5', 'Backtest Date');
                     setEl('breakoutStatDuration', asofDate);
-                    setEl('breakoutKpiSub5', 'Point-in-time simulation');
+                    setEl('breakoutKpiSub5', `${firedCount} Fired · ${coilingCount} Coiling`);
                 } else {
+                    setEl('breakoutStatBreakingCount', breakingCount);
+                    if (breakingCount > 0) {
+                        if (fireCard) fireCard.classList.add('card-on-fire');
+                        setEl('breakoutStatBreakingSub', 'Breached');
+                        setEl('breakoutKpiSubFire', `🔥 ${breakingCount} setup(s) crossed trigger!`);
+                    } else {
+                        if (fireCard) fireCard.classList.remove('card-on-fire');
+                        setEl('breakoutStatBreakingSub', 'Active');
+                        setEl('breakoutKpiSubFire', 'All setups coiling below trigger');
+                    }
+
                     // Live Mode KPIs
                     setEl('breakoutKpiLabel2', 'Top Score');
                     setEl('breakoutStatTopScore', topCandidate ? topCandidate.composite_score : '\u2014');
@@ -12231,14 +12233,14 @@
             },
             return: {
                 id: 'return',
-                label: 'Return %',
+                label: 'Return % & Price',
                 sortKey: 'realized_return_pct',
                 align: 'right',
                 headerStyle: 'color:#34d399;',
                 render: (c, ctx) => `
                     <td style="padding:0.55rem 0.75rem;text-align:right;font-size:0.76rem;white-space:nowrap;">
                         ${ctx.retStr}
-                        ${c.max_gain_pct != null ? `<div style="font-size:0.6rem;color:#64748b;" title="Max high post-signal">Peak: +${c.max_gain_pct}%</div>` : ''}
+                        ${c.max_gain_pct != null ? `<div style="font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);margin-top:2px;" title="Peak high price reached post-signal">Peak: <span style="color:#34d399;font-weight:700;">+${c.max_gain_pct}%</span> ${c.post_high != null ? '<span style="color:#64748b;">(₹' + Number(c.post_high).toLocaleString('en-IN', {maximumFractionDigits:2}) + ')</span>' : ''}</div>` : ''}
                     </td>
                 `
             },
@@ -12431,7 +12433,7 @@
                         ondrop="app.handleBreakoutColDrop(event, '${colKey}')"
                         ondragend="app.handleBreakoutColDragEnd(event)"
                         onclick="${def.sortKey ? `app.sortBreakoutTable('${def.sortKey}')` : ''}"
-                        style="padding:0.6rem 0.75rem;text-align:${def.align};${def.headerStyle || ''}${sortColor ? `color:${sortColor};` : ''}font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;cursor:${def.sortKey ? 'pointer' : 'grab'};white-space:nowrap;user-select:none;transition:background 0.15s, border-color 0.15s;"
+                        style="position:sticky;top:0;z-index:30;background:#090e1a;padding:0.6rem 0.75rem;text-align:${def.align};${def.headerStyle || ''}${sortColor ? `color:${sortColor};` : ''}font-weight:700;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.05em;cursor:${def.sortKey ? 'pointer' : 'grab'};white-space:nowrap;user-select:none;border-bottom:1px solid rgba(56,189,248,0.3);box-shadow:0 2px 6px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.12);transition:background 0.15s, border-color 0.15s;"
                         title="Drag to move column${def.sortKey ? ' • Click to sort' : ''}"
                     >
                         <span style="opacity:0.4;font-size:0.65rem;margin-right:0.25rem;cursor:grab;" title="Drag to move column">⋮⋮</span>
@@ -12532,8 +12534,10 @@
 
                 const retPct = c.realized_return_pct;
                 const retColor = retPct > 0 ? '#34d399' : retPct < 0 ? '#f87171' : '#94a3b8';
+                const curPriceFormatted = c.current_price != null ? `₹${Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '';
                 const retStr = retPct != null
-                    ? `<span style="font-weight:700;color:${retColor};font-family:var(--font-mono);">${retPct >= 0 ? '+' : ''}${Number(retPct).toFixed(1)}%</span>`
+                    ? `<div style="font-weight:800;color:${retColor};font-family:var(--font-mono);font-size:0.82rem;">${retPct >= 0 ? '+' : ''}${Number(retPct).toFixed(2)}%</div>
+                       <div style="font-size:0.68rem;color:#cbd5e1;font-weight:600;font-family:var(--font-mono);margin-top:1px;">${curPriceFormatted}</div>`
                     : '<span style="color:#475569;">\u2014</span>';
 
                 const gapPct = c.pct_from_high != null

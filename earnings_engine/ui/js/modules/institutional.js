@@ -16,18 +16,18 @@
         _institutionalLoaded: false,
 
         switchInstitutionalPage(page) {
-            if (!page || (page !== 'equities' && page !== 'investors')) page = 'equities';
+            if (!page || (page !== 'equities' && page !== 'top-additions' && page !== 'investors')) page = 'equities';
             try {
                 localStorage.setItem('ee_institutional_subpage', page);
                 if (window.location.hash && window.location.hash.includes('institutional')) {
-                    const newHash = page === 'investors' ? '#institutional/investors' : '#institutional';
+                    const newHash = page === 'investors' ? '#institutional/investors' : (page === 'top-additions' ? '#institutional/top-additions' : '#institutional');
                     if (window.location.hash !== newHash) {
                         try { history.replaceState(null, '', newHash); } catch (e) { window.location.hash = newHash; }
                     }
                 }
             } catch (e) {}
 
-            const pages = ['equities', 'investors'];
+            const pages = ['equities', 'top-additions', 'investors'];
             pages.forEach(p => {
                 const el = document.getElementById('instPage-' + p);
                 if (el) el.style.display = (p === page) ? 'block' : 'none';
@@ -123,11 +123,15 @@
             this._fundsLimit = 50;
 
             try {
-                const [resAcc, resDist, resFunds] = await Promise.all([
+                const [resAcc, resDist, resFunds, resTop] = await Promise.all([
                     fetch(API_BASE + `/api/v1/institutional/accumulating?limit=${this._accLimit}`),
                     fetch(API_BASE + `/api/v1/institutional/distributing?limit=${this._distLimit}`),
-                    fetch(API_BASE + `/api/v1/institutional/funds?limit=${this._fundsLimit}`)
+                    fetch(API_BASE + `/api/v1/institutional/funds?limit=${this._fundsLimit}`),
+                    fetch(API_BASE + `/api/v1/institutional/top-additions?min_delta=3.0`),
                 ]);
+
+                const loadedAt = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: 'short', year: 'numeric' });
+                this._dataFreshness = loadedAt;
 
                 if (resAcc.ok) {
                     const accData = await resAcc.json();
@@ -147,11 +151,171 @@
                     this.renderInstitutionalFundsTable(this.institutionalData.funds);
                 }
 
+                if (resTop.ok) {
+                    const topData = await resTop.json();
+                    this.institutionalData.topAdditions = topData;
+                    this.renderInstitutionalTopAdditions(topData);
+                }
+
+                // Render freshness badge on all pages
+                this._renderFreshnessBadges(loadedAt);
+
                 // Initial inspect ALLCARGO as default benchmark drilldown
                 this.searchInstitutionalStock('ALLCARGO.NS');
 
             } catch (e) {
                 console.error('[INSTITUTIONAL] Failed loading institutional flows:', e);
+            }
+        },
+
+        _renderFreshnessBadges(ts) {
+            const badgeHtml = `<span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);background:rgba(255,255,255,0.03);padding:0.15rem 0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.06);">📊 Data as of ${ts} IST</span>`;
+            ['instFreshnessBadge-equities', 'instFreshnessBadge-topadditions', 'instFreshnessBadge-investors'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = badgeHtml;
+            });
+        },
+
+        renderInstitutionalTopAdditions(data) {
+            if (!data) return;
+            const latest = data.latest_additions || [];
+            const hist = data.historical_additions || [];
+
+            // Update KPI cards with dynamic data
+            const countEl = document.getElementById('kpiTopAdditionsCount');
+            if (countEl) countEl.innerText = `${latest.length} Setups`;
+
+            const leaderEl = document.getElementById('kpiTopAdditionLeader');
+            const leaderSubEl = document.getElementById('kpiTopAdditionLeaderSub');
+            if (leaderEl && latest.length > 0) {
+                const top1 = latest[0];
+                leaderEl.innerText = `+${top1.inst_addition_pct}% (${top1.ticker.replace('.NS', '')})`;
+                if (leaderSubEl) leaderSubEl.innerText = `FII +${top1.fii_delta_pct}% · DII +${top1.dii_delta_pct}%`;
+            }
+
+            const inflowEl = document.getElementById('kpiTopAdditionInflow');
+            const inflowSubEl = document.getElementById('kpiTopAdditionInflowSub');
+            if (inflowEl) {
+                const totalInflow = latest.reduce((acc, curr) => acc + (curr.net_flow_cr > 0 ? curr.net_flow_cr : 0), 0);
+                inflowEl.innerText = `+₹${Math.round(totalInflow).toLocaleString('en-IN')} Cr`;
+                if (inflowSubEl && latest.length > 0) {
+                    const topInflows = latest.filter(x => x.net_flow_cr > 0).sort((a,b) => b.net_flow_cr - a.net_flow_cr).slice(0, 2);
+                    inflowSubEl.innerText = topInflows.length ? `Led by ${topInflows.map(x => x.ticker.replace('.NS','')).join(' & ')}` : 'Net institutional inflows';
+                }
+            }
+
+            const histCountEl = document.getElementById('kpiHistoricalMegaCount');
+            const histSubEl = document.getElementById('kpiHistoricalMegaSub');
+            if (histCountEl) histCountEl.innerText = `${hist.length} Surges`;
+            if (histSubEl && hist.length > 0) {
+                const topHist = hist.slice(0, 2);
+                histSubEl.innerText = topHist.map(x => `${x.ticker.replace('.NS','')} (+${x.inst_addition_pct}%)`).join(', ');
+            }
+
+            // 1. Render Latest Top Additions Table
+            const tbodyLatest = document.getElementById('instTopAdditionsTableBody');
+            if (tbodyLatest) {
+                if (!latest.length) {
+                    tbodyLatest.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#64748b;">No stocks with >3% institutional addition found in the latest quarter.</td></tr>';
+                } else {
+                    tbodyLatest.innerHTML = latest.map(it => {
+                        const scoreCol = it.accumulation_score >= 75 ? '#34d399' : (it.accumulation_score >= 50 ? '#38bdf8' : '#fbbf24');
+                        const ret7dStr = it.return_7d_pct != null ? (it.return_7d_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${it.return_7d_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${it.return_7d_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+                        const ret30Str = it.return_30d_pct != null ? (it.return_30d_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${it.return_30d_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${it.return_30d_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+                        const ret1yStr = it.return_1y_pct != null ? (it.return_1y_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${it.return_1y_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${it.return_1y_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+                        const netCol = it.net_flow_cr >= 0 ? '#34d399' : '#f87171';
+                        const netSign = it.net_flow_cr >= 0 ? '+' : '-';
+                        const netStr = `${netSign}₹${Math.abs(Math.round(it.net_flow_cr || 0)).toLocaleString('en-IN')}`;
+
+                        const newFiiBadge = it.is_new_fii_entry ? `<span style="font-size:0.6rem;padding:0.08rem 0.32rem;border-radius:4px;background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-weight:700;margin-left:0.3rem;">New FII</span>` : '';
+                        const newDiiBadge = it.is_new_dii_entry ? `<span style="font-size:0.6rem;padding:0.08rem 0.32rem;border-radius:4px;background:rgba(52,211,153,0.2);color:#34d399;border:1px solid rgba(52,211,153,0.35);font-weight:700;margin-left:0.3rem;">New DII</span>` : '';
+
+                        const compName = (it.company_name && it.company_name !== it.ticker && !it.company_name.endsWith('.NS')) ? it.company_name : it.ticker.replace('.NS', '');
+
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.12s;" onclick="app.searchInstitutionalStock('${it.ticker}'); app.switchInstitutionalPage('equities');" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                                <td style="padding:0.55rem 0.75rem;">
+                                    <div style="font-family:var(--font-mono);font-weight:700;color:#38bdf8;display:flex;align-items:center;">
+                                        ${it.ticker.replace('.NS', '')} ${newFiiBadge}${newDiiBadge}
+                                    </div>
+                                    <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.1rem;">${compName}</div>
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-weight:800;color:#34d399;font-size:0.82rem;">
+                                    +${it.inst_addition_pct}%
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-size:0.7rem;color:#cbd5e1;">
+                                    FII: <strong style="color:#38bdf8;">+${it.fii_delta_pct}%</strong> · DII: <strong style="color:#34d399;">+${it.dii_delta_pct}%</strong>
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">
+                                    ${it.total_institutional_stake_pct}%
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);">
+                                    <span style="color:${scoreCol};font-weight:700;">${it.accumulation_score}</span>
+                                    <span style="font-size:0.65rem;color:#94a3b8;margin-left:0.25rem;">${(it.verdict || '').split(' ')[0] || ''}</span>
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:${netCol};">
+                                    ${netStr} Cr
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-size:0.7rem;">
+                                    <span style="color:#34d399;font-weight:700;">+${it.funds_accumulating_count}</span> / <span style="color:#f87171;font-weight:700;">-${it.funds_selling_count}</span>
+                                </td>
+                                <td style="padding:0.55rem 0.4rem;font-family:var(--font-mono);font-size:0.68rem;">
+                                    <div>${ret7dStr}</div>
+                                    <div style="margin-top:0.1rem;">${ret30Str}</div>
+                                    <div style="margin-top:0.1rem;">${ret1yStr}</div>
+                                </td>
+                                <td style="padding:0.55rem 0.5rem;text-align:center;">
+                                    <button type="button" onclick="event.stopPropagation(); app.searchInstitutionalStock('${it.ticker}'); app.switchInstitutionalPage('equities');" class="btn btn-secondary btn-sm" style="font-size:0.65rem;padding:0.2rem 0.45rem;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);" title="Inspect ${it.ticker}">🔍 Drilldown</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            }
+
+            // 2. Render Historical Mega Additions Table
+            const tbodyHist = document.getElementById('instHistoricalAdditionsTableBody');
+            if (tbodyHist) {
+                if (!hist.length) {
+                    tbodyHist.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">No historical surges found.</td></tr>';
+                } else {
+                    tbodyHist.innerHTML = hist.map(it => {
+                        const scoreCol = it.accumulation_score >= 75 ? '#34d399' : (it.accumulation_score >= 50 ? '#38bdf8' : '#fbbf24');
+                        const ret30Str = it.return_30d_pct != null ? (it.return_30d_pct >= 0 ? `<span style="color:#34d399;font-weight:700;">+${it.return_30d_pct}%</span>` : `<span style="color:#f87171;font-weight:700;">${it.return_30d_pct}%</span>`) : '<span style="color:#64748b;">—</span>';
+
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background 0.12s;" onclick="app.searchInstitutionalStock('${it.ticker}'); app.switchInstitutionalPage('equities');" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                                <td style="padding:0.55rem 0.75rem;">
+                                    <div style="font-family:var(--font-mono);font-weight:700;color:#fbbf24;">
+                                        ${it.ticker.replace('.NS', '')}
+                                    </div>
+                                    <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.1rem;">${it.company_name}</div>
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-size:0.72rem;color:#94a3b8;">
+                                    ${it.quarter_comparison}
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-weight:800;color:#34d399;font-size:0.82rem;">
+                                    +${it.inst_addition_pct}%
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-size:0.7rem;color:#cbd5e1;">
+                                    FII: <strong style="color:#38bdf8;">+${it.fii_delta_pct}%</strong> · DII: <strong style="color:#34d399;">+${it.dii_delta_pct}%</strong>
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-size:0.72rem;color:#f8fafc;">
+                                    <span style="color:#94a3b8;">${it.historical_stake_pct}%</span> → <strong style="color:#38bdf8;">${it.current_total_stake_pct}%</strong>
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:${scoreCol};">
+                                    ${it.accumulation_score}
+                                </td>
+                                <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-size:0.72rem;">
+                                    ${ret30Str}
+                                </td>
+                                <td style="padding:0.55rem 0.5rem;text-align:center;">
+                                    <button type="button" onclick="event.stopPropagation(); app.searchInstitutionalStock('${it.ticker}'); app.switchInstitutionalPage('equities');" class="btn btn-secondary btn-sm" style="font-size:0.65rem;padding:0.2rem 0.45rem;background:rgba(251,191,36,0.1);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);" title="Inspect ${it.ticker}">🔍 Drilldown</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
             }
         },
 
@@ -338,15 +502,26 @@
                 const isSelected = this._selectedTicker === it.ticker;
                 const rowBg = isSelected ? 'rgba(56,189,248,0.12)' : 'transparent';
 
+                const newFiiBadge = it.is_new_fii_entry ? `<span style="font-size:0.6rem;padding:0.08rem 0.32rem;border-radius:4px;background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-weight:700;margin-left:0.3rem;">New FII</span>` : '';
+                const newDiiBadge = it.is_new_dii_entry ? `<span style="font-size:0.6rem;padding:0.08rem 0.32rem;border-radius:4px;background:rgba(52,211,153,0.2);color:#34d399;border:1px solid rgba(52,211,153,0.35);font-weight:700;margin-left:0.3rem;">New DII</span>` : '';
+
+                const compName = (it.company_name && it.company_name !== it.ticker && !it.company_name.endsWith('.NS')) ? it.company_name : '';
+                const netFlowCr = it.net_flow_cr || 0;
+                const netFlowCol = netFlowCr >= 0 ? '#34d399' : '#f87171';
+                const netFlowSign = netFlowCr >= 0 ? '+' : '';
+
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.05);background:${rowBg};cursor:pointer;transition:background 0.12s;" onclick="app.searchInstitutionalStock('${it.ticker}')" onmouseover="if('${this._selectedTicker}' !== '${it.ticker}') this.style.background='rgba(255,255,255,0.03)'" onmouseout="if('${this._selectedTicker}' !== '${it.ticker}') this.style.background='transparent'">
                         <td style="padding:0.45rem 0.6rem;font-family:var(--font-mono);font-weight:700;">
                             <span style="color:#38bdf8;">${it.ticker.replace('.NS', '')}</span>
+                            ${newFiiBadge}${newDiiBadge}
+                            ${compName ? `<div style="font-size:0.6rem;color:#64748b;font-weight:400;font-family:var(--font-sans);margin-top:0.08rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">${compName}</div>` : ''}
                         </td>
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:${scoreCol};">${it.accumulation_score}</td>
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;">${ret7dStr}</td>
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;">${ret30dStr}</td>
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#34d399;font-weight:700;">+${it.funds_accumulating_count}</td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:${netFlowCol};font-weight:700;font-size:0.68rem;">${netFlowSign}₹${Math.abs(Math.round(netFlowCr)).toLocaleString('en-IN')}</td>
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#cbd5e1;">${instStakeStr}</td>
                         <td style="padding:0.45rem 0.4rem;text-align:center;">
                             <button type="button" onclick="event.stopPropagation(); app.searchInstitutionalStock('${it.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.65rem;padding:0.15rem 0.4rem;background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);" title="Inspect ${it.ticker}">🔍</button>
@@ -376,15 +551,26 @@
                 const isSelected = this._selectedTicker === it.ticker;
                 const rowBg = isSelected ? 'rgba(239,68,68,0.12)' : 'transparent';
 
+                const newFiiBadge = it.is_new_fii_entry ? `<span style="font-size:0.6rem;padding:0.08rem 0.32rem;border-radius:4px;background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-weight:700;margin-left:0.3rem;">New FII</span>` : '';
+                const newDiiBadge = it.is_new_dii_entry ? `<span style="font-size:0.6rem;padding:0.08rem 0.32rem;border-radius:4px;background:rgba(52,211,153,0.2);color:#34d399;border:1px solid rgba(52,211,153,0.35);font-weight:700;margin-left:0.3rem;">New DII</span>` : '';
+
+                const compName = (it.company_name && it.company_name !== it.ticker && !it.company_name.endsWith('.NS')) ? it.company_name : '';
+                const netFlowCr = it.net_flow_cr || 0;
+                const netFlowCol = netFlowCr >= 0 ? '#34d399' : '#f87171';
+                const netFlowSign = netFlowCr >= 0 ? '+' : '';
+
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.05);background:${rowBg};cursor:pointer;transition:background 0.12s;" onclick="app.searchInstitutionalStock('${it.ticker}')" onmouseover="if('${this._selectedTicker}' !== '${it.ticker}') this.style.background='rgba(255,255,255,0.03)'" onmouseout="if('${this._selectedTicker}' !== '${it.ticker}') this.style.background='transparent'">
                         <td style="padding:0.45rem 0.6rem;font-family:var(--font-mono);font-weight:700;">
                             <span style="color:#f87171;">${it.ticker.replace('.NS', '')}</span>
+                            ${newFiiBadge}${newDiiBadge}
+                            ${compName ? `<div style="font-size:0.6rem;color:#64748b;font-weight:400;font-family:var(--font-sans);margin-top:0.08rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">${compName}</div>` : ''}
                         </td>
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#f87171;">${it.accumulation_score}</td>
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;">${ret7dStr}</td>
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;">${ret30dStr}</td>
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#f87171;font-weight:700;">-${it.funds_selling_count}</td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:${netFlowCol};font-weight:700;font-size:0.68rem;">${netFlowSign}₹${Math.abs(Math.round(netFlowCr)).toLocaleString('en-IN')}</td>
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#cbd5e1;">${instStakeStr}</td>
                         <td style="padding:0.45rem 0.4rem;text-align:center;">
                             <button type="button" onclick="event.stopPropagation(); app.searchInstitutionalStock('${it.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.65rem;padding:0.15rem 0.4rem;background:rgba(239,68,68,0.1);color:#f87171;border:1px solid rgba(239,68,68,0.3);" title="Inspect ${it.ticker}">🔍</button>
@@ -489,7 +675,12 @@
             const badgeEl = document.getElementById('instSelectedVerdictBadge');
             const scoreTextEl = document.getElementById('instSelectedScoreText');
 
-            if (tickerEl) tickerEl.textContent = data.ticker;
+            const newFiiBadge = data.is_new_fii_entry ? `<span style="font-size:0.68rem;padding:0.12rem 0.45rem;border-radius:4px;background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-weight:700;margin-left:0.4rem;">New FII Entry</span>` : '';
+            const newDiiBadge = data.is_new_dii_entry ? `<span style="font-size:0.68rem;padding:0.12rem 0.45rem;border-radius:4px;background:rgba(52,211,153,0.2);color:#34d399;border:1px solid rgba(52,211,153,0.4);font-weight:700;margin-left:0.4rem;">New DII Entry</span>` : '';
+
+            if (tickerEl) {
+                tickerEl.innerHTML = `<span>${data.ticker}</span>${newFiiBadge}${newDiiBadge}`;
+            }
             if (nameEl) nameEl.textContent = data.company_name || '';
             if (badgeEl) {
                 badgeEl.textContent = data.verdict;
@@ -501,15 +692,46 @@
                 const netCol = (data.net_flow_cr || 0) >= 0 ? '#34d399' : '#f87171';
                 const ret7dStr = data.return_7d_pct != null ? (data.return_7d_pct >= 0 ? `<strong style="color:#34d399;">+${data.return_7d_pct}%</strong>` : `<strong style="color:#f87171;">${data.return_7d_pct}%</strong>`) : '—';
                 const ret30dStr = data.return_30d_pct != null ? (data.return_30d_pct >= 0 ? `<strong style="color:#34d399;">+${data.return_30d_pct}%</strong>` : `<strong style="color:#f87171;">${data.return_30d_pct}%</strong>`) : '—';
+                const ret1yStr = data.return_1y_pct != null ? (data.return_1y_pct >= 0 ? `<strong style="color:#34d399;">+${data.return_1y_pct}%</strong>` : `<strong style="color:#f87171;">${data.return_1y_pct}%</strong>`) : '—';
+
+                let fiiInterestHtml = '';
+                if (data.fii_always_held) {
+                    fiiInterestHtml = `
+                        <div style="margin-top:0.45rem;padding:0.35rem 0.6rem;border-radius:4px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);font-size:0.72rem;color:#93c5fd;display:flex;align-items:center;gap:0.4rem;">
+                            <span>🏛️</span> <strong>FII Interest (8M):</strong> Had ${data.baseline_fii_pct || 0}% on Dec 2025 (Long-term allocation)
+                        </div>
+                    `;
+                } else if (data.fii_interest_date) {
+                    const sigRetStr = (data.fii_interest_return_pct != null) ? ((data.fii_interest_return_pct >= 0 ? '+' : '') + data.fii_interest_return_pct + '%') : '—';
+                    const sigRetCol = (data.fii_interest_return_pct || 0) >= 0 ? '#34d399' : '#f87171';
+                    fiiInterestHtml = `
+                        <div style="margin-top:0.45rem;padding:0.35rem 0.6rem;border-radius:4px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);font-size:0.72rem;color:#6ee7b7;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.3rem;">
+                                <span>⚡ <strong>FII Interest Initiated:</strong> ${data.fii_interest_quarter} (${data.fii_interest_date})</span>
+                                <span style="font-family:var(--font-mono);font-weight:700;">Returns: <strong style="color:${sigRetCol};">${sigRetStr}</strong></span>
+                            </div>
+                            <div style="font-size:0.68rem;color:#cbd5e1;margin-top:0.15rem;font-family:var(--font-mono);">
+                                Signal Price: ₹${Number(data.fii_signal_price || 0).toLocaleString('en-IN', {minimumFractionDigits:2})} &middot; Current Price: ₹${Number(data.fii_current_price || 0).toLocaleString('en-IN', {minimumFractionDigits:2})}
+                            </div>
+                        </div>
+                    `;
+                }
 
                 scoreTextEl.innerHTML = `
-                    Score: <strong style="color:#38bdf8;">${data.accumulation_score}</strong>
-                    &nbsp;·&nbsp; Inflow: <strong style="color:#34d399;">+₹${(data.gross_inflow_cr || 0).toLocaleString()} Cr</strong>
-                    &nbsp;·&nbsp; Outflow: <strong style="color:#f87171;">-₹${(data.gross_outflow_cr || 0).toLocaleString()} Cr</strong>
-                    &nbsp;·&nbsp; Net: <strong style="color:${netCol};">${netSign}₹${Math.abs(data.net_flow_cr || 0).toLocaleString()} Cr</strong>
-                    &nbsp;·&nbsp; 7D: ${ret7dStr}
-                    &nbsp;·&nbsp; 30D: ${ret30dStr}
-                    &nbsp;·&nbsp; Funds (QoQ): <strong style="color:#34d399;">+${data.funds_accumulating_count}</strong> / <strong style="color:#f87171;">-${data.funds_selling_count}</strong>
+                    <div>
+                        Score: <strong style="color:#38bdf8;">${data.accumulation_score}</strong>
+                        &nbsp;·&nbsp; Inst Stake: <strong style="color:#e2e8f0;">${data.total_institutional_stake_pct || '—'}%</strong>
+                        &nbsp;·&nbsp; Inflow: <strong style="color:#34d399;">+₹${(data.gross_inflow_cr || 0).toLocaleString()} Cr</strong>
+                        &nbsp;·&nbsp; Outflow: <strong style="color:#f87171;">-₹${(data.gross_outflow_cr || 0).toLocaleString()} Cr</strong>
+                        &nbsp;·&nbsp; Net: <strong style="color:${netCol};">${netSign}₹${Math.abs(data.net_flow_cr || 0).toLocaleString()} Cr</strong>
+                    </div>
+                    <div style="margin-top:0.2rem;">
+                        7D: ${ret7dStr}
+                        &nbsp;·&nbsp; 30D: ${ret30dStr}
+                        &nbsp;·&nbsp; 1Y: ${ret1yStr}
+                        &nbsp;·&nbsp; Funds (QoQ): <strong style="color:#34d399;">+${data.funds_accumulating_count}</strong> / <strong style="color:#f87171;">-${data.funds_selling_count}</strong>
+                    </div>
+                    ${fiiInterestHtml}
                 `;
             }
 

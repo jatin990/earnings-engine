@@ -18,8 +18,14 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import requests
-import torch
 import yfinance as yf
+
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None  # type: ignore
+    TORCH_AVAILABLE = False
 
 logger = logging.getLogger("earnings_engine.kronos_predictor")
 
@@ -89,6 +95,9 @@ def _normalize_device(device: str | None = None) -> str:
     if dev == "cuda":
         dev = "cuda:0"
 
+    if not TORCH_AVAILABLE or torch is None:
+        return "cpu"
+
     if dev.startswith("cuda"):
         if not torch.cuda.is_available():
             logger.warning("[DEVICE] CUDA requested (%s) but torch.cuda is not available; falling back to CPU", dev)
@@ -113,10 +122,18 @@ def _normalize_device(device: str | None = None) -> str:
 
 def get_cuda_status() -> dict[str, Any]:
     """Return diagnostic status of CUDA and GPU hardware for Kronos inference."""
+    if not TORCH_AVAILABLE or torch is None:
+        return {
+            "cuda_available": False,
+            "torch_version": None,
+            "device_count": 0,
+            "devices": [],
+            "default_device": "cpu",
+        }
     available = torch.cuda.is_available()
     status: dict[str, Any] = {
         "cuda_available": available,
-        "torch_version": torch.__version__,
+        "torch_version": getattr(torch, "__version__", "unknown"),
         "device_count": torch.cuda.device_count() if available else 0,
         "devices": [],
         "default_device": _normalize_device(None),
@@ -952,6 +969,65 @@ def run_kronos_with_cache(
         logger.warning("[KRONOS-CACHE] Failed to save Kronos cache: %s", e)
 
     return ordered
+
+
+def run_batch_kronos(
+    market: str = "ALL",
+    days: int = 14,
+    device: str | None = None,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Run batch Kronos predictions for a market universe, watchlist, or upcoming earnings.
+
+    Persists forecasts into SQLite `kronos_predictions` table and returns the list of predictions.
+    """
+    settings = settings or Settings()
+    from earnings_engine.data.universe import load_universe
+    from earnings_engine.data.watchlists import get_watchlist
+
+    tickers: list[str] = []
+    m_clean = str(market or "ALL").strip().upper()
+    if m_clean in ("IN", "NSE_ALL", "ALL"):
+        uni = load_universe("NSE_TOP", settings) or load_universe("IN", settings)
+        if uni:
+            tickers = list(uni[:50])
+    elif m_clean in ("NIFTY_50", "NIFTY50", "NSE_TOP"):
+        tickers = list(load_universe("NSE_TOP", settings) or load_universe("NIFTY_50", settings) or [])
+    elif m_clean in ("NSE_LARGE_CAP", "LARGE_CAP"):
+        large_caps = load_universe("NSE_LARGE_CAP", settings) or []
+        tickers = list(large_caps[:50])
+    else:
+        # Check if it is a watchlist name
+        wl = get_watchlist(market, settings)
+        if wl:
+            tickers = list(wl)
+        else:
+            custom_uni = load_universe(market, settings)
+            if custom_uni:
+                tickers = list(custom_uni)
+
+    if not tickers:
+        # Fallback to default watchlists or price history tickers
+        wl = get_watchlist("my_watchlist", settings) or get_watchlist("swing", settings)
+        if wl:
+            tickers = list(wl)
+        else:
+            from earnings_engine.data.prices import _connect
+            try:
+                with _connect(settings) as conn:
+                    rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 30").fetchall()
+                    tickers = [r[0] for r in rows if r[0]]
+            except Exception:
+                tickers = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS"]
+
+    return run_kronos_with_cache(
+        tickers=tickers,
+        lookback=120,
+        pred_len=days,
+        device=device,
+        force=False,
+        audit=True,
+    )
 
 
 def generate_markdown_report(forecasts: list[dict[str, Any]], output_path: Path) -> None:

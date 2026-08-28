@@ -864,6 +864,62 @@ def _migration_014_institutional_avg_and_recent_price(conn: Any) -> None:
         pass
 
 
+def _migration_015_scanner_candidates_schema(conn: Any) -> None:
+    """Ensure scanner_candidates table and all required signal/outcome columns exist."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS scanner_candidates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            universe TEXT NOT NULL,
+            category_id TEXT NOT NULL,
+            category_name TEXT,
+            category_badge TEXT,
+            ticker TEXT NOT NULL,
+            stock_name TEXT,
+            signal_date TEXT,
+            signal_price REAL,
+            current_price REAL,
+            return_pct REAL,
+            volume_multiple REAL,
+            trigger_level REAL,
+            target_price REAL,
+            stop_loss REAL,
+            confidence_score INTEGER,
+            severity TEXT,
+            outcome TEXT,
+            outcome_label TEXT,
+            outcome_badge TEXT,
+            expected_horizon TEXT,
+            volatility_est TEXT,
+            headline TEXT,
+            catalyst_summary TEXT,
+            why_it_matches TEXT,
+            published_at TEXT,
+            link TEXT,
+            scanned_at TEXT NOT NULL,
+            UNIQUE(universe, category_id, ticker)
+        )
+    """)
+    for col, col_type in [
+        ("signal_date", "TEXT"),
+        ("signal_price", "REAL"),
+        ("target_price", "REAL"),
+        ("stop_loss", "REAL"),
+        ("severity", "TEXT"),
+        ("outcome", "TEXT"),
+        ("outcome_label", "TEXT"),
+        ("outcome_badge", "TEXT"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE scanner_candidates ADD COLUMN {col} {col_type}")
+        except Exception:
+            pass
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_scanner_univ_cat ON scanner_candidates(universe, category_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_scanner_scanned_at ON scanner_candidates(scanned_at DESC)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -880,6 +936,7 @@ MIGRATIONS: list[Migration] = [
     Migration(12, "012_quarter_repeater_predictions", _migration_012_quarter_repeaters),
     Migration(13, "013_automation_schedules_and_institutional_hub", _migration_013_automation_and_institutional),
     Migration(14, "014_institutional_avg_and_recent_price", _migration_014_institutional_avg_and_recent_price),
+    Migration(15, "015_scanner_candidates_schema", _migration_015_scanner_candidates_schema),
 ]
 
 

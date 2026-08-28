@@ -33,6 +33,8 @@ def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]
     shares_out: int | None = None
     mcap_cr: float | None = None
 
+    short_name: str | None = None
+
     try:
         import yfinance as yf
         t = yf.Ticker(sym)
@@ -41,6 +43,7 @@ def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]
         institutions = info.get("heldPercentInstitutions")
         shares = info.get("sharesOutstanding")
         mcap = info.get("marketCap")
+        short_name = info.get("shortName") or info.get("longName")
 
         if insiders is not None:
             promoter_pct = round(float(insiders) * 100.0, 2)
@@ -67,6 +70,7 @@ def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]
         "institutions_pct": inst_pct,
         "shares_outstanding": shares_out,
         "market_cap_cr": mcap_cr,
+        "short_name": short_name,
     }
 
 
@@ -116,6 +120,14 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
 
     # 1. Retrieve live corporate ownership data
     live_meta = fetch_live_corporate_ownership(sym, conn)
+
+    # Persist company name if we got one from yfinance
+    if live_meta.get("short_name"):
+        try:
+            from earnings_engine.data.names import store_name
+            store_name(sym, live_meta["short_name"], source="yfinance")
+        except Exception:
+            pass
     
     if live_meta["promoter_pct"] is not None:
         promoter_base = live_meta["promoter_pct"]
@@ -153,10 +165,29 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
         ("Q2 FY26", "2025-10-18", 0.85),
     ]
 
+    # Deterministic simulation of new entry patterns for test/demo coverage:
+    # h_val % 7 == 0: Fresh FII entry in Q1 FY27 (0% prior)
+    # h_val % 7 == 1: Fresh DII entry in Q1 FY27 (0% prior)
+    # h_val % 7 == 2: FII interest initiated in Q4 FY26 (0% in Q3/Q2)
+    # Others: Constantly held throughout all quarters
+    sim_fii_fresh_q1 = (h_val % 7 == 0)
+    sim_dii_fresh_q1 = (h_val % 7 == 1)
+    sim_fii_started_q4 = (h_val % 7 == 2)
+
     # 2. Shareholding patterns across 4 quarters in strict chronological order
     for q_idx, (q_name, r_date, mult) in enumerate(quarters):
-        q_fii = round(fii_base * mult, 2)
-        q_dii = round(dii_base * mult, 2)
+        if sim_fii_fresh_q1 and q_name != "Q1 FY27":
+            q_fii = 0.0
+        elif sim_fii_started_q4 and q_name in ("Q3 FY26", "Q2 FY26"):
+            q_fii = 0.0
+        else:
+            q_fii = round(fii_base * mult, 2)
+
+        if sim_dii_fresh_q1 and q_name != "Q1 FY27":
+            q_dii = 0.0
+        else:
+            q_dii = round(dii_base * mult, 2)
+
         q_promoter = round(promoter_base, 2)
         q_retail = round(max(1.0, 100.0 - (q_promoter + q_fii + q_dii)), 2)
         rem = round(100.0 - (q_promoter + q_fii + q_dii + q_retail), 2)
@@ -564,7 +595,103 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
         else:
             total_inst_stake_pct = round(sum(h["stake_pct"] for h in holdings), 2)
 
-        # 4. Returns (7d, 30d, 1y)
+        # 4. FII Interest & New Entry Calculation (8-month lookback window ~ since Dec 2025)
+        WINDOW_CUTOFF_DATE = "2025-12-28"
+        quarter_dates_map = {
+            "Q1 FY27": "2026-07-18",
+            "Q4 FY26": "2026-04-16",
+            "Q3 FY26": "2026-01-15",
+            "Q2 FY26": "2025-10-18",
+            "Q1 FY26": "2025-07-18",
+        }
+        window_patterns = [
+            p for p in patterns
+            if quarter_dates_map.get(p["quarter"], "2026-01-01") >= WINDOW_CUTOFF_DATE
+        ]
+
+        # New entry flags (checking latest quarter Q1 FY27 vs previous quarter Q4 FY26)
+        is_new_fii_entry = False
+        is_new_dii_entry = False
+        if len(patterns) >= 2:
+            latest_fii = patterns[0].get("fii_pct", 0.0)
+            prev_fii = patterns[1].get("fii_pct", 0.0)
+            latest_dii = patterns[0].get("dii_mf_pct", 0.0)
+            prev_dii = patterns[1].get("dii_mf_pct", 0.0)
+            if prev_fii == 0.0 and latest_fii > 0.0:
+                is_new_fii_entry = True
+            if prev_dii == 0.0 and latest_dii > 0.0:
+                is_new_dii_entry = True
+
+        # FII Interest Signal & Always-Held Fallback
+        fii_always_held = True
+        baseline_fii_pct = 0.0
+        fii_interest_quarter = None
+        fii_interest_date = None
+        fii_signal_price = None
+        fii_current_price = None
+        fii_interest_return_pct = None
+        fii_interest_summary = ""
+
+        # Find latest current price
+        curr_price_val = None
+        try:
+            latest_p_row = conn.execute(
+                "SELECT close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 1",
+                (sym,),
+            ).fetchone()
+            if latest_p_row and latest_p_row[0]:
+                curr_price_val = round(float(latest_p_row[0]), 2)
+        except Exception:
+            pass
+
+        if window_patterns:
+            had_zero_fii = any(p.get("fii_pct", 0.0) == 0.0 for p in window_patterns)
+            oldest_window_pat = window_patterns[-1]
+            baseline_fii_pct = round(float(oldest_window_pat.get("fii_pct", 0.0)), 2)
+
+            if not had_zero_fii and baseline_fii_pct > 0.0:
+                # Stock had constant positive FII holding in the last 8 months
+                fii_always_held = True
+                fii_interest_summary = f"Had {baseline_fii_pct:.1f}% on Dec 2025"
+            else:
+                fii_always_held = False
+                # Find the earliest quarter in the 8-month window where FII holding became positive
+                chrono_window = list(reversed(window_patterns))
+                for pat in chrono_window:
+                    if pat.get("fii_pct", 0.0) > 0.0:
+                        fii_interest_quarter = pat["quarter"]
+                        fii_interest_date = quarter_dates_map.get(fii_interest_quarter, "2026-04-16")
+                        break
+
+                if fii_interest_date:
+                    try:
+                        sig_row = conn.execute(
+                            "SELECT close FROM price_history WHERE ticker = ? AND date <= ? ORDER BY date DESC LIMIT 1",
+                            (sym, fii_interest_date),
+                        ).fetchone()
+                        if sig_row and sig_row[0]:
+                            fii_signal_price = round(float(sig_row[0]), 2)
+                    except Exception:
+                        pass
+
+                    if not fii_signal_price and curr_price_val:
+                        fii_signal_price = curr_price_val
+
+                    fii_current_price = curr_price_val
+
+                    if fii_signal_price and fii_current_price and fii_signal_price > 0:
+                        fii_interest_return_pct = round(((fii_current_price - fii_signal_price) / fii_signal_price) * 100.0, 2)
+
+                    ret_str = f"{fii_interest_return_pct:+0.1f}%" if fii_interest_return_pct is not None else "0.0%"
+                    sig_p_str = f"₹{fii_signal_price:,.2f}" if fii_signal_price else "—"
+                    cur_p_str = f"₹{fii_current_price:,.2f}" if fii_current_price else "—"
+                    fii_interest_summary = f"Interest: {fii_interest_quarter} ({fii_interest_date}) · Signal: {sig_p_str} · Current: {cur_p_str} · Return: {ret_str}"
+                else:
+                    fii_interest_summary = "No FII Entry in 8M"
+        else:
+            fii_interest_summary = "—"
+
+        # 5. Returns (7d, 30d, 1y)
         ret_7d, ret_30d, ret_1y = _get_ticker_returns(sym, conn)
 
         # Derive institutional accumulation conviction score (0-100)
@@ -595,9 +722,26 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             verdict = "🔴 Institutional Distribution / Trimming"
             verdict_badge = "rose"
 
-        # Company name lookup
+        # Company name lookup — resolve real name, never return raw ticker
         from earnings_engine.data.names import get_name
-        company_name = get_name(sym) or sym.replace(".NS", "")
+        raw_name = get_name(sym)
+        # If get_name returned the ticker itself (fallback), strip suffix for display
+        if raw_name and raw_name != sym and not raw_name.endswith(".NS") and not raw_name.endswith(".BO"):
+            company_name = raw_name
+        else:
+            # Try yfinance shortName as last resort
+            try:
+                import yfinance as yf
+                yf_info = yf.Ticker(sym).info or {}
+                yf_name = yf_info.get("shortName") or yf_info.get("longName")
+                if yf_name:
+                    company_name = yf_name
+                    from earnings_engine.data.names import store_name
+                    store_name(sym, yf_name, source="yfinance")
+                else:
+                    company_name = sym.replace(".NS", "").replace(".BO", "")
+            except Exception:
+                company_name = sym.replace(".NS", "").replace(".BO", "")
 
         return {
             "success": True,
@@ -614,6 +758,16 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             "net_flow_cr": net_flow_cr,
             "total_institutional_stake_pct": total_inst_stake_pct,
             "total_institutional_stake": total_inst_stake_pct,
+            "is_new_fii_entry": is_new_fii_entry,
+            "is_new_dii_entry": is_new_dii_entry,
+            "fii_always_held": fii_always_held,
+            "baseline_fii_pct": baseline_fii_pct,
+            "fii_interest_quarter": fii_interest_quarter,
+            "fii_interest_date": fii_interest_date,
+            "fii_signal_price": fii_signal_price,
+            "fii_current_price": fii_current_price,
+            "fii_interest_return_pct": fii_interest_return_pct,
+            "fii_interest_summary": fii_interest_summary,
             "return_7d_pct": ret_7d,
             "return_30d_pct": ret_30d,
             "return_1y_pct": ret_1y,
@@ -666,6 +820,10 @@ def get_top_accumulated_stocks(
                     "gross_inflow_cr": act.get("gross_inflow_cr", 0.0),
                     "gross_outflow_cr": act.get("gross_outflow_cr", 0.0),
                     "net_flow_cr": act["net_flow_cr"],
+                    "is_new_fii_entry": act.get("is_new_fii_entry", False),
+                    "is_new_dii_entry": act.get("is_new_dii_entry", False),
+                    "fii_always_held": act.get("fii_always_held", True),
+                    "fii_interest_summary": act.get("fii_interest_summary", ""),
                     "return_7d_pct": act.get("return_7d_pct"),
                     "return_30d_pct": act.get("return_30d_pct"),
                     "funds_accumulating": [
@@ -711,6 +869,10 @@ def get_top_distributed_stocks(
                     "gross_inflow_cr": act.get("gross_inflow_cr", 0.0),
                     "gross_outflow_cr": act.get("gross_outflow_cr", 0.0),
                     "net_flow_cr": act["net_flow_cr"],
+                    "is_new_fii_entry": act.get("is_new_fii_entry", False),
+                    "is_new_dii_entry": act.get("is_new_dii_entry", False),
+                    "fii_always_held": act.get("fii_always_held", True),
+                    "fii_interest_summary": act.get("fii_interest_summary", ""),
                     "return_7d_pct": act.get("return_7d_pct"),
                     "return_30d_pct": act.get("return_30d_pct"),
                     "funds_selling": [
@@ -872,3 +1034,129 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
     except Exception as e:
         logger.warning("[INSTITUTIONAL] Fund portfolio error for %s: %s", fund_name, e)
         return []
+
+
+def get_top_stake_additions(
+    min_delta: float = 3.0,
+    limit: int = 50,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve top stocks with >= min_delta% institutional addition in latest quarter and historical mega surges."""
+    settings = settings or Settings()
+    init_institutional_db(settings)
+
+    quarter_order = {"Q1 FY26": 0, "Q2 FY26": 1, "Q3 FY26": 2, "Q4 FY26": 3, "Q1 FY27": 4, "Q2 FY27": 5}
+
+    try:
+        conn = get_db_connection(settings)
+        tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM shareholding_patterns").fetchall() if r[0]]
+
+        latest_additions: list[dict[str, Any]] = []
+        historical_additions: list[dict[str, Any]] = []
+
+        for t in tickers:
+            pats = conn.execute(
+                """
+                SELECT quarter, promoter_pct, fii_pct, dii_mf_pct, public_retail_pct, other_pct, updated_at
+                FROM shareholding_patterns
+                WHERE ticker = ?
+                """,
+                (t,),
+            ).fetchall()
+
+            pats = sorted(pats, key=lambda x: quarter_order.get(x[0], 0), reverse=True)
+            if len(pats) < 2:
+                continue
+
+            act = get_stock_institutional_activity(t, settings=settings)
+            company_name = act.get("company_name") or t.replace(".NS", "")
+
+            # 1. Latest Quarter Comparison (pats[0] vs pats[1])
+            lat_q, prev_q = pats[0][0], pats[1][0]
+            lat_fii, lat_dii = pats[0][2] or 0.0, pats[0][3] or 0.0
+            prev_fii, prev_dii = pats[1][2] or 0.0, pats[1][3] or 0.0
+
+            lat_inst = round(lat_fii + lat_dii, 2)
+            prev_inst = round(prev_fii + prev_dii, 2)
+            inst_delta = round(lat_inst - prev_inst, 2)
+            fii_delta = round(lat_fii - prev_fii, 2)
+            dii_delta = round(lat_dii - prev_dii, 2)
+
+            item_data = {
+                "ticker": t,
+                "company_name": company_name,
+                "latest_quarter": lat_q,
+                "previous_quarter": prev_q,
+                "inst_addition_pct": inst_delta,
+                "fii_delta_pct": fii_delta,
+                "dii_delta_pct": dii_delta,
+                "total_institutional_stake_pct": lat_inst,
+                "fii_stake_pct": lat_fii,
+                "dii_stake_pct": lat_dii,
+                "accumulation_score": act.get("accumulation_score", 50.0),
+                "verdict": act.get("verdict", "Stable"),
+                "verdict_badge": act.get("verdict_badge", "amber"),
+                "net_flow_cr": act.get("net_flow_cr", 0.0),
+                "gross_inflow_cr": act.get("gross_inflow_cr", 0.0),
+                "gross_outflow_cr": act.get("gross_outflow_cr", 0.0),
+                "funds_accumulating_count": act.get("funds_accumulating_count", 0),
+                "funds_selling_count": act.get("funds_selling_count", 0),
+                "is_new_fii_entry": act.get("is_new_fii_entry", False),
+                "is_new_dii_entry": act.get("is_new_dii_entry", False),
+                "fii_interest_summary": act.get("fii_interest_summary", ""),
+                "return_7d_pct": act.get("return_7d_pct"),
+                "return_30d_pct": act.get("return_30d_pct"),
+                "return_1y_pct": act.get("return_1y_pct"),
+            }
+
+            if inst_delta >= min_delta or fii_delta >= min_delta or dii_delta >= min_delta:
+                latest_additions.append(item_data)
+
+            # 2. Check historical sequential pairs for massive moves
+            for i in range(1, len(pats) - 1):
+                hq_curr, hq_prev = pats[i][0], pats[i+1][0]
+                hfii_curr, hdii_curr = pats[i][2] or 0.0, pats[i][3] or 0.0
+                hfii_prev, hdii_prev = pats[i+1][2] or 0.0, pats[i+1][3] or 0.0
+                hinst_curr = round(hfii_curr + hdii_curr, 2)
+                hinst_prev = round(hfii_prev + hdii_prev, 2)
+                h_delta = round(hinst_curr - hinst_prev, 2)
+                hf_delta = round(hfii_curr - hfii_prev, 2)
+                hd_delta = round(hdii_curr - hdii_prev, 2)
+
+                if h_delta >= min_delta or hf_delta >= min_delta or hd_delta >= min_delta:
+                    historical_additions.append({
+                        "ticker": t,
+                        "company_name": company_name,
+                        "quarter_comparison": f"{hq_curr} vs {hq_prev}",
+                        "target_quarter": hq_curr,
+                        "baseline_quarter": hq_prev,
+                        "inst_addition_pct": h_delta,
+                        "fii_delta_pct": hf_delta,
+                        "dii_delta_pct": hd_delta,
+                        "historical_stake_pct": hinst_curr,
+                        "current_total_stake_pct": lat_inst,
+                        "accumulation_score": act.get("accumulation_score", 50.0),
+                        "funds_accumulating_count": act.get("funds_accumulating_count", 0),
+                        "return_30d_pct": act.get("return_30d_pct"),
+                    })
+
+        latest_additions.sort(key=lambda x: x["inst_addition_pct"], reverse=True)
+        historical_additions.sort(key=lambda x: x["inst_addition_pct"], reverse=True)
+
+        return {
+            "success": True,
+            "min_delta": min_delta,
+            "latest_count": len(latest_additions),
+            "historical_count": len(historical_additions),
+            "latest_additions": latest_additions[:limit],
+            "historical_additions": historical_additions[:limit],
+        }
+    except Exception as e:
+        logger.warning("[INSTITUTIONAL] Top additions error: %s", e)
+        return {
+            "success": False,
+            "error": str(e),
+            "latest_additions": [],
+            "historical_additions": [],
+        }
+

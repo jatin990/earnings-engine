@@ -641,6 +641,38 @@ def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: boo
                 if len(hist) >= 2:
                     prev_c = float(hist.iloc[-2].get("Close", 0))
 
+        # Direct Yahoo v8 chart endpoint fallback (rate-limit immune)
+        if last_p is None or last_p <= 0:
+            import urllib.request
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{fetch_sym}?interval=1d&range=5d"
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"}
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                chart_data = json.loads(resp.read().decode())
+                if chart_data and "chart" in chart_data and "result" in chart_data["chart"] and chart_data["chart"]["result"]:
+                    res_obj = chart_data["chart"]["result"][0]
+                    meta = res_obj.get("meta", {})
+                    last_p = meta.get("regularMarketPrice")
+                    prev_c = meta.get("chartPreviousClose")
+                    yr_h = meta.get("fiftyTwoWeekHigh")
+                    yr_l = meta.get("fiftyTwoWeekLow")
+                    indicators = res_obj.get("indicators", {}).get("quote", [{}])[0]
+                    closes = indicators.get("close", [])
+                    opens = indicators.get("open", [])
+                    highs = indicators.get("high", [])
+                    lows = indicators.get("low", [])
+                    vols = indicators.get("volume", [])
+                    if closes:
+                        valid_closes = [c for c in closes if c is not None]
+                        if valid_closes:
+                            last_p = last_p or valid_closes[-1]
+                    if opens and opens[-1] is not None: open_p = opens[-1]
+                    if highs and highs[-1] is not None: day_h = highs[-1]
+                    if lows and lows[-1] is not None: day_l = lows[-1]
+                    if vols and vols[-1] is not None: vol = vols[-1]
+
     except Exception as e:
         logger.debug("[LIVE-QUOTE] Failed fetching live quote for %s: %s", sym, e)
 

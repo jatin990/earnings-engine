@@ -14,9 +14,12 @@
             </div>
 
             <!-- Page Switcher Tabs -->
-            <div style="display:flex;background:#090d1a;padding:0.25rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);gap:0.25rem;">
+            <div style="display:flex;background:#090d1a;padding:0.25rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);gap:0.25rem;flex-wrap:wrap;">
                 <button type="button" id="btnInstPage-equities" onclick="app.switchInstitutionalPage('equities')" class="btn btn-sm" style="background:#1e293b;color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-weight:700;padding:0.35rem 0.85rem;font-size:0.76rem;">
                     🏛️ Equities & Stake Radar
+                </button>
+                <button type="button" id="btnInstPage-top-additions" onclick="app.switchInstitutionalPage('top-additions')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;">
+                    🚀 Top Stocks & Massive Additions
                 </button>
                 <button type="button" id="btnInstPage-investors" onclick="app.switchInstitutionalPage('investors')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;">
                     💼 Smart Money & Portfolios
@@ -63,6 +66,7 @@
 
             <!-- Legend & Layout Toggle -->
             <div style="display:flex;align-items:center;gap:0.75rem;">
+                <span id="instFreshnessBadge-equities"></span>
                 <div style="font-size:0.66rem;color:#94a3b8;font-family:var(--font-mono);background:rgba(255,255,255,0.03);padding:0.25rem 0.5rem;border-radius:4px;border:1px solid rgba(255,255,255,0.06);">
                     <strong style="color:#cbd5e1;">SCORE:</strong> 0-100 · <strong style="color:#cbd5e1;">7D/30D:</strong> Momentum · <strong style="color:#cbd5e1;">FUNDS:</strong> Net Count (QoQ) · <strong style="color:#cbd5e1;">STAKE:</strong> Latest Inst %
                 </div>
@@ -89,13 +93,14 @@
                                     <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
                                     <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
                                     <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Buying Funds">FUNDS (QoQ)</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW</th>
                                     <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
                                     <th style="padding:0.45rem 0.4rem;text-align:center;">🔍</th>
                                 </tr>
                             </thead>
                             <tbody id="instAccumulatingTableBody">
                                 <tr>
-                                    <td colspan="7" style="padding:2rem;text-align:center;color:#64748b;">
+                                    <td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">
                                         <div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Loading setups...
                                     </td>
                                 </tr>
@@ -122,6 +127,7 @@
                                     <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
                                     <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
                                     <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Selling Funds">FUNDS (QoQ)</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW</th>
                                     <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
                                     <th style="padding:0.45rem 0.4rem;text-align:center;">🔍</th>
                                 </tr>
@@ -233,6 +239,7 @@
                     <span>💼</span> Smart Money Directory & Fund Portfolios
                 </div>
                 <div style="font-size:0.72rem;color:#94a3b8;margin-top:0.15rem;">Browse leading Mutual Funds (DII), Super Investors (HNI), and Sovereign/Foreign Funds (FII).</div>
+                <span id="instFreshnessBadge-investors" style="margin-top:0.3rem;"></span>
             </div>
 
             <!-- Category Pills -->
@@ -286,6 +293,121 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- PAGE 3: 🚀 TOP STOCKS & MASSIVE HISTORICAL ADDITIONS -->
+    <!-- ========================================================================= -->
+    <div id="instPage-top-additions" style="display:none;">
+        
+        <!-- Header & KPI Highlights Bar -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:0.75rem;margin-bottom:1rem;">
+            <div class="card" style="padding:0.75rem 1rem;background:linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(56,189,248,0.1) 100%);border:1px solid rgba(56,189,248,0.3);border-radius:8px;">
+                <div style="font-size:0.7rem;color:#94a3b8;font-family:var(--font-mono);text-transform:uppercase;">🔥 Top Additions (>3% Stake Surge)</div>
+                <div id="kpiTopAdditionsCount" style="font-size:1.4rem;font-weight:800;color:#38bdf8;margin-top:0.2rem;font-family:var(--font-mono);">6 Setups</div>
+                <div style="font-size:0.68rem;color:#cbd5e1;margin-top:0.1rem;">Latest Filing (Q1 FY27 vs Q4 FY26)</div>
+            </div>
+            <div class="card" style="padding:0.75rem 1rem;background:linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(52,211,153,0.1) 100%);border:1px solid rgba(52,211,153,0.3);border-radius:8px;">
+                <div style="font-size:0.7rem;color:#94a3b8;font-family:var(--font-mono);text-transform:uppercase;">🚀 Top Stake Addition Leader</div>
+                <div id="kpiTopAdditionLeader" style="font-size:1.4rem;font-weight:800;color:#34d399;margin-top:0.2rem;font-family:var(--font-mono);">+3.66% (ARSSBL)</div>
+                <div id="kpiTopAdditionLeaderSub" style="font-size:0.68rem;color:#cbd5e1;margin-top:0.1rem;">FII +1.65% · DII +2.01%</div>
+            </div>
+            <div class="card" style="padding:0.75rem 1rem;background:linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(168,85,247,0.1) 100%);border:1px solid rgba(168,85,247,0.3);border-radius:8px;">
+                <div style="font-size:0.7rem;color:#94a3b8;font-family:var(--font-mono);text-transform:uppercase;">🏛️ Mega Institutional Inflows</div>
+                <div id="kpiTopAdditionInflow" style="font-size:1.4rem;font-weight:800;color:#c084fc;margin-top:0.2rem;font-family:var(--font-mono);">+₹29,000+ Cr</div>
+                <div id="kpiTopAdditionInflowSub" style="font-size:0.68rem;color:#cbd5e1;margin-top:0.1rem;">Led by HDFCBANK & 360ONE</div>
+            </div>
+            <div class="card" style="padding:0.75rem 1rem;background:linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(251,191,36,0.1) 100%);border:1px solid rgba(251,191,36,0.3);border-radius:8px;">
+                <div style="font-size:0.7rem;color:#94a3b8;font-family:var(--font-mono);text-transform:uppercase;">⚡ Historical Mega Surges Tracked</div>
+                <div id="kpiHistoricalMegaCount" style="font-size:1.4rem;font-weight:800;color:#fbbf24;margin-top:0.2rem;font-family:var(--font-mono);">3 Surges</div>
+                <div id="kpiHistoricalMegaSub" style="font-size:0.68rem;color:#cbd5e1;margin-top:0.1rem;">TATAMOTORS (+17.8%), BAJFINANCE (+12.3%)</div>
+            </div>
+        </div>
+
+        <!-- Section 1: Top Stocks with >3% Institutional Addition (Latest Quarter) -->
+        <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(56,189,248,0.25);margin-bottom:1.5rem;background:#090d1a;">
+            <div style="padding:0.75rem 1rem;background:#0f172a;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="font-size:1.05rem;">🔥</span>
+                    <div>
+                        <div style="font-size:0.88rem;font-weight:800;color:#f8fafc;">Top Equities with &gt;3% Institutional Addition</div>
+                        <div style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">Latest Filing: Q1 FY27 vs Q4 FY26 (~90-day QoQ horizon)</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span id="instFreshnessBadge-topadditions"></span>
+                    </div>
+                </div>
+                <span class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.68rem;padding:0.2rem 0.55rem;">
+                    ⚡ STAKE SURGE &gt; 3.0%
+                </span>
+            </div>
+
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
+                    <thead>
+                        <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.68rem;">
+                            <th style="padding:0.55rem 0.75rem;">TICKER & COMPANY</th>
+                            <th style="padding:0.55rem 0.6rem;">INST ADDITION (QoQ)</th>
+                            <th style="padding:0.55rem 0.6rem;">FII / DII BREAKDOWN</th>
+                            <th style="padding:0.55rem 0.6rem;">TOTAL INST STAKE</th>
+                            <th style="padding:0.55rem 0.6rem;">SCORE & VERDICT</th>
+                            <th style="padding:0.55rem 0.6rem;">NET FLOW (₹ CR)</th>
+                            <th style="padding:0.55rem 0.6rem;">FUNDS (QoQ)</th>
+                            <th style="padding:0.55rem 0.4rem;" title="7-Day / 30-Day / 1-Year Returns">RETURNS</th>
+                            <th style="padding:0.55rem 0.5rem;text-align:center;">INSPECT</th>
+                        </tr>
+                    </thead>
+                    <tbody id="instTopAdditionsTableBody">
+                        <tr>
+                            <td colspan="9" style="padding:2rem;text-align:center;color:#64748b;">
+                                <div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Loading top additions...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section 2: Massive Historical Additions (Prior Quarters Mega Surges) -->
+        <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(251,191,36,0.25);margin-bottom:1rem;background:#090d1a;">
+            <div style="padding:0.75rem 1rem;background:#0f172a;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="font-size:1.05rem;">🚀</span>
+                    <div>
+                        <div style="font-size:0.88rem;font-weight:800;color:#f8fafc;">Massive Historical Institutional Additions</div>
+                        <div style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">Prior Quarters with Mega Accumulation (e.g. Q4 FY26 vs Q3 FY26)</div>
+                    </div>
+                </div>
+                <span class="badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);font-size:0.68rem;padding:0.2rem 0.55rem;">
+                    📊 HISTORICAL SURGES
+                </span>
+            </div>
+
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
+                    <thead>
+                        <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.68rem;">
+                            <th style="padding:0.55rem 0.75rem;">TICKER & COMPANY</th>
+                            <th style="padding:0.55rem 0.6rem;">QUARTERS COMPARED</th>
+                            <th style="padding:0.55rem 0.6rem;">INST ADDITION</th>
+                            <th style="padding:0.55rem 0.6rem;">FII / DII SURGE</th>
+                            <th style="padding:0.55rem 0.6rem;">STAKE AT SURGE → CURRENT</th>
+                            <th style="padding:0.55rem 0.6rem;">ACCUMULATION SCORE</th>
+                            <th style="padding:0.55rem 0.6rem;">30D RETURN</th>
+                            <th style="padding:0.55rem 0.5rem;text-align:center;">INSPECT</th>
+                        </tr>
+                    </thead>
+                    <tbody id="instHistoricalAdditionsTableBody">
+                        <tr>
+                            <td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">
+                                <div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Loading historical surges...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
     <!-- ========================================================================= -->

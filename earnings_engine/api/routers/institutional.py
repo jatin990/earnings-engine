@@ -67,6 +67,20 @@ async def get_institutional_distributing(
         raise HTTPException(status_code=500, detail=f"Error fetching distributing stocks: {str(e)}")
 
 
+@router.get("/api/v1/institutional/top-additions")
+async def get_top_stake_additions(
+    min_delta: float = Query(3.0, ge=0.5, le=50.0),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """Retrieve top stocks with >= min_delta% institutional additions (latest quarter & historical surges)."""
+    try:
+        data = await asyncio.to_thread(inst_mod.get_top_stake_additions, min_delta=min_delta, limit=limit, settings=_settings)
+        return data
+    except Exception as e:
+        logger.exception("Error in get_top_stake_additions: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching top additions: {str(e)}")
+
+
 @router.get("/api/v1/institutional/funds")
 async def get_top_institutional_funds(
     limit: int = Query(25, ge=1, le=100),

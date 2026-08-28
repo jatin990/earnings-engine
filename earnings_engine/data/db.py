@@ -49,7 +49,8 @@ def _get_thread_session() -> requests.Session:
 
 def _cache_path(settings: Settings) -> Path:
     """Return local SQLite database path with auto-migration from legacy prices.sqlite3."""
-    target_path = settings.data_dirs["prices"] / DB_FILENAME
+    db_filename = os.getenv("EARNINGS_ENGINE_DB_NAME", "money_club.sqlite3")
+    target_path = settings.data_dirs["prices"] / db_filename
     if not target_path.exists():
         legacy_path = settings.data_dirs["prices"] / "prices.sqlite3"
         if legacy_path.exists() and legacy_path.stat().st_size > 0:
