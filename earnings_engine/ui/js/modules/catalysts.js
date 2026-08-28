@@ -70,6 +70,9 @@
                     this.catalystsData = data.catalysts || [];
                     if (totalEl) totalEl.textContent = this.catalystsData.length;
                     this.renderCatalystsFeed(this.catalystsData);
+                    if (typeof window.app?.updateSidebarBadges === 'function') {
+                        window.app.updateSidebarBadges();
+                    }
                 }
             } catch (e) {
                 console.error('[CATALYSTS] Failed loading news catalysts:', e);

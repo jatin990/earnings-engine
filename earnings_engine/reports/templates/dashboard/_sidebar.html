@@ -62,14 +62,17 @@
                 <a class="sidebar-nav-item" data-tab="catalysts" onclick="app.switchTab('catalysts')">
                     <span class="sidebar-icon">📰</span>
                     <span class="sidebar-label">Catalysts & News</span>
+                    <span id="sidebarCatalystCountBadge" class="sidebar-pill" style="display:none;background:rgba(239,68,68,0.22);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Recent High-Impact Catalysts (>50% Impact)">0</span>
                 </a>
                 <a class="sidebar-nav-item" data-tab="gainers" onclick="app.switchTab('gainers')">
                     <span class="sidebar-icon">🚀</span>
                     <span class="sidebar-label">Gainers &amp; Breakouts</span>
+                    <span id="sidebarGainersCountBadge" class="sidebar-pill" style="display:none;background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">0</span>
                 </a>
                 <a class="sidebar-nav-item" data-tab="breakout" onclick="app.switchTab('breakout')">
                     <span class="sidebar-icon">⚡</span>
                     <span class="sidebar-label">Breakout Radar</span>
+                    <span id="sidebarBreakoutCountBadge" class="sidebar-pill" style="display:none;background:rgba(245,158,11,0.22);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Active Breakout Setups & Candidates">0</span>
                 </a>
                 <a class="sidebar-nav-item" data-tab="institutional" onclick="app.switchTab('institutional')">
                     <span class="sidebar-icon">🏛️</span>

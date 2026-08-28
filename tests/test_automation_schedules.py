@@ -140,3 +140,16 @@ def test_scheduler_engine_controls_and_crud_apis(client):
     assert res_del.json()["success"] is True
     assert get_schedule("test_custom_scanner") is None
 
+
+def test_sidebar_badges_endpoint(client):
+    """Verify dynamic sidebar badge counters for catalysts and breakouts."""
+    res = client.get("/api/v1/sidebar/badges")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert "catalysts_count" in data
+    assert "breakouts_count" in data
+    assert isinstance(data["catalysts_count"], int)
+    assert isinstance(data["breakouts_count"], int)
+
+

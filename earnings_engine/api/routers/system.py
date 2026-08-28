@@ -57,6 +57,59 @@ async def api_info():
     }
 
 
+@router.get("/api/v1/sidebar/badges")
+@router.get("/api/v1/system/sidebar-badges")
+async def get_sidebar_badges_endpoint():
+    """Retrieve dynamic notification badge counters for sidebar navigation items."""
+    try:
+        conn = get_db_connection(_settings)
+        # 1. High-impact catalysts count (>50% impact or HIGH in last 14 days)
+        cat_count = 0
+        try:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) FROM news_catalysts
+                WHERE (impact_score >= 50 OR impact_level = 'HIGH')
+                  AND published_at >= datetime('now', '-14 days')
+                """
+            ).fetchone()
+            cat_count = int(row[0]) if row else 0
+        except Exception:
+            try:
+                row = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE (impact_score >= 50 OR impact_level = 'HIGH')").fetchone()
+                cat_count = int(row[0]) if row else 0
+            except Exception:
+                pass
+
+        # 2. Breakout Radar active candidates count (hot + warm setups)
+        bo_count = 0
+        try:
+            from earnings_engine.data import breakout_scanner as breakout_scanner_mod
+            candidates = breakout_scanner_mod.get_cached_scan_results(settings=_settings)
+            if candidates:
+                # Count hot and warm setups with composite score >= 35
+                bo_count = sum(1 for c in candidates if (c.get("composite_score") or 0) >= 35.0)
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "catalysts_count": cat_count,
+            "breakouts_count": bo_count,
+            "high_impact_catalysts": cat_count,
+            "active_breakouts": bo_count,
+        }
+    except Exception as e:
+        logger.debug("[SIDEBAR-BADGES] Error calculating badge counts: %s", e)
+        return {
+            "success": True,
+            "catalysts_count": 0,
+            "breakouts_count": 0,
+            "high_impact_catalysts": 0,
+            "active_breakouts": 0,
+        }
+
+
 # ---------------------------------------------------------------------------
 # Configuration & Control Center
 # ---------------------------------------------------------------------------

@@ -15296,6 +15296,53 @@
         if (window.consensusModule) Object.assign(app, window.consensusModule);
         if (window.swingModule) Object.assign(app, window.swingModule);
 
+        // Update Sidebar Navigation Count Badges (Catalysts >50% impact & Breakout candidates)
+        app.updateSidebarBadges = async function() {
+            try {
+                const res = await fetch(API_BASE + '/api/v1/sidebar/badges');
+                if (res.ok) {
+                    const data = await res.json();
+
+                    // 1. High-Impact Catalysts (>50% impact)
+                    const catBadge = document.getElementById('sidebarCatalystCountBadge');
+                    const catCount = data.catalysts_count || data.high_impact_catalysts || 0;
+                    if (catBadge) {
+                        if (catCount > 0) {
+                            catBadge.textContent = catCount > 99 ? '99+' : String(catCount);
+                            catBadge.style.display = 'inline-block';
+                        } else {
+                            catBadge.style.display = 'none';
+                        }
+                    }
+
+                    // 2. Active Breakout Setups & Candidates
+                    const boBadge = document.getElementById('sidebarBreakoutCountBadge');
+                    const boCount = data.breakouts_count || data.active_breakouts || 0;
+                    if (boBadge) {
+                        if (boCount > 0) {
+                            boBadge.textContent = boCount > 99 ? '99+' : String(boCount);
+                            boBadge.style.display = 'inline-block';
+                        } else {
+                            boBadge.style.display = 'none';
+                        }
+                    }
+
+                    // 3. Gainers / Breakouts badge
+                    const gainerBadge = document.getElementById('sidebarGainersCountBadge');
+                    if (gainerBadge) {
+                        if (boCount > 0) {
+                            gainerBadge.textContent = boCount > 99 ? '99+' : String(boCount);
+                            gainerBadge.style.display = 'inline-block';
+                        } else {
+                            gainerBadge.style.display = 'none';
+                        }
+                    }
+                }
+            } catch (e) {
+                console.debug('[SIDEBAR-BADGES] Error updating sidebar count badges:', e);
+            }
+        };
+
         // Initialize & export to window
         window.app = app;
         if (typeof app.init === 'function') {
@@ -15305,6 +15352,16 @@
             app.updateResultsMonthSummaryCards();
         } catch (e) {
             console.warn('Initial month summary fetch:', e);
+        }
+        try {
+            app.updateSidebarBadges();
+            setInterval(() => {
+                if (typeof app.updateSidebarBadges === 'function') {
+                    app.updateSidebarBadges();
+                }
+            }, 45000);
+        } catch (e) {
+            console.warn('Initial sidebar badge fetch:', e);
         }
 
 
