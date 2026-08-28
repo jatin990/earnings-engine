@@ -253,6 +253,23 @@ async def get_breakout_audit_log_endpoint(
         raise HTTPException(status_code=500, detail=f"Error fetching breakout audit log: {str(e)}")
 
 
+@router.get("/api/v1/breakout-radar/backtest")
+async def run_breakout_historical_backtest(
+    universe: str | None = Query(None, description="Universe or watchlist to run backtest on"),
+):
+    """Run an on-demand historical backtest sweep over 30/45/60/75/90 day periods."""
+    try:
+        stats = await asyncio.to_thread(
+            breakout_scanner_mod.run_historical_backtest,
+            settings=_settings,
+            universe=universe,
+        )
+        return stats
+    except Exception as e:
+        logger.exception("Error in run_breakout_historical_backtest: %s", e)
+        raise HTTPException(status_code=500, detail=f"Backtest run failed: {str(e)}")
+
+
 @router.get("/api/v1/breakout-radar/evaluate/{ticker}")
 async def evaluate_single_breakout(
     ticker: str,

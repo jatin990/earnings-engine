@@ -49,7 +49,7 @@ class TestResistanceProximity:
     def test_at_52w_high_returns_max_score(self):
         closes = pd.Series([90.0 + i * 0.1 for i in range(100)])  # monotonically rising
         score, pct = _score_resistance_proximity(closes)
-        assert score == 30.0
+        assert score == 40.0
         assert pct >= 0.0  # at or above high
 
     def test_far_below_high_returns_zero(self):
@@ -62,16 +62,16 @@ class TestResistanceProximity:
         # price is exactly 2% below the high
         closes = pd.Series([100.0] * 20 + [98.0])
         score, pct = _score_resistance_proximity(closes)
-        assert score >= 20.0
+        assert score >= 25.0
         assert pct == pytest.approx(-2.0, abs=0.01)
 
 
 class TestVolumeSurge:
-    def test_double_volume_gives_max_score(self):
-        volumes = pd.Series([1_000_000] * 20 + [2_500_000])  # >2× surge
+    def test_moderate_volume_gives_max_score(self):
+        volumes = pd.Series([1_000_000] * 20 + [1_200_000])  # 1.2× surge
         score, ratio = _score_volume_surge(volumes)
-        assert score == 20.0
-        assert ratio >= 2.0
+        assert score == 10.0
+        assert ratio >= 1.0
 
     def test_below_average_volume_gives_zero(self):
         volumes = pd.Series([1_000_000] * 20 + [500_000])
@@ -79,10 +79,10 @@ class TestVolumeSurge:
         assert score == 0.0
         assert ratio < 1.0
 
-    def test_15x_volume_gives_15pts(self):
-        volumes = pd.Series([1_000_000] * 20 + [1_600_000])
+    def test_heavy_volume_penalized(self):
+        volumes = pd.Series([1_000_000] * 20 + [2_500_000])
         score, ratio = _score_volume_surge(volumes)
-        assert score == 15.0
+        assert score == 4.0
 
 
 class TestPriceCompression:
@@ -90,7 +90,7 @@ class TestPriceCompression:
         # near-flat prices: ATR% ≈ 0.05%
         closes = pd.Series([100.0 + np.sin(i) * 0.02 for i in range(30)])
         score, atr = _score_price_compression(closes)
-        assert score >= 12.0
+        assert score >= 8.0
 
     def test_high_volatility_gives_zero(self):
         # 5% daily moves
@@ -100,10 +100,10 @@ class TestPriceCompression:
 
 
 class TestMomentum:
-    def test_strong_uptrend_above_sma_scores_15(self):
+    def test_strong_uptrend_above_sma_scores_25(self):
         closes = pd.Series([80.0 + i * 0.5 for i in range(60)])  # strong uptrend
         score, signal = _score_momentum(closes)
-        assert score == 15.0
+        assert score == 25.0
         assert signal == "Strong"
 
     def test_downtrend_below_sma_scores_zero(self):
@@ -116,7 +116,7 @@ class TestMomentum:
 class TestFundamental:
     def test_all_nines_gives_max_score(self):
         score, avg = _score_fundamental([9.0, 9.0, 9.0])
-        assert score == 20.0
+        assert score == 15.0
         assert avg == 9.0
 
     def test_all_ones_gives_zero(self):
@@ -125,12 +125,12 @@ class TestFundamental:
 
     def test_mixed_scores_interpolated(self):
         score, avg = _score_fundamental([5.0, 7.0, 9.0])
-        assert 0.0 < score < 20.0
+        assert 0.0 < score < 15.0
         assert avg == pytest.approx(7.0)
 
     def test_none_values_ignored(self):
         score, avg = _score_fundamental([None, 9.0, None])
-        assert score == 20.0
+        assert score == 15.0
         assert avg == 9.0
 
     def test_all_none_returns_zero(self):
@@ -157,7 +157,7 @@ class TestScoreBreakout:
         prices = _make_flat_prices(n=60, base=500.0)
         result = score_breakout("FLAT.NS", prices, [9.0, 9.0, 9.0])
         assert result is not None
-        assert result["fundamental_score"] == 20.0
+        assert result["fundamental_score"] == 15.0
 
     def test_empty_dataframe_returns_none(self):
         result = score_breakout("NONE.NS", pd.DataFrame(), [])

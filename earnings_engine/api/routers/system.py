@@ -180,7 +180,7 @@ async def scan_logs_endpoint(request: Request = None, full: bool = Query(False, 
     """Scan recent log outputs to ingest any untracked tracebacks (Master only)."""
     if request:
         _require_master_role(request)
-    result = await asyncio.to_thread(scan_log_files, settings=_settings, full=full)
+    result = await asyncio.to_thread(scan_log_files, settings=_settings, full_scan=full)
     return {"success": True, **result}
 
 

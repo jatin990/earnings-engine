@@ -88,7 +88,7 @@ async def get_news_outcomes_endpoint(
             category=category,
             direction=direction,
             status=effective_status,
-            search=search,
+            search_query=search,
             sort_by=sort_by,
             limit=limit,
             settings=_settings,

@@ -696,7 +696,7 @@ def get_scan_status(universe: str | None = None) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _score_resistance_proximity(closes: pd.Series) -> tuple[float, float]:
-    """Return (score 0-30, pct_from_high).
+    """Return (score 0-40, pct_from_high).
 
     Points awarded based on how close current price is to the recent high.
     Closer = higher score.  Being above high = breakout already = also high.
@@ -709,28 +709,27 @@ def _score_resistance_proximity(closes: pd.Series) -> tuple[float, float]:
     if high <= 0:
         return 0.0, float("nan")
     pct_from_high = (current - high) / high * 100  # negative = below high
-    # -5% to 0% → 20-30 pts.  0% to +3% (breakout) → 25-30 pts.  Below -5% → 0
     if pct_from_high >= 0:           # above or at high (breakout)
-        score = 30.0
+        score = 40.0
     elif pct_from_high >= -1:
-        score = 28.0
+        score = 37.0
     elif pct_from_high >= -2:
-        score = 24.0
+        score = 32.0
     elif pct_from_high >= -3:
-        score = 20.0
+        score = 25.0
     elif pct_from_high >= -5:
-        score = 14.0
+        score = 15.0
     elif pct_from_high >= -8:
-        score = 7.0
+        score = 5.0
     else:
         score = 0.0
     return score, pct_from_high
 
 
 def _score_volume_surge(volumes: pd.Series) -> tuple[float, float]:
-    """Return (score 0-20, vol_ratio).
+    """Return (score 0-10, vol_ratio).
 
-    Vol today vs 20D avg.  Ratio ≥ 2× → full 20 pts.
+    Vol today vs 20D avg. Reward moderate accumulation, penalize extreme churn/exhaustion.
     """
     if len(volumes) < 5:
         return 0.0, float("nan")
@@ -739,21 +738,19 @@ def _score_volume_surge(volumes: pd.Series) -> tuple[float, float]:
     if avg_20 <= 0:
         return 0.0, float("nan")
     ratio = today / avg_20
-    if ratio >= 2.0:
-        score = 20.0
-    elif ratio >= 1.5:
-        score = 15.0
-    elif ratio >= 1.2:
-        score = 8.0
-    elif ratio >= 1.0:
-        score = 3.0
+    if 1.0 <= ratio < 1.5:
+        score = 10.0
+    elif 1.5 <= ratio < 2.0:
+        score = 7.0
+    elif ratio >= 2.0:
+        score = 4.0
     else:
         score = 0.0
     return score, round(ratio, 2)
 
 
 def _score_price_compression(closes: pd.Series) -> tuple[float, float]:
-    """Return (score 0-15, atr_pct).
+    """Return (score 0-10, atr_pct).
 
     ATR(14) / price.  Low ratio = price coiling = potential energy.
     """
@@ -765,20 +762,20 @@ def _score_price_compression(closes: pd.Series) -> tuple[float, float]:
     if atr_pct <= 0:
         return 0.0, float("nan")
     if atr_pct < 0.5:
-        score = 15.0
+        score = 10.0
     elif atr_pct < 1.0:
-        score = 12.0
-    elif atr_pct < 1.5:
         score = 8.0
+    elif atr_pct < 1.5:
+        score = 5.0
     elif atr_pct < 2.5:
-        score = 4.0
+        score = 2.0
     else:
         score = 0.0
     return score, round(atr_pct, 3)
 
 
 def _score_momentum(closes: pd.Series) -> tuple[float, str]:
-    """Return (score 0-15, signal).
+    """Return (score 0-25, signal).
 
     30D return > 0 AND price > 20D SMA → strong momentum.
     """
@@ -792,28 +789,28 @@ def _score_momentum(closes: pd.Series) -> tuple[float, str]:
     positive_momentum = ret_30 > 0
 
     if above_sma and positive_momentum and ret_30 > 5:
-        score, signal = 15.0, "Strong"
+        score, signal = 25.0, "Strong"
     elif above_sma and positive_momentum:
-        score, signal = 10.0, "Moderate"
+        score, signal = 18.0, "Moderate"
     elif above_sma or positive_momentum:
-        score, signal = 5.0, "Weak"
+        score, signal = 8.0, "Weak"
     else:
         score, signal = 0.0, "None"
     return score, signal
 
 
 def _score_fundamental(quality_scores: list[float | None]) -> tuple[float, float]:
-    """Return (score 0-20, avg_quality).
+    """Return (score 0-15, avg_quality).
 
     Takes a list of quality scores (each 1-9) from q1/q2/q3 earnings history.
-    Normalised: avg=9 → 20 pts, avg=1 → 0 pts.
+    Normalised: avg=9 → 15 pts, avg=1 → 0 pts.
     """
     valid = [q for q in quality_scores if q is not None and not (isinstance(q, float) and np.isnan(q))]
     if not valid:
         return 0.0, float("nan")
     avg_q = float(np.mean(valid))
-    score = round((avg_q - 1) / 8 * 20, 1)   # map [1,9] → [0,20]
-    return max(0.0, min(20.0, score)), round(avg_q, 2)
+    score = round((avg_q - 1) / 8 * 15, 1)   # map [1,9] → [0,15]
+    return max(0.0, min(15.0, score)), round(avg_q, 2)
 
 
 # ---------------------------------------------------------------------------
@@ -1919,6 +1916,150 @@ def search_breakout_tickers(
             logger.debug("[BREAKOUT-SEARCH] Price history search error: %s", e)
 
     return results[:limit]
+
+
+def run_historical_backtest(
+    settings: Settings,
+    universe: str | None = None,
+) -> dict[str, Any]:
+    """Run an on-demand historical backtest sweep over the last 90, 75, 60, 45, and 30 days.
+
+    Returns structured stats comparing old vs new outcomes, component effect sizes,
+    and performance by score/volume threshold.
+    """
+    from datetime import datetime, timedelta, timezone
+    from concurrent.futures import ThreadPoolExecutor
+
+    t_start = time.perf_counter()
+    ticker_list = _resolve_universe_tickers(settings, universe)
+    if not ticker_list:
+        return {"success": False, "error": "No tickers found in universe."}
+
+    # Standard historical dates
+    asof_dates = [
+        (datetime.now(timezone.utc) - timedelta(days=d)).strftime("%Y-%m-%d")
+        for d in [90, 75, 60, 45, 30]
+    ]
+
+    all_results = []
+
+    def _evaluate_date_tickers(date_str: str) -> list[dict[str, Any]]:
+        date_results = []
+        for ticker in ticker_list:
+            try:
+                res = _score_single_ticker(ticker, settings, asof_date=date_str)
+                if res and res.get("composite_score", 0) >= 25:
+                    res["asof_date"] = date_str
+                    date_results.append(res)
+            except Exception:
+                pass
+        return date_results
+
+    with ThreadPoolExecutor(max_workers=min(8, len(asof_dates))) as executor:
+        batches = list(executor.map(_evaluate_date_tickers, asof_dates))
+
+    for b in batches:
+        all_results.extend(b)
+
+    resolved = [r for r in all_results if r.get("breakout_happened") is not None]
+    broke = [r for r in resolved if r.get("breakout_happened") is True]
+    failed = [r for r in resolved if r.get("breakout_happened") is False]
+
+    total = len(all_results)
+    total_resolved = len(resolved)
+    total_broke = len(broke)
+    total_failed = len(failed)
+
+    win_rate = round(total_broke / total_resolved * 100, 1) if total_resolved else 0.0
+
+    returns = [float(r["realized_return_pct"]) for r in resolved if r.get("realized_return_pct") is not None]
+    avg_return = round(float(np.mean(returns)), 2) if returns else 0.0
+
+    broke_returns = [float(r["realized_return_pct"]) for r in broke if r.get("realized_return_pct") is not None]
+    failed_returns = [float(r["realized_return_pct"]) for r in failed if r.get("realized_return_pct") is not None]
+
+    avg_broke_return = round(float(np.mean(broke_returns)), 2) if broke_returns else 0.0
+    avg_failed_return = round(float(np.mean(failed_returns)), 2) if failed_returns else 0.0
+
+    outcomes_count = {
+        "TARGET_HIT": len([r for r in resolved if r.get("outcome") == "TARGET_HIT"]),
+        "BREAKOUT_SUCCEEDED": len([r for r in resolved if r.get("outcome") == "BREAKOUT_SUCCEEDED"]),
+        "BREAKOUT_RETRACED": len([r for r in resolved if r.get("outcome") == "BREAKOUT_RETRACED"]),
+        "STOP_LOSS_HIT": len([r for r in resolved if r.get("outcome") == "STOP_LOSS_HIT"]),
+        "NO_BREAKOUT": len([r for r in resolved if r.get("outcome") == "NO_BREAKOUT"]),
+    }
+
+    effect_sizes = {}
+    fields = [
+        ("composite_score", "Composite Score"),
+        ("resistance_score", "Resistance Proximity"),
+        ("volume_score", "Volume Surge"),
+        ("compression_score", "Price Compression"),
+        ("momentum_score", "Momentum"),
+        ("fundamental_score", "Fundamental Quality"),
+        ("pct_from_high", "% from 52W High"),
+        ("volume_ratio", "Volume Ratio"),
+        ("atr_pct", "ATR %"),
+    ]
+
+    for col, label in fields:
+        bv = [float(r[col]) for r in broke if r.get(col) is not None]
+        fv = [float(r[col]) for r in failed if r.get(col) is not None]
+        if bv and fv:
+            mean_b = np.mean(bv)
+            mean_f = np.mean(fv)
+            delta = mean_b - mean_f
+            pooled_std = np.std(bv + fv) or 1.0
+            es = abs(delta) / pooled_std
+            effect_sizes[col] = {
+                "label": label,
+                "mean_breakout": round(float(mean_b), 2),
+                "mean_failed": round(float(mean_f), 2),
+                "delta": round(float(delta), 2),
+                "effect_size": round(float(es), 3),
+                "direction": "HIGHER in breakouts ↑" if delta > 0 else "LOWER in breakouts ↓",
+            }
+
+    score_thresholds = {}
+    for th in [35, 45, 50, 55, 60, 65, 70]:
+        th_res = [r for r in resolved if r.get("composite_score", 0) >= th]
+        th_broke = [r for r in th_res if r.get("breakout_happened") is True]
+        score_thresholds[str(th)] = {
+            "count": len(th_res),
+            "broke_count": len(th_broke),
+            "win_rate_pct": round(len(th_broke) / len(th_res) * 100, 1) if th_res else 0.0,
+        }
+
+    vol_thresholds = {}
+    for vr in [1.0, 1.2, 1.5, 2.0]:
+        vr_res = [r for r in resolved if (r.get("volume_ratio") or 0) >= vr]
+        vr_broke = [r for r in vr_res if r.get("breakout_happened") is True]
+        vol_thresholds[f"{vr}x"] = {
+            "count": len(vr_res),
+            "broke_count": len(vr_broke),
+            "win_rate_pct": round(len(vr_broke) / len(vr_res) * 100, 1) if vr_res else 0.0,
+        }
+
+    duration = round(time.perf_counter() - t_start, 2)
+
+    return {
+        "success": True,
+        "universe": universe or "ALL",
+        "total_candidates": total,
+        "total_evaluated": total_resolved,
+        "success_count": total_broke,
+        "failed_count": total_failed,
+        "win_rate_pct": win_rate,
+        "avg_return_pct": avg_return,
+        "avg_broke_return_pct": avg_broke_return,
+        "avg_failed_return_pct": avg_failed_return,
+        "outcomes": outcomes_count,
+        "effect_sizes": effect_sizes,
+        "score_thresholds": score_thresholds,
+        "volume_thresholds": vol_thresholds,
+        "duration_s": duration,
+        "run_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 # ---------------------------------------------------------------------------

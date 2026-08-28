@@ -31,24 +31,24 @@ def test_breakout_subscores():
     # 2. Volume surge
     volumes = pd.Series([1000] * 20 + [2500])
     vol_score, vol_ratio = _score_volume_surge(volumes)
-    assert vol_score == 20.0
+    assert vol_score == 4.0
     assert vol_ratio >= 2.0
 
     # 3. Compression
     comp_closes = pd.Series([100.0 + i * 0.05 for i in range(20)])
     comp_score, atr_pct = _score_price_compression(comp_closes)
-    assert comp_score >= 12.0
+    assert comp_score >= 8.0
     assert atr_pct < 1.0
 
     # 4. Momentum
     mom_closes = pd.Series([90.0 + i * 0.5 for i in range(35)])
     mom_score, mom_signal = _score_momentum(mom_closes)
-    assert mom_score == 15.0
+    assert mom_score == 25.0
     assert mom_signal == "Strong"
 
     # 5. Fundamental
     fund_score, avg_q = _score_fundamental([8.0, 9.0, 8.5])
-    assert fund_score >= 18.0
+    assert fund_score >= 12.0
     assert avg_q >= 8.0
 
 
