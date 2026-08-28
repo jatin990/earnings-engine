@@ -920,6 +920,42 @@ def _migration_015_scanner_candidates_schema(conn: Any) -> None:
         pass
 
 
+def _migration_016_automation_schedule_logs_and_flow_controls(conn: Any) -> None:
+    """Add execution logs table and dynamic configuration columns to automation_schedules."""
+    # Ensure automation_schedules has is_enabled and params_json columns
+    for col_def in [
+        ("is_enabled", "INTEGER NOT NULL DEFAULT 1"),
+        ("params_json", "TEXT"),
+        ("cron_expression", "TEXT"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE automation_schedules ADD COLUMN {col_def[0]} {col_def[1]}")
+        except Exception:
+            pass
+
+    # Create persistent execution logs table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS automation_schedule_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT NOT NULL,
+            job_name TEXT,
+            category TEXT,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            duration_s REAL DEFAULT 0,
+            status TEXT NOT NULL,
+            summary TEXT,
+            error_details TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sched_logs_job_time ON automation_schedule_logs (job_id, started_at DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sched_logs_created ON automation_schedule_logs (created_at DESC)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -937,6 +973,7 @@ MIGRATIONS: list[Migration] = [
     Migration(13, "013_automation_schedules_and_institutional_hub", _migration_013_automation_and_institutional),
     Migration(14, "014_institutional_avg_and_recent_price", _migration_014_institutional_avg_and_recent_price),
     Migration(15, "015_scanner_candidates_schema", _migration_015_scanner_candidates_schema),
+    Migration(16, "016_automation_schedule_logs_and_flow_controls", _migration_016_automation_schedule_logs_and_flow_controls),
 ]
 
 

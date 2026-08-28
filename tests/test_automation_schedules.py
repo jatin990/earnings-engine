@@ -1,4 +1,4 @@
-"""Tests for Automation Schedules and Background Job Tracking."""
+"""Tests for Automation Schedules, Scheduler Engine, and Background Job Tracking."""
 import pytest
 from fastapi.testclient import TestClient
 from earnings_engine.api.server import app
@@ -6,9 +6,15 @@ from earnings_engine.data.automation_schedules import (
     init_automation_schedules,
     record_job_start,
     record_job_finish,
+    append_schedule_log,
     get_all_schedules,
     get_schedule,
+    get_schedule_logs,
+    create_schedule,
+    update_schedule,
+    delete_schedule,
 )
+from earnings_engine.data.scheduler_engine import get_scheduler_engine
 
 
 @pytest.fixture
@@ -62,3 +68,75 @@ def test_automation_schedules_api_endpoints(client):
     assert res_trigger.status_code == 200
     assert res_trigger.json()["success"] is True
     assert "Triggered execution" in res_trigger.json()["message"]
+
+
+def test_scheduler_engine_controls_and_crud_apis(client):
+    # 1. Test Engine Status API
+    res_engine = client.get("/api/v1/automation/engine")
+    assert res_engine.status_code == 200
+    eng_data = res_engine.json()
+    assert "is_running" in eng_data
+    assert "total_schedules" in eng_data
+
+    # 2. Test Create Custom Schedule
+    custom_job = {
+        "job_id": "test_custom_scanner",
+        "job_name": "Test Custom Scanner Flow",
+        "category": "Scanner",
+        "interval_seconds": 120,
+        "params_json": '{"universe": "NSE_TOP"}',
+        "is_enabled": True,
+    }
+    res_create = client.post("/api/v1/automation/schedules", json=custom_job)
+    assert res_create.status_code == 200
+    assert res_create.json()["success"] is True
+    assert res_create.json()["schedule"]["job_id"] == "test_custom_scanner"
+    assert res_create.json()["schedule"]["interval_seconds"] == 120
+
+    # 3. Test Get Single Schedule
+    res_get = client.get("/api/v1/automation/schedules/test_custom_scanner")
+    assert res_get.status_code == 200
+    assert res_get.json()["schedule"]["job_name"] == "Test Custom Scanner Flow"
+
+    # 4. Test Update Schedule
+    update_payload = {
+        "job_name": "Updated Custom Scanner",
+        "interval_seconds": 600,
+    }
+    res_update = client.put("/api/v1/automation/schedules/test_custom_scanner", json=update_payload)
+    assert res_update.status_code == 200
+    assert res_update.json()["schedule"]["job_name"] == "Updated Custom Scanner"
+    assert res_update.json()["schedule"]["interval_seconds"] == 600
+
+    # 5. Test Pause & Resume
+    res_pause = client.post("/api/v1/automation/schedules/test_custom_scanner/stop")
+    assert res_pause.status_code == 200
+    assert res_pause.json()["schedule"]["status"] == "paused"
+
+    res_resume = client.post("/api/v1/automation/schedules/test_custom_scanner/start")
+    assert res_resume.status_code == 200
+    assert res_resume.json()["schedule"]["status"] == "active"
+
+    # 6. Test Logging & Logs Endpoint
+    append_schedule_log(
+        job_id="test_custom_scanner",
+        started_at="2026-08-28T08:00:00Z",
+        finished_at="2026-08-28T08:00:02Z",
+        duration_s=2.0,
+        status="success",
+        summary="Test execution completed successfully.",
+    )
+    res_logs = client.get("/api/v1/automation/logs?job_id=test_custom_scanner")
+    assert res_logs.status_code == 200
+    logs_data = res_logs.json()
+    assert logs_data["success"] is True
+    assert len(logs_data["logs"]) >= 1
+    assert logs_data["logs"][0]["job_id"] == "test_custom_scanner"
+    assert logs_data["logs"][0]["status"] == "success"
+
+    # 7. Test Delete Schedule
+    res_del = client.delete("/api/v1/automation/schedules/test_custom_scanner")
+    assert res_del.status_code == 200
+    assert res_del.json()["success"] is True
+    assert get_schedule("test_custom_scanner") is None
+

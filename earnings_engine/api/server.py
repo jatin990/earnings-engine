@@ -120,27 +120,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("[SCANNER] Could not schedule startup category sweep: %s", e)
 
-        # Start the background breakout scanner loop
+        # Initialize & Start Centralized Automation Scheduler Engine
         try:
-            from earnings_engine.data import breakout_scanner as breakout_scanner_mod
-            _breakout_scanner_task = asyncio.create_task(
-                breakout_scanner_mod.breakout_scanner_loop(_settings),
-                name="breakout_radar",
-            )
-            logger.info("[BREAKOUT] Background scanner task started.")
+            from earnings_engine.data.scheduler_engine import get_scheduler_engine
+            _engine = get_scheduler_engine()
+            _engine.start(_settings)
+            logger.info("[SCHEDULER] Master background scheduler engine active.")
         except Exception as e:
-            logger.warning("[BREAKOUT] Could not start scanner task: %s", e)
-
-        # Start the background news catalyst harvester loop
-        try:
-            from earnings_engine.data.catalysts_news import news_catalyst_harvest_loop
-            _news_catalyst_task = asyncio.create_task(
-                news_catalyst_harvest_loop(_settings),
-                name="news_catalyst_harvester",
-            )
-            logger.info("[NEWS-HARVESTER] Background news harvester task started.")
-        except Exception as e:
-            logger.warning("[NEWS-HARVESTER] Could not start news harvester task: %s", e)
+            logger.warning("[SCHEDULER] Startup scheduler engine warning: %s", e)
 
         # Pre-scan and cache available local LLM models (Ollama / LM Studio)
         try:
@@ -159,15 +146,12 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Graceful shutdown: cancel background tasks
-    for task_handle, name in [(_breakout_scanner_task, "Breakout scanner"), (_news_catalyst_task, "News harvester")]:
-        if task_handle and not task_handle.done():
-            task_handle.cancel()
-            try:
-                await asyncio.wait_for(task_handle, timeout=3.0)
-            except (asyncio.CancelledError, asyncio.TimeoutError):
-                pass
-            logger.info("[%s] Task shut down.", name)
+    # Graceful shutdown: stop scheduler engine
+    try:
+        from earnings_engine.data.scheduler_engine import get_scheduler_engine
+        get_scheduler_engine().stop()
+    except Exception as e:
+        logger.debug("[SCHEDULER] Shutdown error: %s", e)
 
 
 # ---------------------------------------------------------------------------

@@ -184,6 +184,253 @@ def record_job_finish(
         logger.debug("[SCHEDULES] Record job finish error for %s: %s", job_id, e)
 
 
+def append_schedule_log(
+    job_id: str,
+    started_at: str,
+    finished_at: str | None = None,
+    duration_s: float = 0.0,
+    status: str = "success",
+    summary: str = "",
+    error_details: str | None = None,
+    settings: Settings | None = None,
+) -> None:
+    """Record an execution run record in the automation_schedule_logs table."""
+    settings = settings or Settings()
+    try:
+        conn = get_db_connection(settings)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        
+        # Get category and job_name if available
+        row = conn.execute("SELECT job_name, category FROM automation_schedules WHERE job_id = ?", (job_id,)).fetchone()
+        job_name = row[0] if row else job_id
+        category = row[1] if row else "Automation"
+
+        conn.execute(
+            """
+            INSERT INTO automation_schedule_logs (
+                job_id, job_name, category, started_at, finished_at,
+                duration_s, status, summary, error_details, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                job_id,
+                job_name,
+                category,
+                started_at,
+                finished_at or now_iso,
+                round(float(duration_s), 2),
+                status,
+                summary,
+                error_details,
+                now_iso,
+            ),
+        )
+        if hasattr(conn, "commit"):
+            conn.commit()
+    except Exception as e:
+        logger.debug("[SCHEDULES] Append schedule log error for %s: %s", job_id, e)
+
+
+def get_schedule_logs(
+    job_id: str | None = None,
+    limit: int = 50,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Fetch execution run logs for a specific job or all background jobs."""
+    settings = settings or Settings()
+    logs: list[dict[str, Any]] = []
+    try:
+        conn = get_db_connection(settings)
+        if job_id:
+            rows = conn.execute(
+                """
+                SELECT id, job_id, job_name, category, started_at, finished_at,
+                       duration_s, status, summary, error_details, created_at
+                FROM automation_schedule_logs
+                WHERE job_id = ?
+                ORDER BY started_at DESC
+                LIMIT ?
+                """,
+                (job_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, job_id, job_name, category, started_at, finished_at,
+                       duration_s, status, summary, error_details, created_at
+                FROM automation_schedule_logs
+                ORDER BY started_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+        for r in rows:
+            if hasattr(r, "keys"):
+                d = dict(r)
+            else:
+                d = {
+                    "id": r[0],
+                    "job_id": r[1],
+                    "job_name": r[2],
+                    "category": r[3],
+                    "started_at": r[4],
+                    "finished_at": r[5],
+                    "duration_s": r[6],
+                    "status": r[7],
+                    "summary": r[8],
+                    "error_details": r[9],
+                    "created_at": r[10],
+                }
+            d["started_ago"] = _format_time_ago(d.get("started_at"))
+            logs.append(d)
+    except Exception as e:
+        logger.debug("[SCHEDULES] Fetch schedule logs error: %s", e)
+    return logs
+
+
+def create_schedule(job: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Create a new automation schedule."""
+    settings = settings or Settings()
+    init_automation_schedules(settings)
+    job_id = job.get("job_id", "").strip().lower().replace(" ", "_")
+    if not job_id:
+        raise ValueError("job_id is required")
+
+    job_name = job.get("job_name", job_id)
+    category = job.get("category", "Custom")
+    interval = int(job.get("interval_seconds", 300))
+    params_json = job.get("params_json")
+    if isinstance(params_json, (dict, list)):
+        import json
+        params_json = json.dumps(params_json)
+
+    is_enabled = 1 if job.get("is_enabled", True) else 0
+    now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
+    next_iso = (now_dt + timedelta(seconds=interval)).isoformat()
+    status = "active" if is_enabled else "paused"
+
+    conn = get_db_connection(settings)
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO automation_schedules (
+            job_id, job_name, category, interval_seconds,
+            last_run_at, next_run_at, status, last_duration_s,
+            total_runs, last_summary, error_message, updated_at,
+            is_enabled, params_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            job_id,
+            job_name,
+            category,
+            interval,
+            None,
+            next_iso,
+            status,
+            0.0,
+            0,
+            f"Created schedule ({interval}s interval).",
+            None,
+            now_iso,
+            is_enabled,
+            params_json,
+        ),
+    )
+    if hasattr(conn, "commit"):
+        conn.commit()
+
+    return get_schedule(job_id, settings) or {}
+
+
+def update_schedule(job_id: str, updates: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Update fields of an existing automation schedule."""
+    settings = settings or Settings()
+    conn = get_db_connection(settings)
+    now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
+
+    existing = get_schedule(job_id, settings)
+    if not existing:
+        raise ValueError(f"Schedule '{job_id}' not found")
+
+    job_name = updates.get("job_name", existing["job_name"])
+    category = updates.get("category", existing["category"])
+    interval = int(updates.get("interval_seconds", existing["interval_seconds"]))
+    params_json = updates.get("params_json", existing.get("params_json"))
+    if isinstance(params_json, (dict, list)):
+        import json
+        params_json = json.dumps(params_json)
+
+    is_enabled = existing.get("is_enabled", 1)
+    if "is_enabled" in updates:
+        is_enabled = 1 if updates["is_enabled"] else 0
+
+    status = existing.get("status", "active")
+    if "status" in updates:
+        status = updates["status"]
+    elif not is_enabled:
+        status = "paused"
+    elif status == "paused":
+        status = "active"
+
+    # If interval changed, recalculate next_run_at
+    next_iso = existing.get("next_run_at")
+    if interval != existing["interval_seconds"] or not next_iso:
+        next_iso = (now_dt + timedelta(seconds=interval)).isoformat()
+
+    conn.execute(
+        """
+        UPDATE automation_schedules
+        SET job_name = ?,
+            category = ?,
+            interval_seconds = ?,
+            next_run_at = ?,
+            status = ?,
+            is_enabled = ?,
+            params_json = ?,
+            updated_at = ?
+        WHERE job_id = ?
+        """,
+        (
+            job_name,
+            category,
+            interval,
+            next_iso,
+            status,
+            is_enabled,
+            params_json,
+            now_iso,
+            job_id,
+        ),
+    )
+    if hasattr(conn, "commit"):
+        conn.commit()
+
+    return get_schedule(job_id, settings) or {}
+
+
+def delete_schedule(job_id: str, settings: Settings | None = None) -> bool:
+    """Delete an automation schedule from SQLite."""
+    settings = settings or Settings()
+    try:
+        conn = get_db_connection(settings)
+        conn.execute("DELETE FROM automation_schedules WHERE job_id = ?", (job_id,))
+        if hasattr(conn, "commit"):
+            conn.commit()
+        return True
+    except Exception as e:
+        logger.error("[SCHEDULES] Error deleting schedule %s: %s", job_id, e)
+        return False
+
+
+def set_schedule_status(job_id: str, status: str, settings: Settings | None = None) -> dict[str, Any]:
+    """Pause or resume a schedule."""
+    is_enabled = 1 if status == "active" else 0
+    return update_schedule(job_id, {"status": status, "is_enabled": is_enabled}, settings)
+
+
 def get_all_schedules(settings: Settings | None = None) -> list[dict[str, Any]]:
     """Retrieve all automation schedule states with dynamic countdown seconds."""
     settings = settings or Settings()
@@ -213,10 +460,15 @@ def get_all_schedules(settings: Settings | None = None) -> list[dict[str, Any]]:
                     "error_message": r[10],
                     "updated_at": r[11],
                 }
+                if len(r) > 12:
+                    d["is_enabled"] = r[12]
+                if len(r) > 13:
+                    d["params_json"] = r[13]
 
             # Calculate live seconds until next scheduled execution
             secs_until = 0
-            if d.get("next_run_at"):
+            is_active = d.get("status") in ("active", "running")
+            if d.get("next_run_at") and is_active:
                 try:
                     next_dt = datetime.fromisoformat(d["next_run_at"].replace("Z", "+00:00"))
                     secs_until = max(0, int((next_dt - now_dt).total_seconds()))
@@ -226,9 +478,10 @@ def get_all_schedules(settings: Settings | None = None) -> list[dict[str, Any]]:
                 secs_until = d.get("interval_seconds", 60)
 
             d["seconds_until_next"] = secs_until
+            d["is_enabled"] = bool(d.get("is_enabled", 1))
             d["interval_formatted"] = _format_interval(d.get("interval_seconds", 60))
             d["last_run_formatted"] = _format_time_ago(d.get("last_run_at"))
-            d["next_run_formatted"] = _format_time_in(secs_until)
+            d["next_run_formatted"] = _format_time_in(secs_until) if is_active else "Paused"
             schedules.append(d)
 
     except Exception as e:

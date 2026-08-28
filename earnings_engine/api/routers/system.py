@@ -259,12 +259,123 @@ async def cancel_task_generic(request: dict):
 # Automation & Scheduled Jobs
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# ⏱️ Centralized Automation Scheduler & Flow Management API
+# ---------------------------------------------------------------------------
+
+@router.get("/api/v1/automation/engine")
+async def get_scheduler_engine_status_endpoint():
+    """Get master background scheduler engine status and execution metrics."""
+    from earnings_engine.data.scheduler_engine import get_scheduler_engine
+    engine = get_scheduler_engine()
+    return {"success": True, **engine.get_status()}
+
+
+@router.post("/api/v1/automation/engine/start")
+async def start_scheduler_engine_endpoint():
+    """Start or resume the master background scheduler engine."""
+    from earnings_engine.data.scheduler_engine import get_scheduler_engine
+    engine = get_scheduler_engine()
+    engine.start(_settings)
+    return {"success": True, "message": "Master scheduler engine started.", **engine.get_status()}
+
+
+@router.post("/api/v1/automation/engine/stop")
+async def stop_scheduler_engine_endpoint():
+    """Pause or stop the master background scheduler engine."""
+    from earnings_engine.data.scheduler_engine import get_scheduler_engine
+    engine = get_scheduler_engine()
+    engine.stop()
+    return {"success": True, "message": "Master scheduler engine stopped.", **engine.get_status()}
+
+
 @router.get("/api/v1/automation/schedules")
 async def get_automation_schedules_endpoint():
-    """List registered automation cron schedules and execution history."""
+    """List registered automation cron schedules and execution states."""
     from earnings_engine.data.automation_schedules import get_all_schedules
     schedules = await asyncio.to_thread(get_all_schedules, _settings)
     return {"success": True, "schedules": schedules}
+
+
+@router.get("/api/v1/automation/schedules/{job_id}")
+async def get_single_automation_schedule_endpoint(job_id: str):
+    """Retrieve configuration and status for a single scheduled job."""
+    from earnings_engine.data.automation_schedules import get_schedule
+    sched = await asyncio.to_thread(get_schedule, job_id, _settings)
+    if not sched:
+        raise HTTPException(status_code=404, detail=f"Schedule '{job_id}' not found")
+    return {"success": True, "schedule": sched}
+
+
+@router.post("/api/v1/automation/schedules")
+async def create_automation_schedule_endpoint(request: Request):
+    """Create a new automation schedule."""
+    from earnings_engine.data.automation_schedules import create_schedule
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    if not body.get("job_id"):
+        raise HTTPException(status_code=400, detail="job_id is required")
+
+    try:
+        sched = await asyncio.to_thread(create_schedule, body, _settings)
+        return {"success": True, "message": f"Created schedule '{sched.get('job_id')}'", "schedule": sched}
+    except Exception as e:
+        logger.error("[AUTOMATION-CREATE] Error: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/api/v1/automation/schedules/{job_id}")
+async def update_automation_schedule_endpoint(job_id: str, request: Request):
+    """Modify parameters, interval, or status of an existing schedule."""
+    from earnings_engine.data.automation_schedules import update_schedule
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    try:
+        sched = await asyncio.to_thread(update_schedule, job_id, body, _settings)
+        return {"success": True, "message": f"Updated schedule '{job_id}'", "schedule": sched}
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.error("[AUTOMATION-UPDATE] Error updating %s: %s", job_id, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/api/v1/automation/schedules/{job_id}")
+async def delete_automation_schedule_endpoint(job_id: str):
+    """Delete an automation schedule."""
+    from earnings_engine.data.automation_schedules import delete_schedule
+    success = await asyncio.to_thread(delete_schedule, job_id, _settings)
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to delete schedule '{job_id}'")
+    return {"success": True, "message": f"Deleted schedule '{job_id}'"}
+
+
+@router.post("/api/v1/automation/schedules/{job_id}/start")
+async def resume_automation_schedule_endpoint(job_id: str):
+    """Resume / activate a scheduled flow."""
+    from earnings_engine.data.automation_schedules import set_schedule_status
+    try:
+        sched = await asyncio.to_thread(set_schedule_status, job_id, "active", _settings)
+        return {"success": True, "message": f"Resumed schedule '{job_id}'", "schedule": sched}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/automation/schedules/{job_id}/stop")
+async def pause_automation_schedule_endpoint(job_id: str):
+    """Pause / stop a scheduled flow."""
+    from earnings_engine.data.automation_schedules import set_schedule_status
+    try:
+        sched = await asyncio.to_thread(set_schedule_status, job_id, "paused", _settings)
+        return {"success": True, "message": f"Paused schedule '{job_id}'", "schedule": sched}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/api/v1/automation/trigger")
@@ -274,7 +385,7 @@ async def trigger_automation_job(
     job_id: str | None = Query(None),
     schedule_id: str | None = None,
 ):
-    """Manually trigger immediate execution of any background scheduled job."""
+    """Manually trigger immediate execution of any background scheduled flow."""
     target_job = job_id or schedule_id
     if not target_job:
         try:
@@ -285,31 +396,24 @@ async def trigger_automation_job(
     if not target_job:
         raise HTTPException(status_code=400, detail="job_id or schedule_id is required")
 
-    import threading
-    from earnings_engine.data import breakout_scanner as breakout_scanner_mod
+    from earnings_engine.data.scheduler_engine import get_scheduler_engine
+    engine = get_scheduler_engine()
+    dispatched = engine.dispatch_job(target_job, _settings)
+    if dispatched:
+        return {"success": True, "job_id": target_job, "message": f"Triggered execution for '{target_job}' in background thread."}
+    else:
+        return {"success": False, "job_id": target_job, "message": f"Job '{target_job}' is already running."}
 
-    def _execute():
-        try:
-            if target_job == "breakout_hot_rescore":
-                breakout_scanner_mod.run_hot_rescore(_settings)
-            elif target_job == "breakout_warm_rescore":
-                breakout_scanner_mod.run_warm_rescore(_settings)
-            elif target_job == "breakout_cold_scan":
-                breakout_scanner_mod.run_cold_scan(_settings)
-            elif target_job == "news_catalyst_harvest":
-                from earnings_engine.data.catalysts_news import scan_watchlist_catalysts
-                from earnings_engine.data.automation_schedules import record_job_start, record_job_finish
-                record_job_start("news_catalyst_harvest", _settings)
-                t0 = time.perf_counter()
-                res = scan_watchlist_catalysts("my_watchlist", 3, False, _settings)
-                elapsed = round(time.perf_counter() - t0, 2)
-                record_job_finish("news_catalyst_harvest", elapsed, f"Harvested {res.get('catalysts_fetched', 0)} headlines across {res.get('scanned_tickers', 0)} stocks", settings=_settings)
-        except Exception as e:
-            logger.error("[AUTOMATION-TRIGGER] Error running %s: %s", target_job, e)
 
-    t = threading.Thread(target=_execute, daemon=True, name=f"trigger_{target_job}")
-    t.start()
-    return {"success": True, "job_id": target_job, "message": f"Triggered execution for '{target_job}' in background thread."}
+@router.get("/api/v1/automation/logs")
+async def get_automation_logs_endpoint(
+    job_id: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """Retrieve execution run logs history."""
+    from earnings_engine.data.automation_schedules import get_schedule_logs
+    logs = await asyncio.to_thread(get_schedule_logs, job_id, limit, _settings)
+    return {"success": True, "count": len(logs), "logs": logs}
 
 
 # ---------------------------------------------------------------------------
