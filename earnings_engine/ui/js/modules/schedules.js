@@ -249,7 +249,17 @@
                 badges.push(`<span class="signal-badge" style="background:rgba(255,255,255,0.05);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);font-size:0.66rem;">🌐 Default</span>`);
             }
 
-            // 2. Additional Parameters
+            // 2. Market Timing / Session Badge
+            const session = sched.market_session || (sched.run_after_hours ? 'all' : 'market_hours_only');
+            if (session === 'market_hours_only' || sched.run_after_hours === false) {
+                badges.push(`<span class="signal-badge" style="background:rgba(245,158,11,0.12);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);font-size:0.65rem;font-weight:700;" title="Active Only During Live Market Hours (09:15–15:30 IST)">🏛️ Market Hours</span>`);
+            } else if (session === 'after_hours_only') {
+                badges.push(`<span class="signal-badge" style="background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.3);font-size:0.65rem;font-weight:700;" title="Active Only After Market Hours (Post-15:30 IST / EOD)">🌙 After-Hours</span>`);
+            } else {
+                badges.push(`<span class="signal-badge" style="background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);font-size:0.65rem;" title="Runs 24/7 (Market Hours & After-Hours)">🌐 24/7</span>`);
+            }
+
+            // 3. Additional Parameters
             if (params.limit) {
                 badges.push(`<span style="font-size:0.65rem;color:#cbd5e1;background:#0f172a;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:0.08rem 0.35rem;font-family:var(--font-mono);">limit:${params.limit}</span>`);
             }
@@ -387,6 +397,9 @@
             const customRow = document.getElementById('pgSchedCustomIntervalRow');
             if (customRow) customRow.style.display = 'none';
 
+            const sessionSelect = document.getElementById('pgSchedInputMarketSession');
+            if (sessionSelect) sessionSelect.value = 'all';
+
             const enabledInput = document.getElementById('pgSchedInputEnabled');
             if (enabledInput) enabledInput.checked = true;
 
@@ -468,6 +481,12 @@
                 if (customInput) customInput.value = interval;
             }
 
+            const sessionSelect = document.getElementById('pgSchedInputMarketSession');
+            if (sessionSelect) {
+                const session = sched.market_session || (sched.run_after_hours ? 'all' : 'market_hours_only');
+                sessionSelect.value = session;
+            }
+
             const paramsInput = document.getElementById('pgSchedInputParams');
             if (paramsInput) paramsInput.value = sched.params_json || '';
             const enabledInput = document.getElementById('pgSchedInputEnabled');
@@ -541,6 +560,7 @@
             const catSelect = document.getElementById('pgSchedInputCategory');
             const presetSelect = document.getElementById('pgSchedInputIntervalPreset');
             const customInput = document.getElementById('pgSchedInputIntervalSeconds');
+            const sessionSelect = document.getElementById('pgSchedInputMarketSession');
             const paramsInput = document.getElementById('pgSchedInputParams');
             const enabledInput = document.getElementById('pgSchedInputEnabled');
 
@@ -554,13 +574,18 @@
                 interval = parseInt(presetSelect.value, 10);
             }
 
+            const marketSession = sessionSelect ? sessionSelect.value : 'all';
+            const runAfterHours = marketSession !== 'market_hours_only';
+
             const payload = {
                 job_id: jobId,
                 job_name: nameInput ? nameInput.value.trim() : jobId,
                 category: catSelect ? catSelect.value : 'Custom',
                 interval_seconds: interval,
                 params_json: paramsInput ? paramsInput.value.trim() : '',
-                is_enabled: enabledInput ? enabledInput.checked : true
+                is_enabled: enabledInput ? enabledInput.checked : true,
+                market_session: marketSession,
+                run_after_hours: runAfterHours
             };
 
             const submitBtn = document.getElementById('pgSchedSubmitBtn');

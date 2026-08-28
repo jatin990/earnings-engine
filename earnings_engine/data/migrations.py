@@ -1075,6 +1075,18 @@ def _migration_018_breakout_tracked_signals(conn: Any) -> None:
         logger.debug("[MIGRATION-018] Backfill from breakout_radar notice: %s", e)
 
 
+def _migration_019_automation_schedules_market_hours(conn: Any) -> None:
+    """Add run_after_hours and market_session controls to automation_schedules table."""
+    for col_name, col_type in [
+        ("run_after_hours", "INTEGER NOT NULL DEFAULT 1"),
+        ("market_session", "TEXT NOT NULL DEFAULT 'all'"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE automation_schedules ADD COLUMN {col_name} {col_type}")
+        except Exception:
+            pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1095,6 +1107,7 @@ MIGRATIONS: list[Migration] = [
     Migration(16, "016_automation_schedule_logs_and_flow_controls", _migration_016_automation_schedule_logs_and_flow_controls),
     Migration(17, "017_clean_fabricated_earnings_and_guard_rails", _migration_017_clean_fabricated_earnings_and_guard_rails),
     Migration(18, "018_breakout_tracked_signals", _migration_018_breakout_tracked_signals),
+    Migration(19, "019_automation_schedules_market_hours", _migration_019_automation_schedules_market_hours),
 ]
 
 

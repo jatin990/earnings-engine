@@ -179,8 +179,8 @@
                             </div>
                         </div>
 
-                        <!-- Category & Interval Cadence -->
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+                        <!-- Category, Interval Cadence & Market Hours Timing -->
+                        <div style="display:grid; grid-template-columns: 1fr 1fr 1.3fr; gap:0.5rem;">
                             <div>
                                 <label style="display:block; font-size:0.68rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.25rem;">Category</label>
                                 <select id="pgSchedInputCategory" style="width:100%; height:32px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:#f8fafc; font-size:0.75rem; padding:0 0.5rem; outline:none;">
@@ -204,6 +204,14 @@
                                     <option value="7200">Every 2 Hours (7200s)</option>
                                     <option value="86400">Every 24 Hours (Daily)</option>
                                     <option value="custom">✏️ Custom Seconds...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.68rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.25rem;">Market Session / Timing</label>
+                                <select id="pgSchedInputMarketSession" style="width:100%; height:32px; background:#0f172a; border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:#34d399; font-weight:700; font-size:0.75rem; padding:0 0.5rem; outline:none;">
+                                    <option value="all" selected>🌐 24/7 (Run Always / After-Hours)</option>
+                                    <option value="market_hours_only">🏛️ Market Hours Only (09:15–15:30 IST)</option>
+                                    <option value="after_hours_only">🌙 After-Hours Only (Post-15:30 IST)</option>
                                 </select>
                             </div>
                         </div>

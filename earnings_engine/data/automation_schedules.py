@@ -22,22 +22,28 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "⚡ Breakout Hot Rescore",
         "category": "Breakout Radar",
         "interval_seconds": 60,
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
         "params_json": '{"universe": "NSE_ALL", "pool": "hot"}',
-        "description": "High-frequency parallel re-scoring of Hot candidate setups using latest live prices.",
+        "description": "High-frequency parallel re-scoring of Hot candidate setups using latest live prices during market hours.",
     },
     {
         "job_id": "breakout_warm_rescore",
         "job_name": "⚡ Breakout Warm Rescore",
         "category": "Breakout Radar",
         "interval_seconds": 300,
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
         "params_json": '{"universe": "NSE_ALL", "pool": "warm"}',
-        "description": "Re-scores coiling/warm stocks to detect promotions into Hot or demotions.",
+        "description": "Re-scores coiling/warm stocks to detect promotions into Hot or demotions during market hours.",
     },
     {
         "job_id": "breakout_cold_scan",
         "job_name": "🌐 Cold Universe Sweep",
         "category": "Breakout Radar",
         "interval_seconds": 3600,
+        "run_after_hours": 1,
+        "market_session": "all",
         "params_json": '{"universe": "NSE_ALL", "min_score": 35}',
         "description": "Full universe multi-factor scan discovering fresh compression and momentum setups.",
     },
@@ -46,6 +52,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "📰 News Catalyst Harvester",
         "category": "Market Catalysts",
         "interval_seconds": 600,
+        "run_after_hours": 1,
+        "market_session": "all",
         "params_json": '{"watchlist": "my_watchlist", "limit": 10}',
         "description": "Continuous harvesting of corporate order wins, earnings surprises, and regulatory filings.",
     },
@@ -54,6 +62,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🔍 Multi-Category Scanner",
         "category": "Scanner",
         "interval_seconds": 1800,
+        "run_after_hours": 1,
+        "market_session": "all",
         "params_json": '{"universe": "NSE_TOP", "limit": 100}',
         "description": "Multi-category technical scans across 52W Highs, Volume Surges, and Squeeze Coils.",
     },
@@ -62,6 +72,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🔁 Quarter Repeaters Sync",
         "category": "Seasonality",
         "interval_seconds": 7200,
+        "run_after_hours": 1,
+        "market_session": "all",
         "params_json": '{"universe": "NSE_ALL"}',
         "description": "Historical quarter-over-quarter earnings surprise repeater pattern evaluation.",
     },
@@ -70,6 +82,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🏛️ Institutional Flows Sync",
         "category": "Institutional",
         "interval_seconds": 7200,
+        "run_after_hours": 1,
+        "market_session": "all",
         "params_json": '{"watchlist": "my_watchlist"}',
         "description": "Continuous sync of institutional fund portfolios, FII/DII entries, and block deals.",
     },
@@ -78,6 +92,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🧠 Kronos Forecast Warmup",
         "category": "Custom",
         "interval_seconds": 86400,
+        "run_after_hours": 1,
+        "market_session": "all",
         "params_json": '{"watchlist": "my_watchlist", "device": "cuda:0"}',
         "description": "Pre-computes and caches Kronos AI 14-day sequence price predictions.",
     },
@@ -96,14 +112,16 @@ def init_automation_schedules(settings: Settings | None = None) -> None:
 
         for s in DEFAULT_SCHEDULES:
             next_iso = (now_dt + timedelta(seconds=s["interval_seconds"])).isoformat()
+            run_after = int(s.get("run_after_hours", 1))
+            session = s.get("market_session", "all")
             conn.execute(
                 """
                 INSERT OR IGNORE INTO automation_schedules (
                     job_id, job_name, category, interval_seconds,
                     last_run_at, next_run_at, status, last_duration_s,
                     total_runs, last_summary, error_message, updated_at,
-                    is_enabled, params_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    is_enabled, params_json, run_after_hours, market_session
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     s["job_id"],
@@ -120,9 +138,11 @@ def init_automation_schedules(settings: Settings | None = None) -> None:
                     now_iso,
                     1,
                     s.get("params_json"),
+                    run_after,
+                    session,
                 ),
             )
-            # If params_json is null on existing row, seed it
+            # If params_json, run_after_hours, or market_session is null on existing row, update it
             if s.get("params_json"):
                 conn.execute(
                     """
@@ -132,6 +152,15 @@ def init_automation_schedules(settings: Settings | None = None) -> None:
                     """,
                     (s["params_json"], s["job_id"]),
                 )
+            conn.execute(
+                """
+                UPDATE automation_schedules
+                SET run_after_hours = COALESCE(run_after_hours, ?),
+                    market_session = COALESCE(market_session, ?)
+                WHERE job_id = ?
+                """,
+                (run_after, session, s["job_id"]),
+            )
         if hasattr(conn, "commit"):
             conn.commit()
     except Exception as e:
@@ -335,6 +364,8 @@ def create_schedule(job: dict[str, Any], settings: Settings | None = None) -> di
     job_name = job.get("job_name", job_id)
     category = job.get("category", "Custom")
     interval = int(job.get("interval_seconds", 300))
+    run_after_hours = 1 if job.get("run_after_hours", True) else 0
+    market_session = job.get("market_session", "all" if run_after_hours else "market_hours_only")
     params_json = job.get("params_json")
     if isinstance(params_json, (dict, list)):
         import json
@@ -353,8 +384,8 @@ def create_schedule(job: dict[str, Any], settings: Settings | None = None) -> di
             job_id, job_name, category, interval_seconds,
             last_run_at, next_run_at, status, last_duration_s,
             total_runs, last_summary, error_message, updated_at,
-            is_enabled, params_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            is_enabled, params_json, run_after_hours, market_session
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             job_id,
@@ -371,6 +402,8 @@ def create_schedule(job: dict[str, Any], settings: Settings | None = None) -> di
             now_iso,
             is_enabled,
             params_json,
+            run_after_hours,
+            market_session,
         ),
     )
     if hasattr(conn, "commit"):
@@ -402,6 +435,17 @@ def update_schedule(job_id: str, updates: dict[str, Any], settings: Settings | N
     if "is_enabled" in updates:
         is_enabled = 1 if updates["is_enabled"] else 0
 
+    run_after_hours = existing.get("run_after_hours", 1)
+    if "run_after_hours" in updates:
+        run_after_hours = 1 if updates["run_after_hours"] else 0
+
+    market_session = updates.get("market_session", existing.get("market_session", "all" if run_after_hours else "market_hours_only"))
+    # If market_session explicitly changed, sync run_after_hours
+    if market_session == "market_hours_only":
+        run_after_hours = 0
+    elif "run_after_hours" not in updates:
+        run_after_hours = 1
+
     status = existing.get("status", "active")
     if "status" in updates:
         status = updates["status"]
@@ -425,6 +469,8 @@ def update_schedule(job_id: str, updates: dict[str, Any], settings: Settings | N
             status = ?,
             is_enabled = ?,
             params_json = ?,
+            run_after_hours = ?,
+            market_session = ?,
             updated_at = ?
         WHERE job_id = ?
         """,
@@ -436,6 +482,8 @@ def update_schedule(job_id: str, updates: dict[str, Any], settings: Settings | N
             status,
             is_enabled,
             params_json,
+            run_after_hours,
+            market_session,
             now_iso,
             job_id,
         ),
@@ -474,12 +522,17 @@ def get_all_schedules(settings: Settings | None = None) -> list[dict[str, Any]]:
 
     try:
         conn = get_db_connection(settings)
-        rows = conn.execute("SELECT * FROM automation_schedules ORDER BY category, job_name").fetchall()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM automation_schedules ORDER BY category, job_name")
+        col_names = [col[0] for col in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
         now_dt = datetime.now(timezone.utc)
 
         for r in rows:
             if hasattr(r, "keys"):
                 d = dict(r)
+            elif col_names:
+                d = dict(zip(col_names, r))
             else:
                 d = {
                     "job_id": r[0],
@@ -495,10 +548,6 @@ def get_all_schedules(settings: Settings | None = None) -> list[dict[str, Any]]:
                     "error_message": r[10],
                     "updated_at": r[11],
                 }
-                if len(r) > 12:
-                    d["is_enabled"] = r[12]
-                if len(r) > 13:
-                    d["params_json"] = r[13]
 
             # Calculate live seconds until next scheduled execution
             secs_until = 0
@@ -514,6 +563,9 @@ def get_all_schedules(settings: Settings | None = None) -> list[dict[str, Any]]:
 
             d["seconds_until_next"] = secs_until
             d["is_enabled"] = bool(d.get("is_enabled", 1))
+            raw_run_after = d.get("run_after_hours")
+            d["run_after_hours"] = bool(raw_run_after if raw_run_after is not None else 1)
+            d["market_session"] = d.get("market_session") or ("all" if d["run_after_hours"] else "market_hours_only")
             d["interval_formatted"] = _format_interval(d.get("interval_seconds", 60))
             d["last_run_formatted"] = _format_time_ago(d.get("last_run_at"))
             d["next_run_formatted"] = _format_time_in(secs_until) if is_active else "Paused"

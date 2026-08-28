@@ -195,6 +195,10 @@ class SchedulerEngine:
         settings = self._settings or Settings()
         schedules = get_all_schedules(settings)
         now_dt = datetime.now(timezone.utc)
+        now_ts = now_dt.timestamp()
+
+        from earnings_engine.data.market_pulse import is_market_open
+        market_open = is_market_open(now_ts)
 
         for sched in schedules:
             job_id = sched.get("job_id")
@@ -206,6 +210,19 @@ class SchedulerEngine:
                 continue
             if job_id in self._running_jobs:
                 continue
+
+            # Market session & after-hours execution filter
+            run_after_hours = sched.get("run_after_hours")
+            market_session = sched.get("market_session", "all")
+
+            if run_after_hours is False or run_after_hours == 0 or market_session == "market_hours_only":
+                if not market_open:
+                    # Market is closed; skip execution until next market open session
+                    continue
+            elif market_session == "after_hours_only":
+                if market_open:
+                    # Market is open; skip execution until after-hours EOD session
+                    continue
 
             # Check if next_run_at timestamp is due
             next_run_iso = sched.get("next_run_at")
