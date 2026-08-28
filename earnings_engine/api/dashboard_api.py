@@ -1681,6 +1681,8 @@ def run_ai_forecast_api(
     ticker: str,
     swing_support: float | None = None,
     swing_resistance: float | None = None,
+    timeframe_days: int = 14,
+    force: bool = False,
 ) -> dict[str, Any]:
     """Run on-demand multi-modal AI prediction synthesizing news, price action, volume, and swing levels."""
     from earnings_engine.predict_multimodal import run_multimodal_prediction
@@ -1704,6 +1706,8 @@ def run_ai_forecast_api(
 def run_ai_forecasts_batch_api(
     tickers: list[str],
     watchlist: str = "ALL",
+    timeframe_days: int = 14,
+    force: bool = False,
 ) -> list[dict[str, Any]]:
     """Run batch multi-modal AI predictions for a list of tickers."""
     from earnings_engine.predict_multimodal import run_multimodal_prediction
@@ -1722,6 +1726,11 @@ def run_ai_forecasts_batch_api(
             continue
 
     return results
+
+
+# Aliases for router compatibility
+run_ai_forecast_for_ticker_api = run_ai_forecast_api
+run_ai_forecast_batch_api = run_ai_forecasts_batch_api
 
 
 def get_ticker_news_api(ticker: str, limit: int = 10) -> dict[str, Any]:

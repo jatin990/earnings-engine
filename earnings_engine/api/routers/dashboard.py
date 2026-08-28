@@ -419,17 +419,23 @@ async def dashboard_ai_forecast_run(request: dict):
         tickers = request.get("tickers")
         timeframe_days = int(request.get("timeframe_days", 14))
         force = bool(request.get("force", False))
+        swing_support = request.get("swing_support")
+        swing_resistance = request.get("swing_resistance")
+        watchlist = request.get("watchlist", "ALL")
         if ticker:
             return await asyncio.to_thread(
-                dashboard_api.run_ai_forecast_for_ticker_api,
+                dashboard_api.run_ai_forecast_api,
                 ticker=ticker,
+                swing_support=swing_support,
+                swing_resistance=swing_resistance,
                 timeframe_days=timeframe_days,
                 force=force,
             )
         if tickers:
             return await asyncio.to_thread(
-                dashboard_api.run_ai_forecast_batch_api,
+                dashboard_api.run_ai_forecasts_batch_api,
                 tickers=tickers,
+                watchlist=watchlist,
                 timeframe_days=timeframe_days,
                 force=force,
             )
