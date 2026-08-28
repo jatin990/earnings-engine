@@ -657,22 +657,8 @@ def calculate_or_fetch_eps(
 
     now_date_str = pd.Timestamp.now().strftime("%Y-%m-%d")
 
-    # If no earnings_date provided, find the most recent past earnings date
     target_ed = earnings_date
     conn = get_db_connection(settings)
-    if not target_ed:
-        try:
-            row = conn.execute(
-                "SELECT earnings_date, eps_estimate, eps_reported FROM earnings_history WHERE ticker = ? ORDER BY earnings_date DESC LIMIT 1",
-                (sym,),
-            ).fetchone()
-            if row:
-                target_ed = str(row[0])
-        except Exception:
-            pass
-
-    if not target_ed:
-        target_ed = now_date_str
 
     eps_est = override_estimate
     eps_rep = override_reported
@@ -688,7 +674,6 @@ def calculate_or_fetch_eps(
         raw_dates = yf_ticker.get_earnings_dates(limit=60)
         if raw_dates is not None and not raw_dates.empty:
             raw_dates.index = pd.to_datetime(raw_dates.index, utc=True).tz_convert(None).normalize()
-            target_ts = pd.Timestamp(target_ed).normalize()
             
             # Record all available historical dates from consensus
             for dt, row in raw_dates.iterrows():
@@ -706,21 +691,23 @@ def calculate_or_fetch_eps(
                     })
 
             # Check if target date matched
-            matched_row = None
-            for dt, row in raw_dates.iterrows():
-                diff_days = abs((dt - target_ts).days)
-                if diff_days <= 7:
-                    matched_row = row
-                    break
-            
-            if matched_row is not None:
-                r_rep = matched_row.get("Reported EPS") or matched_row.get("reported eps") or matched_row.get("eps_reported")
-                r_est = matched_row.get("EPS Estimate") or matched_row.get("eps estimate") or matched_row.get("eps_estimate")
-                if eps_rep is None and r_rep is not None and not pd.isna(r_rep):
-                    eps_rep = float(r_rep)
-                    method = "yfinance_consensus"
-                if eps_est is None and r_est is not None and not pd.isna(r_est):
-                    eps_est = float(r_est)
+            if target_ed:
+                target_ts = pd.Timestamp(target_ed).normalize()
+                matched_row = None
+                for dt, row in raw_dates.iterrows():
+                    diff_days = abs((dt - target_ts).days)
+                    if diff_days <= 7:
+                        matched_row = row
+                        break
+                
+                if matched_row is not None:
+                    r_rep = matched_row.get("Reported EPS") or matched_row.get("reported eps") or matched_row.get("eps_reported")
+                    r_est = matched_row.get("EPS Estimate") or matched_row.get("eps estimate") or matched_row.get("eps_estimate")
+                    if eps_rep is None and r_rep is not None and not pd.isna(r_rep):
+                        eps_rep = float(r_rep)
+                        method = "yfinance_consensus"
+                    if eps_est is None and r_est is not None and not pd.isna(r_est):
+                        eps_est = float(r_est)
     except Exception as e:
         logger.debug("Tier 1 earnings dates fetch failed for %s: %s", sym, e)
 
@@ -730,7 +717,6 @@ def calculate_or_fetch_eps(
         yf_ticker = yf.Ticker(sym)
         inc_stmt = yf_ticker.quarterly_income_stmt
         if inc_stmt is not None and not inc_stmt.empty:
-            target_ts = pd.Timestamp(target_ed).normalize()
             # Sort columns from newest to oldest
             sorted_cols = sorted(inc_stmt.columns, key=lambda c: pd.Timestamp(c).normalize(), reverse=True)
             
@@ -750,9 +736,9 @@ def calculate_or_fetch_eps(
                 if col_eps is not None:
                     inc_stmt_cols_data.append((col_ts, col_eps))
 
-            # Match for target_ed
-            if inc_stmt_cols_data:
-                # Find column closest to or on target_ed
+            # Match for target_ed if specified
+            if target_ed and inc_stmt_cols_data:
+                target_ts = pd.Timestamp(target_ed).normalize()
                 best_match = None
                 min_diff = 9999
                 for col_ts, col_eps in inc_stmt_cols_data:
@@ -761,84 +747,87 @@ def calculate_or_fetch_eps(
                         min_diff = diff_days
                         best_match = (col_ts, col_eps)
                 
-                if not best_match:
-                    best_match = inc_stmt_cols_data[0]
-
                 if eps_rep is None and best_match:
                     eps_rep = best_match[1]
                     method = "quarterly_income_stmt_diluted"
     except Exception as e:
         logger.debug("Tier 2 quarterly income stmt calculation failed for %s: %s", sym, e)
 
-    # Tier 3: Derive EPS Estimate from preceding quarters if missing
-    if eps_est is None:
-        # Check from inc_stmt_cols_data preceding quarters
-        preceding_eps = [eps for col_ts, eps in inc_stmt_cols_data if (col_ts < pd.Timestamp(target_ed).normalize())]
-        if not preceding_eps and len(inc_stmt_cols_data) > 1:
-            preceding_eps = [eps for _, eps in inc_stmt_cols_data[1:]]
-        
-        if preceding_eps:
-            eps_est = round(sum(preceding_eps[:4]) / len(preceding_eps[:4]), 2)
-            if method is None or method == "quarterly_income_stmt_diluted":
-                method = "quarterly_income_stmt_diluted"
-        else:
+    # If target_ed is specified, derive its EPS Estimate if missing
+    surprise_pct: float | None = None
+    if target_ed:
+        if eps_est is None:
+            preceding_eps = [eps for col_ts, eps in inc_stmt_cols_data if (col_ts < pd.Timestamp(target_ed).normalize())]
+            if not preceding_eps and len(inc_stmt_cols_data) > 1:
+                preceding_eps = [eps for _, eps in inc_stmt_cols_data[1:]]
+            
+            if preceding_eps:
+                eps_est = round(sum(preceding_eps[:4]) / len(preceding_eps[:4]), 2)
+                if method is None or method == "quarterly_income_stmt_diluted":
+                    method = "quarterly_income_stmt_diluted"
+            else:
+                try:
+                    prior_rows = conn.execute(
+                        "SELECT eps_reported FROM earnings_history WHERE ticker = ? AND earnings_date < ? AND eps_reported IS NOT NULL ORDER BY earnings_date DESC LIMIT 4",
+                        (sym, target_ed),
+                    ).fetchall()
+                    if prior_rows:
+                        prior_vals = [float(r[0]) for r in prior_rows if r[0] is not None]
+                        if prior_vals:
+                            eps_est = round(sum(prior_vals) / len(prior_vals), 2)
+                            if method is None:
+                                method = "derived_historical_average"
+                except Exception:
+                    pass
+
+        # Fallback from fast_info if still missing
+        if eps_rep is None:
             try:
-                prior_rows = conn.execute(
-                    "SELECT eps_reported FROM earnings_history WHERE ticker = ? AND earnings_date < ? AND eps_reported IS NOT NULL ORDER BY earnings_date DESC LIMIT 4",
-                    (sym, target_ed),
-                ).fetchall()
-                if prior_rows:
-                    prior_vals = [float(r[0]) for r in prior_rows if r[0] is not None]
-                    if prior_vals:
-                        eps_est = round(sum(prior_vals) / len(prior_vals), 2)
-                        if method is None:
-                            method = "derived_historical_average"
+                yf_ticker = yf.Ticker(sym)
+                info = yf_ticker.fast_info
+                trailing_pe = getattr(info, "trailing_pe", None)
+                last_price = getattr(info, "last_price", None)
+                if trailing_pe and last_price and trailing_pe > 0:
+                    annual_eps = last_price / trailing_pe
+                    eps_rep = round(annual_eps / 4.0, 2)
+                    method = "derived_pe_quarterly_eps"
+                    if eps_est is None:
+                        eps_est = round(eps_rep * 0.96, 2)
             except Exception:
                 pass
 
-    # Tier 4: Fallback from fast_info if still missing
-    if eps_rep is None:
-        try:
-            yf_ticker = yf.Ticker(sym)
-            info = yf_ticker.fast_info
-            trailing_pe = getattr(info, "trailing_pe", None)
-            last_price = getattr(info, "last_price", None)
-            if trailing_pe and last_price and trailing_pe > 0:
-                annual_eps = last_price / trailing_pe
-                eps_rep = round(annual_eps / 4.0, 2)
-                method = "derived_pe_quarterly_eps"
-                if eps_est is None:
-                    eps_est = round(eps_rep * 0.96, 2)
-        except Exception:
-            pass
+        if eps_rep is not None and eps_est is None:
+            eps_est = round(eps_rep * 0.95, 2)
 
-    # If estimate is still missing but reported is present, set conservative baseline
-    if eps_rep is not None and eps_est is None:
-        eps_est = round(eps_rep * 0.95, 2)
+        # Calculate surprise percentage
+        if eps_rep is not None and eps_est is not None and abs(eps_est) > 0.0001:
+            surprise_pct = round(((eps_rep - eps_est) / abs(eps_est)) * 100.0, 2)
 
-    # Calculate surprise percentage
-    surprise_pct = None
-    if eps_rep is not None and eps_est is not None and abs(eps_est) > 0.0001:
-        surprise_pct = round(((eps_rep - eps_est) / abs(eps_est)) * 100.0, 2)
+        # Save target quarter to SQLite database
+        if eps_rep is not None or eps_est is not None:
+            try:
+                with conn:
+                    conn.execute("""
+                        INSERT INTO earnings_history (ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(ticker, earnings_date) DO UPDATE SET
+                            eps_estimate = COALESCE(excluded.eps_estimate, earnings_history.eps_estimate),
+                            eps_reported = COALESCE(excluded.eps_reported, earnings_history.eps_reported),
+                            surprise_pct = COALESCE(excluded.surprise_pct, earnings_history.surprise_pct),
+                            source = excluded.source
+                    """, (sym, target_ed, eps_est, eps_rep, surprise_pct, method or "calculated"))
+                    conn.commit()
+                logger.info("[CALC-EPS] Successfully saved EPS for %s (%s): est=%s, rep=%s, surp=%s (method=%s)", sym, target_ed, eps_est, eps_rep, surprise_pct, method)
+            except Exception as e:
+                logger.warning("[CALC-EPS] Error saving target EPS to DB for %s: %s", sym, e)
 
-    # Save target quarter to SQLite database
-    if eps_rep is not None or eps_est is not None:
+    # Save discovered quarterly income statements under their exact statement dates
+    if inc_stmt_cols_data:
         try:
             with conn:
-                conn.execute("""
-                    INSERT INTO earnings_history (ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(ticker, earnings_date) DO UPDATE SET
-                        eps_estimate = COALESCE(excluded.eps_estimate, earnings_history.eps_estimate),
-                        eps_reported = COALESCE(excluded.eps_reported, earnings_history.eps_reported),
-                        surprise_pct = COALESCE(excluded.surprise_pct, earnings_history.surprise_pct),
-                        source = excluded.source
-                """, (sym, target_ed, eps_est, eps_rep, surprise_pct, method or "calculated"))
-                
-                # Also save any other historical quarters discovered from inc_stmt
                 for i, (col_ts, col_eps) in enumerate(inc_stmt_cols_data):
                     col_dt_str = col_ts.strftime("%Y-%m-%d")
-                    if col_dt_str != target_ed:
+                    if not target_ed or col_dt_str != target_ed:
                         prior_subset = [e for _, e in inc_stmt_cols_data[i+1:]]
                         q_est = round(sum(prior_subset[:4]) / len(prior_subset[:4]), 2) if prior_subset else round(col_eps * 0.95, 2)
                         q_surp = round(((col_eps - q_est) / abs(q_est)) * 100.0, 2) if abs(q_est) > 0.0001 else 0.0
@@ -850,11 +839,40 @@ def calculate_or_fetch_eps(
                                 eps_reported = COALESCE(earnings_history.eps_reported, excluded.eps_reported),
                                 surprise_pct = COALESCE(earnings_history.surprise_pct, excluded.surprise_pct)
                         """, (sym, col_dt_str, q_est, col_eps, q_surp))
-                
                 conn.commit()
-            logger.info("[CALC-EPS] Successfully saved EPS for %s (%s): est=%s, rep=%s, surp=%s (method=%s)", sym, target_ed, eps_est, eps_rep, surprise_pct, method)
         except Exception as e:
-            logger.warning("[CALC-EPS] Error saving to DB for %s: %s", sym, e)
+            logger.warning("[CALC-EPS] Error saving quarterly income statements for %s: %s", sym, e)
+
+    # Save discovered consensus dates
+    if quarterly_eps_records:
+        try:
+            with conn:
+                for rec in quarterly_eps_records:
+                    r_dt = rec["date"]
+                    r_rep = rec["eps_reported"]
+                    r_est = rec["eps_estimate"]
+                    r_surp = round(((r_rep - r_est) / abs(r_est)) * 100.0, 2) if (r_rep is not None and r_est is not None and abs(r_est) > 0.0001) else None
+                    conn.execute("""
+                        INSERT INTO earnings_history (ticker, earnings_date, eps_estimate, eps_reported, surprise_pct, source)
+                        VALUES (?, ?, ?, ?, ?, 'yfinance_consensus')
+                        ON CONFLICT(ticker, earnings_date) DO UPDATE SET
+                            eps_estimate = COALESCE(excluded.eps_estimate, earnings_history.eps_estimate),
+                            eps_reported = COALESCE(excluded.eps_reported, earnings_history.eps_reported),
+                            surprise_pct = COALESCE(excluded.surprise_pct, earnings_history.surprise_pct)
+                    """, (sym, r_dt, r_est, r_rep, r_surp))
+                conn.commit()
+        except Exception as e:
+            logger.warning("[CALC-EPS] Error saving consensus dates for %s: %s", sym, e)
+
+    # If target_ed was not provided, set reporting date to newest statement date for response summary
+    resolved_ed = target_ed
+    if not resolved_ed and inc_stmt_cols_data:
+        resolved_ed = inc_stmt_cols_data[0][0].strftime("%Y-%m-%d")
+        eps_rep = inc_stmt_cols_data[0][1]
+        prior_subset = [e for _, e in inc_stmt_cols_data[1:]]
+        eps_est = round(sum(prior_subset[:4]) / len(prior_subset[:4]), 2) if prior_subset else round(eps_rep * 0.95, 2)
+        surprise_pct = round(((eps_rep - eps_est) / abs(eps_est)) * 100.0, 2) if abs(eps_est) > 0.0001 else 0.0
+        method = "quarterly_income_stmt"
 
     # Trigger full metric recalculation and audit trail diff logging
     recalc_result: dict[str, Any] = {}
@@ -866,15 +884,14 @@ def calculate_or_fetch_eps(
     return {
         "success": True,
         "ticker": sym,
-        "earnings_date": target_ed,
+        "earnings_date": resolved_ed,
         "eps_estimate": eps_est,
         "eps_reported": eps_rep,
         "surprise_pct": surprise_pct,
         "method": method or "not_found",
-        "message": f"Successfully resolved EPS for {target_ed}: Reported ₹{eps_rep if eps_rep is not None else '—'} vs Est ₹{eps_est if eps_est is not None else '—'} ({f'{surprise_pct:+.2f}% surprise' if surprise_pct is not None else 'in line'})",
+        "message": f"Successfully resolved EPS for {resolved_ed or sym}: Reported ₹{eps_rep if eps_rep is not None else '—'} vs Est ₹{eps_est if eps_est is not None else '—'} ({f'{surprise_pct:+.2f}% surprise' if surprise_pct is not None else 'in line'})",
         "has_changes": recalc_result.get("has_changes", False),
         "changes_count": recalc_result.get("changes_count", 0),
-        "changes_summary": recalc_result.get("changes_summary", []),
         "audit_id": recalc_result.get("audit_id"),
         "recalculate": recalc_result,
     }

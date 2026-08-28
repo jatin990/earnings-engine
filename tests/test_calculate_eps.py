@@ -98,3 +98,25 @@ def test_calculate_eps_api_endpoint():
     matching = [h for h in history if h["earnings_date"] == "2026-08-07"]
     assert len(matching) == 1
     assert matching[0]["eps_reported"] == 19.425
+
+
+def test_calculate_or_fetch_eps_does_not_fabricate_today_date():
+    """Verify calculate_or_fetch_eps without earnings_date does not insert today's date as earnings date."""
+    import pandas as pd
+    settings = Settings()
+    conn = get_db_connection(settings)
+
+    # Call calculate_or_fetch_eps for a ticker with no earnings_date provided
+    res = calculate_or_fetch_eps(
+        ticker="KAMDHENU.NS",
+        earnings_date=None,
+        settings=settings,
+    )
+
+    today_str = pd.Timestamp.now().strftime("%Y-%m-%d")
+    today_rows = conn.execute(
+        "SELECT earnings_date, eps_reported FROM earnings_history WHERE ticker = 'KAMDHENU.NS' AND earnings_date = ?",
+        (today_str,),
+    ).fetchall()
+
+    assert len(today_rows) == 0, f"Found unexpected today's date {today_str} in earnings_history!"
