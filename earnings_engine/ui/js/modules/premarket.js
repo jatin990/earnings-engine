@@ -174,7 +174,7 @@
                 return;
             }
 
-            tbody.innerHTML = items.map(s => {
+            tbody.innerHTML = items.map((s, idx) => {
                 const ticker = s.ticker || '—';
                 const cleanTicker = ticker.replace('.NS', '').replace('.BO', '');
                 const stockName = s.stock_name || cleanTicker;
@@ -196,6 +196,10 @@
                     phaseBadge = '<span style="background:rgba(56,189,248,0.18);color:#38bdf8;padding:0.08rem 0.35rem;border-radius:4px;font-size:0.60rem;font-weight:700;border:1px solid rgba(56,189,248,0.35);">🌅 Pre-Open</span>';
                 } else if (s.session_phase === 'POST_CLOSE') {
                     phaseBadge = '<span style="background:rgba(168,85,247,0.18);color:#c084fc;padding:0.08rem 0.35rem;border-radius:4px;font-size:0.60rem;font-weight:700;border:1px solid rgba(168,85,247,0.35);">🌆 Post-Close</span>';
+                } else if (s.session_phase === 'INTRADAY') {
+                    phaseBadge = '<span style="background:rgba(234,179,8,0.18);color:#facc15;padding:0.08rem 0.35rem;border-radius:4px;font-size:0.60rem;font-weight:700;border:1px solid rgba(234,179,8,0.35);">☀️ Intraday</span>';
+                } else if (s.session_phase === 'HISTORICAL') {
+                    phaseBadge = '<span style="background:rgba(148,163,184,0.18);color:#94a3b8;padding:0.08rem 0.35rem;border-radius:4px;font-size:0.60rem;font-weight:700;border:1px solid rgba(148,163,184,0.35);">📜 Archive Filing</span>';
                 }
 
                 // Source badge color
@@ -214,6 +218,10 @@
                 const t1 = s.target_1 ? `₹${Number(s.target_1).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
                 const sl = s.stop_loss ? `₹${Number(s.stop_loss).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
 
+                const pubDateStr = s.published_at_ist || s.published_at || '—';
+                const otherHeadlines = s.other_headlines || [];
+                const rowKey = `${cleanTicker}_${idx}`;
+
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s ease;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
                         <!-- 1. Stock / Ticker -->
@@ -231,7 +239,7 @@
 
                         <!-- 2. Submission Time (IST) -->
                         <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);white-space:nowrap;">
-                            <div style="color:#ededed;font-size:0.72rem;font-weight:600;">${(s.published_at || '').substring(0, 16)}</div>
+                            <div style="color:#ededed;font-size:0.72rem;font-weight:600;">${pubDateStr}</div>
                             <div style="margin-top:0.15rem;">${phaseBadge}</div>
                         </td>
 
@@ -247,6 +255,12 @@
                                 ${s.title}
                             </div>
                             ${s.summary ? `<div style="font-size:0.68rem;color:#94a3b8;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="${s.summary}">${s.summary}</div>` : ''}
+                            ${(otherHeadlines.length > 0) ? `
+                                <button type="button" onclick="app.togglePremarketDetails('${rowKey}')" class="btn-micro" style="margin-top:0.35rem;font-size:0.64rem;padding:0.15rem 0.45rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:0.3rem;" title="View all filings for ${cleanTicker}">
+                                    <span>📦 +${otherHeadlines.length} more filing${otherHeadlines.length > 1 ? 's' : ''}</span>
+                                    <span id="pmChevron_${rowKey}">▾</span>
+                                </button>
+                            ` : ''}
                         </td>
 
                         <!-- 5. Prev Close & Est Gap -->
@@ -288,6 +302,32 @@
                             </div>
                         </td>
                     </tr>
+
+                    ${(otherHeadlines.length > 0) ? `
+                        <tr id="pmDetailsRow_${rowKey}" style="display:none;background:rgba(3,7,18,0.7);border-bottom:1px solid rgba(255,255,255,0.06);">
+                            <td colspan="8" style="padding:0.6rem 1rem 0.75rem 2rem;">
+                                <div style="font-size:0.7rem;font-weight:700;color:#94a3b8;margin-bottom:0.4rem;display:flex;align-items:center;gap:0.4rem;">
+                                    <span>📑</span>
+                                    <span>Additional Recent Filings &amp; Headlines for ${cleanTicker} (${otherHeadlines.length}):</span>
+                                </div>
+                                <div style="display:flex;flex-direction:column;gap:0.35rem;">
+                                    ${otherHeadlines.map(oh => `
+                                        <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;padding:0.4rem 0.6rem;background:rgba(255,255,255,0.02);border-radius:4px;border:1px solid rgba(255,255,255,0.04);font-size:0.72rem;">
+                                            <div style="flex:1;min-width:0;">
+                                                <div style="font-weight:600;color:#f8fafc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${oh.title}">${oh.title}</div>
+                                                ${oh.summary ? `<div style="font-size:0.66rem;color:#94a3b8;margin-top:0.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${oh.summary}">${oh.summary}</div>` : ''}
+                                            </div>
+                                            <div style="display:flex;align-items:center;gap:0.5rem;white-space:nowrap;font-family:var(--font-mono);font-size:0.66rem;color:#64748b;">
+                                                <span style="color:#cbd5e1;">${oh.published_at_ist || oh.published_at}</span>
+                                                <span style="padding:0.06rem 0.35rem;border-radius:3px;background:rgba(255,255,255,0.06);color:#94a3b8;font-weight:600;">${oh.source_badge || oh.category}</span>
+                                                <span style="font-weight:700;color:${oh.action_color || '#38bdf8'};">${oh.impact_score}% impact</span>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </td>
+                        </tr>
+                    ` : ''}
                 `;
             }).join('');
         },
@@ -506,6 +546,17 @@
                     btn.disabled = false;
                     btn.innerHTML = '<span>🔄</span> Refresh';
                 }
+            }
+        },
+
+        togglePremarketDetails(rowKey) {
+            const detailsRow = document.getElementById(`pmDetailsRow_${rowKey}`);
+            const chevron = document.getElementById(`pmChevron_${rowKey}`);
+            if (!detailsRow) return;
+            const isHidden = detailsRow.style.display === 'none';
+            detailsRow.style.display = isHidden ? 'table-row' : 'none';
+            if (chevron) {
+                chevron.textContent = isHidden ? '▴' : '▾';
             }
         },
 

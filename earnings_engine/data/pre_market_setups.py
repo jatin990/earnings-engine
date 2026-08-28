@@ -58,6 +58,7 @@ def is_in_overnight_window(
     published_at_str: str,
     window_mode: str = "standard_6pm",
     target_date: str | None = None,
+    max_hours_ago: float | None = None,
 ) -> tuple[bool, str, str]:
     """Determine if publication timestamp falls in the after-hours / overnight pre-market window.
 
@@ -73,6 +74,13 @@ def is_in_overnight_window(
     ist_dt, time_label = parse_to_ist(published_at_str)
     if not ist_dt:
         return False, "UNKNOWN", time_label
+
+    now_ist = datetime.now(timezone(IST_OFFSET))
+    hours_ago = (now_ist - ist_dt).total_seconds() / 3600.0
+
+    # If a maximum lookback in hours is enforced and the news is older, reject from current overnight window
+    if max_hours_ago is not None and hours_ago > max_hours_ago:
+        return False, "HISTORICAL", time_label
 
     hour = ist_dt.hour
     minute = ist_dt.minute
@@ -250,12 +258,22 @@ def get_premarket_setups(
         settings=settings,
     )
 
+    # Active overnight window lookback:
+    # If standard_6pm, full_post_market, early_morning: only show filings from the current overnight window (last 28h)
+    # If all_recent: allow full archive lookback (e.g. 7-14 days)
+    max_hours = (days_lookback * 24.0) if window_mode == "all_recent" else 28.0
+
     setups: list[dict[str, Any]] = []
 
     for c in raw_catalysts:
         pub_at = c.get("published_at") or ""
-        is_match, session_phase, timing_desc = is_in_overnight_window(pub_at, window_mode=window_mode)
-        if not is_match and window_mode != "all_recent":
+        ist_dt, time_label = parse_to_ist(pub_at)
+        is_match, session_phase, timing_desc = is_in_overnight_window(
+            pub_at,
+            window_mode=window_mode,
+            max_hours_ago=max_hours,
+        )
+        if not is_match:
             continue
 
         impact_score = float(c.get("impact_score") or 50.0)
@@ -293,7 +311,9 @@ def get_premarket_setups(
             "summary": summary,
             "publisher": c.get("publisher") or "Exchange Filing",
             "link": c.get("link") or f"/stock/{ticker}",
-            "published_at": pub_at,
+            "published_at": time_label,
+            "published_at_raw": pub_at,
+            "published_at_ist": time_label,
             "timing_desc": timing_desc,
             "session_phase": session_phase,
             "category": category,
@@ -306,17 +326,35 @@ def get_premarket_setups(
         }
         setups.append(setup_item)
 
-    # Sort setups by impact_score DESC, published_at DESC
-    setups.sort(key=lambda x: (x["impact_score"], x["published_at"]), reverse=True)
-    items = setups[:limit]
+    # Group setups by ticker so the same stock has 1 primary row and collapsible other headlines
+    grouped_by_ticker: dict[str, list[dict[str, Any]]] = {}
+    for s in setups:
+        t = s["ticker"]
+        if t not in grouped_by_ticker:
+            grouped_by_ticker[t] = []
+        grouped_by_ticker[t].append(s)
+
+    deduped_setups: list[dict[str, Any]] = []
+    for t, group in grouped_by_ticker.items():
+        # Sort group by impact_score DESC, published_at DESC
+        group.sort(key=lambda x: (x["impact_score"], x.get("published_at_raw") or x["published_at"]), reverse=True)
+        primary = dict(group[0])
+        primary["headlines_count"] = len(group)
+        primary["all_headlines"] = group
+        primary["other_headlines"] = group[1:] if len(group) > 1 else []
+        deduped_setups.append(primary)
+
+    # Sort deduped setups by impact_score DESC, published_at DESC
+    deduped_setups.sort(key=lambda x: (x["impact_score"], x.get("published_at_raw") or x["published_at"]), reverse=True)
+    items = deduped_setups[:limit]
 
     # Compute KPI Summary Cards
-    total_count = len(setups)
-    strong_gappers = [s for s in setups if s.get("action_code") == "STRONG_GAP_UP" or s.get("impact_score", 0) >= 80]
-    bullish_count = len([s for s in setups if s.get("direction") == "BULLISH"])
-    bearish_count = len([s for s in setups if s.get("direction") == "BEARISH"])
-    avg_impact = round(sum(s.get("impact_score", 0) for s in setups) / len(setups), 1) if setups else 0.0
-    sebi_filings_count = len([s for s in setups if "SEBI" in s.get("source_code", "") or "ORDER" in s.get("source_code", "")])
+    total_count = len(deduped_setups)
+    strong_gappers = [s for s in deduped_setups if s.get("action_code") == "STRONG_GAP_UP" or s.get("impact_score", 0) >= 80]
+    bullish_count = len([s for s in deduped_setups if s.get("direction") == "BULLISH"])
+    bearish_count = len([s for s in deduped_setups if s.get("direction") == "BEARISH"])
+    avg_impact = round(sum(s.get("impact_score", 0) for s in deduped_setups) / len(deduped_setups), 1) if deduped_setups else 0.0
+    sebi_filings_count = len([s for s in deduped_setups if "SEBI" in s.get("source_code", "") or "ORDER" in s.get("source_code", "")])
 
     return {
         "success": True,

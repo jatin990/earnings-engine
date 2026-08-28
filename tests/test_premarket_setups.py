@@ -143,3 +143,17 @@ def test_premarket_api_endpoints(client):
     assert res_scan.status_code == 200
     assert res_scan.json()["success"] is True
 
+
+def test_premarket_ticker_grouping_and_deduplication():
+    res = get_premarket_setups(window_mode="all_recent", days_lookback=14, limit=50)
+    items = res.get("items", [])
+    tickers = [x["ticker"] for x in items]
+    # Verify no duplicate ticker rows exist in the primary list
+    assert len(tickers) == len(set(tickers))
+    for item in items:
+        assert "headlines_count" in item
+        assert "all_headlines" in item
+        assert "other_headlines" in item
+        assert item["headlines_count"] == len(item["all_headlines"])
+
+
