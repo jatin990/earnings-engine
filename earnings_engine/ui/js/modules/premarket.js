@@ -419,7 +419,7 @@
             if (!tbody) return;
 
             if (!items || !items.length) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2.5rem;color:#64748b;">No verified historical setups in lookback window.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2.5rem;color:#64748b;">No verified historical setups in lookback window.</td></tr>';
                 return;
             }
 
@@ -436,6 +436,17 @@
 
                 const ret = s.day_return_pct != null ? s.day_return_pct : 0;
                 const retCol = ret >= 0 ? '#34d399' : '#f87171';
+
+                // Conviction bar
+                const imp = Math.round(s.impact_score || 50);
+                const barCol = imp >= 80 ? '#34d399' : (imp >= 65 ? '#38bdf8' : '#a1a1aa');
+
+                // Source badge color
+                let srcCol = '#94a3b8';
+                if (s.source_code === 'SEBI_FILING') srcCol = '#c084fc';
+                else if (s.source_code === 'ORDER_WIN') srcCol = '#38bdf8';
+                else if (s.source_code === 'REGULATORY_NOD') srcCol = '#34d399';
+                else if (s.source_code === 'EARNINGS_BEAT') srcCol = '#fbbf24';
 
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s ease;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
@@ -460,31 +471,45 @@
 
                         <!-- 3. Catalyst & Source -->
                         <td style="padding:0.5rem 0.6rem;white-space:nowrap;">
-                            <div style="font-weight:700;color:#c084fc;font-size:0.72rem;">${s.source_badge || '📰 Announcement'}</div>
+                            <div style="font-weight:700;color:${srcCol};font-size:0.72rem;">${s.source_badge || '📰 Announcement'}</div>
                             <div style="font-size:0.65rem;color:#64748b;margin-top:0.1rem;">${s.category || 'General'}</div>
                         </td>
 
-                        <!-- 4. Headline -->
+                        <!-- 4. Headline & Summary -->
                         <td style="padding:0.5rem 0.6rem;">
                             <div style="font-weight:600;color:#f8fafc;font-size:0.74rem;line-height:1.25;" title="${s.title}">
                                 ${s.title}
                             </div>
+                            ${s.summary ? `<div style="font-size:0.68rem;color:#94a3b8;line-height:1.2;margin-top:0.15rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="${s.summary}">${s.summary}</div>` : ''}
                         </td>
 
-                        <!-- 5. Prev Close -> Open -->
+                        <!-- 5. Action & Conviction -->
+                        <td style="padding:0.5rem 0.6rem;text-align:center;white-space:nowrap;">
+                            <span style="display:inline-block;padding:0.15rem 0.45rem;border-radius:4px;font-size:0.65rem;font-weight:800;background:rgba(255,255,255,0.05);color:${s.action_color || '#ededed'};border:1px solid ${s.action_color ? s.action_color + '40' : 'rgba(255,255,255,0.1)'};">
+                                ${s.action_badge || '⚡ SETUP'}
+                            </span>
+                            <div style="display:flex;align-items:center;justify-content:center;gap:0.25rem;margin-top:0.25rem;">
+                                <div style="width:40px;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden;">
+                                    <div style="width:${imp}%;height:100%;background:${barCol};border-radius:2px;"></div>
+                                </div>
+                                <span style="font-size:0.62rem;font-weight:700;color:${barCol};font-family:var(--font-mono);">${imp}%</span>
+                            </div>
+                        </td>
+
+                        <!-- 6. Prev Close -> Open -->
                         <td style="padding:0.5rem 0.6rem;text-align:right;font-family:var(--font-mono);white-space:nowrap;">
                             <div style="color:#94a3b8;font-size:0.68rem;">Prev: ${prevP}</div>
                             <div style="color:#f8fafc;font-weight:800;font-size:0.74rem;">Open: ${openP}</div>
                         </td>
 
-                        <!-- 6. Realized Open Gap % -->
+                        <!-- 7. Realized Open Gap % -->
                         <td style="padding:0.5rem 0.6rem;text-align:right;font-family:var(--font-mono);white-space:nowrap;">
                             <div style="font-weight:800;font-size:0.76rem;color:${gapCol};">
                                 ${gap >= 0 ? '+' : ''}${gap.toFixed(2)}%
                             </div>
                         </td>
 
-                        <!-- 7. Day High & Return -->
+                        <!-- 8. Day High & Return -->
                         <td style="padding:0.5rem 0.6rem;text-align:right;font-family:var(--font-mono);white-space:nowrap;">
                             <div style="color:#93c5fd;font-size:0.70rem;">High: ${highP}</div>
                             <div style="font-weight:800;font-size:0.72rem;color:${retCol};">
@@ -492,11 +517,23 @@
                             </div>
                         </td>
 
-                        <!-- 8. Outcome Status -->
+                        <!-- 9. Outcome Status -->
                         <td style="padding:0.5rem 0.6rem;text-align:center;white-space:nowrap;">
                             <span style="display:inline-block;padding:0.18rem 0.5rem;border-radius:4px;font-size:0.66rem;font-weight:800;background:rgba(255,255,255,0.05);color:${s.outcome_color || '#ededed'};border:1px solid ${s.outcome_color ? s.outcome_color + '40' : 'rgba(255,255,255,0.1)'};">
                                 ${s.outcome_badge || 'VERIFIED'}
                             </span>
+                        </td>
+
+                        <!-- 10. Actions -->
+                        <td style="padding:0.5rem 0.6rem;text-align:right;white-space:nowrap;">
+                            <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.3rem;">
+                                <button type="button" onclick="app.openConsensusModal('${ticker}')" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:4px;" title="Run AI Consensus">
+                                    🧠 AI
+                                </button>
+                                <a href="/stock/${ticker}" target="_blank" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(255,255,255,0.06);color:#ededed;border:1px solid rgba(255,255,255,0.15);border-radius:4px;text-decoration:none;" title="Stock Intelligence Details">
+                                    📊 Intel
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 `;

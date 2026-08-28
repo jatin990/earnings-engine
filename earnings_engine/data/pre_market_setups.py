@@ -586,6 +586,7 @@ def get_historical_premarket_outcomes(
                 "outcome_color": outcome_color,
                 "action_badge": scored["action_badge"],
                 "action_code": scored["action_code"],
+                "action_color": scored.get("action_color", "#38bdf8"),
                 "source_badge": scored["source_badge"],
                 "source_code": scored["source_code"],
             })

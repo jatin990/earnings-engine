@@ -209,6 +209,11 @@ def _connect(settings: Settings) -> Any:
             why_it_matters TEXT,
             source TEXT,
             created_at TEXT NOT NULL,
+            verification_status TEXT DEFAULT 'VERIFIED',
+            verification_flags TEXT DEFAULT '[]',
+            verified_numbers TEXT DEFAULT '{}',
+            entity_confidence REAL DEFAULT 0.85,
+            canonical_hash TEXT,
             UNIQUE(ticker, title)
         )
         """
@@ -219,6 +224,19 @@ def _connect(settings: Settings) -> Any:
         ON news_catalysts (ticker, impact_score DESC, published_at DESC)
         """
     )
+    try:
+        existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(news_catalysts)").fetchall()}
+        for col_name, col_type in [
+            ("verification_status", "TEXT DEFAULT 'VERIFIED'"),
+            ("verification_flags", "TEXT DEFAULT '[]'"),
+            ("verified_numbers", "TEXT DEFAULT '{}'"),
+            ("entity_confidence", "REAL DEFAULT 0.85"),
+            ("canonical_hash", "TEXT"),
+        ]:
+            if col_name not in existing_cols:
+                conn.execute(f"ALTER TABLE news_catalysts ADD COLUMN {col_name} {col_type}")
+    except Exception:
+        pass
     # Self-healing: Ensure any raw RFC date strings with comma are converted to standard ISO YYYY-MM-DD HH:MM:SS
     try:
         raw_rows = conn.execute("SELECT id, published_at FROM news_catalysts WHERE published_at LIKE '%,%'").fetchall()
