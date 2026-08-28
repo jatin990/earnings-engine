@@ -535,77 +535,19 @@ def fetch_ticker_catalysts(
         except Exception:
             pass
 
-    articles: list[dict[str, Any]] = []
-    seen_titles: set[str] = set()
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    from earnings_engine.data.news_sentiment import _parse_iso_pubdate
+    # 3. Route raw items through Institutional Multi-Section News Verification Pipeline
+    from earnings_engine.data.news_pipeline import process_and_verify_news_items, save_verified_news_records
 
-    with _connect(settings) as conn:
-        for item in raw_items:
-            title = _clean_text(item.get("title", ""))
-            if not title or title.lower() in seen_titles:
-                continue
-            seen_titles.add(title.lower())
+    # Inject target ticker into raw items if missing
+    for it in raw_items:
+        if "ticker" not in it:
+            it["ticker"] = ticker
 
-            summary = _clean_text(item.get("summary", ""))
-            publisher = item.get("publisher", "Market News")
-            link = item.get("link", "")
-            raw_pub = item.get("published_at")
-            pub_date = _parse_iso_pubdate(raw_pub)
+    articles = process_and_verify_news_items(raw_items, settings=settings)
+    if articles:
+        save_verified_news_records(articles, settings=settings)
 
-            # Strict recency and forward-catalyst check
-            if not is_headline_current(title, summary, pub_date):
-                continue
-
-            scored = score_catalyst_headline(title, summary)
-            effective_ticker = disambiguate_ticker_for_headline(ticker, title, summary)
-            effective_name = get_name(effective_ticker, settings) if effective_ticker != ticker else name
-
-            record = {
-                "ticker": effective_ticker,
-                "stock_name": effective_name or name,
-                "title": title,
-                "publisher": publisher,
-                "link": link,
-                "published_at": pub_date,
-                "summary": summary,
-                "impact_score": scored["impact_score"],
-                "impact_level": scored["impact_level"],
-                "category": scored["category"],
-                "direction": scored["direction"],
-                "expected_horizon": scored["expected_horizon"],
-                "volatility_est": scored["volatility_est"],
-                "why_it_matters": scored["why_it_matters"],
-                "source": item.get("source", "rss"),
-                "created_at": now_str,
-            }
-            articles.append(record)
-
-            # Store in SQLite cache
-            try:
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO news_catalysts (
-                        ticker, stock_name, title, publisher, link, published_at,
-                        summary, impact_score, impact_level, category, direction,
-                        expected_horizon, volatility_est, why_it_matters, source, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        record["ticker"], record["stock_name"], record["title"],
-                        record["publisher"], record["link"], record["published_at"],
-                        record["summary"], record["impact_score"], record["impact_level"],
-                        record["category"], record["direction"], record["expected_horizon"],
-                        record["volatility_est"], record["why_it_matters"], record["source"],
-                        record["created_at"]
-                    )
-                )
-            except Exception as e:
-                logger.debug("Failed saving catalyst record: %s", e)
-
-        conn.commit()
-
-    logger.debug("[CATALYSTS] Processed %d catalyst items for %s", len(articles), ticker)
+    logger.debug("[CATALYSTS] Verified and saved %d catalyst items for %s", len(articles), ticker)
 
     # Sort by newest published date descending, then impact score
     articles.sort(key=lambda a: (a.get("published_at", ""), a.get("impact_score", 0)), reverse=True)
@@ -628,9 +570,9 @@ def get_short_term_catalysts(
         conn.row_factory = sqlite3.Row
 
         if days and days > 0:
-            query = f"SELECT * FROM news_catalysts WHERE published_at >= datetime('now', '-{days} days')"
+            query = f"SELECT * FROM news_catalysts WHERE published_at >= datetime('now', '-{days} days') AND (verification_status IS NULL OR verification_status = 'VERIFIED')"
         else:
-            query = "SELECT * FROM news_catalysts WHERE 1=1"
+            query = "SELECT * FROM news_catalysts WHERE (verification_status IS NULL OR verification_status = 'VERIFIED')"
         params: list[Any] = []
 
         # Filter by watchlist / universe if supplied
