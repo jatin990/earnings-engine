@@ -40,7 +40,12 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
             "order win", "bags order", "secures order", "awarded contract", "receives order",
             "major contract", "multi-year deal", "commercial deal", "strategic deal",
             "crore order", "million order", "billion contract", "pact with", "signs agreement",
-            "wins bid", "lowest bidder", "l1 bidder", "defense order", "railway contract"
+            "wins bid", "lowest bidder", "l1 bidder", "defense order", "railway contract",
+            "letter of award", "letter of intent", "loi from", "purchase order", "turnkey project",
+            "epc contract", "solar project order", "transmission order", "exports order",
+            "repeat order", "bags mandate", "wins tender", "clinches order", "emerges l1",
+            "secures mandate", "supply agreement", "signs mou", "offtake agreement",
+            "long-term agreement", "commercial agreement"
         ],
         "base_impact": 82,
         "default_direction": "BULLISH",
@@ -52,7 +57,11 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
             "profit surges", "profit jumps", "revenue beats", "earnings beat", "net profit up",
             "guidance raised", "upward revision", "strong q1", "strong q2", "strong q3", "strong q4",
             "q1 net profit", "q2 net profit", "q3 net profit", "q4 net profit", "ebitda surges",
-            "profit plunges", "net loss", "margin expands", "guidance slashed", "revenue misses"
+            "pat jumps", "pat surges", "pat up", "ebitda up", "operating profit rises",
+            "margin expansion", "margin improves", "beats street", "beats estimates",
+            "topline growth", "guidance upgrade", "fy guidance raised", "strong quarterly results",
+            "profit plunges", "net loss", "margin contracts", "guidance slashed", "revenue misses",
+            "profit declines", "pat falls", "loss widens", "misses estimates", "weak q1", "weak q2", "weak q3", "weak q4"
         ],
         "base_impact": 88,
         "default_direction": "BULLISH",
@@ -64,7 +73,11 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
             "fda approval", "usfda nod", "regulatory nod", "clearance", "rbi approval",
             "sebi nod", "government approval", "patent granted", "licence granted", "pli scheme",
             "tariff hike", "duty cut", "import duty", "subsidies", "anti-dumping",
-            "environmental clearance"
+            "environmental clearance", "usfda approval", "anda approval", "tentative approval",
+            "establishment inspection report", "eir with zero observations", "eir received",
+            "nao classification", "vair classification", "dcfi clearance", "dgca approval",
+            "cerc approval", "pci approval", "central bank nod", "cabinet nod", "defense clearance",
+            "mining lease granted", "environmental approval", "pollution board clearance", "patent grant"
         ],
         "base_impact": 80,
         "default_direction": "BULLISH",
@@ -75,7 +88,12 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
         "keywords": [
             "acquisition", "acquires stake", "buys stake", "stake sale", "merger", "joint venture",
             "capacity expansion", "new plant", "capex", "investment of", "open offer",
-            "block deal", "bulk deal", "promoter buys", "insider buying", "fund raising", "qip"
+            "block deal", "bulk deal", "promoter buys", "insider buying", "fund raising", "qip",
+            "acquires 100% stake", "acquires controlling stake", "signs definitive agreement",
+            "share purchase agreement", "amalgamation", "demerger", "hiving off", "strategic partnership",
+            "expansion plan", "brownfield expansion", "greenfield project", "commissioning of plant",
+            "commercial operations commence", "preferential allotment", "rights issue",
+            "warrant conversion", "institutional placement", "strategic investor"
         ],
         "base_impact": 78,
         "default_direction": "BULLISH",
@@ -86,7 +104,11 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
         "keywords": [
             "upgrade", "upgrades", "raised target", "price target raised", "buy rating",
             "outperform", "overweight", "initiates coverage", "strong buy", "downgrade",
-            "slashes target", "underperform"
+            "slashes target", "underperform", "goldman sachs upgrades", "morgan stanley overweight",
+            "jefferies maintains buy", "nomura initiates", "clsa upgrades", "macquarie buy",
+            "kotak upgrades", "motilal oswal buy", "target price raised to", "raised price target",
+            "bullish call", "initiates with buy", "maintains outperform", "downgrades to neutral",
+            "downgraded to sell", "cuts price target", "target cut to"
         ],
         "base_impact": 65,
         "default_direction": "BULLISH",
@@ -96,7 +118,11 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
     "Corporate Action & Dividends": {
         "keywords": [
             "bonus issue", "bonus shares", "stock split", "dividend declared", "special dividend",
-            "interim dividend", "record date", "share buyback", "board meeting for dividend"
+            "interim dividend", "record date", "share buyback", "board meeting for dividend",
+            "bonus share issue", "1:1 bonus", "1:2 bonus", "2:1 bonus", "sub-division of shares",
+            "split from rs 10 to", "face value split", "final dividend of rs", "interim dividend of rs",
+            "tender offer buyback", "open market buyback", "buyback price of rs", "capital reduction",
+            "fix record date"
         ],
         "base_impact": 68,
         "default_direction": "BULLISH",
@@ -107,7 +133,12 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
         "keywords": [
             "sebi probe", "sebi notice", "probe", "initiates probe", "ed search", "it raid", "fraud", "scam", "auditor resigns",
             "default on debt", "insolvency", "nclt", "penalty imposed", "lawsuit filed", "inquiry",
-            "court stays", "usfda warning letter", "import alert", "downgraded to junk", "rbi ban", "tax demand", "gst notice", "it demand"
+            "court stays", "usfda warning letter", "import alert", "downgraded to junk", "rbi ban", "tax demand", "gst notice", "it demand",
+            "show cause notice", "enforcement directorate", "cbi probe", "forensic audit",
+            "statutory auditor resigns", "adverse remarks", "whistleblower complaint",
+            "form 483 with observations", "official action indicated", "oai classification",
+            "import ban", "circuit limit revised down", "delisting notice", "income tax assessment",
+            "nclt admits insolvency", "cirp initiated"
         ],
         "base_impact": 90,
         "default_direction": "BEARISH",
@@ -118,7 +149,12 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
         "keywords": [
             "rating upgraded", "rating upgrade", "crisil upgrade", "care upgrade", "icra upgrade",
             "appoints ceo", "appoints md", "new ceo", "promoter unpledge", "pledge released",
-            "rating downgraded", "downgrade by crisil", "pledge invoked", "promoter pledge"
+            "crisil upgrades rating to", "care upgrades outlook", "icra revises outlook to positive",
+            "ind-ra upgrades", "rating assigned as aa+", "rating assigned as aaa",
+            "appointed as managing director", "appointed as chief executive officer",
+            "revocation of pledge", "release of pledged shares", "promoter increases stake",
+            "open market purchase by promoter", "rating downgraded by care", "rating placed on watch negative",
+            "invocation of pledged shares", "rating downgraded", "downgrade by crisil", "pledge invoked", "promoter pledge"
         ],
         "base_impact": 72,
         "default_direction": "BULLISH",
@@ -128,7 +164,11 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
     "Miscellaneous Corporate Disclosures": {
         "keywords": [
             "intimation", "regulation 30", "lodr", "exchange disclosure", "commercial production",
-            "operations resume", "plant shutdown", "business update", "clarification on", "investor presentation"
+            "operations resume", "plant shutdown", "business update", "clarification on", "investor presentation",
+            "general update", "press release", "outcome of board meeting", "submission of disclosure",
+            "newspaper publication", "schedule of analyst meet", "transcript of conference call",
+            "audio recording of earnings call", "resumption of operations", "temporary disruption",
+            "product launch", "new brand launch", "enters into agreement", "commercial launch"
         ],
         "base_impact": 55,
         "default_direction": "NEUTRAL",
@@ -141,7 +181,8 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
 URGENCY_BOOSTERS = {
     "breaking": 8, "huge": 6, "record": 6, "massive": 7, "surges": 6, "plunges": 7,
     "soars": 6, "crashes": 8, "billion": 6, "crore": 5, "approved": 7, "warning": 7,
-    "banned": 9, "exclusive": 5, "multibagger": 5, "all-time high": 6, "52-week high": 5
+    "banned": 9, "exclusive": 5, "multibagger": 5, "all-time high": 6, "52-week high": 5,
+    "mega": 7, "landslide": 6, "slashes": 6, "skyrockets": 7, "historic": 6, "cleared": 6
 }
 
 
