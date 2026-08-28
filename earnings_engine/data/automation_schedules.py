@@ -22,6 +22,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "⚡ Breakout Hot Rescore",
         "category": "Breakout Radar",
         "interval_seconds": 60,
+        "params_json": '{"universe": "NSE_ALL", "pool": "hot"}',
         "description": "High-frequency parallel re-scoring of Hot candidate setups using latest live prices.",
     },
     {
@@ -29,6 +30,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "⚡ Breakout Warm Rescore",
         "category": "Breakout Radar",
         "interval_seconds": 300,
+        "params_json": '{"universe": "NSE_ALL", "pool": "warm"}',
         "description": "Re-scores coiling/warm stocks to detect promotions into Hot or demotions.",
     },
     {
@@ -36,6 +38,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🌐 Cold Universe Sweep",
         "category": "Breakout Radar",
         "interval_seconds": 3600,
+        "params_json": '{"universe": "NSE_ALL", "min_score": 35}',
         "description": "Full universe multi-factor scan discovering fresh compression and momentum setups.",
     },
     {
@@ -43,6 +46,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "📰 News Catalyst Harvester",
         "category": "Market Catalysts",
         "interval_seconds": 600,
+        "params_json": '{"watchlist": "my_watchlist", "limit": 10}',
         "description": "Continuous harvesting of corporate order wins, earnings surprises, and regulatory filings.",
     },
     {
@@ -50,6 +54,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🔍 Multi-Category Scanner",
         "category": "Scanner",
         "interval_seconds": 1800,
+        "params_json": '{"universe": "NSE_TOP", "limit": 100}',
         "description": "Multi-category technical scans across 52W Highs, Volume Surges, and Squeeze Coils.",
     },
     {
@@ -57,7 +62,24 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🔁 Quarter Repeaters Sync",
         "category": "Seasonality",
         "interval_seconds": 7200,
+        "params_json": '{"universe": "NSE_ALL"}',
         "description": "Historical quarter-over-quarter earnings surprise repeater pattern evaluation.",
+    },
+    {
+        "job_id": "institutional_sync",
+        "job_name": "🏛️ Institutional Flows Sync",
+        "category": "Institutional",
+        "interval_seconds": 7200,
+        "params_json": '{"watchlist": "my_watchlist"}',
+        "description": "Continuous sync of institutional fund portfolios, FII/DII entries, and block deals.",
+    },
+    {
+        "job_id": "kronos_cache_warmup",
+        "job_name": "🧠 Kronos Forecast Warmup",
+        "category": "Custom",
+        "interval_seconds": 86400,
+        "params_json": '{"watchlist": "my_watchlist", "device": "cuda:0"}',
+        "description": "Pre-computes and caches Kronos AI 14-day sequence price predictions.",
     },
 ]
 
@@ -79,8 +101,9 @@ def init_automation_schedules(settings: Settings | None = None) -> None:
                 INSERT OR IGNORE INTO automation_schedules (
                     job_id, job_name, category, interval_seconds,
                     last_run_at, next_run_at, status, last_duration_s,
-                    total_runs, last_summary, error_message, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    total_runs, last_summary, error_message, updated_at,
+                    is_enabled, params_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     s["job_id"],
@@ -95,8 +118,20 @@ def init_automation_schedules(settings: Settings | None = None) -> None:
                     f"Initialized. Ready for scheduled run ({s['interval_seconds']}s interval).",
                     None,
                     now_iso,
+                    1,
+                    s.get("params_json"),
                 ),
             )
+            # If params_json is null on existing row, seed it
+            if s.get("params_json"):
+                conn.execute(
+                    """
+                    UPDATE automation_schedules
+                    SET params_json = ?
+                    WHERE job_id = ? AND (params_json IS NULL OR params_json = '')
+                    """,
+                    (s["params_json"], s["job_id"]),
+                )
         if hasattr(conn, "commit"):
             conn.commit()
     except Exception as e:

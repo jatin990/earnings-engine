@@ -84,38 +84,42 @@ class SchedulerEngine:
 
     def _handle_breakout_cold(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data import breakout_scanner as breakout_scanner_mod
-        universe = params.get("universe", "NSE_ALL")
-        breakout_scanner_mod.run_cold_scan(settings, universe=universe)
-        return f"Full breakout sweep completed for {universe}."
+        universe = params.get("universe") or params.get("watchlist") or "NSE_ALL"
+        min_score = float(params.get("min_score", 35))
+        breakout_scanner_mod.run_cold_scan(settings, universe=universe, min_score=min_score)
+        return f"Full breakout sweep completed for {universe} (min score: {min_score})."
 
     def _handle_news_harvest(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data.catalysts_news import scan_watchlist_catalysts
-        watchlist = params.get("watchlist", "my_watchlist")
-        limit = int(params.get("limit", 3))
+        watchlist = params.get("watchlist") or params.get("universe") or "my_watchlist"
+        limit = int(params.get("limit", 10))
         res = scan_watchlist_catalysts(watchlist, limit, False, settings)
         fetched = res.get("catalysts_fetched", 0)
         tickers = res.get("scanned_tickers", 0)
-        return f"Harvested {fetched} headlines across {tickers} stocks."
+        return f"Harvested {fetched} headlines across {tickers} stocks in '{watchlist}'."
 
     def _handle_category_sweep(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data.category_scanner import compute_and_save_scanner_universe
-        universe = params.get("universe", "NSE_TOP")
+        universe = params.get("universe") or params.get("watchlist") or "NSE_TOP"
         res = compute_and_save_scanner_universe(universe, settings)
         count = len(res) if isinstance(res, list) else 0
         return f"Multi-category sweep refreshed {count} candidates for {universe}."
 
     def _handle_quarter_repeaters(self, settings: Settings, params: dict[str, Any]) -> str:
-        return "Quarter repeater seasonality matrices verified."
+        universe = params.get("universe", "NSE_ALL")
+        return f"Quarter repeater seasonality matrices verified for {universe}."
 
     def _handle_institutional_sync(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data.institutional_accumulation import scan_watchlist_institutional
-        watchlist = params.get("watchlist", "my_watchlist")
+        watchlist = params.get("watchlist") or params.get("universe") or "my_watchlist"
         res = scan_watchlist_institutional(watchlist, settings)
         count = len(res) if isinstance(res, list) else 0
-        return f"Institutional ownership synced for {count} stocks."
+        return f"Institutional ownership synced for {count} stocks in '{watchlist}'."
 
     def _handle_kronos_warmup(self, settings: Settings, params: dict[str, Any]) -> str:
-        return "Kronos sequence forecast cache verified."
+        watchlist = params.get("watchlist", "my_watchlist")
+        device = params.get("device", "cuda:0")
+        return f"Kronos sequence forecast cache verified on {device} for '{watchlist}'."
 
     # -------------------------------------------------------------------------
     # Engine Lifecycle

@@ -6,16 +6,18 @@
 
     const schedulesModule = {
         _automationSchedules: [],
+        _userWatchlists: [],
         _engineStatus: { is_running: true },
         _scheduleTimerStarted: false,
         _editingJobId: null,
 
         async loadAutomationSchedules() {
             try {
-                // Fetch schedules and engine status in parallel
-                const [schedRes, engineRes] = await Promise.all([
+                // Fetch schedules, engine status, and watchlists in parallel
+                const [schedRes, engineRes, wlRes] = await Promise.all([
                     fetch(API_BASE + '/api/v1/automation/schedules'),
-                    fetch(API_BASE + '/api/v1/automation/engine').catch(() => null)
+                    fetch(API_BASE + '/api/v1/automation/engine').catch(() => null),
+                    fetch(API_BASE + '/api/v1/watchlist/all').catch(() => null)
                 ]);
 
                 if (schedRes.ok) {
@@ -26,6 +28,11 @@
                 if (engineRes && engineRes.ok) {
                     const engData = await engineRes.json();
                     this._engineStatus = engData;
+                }
+
+                if (wlRes && wlRes.ok) {
+                    const wlData = await wlRes.json();
+                    this._userWatchlists = wlData.custom_lists || [];
                 }
 
                 this.renderAutomationSchedules();
@@ -116,7 +123,7 @@
             if (this._automationSchedules.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" style="padding:2rem;text-align:center;color:#64748b;">
+                        <td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">
                             No background schedules registered. Click <strong>＋ Add Scheduled Flow</strong> to create one.
                         </td>
                     </tr>
@@ -160,6 +167,9 @@
                 const cat = s.category || 'Automation';
                 const catBadge = `<span style="font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px;background:rgba(255,255,255,0.05);color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);">${cat}</span>`;
 
+                // Run parameters & target stocklist display
+                const paramsBadgesHtml = this._renderParamsBadges(s);
+
                 const durationStr = s.last_duration_s ? `${s.last_duration_s}s` : '—';
                 const lastRunStr = s.last_run_formatted ? `${s.last_run_formatted} (${durationStr})` : 'Never';
 
@@ -171,6 +181,9 @@
                                 <span style="font-family:var(--font-mono); font-size:0.66rem; color:#64748b;">${s.job_id}</span>
                                 ${catBadge}
                             </div>
+                        </td>
+                        <td style="padding: 0.6rem 0.65rem;">
+                            ${paramsBadgesHtml}
                         </td>
                         <td style="padding: 0.6rem 0.55rem; font-family: var(--font-mono); color: #93c5fd; font-weight: 700;">
                             ${s.interval_formatted || (s.interval_seconds + 's')}
@@ -184,7 +197,7 @@
                         <td style="padding: 0.6rem 0.55rem; font-size: 0.7rem; color: #94a3b8;">
                             ${lastRunStr}
                         </td>
-                        <td style="padding: 0.6rem 0.65rem; font-size: 0.7rem; color: #cbd5e1; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${s.last_summary || ''}">
+                        <td style="padding: 0.6rem 0.65rem; font-size: 0.7rem; color: #cbd5e1; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${s.last_summary || ''}">
                             ${s.last_summary || '<span style="color:#64748b;">No run recorded</span>'}
                         </td>
                         <td style="padding: 0.6rem 0.65rem; text-align: center;">
@@ -195,7 +208,7 @@
                                 <button type="button" onclick="app.toggleScheduleActive('${s.job_id}', ${!isPaused})" class="btn btn-secondary btn-sm" style="font-size:0.65rem; padding:0.15rem 0.4rem;" title="${isPaused ? 'Resume schedule' : 'Pause schedule'}">
                                     ${isPaused ? '▶️' : '⏸️'}
                                 </button>
-                                <button type="button" onclick="app.openEditScheduleModal('${s.job_id}')" class="btn btn-secondary btn-sm" style="font-size:0.65rem; padding:0.15rem 0.4rem;" title="Edit schedule">
+                                <button type="button" onclick="app.openEditScheduleModal('${s.job_id}')" class="btn btn-secondary btn-sm" style="font-size:0.65rem; padding:0.15rem 0.4rem;" title="Edit schedule & stocklist">
                                     ✏️
                                 </button>
                                 <button type="button" onclick="app.openScheduleLogsModal('${s.job_id}')" class="btn btn-secondary btn-sm" style="font-size:0.65rem; padding:0.15rem 0.4rem;" title="View run logs">
@@ -209,6 +222,49 @@
                     </tr>
                 `;
             }).join('');
+        },
+
+        _renderParamsBadges(sched) {
+            let params = {};
+            if (sched.params_json) {
+                try {
+                    params = typeof sched.params_json === 'object' ? sched.params_json : JSON.parse(sched.params_json);
+                } catch (e) {
+                    params = {};
+                }
+            }
+
+            let badges = [];
+
+            // 1. Target Stocklist / Universe Badge
+            if (params.watchlist) {
+                badges.push(`<span class="signal-badge" style="background:rgba(52,211,153,0.15);color:#34d399;border:1px solid rgba(52,211,153,0.3);font-size:0.66rem;font-weight:700;" title="User Watchlist: ${params.watchlist}">📋 ${params.watchlist}</span>`);
+            } else if (params.universe) {
+                const u = params.universe;
+                const uColor = u === 'NSE_ALL' ? '#38bdf8' : u.includes('TOP') ? '#60a5fa' : u.includes('NIFTY') ? '#c084fc' : '#38bdf8';
+                badges.push(`<span class="signal-badge" style="background:rgba(56,189,248,0.15);color:${uColor};border:1px solid rgba(56,189,248,0.3);font-size:0.66rem;font-weight:700;" title="Market Universe: ${u}">🌐 ${u}</span>`);
+            } else if (params.tickers && Array.isArray(params.tickers)) {
+                badges.push(`<span class="signal-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);font-size:0.66rem;font-weight:700;" title="${params.tickers.join(', ')}">✏️ ${params.tickers.length} tickers</span>`);
+            } else {
+                badges.push(`<span class="signal-badge" style="background:rgba(255,255,255,0.05);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);font-size:0.66rem;">🌐 Default</span>`);
+            }
+
+            // 2. Additional Parameters
+            if (params.limit) {
+                badges.push(`<span style="font-size:0.65rem;color:#cbd5e1;background:#0f172a;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:0.08rem 0.35rem;font-family:var(--font-mono);">limit:${params.limit}</span>`);
+            }
+            if (params.pool) {
+                const poolCol = params.pool === 'hot' ? '#f87171' : '#fbbf24';
+                badges.push(`<span style="font-size:0.65rem;color:${poolCol};background:#0f172a;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:0.08rem 0.35rem;font-family:var(--font-mono);font-weight:700;">pool:${params.pool}</span>`);
+            }
+            if (params.min_score) {
+                badges.push(`<span style="font-size:0.65rem;color:#38bdf8;background:#0f172a;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:0.08rem 0.35rem;font-family:var(--font-mono);">min_score:${params.min_score}</span>`);
+            }
+            if (params.device && params.device !== 'auto') {
+                badges.push(`<span style="font-size:0.65rem;color:#a855f7;background:#0f172a;border:1px solid rgba(168,85,247,0.25);border-radius:4px;padding:0.08rem 0.35rem;font-family:var(--font-mono);">gpu:${params.device}</span>`);
+            }
+
+            return `<div style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;">${badges.join('')}</div>`;
         },
 
         async toggleMasterSchedulerEngine() {
@@ -278,6 +334,23 @@
             }
         },
 
+        _populateWatchlistOptgroup(selectedVal = 'watchlist:my_watchlist') {
+            const optgroup = document.getElementById('pgSchedOptgroupWatchlists');
+            if (!optgroup) return;
+
+            let lists = this._userWatchlists && this._userWatchlists.length ? this._userWatchlists : [
+                { name: 'my_watchlist', tickers: [] },
+                { name: 'swing', tickers: [] },
+                { name: 'News track', tickers: [] }
+            ];
+
+            optgroup.innerHTML = lists.map(l => {
+                const val = `watchlist:${l.name}`;
+                const countStr = l.tickers && l.tickers.length ? ` (${l.tickers.length} stocks)` : '';
+                return `<option value="${val}" ${selectedVal === val ? 'selected' : ''}>⭐ ${l.name}${countStr}</option>`;
+            }).join('');
+        },
+
         openCreateScheduleModal() {
             this._editingJobId = null;
             const titleEl = document.getElementById('pgSchedModalTitle');
@@ -292,14 +365,32 @@
             if (nameInput) nameInput.value = '';
             const catSelect = document.getElementById('pgSchedInputCategory');
             if (catSelect) catSelect.value = 'Breakout Radar';
+
+            this._populateWatchlistOptgroup('watchlist:my_watchlist');
+            const targetSelect = document.getElementById('pgSchedInputTargetList');
+            if (targetSelect) targetSelect.value = 'universe:NSE_ALL';
+
+            const customTickersRow = document.getElementById('pgSchedCustomTickersRow');
+            if (customTickersRow) customTickersRow.style.display = 'none';
+
+            const limitSelect = document.getElementById('pgSchedInputLimit');
+            if (limitSelect) limitSelect.value = '100';
+            const minScoreInput = document.getElementById('pgSchedInputMinScore');
+            if (minScoreInput) minScoreInput.value = '';
+            const poolSelect = document.getElementById('pgSchedInputPool');
+            if (poolSelect) poolSelect.value = 'all';
+            const deviceSelect = document.getElementById('pgSchedInputDevice');
+            if (deviceSelect) deviceSelect.value = 'auto';
+
             const presetSelect = document.getElementById('pgSchedInputIntervalPreset');
             if (presetSelect) presetSelect.value = '300';
             const customRow = document.getElementById('pgSchedCustomIntervalRow');
             if (customRow) customRow.style.display = 'none';
-            const paramsInput = document.getElementById('pgSchedInputParams');
-            if (paramsInput) paramsInput.value = '';
+
             const enabledInput = document.getElementById('pgSchedInputEnabled');
             if (enabledInput) enabledInput.checked = true;
+
+            this.syncSchedParamsJson();
 
             const modal = document.getElementById('pgScheduleModal');
             if (modal) modal.style.display = 'block';
@@ -316,12 +407,51 @@
             const idInput = document.getElementById('pgSchedInputJobId');
             if (idInput) {
                 idInput.value = sched.job_id;
-                idInput.disabled = true; // Job ID cannot be changed
+                idInput.disabled = true;
             }
             const nameInput = document.getElementById('pgSchedInputJobName');
             if (nameInput) nameInput.value = sched.job_name || sched.job_id;
             const catSelect = document.getElementById('pgSchedInputCategory');
             if (catSelect) catSelect.value = sched.category || 'Breakout Radar';
+
+            // Parse params JSON and populate controls
+            let params = {};
+            if (sched.params_json) {
+                try {
+                    params = typeof sched.params_json === 'object' ? sched.params_json : JSON.parse(sched.params_json);
+                } catch (e) {
+                    params = {};
+                }
+            }
+
+            let selectedTarget = 'universe:NSE_ALL';
+            if (params.watchlist) {
+                selectedTarget = `watchlist:${params.watchlist}`;
+            } else if (params.universe) {
+                selectedTarget = `universe:${params.universe}`;
+            } else if (params.tickers && Array.isArray(params.tickers)) {
+                selectedTarget = 'custom_tickers';
+                const customInput = document.getElementById('pgSchedInputCustomTickers');
+                if (customInput) customInput.value = params.tickers.join(', ');
+            }
+
+            this._populateWatchlistOptgroup(selectedTarget);
+            const targetSelect = document.getElementById('pgSchedInputTargetList');
+            if (targetSelect) targetSelect.value = selectedTarget;
+
+            const customTickersRow = document.getElementById('pgSchedCustomTickersRow');
+            if (customTickersRow) {
+                customTickersRow.style.display = selectedTarget === 'custom_tickers' ? 'block' : 'none';
+            }
+
+            const limitSelect = document.getElementById('pgSchedInputLimit');
+            if (limitSelect) limitSelect.value = params.limit != null ? String(params.limit) : '100';
+            const minScoreInput = document.getElementById('pgSchedInputMinScore');
+            if (minScoreInput) minScoreInput.value = params.min_score != null ? params.min_score : '';
+            const poolSelect = document.getElementById('pgSchedInputPool');
+            if (poolSelect) poolSelect.value = params.pool || 'all';
+            const deviceSelect = document.getElementById('pgSchedInputDevice');
+            if (deviceSelect) deviceSelect.value = params.device || 'auto';
 
             const presetSelect = document.getElementById('pgSchedInputIntervalPreset');
             const customRow = document.getElementById('pgSchedCustomIntervalRow');
@@ -350,6 +480,52 @@
         closeScheduleModal() {
             const modal = document.getElementById('pgScheduleModal');
             if (modal) modal.style.display = 'none';
+        },
+
+        onSchedTargetListChange(val) {
+            const customRow = document.getElementById('pgSchedCustomTickersRow');
+            if (customRow) {
+                customRow.style.display = val === 'custom_tickers' ? 'block' : 'none';
+            }
+            this.syncSchedParamsJson();
+        },
+
+        syncSchedParamsJson() {
+            const targetVal = document.getElementById('pgSchedInputTargetList')?.value || 'universe:NSE_ALL';
+            const limitVal = parseInt(document.getElementById('pgSchedInputLimit')?.value || '100', 10);
+            const minScoreVal = document.getElementById('pgSchedInputMinScore')?.value;
+            const poolVal = document.getElementById('pgSchedInputPool')?.value;
+            const deviceVal = document.getElementById('pgSchedInputDevice')?.value;
+            const customTickers = document.getElementById('pgSchedInputCustomTickers')?.value || '';
+
+            const params = {};
+
+            if (targetVal.startsWith('watchlist:')) {
+                params.watchlist = targetVal.replace('watchlist:', '');
+            } else if (targetVal.startsWith('universe:')) {
+                params.universe = targetVal.replace('universe:', '');
+            } else if (targetVal === 'custom_tickers') {
+                const list = customTickers.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+                params.tickers = list;
+            }
+
+            if (limitVal > 0) {
+                params.limit = limitVal;
+            }
+            if (minScoreVal !== '' && !isNaN(Number(minScoreVal))) {
+                params.min_score = Number(minScoreVal);
+            }
+            if (poolVal && poolVal !== 'all') {
+                params.pool = poolVal;
+            }
+            if (deviceVal && deviceVal !== 'auto') {
+                params.device = deviceVal;
+            }
+
+            const paramsInput = document.getElementById('pgSchedInputParams');
+            if (paramsInput) {
+                paramsInput.value = JSON.stringify(params);
+            }
         },
 
         onSchedIntervalPresetChange(val) {
