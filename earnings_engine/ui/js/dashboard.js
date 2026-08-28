@@ -12776,6 +12776,12 @@
                     isBreakingOut
                 };
 
+                const cellsHtml = cols.map(colKey => {
+                    const def = BREAKOUT_COLUMNS[colKey];
+                    if (!def || typeof def.render !== 'function') return '';
+                    return def.render(c, cellCtx);
+                }).join('');
+
                 let rowClass = 'bk-table-row';
                 if (c.outcome === 'TARGET_HIT' || c.outcome === 'BREAKOUT_SUCCEEDED') {
                     rowClass += ' bk-row-success';
