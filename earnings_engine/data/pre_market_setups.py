@@ -335,6 +335,295 @@ def get_premarket_setups(
     }
 
 
+def get_historical_premarket_outcomes(
+    days_lookback: int = 90,
+    category_filter: str = "ALL",
+    direction_filter: str = "ALL",
+    min_impact: float = 0.0,
+    search_query: str = "",
+    limit: int = 150,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Verify historical pre-market setups against actual market open and day candles, computing accuracy metrics."""
+    settings = settings or Settings()
+
+    # 1. Fetch raw catalysts in lookback window
+    raw_catalysts = get_short_term_catalysts(
+        days=days_lookback,
+        impact_filter="ALL",
+        category_filter="ALL",
+        direction_filter="ALL",
+        search_query="",
+        limit=600,
+        settings=settings,
+    )
+
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+
+        verified_items: list[dict[str, Any]] = []
+
+        for c in raw_catalysts:
+            pub_at = c.get("published_at") or ""
+            is_match, session_phase, timing_desc = is_in_overnight_window(pub_at, window_mode="all_recent")
+            if not is_match:
+                continue
+
+            impact_score = float(c.get("impact_score") or 50.0)
+            if impact_score < min_impact:
+                continue
+
+            direction = (c.get("direction") or "NEUTRAL").upper()
+            if direction_filter != "ALL" and direction != direction_filter.upper():
+                continue
+
+            category = c.get("category") or "Miscellaneous Corporate Disclosures"
+            if category_filter != "ALL" and category != category_filter:
+                continue
+
+            title = c.get("title") or ""
+            summary = c.get("summary") or ""
+            ticker = c.get("ticker") or ""
+            stock_name = c.get("stock_name") or get_name(ticker) or ticker.replace(".NS", "")
+
+            if search_query:
+                sq = search_query.strip().lower()
+                if sq not in title.lower() and sq not in summary.lower() and sq not in ticker.lower() and sq not in stock_name.lower():
+                    continue
+
+            pub_date = pub_at[:10]
+            if not pub_date or not ticker:
+                continue
+
+            # Query the trade day T candle on or after pub_date
+            candle_rows = conn.execute(
+                """
+                SELECT date, open, high, low, close, volume 
+                FROM price_history 
+                WHERE ticker = ? AND date >= ? 
+                ORDER BY date ASC LIMIT 2
+                """,
+                (ticker, pub_date),
+            ).fetchall()
+
+            if not candle_rows:
+                continue
+
+            day_candle = candle_rows[0]
+            candle_date = day_candle["date"]
+            open_p = float(day_candle["open"]) if day_candle["open"] is not None else None
+            high_p = float(day_candle["high"]) if day_candle["high"] is not None else None
+            low_p = float(day_candle["low"]) if day_candle["low"] is not None else None
+            close_p = float(day_candle["close"]) if day_candle["close"] is not None else None
+
+            # Look up base T-1 close price before candle_date
+            prev_row = conn.execute(
+                """
+                SELECT close, date FROM price_history 
+                WHERE ticker = ? AND date < ? 
+                ORDER BY date DESC LIMIT 1
+                """,
+                (ticker, candle_date),
+            ).fetchone()
+
+            prev_close = float(prev_row[0]) if prev_row and prev_row[0] is not None else (open_p or 100.0)
+
+            if not prev_close or prev_close <= 0 or not open_p or not high_p or not low_p or not close_p:
+                continue
+
+            # Compute planned levels
+            scored = score_premarket_setup(c, prev_close=prev_close, current_price=close_p)
+            t1 = scored["target_1"]
+            t2 = scored["target_2"]
+            sl = scored["stop_loss"]
+
+            # Realized gaps and price action
+            actual_gap_pct = round(((open_p - prev_close) / prev_close) * 100.0, 2)
+            day_return_pct = round(((close_p - prev_close) / prev_close) * 100.0, 2)
+            intraday_run_pct = round(((high_p - open_p) / open_p) * 100.0, 2)
+            max_gain_pct = round(((high_p - prev_close) / prev_close) * 100.0, 2)
+            max_drawdown_pct = round(((low_p - prev_close) / prev_close) * 100.0, 2)
+
+            # Outcome verification
+            t1_hit = False
+            t2_hit = False
+            sl_hit = False
+            is_win = False
+
+            if direction == "BULLISH":
+                if high_p >= t2:
+                    t2_hit = True
+                    t1_hit = True
+                    is_win = True
+                    outcome_code = "TARGET_2_HIT"
+                    outcome_badge = f"🎯 Target 2 Hit (+{max_gain_pct}%)"
+                    outcome_color = "#10b981"
+                elif high_p >= t1:
+                    t1_hit = True
+                    is_win = True
+                    outcome_code = "TARGET_1_HIT"
+                    outcome_badge = f"✅ Target 1 Hit (+{max_gain_pct}%)"
+                    outcome_color = "#34d399"
+                elif actual_gap_pct > 0 and day_return_pct > 0:
+                    is_win = True
+                    outcome_code = "GAP_HELD"
+                    outcome_badge = f"🟢 Gap Held Green (+{day_return_pct}%)"
+                    outcome_color = "#38bdf8"
+                elif low_p <= sl:
+                    sl_hit = True
+                    outcome_code = "STOP_LOSS_HIT"
+                    outcome_badge = f"🛑 Stop Hit ({max_drawdown_pct}%)"
+                    outcome_color = "#f43f5e"
+                else:
+                    outcome_code = "GAP_FADED"
+                    outcome_badge = f"⚠️ Gap Faded ({day_return_pct}%)"
+                    outcome_color = "#fbbf24"
+            elif direction == "BEARISH":
+                if low_p <= t2:
+                    t2_hit = True
+                    t1_hit = True
+                    is_win = True
+                    outcome_code = "TARGET_2_HIT"
+                    outcome_badge = f"🎯 Target 2 Hit ({max_drawdown_pct}%)"
+                    outcome_color = "#10b981"
+                elif low_p <= t1:
+                    t1_hit = True
+                    is_win = True
+                    outcome_code = "TARGET_1_HIT"
+                    outcome_badge = f"✅ Target 1 Hit ({max_drawdown_pct}%)"
+                    outcome_color = "#34d399"
+                elif actual_gap_pct < 0 and day_return_pct < 0:
+                    is_win = True
+                    outcome_code = "GAP_HELD"
+                    outcome_badge = f"🟢 Gap Down Held ({day_return_pct}%)"
+                    outcome_color = "#38bdf8"
+                elif high_p >= sl:
+                    sl_hit = True
+                    outcome_code = "STOP_LOSS_HIT"
+                    outcome_badge = f"🛑 Stop Hit (+{max_gain_pct}%)"
+                    outcome_color = "#f43f5e"
+                else:
+                    outcome_code = "GAP_FADED"
+                    outcome_badge = f"⚠️ Faded ({day_return_pct}%)"
+                    outcome_color = "#fbbf24"
+            else:
+                is_win = abs(day_return_pct) <= 2.0
+                outcome_code = "NEUTRAL"
+                outcome_badge = f"⚖️ Neutral ({day_return_pct}%)"
+                outcome_color = "#94a3b8"
+
+            verified_items.append({
+                "id": c.get("id"),
+                "ticker": ticker,
+                "stock_name": stock_name,
+                "title": title,
+                "summary": summary,
+                "publisher": c.get("publisher") or "Exchange Feed",
+                "published_at": pub_at,
+                "session_date": candle_date,
+                "timing_desc": timing_desc,
+                "session_phase": session_phase,
+                "category": category,
+                "direction": direction,
+                "impact_score": impact_score,
+                "prev_close": prev_close,
+                "actual_open": open_p,
+                "actual_gap_pct": actual_gap_pct,
+                "day_high": high_p,
+                "day_low": low_p,
+                "day_close": close_p,
+                "day_return_pct": day_return_pct,
+                "max_gain_pct": max_gain_pct,
+                "max_drawdown_pct": max_drawdown_pct,
+                "intraday_run_pct": intraday_run_pct,
+                "target_1": t1,
+                "target_2": t2,
+                "stop_loss": sl,
+                "target_1_hit": t1_hit,
+                "target_2_hit": t2_hit,
+                "stop_loss_hit": sl_hit,
+                "is_win": is_win,
+                "outcome_code": outcome_code,
+                "outcome_badge": outcome_badge,
+                "outcome_color": outcome_color,
+                "action_badge": scored["action_badge"],
+                "action_code": scored["action_code"],
+                "source_badge": scored["source_badge"],
+                "source_code": scored["source_code"],
+            })
+
+    # Sort historical verified setups by session_date DESC, impact_score DESC
+    verified_items.sort(key=lambda x: (x["session_date"], x["published_at"]), reverse=True)
+    items = verified_items[:limit]
+
+    # Compute Aggregated Accuracy Breakdown Matrices
+    accuracy_by_category = _compute_accuracy_grouping(verified_items, group_key="category")
+    accuracy_by_action = _compute_accuracy_grouping(verified_items, group_key="action_code")
+
+    # Global KPI summary
+    total_ver = len(verified_items)
+    wins = len([v for v in verified_items if v["is_win"]])
+    t1_hits = len([v for v in verified_items if v["target_1_hit"]])
+    t2_hits = len([v for v in verified_items if v["target_2_hit"]])
+    win_rate = round((wins / total_ver * 100.0), 1) if total_ver else 0.0
+    t1_rate = round((t1_hits / total_ver * 100.0), 1) if total_ver else 0.0
+    t2_rate = round((t2_hits / total_ver * 100.0), 1) if total_ver else 0.0
+    avg_gap = round(sum(v["actual_gap_pct"] for v in verified_items) / total_ver, 2) if total_ver else 0.0
+    avg_return = round(sum(v["day_return_pct"] for v in verified_items) / total_ver, 2) if total_ver else 0.0
+
+    return {
+        "success": True,
+        "total_verified": total_ver,
+        "as_of": datetime.now(timezone(IST_OFFSET)).strftime("%Y-%m-%d %H:%M:%S IST"),
+        "track_record_summary": {
+            "total_verified_setups": total_ver,
+            "win_rate_pct": win_rate,
+            "target_1_hit_rate_pct": t1_rate,
+            "target_2_hit_rate_pct": t2_rate,
+            "avg_realized_open_gap_pct": avg_gap,
+            "avg_day_return_pct": avg_return,
+            "total_wins": wins,
+        },
+        "accuracy_by_category": accuracy_by_category,
+        "accuracy_by_action": accuracy_by_action,
+        "items": items,
+    }
+
+
+def _compute_accuracy_grouping(items: list[dict[str, Any]], group_key: str) -> list[dict[str, Any]]:
+    """Group verified items by key and compute win rate, target hit rate, and average returns."""
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for item in items:
+        k = item.get(group_key) or "Unknown"
+        groups.setdefault(k, []).append(item)
+
+    results: list[dict[str, Any]] = []
+    for k, sub_items in groups.items():
+        n = len(sub_items)
+        wins = len([x for x in sub_items if x.get("is_win")])
+        t1_count = len([x for x in sub_items if x.get("target_1_hit")])
+        t2_count = len([x for x in sub_items if x.get("target_2_hit")])
+        win_rate = round((wins / n * 100.0), 1) if n else 0.0
+        t1_rate = round((t1_count / n * 100.0), 1) if n else 0.0
+        t2_rate = round((t2_count / n * 100.0), 1) if n else 0.0
+        avg_gap = round(sum(x.get("actual_gap_pct", 0.0) for x in sub_items) / n, 2) if n else 0.0
+        avg_ret = round(sum(x.get("day_return_pct", 0.0) for x in sub_items) / n, 2) if n else 0.0
+
+        results.append({
+            "group_name": k,
+            "total_setups": n,
+            "wins": wins,
+            "win_rate_pct": win_rate,
+            "target_1_hit_rate_pct": t1_rate,
+            "target_2_hit_rate_pct": t2_rate,
+            "avg_open_gap_pct": avg_gap,
+            "avg_day_return_pct": avg_ret,
+        })
+
+    results.sort(key=lambda x: (x["total_setups"], x["win_rate_pct"]), reverse=True)
+    return results
+
+
 def scan_premarket_filings(settings: Settings | None = None) -> dict[str, Any]:
     """Trigger background sweep of overnight corporate filings and news feeds."""
     settings = settings or Settings()
@@ -345,3 +634,4 @@ def scan_premarket_filings(settings: Settings | None = None) -> dict[str, Any]:
         "scanned_summary": res,
         "timestamp": datetime.now(timezone(IST_OFFSET)).strftime("%Y-%m-%d %H:%M:%S IST"),
     }
+

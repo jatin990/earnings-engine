@@ -73,6 +73,34 @@ async def get_premarket_summary_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/v1/premarket/outcomes")
+async def get_premarket_outcomes_endpoint(
+    category: str = Query("ALL"),
+    direction: str = Query("ALL"),
+    min_impact: float = Query(0.0, ge=0.0, le=100.0),
+    search: str = Query(""),
+    days: int = Query(90, ge=1, le=365),
+    limit: int = Query(150, ge=1, le=500),
+):
+    """Retrieve historical pre-market setups with actual open gaps, target hits, and accuracy by category."""
+    try:
+        from earnings_engine.data.pre_market_setups import get_historical_premarket_outcomes
+        data = await asyncio.to_thread(
+            get_historical_premarket_outcomes,
+            days_lookback=days,
+            category_filter=category,
+            direction_filter=direction,
+            min_impact=min_impact,
+            search_query=search,
+            limit=limit,
+            settings=_settings,
+        )
+        return data
+    except Exception as e:
+        logger.error(f"[PREMARKET] Failed fetching outcomes: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/api/v1/premarket/scan")
 async def post_premarket_scan_endpoint():
     """Trigger background refresh and scan of overnight SEBI filings & news."""

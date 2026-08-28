@@ -101,6 +101,19 @@ def test_get_premarket_setups_function():
     assert isinstance(res["items"], list)
 
 
+def test_historical_premarket_outcomes_and_accuracy():
+    from earnings_engine.data.pre_market_setups import get_historical_premarket_outcomes
+    res = get_historical_premarket_outcomes(days_lookback=90, limit=20)
+    assert res is not None
+    assert res["success"] is True
+    assert "track_record_summary" in res
+    assert "accuracy_by_category" in res
+    assert "accuracy_by_action" in res
+    assert "items" in res
+    assert "total_verified_setups" in res["track_record_summary"]
+    assert "win_rate_pct" in res["track_record_summary"]
+
+
 def test_premarket_api_endpoints(client):
     # Test GET /api/v1/premarket/setups
     res = client.get("/api/v1/premarket/setups?window=all_recent&limit=20")
@@ -117,7 +130,16 @@ def test_premarket_api_endpoints(client):
     assert data_sum["success"] is True
     assert "summary" in data_sum
 
+    # Test GET /api/v1/premarket/outcomes
+    res_out = client.get("/api/v1/premarket/outcomes?days=90&limit=20")
+    assert res_out.status_code == 200
+    data_out = res_out.json()
+    assert data_out["success"] is True
+    assert "track_record_summary" in data_out
+    assert "accuracy_by_category" in data_out
+
     # Test POST /api/v1/premarket/scan
     res_scan = client.post("/api/v1/premarket/scan")
     assert res_scan.status_code == 200
     assert res_scan.json()["success"] is True
+

@@ -107,12 +107,33 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
         "keywords": [
             "sebi probe", "sebi notice", "probe", "initiates probe", "ed search", "it raid", "fraud", "scam", "auditor resigns",
             "default on debt", "insolvency", "nclt", "penalty imposed", "lawsuit filed", "inquiry",
-            "court stays", "usfda warning letter", "import alert", "downgraded to junk", "rbi ban"
+            "court stays", "usfda warning letter", "import alert", "downgraded to junk", "rbi ban", "tax demand", "gst notice", "it demand"
         ],
         "base_impact": 90,
         "default_direction": "BEARISH",
         "horizon": "⚡ 1-2 Days (Immediate Panic)",
         "volatility_est": "±5% to ±15%",
+    },
+    "Management, Governance & Ratings": {
+        "keywords": [
+            "rating upgraded", "rating upgrade", "crisil upgrade", "care upgrade", "icra upgrade",
+            "appoints ceo", "appoints md", "new ceo", "promoter unpledge", "pledge released",
+            "rating downgraded", "downgrade by crisil", "pledge invoked", "promoter pledge"
+        ],
+        "base_impact": 72,
+        "default_direction": "BULLISH",
+        "horizon": "📅 2-4 Days",
+        "volatility_est": "±2% to ±6%",
+    },
+    "Miscellaneous Corporate Disclosures": {
+        "keywords": [
+            "intimation", "regulation 30", "lodr", "exchange disclosure", "commercial production",
+            "operations resume", "plant shutdown", "business update", "clarification on", "investor presentation"
+        ],
+        "base_impact": 55,
+        "default_direction": "NEUTRAL",
+        "horizon": "📅 1-2 Days",
+        "volatility_est": "±1% to ±3%",
     },
 }
 
