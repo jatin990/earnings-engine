@@ -2157,6 +2157,7 @@
                 const avgAllStr = genStats['all_time']?.avg_s ? `${genStats['all_time'].avg_s}s (All)` : (stats.avg_latency_all_s ? `${stats.avg_latency_all_s}s (All)` : null);
                 const avgDisplay = [avg1hStr, avg24hStr, avgAllStr].filter(Boolean).join(' · ');
                 const avgReturnS = stats.avg_return_time_s || (genStats['24h']?.avg_s || genStats['all_time']?.avg_s || '2.2');
+                const successRate = stats.success_rate_pct != null ? stats.success_rate_pct : (stats.benchmark_success_rate_pct || 100);
                 const isDegraded = stats.is_degraded || (stats.avg_latency_1h_ms && stats.avg_latency_1h_ms > 8000);
                 const latencyBadgeHtml = isDegraded ? `
                     <span style="color: #94a3b8; background: rgba(148, 163, 184, 0.12); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(148, 163, 184, 0.25); font-family: var(--font-mono); font-size: 0.64rem;" title="Model latency is currently elevated (~${avgReturnS}s avg) - Executable">
