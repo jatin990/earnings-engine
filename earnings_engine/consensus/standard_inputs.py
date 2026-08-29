@@ -22,7 +22,7 @@ from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.prices import fetch_live_quote, load_prices
 from earnings_engine.data.market_context import detect_swing_range
-from earnings_engine.data.catalysts_news import get_short_term_catalysts
+from earnings_engine.data.catalysts_news import get_short_term_catalysts, fetch_ticker_catalysts, is_headline_current
 from earnings_engine.features.market_sentiment import get_market_sentiment
 from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
 
@@ -450,7 +450,18 @@ def build_standardized_model_context(
 
     # 7. Pillar 4: Corporate Catalysts, News & Order Wins
     try:
-        raw_cats = get_short_term_catalysts(sym, days=30, settings=settings)
+        # Actively fetch verified news articles for this ticker
+        raw_cats = fetch_ticker_catalysts(sym, limit=8, force=fetch_live, settings=settings)
+        if not raw_cats:
+            # Fallback to direct DB query specifically for this ticker
+            conn = get_db_connection(settings)
+            rows = conn.execute(
+                "SELECT * FROM news_catalysts WHERE ticker = ? ORDER BY published_at DESC, impact_score DESC LIMIT 8",
+                (sym,),
+            ).fetchall()
+            col_names = [d[0] for d in conn.execute("SELECT * FROM news_catalysts LIMIT 0").description] if rows else []
+            db_cats = [dict(zip(col_names, r)) for r in rows]
+            raw_cats = [c for c in db_cats if is_headline_current(c.get("title", ""), c.get("summary") or "", c.get("published_at", ""))]
         ctx["corporate_catalysts"] = raw_cats[:6] if raw_cats else []
     except Exception as e:
         logger.debug("[STD-CTX] Catalysts error for %s: %s", sym, e)
@@ -584,12 +595,18 @@ def format_standardized_llm_prompt(ctx: dict[str, Any]) -> str:
         "## 📰 Pillar 4: Corporate Catalysts & News Sentiment (Weight: 16%)",
     ])
     if cat:
-        for i, c in enumerate(cat[:5], 1):
+        for i, c in enumerate(cat[:6], 1):
             direction = c.get("direction", "NEUTRAL")
             icon = "🟢" if direction == "BULLISH" else ("🔴" if direction == "BEARISH" else "⚪")
-            lines.append(f"{i}. {icon} [{c.get('impact_score', 0)}/100] **{c.get('title', 'N/A')}**")
+            pub_date = (c.get("published_at") or "")[:10]
+            horizon = c.get("expected_horizon") or "⚡ 1–3 Days"
+            lines.append(f"{i}. {icon} [{c.get('impact_score', 50)}/100 {direction}] **{c.get('title', 'N/A')}** ({pub_date})")
             if c.get("category"):
-                lines.append(f"   *Category:* {c['category']} | *Level:* {c.get('impact_level', 'N/A')}")
+                lines.append(f"   *Category:* {c['category']} | *Impact Level:* {c.get('impact_level', 'MODERATE')} | *Horizon:* {horizon}")
+            if c.get("why_it_matters") or c.get("summary"):
+                summary_text = (c.get("why_it_matters") or c.get("summary") or "").strip()
+                if summary_text:
+                    lines.append(f"   *Context:* {summary_text[:180]}")
     else:
         lines.append("- No recent material news catalysts found within the last 30 days.")
 
