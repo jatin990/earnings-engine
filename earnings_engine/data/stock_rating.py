@@ -142,7 +142,7 @@ def match_industry_benchmark(industry_str: str | None) -> tuple[str, dict[str, f
         return "Pharmaceuticals & Healthcare", INDUSTRY_BENCHMARKS["Pharmaceuticals & Healthcare"]
     if any(k in ind_lower for k in ["fmcg", "consumer", "food", "beverage", "personal", "tobacco", "retail"]):
         return "FMCG & Consumer Goods", INDUSTRY_BENCHMARKS["FMCG & Consumer Goods"]
-    if any(k in ind_lower for k in ["oil", "gas", "energy", "petroleum", "power", "utility", "solar"]):
+    if any(k in ind_lower for k in ["oil", "gas", "energy", "petroleum", "power", "utility", "solar", "renewable", "green", "clean"]):
         return "Oil, Gas & Energy", INDUSTRY_BENCHMARKS["Oil, Gas & Energy"]
     if any(k in ind_lower for k in ["metal", "steel", "mining", "aluminum", "copper", "iron"]):
         return "Metals & Mining", INDUSTRY_BENCHMARKS["Metals & Mining"]
