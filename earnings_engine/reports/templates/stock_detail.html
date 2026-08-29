@@ -2571,31 +2571,7 @@
             }
         }
 
-        function setTimeframe(days) {
-            currentSelectedTimeframe = parseInt(days, 10) || 14;
-            [3, 7, 14, 30, 60, 90].forEach(d => {
-                const btn = document.getElementById(`tfBtn-${d}`);
-                const aiBtn = document.getElementById(`aiTfBtn-${d}`);
-                if (btn) {
-                    if (d === currentSelectedTimeframe) btn.classList.add('active');
-                    else btn.classList.remove('active');
-                }
-                if (aiBtn) {
-                    if (d === currentSelectedTimeframe) aiBtn.classList.add('active');
-                    else aiBtn.classList.remove('active');
-                }
-            });
-            const horizonEl = document.getElementById('lblConsensusHorizon');
-            if (horizonEl) {
-                horizonEl.textContent = `${currentSelectedTimeframe}D HORIZON`;
-            }
-            // Update labels in consensus cards
-            const tgSub = document.getElementById('kpiTargetSub');
-            if (tgSub && tgSub.textContent.includes('upside target')) {
-                const parts = tgSub.textContent.split('upside target');
-                tgSub.textContent = `${parts[0].trim()} upside target (${currentSelectedTimeframe}D)`;
-            }
-        }
+
 
         function openLocalModelModal() {
             const hostInput = document.getElementById('cfgLocalHost');
@@ -2793,8 +2769,6 @@
             }
         }
 
-        let currentSelectedTimeframe = 14;
-
         async function setHorizonTimeframe(days) {
             currentSelectedTimeframe = parseInt(days, 10) || 14;
 
@@ -2802,8 +2776,28 @@
             document.querySelectorAll('.timeframe-pill-group .tf-pill-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
-            const activeBtn = document.getElementById(`aiTfBtn-${currentSelectedTimeframe}`);
-            if (activeBtn) activeBtn.classList.add('active');
+            [3, 7, 14, 30, 60, 90].forEach(d => {
+                const btn = document.getElementById(`tfBtn-${d}`);
+                const aiBtn = document.getElementById(`aiTfBtn-${d}`);
+                if (btn) {
+                    if (d === currentSelectedTimeframe) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                }
+                if (aiBtn) {
+                    if (d === currentSelectedTimeframe) aiBtn.classList.add('active');
+                    else aiBtn.classList.remove('active');
+                }
+            });
+
+            const horizonEl = document.getElementById('lblConsensusHorizon');
+            if (horizonEl) {
+                horizonEl.textContent = `${currentSelectedTimeframe}D HORIZON`;
+            }
+            const tgSub = document.getElementById('kpiTargetSub');
+            if (tgSub && tgSub.textContent.includes('upside target')) {
+                const parts = tgSub.textContent.split('upside target');
+                tgSub.textContent = `${parts[0].trim()} upside target (${currentSelectedTimeframe}D)`;
+            }
 
             const mainBtn = document.getElementById('btnConsensusMain');
             if (mainBtn) {
