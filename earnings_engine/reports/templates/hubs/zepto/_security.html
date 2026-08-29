@@ -1,112 +1,109 @@
 <!-- Tab 4: Zepto Security Deposit & 50-50 Partner Capital Contribution Ledger -->
-<div class="space-y-4">
+<div class="space-y-2.5">
     <!-- Equity Split Visual Dashboard Card -->
-    <div class="glass-panel p-5 border-amber-500/30">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+    <div class="glass-panel p-3.5 border-amber-500/30">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pb-2.5 border-b border-white/10">
             <div>
-                <span class="text-xs font-extrabold uppercase tracking-wider text-amber-400">Zepto Franchise Capital
-                    Commitment</span>
-                <h3 class="text-xl sm:text-2xl font-black font-display text-white mt-0.5">₹75,00,000 (₹75 Lakhs) Master
-                    Security Deposit</h3>
-                <p class="text-xs text-slate-400 mt-1">2 Partners · 50% - 50% Equal Equity Stake (₹37.5 Lakhs target per
-                    partner)</p>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">Zepto Franchise Capital Commitment</span>
+                <h3 class="text-lg sm:text-xl font-black font-display text-white mt-0.5">₹75,00,000 (₹75 Lakhs) Master Security Deposit</h3>
+                <p class="text-[11px] text-slate-400">2 Partners · 50% - 50% Equal Equity Stake (₹37.5 Lakhs target per partner)</p>
             </div>
 
             <div class="flex items-center gap-3">
                 <div class="text-right">
-                    <span class="text-[11px] text-slate-400 block">Total Deposited to Zepto:</span>
-                    <span class="text-xl font-extrabold font-mono text-amber-300" id="secTotalDeposited">₹0</span>
+                    <span class="text-[10px] text-slate-400 block uppercase font-semibold">Total Deposited to Zepto</span>
+                    <span class="text-lg font-extrabold font-mono text-amber-300" id="secTotalDeposited">₹0</span>
                 </div>
                 <button type="button" onclick="zeptoApp.openAddTrancheModal()"
-                    class="px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shadow-lg shadow-amber-500/20 transition flex items-center gap-1.5">
-                    <span>➕</span> Record Capital Tranche
+                    class="btn-zepto text-xs font-bold whitespace-nowrap">
+                    <span>➕</span> Record Tranche
                 </button>
             </div>
         </div>
 
         <!-- 50-50 Partner Split Comparison Bars -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2.5">
             <!-- Partner 1 Card -->
-            <div class="p-4 rounded-xl bg-purple-500/5 border border-purple-500/20">
-                <div class="flex justify-between items-center mb-2">
+            <div class="glass-panel-sub border-purple-500/25 p-3">
+                <div class="flex justify-between items-center mb-1.5">
                     <div class="flex items-center gap-2">
                         <span id="secPartner1Initials"
-                            class="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center font-bold text-xs">JA</span>
-                        <span class="font-bold text-sm text-white" id="secPartner1Name">Jatin Abrol</span>
+                            class="w-6 h-6 rounded-md bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center font-black text-[10px]">JA</span>
+                        <span class="font-bold text-xs text-white" id="secPartner1Name">Jatin Abrol</span>
                     </div>
                     <span class="text-xs font-mono font-bold text-purple-400" id="secPartner1Pct">0%</span>
                 </div>
-                <div class="text-xl font-extrabold font-mono text-white mb-2" id="secPartner1Paid">₹0</div>
-                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                <div class="text-lg font-extrabold font-mono text-white mb-1.5" id="secPartner1Paid">₹0</div>
+                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-white/5">
                     <div id="secPartner1Bar"
-                        class="bg-gradient-to-r from-purple-600 to-fuchsia-500 h-2.5 rounded-full transition-all duration-500"
+                        class="bg-gradient-to-r from-purple-600 to-fuchsia-500 h-2 rounded-full transition-all duration-500"
                         style="width: 0%"></div>
                 </div>
-                <div class="flex justify-between text-[11px] text-slate-400 mt-2">
+                <div class="flex justify-between text-[10px] text-slate-400 mt-1.5">
                     <span>Target: ₹37,50,000 (50%)</span>
-                    <span id="secPartner1Remaining">₹37,50,000 Pending</span>
+                    <span id="secPartner1Remaining" class="text-purple-300 font-mono font-semibold">₹37,50,000 Pending</span>
                 </div>
             </div>
 
             <!-- Partner 2 Card -->
-            <div class="p-4 rounded-xl bg-pink-500/5 border border-pink-500/20">
-                <div class="flex justify-between items-center mb-2">
+            <div class="glass-panel-sub border-pink-500/25 p-3">
+                <div class="flex justify-between items-center mb-1.5">
                     <div class="flex items-center gap-2">
                         <span id="secPartner2Initials"
-                            class="w-7 h-7 rounded-lg bg-pink-500/20 border border-pink-500/40 text-pink-300 flex items-center justify-center font-bold text-xs">HB</span>
-                        <span class="font-bold text-sm text-white" id="secPartner2Name">Harshiv Bargotra</span>
+                            class="w-6 h-6 rounded-md bg-pink-500/20 border border-pink-500/40 text-pink-300 flex items-center justify-center font-black text-[10px]">HB</span>
+                        <span class="font-bold text-xs text-white" id="secPartner2Name">Harshiv Bargotra</span>
                     </div>
                     <span class="text-xs font-mono font-bold text-pink-400" id="secPartner2Pct">0%</span>
                 </div>
-                <div class="text-xl font-extrabold font-mono text-white mb-2" id="secPartner2Paid">₹0</div>
-                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                <div class="text-lg font-extrabold font-mono text-white mb-1.5" id="secPartner2Paid">₹0</div>
+                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-white/5">
                     <div id="secPartner2Bar"
-                        class="bg-gradient-to-r from-pink-600 to-rose-500 h-2.5 rounded-full transition-all duration-500"
+                        class="bg-gradient-to-r from-pink-600 to-rose-500 h-2 rounded-full transition-all duration-500"
                         style="width: 0%"></div>
                 </div>
-                <div class="flex justify-between text-[11px] text-slate-400 mt-2">
+                <div class="flex justify-between text-[10px] text-slate-400 mt-1.5">
                     <span>Target: ₹37,50,000 (50%)</span>
-                    <span id="secPartner2Remaining">₹37,50,000 Pending</span>
+                    <span id="secPartner2Remaining" class="text-pink-300 font-mono font-semibold">₹37,50,000 Pending</span>
                 </div>
             </div>
         </div>
 
         <!-- Equalization Status Banner -->
         <div
-            class="mt-4 p-3 rounded-lg bg-slate-900/90 border border-white/10 flex items-center justify-between text-xs">
+            class="mt-2.5 px-3 py-2 rounded-md bg-slate-900/90 border border-white/10 flex items-center justify-between text-xs">
             <div class="flex items-center gap-2 text-slate-300">
                 <span>⚖️</span>
-                <span class="font-semibold">Equalization Balance:</span>
-                <span id="secEqualizationStatus" class="font-mono text-emerald-400 font-bold">Checking split
+                <span class="font-semibold text-[11px]">Equalization:</span>
+                <span id="secEqualizationStatus" class="font-mono text-emerald-400 font-bold text-[11px]">Checking split
                     balance...</span>
             </div>
-            <span class="text-slate-400 text-[11px]" id="secOverallProgressText">Total Progress: 0% of ₹75L</span>
+            <span class="text-slate-400 text-[10px] font-mono" id="secOverallProgressText">Total Progress: 0% of ₹75L</span>
         </div>
     </div>
 
     <!-- Capital Tranches Table -->
-    <div class="glass-panel overflow-hidden">
-        <div class="p-4 border-b border-white/10 flex justify-between items-center">
-            <h4 class="font-bold text-sm text-white">Payment Tranches Sent to Zepto</h4>
-            <span class="text-xs font-mono text-slate-400" id="secTranchesCount">0 Tranches recorded</span>
+    <div class="glass-panel overflow-hidden border-white/10">
+        <div class="px-3 py-2 border-b border-white/10 flex justify-between items-center">
+            <h4 class="font-bold text-xs text-white">Payment Tranches Sent to Zepto</h4>
+            <span class="text-[11px] font-mono text-slate-400" id="secTranchesCount">0 Tranches recorded</span>
         </div>
         <div class="overflow-x-auto custom-scrollbar max-h-[550px]">
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                    <tr class="border-b border-white/10 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
-                        <th class="p-3.5 pl-4">Tranche Description</th>
-                        <th class="p-3.5">Payment Date</th>
-                        <th class="p-3.5">Paid By (Partner)</th>
-                        <th class="p-3.5">Mode / UTR Ref</th>
-                        <th class="p-3.5 text-right">Amount (₹)</th>
-                        <th class="p-3.5 text-center">Transfer Proof</th>
-                        <th class="p-3.5">Notes</th>
-                        <th class="p-3.5 pr-4 text-center">Actions</th>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                        <th class="p-2.5 pl-3.5">Tranche Description</th>
+                        <th class="p-2.5">Payment Date</th>
+                        <th class="p-2.5">Paid By (Partner)</th>
+                        <th class="p-2.5">Mode / UTR Ref</th>
+                        <th class="p-2.5 text-right">Amount (₹)</th>
+                        <th class="p-2.5 text-center">Transfer Proof</th>
+                        <th class="p-2.5">Notes</th>
+                        <th class="p-2.5 pr-3.5 text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="securityTableBody" class="divide-y divide-white/5 font-sans">
                     <tr>
-                        <td colspan="8" class="p-8 text-center text-slate-500 text-xs">
+                        <td colspan="8" class="p-6 text-center text-slate-500 text-xs">
                             <div class="inline-block animate-spin mr-2">⏳</div> Loading capital tranche ledger...
                         </td>
                     </tr>

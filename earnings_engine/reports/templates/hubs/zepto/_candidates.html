@@ -1,17 +1,17 @@
 <!-- Tab 3: Future Candidates (Hiring Pipeline) -->
-<div class="space-y-4">
+<div class="space-y-2.5">
     <!-- Filter Bar -->
-    <div class="glass-panel p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div class="flex items-center gap-2.5 flex-wrap flex-1">
-            <div class="relative min-w-[220px] flex-1">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
+    <div class="glass-panel px-3 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+        <div class="flex items-center gap-2 flex-wrap flex-1">
+            <div class="relative min-w-[200px] flex-1">
+                <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
                 <input type="text" id="candSearchInput" oninput="zeptoApp.filterCandidates()"
                     placeholder="Search candidate name, phone, email..."
-                    class="w-full bg-slate-900/80 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition">
+                    class="w-full bg-slate-900/90 border border-white/10 rounded-md pl-7 pr-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition">
             </div>
 
             <select id="candStageFilter" onchange="zeptoApp.filterCandidates()"
-                class="bg-slate-900/90 border border-white/15 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                class="bg-slate-900/90 border border-white/15 rounded-md px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
                 <option value="ALL" selected>⚡ All Stages</option>
                 <option value="APPLIED">📥 Applied</option>
                 <option value="INTERVIEWING">🗣️ Interviewing</option>
@@ -22,43 +22,42 @@
             </select>
 
             <select id="candRoleFilter" onchange="zeptoApp.filterCandidates()"
-                class="bg-slate-900/90 border border-white/15 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
-                <option value="ALL" selected>All Roles</option>
+                class="bg-slate-900/90 border border-white/15 rounded-md px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                <option value="ALL" selected>⚡ All 4 Roles</option>
                 <option value="PICKER">🛒 Pickers</option>
-                <option value="SHIFT_INCHARGE">👔 Shift Incharges</option>
-                <!-- <option value="RIDER">🛵 Delivery Riders</option> -->
-                <!-- <option value="PACKER">📦 Packers</option> -->
-                <!-- <option value="STORE_MANAGER">🏛️ Store Managers</option> -->
+                <option value="SHIFT_INCHARGE">⚡ Shift Incharges</option>
+                <option value="SECURITY_GUARD">🛡️ Security Guards</option>
+                <option value="HOUSEKEEPING">🧹 House Keeping</option>
             </select>
         </div>
 
         <div class="flex items-center gap-2">
             <span class="text-xs text-slate-400 font-mono" id="candCountBadge">0 Candidates</span>
-            <button type="button" onclick="zeptoApp.openAddCandidateModal()" class="btn-zepto text-xs">
-                <span>➕</span> Add Candidate
+            <button type="button" onclick="zeptoApp.openAddCandidateModal()" class="btn-zepto text-xs whitespace-nowrap">
+                <span>🎯</span> Add Candidate
             </button>
         </div>
     </div>
 
     <!-- Candidates Table -->
-    <div class="glass-panel overflow-hidden">
-        <div class="overflow-x-auto custom-scrollbar max-h-[680px]">
+    <div class="glass-panel overflow-hidden border-white/10">
+        <div class="overflow-x-auto custom-scrollbar max-h-[640px]">
             <table class="w-full text-left text-xs border-collapse">
                 <thead>
-                    <tr class="border-b border-white/10 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
-                        <th class="p-3.5 pl-4">Candidate</th>
-                        <th class="p-3.5">Target Role</th>
-                        <th class="p-3.5 text-center">Stage</th>
-                        <th class="p-3.5 text-center">Rating</th>
-                        <th class="p-3.5 text-right">Expected Salary</th>
-                        <th class="p-3.5 text-center">Attachments</th>
-                        <th class="p-3.5">Interview / Notes</th>
-                        <th class="p-3.5 pr-4 text-center">Actions</th>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                        <th class="p-2.5 pl-3.5">Candidate</th>
+                        <th class="p-2.5">Target Role</th>
+                        <th class="p-2.5 text-center">Stage</th>
+                        <th class="p-2.5 text-center">Rating</th>
+                        <th class="p-2.5 text-right">Expected Salary</th>
+                        <th class="p-2.5 text-center">Attachments</th>
+                        <th class="p-2.5">Interview / Notes</th>
+                        <th class="p-2.5 pr-3.5 text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="candidatesTableBody" class="divide-y divide-white/5 font-sans">
                     <tr>
-                        <td colspan="8" class="p-8 text-center text-slate-500 text-xs">
+                        <td colspan="8" class="p-6 text-center text-slate-500 text-xs">
                             <div class="inline-block animate-spin mr-2">⏳</div> Loading candidate pipeline...
                         </td>
                     </tr>
