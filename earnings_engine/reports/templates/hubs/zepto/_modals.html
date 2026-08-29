@@ -257,10 +257,11 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-slate-300 font-semibold mb-1">Reimbursement Status</label>
-                    <select id="expFormIsReimbursed" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
-                        <option value="0">⏳ Pending Reimbursement (Unpaid Out-of-Pocket)</option>
-                        <option value="1">✅ Settled / Already Reimbursed</option>
+                    <label class="block text-slate-300 font-semibold mb-1">Reimbursement Eligibility / Tracking</label>
+                    <select id="expFormReimbursementOption" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        <option value="NONE">❌ No / Optional (Direct Non-Claimable Spend)</option>
+                        <option value="PENDING" selected>⏳ Yes, Track as Pending Reimbursement</option>
+                        <option value="SETTLED">✅ Yes, Already Reimbursed / Settled</option>
                     </select>
                 </div>
                 <div>

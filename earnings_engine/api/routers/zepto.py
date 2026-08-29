@@ -234,14 +234,28 @@ async def get_expenses_endpoint(
             settings=_settings,
         )
         total = sum(e.get("amount", 0.0) for e in expenses)
-        reimbursed_total = sum(e.get("amount", 0.0) for e in expenses if e.get("is_reimbursed") == 1 or e.get("incurred_by") == "STORE_CASH")
-        pending_total = sum(e.get("amount", 0.0) for e in expenses if e.get("is_reimbursed") == 0 and e.get("incurred_by") != "STORE_CASH")
+        reimbursed_total = sum(
+            e.get("amount", 0.0)
+            for e in expenses
+            if (e.get("is_reimbursable", 1) == 1 and e.get("is_reimbursed") == 1) or e.get("incurred_by") == "STORE_CASH"
+        )
+        pending_total = sum(
+            e.get("amount", 0.0)
+            for e in expenses
+            if e.get("is_reimbursable", 1) == 1 and e.get("is_reimbursed") == 0 and e.get("incurred_by") != "STORE_CASH"
+        )
+        non_reimbursable_total = sum(
+            e.get("amount", 0.0)
+            for e in expenses
+            if e.get("is_reimbursable", 1) == 0 and e.get("incurred_by") != "STORE_CASH"
+        )
         return {
             "success": True,
             "count": len(expenses),
             "total_amount": total,
             "reimbursed_total": reimbursed_total,
             "pending_total": pending_total,
+            "non_reimbursable_total": non_reimbursable_total,
             "items": expenses,
         }
     except Exception as e:

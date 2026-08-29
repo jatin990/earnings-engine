@@ -832,7 +832,7 @@ const zeptoApp = {
 
         const sumPendingBadgeEl = document.getElementById('expSummaryPendingBadge');
         if (sumPendingBadgeEl) {
-            const pendingCount = items.filter(e => e.is_reimbursed === 0 && e.incurred_by !== 'STORE_CASH').length;
+            const pendingCount = items.filter(e => (e.is_reimbursable !== 0) && e.is_reimbursed === 0 && e.incurred_by !== 'STORE_CASH').length;
             sumPendingBadgeEl.textContent = `⏳ ${pendingCount} Pending (${this.formatCurrency(pendingTotal)})`;
             if (pendingCount > 0) {
                 sumPendingBadgeEl.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse';
@@ -853,7 +853,7 @@ const zeptoApp = {
         if (pendingBreakdownEl) {
             const partnerPending = {};
             items.forEach(exp => {
-                if (exp.is_reimbursed === 0 && exp.incurred_by !== 'STORE_CASH') {
+                if ((exp.is_reimbursable !== 0) && exp.is_reimbursed === 0 && exp.incurred_by !== 'STORE_CASH') {
                     const p = exp.incurred_by || 'Partner';
                     partnerPending[p] = (partnerPending[p] || 0) + exp.amount;
                 }
@@ -903,8 +903,16 @@ const zeptoApp = {
 
             // Reimbursement status toggle button/badge
             let reimbBadgeHtml = '';
+            const isClaimable = exp.is_reimbursable !== undefined && exp.is_reimbursable !== null ? exp.is_reimbursable : 1;
+            
             if (exp.incurred_by === 'STORE_CASH') {
                 reimbBadgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/20 text-slate-300 border border-slate-500/30">Store Cash</span>`;
+            } else if (isClaimable === 0) {
+                reimbBadgeHtml = `
+                    <button type="button" onclick="zeptoApp.toggleReimbursement('${exp.id}', 0)" title="Non-claimable direct spend (Click to enable reimbursement tracking)" class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800/80 text-slate-400 border border-white/10 hover:bg-slate-700 hover:text-slate-200 transition flex items-center gap-1 mx-auto cursor-pointer">
+                        <span>⚪</span> Direct Spend
+                    </button>
+                `;
             } else if (exp.is_reimbursed === 1) {
                 reimbBadgeHtml = `
                     <button type="button" onclick="zeptoApp.toggleReimbursement('${exp.id}', 0)" title="Click to mark as Pending Reimbursement" class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30 transition flex items-center gap-1 mx-auto cursor-pointer">
@@ -967,15 +975,15 @@ const zeptoApp = {
         document.getElementById('expFormDate').value = new Date().toISOString().split('T')[0];
         
         const incurredEl = document.getElementById('expFormIncurred');
-        const reimbEl = document.getElementById('expFormIsReimbursed');
-        if (reimbEl) reimbEl.value = '0';
+        const reimbOptEl = document.getElementById('expFormReimbursementOption');
+        if (reimbOptEl) reimbOptEl.value = 'PENDING';
 
-        if (incurredEl && reimbEl) {
+        if (incurredEl && reimbOptEl) {
             incurredEl.onchange = (e) => {
                 if (e.target.value === 'STORE_CASH') {
-                    reimbEl.value = '1';
-                } else {
-                    reimbEl.value = '0';
+                    reimbOptEl.value = 'NONE';
+                } else if (reimbOptEl.value === 'NONE') {
+                    reimbOptEl.value = 'PENDING';
                 }
             };
         }
@@ -1002,7 +1010,7 @@ const zeptoApp = {
             }
 
             const incurredBy = document.getElementById('expFormIncurred').value;
-            const isReimbursedVal = parseInt(document.getElementById('expFormIsReimbursed')?.value || (incurredBy === 'STORE_CASH' ? '1' : '0'), 10);
+            const reimbOption = document.getElementById('expFormReimbursementOption')?.value || 'PENDING';
 
             const payload = {
                 title: document.getElementById('expFormTitle').value,
@@ -1010,7 +1018,7 @@ const zeptoApp = {
                 amount: parseFloat(document.getElementById('expFormAmount').value || 0),
                 expense_date: document.getElementById('expFormDate').value,
                 incurred_by: incurredBy,
-                is_reimbursed: isReimbursedVal,
+                reimbursement_option: reimbOption,
                 document_url: docUrl,
                 document_filename: filename,
                 notes: document.getElementById('expFormNotes').value,

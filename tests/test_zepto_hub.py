@@ -83,23 +83,42 @@ def test_employee_crud_and_bonus():
 
 def test_store_expenses_and_spend_per_employee():
     settings = Settings()
+    # 1. Claimable expense (Pending)
     exp_data = {
         "title": "Aisle B Barcode Scanners (x4)",
         "category": "EQUIPMENT",
         "amount": 22000.0,
         "incurred_by": "Jatin Abrol",
-        "is_reimbursed": 0,
+        "reimbursement_option": "PENDING",
         "notes": "Handheld Zebra scanners (Pending Reimbursement)",
     }
     exp = zepto_db.create_expense(exp_data, settings)
     assert exp["id"] is not None
+    assert exp["is_reimbursable"] == 1
     assert exp["is_reimbursed"] == 0
+
+    # 2. Non-claimable direct spend (reimbursement_option = NONE)
+    direct_exp_data = {
+        "title": "Store Interior Paint",
+        "category": "STORE_MAINTENANCE",
+        "amount": 8000.0,
+        "incurred_by": "Jatin Abrol",
+        "reimbursement_option": "NONE",
+        "notes": "Direct non-claimable renovation expense",
+    }
+    direct_exp = zepto_db.create_expense(direct_exp_data, settings)
+    assert direct_exp["is_reimbursable"] == 0
 
     # Filter by category and reimbursement status
     pending_expenses = zepto_db.get_expenses(category="EQUIPMENT", reimbursement_status="PENDING", settings=settings)
     assert any(e["id"] == exp["id"] for e in pending_expenses)
+    assert not any(e["id"] == direct_exp["id"] for e in pending_expenses)
 
-    # Toggle reimbursement to settled
+    # Filter by NOT_CLAIMABLE
+    non_claimable_expenses = zepto_db.get_expenses(reimbursement_status="NOT_CLAIMABLE", settings=settings)
+    assert any(e["id"] == direct_exp["id"] for e in non_claimable_expenses)
+
+    # Toggle claimable expense reimbursement to settled
     toggled = zepto_db.toggle_expense_reimbursement(exp["id"], is_reimbursed=1, settings=settings)
     assert toggled["is_reimbursed"] == 1
 
@@ -110,6 +129,7 @@ def test_store_expenses_and_spend_per_employee():
     assert overview["expenses"]["spend_per_employee"] > 0
     assert "pending_reimbursement" in overview["expenses"]
     assert "reimbursed_expenses" in overview["expenses"]
+    assert "non_reimbursable_expenses" in overview["expenses"]
 
 
 def test_candidate_hiring_and_one_click_conversion():

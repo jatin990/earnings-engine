@@ -136,6 +136,7 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 incurred_by TEXT NOT NULL,
                 document_url TEXT,
                 document_filename TEXT,
+                is_reimbursable INTEGER DEFAULT 1,
                 is_reimbursed INTEGER DEFAULT 0,
                 notes TEXT,
                 created_at TEXT NOT NULL
@@ -189,6 +190,12 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
         cols = [c[1] for c in conn.execute("PRAGMA table_info(zepto_staffing_targets)").fetchall()]
         if "default_base_salary" not in cols:
             conn.execute("ALTER TABLE zepto_staffing_targets ADD COLUMN default_base_salary REAL DEFAULT 0.0")
+
+        # Migration: Ensure is_reimbursable column exists on zepto_expenses
+        exp_cols = [c[1] for c in conn.execute("PRAGMA table_info(zepto_expenses)").fetchall()]
+        if "is_reimbursable" not in exp_cols:
+            conn.execute("ALTER TABLE zepto_expenses ADD COLUMN is_reimbursable INTEGER DEFAULT 1")
+            conn.execute("UPDATE zepto_expenses SET is_reimbursable = 0, is_reimbursed = 1 WHERE incurred_by = 'STORE_CASH'")
 
         # Seed default staffing targets and base pay if missing or zero
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -539,22 +546,30 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
         reimb_rows = conn.execute("""
             SELECT 
                 incurred_by,
+                is_reimbursable,
                 is_reimbursed,
                 SUM(amount) as total_amt,
                 COUNT(*) as count
             FROM zepto_expenses
-            GROUP BY incurred_by, is_reimbursed
+            GROUP BY incurred_by, is_reimbursable, is_reimbursed
         """).fetchall()
 
         total_reimbursed = 0.0
         total_pending_reimbursement = 0.0
+        total_non_reimbursable = 0.0
         pending_by_partner: dict[str, float] = {}
 
         for r in reimb_rows:
             amt = float(r["total_amt"] or 0.0)
             incurred = (r["incurred_by"] or "").strip()
+            is_claimable = int(r["is_reimbursable"] if r["is_reimbursable"] is not None else 1)
             is_r = int(r["is_reimbursed"] or 0)
-            if is_r == 1 or incurred == "STORE_CASH":
+
+            if is_claimable == 0 or incurred == "STORE_CASH":
+                total_non_reimbursable += amt
+                if incurred == "STORE_CASH" or is_r == 1:
+                    total_reimbursed += amt
+            elif is_r == 1:
                 total_reimbursed += amt
             else:
                 total_pending_reimbursement += amt
@@ -621,6 +636,7 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
                 "total_expenses": total_expenses,
                 "reimbursed_expenses": total_reimbursed,
                 "pending_reimbursement": total_pending_reimbursement,
+                "non_reimbursable_expenses": total_non_reimbursable,
                 "pending_by_partner": pending_by_partner,
                 "training_expenses": training_expenses,
                 "spend_per_employee": spend_per_employee,
@@ -881,10 +897,13 @@ def get_expenses(
             query += " AND incurred_by LIKE ?"
             params.append(f"%{incurred_by}%")
         if reimbursement_status and reimbursement_status.upper() != "ALL":
-            if reimbursement_status.upper() == "PENDING":
-                query += " AND is_reimbursed = 0 AND incurred_by != 'STORE_CASH'"
-            elif reimbursement_status.upper() == "REIMBURSED":
-                query += " AND (is_reimbursed = 1 OR incurred_by = 'STORE_CASH')"
+            st = reimbursement_status.upper()
+            if st == "PENDING":
+                query += " AND is_reimbursable = 1 AND is_reimbursed = 0 AND incurred_by != 'STORE_CASH'"
+            elif st == "REIMBURSED":
+                query += " AND is_reimbursable = 1 AND is_reimbursed = 1"
+            elif st in ("NOT_CLAIMABLE", "NONE", "DIRECT", "NON_REIMBURSABLE"):
+                query += " AND (is_reimbursable = 0 OR incurred_by = 'STORE_CASH')"
         if search:
             query += " AND (title LIKE ? OR notes LIKE ?)"
             term = f"%{search.strip()}%"
@@ -896,22 +915,41 @@ def get_expenses(
 
 
 def create_expense(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
-    """Record a store expense with receipt document attachment and reimbursement flag."""
+    """Record a store expense with receipt document attachment and optional reimbursement flag."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
     exp_id = data.get("id") or str(uuid.uuid4())
     now_iso = datetime.now(timezone.utc).isoformat()
 
     incurred = data.get("incurred_by", "Jatin Abrol").strip()
-    is_reimbursed = int(data.get("is_reimbursed", 1 if incurred == "STORE_CASH" else 0))
+    reimb_opt = data.get("reimbursement_option", data.get("reimbursement_status"))
+
+    if reimb_opt:
+        opt_upper = str(reimb_opt).upper()
+        if opt_upper in ("NONE", "NO", "NOT_CLAIMABLE", "DIRECT", "0", "FALSE"):
+            is_reimbursable = 0
+            is_reimbursed = 0
+        elif opt_upper in ("SETTLED", "REIMBURSED", "1", "TRUE"):
+            is_reimbursable = 1
+            is_reimbursed = 1
+        else:  # PENDING / YES
+            is_reimbursable = 1
+            is_reimbursed = 0
+    else:
+        if incurred == "STORE_CASH":
+            is_reimbursable = 0
+            is_reimbursed = 1
+        else:
+            is_reimbursable = int(data.get("is_reimbursable", 1))
+            is_reimbursed = int(data.get("is_reimbursed", 0))
 
     with _connect(settings) as conn:
         conn.execute(
             """
             INSERT INTO zepto_expenses (
                 id, title, category, amount, expense_date, incurred_by,
-                document_url, document_filename, is_reimbursed, notes, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                document_url, document_filename, is_reimbursable, is_reimbursed, notes, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 exp_id,
@@ -922,12 +960,19 @@ def create_expense(data: dict[str, Any], settings: Settings | None = None) -> di
                 incurred,
                 data.get("document_url"),
                 data.get("document_filename"),
+                is_reimbursable,
                 is_reimbursed,
                 data.get("notes", ""),
                 now_iso,
             )
         )
-    return {"id": exp_id, "title": data.get("title"), "amount": data.get("amount"), "is_reimbursed": is_reimbursed}
+    return {
+        "id": exp_id,
+        "title": data.get("title"),
+        "amount": data.get("amount"),
+        "is_reimbursable": is_reimbursable,
+        "is_reimbursed": is_reimbursed
+    }
 
 
 def update_expense(exp_id: str, data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
@@ -940,7 +985,22 @@ def update_expense(exp_id: str, data: dict[str, Any], settings: Settings | None 
             raise ValueError(f"Expense {exp_id} not found")
 
         incurred = data.get("incurred_by", cur["incurred_by"]).strip()
-        is_reimbursed = int(data.get("is_reimbursed", cur["is_reimbursed"]))
+        reimb_opt = data.get("reimbursement_option", data.get("reimbursement_status"))
+
+        if reimb_opt:
+            opt_upper = str(reimb_opt).upper()
+            if opt_upper in ("NONE", "NO", "NOT_CLAIMABLE", "DIRECT", "0", "FALSE"):
+                is_reimbursable = 0
+                is_reimbursed = 0
+            elif opt_upper in ("SETTLED", "REIMBURSED", "1", "TRUE"):
+                is_reimbursable = 1
+                is_reimbursed = 1
+            else:
+                is_reimbursable = 1
+                is_reimbursed = 0
+        else:
+            is_reimbursable = int(data.get("is_reimbursable", cur["is_reimbursable"] if "is_reimbursable" in cur.keys() else 1))
+            is_reimbursed = int(data.get("is_reimbursed", cur["is_reimbursed"]))
 
         conn.execute(
             """
@@ -952,6 +1012,7 @@ def update_expense(exp_id: str, data: dict[str, Any], settings: Settings | None 
                 incurred_by = ?,
                 document_url = COALESCE(?, document_url),
                 document_filename = COALESCE(?, document_filename),
+                is_reimbursable = ?,
                 is_reimbursed = ?,
                 notes = ?
             WHERE id = ?
@@ -964,12 +1025,18 @@ def update_expense(exp_id: str, data: dict[str, Any], settings: Settings | None 
                 incurred,
                 data.get("document_url"),
                 data.get("document_filename"),
+                is_reimbursable,
                 is_reimbursed,
                 data.get("notes", cur["notes"]),
                 exp_id,
             )
         )
-        return {"id": exp_id, "title": data.get("title", cur["title"]), "is_reimbursed": is_reimbursed}
+        return {
+            "id": exp_id,
+            "title": data.get("title", cur["title"]),
+            "is_reimbursable": is_reimbursable,
+            "is_reimbursed": is_reimbursed
+        }
 
 
 def toggle_expense_reimbursement(exp_id: str, is_reimbursed: int | None = None, settings: Settings | None = None) -> dict[str, Any]:
@@ -983,15 +1050,21 @@ def toggle_expense_reimbursement(exp_id: str, is_reimbursed: int | None = None, 
 
         if is_reimbursed is not None:
             new_val = 1 if int(is_reimbursed) == 1 else 0
+            new_reimbursable = 1 if new_val == 1 or cur.get("is_reimbursable", 1) == 1 else 0
         else:
             new_val = 0 if cur["is_reimbursed"] == 1 else 1
+            new_reimbursable = 1
 
-        conn.execute("UPDATE zepto_expenses SET is_reimbursed = ? WHERE id = ?", (new_val, exp_id))
+        conn.execute(
+            "UPDATE zepto_expenses SET is_reimbursed = ?, is_reimbursable = ? WHERE id = ?",
+            (new_val, new_reimbursable, exp_id)
+        )
         return {
             "id": exp_id,
             "title": cur["title"],
             "amount": cur["amount"],
             "incurred_by": cur["incurred_by"],
+            "is_reimbursable": new_reimbursable,
             "is_reimbursed": new_val,
         }
 
