@@ -522,15 +522,15 @@
     </div>
 </div>
 
-<!-- Modal 6: Configure Staffing Requirements & Thresholds -->
+<!-- Modal 6: Configure Staffing Requirements & Role Base Pay -->
 <div id="modalStaffingTargets" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 hidden">
-    <div class="glass-panel w-full max-w-lg p-6 border-purple-500/40 relative shadow-2xl">
+    <div class="glass-panel w-full max-w-xl p-6 border-purple-500/40 relative shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <div>
                 <h3 class="text-base font-bold text-white flex items-center gap-2">
-                    <span>⚙️</span> Dark Store Staffing Requirements
+                    <span>⚙️</span> Dark Store Staffing & Role Base Pay Requirements
                 </h3>
-                <p class="text-xs text-slate-400 mt-0.5">Customize operational capacity requirements per role.</p>
+                <p class="text-xs text-slate-400 mt-0.5">Customize active staffing capacity thresholds and benchmark monthly base pay per role.</p>
             </div>
             <button type="button" onclick="zeptoApp.closeModal('modalStaffingTargets')" class="text-slate-400 hover:text-white text-lg">✕</button>
         </div>
@@ -538,81 +538,151 @@
         <form id="formStaffingTargets" onsubmit="zeptoApp.saveStaffingTargets(event)" class="space-y-4 text-xs">
             <div class="space-y-3">
                 <!-- 1. Pickers -->
-                <div class="flex items-center justify-between p-3 rounded-xl bg-purple-500/[0.06] border border-purple-500/20">
-                    <div class="flex items-center gap-2">
-                        <span class="text-lg">🛒</span>
-                        <div>
-                            <div class="text-xs font-bold text-purple-200">Pickers</div>
-                            <div class="text-[10px] text-slate-400">Order item picking, bagging & shelf staging</div>
+                <div class="p-3 rounded-xl bg-purple-500/[0.06] border border-purple-500/20 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">🛒</span>
+                            <div>
+                                <div class="text-xs font-bold text-purple-200">Pickers</div>
+                                <div class="text-[10px] text-slate-400">Order item picking, bagging & shelf staging</div>
+                            </div>
                         </div>
+                        <span class="text-[11px] font-mono text-purple-300 font-bold" id="roleProjected-PICKER">₹1,62,000/mo</span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <input type="number" id="targetInput-PICKER" min="0" max="100" required value="9"
-                            class="w-20 bg-slate-900 border border-purple-500/40 rounded-lg px-3 py-1.5 text-center text-white font-mono font-bold text-sm focus:outline-none focus:border-purple-400">
-                        <span class="text-slate-400 text-xs font-semibold">Staff</span>
+                    <div class="grid grid-cols-2 gap-3 pt-1">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 font-semibold mb-1">Target Headcount</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" id="targetInput-PICKER" min="0" max="100" required value="9"
+                                    class="w-full bg-slate-900 border border-purple-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-purple-400">
+                                <span class="text-slate-400 text-[11px]">Staff</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400 font-semibold mb-1">Monthly Base Pay (₹)</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" id="payInput-PICKER" min="0" step="500" required value="18000"
+                                    class="w-full bg-slate-900 border border-purple-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-purple-400">
+                                <span class="text-slate-400 text-[11px]">/mo</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- 2. Shift Incharges -->
-                <div class="flex items-center justify-between p-3 rounded-xl bg-indigo-500/[0.06] border border-indigo-500/20">
-                    <div class="flex items-center gap-2">
-                        <span class="text-lg">⚡</span>
-                        <div>
-                            <div class="text-xs font-bold text-indigo-200">Shift Incharges</div>
-                            <div class="text-[10px] text-slate-400">Shift supervision, dispatch & accuracy lead</div>
+                <div class="p-3 rounded-xl bg-indigo-500/[0.06] border border-indigo-500/20 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">⚡</span>
+                            <div>
+                                <div class="text-xs font-bold text-indigo-200">Shift Incharges</div>
+                                <div class="text-[10px] text-slate-400">Shift supervision, dispatch & accuracy lead</div>
+                            </div>
                         </div>
+                        <span class="text-[11px] font-mono text-indigo-300 font-bold" id="roleProjected-SHIFT_INCHARGE">₹75,000/mo</span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <input type="number" id="targetInput-SHIFT_INCHARGE" min="0" max="50" required value="3"
-                            class="w-20 bg-slate-900 border border-indigo-500/40 rounded-lg px-3 py-1.5 text-center text-white font-mono font-bold text-sm focus:outline-none focus:border-indigo-400">
-                        <span class="text-slate-400 text-xs font-semibold">Staff</span>
+                    <div class="grid grid-cols-2 gap-3 pt-1">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 font-semibold mb-1">Target Headcount</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" id="targetInput-SHIFT_INCHARGE" min="0" max="50" required value="3"
+                                    class="w-full bg-slate-900 border border-indigo-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-indigo-400">
+                                <span class="text-slate-400 text-[11px]">Staff</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400 font-semibold mb-1">Monthly Base Pay (₹)</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" id="payInput-SHIFT_INCHARGE" min="0" step="500" required value="25000"
+                                    class="w-full bg-slate-900 border border-indigo-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-indigo-400">
+                                <span class="text-slate-400 text-[11px]">/mo</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- 3. Security Guards -->
-                <div class="flex items-center justify-between p-3 rounded-xl bg-blue-500/[0.06] border border-blue-500/20">
-                    <div class="flex items-center gap-2">
-                        <span class="text-lg">🛡️</span>
-                        <div>
-                            <div class="text-xs font-bold text-blue-200">Security Guards</div>
-                            <div class="text-[10px] text-slate-400">Store gate security & 24/7 inventory safety</div>
+                <div class="p-3 rounded-xl bg-blue-500/[0.06] border border-blue-500/20 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">🛡️</span>
+                            <div>
+                                <div class="text-xs font-bold text-blue-200">Security Guards</div>
+                                <div class="text-[10px] text-slate-400">Store gate security & 24/7 inventory safety</div>
+                            </div>
                         </div>
+                        <span class="text-[11px] font-mono text-blue-300 font-bold" id="roleProjected-SECURITY_GUARD">₹32,000/mo</span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <input type="number" id="targetInput-SECURITY_GUARD" min="0" max="20" required value="2"
-                            class="w-20 bg-slate-900 border border-blue-500/40 rounded-lg px-3 py-1.5 text-center text-white font-mono font-bold text-sm focus:outline-none focus:border-blue-400">
-                        <span class="text-slate-400 text-xs font-semibold">Staff</span>
+                    <div class="grid grid-cols-2 gap-3 pt-1">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 font-semibold mb-1">Target Headcount</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" id="targetInput-SECURITY_GUARD" min="0" max="20" required value="2"
+                                    class="w-full bg-slate-900 border border-blue-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-blue-400">
+                                <span class="text-slate-400 text-[11px]">Staff</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400 font-semibold mb-1">Monthly Base Pay (₹)</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" id="payInput-SECURITY_GUARD" min="0" step="500" required value="16000"
+                                    class="w-full bg-slate-900 border border-blue-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-blue-400">
+                                <span class="text-slate-400 text-[11px]">/mo</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- 4. House Keeping -->
-                <div class="flex items-center justify-between p-3 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/20">
-                    <div class="flex items-center gap-2">
-                        <span class="text-lg">🧹</span>
-                        <div>
-                            <div class="text-xs font-bold text-emerald-200">House Keeping</div>
-                            <div class="text-[10px] text-slate-400">Warehouse floor sanitation & spill cleaning</div>
+                <div class="p-3 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/20 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">🧹</span>
+                            <div>
+                                <div class="text-xs font-bold text-emerald-200">House Keeping</div>
+                                <div class="text-[10px] text-slate-400">Warehouse floor sanitation & spill cleaning</div>
+                            </div>
                         </div>
+                        <span class="text-[11px] font-mono text-emerald-300 font-bold" id="roleProjected-HOUSEKEEPING">₹14,000/mo</span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <input type="number" id="targetInput-HOUSEKEEPING" min="0" max="20" required value="1"
-                            class="w-20 bg-slate-900 border border-emerald-500/40 rounded-lg px-3 py-1.5 text-center text-white font-mono font-bold text-sm focus:outline-none focus:border-emerald-400">
-                        <span class="text-slate-400 text-xs font-semibold">Staff</span>
+                    <div class="grid grid-cols-2 gap-3 pt-1">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 font-semibold mb-1">Target Headcount</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" id="targetInput-HOUSEKEEPING" min="0" max="20" required value="1"
+                                    class="w-full bg-slate-900 border border-emerald-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-emerald-400">
+                                <span class="text-slate-400 text-[11px]">Staff</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400 font-semibold mb-1">Monthly Base Pay (₹)</label>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" id="payInput-HOUSEKEEPING" min="0" step="500" required value="14000"
+                                    class="w-full bg-slate-900 border border-emerald-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-emerald-400">
+                                <span class="text-slate-400 text-[11px]">/mo</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Total Target Summary Callout -->
-            <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center text-xs">
-                <span class="text-slate-300 font-semibold">Total Target Headcount:</span>
-                <span class="font-mono font-extrabold text-purple-300 text-sm" id="modalTargetTotalCount">15 Staff</span>
+            <!-- Total Target & Projected Payroll Summary Callout -->
+            <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 grid grid-cols-2 gap-3 text-xs">
+                <div>
+                    <span class="text-slate-400 block text-[10px] uppercase font-semibold">Total Target Headcount</span>
+                    <span class="font-mono font-extrabold text-purple-300 text-sm" id="modalTargetTotalCount">15 Staff</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-slate-400 block text-[10px] uppercase font-semibold">Projected Target Payroll</span>
+                    <span class="font-mono font-extrabold text-emerald-400 text-sm" id="modalTargetProjectedPayroll">₹2,83,000 / mo</span>
+                </div>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
                 <button type="button" onclick="zeptoApp.closeModal('modalStaffingTargets')"
                     class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
                 <button type="submit" id="btnSaveStaffingTargets"
-                    class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition">Save Requirements</button>
+                    class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition">Save Configurations</button>
             </div>
         </form>
     </div>

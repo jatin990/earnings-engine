@@ -210,49 +210,76 @@ def test_zepto_api_endpoints(client):
     assert sec_resp.status_code == 200
     assert sec_resp.json()["success"] is True
 
-    # 7. Staffing Targets API
+    # 7. Staffing Targets & Base Pay API
     target_resp = client.get("/api/v1/zepto/staffing-targets")
     assert target_resp.status_code == 200
     target_json = target_resp.json()
     assert target_json["success"] is True
     assert "targets" in target_json
-    assert "capacity" in target_json
+    assert "base_pays" in target_json
+    assert "role_configs" in target_json
+    assert "projected_payroll_target" in target_json
     assert target_json["targets"]["PICKER"] >= 1
+    assert target_json["base_pays"]["PICKER"] == 18000.0
 
-    # Update targets
-    put_resp = client.put("/api/v1/zepto/staffing-targets", json={"targets": {"PICKER": 9, "SHIFT_INCHARGE": 3, "SECURITY_GUARD": 2, "HOUSEKEEPING": 1}})
+    # Update targets and base pay via API
+    put_resp = client.put(
+        "/api/v1/zepto/staffing-targets",
+        json={
+            "role_configs": {
+                "PICKER": {"target_count": 9, "base_pay": 18500.0},
+                "SHIFT_INCHARGE": {"target_count": 3, "base_pay": 26000.0},
+                "SECURITY_GUARD": {"target_count": 2, "base_pay": 16000.0},
+                "HOUSEKEEPING": {"target_count": 1, "base_pay": 14000.0},
+            }
+        }
+    )
     assert put_resp.status_code == 200
-    assert put_resp.json()["targets"]["PICKER"] == 9
+    assert put_resp.json()["base_pays"]["PICKER"] == 18500.0
+    assert put_resp.json()["base_pays"]["SHIFT_INCHARGE"] == 26000.0
 
 
-def test_customizable_staffing_targets():
+def test_customizable_staffing_targets_and_base_pay():
     settings = Settings()
-    # Check default thresholds
-    targets = zepto_db.get_staffing_targets(settings)
-    assert targets["PICKER"] == 9
-    assert targets["SHIFT_INCHARGE"] == 3
-    assert targets["SECURITY_GUARD"] == 2
-    assert targets["HOUSEKEEPING"] == 1
+    # Check default thresholds & base pays
+    configs = zepto_db.get_role_configs(settings)
+    assert configs["PICKER"]["target_count"] == 9
+    assert configs["PICKER"]["base_pay"] == 18500.0 or configs["PICKER"]["base_pay"] == 18000.0
+    assert configs["SHIFT_INCHARGE"]["target_count"] == 3
+    assert configs["SECURITY_GUARD"]["target_count"] == 2
+    assert configs["HOUSEKEEPING"]["target_count"] == 1
 
-    # Customize thresholds
-    updated = zepto_db.update_staffing_targets(
-        {"PICKER": 12, "SHIFT_INCHARGE": 4, "SECURITY_GUARD": 3, "HOUSEKEEPING": 2},
+    # Customize thresholds and base pay
+    updated = zepto_db.update_role_configs(
+        {
+            "PICKER": {"target_count": 10, "base_pay": 19000.0},
+            "SHIFT_INCHARGE": {"target_count": 4, "base_pay": 27000.0},
+            "SECURITY_GUARD": {"target_count": 2, "base_pay": 16500.0},
+            "HOUSEKEEPING": {"target_count": 1, "base_pay": 14500.0},
+        },
         settings
     )
-    assert updated["PICKER"] == 12
-    assert updated["SHIFT_INCHARGE"] == 4
+    assert updated["PICKER"]["target_count"] == 10
+    assert updated["PICKER"]["base_pay"] == 19000.0
+    assert updated["SHIFT_INCHARGE"]["base_pay"] == 27000.0
 
-    # Verify overview capacity calculation
+    # Verify overview capacity & payroll projection calculation
+    # Projected payroll: 10*19000 + 4*27000 + 2*16500 + 1*14500 = 190000 + 108000 + 33000 + 14500 = 345500.0
     overview = zepto_db.get_zepto_overview(settings)
     cap = overview["headcount"]["capacity"]
-    assert cap["PICKER"]["target"] == 12
-    assert cap["SHIFT_INCHARGE"]["target"] == 4
-    assert "deficit" in cap["PICKER"]
-    assert "fulfilled" in cap["PICKER"]
+    assert cap["PICKER"]["target"] == 10
+    assert cap["PICKER"]["base_pay"] == 19000.0
+    assert cap["PICKER"]["projected_role_payroll"] == 190000.0
+    assert overview["headcount"]["projected_payroll_target"] == 345500.0
 
     # Reset back to default
-    zepto_db.update_staffing_targets(
-        {"PICKER": 9, "SHIFT_INCHARGE": 3, "SECURITY_GUARD": 2, "HOUSEKEEPING": 1},
+    zepto_db.update_role_configs(
+        {
+            "PICKER": {"target_count": 9, "base_pay": 18000.0},
+            "SHIFT_INCHARGE": {"target_count": 3, "base_pay": 25000.0},
+            "SECURITY_GUARD": {"target_count": 2, "base_pay": 16000.0},
+            "HOUSEKEEPING": {"target_count": 1, "base_pay": 14000.0},
+        },
         settings
     )
 

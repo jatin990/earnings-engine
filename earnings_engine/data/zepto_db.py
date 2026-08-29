@@ -63,11 +63,18 @@ DEFAULT_STAFFING_TARGETS = {
     "HOUSEKEEPING": 1,
 }
 
+DEFAULT_ROLE_BASE_PAY = {
+    "PICKER": 18000.0,
+    "SHIFT_INCHARGE": 25000.0,
+    "SECURITY_GUARD": 16000.0,
+    "HOUSEKEEPING": 14000.0,
+}
+
 ROLE_METADATA = {
-    "PICKER": {"label": "Picker", "icon": "🛒", "color": "purple", "desc": "Item picking, bin staging & UPT speed"},
-    "SHIFT_INCHARGE": {"label": "Shift Incharge", "icon": "⚡", "color": "indigo", "desc": "Shift management, inventory & dispatch audits"},
-    "SECURITY_GUARD": {"label": "Security Guard", "icon": "🛡️", "color": "blue", "desc": "Store entry, asset safety & night surveillance"},
-    "HOUSEKEEPING": {"label": "House Keeping", "icon": "🧹", "color": "emerald", "desc": "Warehouse cleaning, sanitation & spill management"},
+    "PICKER": {"label": "Picker", "icon": "🛒", "color": "purple", "desc": "Item picking, bin staging & UPT speed", "default_salary": 18000.0},
+    "SHIFT_INCHARGE": {"label": "Shift Incharge", "icon": "⚡", "color": "indigo", "desc": "Shift management, inventory & dispatch audits", "default_salary": 25000.0},
+    "SECURITY_GUARD": {"label": "Security Guard", "icon": "🛡️", "color": "blue", "desc": "Store entry, asset safety & night surveillance", "default_salary": 16000.0},
+    "HOUSEKEEPING": {"label": "House Keeping", "icon": "🧹", "color": "emerald", "desc": "Warehouse cleaning, sanitation & spill management", "default_salary": 14000.0},
 }
 
 UPLOAD_DIR = Path("data/zepto/uploads")
@@ -167,6 +174,7 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             CREATE TABLE IF NOT EXISTS zepto_staffing_targets (
                 role TEXT PRIMARY KEY,
                 target_count INTEGER NOT NULL DEFAULT 0,
+                default_base_salary REAL NOT NULL DEFAULT 15000.0,
                 updated_at TEXT NOT NULL
             );
 
@@ -177,16 +185,27 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             CREATE INDEX IF NOT EXISTS idx_zepto_cand_stage ON zepto_candidates(stage);
         """)
 
-        # Seed default staffing targets if missing
+        # Migration: Ensure default_base_salary column exists on zepto_staffing_targets
+        cols = [c[1] for c in conn.execute("PRAGMA table_info(zepto_staffing_targets)").fetchall()]
+        if "default_base_salary" not in cols:
+            conn.execute("ALTER TABLE zepto_staffing_targets ADD COLUMN default_base_salary REAL DEFAULT 0.0")
+
+        # Seed default staffing targets and base pay if missing or zero
         now_iso = datetime.now(timezone.utc).isoformat()
         for role, count in DEFAULT_STAFFING_TARGETS.items():
+            default_pay = DEFAULT_ROLE_BASE_PAY.get(role, 15000.0)
             conn.execute(
                 """
-                INSERT INTO zepto_staffing_targets (role, target_count, updated_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(role) DO NOTHING
+                INSERT INTO zepto_staffing_targets (role, target_count, default_base_salary, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(role) DO UPDATE SET
+                    default_base_salary = CASE 
+                        WHEN zepto_staffing_targets.default_base_salary IS NULL OR zepto_staffing_targets.default_base_salary <= 0 
+                        THEN excluded.default_base_salary 
+                        ELSE zepto_staffing_targets.default_base_salary 
+                    END
                 """,
-                (role, count, now_iso)
+                (role, count, default_pay, now_iso)
             )
 
         # Migrate existing Partner 1 / Partner 2 rows to centralized names
@@ -310,39 +329,126 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Staffing Thresholds Management
+# Staffing Thresholds & Role Base Pay Management
 # ---------------------------------------------------------------------------
 
-def get_staffing_targets(settings: Settings | None = None) -> dict[str, int]:
-    """Retrieve target staffing thresholds per role."""
+def get_role_configs(settings: Settings | None = None) -> dict[str, dict[str, Any]]:
+    """Retrieve target staffing count and default monthly base pay per role."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("SELECT role, target_count FROM zepto_staffing_targets").fetchall()
-        targets = {r["role"]: int(r["target_count"]) for r in rows}
-        for role, default_val in DEFAULT_STAFFING_TARGETS.items():
-            if role not in targets:
-                targets[role] = default_val
-        return targets
+        rows = conn.execute("SELECT role, target_count, default_base_salary, updated_at FROM zepto_staffing_targets").fetchall()
+        configs = {}
+        for r in rows:
+            configs[r["role"]] = {
+                "target_count": int(r["target_count"]),
+                "base_pay": float(r["default_base_salary"] or DEFAULT_ROLE_BASE_PAY.get(r["role"], 15000.0)),
+                "updated_at": r["updated_at"],
+            }
+        for role in VALID_STAFF_ROLES:
+            if role not in configs:
+                configs[role] = {
+                    "target_count": DEFAULT_STAFFING_TARGETS.get(role, 0),
+                    "base_pay": DEFAULT_ROLE_BASE_PAY.get(role, 15000.0),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+        return configs
 
 
-def update_staffing_targets(targets: dict[str, int], settings: Settings | None = None) -> dict[str, int]:
-    """Update target staffing thresholds per role."""
+def update_role_configs(configs: dict[str, dict[str, Any]], settings: Settings | None = None) -> dict[str, dict[str, Any]]:
+    """Update target staffing count and/or default base pay per role."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
     now_iso = datetime.now(timezone.utc).isoformat()
     with _connect(settings) as conn:
         for role in VALID_STAFF_ROLES:
-            if role in targets:
-                cnt = max(0, int(targets[role]))
+            if role in configs:
+                cfg = configs[role]
+                cnt = int(cfg.get("target_count", cfg.get("count", DEFAULT_STAFFING_TARGETS.get(role, 0))))
+                pay = float(cfg.get("base_pay", cfg.get("salary", cfg.get("default_base_salary", DEFAULT_ROLE_BASE_PAY.get(role, 15000.0)))))
                 conn.execute(
                     """
-                    INSERT INTO zepto_staffing_targets (role, target_count, updated_at)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(role) DO UPDATE SET target_count = excluded.target_count, updated_at = excluded.updated_at
+                    INSERT INTO zepto_staffing_targets (role, target_count, default_base_salary, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(role) DO UPDATE SET 
+                        target_count = excluded.target_count,
+                        default_base_salary = excluded.default_base_salary,
+                        updated_at = excluded.updated_at
                     """,
-                    (role, cnt, now_iso)
+                    (role, max(0, cnt), max(0.0, pay), now_iso)
+                )
+    return get_role_configs(settings)
+
+
+def get_staffing_targets(settings: Settings | None = None) -> dict[str, int]:
+    """Retrieve target staffing thresholds per role."""
+    configs = get_role_configs(settings)
+    return {role: data["target_count"] for role, data in configs.items()}
+
+
+def get_role_base_pays(settings: Settings | None = None) -> dict[str, float]:
+    """Retrieve target monthly base pay per role."""
+    configs = get_role_configs(settings)
+    return {role: data["base_pay"] for role, data in configs.items()}
+
+
+def update_staffing_targets(
+    targets: dict[str, Any],
+    base_pays: dict[str, Any] | None = None,
+    settings: Settings | None = None
+) -> dict[str, int]:
+    """Update target staffing thresholds and optional role base pays."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with _connect(settings) as conn:
+        for role in VALID_STAFF_ROLES:
+            cnt = None
+            pay = None
+            if role in targets:
+                val = targets[role]
+                if isinstance(val, dict):
+                    cnt = int(val.get("target_count", val.get("count", 0)))
+                    pay = float(val.get("base_pay", val.get("salary", DEFAULT_ROLE_BASE_PAY.get(role, 15000.0))))
+                else:
+                    cnt = max(0, int(val))
+            if base_pays and role in base_pays:
+                pay = max(0.0, float(base_pays[role]))
+
+            if cnt is not None and pay is not None:
+                conn.execute(
+                    """
+                    INSERT INTO zepto_staffing_targets (role, target_count, default_base_salary, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(role) DO UPDATE SET 
+                        target_count = excluded.target_count,
+                        default_base_salary = excluded.default_base_salary,
+                        updated_at = excluded.updated_at
+                    """,
+                    (role, cnt, pay, now_iso)
+                )
+            elif cnt is not None:
+                conn.execute(
+                    """
+                    INSERT INTO zepto_staffing_targets (role, target_count, default_base_salary, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(role) DO UPDATE SET 
+                        target_count = excluded.target_count,
+                        updated_at = excluded.updated_at
+                    """,
+                    (role, cnt, DEFAULT_ROLE_BASE_PAY.get(role, 15000.0), now_iso)
+                )
+            elif pay is not None:
+                conn.execute(
+                    """
+                    INSERT INTO zepto_staffing_targets (role, target_count, default_base_salary, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(role) DO UPDATE SET 
+                        default_base_salary = excluded.default_base_salary,
+                        updated_at = excluded.updated_at
+                    """,
+                    (role, DEFAULT_STAFFING_TARGETS.get(role, 0), pay, now_iso)
                 )
     return get_staffing_targets(settings)
 
@@ -352,14 +458,15 @@ def update_staffing_targets(targets: dict[str, int], settings: Settings | None =
 # ---------------------------------------------------------------------------
 
 def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
-    """Calculate aggregated store intelligence, headcount, staffing capacity, spend metrics & equity."""
+    """Calculate aggregated store operational KPIs, partner equity, and payroll metrics."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
+
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
 
-        # Headcounts
-        emp_rows = conn.execute("SELECT status, role, COUNT(*) as cnt FROM zepto_employees GROUP BY status, role").fetchall()
+        # Employee Headcount
+        emp_rows = conn.execute("SELECT role, status, COUNT(*) as cnt FROM zepto_employees GROUP BY role, status").fetchall()
         active_count = 0
         resigned_count = 0
         probation_count = 0
@@ -381,15 +488,23 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
         total_staff_ever = active_count + resigned_count
         attrition_rate = round((resigned_count / max(1, total_staff_ever)) * 100, 1)
 
-        # Staffing Targets & Capacity Calculations
-        targets = get_staffing_targets(settings)
-        total_target_headcount = sum(targets.get(r, DEFAULT_STAFFING_TARGETS.get(r, 0)) for r in VALID_STAFF_ROLES)
+        # Staffing Targets, Base Pay & Capacity Calculations
+        role_configs = get_role_configs(settings)
+        targets = {r: role_configs[r]["target_count"] for r in VALID_STAFF_ROLES}
+        base_pays = {r: role_configs[r]["base_pay"] for r in VALID_STAFF_ROLES}
+        total_target_headcount = sum(targets.values())
+
         staffing_capacity = {}
+        projected_payroll_target = 0.0
         for role in VALID_STAFF_ROLES:
             t = targets.get(role, DEFAULT_STAFFING_TARGETS.get(role, 0))
             c = role_breakdown.get(role, 0)
+            pay = base_pays.get(role, DEFAULT_ROLE_BASE_PAY.get(role, 15000.0))
             deficit = max(0, t - c)
-            meta = ROLE_METADATA.get(role, {"label": role, "icon": "👤", "color": "slate", "desc": ""})
+            projected_role_pay = round(t * pay, 2)
+            projected_payroll_target += projected_role_pay
+            meta = ROLE_METADATA.get(role, {"label": role, "icon": "👤", "color": "slate", "desc": "", "default_salary": pay})
+
             staffing_capacity[role] = {
                 "role": role,
                 "label": meta["label"],
@@ -398,12 +513,15 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
                 "desc": meta["desc"],
                 "current": c,
                 "target": t,
+                "base_pay": pay,
+                "projected_role_payroll": projected_role_pay,
                 "deficit": deficit,
                 "fulfilled": c >= t,
                 "pct": round((c / max(1, t)) * 100, 1),
             }
 
         overall_staffing_pct = round((active_count / max(1, total_target_headcount)) * 100, 1)
+        projected_payroll_target = round(projected_payroll_target, 2)
 
         # Average Rating
         avg_rating_row = conn.execute("SELECT AVG(rating) as avg_r FROM zepto_employees WHERE status = 'ACTIVE'").fetchone()
@@ -494,7 +612,10 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
                 "role_breakdown": role_breakdown,
                 "capacity": staffing_capacity,
                 "targets": targets,
+                "base_pays": base_pays,
+                "role_configs": role_configs,
                 "monthly_payroll": current_monthly_payroll,
+                "projected_payroll_target": projected_payroll_target,
             },
             "expenses": {
                 "total_expenses": total_expenses,

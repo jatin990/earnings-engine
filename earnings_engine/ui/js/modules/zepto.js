@@ -261,8 +261,18 @@ const zeptoApp = {
     },
 
     // -----------------------------------------------------------------------
-    // Staffing Requirements & Fulfillment Capacity
+    // Staffing Requirements, Role Base Pay & Fulfillment Capacity
     // -----------------------------------------------------------------------
+
+    getBasePayForRole(role) {
+        const basePays = this.overviewData?.headcount?.base_pays || {
+            'PICKER': 18000,
+            'SHIFT_INCHARGE': 25000,
+            'SECURITY_GUARD': 16000,
+            'HOUSEKEEPING': 14000,
+        };
+        return basePays[role] || 15000;
+    },
 
     renderStaffingCapacity(hc) {
         if (!hc) return;
@@ -280,7 +290,7 @@ const zeptoApp = {
 
         const capacity = hc.capacity || {};
         ['PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING'].forEach(role => {
-            const cap = capacity[role] || { current: 0, target: 1, deficit: 1, pct: 0, fulfilled: false };
+            const cap = capacity[role] || { current: 0, target: 1, deficit: 1, pct: 0, fulfilled: false, base_pay: 15000 };
 
             const badgeEl = document.getElementById(`capBadge-${role}`);
             if (badgeEl) badgeEl.textContent = `${cap.current} / ${cap.target}`;
@@ -290,6 +300,9 @@ const zeptoApp = {
 
             const pctEl = document.getElementById(`capPct-${role}`);
             if (pctEl) pctEl.textContent = `${cap.pct}%`;
+
+            const payEl = document.getElementById(`capPay-${role}`);
+            if (payEl) payEl.textContent = `${this.formatCurrency(cap.base_pay || 0)}/mo`;
 
             const statusEl = document.getElementById(`capStatus-${role}`);
             if (statusEl) {
@@ -309,12 +322,23 @@ const zeptoApp = {
             'SECURITY_GUARD': 2,
             'HOUSEKEEPING': 1,
         };
+        const basePays = this.overviewData?.headcount?.base_pays || {
+            'PICKER': 18000,
+            'SHIFT_INCHARGE': 25000,
+            'SECURITY_GUARD': 16000,
+            'HOUSEKEEPING': 14000,
+        };
 
         ['PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING'].forEach(role => {
-            const input = document.getElementById(`targetInput-${role}`);
-            if (input) {
-                input.value = targets[role] !== undefined ? targets[role] : 1;
-                input.oninput = () => this.updateModalTargetTotal();
+            const targetInput = document.getElementById(`targetInput-${role}`);
+            if (targetInput) {
+                targetInput.value = targets[role] !== undefined ? targets[role] : 1;
+                targetInput.oninput = () => this.updateModalTargetTotal();
+            }
+            const payInput = document.getElementById(`payInput-${role}`);
+            if (payInput) {
+                payInput.value = basePays[role] !== undefined ? basePays[role] : 15000;
+                payInput.oninput = () => this.updateModalTargetTotal();
             }
         });
 
@@ -323,13 +347,28 @@ const zeptoApp = {
     },
 
     updateModalTargetTotal() {
-        let total = 0;
+        let totalCount = 0;
+        let totalPayroll = 0;
+
         ['PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING'].forEach(role => {
-            const val = parseInt(document.getElementById(`targetInput-${role}`)?.value || '0', 10);
-            total += isNaN(val) ? 0 : val;
+            const cnt = parseInt(document.getElementById(`targetInput-${role}`)?.value || '0', 10);
+            const pay = parseFloat(document.getElementById(`payInput-${role}`)?.value || '0');
+            const validCnt = isNaN(cnt) ? 0 : Math.max(0, cnt);
+            const validPay = isNaN(pay) ? 0 : Math.max(0, pay);
+            const subtotal = validCnt * validPay;
+
+            totalCount += validCnt;
+            totalPayroll += subtotal;
+
+            const projEl = document.getElementById(`roleProjected-${role}`);
+            if (projEl) projEl.textContent = `${this.formatCurrency(subtotal)}/mo`;
         });
+
         const totalEl = document.getElementById('modalTargetTotalCount');
-        if (totalEl) totalEl.textContent = `${total} Staff`;
+        if (totalEl) totalEl.textContent = `${totalCount} Staff`;
+
+        const payrollEl = document.getElementById('modalTargetProjectedPayroll');
+        if (payrollEl) payrollEl.textContent = `${this.formatCurrency(totalPayroll)} / mo`;
     },
 
     async saveStaffingTargets(e) {
@@ -337,24 +376,36 @@ const zeptoApp = {
         const btn = document.getElementById('btnSaveStaffingTargets');
         if (btn) {
             btn.disabled = true;
-            btn.textContent = 'Saving Requirements...';
+            btn.textContent = 'Saving Configurations...';
         }
 
         try {
-            const targets = {
-                'PICKER': parseInt(document.getElementById('targetInput-PICKER')?.value || '9', 10),
-                'SHIFT_INCHARGE': parseInt(document.getElementById('targetInput-SHIFT_INCHARGE')?.value || '3', 10),
-                'SECURITY_GUARD': parseInt(document.getElementById('targetInput-SECURITY_GUARD')?.value || '2', 10),
-                'HOUSEKEEPING': parseInt(document.getElementById('targetInput-HOUSEKEEPING')?.value || '1', 10),
+            const role_configs = {
+                'PICKER': {
+                    target_count: parseInt(document.getElementById('targetInput-PICKER')?.value || '9', 10),
+                    base_pay: parseFloat(document.getElementById('payInput-PICKER')?.value || '18000')
+                },
+                'SHIFT_INCHARGE': {
+                    target_count: parseInt(document.getElementById('targetInput-SHIFT_INCHARGE')?.value || '3', 10),
+                    base_pay: parseFloat(document.getElementById('payInput-SHIFT_INCHARGE')?.value || '25000')
+                },
+                'SECURITY_GUARD': {
+                    target_count: parseInt(document.getElementById('targetInput-SECURITY_GUARD')?.value || '2', 10),
+                    base_pay: parseFloat(document.getElementById('payInput-SECURITY_GUARD')?.value || '16000')
+                },
+                'HOUSEKEEPING': {
+                    target_count: parseInt(document.getElementById('targetInput-HOUSEKEEPING')?.value || '1', 10),
+                    base_pay: parseFloat(document.getElementById('payInput-HOUSEKEEPING')?.value || '14000')
+                },
             };
 
             const res = await fetch('/api/v1/zepto/staffing-targets', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targets }),
+                body: JSON.stringify({ role_configs }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Failed to update staffing targets');
+            if (!res.ok) throw new Error(data.detail || 'Failed to update staffing targets & base pay');
 
             this.closeModal('modalStaffingTargets');
             await this.loadOverview();
@@ -364,7 +415,7 @@ const zeptoApp = {
         } finally {
             if (btn) {
                 btn.disabled = false;
-                btn.textContent = 'Save Requirements';
+                btn.textContent = 'Save Configurations';
             }
         }
     },
@@ -478,6 +529,18 @@ const zeptoApp = {
         document.getElementById('modalEmployeeTitle').innerHTML = '<span>👤</span> Add Store Staff Member';
         document.getElementById('empFormJoiningDate').value = new Date().toISOString().split('T')[0];
         document.getElementById('resignationReasonGroup').style.display = 'none';
+
+        const roleSelect = document.getElementById('empFormRole');
+        const salInput = document.getElementById('empFormSalary');
+        if (roleSelect && salInput) {
+            salInput.value = this.getBasePayForRole(roleSelect.value || 'PICKER');
+            roleSelect.onchange = () => {
+                if (!document.getElementById('empFormId')?.value) {
+                    salInput.value = this.getBasePayForRole(roleSelect.value);
+                }
+            };
+        }
+
         this.openModal('modalEmployee');
     },
 
@@ -1079,6 +1142,18 @@ const zeptoApp = {
         document.getElementById('formCandidate')?.reset();
         document.getElementById('candFormId').value = '';
         document.getElementById('modalCandidateTitle').innerHTML = '<span>🎯</span> Add Prospective Candidate';
+
+        const roleSelect = document.getElementById('candFormRole');
+        const salInput = document.getElementById('candFormSalary');
+        if (roleSelect && salInput) {
+            salInput.value = this.getBasePayForRole(roleSelect.value || 'PICKER');
+            roleSelect.onchange = () => {
+                if (!document.getElementById('candFormId')?.value) {
+                    salInput.value = this.getBasePayForRole(roleSelect.value);
+                }
+            };
+        }
+
         this.openModal('modalCandidate');
     },
 

@@ -5,16 +5,13 @@
         <div class="flex items-center gap-2.5 flex-wrap flex-1">
             <div class="relative min-w-[220px] flex-1">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
-                <input 
-                    type="text" 
-                    id="candSearchInput" 
-                    oninput="zeptoApp.filterCandidates()" 
-                    placeholder="Search candidate name, phone, email..." 
-                    class="w-full bg-slate-900/80 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition"
-                >
+                <input type="text" id="candSearchInput" oninput="zeptoApp.filterCandidates()"
+                    placeholder="Search candidate name, phone, email..."
+                    class="w-full bg-slate-900/80 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition">
             </div>
 
-            <select id="candStageFilter" onchange="zeptoApp.filterCandidates()" class="bg-slate-900/90 border border-white/15 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+            <select id="candStageFilter" onchange="zeptoApp.filterCandidates()"
+                class="bg-slate-900/90 border border-white/15 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
                 <option value="ALL" selected>⚡ All Stages</option>
                 <option value="APPLIED">📥 Applied</option>
                 <option value="INTERVIEWING">🗣️ Interviewing</option>
@@ -24,12 +21,14 @@
                 <option value="REJECTED">🚫 Rejected</option>
             </select>
 
-            <select id="candRoleFilter" onchange="zeptoApp.filterCandidates()" class="bg-slate-900/90 border border-white/15 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
-                <option value="ALL" selected>All 4 Roles</option>
+            <select id="candRoleFilter" onchange="zeptoApp.filterCandidates()"
+                class="bg-slate-900/90 border border-white/15 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                <option value="ALL" selected>All Roles</option>
                 <option value="PICKER">🛒 Pickers</option>
-                <option value="SHIFT_INCHARGE">⚡ Shift Incharges</option>
-                <option value="SECURITY_GUARD">🛡️ Security Guards</option>
-                <option value="HOUSEKEEPING">🧹 House Keeping</option>
+                <option value="SHIFT_INCHARGE">👔 Shift Incharges</option>
+                <!-- <option value="RIDER">🛵 Delivery Riders</option> -->
+                <!-- <option value="PACKER">📦 Packers</option> -->
+                <!-- <option value="STORE_MANAGER">🏛️ Store Managers</option> -->
             </select>
         </div>
 

@@ -64,14 +64,18 @@ async def get_zepto_overview_endpoint() -> dict[str, Any]:
 
 
 @router.get("/api/v1/zepto/staffing-targets", summary="Get Staffing Targets & Capacity")
+@router.get("/api/v1/zepto/role-configs", summary="Get Role Configs & Base Pay")
 async def get_staffing_targets_endpoint() -> dict[str, Any]:
-    """Retrieve customizable target headcount per store role with live fulfillment capacity."""
+    """Retrieve customizable target headcount and base pay per store role with live fulfillment capacity."""
     try:
-        targets = zepto_db.get_staffing_targets(_settings)
+        role_configs = zepto_db.get_role_configs(_settings)
         overview = zepto_db.get_zepto_overview(_settings)
         return {
             "success": True,
-            "targets": targets,
+            "targets": {r: role_configs[r]["target_count"] for r in role_configs},
+            "base_pays": {r: role_configs[r]["base_pay"] for r in role_configs},
+            "role_configs": role_configs,
+            "projected_payroll_target": overview["headcount"]["projected_payroll_target"],
             "capacity": overview["headcount"]["capacity"],
             "roles": overview["config"]["roles"],
         }
@@ -80,18 +84,38 @@ async def get_staffing_targets_endpoint() -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/api/v1/zepto/staffing-targets", summary="Update Staffing Targets")
-@router.post("/api/v1/zepto/staffing-targets", summary="Update Staffing Targets (POST)")
+@router.put("/api/v1/zepto/staffing-targets", summary="Update Staffing Targets & Base Pay")
+@router.post("/api/v1/zepto/staffing-targets", summary="Update Staffing Targets & Base Pay (POST)")
+@router.put("/api/v1/zepto/role-configs", summary="Update Role Configs")
+@router.post("/api/v1/zepto/role-configs", summary="Update Role Configs (POST)")
 async def update_staffing_targets_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
-    """Update customizable target headcount per store role."""
+    """Update customizable target headcount and/or monthly base pay per store role."""
     try:
-        raw_targets = payload.get("targets", payload)
-        targets = {k.upper(): int(v) for k, v in raw_targets.items() if isinstance(v, (int, str)) and str(v).isdigit()}
-        updated = zepto_db.update_staffing_targets(targets, _settings)
+        # Check if structured role_configs/configs provided
+        if "role_configs" in payload or "configs" in payload:
+            configs = payload.get("role_configs", payload.get("configs", {}))
+            updated_configs = zepto_db.update_role_configs(configs, _settings)
+        else:
+            raw_targets = payload.get("targets", {})
+            raw_base_pays = payload.get("base_pays", payload.get("base_pay", {}))
+
+            # Also allow flat key-value pairs if targets key omitted
+            if not raw_targets and not raw_base_pays:
+                raw_targets = payload
+
+            targets = {k.upper(): int(v) for k, v in raw_targets.items() if isinstance(v, (int, str)) and str(v).isdigit()}
+            base_pays = {k.upper(): float(v) for k, v in raw_base_pays.items() if isinstance(v, (int, float, str)) and str(v).replace(".", "", 1).isdigit()}
+
+            zepto_db.update_staffing_targets(targets, base_pays=base_pays, settings=_settings)
+            updated_configs = zepto_db.get_role_configs(_settings)
+
         overview = zepto_db.get_zepto_overview(_settings)
         return {
             "success": True,
-            "targets": updated,
+            "targets": {r: updated_configs[r]["target_count"] for r in updated_configs},
+            "base_pays": {r: updated_configs[r]["base_pay"] for r in updated_configs},
+            "role_configs": updated_configs,
+            "projected_payroll_target": overview["headcount"]["projected_payroll_target"],
             "capacity": overview["headcount"]["capacity"],
             "roles": overview["config"]["roles"],
         }
