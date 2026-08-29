@@ -208,8 +208,8 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
     # 3. Sample Store Expenses
     expenses = [
         (str(uuid.uuid4()), "Initial Picker Onboarding & Zepto Training Batch", "TRAINING", 45000.0, "2026-06-05", PARTNER_1_NAME, None, "training_receipt.pdf", 1, "Offsite training & simulator software fee", now_iso),
-        (str(uuid.uuid4()), "Staff Uniforms, Thermal Bags & Reflective Vests", "UNIFORMS_GEAR", 28500.0, "2026-06-12", PARTNER_2_NAME, None, "uniform_invoice.pdf", 1, "20 sets of customized shirts and thermal jackets", now_iso),
-        (str(uuid.uuid4()), "Heavy-Duty Warehouse Racks & Bins Installation", "EQUIPMENT", 125000.0, "2026-06-18", PARTNER_1_NAME, None, "racks_bill.pdf", 1, "Aisle A-D high density racking system", now_iso),
+        (str(uuid.uuid4()), "Staff Uniforms, Thermal Bags & Reflective Vests", "UNIFORMS_GEAR", 28500.0, "2026-06-12", PARTNER_2_NAME, None, "uniform_invoice.pdf", 0, "20 sets of customized shirts and thermal jackets (Pending Reimbursement)", now_iso),
+        (str(uuid.uuid4()), "Heavy-Duty Warehouse Racks & Bins Installation", "EQUIPMENT", 125000.0, "2026-06-18", PARTNER_1_NAME, None, "racks_bill.pdf", 0, "Aisle A-D high density racking system (Pending Reimbursement)", now_iso),
         (str(uuid.uuid4()), "Staff Refreshment & Breakroom Tea/Snacks (Monthly)", "SNACKS_WELFARE", 8500.0, "2026-08-15", "STORE_CASH", None, None, 1, "Monthly pantry items & energy drinks", now_iso),
         (str(uuid.uuid4()), "Store Deep Cleaning & Pest Control Service", "STORE_MAINTENANCE", 12000.0, "2026-08-20", PARTNER_2_NAME, None, "pest_control_bill.pdf", 1, "Bi-weekly warehouse pest safety compliance", now_iso),
     ]
@@ -298,9 +298,34 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
         payroll_row = conn.execute("SELECT SUM(base_salary_monthly + current_month_bonus) as total_pay FROM zepto_employees WHERE status = 'ACTIVE'").fetchone()
         current_monthly_payroll = float(payroll_row["total_pay"] or 0.0)
 
-        # Total Store Expenses
+        # Total Store Expenses & Reimbursements
         exp_row = conn.execute("SELECT SUM(amount) as total_exp FROM zepto_expenses").fetchone()
         total_expenses = float(exp_row["total_exp"] or 0.0)
+
+        # Reimbursement calculations
+        reimb_rows = conn.execute("""
+            SELECT 
+                incurred_by,
+                is_reimbursed,
+                SUM(amount) as total_amt,
+                COUNT(*) as count
+            FROM zepto_expenses
+            GROUP BY incurred_by, is_reimbursed
+        """).fetchall()
+
+        total_reimbursed = 0.0
+        total_pending_reimbursement = 0.0
+        pending_by_partner: dict[str, float] = {}
+
+        for r in reimb_rows:
+            amt = float(r["total_amt"] or 0.0)
+            incurred = (r["incurred_by"] or "").strip()
+            is_r = int(r["is_reimbursed"] or 0)
+            if is_r == 1 or incurred == "STORE_CASH":
+                total_reimbursed += amt
+            else:
+                total_pending_reimbursement += amt
+                pending_by_partner[incurred] = pending_by_partner.get(incurred, 0.0) + amt
 
         # Training Specific Expenses
         training_row = conn.execute("SELECT SUM(amount) as train_exp FROM zepto_expenses WHERE category = 'TRAINING'").fetchone()
@@ -353,6 +378,9 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
             },
             "expenses": {
                 "total_expenses": total_expenses,
+                "reimbursed_expenses": total_reimbursed,
+                "pending_reimbursement": total_pending_reimbursement,
+                "pending_by_partner": pending_by_partner,
                 "training_expenses": training_expenses,
                 "spend_per_employee": spend_per_employee,
             },
@@ -593,10 +621,11 @@ def delete_employee(emp_id: str, settings: Settings | None = None) -> bool:
 def get_expenses(
     category: str | None = None,
     incurred_by: str | None = None,
+    reimbursement_status: str | None = None,
     search: str | None = None,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Retrieve all store expenses with optional filters."""
+    """Retrieve all store expenses with optional category, payer, and reimbursement status filters."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
     with _connect(settings) as conn:
@@ -610,6 +639,11 @@ def get_expenses(
         if incurred_by and incurred_by.upper() != "ALL":
             query += " AND incurred_by LIKE ?"
             params.append(f"%{incurred_by}%")
+        if reimbursement_status and reimbursement_status.upper() != "ALL":
+            if reimbursement_status.upper() == "PENDING":
+                query += " AND is_reimbursed = 0 AND incurred_by != 'STORE_CASH'"
+            elif reimbursement_status.upper() == "REIMBURSED":
+                query += " AND (is_reimbursed = 1 OR incurred_by = 'STORE_CASH')"
         if search:
             query += " AND (title LIKE ? OR notes LIKE ?)"
             term = f"%{search.strip()}%"
@@ -621,11 +655,14 @@ def get_expenses(
 
 
 def create_expense(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
-    """Record a store expense with receipt document attachment."""
+    """Record a store expense with receipt document attachment and reimbursement flag."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
     exp_id = data.get("id") or str(uuid.uuid4())
     now_iso = datetime.now(timezone.utc).isoformat()
+
+    incurred = data.get("incurred_by", "Jatin Abrol").strip()
+    is_reimbursed = int(data.get("is_reimbursed", 1 if incurred == "STORE_CASH" else 0))
 
     with _connect(settings) as conn:
         conn.execute(
@@ -641,15 +678,81 @@ def create_expense(data: dict[str, Any], settings: Settings | None = None) -> di
                 data.get("category", "OPERATIONAL").strip().upper(),
                 float(data.get("amount", 0.0)),
                 data.get("expense_date", datetime.now().strftime("%Y-%m-%d")),
-                data.get("incurred_by", "Jatin Abrol").strip(),
+                incurred,
                 data.get("document_url"),
                 data.get("document_filename"),
-                int(data.get("is_reimbursed", 0)),
+                is_reimbursed,
                 data.get("notes", ""),
                 now_iso,
             )
         )
-    return {"id": exp_id, "title": data.get("title"), "amount": data.get("amount")}
+    return {"id": exp_id, "title": data.get("title"), "amount": data.get("amount"), "is_reimbursed": is_reimbursed}
+
+
+def update_expense(exp_id: str, data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Update an existing store expense record."""
+    settings = settings or Settings()
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.execute("SELECT * FROM zepto_expenses WHERE id = ?", (exp_id,)).fetchone()
+        if not cur:
+            raise ValueError(f"Expense {exp_id} not found")
+
+        incurred = data.get("incurred_by", cur["incurred_by"]).strip()
+        is_reimbursed = int(data.get("is_reimbursed", cur["is_reimbursed"]))
+
+        conn.execute(
+            """
+            UPDATE zepto_expenses SET
+                title = ?,
+                category = ?,
+                amount = ?,
+                expense_date = ?,
+                incurred_by = ?,
+                document_url = COALESCE(?, document_url),
+                document_filename = COALESCE(?, document_filename),
+                is_reimbursed = ?,
+                notes = ?
+            WHERE id = ?
+            """,
+            (
+                data.get("title", cur["title"]).strip(),
+                data.get("category", cur["category"]).strip().upper(),
+                float(data.get("amount", cur["amount"])),
+                data.get("expense_date", cur["expense_date"]),
+                incurred,
+                data.get("document_url"),
+                data.get("document_filename"),
+                is_reimbursed,
+                data.get("notes", cur["notes"]),
+                exp_id,
+            )
+        )
+        return {"id": exp_id, "title": data.get("title", cur["title"]), "is_reimbursed": is_reimbursed}
+
+
+def toggle_expense_reimbursement(exp_id: str, is_reimbursed: int | None = None, settings: Settings | None = None) -> dict[str, Any]:
+    """Toggle or directly set the reimbursement status of an out-of-pocket store expense."""
+    settings = settings or Settings()
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.execute("SELECT * FROM zepto_expenses WHERE id = ?", (exp_id,)).fetchone()
+        if not cur:
+            raise ValueError(f"Expense {exp_id} not found")
+
+        if is_reimbursed is not None:
+            new_val = 1 if int(is_reimbursed) == 1 else 0
+        else:
+            new_val = 0 if cur["is_reimbursed"] == 1 else 1
+
+        conn.execute("UPDATE zepto_expenses SET is_reimbursed = ? WHERE id = ?", (new_val, exp_id))
+        return {
+            "id": exp_id,
+            "title": cur["title"],
+            "amount": cur["amount"],
+            "incurred_by": cur["incurred_by"],
+            "is_reimbursed": new_val,
+        }
 
 
 def delete_expense(exp_id: str, settings: Settings | None = None) -> bool:

@@ -1,5 +1,58 @@
 <!-- Tab 2: Store Expenses & Spend Insights -->
 <div class="space-y-4">
+    <!-- Store Expenses & Reimbursement Summary Banner -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <!-- 1. Total Incurred Spend -->
+        <div class="glass-panel p-4 flex flex-col justify-between border-pink-500/30">
+            <div class="flex justify-between items-center">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-pink-400">Total Store Spend</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-500/15 text-pink-300 border border-pink-500/30">All Expenses</span>
+            </div>
+            <div class="my-2">
+                <div class="text-2xl font-extrabold font-mono text-pink-300" id="expSummaryTotalSpend">₹0</div>
+                <div class="text-[11px] text-slate-400 mt-1" id="expSummaryCount">0 expenses logged</div>
+            </div>
+            <div class="text-[11px] text-slate-500 pt-2 border-t border-white/5 flex justify-between">
+                <span>Spend Per Staff:</span>
+                <span class="font-mono font-bold text-slate-300" id="expSummaryPerStaff">₹0</span>
+            </div>
+        </div>
+
+        <!-- 2. Reimbursed & Store Cash -->
+        <div class="glass-panel p-4 flex flex-col justify-between border-emerald-500/30">
+            <div class="flex justify-between items-center">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Settled / Reimbursed</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">✅ Settled</span>
+            </div>
+            <div class="my-2">
+                <div class="text-2xl font-extrabold font-mono text-emerald-400" id="expSummaryReimbursed">₹0</div>
+                <div class="text-[11px] text-slate-400 mt-1">Paid directly via store cash or already reimbursed to partner</div>
+            </div>
+            <div class="text-[11px] text-emerald-400/80 pt-2 border-t border-white/5 flex justify-between">
+                <span>Settled Percentage:</span>
+                <span class="font-mono font-bold" id="expSummaryReimbursedPct">0%</span>
+            </div>
+        </div>
+
+        <!-- 3. Pending Partner Reimbursements -->
+        <div class="glass-panel p-4 flex flex-col justify-between border-amber-500/40 bg-amber-500/[0.03]">
+            <div class="flex justify-between items-center">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-amber-300">Pending Reimbursements</span>
+                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40" id="expSummaryPendingBadge">⏳ 0 Pending</span>
+            </div>
+            <div class="my-2">
+                <div class="text-2xl font-extrabold font-mono text-amber-300" id="expSummaryPendingAmount">₹0</div>
+                <div class="text-[11px] text-slate-300 mt-1 flex items-center gap-1.5 flex-wrap" id="expSummaryPendingBreakdown">
+                    <span>Awaiting payback from store cash</span>
+                </div>
+            </div>
+            <div class="text-[11px] text-amber-400/90 pt-2 border-t border-white/5 flex justify-between">
+                <span>Pending Out-of-Pocket:</span>
+                <span class="font-mono font-bold" id="expSummaryPendingPct">0%</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Category Spend Distribution Row -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" id="expenseCategoryCards">
         <div class="glass-panel p-3 text-center border-purple-500/20">
@@ -31,7 +84,7 @@
     <!-- Filter Bar -->
     <div class="glass-panel p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div class="flex items-center gap-2.5 flex-wrap flex-1">
-            <div class="relative min-w-[220px] flex-1">
+            <div class="relative min-w-[200px] flex-1">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
                 <input 
                     type="text" 
@@ -60,11 +113,17 @@
                 <option value="Harshiv Bargotra">Harshiv Bargotra</option>
                 <option value="STORE_CASH">Store Cash</option>
             </select>
+
+            <select id="expReimbursementFilter" onchange="zeptoApp.filterExpenses()" class="bg-slate-900/90 border border-white/15 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-pink-500">
+                <option value="ALL">All Reimbursements</option>
+                <option value="PENDING">⏳ Pending Reimbursement</option>
+                <option value="REIMBURSED">✅ Settled / Reimbursed</option>
+            </select>
         </div>
 
         <div class="flex items-center gap-2">
             <span class="text-xs font-mono text-pink-300 font-bold" id="expTotalAmountBadge">Total: ₹0</span>
-            <button type="button" onclick="zeptoApp.openAddExpenseModal()" class="px-3.5 py-2 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold transition flex items-center gap-1.5">
+            <button type="button" onclick="zeptoApp.openAddExpenseModal()" class="px-3.5 py-2 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap">
                 <span>➕</span> Record Expense
             </button>
         </div>
@@ -79,7 +138,8 @@
                         <th class="p-3.5 pl-4">Expense Title</th>
                         <th class="p-3.5">Category</th>
                         <th class="p-3.5">Date</th>
-                        <th class="p-3.5">Paid By</th>
+                        <th class="p-3.5">Incurred By</th>
+                        <th class="p-3.5 text-center">Reimbursement</th>
                         <th class="p-3.5 text-right">Amount</th>
                         <th class="p-3.5 text-center">Receipt / Proof</th>
                         <th class="p-3.5">Notes</th>
@@ -88,7 +148,7 @@
                 </thead>
                 <tbody id="expensesTableBody" class="divide-y divide-white/5 font-sans">
                     <tr>
-                        <td colspan="8" class="p-8 text-center text-slate-500 text-xs">
+                        <td colspan="9" class="p-8 text-center text-slate-500 text-xs">
                             <div class="inline-block animate-spin mr-2">⏳</div> Loading expense ledger...
                         </td>
                     </tr>

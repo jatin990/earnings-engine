@@ -117,9 +117,24 @@ const zeptoApp = {
         const payrollEl = document.getElementById('kpiPayroll');
         if (payrollEl) payrollEl.textContent = this.formatCurrency(hc.monthly_payroll || 0);
 
-        // 2. Total Store Expenses & Spend per Employee
+        // 2. Total Store Expenses & Reimbursements
         const totalExpEl = document.getElementById('kpiTotalExpenses');
         if (totalExpEl) totalExpEl.textContent = this.formatCurrency(exp.total_expenses || 0);
+
+        const pendingReimbEl = document.getElementById('kpiPendingReimbBadge');
+        if (pendingReimbEl) {
+            const pendAmt = exp.pending_reimbursement || 0;
+            pendingReimbEl.textContent = `⏳ ${this.formatCurrency(pendAmt)} Pending`;
+            if (pendAmt > 0) {
+                pendingReimbEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono animate-pulse';
+            } else {
+                pendingReimbEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono';
+                pendingReimbEl.textContent = '✅ All Reimbursed';
+            }
+        }
+
+        const reimbSpendEl = document.getElementById('kpiReimbursedSpend');
+        if (reimbSpendEl) reimbSpendEl.textContent = this.formatCurrency(exp.reimbursed_expenses || 0);
 
         const trainExpEl = document.getElementById('kpiTrainingSpend');
         if (trainExpEl) trainExpEl.textContent = this.formatCurrency(exp.training_expenses || 0);
@@ -576,12 +591,14 @@ const zeptoApp = {
     async loadExpenses() {
         const category = document.getElementById('expCategoryFilter')?.value || 'ALL';
         const incurred = document.getElementById('expIncurredFilter')?.value || 'ALL';
+        const reimbStatus = document.getElementById('expReimbursementFilter')?.value || 'ALL';
         const search = document.getElementById('expSearchInput')?.value || '';
 
         try {
             const params = new URLSearchParams();
             if (category !== 'ALL') params.append('category', category);
             if (incurred !== 'ALL') params.append('incurred_by', incurred);
+            if (reimbStatus !== 'ALL') params.append('reimbursement_status', reimbStatus);
             if (search) params.append('search', search);
 
             const res = await fetch(`/api/v1/zepto/expenses?${params.toString()}`);
@@ -589,7 +606,12 @@ const zeptoApp = {
             if (!res.ok) throw new Error(data.detail || 'Failed to load expenses');
 
             this.expenses = data.items || [];
-            this.renderExpenses(this.expenses, data.total_amount || 0);
+            this.renderExpenses(
+                this.expenses,
+                data.total_amount || 0,
+                data.reimbursed_total || 0,
+                data.pending_total || 0
+            );
         } catch (err) {
             console.error('[ZEPTO] Error loading expenses:', err);
         }
@@ -599,13 +621,76 @@ const zeptoApp = {
         this.loadExpenses();
     },
 
-    renderExpenses(items, totalAmount) {
+    renderExpenses(items, totalAmount, reimbursedTotal, pendingTotal) {
         const tbody = document.getElementById('expensesTableBody');
         const badge = document.getElementById('expTotalAmountBadge');
         if (badge) badge.textContent = `Total: ${this.formatCurrency(totalAmount)}`;
-        if (!tbody) return;
 
-        // Update category summary cards
+        // 1. Update Top Reimbursement Summary Cards
+        const sumTotalEl = document.getElementById('expSummaryTotalSpend');
+        if (sumTotalEl) sumTotalEl.textContent = this.formatCurrency(totalAmount);
+
+        const sumCountEl = document.getElementById('expSummaryCount');
+        if (sumCountEl) sumCountEl.textContent = `${items.length} expenses logged`;
+
+        const activeStaff = this.overviewData?.headcount?.active || 1;
+        const sumPerStaffEl = document.getElementById('expSummaryPerStaff');
+        if (sumPerStaffEl) sumPerStaffEl.textContent = `${this.formatCurrency(totalAmount / Math.max(1, activeStaff))} / staff`;
+
+        const sumReimbEl = document.getElementById('expSummaryReimbursed');
+        if (sumReimbEl) sumReimbEl.textContent = this.formatCurrency(reimbursedTotal);
+
+        const sumReimbPctEl = document.getElementById('expSummaryReimbursedPct');
+        if (sumReimbPctEl) {
+            const pct = totalAmount > 0 ? Math.round((reimbursedTotal / totalAmount) * 100) : 0;
+            sumReimbPctEl.textContent = `${pct}% settled`;
+        }
+
+        const sumPendingAmtEl = document.getElementById('expSummaryPendingAmount');
+        if (sumPendingAmtEl) sumPendingAmtEl.textContent = this.formatCurrency(pendingTotal);
+
+        const sumPendingBadgeEl = document.getElementById('expSummaryPendingBadge');
+        if (sumPendingBadgeEl) {
+            const pendingCount = items.filter(e => e.is_reimbursed === 0 && e.incurred_by !== 'STORE_CASH').length;
+            sumPendingBadgeEl.textContent = `⏳ ${pendingCount} Pending (${this.formatCurrency(pendingTotal)})`;
+            if (pendingCount > 0) {
+                sumPendingBadgeEl.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse';
+            } else {
+                sumPendingBadgeEl.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+                sumPendingBadgeEl.textContent = '✅ All Settled';
+            }
+        }
+
+        const sumPendingPctEl = document.getElementById('expSummaryPendingPct');
+        if (sumPendingPctEl) {
+            const pct = totalAmount > 0 ? Math.round((pendingTotal / totalAmount) * 100) : 0;
+            sumPendingPctEl.textContent = `${pct}% of total spend`;
+        }
+
+        // Partner-specific pending breakdown pills
+        const pendingBreakdownEl = document.getElementById('expSummaryPendingBreakdown');
+        if (pendingBreakdownEl) {
+            const partnerPending = {};
+            items.forEach(exp => {
+                if (exp.is_reimbursed === 0 && exp.incurred_by !== 'STORE_CASH') {
+                    const p = exp.incurred_by || 'Partner';
+                    partnerPending[p] = (partnerPending[p] || 0) + exp.amount;
+                }
+            });
+
+            const partnerKeys = Object.keys(partnerPending);
+            if (partnerKeys.length > 0) {
+                pendingBreakdownEl.innerHTML = partnerKeys.map(name => {
+                    const isJA = name.toLowerCase().includes('jatin');
+                    const colorClasses = isJA ? 'bg-purple-500/20 text-purple-200 border-purple-500/40' : 'bg-pink-500/20 text-pink-200 border-pink-500/40';
+                    return `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${colorClasses}">${name}: ${this.formatCurrency(partnerPending[name])}</span>`;
+                }).join('');
+            } else {
+                pendingBreakdownEl.innerHTML = `<span class="text-emerald-400 font-semibold text-[11px]">✨ All partner out-of-pocket expenses settled</span>`;
+            }
+        }
+
+        // 2. Update category summary cards
         const catSums = {};
         items.forEach(exp => {
             catSums[exp.category] = (catSums[exp.category] || 0) + exp.amount;
@@ -615,22 +700,43 @@ const zeptoApp = {
             if (el) el.textContent = this.formatCurrency(catSums[cat] || 0);
         });
 
+        if (!tbody) return;
+
         if (items.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" class="p-8 text-center text-slate-500">
-                        No expenses recorded yet. Click "Record Expense" to track out-of-pocket store costs.
+                    <td colspan="9" class="p-8 text-center text-slate-500">
+                        No expenses match the selected filters. Click "Record Expense" to track out-of-pocket store costs.
                     </td>
                 </tr>
             `;
             return;
         }
 
+        // 3. Render Table Rows
         tbody.innerHTML = items.map(exp => {
             const catBadge = this.getCategoryBadge(exp.category);
             const proofLink = exp.document_url
                 ? `<a href="${exp.document_url}" target="_blank" class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold hover:underline">📄 View Bill</a>`
                 : `<span class="text-slate-600">—</span>`;
+
+            // Reimbursement status toggle button/badge
+            let reimbBadgeHtml = '';
+            if (exp.incurred_by === 'STORE_CASH') {
+                reimbBadgeHtml = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-500/20 text-slate-300 border border-slate-500/30">Store Cash</span>`;
+            } else if (exp.is_reimbursed === 1) {
+                reimbBadgeHtml = `
+                    <button type="button" onclick="zeptoApp.toggleReimbursement('${exp.id}', 0)" title="Click to mark as Pending Reimbursement" class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30 transition flex items-center gap-1 mx-auto cursor-pointer">
+                        <span>✅</span> Settled
+                    </button>
+                `;
+            } else {
+                reimbBadgeHtml = `
+                    <button type="button" onclick="zeptoApp.toggleReimbursement('${exp.id}', 1)" title="Click to mark as Reimbursed / Settled" class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition flex items-center gap-1 mx-auto cursor-pointer animate-pulse">
+                        <span>⏳</span> Pending Reimb
+                    </button>
+                `;
+            }
 
             return `
                 <tr class="hover:bg-white/[0.02] transition">
@@ -642,6 +748,7 @@ const zeptoApp = {
                             ${exp.incurred_by}
                         </span>
                     </td>
+                    <td class="p-3.5 text-center">${reimbBadgeHtml}</td>
                     <td class="p-3.5 text-right font-mono font-extrabold text-pink-300 text-sm">
                         ${this.formatCurrency(exp.amount)}
                     </td>
@@ -657,9 +764,41 @@ const zeptoApp = {
         }).join('');
     },
 
+    async toggleReimbursement(expId, targetStatus) {
+        try {
+            const res = await fetch(`/api/v1/zepto/expenses/${expId}/reimburse`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_reimbursed: targetStatus }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to update reimbursement status');
+
+            await this.loadOverview();
+            await this.loadExpenses();
+        } catch (err) {
+            alert(err.message);
+        }
+    },
+
     openAddExpenseModal() {
         document.getElementById('formExpense')?.reset();
         document.getElementById('expFormDate').value = new Date().toISOString().split('T')[0];
+        
+        const incurredEl = document.getElementById('expFormIncurred');
+        const reimbEl = document.getElementById('expFormIsReimbursed');
+        if (reimbEl) reimbEl.value = '0';
+
+        if (incurredEl && reimbEl) {
+            incurredEl.onchange = (e) => {
+                if (e.target.value === 'STORE_CASH') {
+                    reimbEl.value = '1';
+                } else {
+                    reimbEl.value = '0';
+                }
+            };
+        }
+
         this.openModal('modalExpense');
     },
 
@@ -681,12 +820,16 @@ const zeptoApp = {
                 filename = uploaded.filename;
             }
 
+            const incurredBy = document.getElementById('expFormIncurred').value;
+            const isReimbursedVal = parseInt(document.getElementById('expFormIsReimbursed')?.value || (incurredBy === 'STORE_CASH' ? '1' : '0'), 10);
+
             const payload = {
                 title: document.getElementById('expFormTitle').value,
                 category: document.getElementById('expFormCategory').value,
                 amount: parseFloat(document.getElementById('expFormAmount').value || 0),
                 expense_date: document.getElementById('expFormDate').value,
-                incurred_by: document.getElementById('expFormIncurred').value,
+                incurred_by: incurredBy,
+                is_reimbursed: isReimbursedVal,
                 document_url: docUrl,
                 document_filename: filename,
                 notes: document.getElementById('expFormNotes').value,

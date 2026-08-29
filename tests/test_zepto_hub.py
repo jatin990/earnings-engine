@@ -87,17 +87,29 @@ def test_store_expenses_and_spend_per_employee():
         "title": "Aisle B Barcode Scanners (x4)",
         "category": "EQUIPMENT",
         "amount": 22000.0,
-        "incurred_by": "Partner 1",
-        "notes": "Handheld Zebra scanners",
+        "incurred_by": "Jatin Abrol",
+        "is_reimbursed": 0,
+        "notes": "Handheld Zebra scanners (Pending Reimbursement)",
     }
     exp = zepto_db.create_expense(exp_data, settings)
     assert exp["id"] is not None
+    assert exp["is_reimbursed"] == 0
 
-    expenses = zepto_db.get_expenses(category="EQUIPMENT", settings=settings)
-    assert any(e["id"] == exp["id"] for e in expenses)
+    # Filter by category and reimbursement status
+    pending_expenses = zepto_db.get_expenses(category="EQUIPMENT", reimbursement_status="PENDING", settings=settings)
+    assert any(e["id"] == exp["id"] for e in pending_expenses)
+
+    # Toggle reimbursement to settled
+    toggled = zepto_db.toggle_expense_reimbursement(exp["id"], is_reimbursed=1, settings=settings)
+    assert toggled["is_reimbursed"] == 1
+
+    reimbursed_expenses = zepto_db.get_expenses(reimbursement_status="REIMBURSED", settings=settings)
+    assert any(e["id"] == exp["id"] for e in reimbursed_expenses)
 
     overview = zepto_db.get_zepto_overview(settings)
     assert overview["expenses"]["spend_per_employee"] > 0
+    assert "pending_reimbursement" in overview["expenses"]
+    assert "reimbursed_expenses" in overview["expenses"]
 
 
 def test_candidate_hiring_and_one_click_conversion():
@@ -175,10 +187,18 @@ def test_zepto_api_endpoints(client):
     assert emp_resp.status_code == 200
     assert emp_resp.json()["success"] is True
 
-    # 4. Expenses API
+    # 4. Expenses API & Reimbursement Toggle
     exp_resp = client.get("/api/v1/zepto/expenses")
     assert exp_resp.status_code == 200
-    assert exp_resp.json()["success"] is True
+    exp_json = exp_resp.json()
+    assert exp_json["success"] is True
+    assert "reimbursed_total" in exp_json
+    assert "pending_total" in exp_json
+    if exp_json["items"]:
+        first_id = exp_json["items"][0]["id"]
+        patch_resp = client.patch(f"/api/v1/zepto/expenses/{first_id}/reimburse", json={"is_reimbursed": 1})
+        assert patch_resp.status_code == 200
+        assert patch_resp.json()["success"] is True
 
     # 5. Candidates API
     cand_resp = client.get("/api/v1/zepto/candidates")

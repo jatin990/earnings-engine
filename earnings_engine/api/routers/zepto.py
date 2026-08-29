@@ -160,13 +160,29 @@ async def record_salary_endpoint(emp_id: str, payload: dict[str, Any]) -> dict[s
 async def get_expenses_endpoint(
     category: str | None = Query(None, description="Filter by category e.g. TRAINING, UNIFORMS_GEAR"),
     incurred_by: str | None = Query(None, description="Filter by partner or cash"),
+    reimbursement_status: str | None = Query(None, description="Filter by reimbursement status: PENDING, REIMBURSED, ALL"),
     search: str | None = Query(None, description="Search expense title"),
 ) -> dict[str, Any]:
-    """Retrieve store expenses ledger with category and search filters."""
+    """Retrieve store expenses ledger with category, payer, and reimbursement filters."""
     try:
-        expenses = zepto_db.get_expenses(category=category, incurred_by=incurred_by, search=search, settings=_settings)
+        expenses = zepto_db.get_expenses(
+            category=category,
+            incurred_by=incurred_by,
+            reimbursement_status=reimbursement_status,
+            search=search,
+            settings=_settings,
+        )
         total = sum(e.get("amount", 0.0) for e in expenses)
-        return {"success": True, "count": len(expenses), "total_amount": total, "items": expenses}
+        reimbursed_total = sum(e.get("amount", 0.0) for e in expenses if e.get("is_reimbursed") == 1 or e.get("incurred_by") == "STORE_CASH")
+        pending_total = sum(e.get("amount", 0.0) for e in expenses if e.get("is_reimbursed") == 0 and e.get("incurred_by") != "STORE_CASH")
+        return {
+            "success": True,
+            "count": len(expenses),
+            "total_amount": total,
+            "reimbursed_total": reimbursed_total,
+            "pending_total": pending_total,
+            "items": expenses,
+        }
     except Exception as e:
         logger.error("[ZEPTO-API] Error listing expenses: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -180,6 +196,29 @@ async def create_expense_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
         return {"success": True, "expense": exp}
     except Exception as e:
         logger.error("[ZEPTO-API] Error recording expense: %s", e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/api/v1/zepto/expenses/{exp_id}", summary="Update Store Expense")
+async def update_expense_endpoint(exp_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Update an existing store expense record."""
+    try:
+        exp = zepto_db.update_expense(exp_id, payload, _settings)
+        return {"success": True, "expense": exp}
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error updating expense %s: %s", exp_id, e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/api/v1/zepto/expenses/{exp_id}/reimburse", summary="Toggle Reimbursement Status")
+async def toggle_expense_reimburse_endpoint(exp_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Toggle or directly set the reimbursement status of an expense."""
+    try:
+        is_reimbursed = payload.get("is_reimbursed") if payload else None
+        res = zepto_db.toggle_expense_reimbursement(exp_id, is_reimbursed, _settings)
+        return {"success": True, "result": res}
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error toggling reimbursement for expense %s: %s", exp_id, e)
         raise HTTPException(status_code=400, detail=str(e))
 
 
