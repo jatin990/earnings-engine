@@ -132,27 +132,27 @@ def match_industry_benchmark(industry_str: str | None) -> tuple[str, dict[str, f
         return "General / Multi-Sector", INDUSTRY_BENCHMARKS["General / Multi-Sector"]
 
     ind_lower = industry_str.lower()
-    if any(k in ind_lower for k in ["software", "tech", "information technology", "it services", "internet"]):
+    if any(k in ind_lower for k in ["software", "tech", "information technology", "it services", "internet", "electronics", "semiconductor", "computer", "hardware", "education", "training", "business services"]):
         return "IT Services & Tech", INDUSTRY_BENCHMARKS["IT Services & Tech"]
-    if any(k in ind_lower for k in ["bank", "financial", "insurance", "nbfc", "capital market", "fintech"]):
+    if any(k in ind_lower for k in ["bank", "financial", "insurance", "nbfc", "capital market", "fintech", "asset management", "wealth", "broking", "depository", "exchange", "microfinance", "mortgage"]):
         return "Banking & Financial Services", INDUSTRY_BENCHMARKS["Banking & Financial Services"]
-    if any(k in ind_lower for k in ["auto", "vehicle", "motor", "tyre", "truck"]):
+    if any(k in ind_lower for k in ["auto", "vehicle", "motor", "tyre", "truck", "ancillaries", "automobile"]):
         return "Automotive & Ancillaries", INDUSTRY_BENCHMARKS["Automotive & Ancillaries"]
-    if any(k in ind_lower for k in ["pharma", "health", "biotech", "drug", "hospital"]):
+    if any(k in ind_lower for k in ["pharma", "health", "biotech", "drug", "hospital", "clinic", "medical", "diagnostic", "laboratory", "lifesciences"]):
         return "Pharmaceuticals & Healthcare", INDUSTRY_BENCHMARKS["Pharmaceuticals & Healthcare"]
-    if any(k in ind_lower for k in ["fmcg", "consumer", "food", "beverage", "personal", "tobacco", "retail"]):
+    if any(k in ind_lower for k in ["fmcg", "consumer", "food", "beverage", "personal", "tobacco", "retail", "textile", "apparel", "garment", "clothing", "footwear", "lodging", "hotel", "resort", "restaurant", "travel", "entertainment", "media", "broadcasting", "gaming", "confection", "farm product", "luxury", "publishing"]):
         return "FMCG & Consumer Goods", INDUSTRY_BENCHMARKS["FMCG & Consumer Goods"]
-    if any(k in ind_lower for k in ["oil", "gas", "energy", "petroleum", "power", "utility", "solar", "renewable", "green", "clean"]):
+    if any(k in ind_lower for k in ["oil", "gas", "energy", "petroleum", "power", "utility", "solar", "renewable", "green", "clean", "thermal", "hydro", "electric"]):
         return "Oil, Gas & Energy", INDUSTRY_BENCHMARKS["Oil, Gas & Energy"]
-    if any(k in ind_lower for k in ["metal", "steel", "mining", "aluminum", "copper", "iron"]):
+    if any(k in ind_lower for k in ["metal", "steel", "mining", "aluminum", "copper", "iron", "mineral", "zinc", "gold"]):
         return "Metals & Mining", INDUSTRY_BENCHMARKS["Metals & Mining"]
-    if any(k in ind_lower for k in ["infra", "capital good", "engineering", "machinery", "defense", "railway"]):
+    if any(k in ind_lower for k in ["infra", "capital good", "engineering", "machinery", "defense", "railway", "electrical equipment", "aerospace", "freight", "logistics", "shipping", "transport", "ports", "tools", "business equipment", "wood", "lumber"]):
         return "Infrastructure & Capital Goods", INDUSTRY_BENCHMARKS["Infrastructure & Capital Goods"]
-    if any(k in ind_lower for k in ["chemical", "fertilizer", "specialty chemical", "pesticide"]):
+    if any(k in ind_lower for k in ["chemical", "fertilizer", "specialty chemical", "pesticide", "agricultural input", "agri", "packaging", "paper", "plastic", "container", "rubber"]):
         return "Chemicals & Materials", INDUSTRY_BENCHMARKS["Chemicals & Materials"]
-    if any(k in ind_lower for k in ["telecom", "wireless", "broadband"]):
+    if any(k in ind_lower for k in ["telecom", "wireless", "broadband", "satellite", "network", "communication equipment"]):
         return "Telecommunication", INDUSTRY_BENCHMARKS["Telecommunication"]
-    if any(k in ind_lower for k in ["realty", "real estate", "construction", "housing", "cement"]):
+    if any(k in ind_lower for k in ["realty", "real estate", "construction", "housing", "cement", "building", "fixture", "furnishing", "appliance", "tile", "sanitaryware", "paint", "glass", "plywood"]):
         return "Real Estate & Construction", INDUSTRY_BENCHMARKS["Real Estate & Construction"]
 
     return "General / Multi-Sector", INDUSTRY_BENCHMARKS["General / Multi-Sector"]
