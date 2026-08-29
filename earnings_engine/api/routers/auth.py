@@ -55,7 +55,7 @@ async def verify_portal_code(req: VerifyCodeRequest, response: Response):
     is_owner = result.get("role") == "owner" or result.get("is_admin")
     role = result.get("role") or ("owner" if is_owner else "friend")
     scopes = result.get("scopes") or (
-        ["can_view_trips", "can_view_cards", "can_view_net_worth", "admin", "dashboard", "credit_card"]
+        ["can_view_trips", "can_view_cards", "can_view_net_worth", "can_view_zepto", "zepto", "admin", "dashboard", "credit_card"]
         if is_owner else ["can_view_trips"]
     )
     email = result.get("email") or ("owner@nexus.local" if is_owner else "friend@nexus.local")

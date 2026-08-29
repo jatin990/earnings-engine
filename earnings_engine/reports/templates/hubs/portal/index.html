@@ -354,22 +354,26 @@
 
                     <div class="mb-3">
                         <label class="block text-[11px] text-slate-400 mb-1.5 font-semibold">Allowed Section Scopes:</label>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
                             <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
                                 <input type="checkbox" id="scope_trips" checked>
-                                <span>✈️ Trips & Plans</span>
+                                <span>✈️ Trips</span>
                             </label>
                             <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
                                 <input type="checkbox" id="scope_cards" checked>
-                                <span>💳 Credit Cards</span>
+                                <span>💳 Cards</span>
                             </label>
                             <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
                                 <input type="checkbox" id="scope_net_worth" checked>
                                 <span>💰 Net Worth</span>
                             </label>
                             <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
+                                <input type="checkbox" id="scope_zepto" checked>
+                                <span>⚡ Zepto Store</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
                                 <input type="checkbox" id="scope_dashboard">
-                                <span>📈 Trading Terminal</span>
+                                <span>📈 Trading</span>
                             </label>
                         </div>
                     </div>
@@ -754,6 +758,16 @@
                         is_modal: false,
                     },
                     {
+                        id: 'zepto',
+                        name: 'Zepto Dark Store Hub',
+                        icon: '⚡',
+                        description: 'Staffing matrix, MoM payroll, out-of-pocket expenses & ₹75L 50-50 partner equity ledger.',
+                        badge: 'Store Operations',
+                        path: '/zepto',
+                        is_auth: isOwner || scopes.includes('can_view_zepto') || scopes.includes('zepto'),
+                        is_modal: false,
+                    },
+                    {
                         id: 'net_worth',
                         name: 'Net Worth Overview',
                         icon: '🏛️',
@@ -1051,6 +1065,7 @@
                 if (document.getElementById('scope_trips')?.checked) scopes.push('can_view_trips');
                 if (document.getElementById('scope_cards')?.checked) scopes.push('can_view_cards');
                 if (document.getElementById('scope_net_worth')?.checked) scopes.push('can_view_net_worth');
+                if (document.getElementById('scope_zepto')?.checked) scopes.push('can_view_zepto');
                 if (document.getElementById('scope_dashboard')?.checked) scopes.push('dashboard');
 
                 if (!scopes.length) {
