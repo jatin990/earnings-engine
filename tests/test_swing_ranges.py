@@ -163,6 +163,7 @@ def test_get_swing_setups_enriches_swing_range(monkeypatch, test_settings):
 
 def test_api_endpoints_swing_range(monkeypatch, test_settings):
     monkeypatch.setattr("earnings_engine.api.dashboard_api._settings", lambda: test_settings)
+    monkeypatch.setattr("earnings_engine.api.routers.swing._settings", lambda: test_settings)
     from earnings_engine.data.auth import create_session_token
     token = create_session_token(
         user_id="test-admin",

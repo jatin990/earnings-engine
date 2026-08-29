@@ -58,6 +58,9 @@ class SchedulerEngine:
         self._job_handlers["breakout_hot_rescore"] = self._handle_breakout_hot
         self._job_handlers["breakout_warm_rescore"] = self._handle_breakout_warm
         self._job_handlers["breakout_cold_scan"] = self._handle_breakout_cold
+        self._job_handlers["swing_hot_rescore"] = self._handle_swing_hot
+        self._job_handlers["swing_warm_rescore"] = self._handle_swing_warm
+        self._job_handlers["swing_cold_scan"] = self._handle_swing_cold
         self._job_handlers["news_catalyst_harvest"] = self._handle_news_harvest
         self._job_handlers["category_scanner_sweep"] = self._handle_category_sweep
         self._job_handlers["quarter_repeaters_sync"] = self._handle_quarter_repeaters
@@ -88,6 +91,23 @@ class SchedulerEngine:
         min_score = float(params.get("min_score", 35))
         breakout_scanner_mod.run_cold_scan(settings, universe=universe, min_score=min_score)
         return f"Full breakout sweep completed for {universe} (min score: {min_score})."
+
+    def _handle_swing_hot(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data import swing_scanner as swing_scanner_mod
+        swing_scanner_mod.run_hot_rescore(settings)
+        return "Hot swing buy zone pool re-scored."
+
+    def _handle_swing_warm(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data import swing_scanner as swing_scanner_mod
+        swing_scanner_mod.run_warm_rescore(settings)
+        return "Warm swing candidate pool re-scored."
+
+    def _handle_swing_cold(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data import swing_scanner as swing_scanner_mod
+        universe = params.get("universe") or params.get("watchlist") or "ALL"
+        min_score = int(params.get("min_score", 20))
+        swing_scanner_mod.run_cold_scan(settings, universe=universe, min_score=min_score)
+        return f"Full swing channel sweep completed for {universe} (min score: {min_score})."
 
     def _handle_news_harvest(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data.catalysts_news import scan_watchlist_catalysts

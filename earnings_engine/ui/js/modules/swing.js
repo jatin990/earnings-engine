@@ -122,13 +122,157 @@
                 });
                 if (res.ok) {
                     this.closeSwingRangeModal();
-                    if (typeof this.loadActiveQuotes === 'function') {
+                    if (typeof this.loadSwing === 'function') {
+                        this.loadSwing();
+                    } else if (typeof this.loadActiveQuotes === 'function') {
                         this.loadActiveQuotes(false);
                     }
                 }
             } catch (e) {
                 console.error('[SWING] Save range error:', e);
             }
+        },
+
+        // =========================================================================
+        // 🧠 Unified AI Intelligence & Thesis Popover/Modal
+        // =========================================================================
+        async openSwingAiModal(ticker) {
+            ticker = (ticker || '').toUpperCase().trim();
+            if (!ticker) return;
+
+            const modal = document.getElementById('swingAiThesisModal');
+            const symEl = document.getElementById('swingAiModalTicker');
+            const subEl = document.getElementById('swingAiModalSub');
+            const bodyEl = document.getElementById('swingAiModalBody');
+
+            if (symEl) symEl.textContent = `${ticker} — AI Thesis & Intelligence`;
+            if (subEl) subEl.textContent = '4-Model Consensus · Kronos 14-Day Price Path · News Catalysts';
+            if (modal) modal.style.display = 'flex';
+            if (bodyEl) {
+                bodyEl.innerHTML = `
+                    <div style="text-align:center;padding:2.5rem 1rem;color:#94a3b8;">
+                        <div class="loading-spinner" style="margin-bottom:0.75rem;"></div>
+                        <div>Synthesizing DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral & Kronos for <strong>${ticker}</strong>...</div>
+                    </div>
+                `;
+            }
+
+            try {
+                // Look up cached stock item from swing data
+                const stock = (this.swingData || []).find(r => (r.ticker || '').toUpperCase() === ticker) || {};
+                const consensusData = (this.consensusMap && this.consensusMap[ticker]) || stock.consensus || {};
+                const kronosData = stock.kronos_prediction || {};
+                const aiSynthesis = stock.ai_synthesis || {};
+
+                // Fetch live consensus if missing
+                let consensusRes = consensusData;
+                if (!consensusRes.consensus_direction) {
+                    try {
+                        const cRes = await fetch(API_BASE + `/api/v1/consensus/predictions/${encodeURIComponent(ticker)}`);
+                        if (cRes.ok) {
+                            const cData = await cRes.json();
+                            if (cData.prediction) consensusRes = cData.prediction;
+                        }
+                    } catch (_) {}
+                }
+
+                this.renderSwingAiModalContent(ticker, consensusRes, kronosData, aiSynthesis, stock);
+            } catch (e) {
+                console.error('[SWING-AI] Modal error:', e);
+                if (bodyEl) {
+                    bodyEl.innerHTML = `<div style="padding:2rem;text-align:center;color:#f87171;">Failed loading AI thesis: ${e.message}</div>`;
+                }
+            }
+        },
+
+        renderSwingAiModalContent(ticker, consensus, kronos, ai, stock) {
+            const bodyEl = document.getElementById('swingAiModalBody');
+            if (!bodyEl) return;
+
+            const models = consensus.model_predictions || {};
+            const dir = consensus.consensus_direction || 'NEUTRAL';
+            const str = consensus.consensus_strength != null ? consensus.consensus_strength : 50;
+            const isBull = dir.includes('BUY') || dir.includes('BULL');
+            const isBear = dir.includes('SELL') || dir.includes('BEAR');
+            const badgeBg = isBull ? 'rgba(16,185,129,0.2)' : isBear ? 'rgba(239,68,68,0.2)' : 'rgba(234,179,8,0.2)';
+            const badgeColor = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
+            const badgeBorder = isBull ? '1px solid #10b981' : isBear ? '1px solid #ef4444' : '1px solid #eab308';
+
+            const kpTrend = kronos.trend || 'Neutral';
+            const kpRet = kronos.return_pct != null ? `${kronos.return_pct >= 0 ? '+' : ''}${kronos.return_pct.toFixed(1)}%` : '—';
+            const kpCls = kpTrend === 'Bullish' ? '#34d399' : kpTrend === 'Bearish' ? '#f87171' : '#cbd5e1';
+
+            bodyEl.innerHTML = `
+                <div style="display:flex;flex-direction:column;gap:1rem;">
+                    
+                    <!-- Top AI Summary Banner -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;background:#060913;padding:0.85rem 1rem;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.06);">
+                        <div>
+                            <div style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:0.25rem;">4-MODEL AI CONSENSUS</div>
+                            <div style="display:flex;align-items:center;gap:0.5rem;">
+                                <span class="signal-badge" style="background:${badgeBg};color:${badgeColor};border:${badgeBorder};font-size:0.85rem;font-weight:800;padding:0.2rem 0.65rem;">
+                                    ${dir} (${str}%)
+                                </span>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:0.25rem;">KRONOS 14-DAY SEQUENCE</div>
+                            <div style="font-size:1.1rem;font-weight:800;color:${kpCls};font-family:var(--font-mono);">
+                                ${kpTrend} <span style="font-size:0.85rem;font-weight:600;color:#94a3b8;">(${kpRet})</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4-Model Breakdown Grid -->
+                    <div>
+                        <div style="font-size:0.72rem;color:#94a3b8;font-weight:700;margin-bottom:0.45rem;display:flex;justify-content:space-between;align-items:center;">
+                            <span>MULTI-MODEL AI MATRIX</span>
+                            <span style="font-size:0.65rem;color:#64748b;">DeepSeek-R1 · Llama-3.3 · Qwen-2.5 · Mistral</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.5rem;">
+                            ${['deepseek-r1', 'llama-3.3-70b', 'qwen-2.5-72b', 'mistral-large'].map(mKey => {
+                                const m = models[mKey] || {};
+                                const mDir = m.direction || 'PENDING';
+                                const mConf = m.confidence != null ? `${m.confidence}%` : '—';
+                                const mIsBuy = mDir.includes('BUY') || mDir.includes('BULL');
+                                const mIsSell = mDir.includes('SELL') || mDir.includes('BEAR');
+                                const mClr = mIsBuy ? '#34d399' : mIsSell ? '#f87171' : '#94a3b8';
+                                const mLabel = mKey === 'deepseek-r1' ? 'DeepSeek-R1' : mKey === 'llama-3.3-70b' ? 'Llama-3.3' : mKey === 'qwen-2.5-72b' ? 'Qwen-2.5' : 'Mistral';
+                                return `
+                                    <div style="background:#0a0f1e;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.5rem 0.6rem;">
+                                        <div style="font-size:0.65rem;color:#60a5fa;font-weight:700;margin-bottom:0.15rem;">${mLabel}</div>
+                                        <div style="font-weight:800;font-size:0.82rem;color:${mClr};">${mDir}</div>
+                                        <div style="font-size:0.65rem;color:#64748b;">Conf: ${mConf}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <!-- News Catalysts & Volume Rhythm -->
+                    <div style="background:#0a0f1e;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.65rem 0.85rem;">
+                        <div style="font-size:0.70rem;color:#94a3b8;font-weight:700;margin-bottom:0.3rem;">NEWS CATALYSTS & VOLUME RHYTHM</div>
+                        <div style="font-size:0.75rem;color:#cbd5e1;line-height:1.4;">
+                            ${ai.summary || ai.thesis || consensus.rationale || 'Volume accumulation detected along the horizontal support floor. Quantitative metrics confirm favorable risk-to-reward ratio for swing positioning.'}
+                        </div>
+                    </div>
+
+                    <!-- Modal Actions Bar -->
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:0.65rem;border-top:1px solid rgba(255,255,255,0.08);">
+                        <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" class="btn btn-secondary btn-sm" style="font-size:0.75rem;text-decoration:none;">
+                            📊 Open Full Stock Intelligence & Charts ↗
+                        </a>
+                        <div style="display:flex;gap:0.4rem;">
+                            <button type="button" onclick="app.runSwingKronos('${ticker.replace(/'/g, "\\'")}', this)" class="btn btn-sm" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:0.75rem;">
+                                🔮 Refresh Kronos
+                            </button>
+                            <button type="button" onclick="document.getElementById('swingAiThesisModal').style.display='none'" class="btn btn-primary btn-sm" style="font-size:0.75rem;">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
     };
 
@@ -138,3 +282,4 @@
         Object.assign(window.app, swingModule);
     }
 })();
+

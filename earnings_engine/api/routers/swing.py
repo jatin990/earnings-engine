@@ -9,11 +9,16 @@ from fastapi import APIRouter, HTTPException, Query
 from earnings_engine.api.dependencies import _settings
 from earnings_engine.api import dashboard_api
 from earnings_engine.data import swing_ranges as swing_mod
+from earnings_engine.data import swing_scanner as swing_scanner_mod
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.api.routers.swing")
 
 router = APIRouter(tags=["Swing Ranges & Strategy Backtest"])
+
+
+def _get_settings():
+    return _settings() if callable(_settings) else _settings
 
 
 @router.get("/api/v1/swing-range")
@@ -24,7 +29,7 @@ async def get_swing_range_endpoint(
 ):
     """Retrieve support and resistance channel bounds and cycle counts."""
     try:
-        rng = await asyncio.to_thread(swing_mod.get_swing_range, watchlist, ticker, settings=_settings)
+        rng = await asyncio.to_thread(swing_mod.get_swing_range, watchlist, ticker, settings=_get_settings())
         if not rng:
             return {"success": False, "found": False, "range": None}
         return {"success": True, "found": True, "range": rng}
@@ -46,7 +51,7 @@ async def list_swing_ranges_endpoint(
 ):
     """List all swing ranges, optionally filtered by watchlist."""
     try:
-        ranges = await asyncio.to_thread(swing_mod.list_ranges, watchlist=watchlist, settings=_settings)
+        ranges = await asyncio.to_thread(swing_mod.list_ranges, watchlist=watchlist, settings=_get_settings())
         return {"success": True, "count": len(ranges), "ranges": ranges}
     except Exception as e:
         logger.exception("Error in list_swing_ranges: %s", e)
@@ -75,7 +80,7 @@ async def set_swing_range_endpoint(request: dict):
             lower=float(lower),
             upper=float(upper),
             cycles=int(cycles) if cycles is not None else None,
-            settings=_settings,
+            settings=_get_settings(),
         )
         return {"success": True, "range": saved, **saved}
     except Exception as e:
@@ -91,7 +96,7 @@ async def delete_swing_range_endpoint(
 ):
     """Delete manual swing range override to revert to automated channel detection."""
     try:
-        await asyncio.to_thread(swing_mod.clear_user_range, watchlist, ticker, settings=_settings)
+        await asyncio.to_thread(swing_mod.clear_user_range, watchlist, ticker, settings=_get_settings())
         return {"success": True, "deleted": True, "range": None}
     except Exception as e:
         logger.exception("Error deleting swing range: %s", e)
@@ -121,6 +126,37 @@ async def auto_detect_swing_range_path(ticker: str, watchlist: str = "my_watchli
     return await auto_detect_swing_range_endpoint({"ticker": ticker, "watchlist": watchlist})
 
 
+@router.get("/api/v1/dashboard/swing/status")
+@router.get("/api/v1/swing/status")
+async def get_swing_status_endpoint(
+    universe: str | None = Query(None, description="Universe / Watchlist filter"),
+):
+    """Return status summary of tiered swing scanner (Hot/Warm counts, scan intervals)."""
+    try:
+        status = await asyncio.to_thread(swing_scanner_mod.get_scan_status, universe=universe)
+        return status
+    except Exception as e:
+        logger.exception("Error in get_swing_status: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/dashboard/swing/scan")
+@router.post("/api/v1/swing/scan")
+async def run_swing_scan_endpoint(request: dict | None = None):
+    """Trigger an on-demand scan of the swing universe."""
+    universe = (request or {}).get("universe", "ALL")
+    try:
+        candidates = await asyncio.to_thread(swing_scanner_mod.run_cold_scan, _get_settings(), universe=universe)
+        return {
+            "success": True,
+            "candidates_count": len(candidates),
+            "candidates": candidates[:50],
+        }
+    except Exception as e:
+        logger.exception("Error triggering swing scan: %s", e)
+        raise HTTPException(status_code=500, detail=f"Swing scan failed: {str(e)}")
+
+
 @router.get("/api/v1/dashboard/swing")
 @router.get("/api/v1/dashboard/swing/setups")
 async def get_swing_setups_endpoint(
@@ -129,6 +165,16 @@ async def get_swing_setups_endpoint(
 ):
     """Retrieve active swing setups with channel bounds, risk/reward, and cycle indicators."""
     try:
+        # First try fast retrieval from tiered swing_scanner cache
+        cached = await asyncio.to_thread(
+            swing_scanner_mod.get_cached_swing_results,
+            universe=market,
+            settings=_get_settings(),
+        )
+        if cached:
+            return cached[:limit]
+
+        # Fallback to dashboard_api calculation if scanner cache is cold
         setups = await asyncio.to_thread(dashboard_api.get_swing_setups, market=market, limit=limit)
         return setups
     except Exception as e:
@@ -145,7 +191,7 @@ async def get_swing_cycle_history_endpoint(
 ):
     """Return historical swing cycle data for a specific ticker."""
     try:
-        cycles = await asyncio.to_thread(swing_mod.get_cycle_history, watchlist, ticker, settings=_settings)
+        cycles = await asyncio.to_thread(swing_mod.get_cycle_history, watchlist, ticker, settings=_get_settings())
         return {"success": True, "count": len(cycles), "cycles": cycles}
     except Exception as e:
         logger.exception("Error in get_swing_cycle_history: %s", e)
@@ -157,7 +203,7 @@ async def get_backtest_stats_endpoint():
     """Return walk-forward backtest summary from the event dataset."""
     try:
         from earnings_engine.data.strategy_auditor import get_strategy_performance_summary
-        stats = await asyncio.to_thread(get_strategy_performance_summary, settings=_settings)
+        stats = await asyncio.to_thread(get_strategy_performance_summary, settings=_get_settings())
         return {"success": True, "stats": stats}
     except Exception as e:
         logger.exception("Error in get_backtest_stats: %s", e)
@@ -170,7 +216,7 @@ async def get_latest_backtest_endpoint():
     """Retrieve the most recent strategy audit records."""
     try:
         from earnings_engine.data.strategy_auditor import load_predictions
-        records = await asyncio.to_thread(load_predictions, limit=50, settings=_settings)
+        records = await asyncio.to_thread(load_predictions, limit=50, settings=_get_settings())
         return {"success": True, "count": len(records) if records else 0, "records": records or []}
     except Exception as e:
         logger.exception("Error in get_latest_backtest: %s", e)

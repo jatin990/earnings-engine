@@ -131,6 +131,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("[SCHEDULER] Startup scheduler engine warning: %s", e)
 
+        # Hydrate swing scanner pool from database on startup
+        try:
+            from earnings_engine.data.swing_scanner import load_swing_pool_from_db
+            load_swing_pool_from_db(_settings)
+            logger.info("[SWING] Swing scanner pool hydrated on startup.")
+        except Exception as e:
+            logger.warning("[SWING] Startup swing scanner pool warning: %s", e)
+
         # Pre-scan and cache available local LLM models (Ollama / LM Studio)
         try:
             from earnings_engine.api.routers.consensus import _scan_and_cache_local_models
