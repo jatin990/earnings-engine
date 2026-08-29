@@ -999,6 +999,7 @@ def get_all_watchlists_and_universes() -> dict[str, Any]:
     universes = get_universe_details(settings)
     return {
         "watchlists": custom_lists,
+        "custom_lists": custom_lists,
         "universes": universes,
         "all_lists": custom_lists + universes,
     }

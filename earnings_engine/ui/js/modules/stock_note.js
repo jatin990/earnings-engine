@@ -341,8 +341,9 @@
                 try {
                     const res = await fetch(API_BASE + '/api/v1/watchlist/all');
                     if (!res.ok) return;
-                    const lists = await res.json();
-                    if (!Array.isArray(lists) || !lists.length) return;
+                    const data = await res.json();
+                    const lists = data.watchlists || data.custom_lists || (Array.isArray(data) ? data : []);
+                    if (!lists.length) return;
 
                     const currentVal = document.getElementById('pgBatchSource')?.value;
                     group.innerHTML = lists.map(wl => {

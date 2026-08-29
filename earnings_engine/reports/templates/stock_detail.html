@@ -3002,7 +3002,7 @@
                 const res = await fetch('/api/v1/watchlist/all');
                 if (res.ok) {
                     const data = await res.json();
-                    stockAllPlaylists = data.custom_lists || [];
+                    stockAllPlaylists = data.watchlists || data.custom_lists || (Array.isArray(data) ? data : []);
                 } else {
                     const resN = await fetch('/api/v1/watchlist/names');
                     if (resN.ok) {
