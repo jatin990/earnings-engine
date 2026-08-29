@@ -44,12 +44,36 @@ MODEL_FALLBACKS: dict[str, str] = {
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-SYSTEM_PROMPT = """You are a quantitative stock analyst and swing trader. Given the stock analysis context below, provide your prediction as a STRICT JSON object with exactly these fields:
 
-{
+def get_horizon_system_prompt(timeframe_days: int = 14) -> str:
+    """Generate specialized system prompt calibrated for the specified trading horizon."""
+    if timeframe_days <= 5:
+        horizon_name = "SHORT-TERM SWING / CATALYST SCALP (1–5 Trading Days)"
+        horizon_guidance = """- Horizon Focus: Immediate news catalyst reaction, deliverable volume surge, 1-3 day price expansion, and tight invalidation stop-loss.
+- Expected Target Return Scale: Typically 2.0% to 7.0% for short-term breakouts.
+- Invalidation / Stop Loss: Tight technical invalidation below recent session low or swing pivot (1.0% to 3.0% max risk)."""
+    elif timeframe_days <= 21:
+        horizon_name = "MEDIUM-TERM SWING MOMENTUM (14–21 Trading Days)"
+        horizon_guidance = """- Horizon Focus: 2-week swing structure, 20/50 EMA dynamic support, Kronos sequence trajectory, and swing channel extremes.
+- Expected Target Return Scale: Typically 5.0% to 15.0% for medium-term swing setups.
+- Invalidation / Stop Loss: Dynamic structural stop below the 20-day EMA or recent swing channel support."""
+    elif timeframe_days <= 60:
+        horizon_name = "MULTI-WEEK POSITIONAL TREND (30–60 Trading Days)"
+        horizon_guidance = """- Horizon Focus: Quarterly earnings track record, multi-week base breakouts, institutional accumulation trends, and trend following.
+- Expected Target Return Scale: Typically 10.0% to 25.0% for multi-week positional setups.
+- Invalidation / Stop Loss: Wider stop below the 50-day EMA or major base pivot."""
+    else:
+        horizon_name = "POSITIONAL / MULTI-QUARTER HORIZON (60–90+ Trading Days)"
+        horizon_guidance = """- Horizon Focus: Multi-quarter EPS beat consistency, fundamental compounder valuation, institutional fund stake accumulation, and macro industry tailwinds.
+- Expected Target Return Scale: Typically 15.0% to 40.0% for multi-quarter holding horizons.
+- Invalidation / Stop Loss: Positional invalidation below the 200-day EMA or multi-month cyclical floor."""
+
+    return f"""You are a quantitative stock analyst and swing trader specializing in {horizon_name}. Given the stock analysis context below, provide your prediction as a STRICT JSON object with exactly these fields:
+
+{{
   "direction": "BULLISH" or "BEARISH" or "NEUTRAL",
   "confidence_pct": <integer 0-100>,
-  "target_return_pct": <float, expected % return over the timeframe>,
+  "target_return_pct": <float, expected % return over the {timeframe_days}-day timeframe>,
   "target_price": <float>,
   "support_level": <float, key swing/pivot support floor>,
   "resistance_level": <float, key breakout resistance ceiling>,
@@ -60,16 +84,22 @@ SYSTEM_PROMPT = """You are a quantitative stock analyst and swing trader. Given 
   "recommended_action": "<string, e.g. 'STRONG BUY', 'ACCUMULATE ON DIPS', 'HOLD / WAIT FOR BREAKOUT', 'TAKE PROFITS', 'AVOID / CAUTION'>",
   "key_drivers": [<string>, <string>],
   "primary_risk": "<string>"
-}
+}}
+
+Horizon Directives ({horizon_name}):
+{horizon_guidance}
 
 Rules:
 - Respond with ONLY the JSON object. No markdown, no explanation, no commentary.
 - confidence_pct reflects how certain you are in the direction call (0-100).
-- target_return_pct is positive for BULLISH, negative for BEARISH, near-zero for NEUTRAL.
+- target_return_pct is positive for BULLISH, negative for BEARISH, near-zero for NEUTRAL over {timeframe_days} trading days.
 - stop_loss_price should be a sensible invalidation level below support (for bullish) or above resistance (for bearish).
-- key_drivers should list 2-3 concise reasons for your directional call.
-- primary_risk should state the single biggest risk to your thesis.
+- key_drivers should list 2-3 concise reasons for your directional call for this {timeframe_days}-day horizon.
+- primary_risk should state the single biggest risk to your thesis over this horizon.
 - All price fields should use the same currency as the context."""
+
+
+SYSTEM_PROMPT = get_horizon_system_prompt(14)
 
 # Short display names for model IDs
 MODEL_DISPLAY_NAMES: dict[str, str] = {
@@ -112,6 +142,7 @@ def _query_local_model(
     prompt: str,
     timeout: int = 60,
     local_url: str | None = None,
+    timeframe_days: int = 14,
 ) -> dict[str, Any]:
     """Execute a local LLM prompt via Ollama (http://localhost:11434) or LM Studio (http://localhost:1234)."""
     start = time.perf_counter()
@@ -123,9 +154,10 @@ def _query_local_model(
     
     base_host = (local_url or os.getenv("LOCAL_LLM_URL") or os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
     
-    logger.info("[CONSENSUS-LOCAL] Querying local model %s at %s...", local_model, base_host)
+    logger.info("[CONSENSUS-LOCAL] Querying local model %s (timeframe=%dd) at %s...", local_model, timeframe_days, base_host)
     
     v1_url = f"{base_host}/v1/chat/completions" if not base_host.endswith("/v1") else f"{base_host}/chat/completions"
+    system_prompt = get_horizon_system_prompt(timeframe_days)
     
     resp_text = ""
     total_tokens = 0
@@ -140,7 +172,7 @@ def _query_local_model(
             json={
                 "model": local_model,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
                 "format": "json",
@@ -178,7 +210,7 @@ def _query_local_model(
                 json={
                     "model": local_model,
                     "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.3,
@@ -202,7 +234,7 @@ def _query_local_model(
     if not success:
         try:
             native_gen_url = f"{base_host}/api/generate"
-            full_user_prompt = f"{SYSTEM_PROMPT}\n\nUser Context:\n{prompt}"
+            full_user_prompt = f"{system_prompt}\n\nUser Context:\n{prompt}"
             resp = requests.post(
                 native_gen_url,
                 headers={"Content-Type": "application/json"},
@@ -324,7 +356,8 @@ def _query_single_model(
     timeout: int = 60,
     max_retries: int = 2,
     local_url: str | None = None,
-    _ticker: str | None = None,
+    _ticker: str = "UNKNOWN",
+    timeframe_days: int = 14,
 ) -> dict[str, Any]:
     """Send a prediction request to a single model (local or via OpenRouter) with rate limit retry & fallback.
 
@@ -337,11 +370,12 @@ def _query_single_model(
         or model_id.startswith("lmstudio/")
         or model_id == "local"
     ):
-        return _query_local_model(model_id, prompt, timeout=timeout, local_url=local_url)
+        return _query_local_model(model_id, prompt, timeout=timeout, local_url=local_url, timeframe_days=timeframe_days)
 
     display_name = MODEL_DISPLAY_NAMES.get(model_id, model_id.split("/")[-1])
     current_model = model_id
     current_max_tokens = int(os.getenv("OPENROUTER_MAX_TOKENS", "1000"))
+    system_prompt = get_horizon_system_prompt(timeframe_days)
 
     # --- Pre-flight rate-limit check (only blocks on genuine quota exhaustion) ---
     try:
@@ -369,7 +403,7 @@ def _query_single_model(
 
     for attempt in range(max_retries + 1):
         start = time.perf_counter()
-        logger.info("[CONSENSUS] Querying %s (%s, attempt %d/%d, max_tokens=%d)...", display_name, current_model, attempt + 1, max_retries + 1, current_max_tokens)
+        logger.info("[CONSENSUS] Querying %s (%s, timeframe=%dd, attempt %d/%d, max_tokens=%d)...", display_name, current_model, timeframe_days, attempt + 1, max_retries + 1, current_max_tokens)
         try:
             # Record request BEFORE the HTTP call so the sliding window is updated
             # even if the request errors or times out.
@@ -392,7 +426,7 @@ def _query_single_model(
                 json={
                     "model": current_model,
                     "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.3,
@@ -808,7 +842,7 @@ def run_consensus_models(
 
     with ThreadPoolExecutor(max_workers=len(models)) as executor:
         futures = {
-            executor.submit(_query_single_model, model_id, full_prompt, api_key, timeout, 2, local_url, ticker): model_id
+            executor.submit(_query_single_model, model_id, full_prompt, api_key, timeout, 2, local_url, ticker, timeframe): model_id
             for model_id in models
         }
         for future in as_completed(futures):

@@ -20,7 +20,7 @@ _TABLE_CREATED = False
 
 
 def _ensure_table(conn: Any) -> None:
-    """Create the consensus_predictions table if it doesn't exist."""
+    """Create the consensus_predictions table if it doesn't exist, and migrate columns."""
     global _TABLE_CREATED
     if _TABLE_CREATED:
         return
@@ -31,6 +31,7 @@ def _ensure_table(conn: Any) -> None:
             ticker TEXT NOT NULL,
             created_at TEXT NOT NULL,
             evaluation_date TEXT NOT NULL,
+            timeframe_days INTEGER DEFAULT 14,
             as_of_price REAL NOT NULL,
             consensus_direction TEXT NOT NULL,
             consensus_strength REAL NOT NULL,
@@ -52,7 +53,15 @@ def _ensure_table(conn: Any) -> None:
             failure_post_mortem TEXT
         )
     """)
+    # Migration: add timeframe_days if table was created in an older version
+    try:
+        conn.execute("ALTER TABLE consensus_predictions ADD COLUMN timeframe_days INTEGER DEFAULT 14")
+        conn.commit()
+    except Exception:
+        pass
+
     conn.execute("CREATE INDEX IF NOT EXISTS idx_consensus_ticker ON consensus_predictions(ticker)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_consensus_ticker_timeframe ON consensus_predictions(ticker, timeframe_days)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_consensus_status ON consensus_predictions(settlement_status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_consensus_eval_date ON consensus_predictions(evaluation_date)")
     conn.commit()
@@ -88,21 +97,23 @@ def save_prediction(consensus: dict[str, Any], evaluation_date: str, settings: S
 
     models_json = json.dumps(consensus.get("models_breakdown", []), default=str)
     now = datetime.now().isoformat()
+    timeframe_days = int(consensus.get("timeframe_days") or 14)
 
     cursor = conn.execute(
         """
         INSERT INTO consensus_predictions (
-            ticker, created_at, evaluation_date, as_of_price,
+            ticker, created_at, evaluation_date, timeframe_days, as_of_price,
             consensus_direction, consensus_strength, consensus_return_pct,
             consensus_target_price, consensus_support, consensus_resistance,
             model_count, agreement_ratio, models_breakdown_json, synthesized_thesis,
             settlement_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
         """,
         (
             consensus["ticker"],
             now,
             evaluation_date,
+            timeframe_days,
             consensus["as_of_price"],
             consensus["consensus_direction"],
             consensus["consensus_strength"],
@@ -123,14 +134,15 @@ def save_prediction(consensus: dict[str, Any], evaluation_date: str, settings: S
     row_id = row[0] if row else 0
     conn.close()
 
-    logger.info("[CONSENSUS-DB] Saved prediction for %s (id=%d, direction=%s, strength=%.0f%%)",
-                consensus["ticker"], row_id, consensus["consensus_direction"], consensus["consensus_strength"])
+    logger.info("[CONSENSUS-DB] Saved prediction for %s (id=%d, timeframe=%dd, direction=%s, strength=%.0f%%)",
+                consensus["ticker"], row_id, timeframe_days, consensus["consensus_direction"], consensus["consensus_strength"])
     return row_id
 
 
 def get_predictions(
     settings: Settings | None = None,
     ticker: str | None = None,
+    timeframe_days: int | None = None,
     status: str | None = None,
     direction: str | None = None,
     limit: int = 50,
@@ -145,6 +157,9 @@ def get_predictions(
     if ticker:
         query += " AND ticker = ?"
         params.append(ticker)
+    if timeframe_days is not None:
+        query += " AND timeframe_days = ?"
+        params.append(int(timeframe_days))
     if status:
         query += " AND settlement_status = ?"
         params.append(status.upper())
@@ -346,7 +361,7 @@ def _row_to_dict(row: Any) -> dict[str, Any]:
 
     # Column names for consensus_predictions table
     columns = [
-        "id", "ticker", "created_at", "evaluation_date", "as_of_price",
+        "id", "ticker", "created_at", "evaluation_date", "timeframe_days", "as_of_price",
         "consensus_direction", "consensus_strength", "consensus_return_pct",
         "consensus_target_price", "consensus_support", "consensus_resistance",
         "model_count", "agreement_ratio", "models_breakdown_json", "synthesized_thesis",
@@ -364,6 +379,9 @@ def _row_to_dict(row: Any) -> dict[str, Any]:
                 d[col] = row[i]
             except (IndexError, TypeError):
                 d[col] = None
+
+    if d.get("timeframe_days") is None:
+        d["timeframe_days"] = 14
 
     # Parse the JSON breakdown
     if "models_breakdown_json" in d and isinstance(d["models_breakdown_json"], str):

@@ -1224,12 +1224,12 @@
                 <!-- Action Controls Group -->
                 <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
                     <div class="timeframe-pill-group" title="Select prediction horizon">
-                        <button type="button" class="tf-pill-btn" onclick="setTimeframe(7)" id="aiTfBtn-7">7D</button>
-                        <button type="button" class="tf-pill-btn active" onclick="setTimeframe(14)" id="aiTfBtn-14">14D</button>
-                        <button type="button" class="tf-pill-btn" onclick="setTimeframe(30)" id="aiTfBtn-30">30D</button>
-                        <button type="button" class="tf-pill-btn" onclick="setTimeframe(90)" id="aiTfBtn-90">90D</button>
+                        <button type="button" class="tf-pill-btn" onclick="setHorizonTimeframe(3)" id="aiTfBtn-3">⚡ 3D Swing</button>
+                        <button type="button" class="tf-pill-btn active" onclick="setHorizonTimeframe(14)" id="aiTfBtn-14">🎯 14D Momentum</button>
+                        <button type="button" class="tf-pill-btn" onclick="setHorizonTimeframe(45)" id="aiTfBtn-45">📈 45D Positional</button>
+                        <button type="button" class="tf-pill-btn" onclick="setHorizonTimeframe(90)" id="aiTfBtn-90">🏛️ 90D Quarterly</button>
                     </div>
-                    <button type="button" id="btnConsensusMain" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.38rem 0.95rem; font-size: 0.78rem; font-weight: 800; background: linear-gradient(135deg, #2563eb, #6366f1); border: none; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);" title="Run all AI engines in parallel on-demand">
+                    <button type="button" id="btnConsensusMain" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.38rem 0.95rem; font-size: 0.78rem; font-weight: 800; background: linear-gradient(135deg, #2563eb, #6366f1); border: none; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);" title="Run all AI engines in parallel on-demand for selected horizon">
                         ⚡ Run All Consensus
                     </button>
                 </div>
@@ -1998,13 +1998,29 @@
                 vPill.style.color = isBull ? 'var(--emerald)' : (dir === 'BEARISH' ? 'var(--rose)' : '#fbbf24');
             }
 
+            const tfDays = c.timeframe_days || currentSelectedTimeframe || 14;
+            currentSelectedTimeframe = tfDays;
+
+            // Sync timeframe pill active state
+            document.querySelectorAll('.timeframe-pill-group .tf-pill-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeTfBtn = document.getElementById(`aiTfBtn-${tfDays}`);
+            if (activeTfBtn) activeTfBtn.classList.add('active');
+
+            const horizonTitle = tfDays <= 5 ? '⚡ 3D Catalyst Scalp' :
+                                 tfDays <= 21 ? '🎯 14D Swing Momentum' :
+                                 tfDays <= 60 ? '📈 45D Positional Trend' :
+                                 '🏛️ 90D Multi-Quarter Horizon';
+
             const summaryEl = document.getElementById('lblVerdictSummary');
             const subEl = document.getElementById('lblVerdictSub');
             if (summaryEl) {
-                summaryEl.textContent = isBull ? '🚀 High-Conviction Bullish Setup' : (dir === 'BEARISH' ? '🔻 Bearish Breakdown Warning' : '⚖️ Range-Bound Tactical Setup');
+                summaryEl.textContent = isBull ? `🚀 High-Conviction Bullish Setup (${horizonTitle})` : (dir === 'BEARISH' ? `🔻 Bearish Breakdown Warning (${horizonTitle})` : `⚖️ Range-Bound Tactical Setup (${horizonTitle})`);
             }
             if (subEl) {
-                subEl.textContent = `${c.model_count || 6} AI Models evaluated for ${currentSelectedTimeframe || 14}-day tactical swing horizon`;
+                const evalDateStr = c.evaluation_date ? ` · Target Date: ${c.evaluation_date}` : '';
+                subEl.textContent = `${c.model_count || 6} AI Models evaluated for ${tfDays}-day horizon${evalDateStr}`;
             }
 
             if (wEl) {
@@ -2027,12 +2043,12 @@
             const targetP = Number(c.consensus_target_price || c.target_price || 0);
             if (tgEl) tgEl.textContent = targetP ? `₹${targetP.toFixed(2)}` : '—';
             const gainPct = (targetP && curr) ? ((targetP / curr - 1.0) * 100).toFixed(1) : (c.consensus_return_pct ? Number(c.consensus_return_pct).toFixed(1) : '0.0');
-            if (tgSub) tgSub.textContent = `+${gainPct}% upside target (${currentSelectedTimeframe || 14}D)`;
+            if (tgSub) tgSub.textContent = `+${gainPct}% upside target (${tfDays}D Horizon)`;
 
             const slP = Number(c.consensus_stop_loss || (supportP && supportP < curr ? supportP : (curr * 0.94)));
             if (slEl) slEl.textContent = slP ? `₹${slP.toFixed(2)}` : '—';
             const riskPct = (slP && curr) ? ((slP / curr - 1.0) * 100).toFixed(1) : '-6.0';
-            if (slSub) slSub.textContent = `${riskPct}% risk cut`;
+            if (slSub) slSub.textContent = `${riskPct}% risk cut (${tfDays}D Horizon)`;
 
             const rrVal = c.consensus_risk_reward || (targetP && slP && curr && (curr - slP) > 0 ? ((targetP - curr) / (curr - slP)).toFixed(1) : '2.5');
             if (rrEl) rrEl.textContent = `1 : ${rrVal}`;
@@ -2775,6 +2791,52 @@
                     btn.innerHTML = prevHtml;
                 }
             }
+        }
+
+        let currentSelectedTimeframe = 14;
+
+        async function setHorizonTimeframe(days) {
+            currentSelectedTimeframe = parseInt(days, 10) || 14;
+
+            // Sync timeframe pill UI state
+            document.querySelectorAll('.timeframe-pill-group .tf-pill-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeBtn = document.getElementById(`aiTfBtn-${currentSelectedTimeframe}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            const mainBtn = document.getElementById('btnConsensusMain');
+            if (mainBtn) {
+                mainBtn.innerHTML = `⚡ Run ${currentSelectedTimeframe}D Consensus`;
+            }
+
+            // Check if cached prediction exists specifically for this horizon
+            try {
+                const res = await fetch(`/api/v1/consensus/prediction?ticker=${encodeURIComponent(ACTIVE_SYM)}&timeframe_days=${currentSelectedTimeframe}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.found && data.prediction && Number(data.prediction.timeframe_days) === currentSelectedTimeframe) {
+                        if (stockState) stockState.consensus = data.prediction;
+                        const currPrice = (stockState && stockState.quote && stockState.quote.current_price) || 0;
+                        renderConsensus(data.prediction, currPrice);
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.debug('Horizon cache check note:', e);
+            }
+
+            // If this horizon hasn't been generated yet, show empty launcher state for this horizon
+            const resultsState = document.getElementById('aiConsensusResults');
+            const emptyLauncher = document.getElementById('aiEmptyLauncher');
+            if (emptyLauncher && resultsState) {
+                resultsState.style.display = 'none';
+                emptyLauncher.style.display = 'block';
+            }
+        }
+
+        function setTimeframe(days) {
+            return setHorizonTimeframe(days);
         }
 
         async function runConsensus(force = true, modelId = null) {

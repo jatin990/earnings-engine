@@ -68,6 +68,7 @@ def aggregate_predictions(
     if not valid:
         return {
             "ticker": ticker,
+            "timeframe_days": timeframe_days,
             "as_of_price": as_of_price,
             "consensus_direction": "NEUTRAL",
             "consensus_strength": 0.0,
@@ -240,6 +241,7 @@ def aggregate_predictions(
 
     return {
         "ticker": ticker,
+        "timeframe_days": timeframe_days,
         "as_of_price": round(as_of_price, 2),
         "consensus_direction": consensus_direction,
         "consensus_strength": round(consensus_strength, 1),

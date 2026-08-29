@@ -203,6 +203,62 @@ async def get_latest_consensus_predictions(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/v1/consensus/prediction")
+async def get_cached_consensus_prediction(
+    ticker: str = Query(..., description="Stock ticker symbol (e.g. TCS.NS)"),
+    timeframe_days: int | None = Query(None, description="Optional horizon in days (e.g. 3, 14, 45, 90)"),
+    event_date: str | None = Query(None, description="Optional earnings event date (YYYY-MM-DD)"),
+):
+    """Retrieve cached consensus prediction for a specific horizon if present."""
+    try:
+        sym = ticker.upper().strip()
+        preds = await asyncio.to_thread(
+            get_predictions,
+            settings=_settings,
+            ticker=sym,
+            timeframe_days=timeframe_days,
+            limit=1,
+        )
+        if not preds and timeframe_days is not None:
+            # Fallback to latest overall prediction for this ticker if specific timeframe not yet cached
+            preds = await asyncio.to_thread(get_predictions, settings=_settings, ticker=sym, limit=1)
+
+        if not preds:
+            return {"found": False, "prediction": None}
+        return {"found": True, "prediction": preds[0]}
+    except Exception as e:
+        logger.exception("Error fetching cached prediction for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/consensus/horizons/{ticker}")
+@router.get("/api/v1/consensus/{ticker}/horizons")
+async def get_multi_horizon_consensus(ticker: str):
+    """Retrieve latest cached consensus predictions across all major horizons (3D, 14D, 45D, 90D)."""
+    sym = ticker.upper().strip()
+    horizons = [3, 14, 45, 90]
+    results: dict[str, Any] = {}
+    try:
+        for tf in horizons:
+            preds = await asyncio.to_thread(
+                get_predictions,
+                settings=_settings,
+                ticker=sym,
+                timeframe_days=tf,
+                limit=1,
+            )
+            results[f"{tf}d"] = preds[0] if preds else None
+        return {
+            "success": True,
+            "ticker": sym,
+            "available_horizons": [3, 14, 45, 90],
+            "horizons": results,
+        }
+    except Exception as e:
+        logger.exception("Error fetching multi-horizon consensus for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/api/v1/consensus/{prediction_id}")
 async def get_consensus_prediction_by_id(prediction_id: int):
     """Retrieve a specific consensus prediction by ID."""
@@ -218,25 +274,9 @@ async def get_consensus_prediction_by_id(prediction_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/api/v1/consensus/prediction")
-async def get_cached_consensus_prediction(
-    ticker: str = Query(..., description="Stock ticker symbol (e.g. TCS.NS)"),
-    event_date: str | None = Query(None, description="Optional earnings event date (YYYY-MM-DD)"),
-):
-    """Retrieve cached consensus prediction if present."""
-    try:
-        preds = await asyncio.to_thread(get_predictions, settings=_settings, ticker=ticker.upper().strip(), limit=1)
-        if not preds:
-            return {"found": False, "prediction": None}
-        return {"found": True, "prediction": preds[0]}
-    except Exception as e:
-        logger.exception("Error fetching cached prediction for %s: %s", ticker, e)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.post("/api/v1/consensus/predict")
 async def run_consensus_predict(req: ConsensusPredictRequest):
-    """Execute live multi-model AI consensus reasoning workflow."""
+    """Execute live multi-model AI consensus reasoning workflow for a specific horizon."""
     from earnings_engine.consensus import context_builder, model_runner, aggregator, storage
     from earnings_engine.rate_limits import get_models_rate_limits, get_ratelimits_summary
 
@@ -255,7 +295,13 @@ async def run_consensus_predict(req: ConsensusPredictRequest):
     for ticker in target_tickers:
         try:
             if not req.force_refresh and not req.force:
-                cached_preds = await asyncio.to_thread(storage.get_predictions, settings=_settings, ticker=ticker, limit=1)
+                cached_preds = await asyncio.to_thread(
+                    storage.get_predictions,
+                    settings=_settings,
+                    ticker=ticker,
+                    timeframe_days=req.timeframe_days,
+                    limit=1,
+                )
                 if cached_preds:
                     latest = cached_preds[0]
                     created_at_str = latest.get("created_at") or ""
@@ -269,8 +315,8 @@ async def run_consensus_predict(req: ConsensusPredictRequest):
                         is_usable_cache = bool(latest.get("consensus_direction"))
 
                     if is_usable_cache:
-                        logger.info("[CONSENSUS-CACHE] Returning cached prediction for %s (id=%s, direction=%s)",
-                                    ticker, latest.get("id"), latest.get("consensus_direction"))
+                        logger.info("[CONSENSUS-CACHE] Returning cached prediction for %s (id=%s, timeframe=%dd, direction=%s)",
+                                    ticker, latest.get("id"), req.timeframe_days, latest.get("consensus_direction"))
                         results.append(latest)
                         continue
 
@@ -291,9 +337,15 @@ async def run_consensus_predict(req: ConsensusPredictRequest):
                 local_url=req.local_model_url,
             )
 
-            # If running a single model (or subset), merge with previous model outputs to keep 4-model matrix updated
+            # If running a single model (or subset), merge with previous model outputs for this horizon to keep matrix updated
             if req.models and len(req.models) < len(model_runner.DEFAULT_MODELS):
-                cached_preds = await asyncio.to_thread(storage.get_predictions, settings=_settings, ticker=ticker, limit=1)
+                cached_preds = await asyncio.to_thread(
+                    storage.get_predictions,
+                    settings=_settings,
+                    ticker=ticker,
+                    timeframe_days=req.timeframe_days,
+                    limit=1,
+                )
                 if cached_preds:
                     prev_models = cached_preds[0].get("models_breakdown", [])
                     new_ids = {m.get("model_id") for m in model_outputs}
@@ -316,6 +368,7 @@ async def run_consensus_predict(req: ConsensusPredictRequest):
             pred_id = await asyncio.to_thread(storage.save_prediction, consensus, evaluation_date=eval_date, settings=_settings)
             consensus["id"] = pred_id
             consensus["evaluation_date"] = eval_date
+            consensus["timeframe_days"] = req.timeframe_days
             results.append(consensus)
         except Exception as e:
             logger.error("[CONSENSUS-API] Error predicting for %s: %s", ticker, e)
