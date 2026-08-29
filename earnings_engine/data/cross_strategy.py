@@ -65,6 +65,66 @@ def get_market_macro_summary(settings: Settings | None = None) -> dict[str, Any]
         }
 
 
+def compute_market_regime_multiplier(settings: Settings | None = None) -> dict[str, Any]:
+    """Compute setup multipliers and macro alignment scores across all strategies.
+
+    Returns
+    -------
+    dict:
+        breakout_multiplier: float (0.75 - 1.20)
+        swing_multiplier: float (0.80 - 1.15)
+        macro_score: float (0 - 15 pts)
+        macro_bias: str
+        macro_tag: str
+        macro_pill: str
+        pill_color: str
+        fear_greed_score: float
+        vix_level: float
+    """
+    macro = get_market_macro_summary(settings)
+    fg = float(macro.get("fear_greed_score", 50.0))
+    vix = float(macro.get("vix_level", 14.0))
+    bias = macro.get("macro_bias", "RANGEBOUND_NEUTRAL")
+
+    if bias == "BULLISH_EXPANSION" or (fg >= 60 and vix <= 15.5):
+        # Risk-on expansion favors momentum breakouts & support rebounds
+        breakout_mult = 1.15
+        swing_mult = 1.10
+        macro_score = 15.0
+        macro_tag = "🌐 Macro Tailwinds (Expansion · High Breakout Win-Rate)"
+        macro_pill = f"🟢 Tailwinds (+15 pts · Greed {fg:.0f})"
+        pill_color = "#34d399"
+    elif bias == "BEARISH_DEFENSIVE" or (fg <= 40 or vix >= 20.0):
+        # Risk-off volatile regime: penalize false breakouts, tighten swing requirements
+        breakout_mult = 0.75
+        swing_mult = 0.80
+        macro_score = 0.0
+        macro_tag = "⚠️ Macro Headwinds (Volatile · Elevated False Breakout Risk)"
+        macro_pill = f"🔴 Headwinds (-15 pts · VIX {vix:.1f})"
+        pill_color = "#f87171"
+    else:
+        # Rangebound / Normal
+        breakout_mult = 1.00
+        swing_mult = 1.05  # Rangebound is great for horizontal support/resistance swings
+        macro_score = 8.0
+        macro_tag = "⚖️ Rangebound Consolidation (Optimal for Swing Channels)"
+        macro_pill = f"🟡 Neutral ({macro.get('fear_greed_label', 'Neutral')})"
+        pill_color = "#fbbf24"
+
+    return {
+        "breakout_multiplier": breakout_mult,
+        "swing_multiplier": swing_mult,
+        "macro_score": macro_score,
+        "macro_bias": bias,
+        "macro_tag": macro_tag,
+        "macro_pill": macro_pill,
+        "pill_color": pill_color,
+        "fear_greed_score": fg,
+        "vix_level": vix,
+        "macro_summary": macro,
+    }
+
+
 def get_stock_news_sentiment(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
     """Retrieve recent news catalysts and sentiment score for a stock."""
     ticker = (ticker or "").upper().strip()

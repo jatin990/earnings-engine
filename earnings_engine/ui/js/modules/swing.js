@@ -206,7 +206,7 @@
                 <div style="display:flex;flex-direction:column;gap:1rem;">
                     
                     <!-- Top AI Summary Banner -->
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;background:#060913;padding:0.85rem 1rem;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.06);">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:0.75rem;background:#060913;padding:0.85rem 1rem;border-radius:0.5rem;border:1px solid rgba(255,255,255,0.06);">
                         <div>
                             <div style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:0.25rem;">4-MODEL AI CONSENSUS</div>
                             <div style="display:flex;align-items:center;gap:0.5rem;">
@@ -219,6 +219,12 @@
                             <div style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:0.25rem;">KRONOS 14-DAY SEQUENCE</div>
                             <div style="font-size:1.1rem;font-weight:800;color:${kpCls};font-family:var(--font-mono);">
                                 ${kpTrend} <span style="font-size:0.85rem;font-weight:600;color:#94a3b8;">(${kpRet})</span>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:0.25rem;">🌐 MACRO REGIME WEIGHT</div>
+                            <div style="font-size:0.85rem;font-weight:800;color:${(stock && stock.macro_regime && stock.macro_regime.pill_color) || '#38bdf8'};font-family:var(--font-mono);margin-top:0.2rem;">
+                                ${(stock && stock.macro_regime && stock.macro_regime.pill) || '🟡 Macro Weighted (1.0x)'}
                             </div>
                         </div>
                     </div>

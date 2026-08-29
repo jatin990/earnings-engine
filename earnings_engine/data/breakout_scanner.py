@@ -1716,6 +1716,39 @@ def _score_single_ticker(
                 except Exception as e:
                     logger.debug("[BREAKOUT-NEWS] Catalyst integration error for %s: %s", ticker, e)
 
+            # 3. Macro Market Conditions & Volatility Regime Weighting
+            if not asof_date:
+                try:
+                    from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
+                    macro_info = compute_market_regime_multiplier(settings)
+                    b_mult = float(macro_info.get("breakout_multiplier", 1.0))
+                    m_score = float(macro_info.get("macro_score", 8.0))
+                    m_pill = str(macro_info.get("macro_pill", "🟡 Neutral"))
+                    m_bias = str(macro_info.get("macro_bias", "RANGEBOUND_NEUTRAL"))
+
+                    # Apply macro multiplier to composite score
+                    raw_score = float(result.get("composite_score", 0.0))
+                    adjusted_score = max(0.0, min(100.0, round(raw_score * b_mult, 1)))
+                    macro_delta = round(adjusted_score - raw_score, 1)
+
+                    result["composite_score"] = adjusted_score
+                    result["macro_regime"] = {
+                        "bias": m_bias,
+                        "multiplier": b_mult,
+                        "score": m_score,
+                        "delta": macro_delta,
+                        "pill": m_pill,
+                        "fear_greed_score": macro_info.get("fear_greed_score"),
+                        "vix_level": macro_info.get("vix_level"),
+                    }
+                    if macro_delta != 0.0:
+                        tag = "Tailwind" if macro_delta > 0 else "Headwind"
+                        result.setdefault("reasoning", []).append(
+                            f"🌐 Macro Market {tag} ({b_mult:.2f}x mult, {macro_delta:+.1f} pts): {m_pill}"
+                        )
+                except Exception as e:
+                    logger.debug("[BREAKOUT-MACRO] Macro weighting error for %s: %s", ticker, e)
+
         return result
     except Exception as e:
         logger.debug("[BREAKOUT] Error scoring %s: %s", ticker, e)

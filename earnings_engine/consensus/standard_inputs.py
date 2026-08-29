@@ -313,6 +313,16 @@ def build_standardized_model_context(
 
     # 3. Pillar 5: Market Sentiment & Macro Regime Data
     market_sentiment = get_market_sentiment(sym, settings=settings, fetch_live=fetch_live)
+    try:
+        from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
+        macro_mult_data = compute_market_regime_multiplier(settings)
+        market_sentiment["macro_multiplier_info"] = macro_mult_data
+        market_sentiment["fear_greed_score"] = macro_mult_data.get("fear_greed_score", 50.0)
+        market_sentiment["macro_bias"] = macro_mult_data.get("macro_bias", "RANGEBOUND_NEUTRAL")
+        market_sentiment["macro_pill"] = macro_mult_data.get("macro_pill", "🟡 Neutral")
+        market_sentiment["macro_tag"] = macro_mult_data.get("macro_tag", "")
+    except Exception as e:
+        logger.debug("[STD-CTX] Macro multiplier enrichment error: %s", e)
     ctx["market_sentiment"] = market_sentiment
 
     # 4. Pillar 1: Institutional & Smart Money Flows
@@ -501,6 +511,8 @@ def format_standardized_llm_prompt(ctx: dict[str, Any]) -> str:
         "",
         "---",
         "## 🌐 Pillar 5: Market Sentiment & Macro Regime (Weight: 14%)",
+        f"- **Macro Market Stance:** {mkt.get('macro_pill', '🟡 Neutral')} — *{mkt.get('macro_tag', 'Normal Regime')}*",
+        f"- **Fear & Greed Index:** {mkt.get('fear_greed_score', 50):.1f}/100 (`{mkt.get('macro_bias', 'RANGEBOUND_NEUTRAL')}`)",
         f"- **Benchmark Index ({mkt.get('benchmark_name', 'Nifty 50')}):** {mkt.get('benchmark_symbol')} @ {mkt.get('benchmark_cmp', 'N/A')} "
         f"| 5D: {mkt.get('benchmark_return_5d_pct', 0):+.2f}% | 20D: {mkt.get('benchmark_return_20d_pct', 0):+.2f}%",
         f"- **Index Trend:** `{mkt.get('benchmark_trend', 'NEUTRAL')}`",

@@ -529,11 +529,26 @@ def evaluate_stock_swing(
         mom_score = _score_momentum_compression(closes, mom_30d)
         fund_score = _score_fundamental_bonus(earnings_score)
 
-        comp_score = round(prox_score + chan_score + vol_score + mom_score + fund_score, 1)
+        # Macro Market Conditions & Volatility Regime Weighting
+        macro_mult = 1.0
+        macro_info: dict[str, Any] = {}
+        try:
+            from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
+            macro_info = compute_market_regime_multiplier(settings)
+            macro_mult = float(macro_info.get("swing_multiplier", 1.0))
+        except Exception:
+            pass
+
+        comp_score = round((prox_score + chan_score + vol_score + mom_score + fund_score) * macro_mult, 1)
+        comp_score = max(0.0, min(100.0, comp_score))
 
         # Upgrade signal if high quality in buy zone
         if signal == "Buy Zone" and earnings_score is not None and earnings_score >= 6.0:
             signal = "Strong Buy"
+
+        # In risk-off defensive regime, tighten floor criteria to avoid catching falling knives
+        if macro_info.get("macro_bias") == "BEARISH_DEFENSIVE" and dist_pct > 2.5 and signal == "Strong Buy":
+            signal = "Buy Zone"
 
         # Determine Tier
         is_hot = (
@@ -552,6 +567,14 @@ def evaluate_stock_swing(
             "volume_score": vol_score,
             "momentum_score": mom_score,
             "fundamental_score": fund_score,
+            "macro_regime": {
+                "bias": macro_info.get("macro_bias", "RANGEBOUND_NEUTRAL"),
+                "multiplier": macro_mult,
+                "pill": macro_info.get("macro_pill", "🟡 Neutral"),
+                "pill_color": macro_info.get("pill_color", "#fbbf24"),
+                "fear_greed_score": macro_info.get("fear_greed_score"),
+                "vix_level": macro_info.get("vix_level"),
+            },
             "current_price": round(cur_price, 2),
             "current_support": round(support, 2),
             "next_resistance": round(resistance, 2),
