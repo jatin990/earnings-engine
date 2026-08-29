@@ -14,6 +14,9 @@ const zeptoApp = {
     currentEmpId: null,
 
     async init() {
+        // Hydrate partner dropdowns immediately with defaults
+        this.populatePartnerDropdowns();
+
         // Tab routing via hash
         const hash = (window.location.hash || '#employees').replace('#', '');
         if (['employees', 'expenses', 'candidates', 'security'].includes(hash)) {
@@ -173,9 +176,8 @@ const zeptoApp = {
     },
 
     populatePartnerDropdowns(config) {
-        if (!config || !config.partners) return;
-        const p1 = config.partners.partner_1;
-        const p2 = config.partners.partner_2;
+        const p1 = (config && config.partners && config.partners.partner_1) || { name: 'Jatin Abrol', label: 'Jatin Abrol', initials: 'JA' };
+        const p2 = (config && config.partners && config.partners.partner_2) || { name: 'Harshiv Bargotra', label: 'Harshiv Bargotra', initials: 'HB' };
         if (!p1 || !p2) return;
 
         // 1. Expense Incurred By Select
@@ -1216,6 +1218,8 @@ const zeptoApp = {
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => zeptoApp.init());
+} else {
     zeptoApp.init();
-});
+}

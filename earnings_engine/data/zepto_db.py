@@ -30,8 +30,8 @@ PARTNERS_CONFIG = {
     "partner_1": {
         "id": "partner_1",
         "name": "Jatin Abrol",
-        "label": "Jatin Abrol (Founder)",
-        "role": "Founder",
+        "label": "Jatin Abrol",
+        "role": "Partner",
         "initials": "JA",
         "share_pct": 50.0,
         "color": "purple",
