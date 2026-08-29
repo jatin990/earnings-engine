@@ -507,13 +507,37 @@ def recalculate_stock_rating(
                 "last_updated": row[6],
             }
 
-    # 2. Fetch fresh live data from yfinance & DB
+    # 2. Fetch fresh live data from yfinance & DB with local fallback
     info: dict[str, Any] = {}
     try:
         yf_ticker = yf.Ticker(ticker)
         info = yf_ticker.info or {}
     except Exception as e:
         logger.warning(f"Error fetching live info for {ticker}: {e}")
+
+    # Fallback to local DB if yfinance was rate-limited or failed
+    if not info or not any(k in info for k in ("trailingPE", "priceToBook", "debtToEquity", "operatingMargins")):
+        try:
+            with get_db_connection(settings) as conn:
+                t_row = conn.execute(
+                    "SELECT metrics, sector, industry FROM tickers WHERE ticker = ?",
+                    (ticker,),
+                ).fetchone()
+                if t_row and t_row[0]:
+                    try:
+                        cached_m = json.loads(t_row[0])
+                        if isinstance(cached_m, dict):
+                            for k, v in cached_m.items():
+                                if k not in info and v is not None:
+                                    info[k] = v
+                    except Exception:
+                        pass
+                if t_row and len(t_row) > 1 and t_row[1] and "sector" not in info:
+                    info["sector"] = t_row[1]
+                if t_row and len(t_row) > 2 and t_row[2] and "industry" not in info:
+                    info["industry"] = t_row[2]
+        except Exception as ex:
+            logger.debug(f"DB fallback query failed for {ticker}: {ex}")
 
     # Load industry
     from earnings_engine.data.industry import load_industry
@@ -522,10 +546,13 @@ def recalculate_stock_rating(
     # Evaluate Fundamental
     fund_res = evaluate_fundamental_rating(ticker, info, ind)
 
-    # Compute VWAP & Technicals
+    # Compute VWAP & Technicals from local price history first, then yfinance
     hist = pd.DataFrame()
     try:
-        hist = yf_ticker.history(period="1mo")
+        from earnings_engine.data.prices import load_prices
+        hist = load_prices(ticker, settings)
+        if hist.empty or len(hist) < 5:
+            hist = yf_ticker.history(period="1mo")
     except Exception:
         pass
 
@@ -533,15 +560,18 @@ def recalculate_stock_rating(
     vol_surge = None
     current_price = info.get("currentPrice") or info.get("regularMarketPrice")
 
-    if not hist.empty and "Close" in hist.columns:
-        if current_price is None:
-            current_price = float(hist["Close"].iloc[-1])
-        if "Volume" in hist.columns and hist["Volume"].sum() > 0:
-            vwap = float((hist["Close"] * hist["Volume"]).sum() / hist["Volume"].sum())
-            avg_vol = float(hist["Volume"].mean())
-            last_vol = float(hist["Volume"].iloc[-1])
-            if avg_vol > 0:
-                vol_surge = round(last_vol / avg_vol, 2)
+    if not hist.empty:
+        c_col = "close" if "close" in hist.columns else ("Close" if "Close" in hist.columns else None)
+        v_col = "volume" if "volume" in hist.columns else ("Volume" if "Volume" in hist.columns else None)
+        if c_col:
+            if current_price is None:
+                current_price = float(hist[c_col].dropna().iloc[-1])
+            if v_col and hist[v_col].sum() > 0:
+                vwap = float((hist[c_col] * hist[v_col]).sum() / hist[v_col].sum())
+                avg_vol = float(hist[v_col].mean())
+                last_vol = float(hist[v_col].dropna().iloc[-1])
+                if avg_vol > 0:
+                    vol_surge = round(last_vol / avg_vol, 2)
 
     tech_res = evaluate_technical_rating(
         ticker=ticker,
