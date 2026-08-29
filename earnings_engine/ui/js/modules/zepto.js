@@ -158,6 +158,80 @@ const zeptoApp = {
         if (eqEl && sec.equalization) {
             eqEl.textContent = sec.equalization.status;
         }
+
+        // Dynamically sync partner names and selectors from backend config
+        if (data.config && data.config.partners) {
+            this.populatePartnerDropdowns(data.config);
+        } else if (sec.partner_1 && sec.partner_2) {
+            this.populatePartnerDropdowns({
+                partners: {
+                    partner_1: sec.partner_1,
+                    partner_2: sec.partner_2,
+                }
+            });
+        }
+    },
+
+    populatePartnerDropdowns(config) {
+        if (!config || !config.partners) return;
+        const p1 = config.partners.partner_1;
+        const p2 = config.partners.partner_2;
+        if (!p1 || !p2) return;
+
+        // 1. Expense Incurred By Select
+        const expIncurred = document.getElementById('expFormIncurred');
+        if (expIncurred) {
+            const curVal = expIncurred.value;
+            expIncurred.innerHTML = `
+                <option value="${p1.name}">${p1.label || p1.name}</option>
+                <option value="${p2.name}">${p2.label || p2.name}</option>
+                <option value="STORE_CASH">Store Cash</option>
+            `;
+            if (curVal) expIncurred.value = curVal;
+        }
+
+        // 2. Tranche Paid By Select
+        const tranchePartner = document.getElementById('trancheFormPartner');
+        if (tranchePartner) {
+            const curVal = tranchePartner.value;
+            tranchePartner.innerHTML = `
+                <option value="${p1.name}">${p1.label || p1.name}</option>
+                <option value="${p2.name}">${p2.label || p2.name}</option>
+            `;
+            if (curVal) tranchePartner.value = curVal;
+        }
+
+        // 3. Expense Payer Filter
+        const expFilter = document.getElementById('expIncurredFilter');
+        if (expFilter) {
+            const curVal = expFilter.value;
+            expFilter.innerHTML = `
+                <option value="ALL">All Payers</option>
+                <option value="${p1.name}">${p1.name}</option>
+                <option value="${p2.name}">${p2.name}</option>
+                <option value="STORE_CASH">Store Cash</option>
+            `;
+            if (curVal) expFilter.value = curVal;
+        }
+
+        // 4. Partner Cards Names and Badges
+        const p1NameEl = document.getElementById('secPartner1Name');
+        if (p1NameEl) p1NameEl.textContent = p1.label || p1.name;
+
+        const p1InitEl = document.getElementById('secPartner1Initials');
+        if (p1InitEl) p1InitEl.textContent = p1.initials || 'JA';
+
+        const p2NameEl = document.getElementById('secPartner2Name');
+        if (p2NameEl) p2NameEl.textContent = p2.label || p2.name;
+
+        const p2InitEl = document.getElementById('secPartner2Initials');
+        if (p2InitEl) p2InitEl.textContent = p2.initials || 'HB';
+
+        const kpiP1Bar = document.getElementById('kpiPartner1Bar');
+        if (kpiP1Bar) kpiP1Bar.title = p1.name;
+
+        const kpiP2Bar = document.getElementById('kpiPartner2Bar');
+        if (kpiP2Bar) kpiP2Bar.title = p2.name;
     },
 
     // -----------------------------------------------------------------------
@@ -886,6 +960,15 @@ const zeptoApp = {
     renderSecurity(data) {
         const sum = data.summary || {};
         const tranches = data.tranches || [];
+
+        if (sum.partner_1 && sum.partner_2) {
+            this.populatePartnerDropdowns({
+                partners: {
+                    partner_1: sum.partner_1,
+                    partner_2: sum.partner_2,
+                }
+            });
+        }
 
         // Total Deposited
         const totalEl = document.getElementById('secTotalDeposited');

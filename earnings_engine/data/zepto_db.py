@@ -21,9 +21,34 @@ from earnings_engine.data.catalysts_news import _connect
 logger = logging.getLogger(__name__)
 
 ZEPTO_TOTAL_SECURITY_TARGET = 7500000.0  # ₹75 Lakhs total franchise deposit
-PARTNER_EQUITY_SHARE = 0.50             # 50% Jatin Abrol, 50% Harshiv (₹37.5L each)
-PARTNER_1_NAME = "Jatin Abrol"
-PARTNER_2_NAME = "Harshiv"
+PARTNER_EQUITY_SHARE = 0.50             # 50% equity share each (₹37.5L)
+
+# ===========================================================================
+# Centralized Partners Configuration (Single Source of Truth)
+# ===========================================================================
+PARTNERS_CONFIG = {
+    "partner_1": {
+        "id": "partner_1",
+        "name": "Jatin Abrol",
+        "label": "Jatin Abrol (Founder)",
+        "role": "Founder",
+        "initials": "JA",
+        "share_pct": 50.0,
+        "color": "purple",
+    },
+    "partner_2": {
+        "id": "partner_2",
+        "name": "Harshiv Bargotra",
+        "label": "Harshiv Bargotra",
+        "role": "Partner",
+        "initials": "HB",
+        "share_pct": 50.0,
+        "color": "pink",
+    },
+}
+
+PARTNER_1_NAME = PARTNERS_CONFIG["partner_1"]["name"]
+PARTNER_2_NAME = PARTNERS_CONFIG["partner_2"]["name"]
 
 UPLOAD_DIR = Path("data/zepto/uploads")
 
@@ -126,11 +151,11 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             CREATE INDEX IF NOT EXISTS idx_zepto_cand_stage ON zepto_candidates(stage);
         """)
 
-        # Migrate existing Partner 1 / Partner 2 rows to Jatin Abrol and Harshiv
-        conn.execute("UPDATE zepto_expenses SET incurred_by = 'Jatin Abrol' WHERE incurred_by LIKE '%Partner 1%'")
-        conn.execute("UPDATE zepto_expenses SET incurred_by = 'Harshiv' WHERE incurred_by LIKE '%Partner 2%'")
-        conn.execute("UPDATE zepto_security_capital SET partner_name = 'Jatin Abrol' WHERE partner_name LIKE '%Partner 1%'")
-        conn.execute("UPDATE zepto_security_capital SET partner_name = 'Harshiv' WHERE partner_name LIKE '%Partner 2%'")
+        # Migrate existing Partner 1 / Partner 2 rows to centralized names
+        conn.execute("UPDATE zepto_expenses SET incurred_by = ? WHERE incurred_by LIKE '%Partner 1%' OR incurred_by LIKE '%Jatin%'", (PARTNER_1_NAME,))
+        conn.execute("UPDATE zepto_expenses SET incurred_by = ? WHERE incurred_by LIKE '%Partner 2%' OR incurred_by LIKE '%Harshiv%'", (PARTNER_2_NAME,))
+        conn.execute("UPDATE zepto_security_capital SET partner_name = ? WHERE partner_name LIKE '%Partner 1%' OR partner_name LIKE '%Jatin%'", (PARTNER_1_NAME,))
+        conn.execute("UPDATE zepto_security_capital SET partner_name = ? WHERE partner_name LIKE '%Partner 2%' OR partner_name LIKE '%Harshiv%'", (PARTNER_2_NAME,))
 
         # Check if seed data needed
         row = conn.execute("SELECT COUNT(*) FROM zepto_employees").fetchone()
@@ -182,11 +207,11 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
     # 3. Sample Store Expenses
     expenses = [
-        (str(uuid.uuid4()), "Initial Picker Onboarding & Zepto Training Batch", "TRAINING", 45000.0, "2026-06-05", "Jatin Abrol", None, "training_receipt.pdf", 1, "Offsite training & simulator software fee", now_iso),
-        (str(uuid.uuid4()), "Staff Uniforms, Thermal Bags & Reflective Vests", "UNIFORMS_GEAR", 28500.0, "2026-06-12", "Harshiv", None, "uniform_invoice.pdf", 1, "20 sets of customized shirts and thermal jackets", now_iso),
-        (str(uuid.uuid4()), "Heavy-Duty Warehouse Racks & Bins Installation", "EQUIPMENT", 125000.0, "2026-06-18", "Jatin Abrol", None, "racks_bill.pdf", 1, "Aisle A-D high density racking system", now_iso),
+        (str(uuid.uuid4()), "Initial Picker Onboarding & Zepto Training Batch", "TRAINING", 45000.0, "2026-06-05", PARTNER_1_NAME, None, "training_receipt.pdf", 1, "Offsite training & simulator software fee", now_iso),
+        (str(uuid.uuid4()), "Staff Uniforms, Thermal Bags & Reflective Vests", "UNIFORMS_GEAR", 28500.0, "2026-06-12", PARTNER_2_NAME, None, "uniform_invoice.pdf", 1, "20 sets of customized shirts and thermal jackets", now_iso),
+        (str(uuid.uuid4()), "Heavy-Duty Warehouse Racks & Bins Installation", "EQUIPMENT", 125000.0, "2026-06-18", PARTNER_1_NAME, None, "racks_bill.pdf", 1, "Aisle A-D high density racking system", now_iso),
         (str(uuid.uuid4()), "Staff Refreshment & Breakroom Tea/Snacks (Monthly)", "SNACKS_WELFARE", 8500.0, "2026-08-15", "STORE_CASH", None, None, 1, "Monthly pantry items & energy drinks", now_iso),
-        (str(uuid.uuid4()), "Store Deep Cleaning & Pest Control Service", "STORE_MAINTENANCE", 12000.0, "2026-08-20", "Harshiv", None, "pest_control_bill.pdf", 1, "Bi-weekly warehouse pest safety compliance", now_iso),
+        (str(uuid.uuid4()), "Store Deep Cleaning & Pest Control Service", "STORE_MAINTENANCE", 12000.0, "2026-08-20", PARTNER_2_NAME, None, "pest_control_bill.pdf", 1, "Bi-weekly warehouse pest safety compliance", now_iso),
     ]
     conn.executemany(
         """
@@ -214,12 +239,12 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
         candidates
     )
 
-    # 5. Sample Security Capital Tranches (50-50 Partner Equity Split: Jatin Abrol & Harshiv)
+    # 5. Sample Security Capital Tranches (50-50 Partner Equity Split)
     capital_tranches = [
-        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1", 2000000.0, "2026-05-15", "Jatin Abrol", "NEFT_RTGS", "HDFC202605159812", None, "First deposit directly to Zepto Operations Escrow", now_iso),
-        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1 Match", 2000000.0, "2026-05-16", "Harshiv", "NEFT_RTGS", "ICIC202605161142", None, "50% equity matching tranche", now_iso),
-        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2", 1000000.0, "2026-06-10", "Jatin Abrol", "NEFT_RTGS", "HDFC202606105521", None, "Second installment towards ₹75L commitment", now_iso),
-        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2 Match", 1000000.0, "2026-06-12", "Harshiv", "NEFT_RTGS", "ICIC202606127891", None, "Matching second installment", now_iso),
+        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1", 2000000.0, "2026-05-15", PARTNER_1_NAME, "NEFT_RTGS", "HDFC202605159812", None, "First deposit directly to Zepto Operations Escrow", now_iso),
+        (str(uuid.uuid4()), "Initial Franchise Security Tranche 1 Match", 2000000.0, "2026-05-16", PARTNER_2_NAME, "NEFT_RTGS", "ICIC202605161142", None, "50% equity matching tranche", now_iso),
+        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2", 1000000.0, "2026-06-10", PARTNER_1_NAME, "NEFT_RTGS", "HDFC202606105521", None, "Second installment towards ₹75L commitment", now_iso),
+        (str(uuid.uuid4()), "Dark Store Capex & Inventory Deposit Tranche 2 Match", 1000000.0, "2026-06-12", PARTNER_2_NAME, "NEFT_RTGS", "ICIC202606127891", None, "Matching second installment", now_iso),
     ]
     conn.executemany(
         """
@@ -311,6 +336,11 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
         equalization_diff = round(partner_1_paid - partner_2_paid, 2)
 
         return {
+            "config": {
+                "partners": PARTNERS_CONFIG,
+                "target_security_deposit": target_capital,
+                "target_per_partner": target_per_partner,
+            },
             "headcount": {
                 "active": active_count,
                 "resigned": resigned_count,
@@ -337,14 +367,20 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
                 "remaining_pending": remaining_capital,
                 "progress_pct": capital_progress_pct,
                 "partner_1": {
-                    "name": "Jatin Abrol (Founder)",
+                    "id": "partner_1",
+                    "name": PARTNERS_CONFIG["partner_1"]["name"],
+                    "label": PARTNERS_CONFIG["partner_1"]["label"],
+                    "initials": PARTNERS_CONFIG["partner_1"]["initials"],
                     "paid": partner_1_paid,
                     "target": target_per_partner,
                     "progress_pct": partner_1_progress,
                     "remaining": max(0.0, target_per_partner - partner_1_paid),
                 },
                 "partner_2": {
-                    "name": "Harshiv",
+                    "id": "partner_2",
+                    "name": PARTNERS_CONFIG["partner_2"]["name"],
+                    "label": PARTNERS_CONFIG["partner_2"]["label"],
+                    "initials": PARTNERS_CONFIG["partner_2"]["initials"],
                     "paid": partner_2_paid,
                     "target": target_per_partner,
                     "progress_pct": partner_2_progress,
@@ -353,7 +389,11 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
                 "equalization": {
                     "difference": equalization_diff,
                     "is_equal": abs(equalization_diff) < 1.0,
-                    "status": "Balanced (50-50)" if abs(equalization_diff) < 1.0 else (f"Jatin Abrol is ahead by ₹{equalization_diff:,.0f}" if equalization_diff > 0 else f"Harshiv is ahead by ₹{abs(equalization_diff):,.0f}"),
+                    "status": "Balanced (50-50)" if abs(equalization_diff) < 1.0 else (
+                        f"{PARTNERS_CONFIG['partner_1']['name']} is ahead by ₹{equalization_diff:,.0f}"
+                        if equalization_diff > 0
+                        else f"{PARTNERS_CONFIG['partner_2']['name']} is ahead by ₹{abs(equalization_diff):,.0f}"
+                    ),
                 }
             },
             "as_of": datetime.now(timezone.utc).isoformat(),

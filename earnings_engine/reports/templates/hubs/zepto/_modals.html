@@ -1,11 +1,13 @@
 <!-- ================= 1. ADD / EDIT EMPLOYEE MODAL ================= -->
-<div id="modalEmployee" style="display: none;" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+<div id="modalEmployee" style="display: none;"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="glass-panel max-w-2xl w-full p-6 border-purple-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <h3 class="text-base font-extrabold text-white flex items-center gap-2" id="modalEmployeeTitle">
                 <span>👤</span> Add Store Employee
             </h3>
-            <button type="button" onclick="zeptoApp.closeModal('modalEmployee')" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            <button type="button" onclick="zeptoApp.closeModal('modalEmployee')"
+                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
         </div>
 
         <form id="formEmployee" onsubmit="zeptoApp.saveEmployee(event)" class="space-y-4 text-xs">
@@ -14,11 +16,13 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Full Name *</label>
-                    <input type="text" id="empFormName" required placeholder="e.g. Rahul Sharma" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="text" id="empFormName" required placeholder="e.g. Rahul Sharma"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Role Profile *</label>
-                    <select id="empFormRole" required class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <select id="empFormRole" required
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                         <option value="PICKER">🛒 Picker (Items Picker)</option>
                         <option value="SHIFT_INCHARGE">👔 Shift Incharge</option>
                         <option value="RIDER">🛵 Delivery Rider</option>
@@ -32,18 +36,21 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Phone Number</label>
-                    <input type="tel" id="empFormPhone" placeholder="+91 98765 43210" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="tel" id="empFormPhone" placeholder="+91 98765 43210"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Email Address</label>
-                    <input type="email" id="empFormEmail" placeholder="staff@darkstore.in" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="email" id="empFormEmail" placeholder="staff@darkstore.in"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Status</label>
-                    <select id="empFormStatus" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <select id="empFormStatus"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                         <option value="ACTIVE">🟢 Active</option>
                         <option value="ON_PROBATION">🟡 On Probation</option>
                         <option value="RESIGNED">🔴 Resigned</option>
@@ -51,28 +58,33 @@
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Monthly Base Salary (₹) *</label>
-                    <input type="number" step="100" id="empFormSalary" required placeholder="18500" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="number" step="100" id="empFormSalary" required placeholder="18500"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Performance Rating (1-5 ⭐)</label>
-                    <input type="number" step="0.1" min="1.0" max="5.0" id="empFormRating" value="5.0" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="number" step="0.1" min="1.0" max="5.0" id="empFormRating" value="5.0"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Joining Date *</label>
-                    <input type="date" id="empFormJoiningDate" required class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="date" id="empFormJoiningDate" required
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Resignation Date (If resigned)</label>
-                    <input type="date" id="empFormResignationDate" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="date" id="empFormResignationDate"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
             </div>
 
             <div id="resignationReasonGroup" class="space-y-1" style="display: none;">
                 <label class="block text-rose-300 font-semibold">Resignation Reason</label>
-                <input type="text" id="empFormResignationReason" placeholder="e.g. Better opportunity, relocation..." class="w-full bg-slate-900 border border-rose-500/30 rounded-lg px-3 py-2 text-white">
+                <input type="text" id="empFormResignationReason" placeholder="e.g. Better opportunity, relocation..."
+                    class="w-full bg-slate-900 border border-rose-500/30 rounded-lg px-3 py-2 text-white">
             </div>
 
             <!-- Documents Upload Area -->
@@ -81,12 +93,14 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-slate-400 text-[11px] mb-1">Aadhar Card (PDF/Image):</label>
-                        <input type="file" id="empFormAadharFile" accept=".pdf,.png,.jpg,.jpeg" class="w-full text-slate-400 text-[11px]">
+                        <input type="file" id="empFormAadharFile" accept=".pdf,.png,.jpg,.jpeg"
+                            class="w-full text-slate-400 text-[11px]">
                         <input type="hidden" id="empFormAadharUrl">
                     </div>
                     <div>
                         <label class="block text-slate-400 text-[11px] mb-1">Resume / CV (PDF/DOCX):</label>
-                        <input type="file" id="empFormResumeFile" accept=".pdf,.docx,.doc" class="w-full text-slate-400 text-[11px]">
+                        <input type="file" id="empFormResumeFile" accept=".pdf,.docx,.doc"
+                            class="w-full text-slate-400 text-[11px]">
                         <input type="hidden" id="empFormResumeUrl">
                     </div>
                 </div>
@@ -94,11 +108,14 @@
 
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Operational Notes & Performance Remarks</label>
-                <textarea id="empFormNotes" rows="2" placeholder="e.g. Verified background check, morning shift preference..." class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+                <textarea id="empFormNotes" rows="2"
+                    placeholder="e.g. Verified background check, morning shift preference..."
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
-                <button type="button" onclick="zeptoApp.closeModal('modalEmployee')" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                <button type="button" onclick="zeptoApp.closeModal('modalEmployee')"
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
                 <button type="submit" id="btnSaveEmployee" class="btn-zepto font-bold">Save Staff Record</button>
             </div>
         </form>
@@ -107,7 +124,8 @@
 
 
 <!-- ================= 2. MOM SALARY DRILLDOWN & BONUS MODAL ================= -->
-<div id="modalSalaryDrilldown" style="display: none;" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+<div id="modalSalaryDrilldown" style="display: none;"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="glass-panel max-w-2xl w-full p-6 border-purple-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <div>
@@ -116,17 +134,21 @@
                 </h3>
                 <p class="text-xs text-slate-400" id="modalSalaryEmpMeta">Base Salary: ₹0 · Role: Picker</p>
             </div>
-            <button type="button" onclick="zeptoApp.closeModal('modalSalaryDrilldown')" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            <button type="button" onclick="zeptoApp.closeModal('modalSalaryDrilldown')"
+                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
         </div>
 
         <!-- Quick Performance Bonus Award Card -->
-        <div class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 mb-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div
+            class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 mb-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div>
                 <span class="font-bold text-xs text-purple-300 block">🎁 Award Instant Performance Bonus</span>
-                <span class="text-[11px] text-slate-400">Bonus adds directly to current month compensation payout.</span>
+                <span class="text-[11px] text-slate-400">Bonus adds directly to current month compensation
+                    payout.</span>
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto">
-                <input type="number" id="quickBonusInput" placeholder="Amount ₹" class="w-24 bg-slate-900 border border-purple-500/40 rounded-lg px-2.5 py-1.5 text-xs text-white">
+                <input type="number" id="quickBonusInput" placeholder="Amount ₹"
+                    class="w-24 bg-slate-900 border border-purple-500/40 rounded-lg px-2.5 py-1.5 text-xs text-white">
                 <button type="button" onclick="zeptoApp.submitQuickBonus()" class="btn-zepto text-xs whitespace-nowrap">
                     + Award
                 </button>
@@ -148,7 +170,9 @@
                     </tr>
                 </thead>
                 <tbody id="salaryHistoryTableBody" class="divide-y divide-white/5 font-mono text-slate-200">
-                    <tr><td colspan="6" class="p-4 text-center text-slate-500">No past salary records logged yet.</td></tr>
+                    <tr>
+                        <td colspan="6" class="p-4 text-center text-slate-500">No past salary records logged yet.</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -156,11 +180,16 @@
         <!-- Record Monthly Slip Form -->
         <div class="mt-4 pt-4 border-t border-white/10">
             <h4 class="font-bold text-xs text-slate-300 mb-2">➕ Record New Monthly Payout Slip</h4>
-            <form id="formRecordSalary" onsubmit="zeptoApp.saveSalarySlip(event)" class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                <input type="month" id="salSlipMonth" required class="bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
-                <input type="number" id="salSlipBase" required placeholder="Base (₹)" class="bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
-                <input type="number" id="salSlipBonus" value="0" placeholder="Bonus (₹)" class="bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
-                <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold text-white text-xs">
+            <form id="formRecordSalary" onsubmit="zeptoApp.saveSalarySlip(event)"
+                class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <input type="month" id="salSlipMonth" required
+                    class="bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
+                <input type="number" id="salSlipBase" required placeholder="Base (₹)"
+                    class="bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
+                <input type="number" id="salSlipBonus" value="0" placeholder="Bonus (₹)"
+                    class="bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
+                <button type="submit"
+                    class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold text-white text-xs">
                     Log Payout Slip
                 </button>
             </form>
@@ -170,25 +199,30 @@
 
 
 <!-- ================= 3. ADD STORE EXPENSE MODAL ================= -->
-<div id="modalExpense" style="display: none;" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+<div id="modalExpense" style="display: none;"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="glass-panel max-w-lg w-full p-6 border-pink-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <h3 class="text-base font-extrabold text-white flex items-center gap-2">
                 <span>🧾</span> Record Store Out-of-Pocket Expense
             </h3>
-            <button type="button" onclick="zeptoApp.closeModal('modalExpense')" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            <button type="button" onclick="zeptoApp.closeModal('modalExpense')"
+                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
         </div>
 
         <form id="formExpense" onsubmit="zeptoApp.saveExpense(event)" class="space-y-4 text-xs">
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Expense Title / Item Name *</label>
-                <input type="text" id="expFormTitle" required placeholder="e.g. Training Batch 1, Uniform Sets, Warehouse Racks..." class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                <input type="text" id="expFormTitle" required
+                    placeholder="e.g. Training Batch 1, Uniform Sets, Warehouse Racks..."
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Category *</label>
-                    <select id="expFormCategory" required class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <select id="expFormCategory" required
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                         <option value="TRAINING">🎓 Training & Onboarding</option>
                         <option value="UNIFORMS_GEAR">👕 Uniforms & Gear</option>
                         <option value="EQUIPMENT">🏗️ Equipment & Racks</option>
@@ -201,38 +235,48 @@
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Amount (₹) *</label>
-                    <input type="number" step="1" id="expFormAmount" required placeholder="45000" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono">
+                    <input type="number" step="1" id="expFormAmount" required placeholder="45000"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono">
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Expense Date *</label>
-                    <input type="date" id="expFormDate" required class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="date" id="expFormDate" required
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Incurred By *</label>
-                    <select id="expFormIncurred" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <select id="expFormIncurred"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                         <option value="Jatin Abrol">Jatin Abrol (Founder)</option>
-                        <option value="Harshiv">Harshiv</option>
+                        <option value="Harshiv Bargotra">Harshiv Bargotra</option>
                         <option value="STORE_CASH">Store Cash</option>
                     </select>
                 </div>
             </div>
 
             <div>
-                <label class="block text-slate-300 font-semibold mb-1">Upload Receipt / Bill Document (PDF/Image)</label>
-                <input type="file" id="expFormReceiptFile" accept=".pdf,.png,.jpg,.jpeg" class="w-full text-slate-400 text-xs">
+                <label class="block text-slate-300 font-semibold mb-1">Upload Receipt / Bill Document
+                    (PDF/Image)</label>
+                <input type="file" id="expFormReceiptFile" accept=".pdf,.png,.jpg,.jpeg"
+                    class="w-full text-slate-400 text-xs">
             </div>
 
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Expense Notes</label>
-                <textarea id="expFormNotes" rows="2" placeholder="e.g. Paid directly via card for picker safety jackets..." class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+                <textarea id="expFormNotes" rows="2"
+                    placeholder="e.g. Paid directly via card for picker safety jackets..."
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
-                <button type="button" onclick="zeptoApp.closeModal('modalExpense')" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
-                <button type="submit" id="btnSaveExpense" class="px-4 py-2 rounded-lg bg-pink-600 hover:bg-pink-500 text-white font-bold">Save Expense</button>
+                <button type="button" onclick="zeptoApp.closeModal('modalExpense')"
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                <button type="submit" id="btnSaveExpense"
+                    class="px-4 py-2 rounded-lg bg-pink-600 hover:bg-pink-500 text-white font-bold">Save
+                    Expense</button>
             </div>
         </form>
     </div>
@@ -240,13 +284,15 @@
 
 
 <!-- ================= 4. ADD / EDIT CANDIDATE MODAL ================= -->
-<div id="modalCandidate" style="display: none;" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+<div id="modalCandidate" style="display: none;"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="glass-panel max-w-lg w-full p-6 border-purple-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <h3 class="text-base font-extrabold text-white flex items-center gap-2" id="modalCandidateTitle">
                 <span>🎯</span> Add Prospective Candidate
             </h3>
-            <button type="button" onclick="zeptoApp.closeModal('modalCandidate')" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            <button type="button" onclick="zeptoApp.closeModal('modalCandidate')"
+                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
         </div>
 
         <form id="formCandidate" onsubmit="zeptoApp.saveCandidate(event)" class="space-y-4 text-xs">
@@ -254,24 +300,28 @@
 
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Candidate Name *</label>
-                <input type="text" id="candFormName" required placeholder="e.g. Rohit Verma" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                <input type="text" id="candFormName" required placeholder="e.g. Rohit Verma"
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Phone Number</label>
-                    <input type="tel" id="candFormPhone" placeholder="+91 99887 66554" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="tel" id="candFormPhone" placeholder="+91 99887 66554"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Email Address</label>
-                    <input type="email" id="candFormEmail" placeholder="candidate@gmail.com" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="email" id="candFormEmail" placeholder="candidate@gmail.com"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Target Role Profile *</label>
-                    <select id="candFormRole" required class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <select id="candFormRole" required
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                         <option value="PICKER">🛒 Picker</option>
                         <option value="SHIFT_INCHARGE">👔 Shift Incharge</option>
                         <option value="RIDER">🛵 Delivery Rider</option>
@@ -281,7 +331,8 @@
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Pipeline Stage *</label>
-                    <select id="candFormStage" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <select id="candFormStage"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                         <option value="APPLIED">📥 Applied</option>
                         <option value="INTERVIEWING">🗣️ Interviewing</option>
                         <option value="SHORTLISTED">⭐ Shortlisted</option>
@@ -294,32 +345,39 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Expected Salary (₹)</label>
-                    <input type="number" id="candFormSalary" placeholder="18000" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono">
+                    <input type="number" id="candFormSalary" placeholder="18000"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Candidate Rating (1-5 ⭐)</label>
-                    <input type="number" step="0.1" min="1.0" max="5.0" id="candFormRating" value="4.5" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="number" step="0.1" min="1.0" max="5.0" id="candFormRating" value="4.5"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-400 text-[11px] mb-1">Upload Resume (PDF):</label>
-                    <input type="file" id="candFormResumeFile" accept=".pdf,.docx,.doc" class="w-full text-slate-400 text-[11px]">
+                    <input type="file" id="candFormResumeFile" accept=".pdf,.docx,.doc"
+                        class="w-full text-slate-400 text-[11px]">
                 </div>
                 <div>
                     <label class="block text-slate-400 text-[11px] mb-1">Upload Aadhar (PDF/Image):</label>
-                    <input type="file" id="candFormAadharFile" accept=".pdf,.png,.jpg,.jpeg" class="w-full text-slate-400 text-[11px]">
+                    <input type="file" id="candFormAadharFile" accept=".pdf,.png,.jpg,.jpeg"
+                        class="w-full text-slate-400 text-[11px]">
                 </div>
             </div>
 
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Interview Feedback & Notes</label>
-                <textarea id="candFormNotes" rows="2" placeholder="e.g. Previous experience at grocery warehouse, good speed..." class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+                <textarea id="candFormNotes" rows="2"
+                    placeholder="e.g. Previous experience at grocery warehouse, good speed..."
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
-                <button type="button" onclick="zeptoApp.closeModal('modalCandidate')" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                <button type="button" onclick="zeptoApp.closeModal('modalCandidate')"
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
                 <button type="submit" id="btnSaveCandidate" class="btn-zepto font-bold">Save Candidate</button>
             </div>
         </form>
@@ -328,13 +386,15 @@
 
 
 <!-- ================= 5. ONE-CLICK HIRE / CONVERT CANDIDATE MODAL ================= -->
-<div id="modalConvertCandidate" style="display: none;" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+<div id="modalConvertCandidate" style="display: none;"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="glass-panel max-w-md w-full p-6 border-emerald-500/40">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <h3 class="text-base font-extrabold text-emerald-400 flex items-center gap-2">
                 <span>🎉</span> Convert Candidate to Active Employee
             </h3>
-            <button type="button" onclick="zeptoApp.closeModal('modalConvertCandidate')" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            <button type="button" onclick="zeptoApp.closeModal('modalConvertCandidate')"
+                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
         </div>
 
         <form id="formConvertCandidate" onsubmit="zeptoApp.submitConvertCandidate(event)" class="space-y-4 text-xs">
@@ -347,12 +407,14 @@
 
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Official Joining Date *</label>
-                <input type="date" id="convertJoiningDate" required class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                <input type="date" id="convertJoiningDate" required
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
             </div>
 
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Agreed Monthly Starting Salary (₹) *</label>
-                <input type="number" id="convertStartingSalary" required class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono">
+                <input type="number" id="convertStartingSalary" required
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono">
             </div>
 
             <p class="text-[11px] text-slate-400">
@@ -360,8 +422,11 @@
             </p>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
-                <button type="button" onclick="zeptoApp.closeModal('modalConvertCandidate')" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
-                <button type="submit" id="btnSubmitConvert" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">Confirm & Hire Staff</button>
+                <button type="button" onclick="zeptoApp.closeModal('modalConvertCandidate')"
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                <button type="submit" id="btnSubmitConvert"
+                    class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">Confirm & Hire
+                    Staff</button>
             </div>
         </form>
     </div>
@@ -369,43 +434,51 @@
 
 
 <!-- ================= 6. RECORD CAPITAL TRANCHE MODAL ================= -->
-<div id="modalTranche" style="display: none;" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+<div id="modalTranche" style="display: none;"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="glass-panel max-w-lg w-full p-6 border-amber-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <h3 class="text-base font-extrabold text-amber-400 flex items-center gap-2">
                 <span>💰</span> Record Zepto Security Capital Tranche
             </h3>
-            <button type="button" onclick="zeptoApp.closeModal('modalTranche')" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+            <button type="button" onclick="zeptoApp.closeModal('modalTranche')"
+                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
         </div>
 
         <form id="formTranche" onsubmit="zeptoApp.saveTranche(event)" class="space-y-4 text-xs">
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Tranche Title / Description *</label>
-                <input type="text" id="trancheFormTitle" required placeholder="e.g. Franchise Security Tranche 3, Capex Deposit..." class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                <input type="text" id="trancheFormTitle" required
+                    placeholder="e.g. Franchise Security Tranche 3, Capex Deposit..."
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Amount Sent (₹) *</label>
-                    <input type="number" step="1000" id="trancheFormAmount" required placeholder="1000000" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono font-bold text-amber-300">
+                    <input type="number" step="1000" id="trancheFormAmount" required placeholder="1000000"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono font-bold text-amber-300">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Payment Date *</label>
-                    <input type="date" id="trancheFormDate" required class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <input type="date" id="trancheFormDate" required
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Paid By (50-50 Partner) *</label>
-                    <select id="trancheFormPartner" required class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <select id="trancheFormPartner" required
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                         <option value="Jatin Abrol">Jatin Abrol (Founder)</option>
-                        <option value="Harshiv">Harshiv</option>
+                        <option value="Harshiv Bargotra">Harshiv Bargotra</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Payment Mode</label>
-                    <select id="trancheFormMode" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <select id="trancheFormMode"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                         <option value="NEFT_RTGS">NEFT / RTGS Bank Transfer</option>
                         <option value="IMPS">IMPS Instant Transfer</option>
                         <option value="CHEQUE">Bank Cheque / DD</option>
@@ -415,22 +488,30 @@
 
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Bank Reference / UTR Number</label>
-                <input type="text" id="trancheFormUtr" placeholder="e.g. HDFC20260829001928" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono uppercase">
+                <input type="text" id="trancheFormUtr" placeholder="e.g. HDFC20260829001928"
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono uppercase">
             </div>
 
             <div>
-                <label class="block text-slate-300 font-semibold mb-1">Upload Transfer Slip / Receipt Proof (PDF/Image)</label>
-                <input type="file" id="trancheFormProofFile" accept=".pdf,.png,.jpg,.jpeg" class="w-full text-slate-400 text-xs">
+                <label class="block text-slate-300 font-semibold mb-1">Upload Transfer Slip / Receipt Proof
+                    (PDF/Image)</label>
+                <input type="file" id="trancheFormProofFile" accept=".pdf,.png,.jpg,.jpeg"
+                    class="w-full text-slate-400 text-xs">
             </div>
 
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Tranche Notes</label>
-                <textarea id="trancheFormNotes" rows="2" placeholder="e.g. Sent to Zepto operations official escrow account..." class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+                <textarea id="trancheFormNotes" rows="2"
+                    placeholder="e.g. Sent to Zepto operations official escrow account..."
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
-                <button type="button" onclick="zeptoApp.closeModal('modalTranche')" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
-                <button type="submit" id="btnSaveTranche" class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold">Record Tranche</button>
+                <button type="button" onclick="zeptoApp.closeModal('modalTranche')"
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                <button type="submit" id="btnSaveTranche"
+                    class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold">Record
+                    Tranche</button>
             </div>
         </form>
     </div>
