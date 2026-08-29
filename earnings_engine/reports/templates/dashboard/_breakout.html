@@ -297,21 +297,22 @@
                 <!-- KPI Summary Cards -->
                 <div id="breakoutKpiCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.65rem;margin-bottom:0.85rem;">
                     <!-- Active Breaking Out Card (On Fire) -->
-                    <div id="breakoutCardOnFire" class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(249,115,22,0.3);border-top:2px solid #f97316;transition:all 0.3s ease;">
-                        <div id="breakoutKpiLabelFire" style="font-size:0.68rem;color:#fb923c;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;display:flex;align-items:center;gap:0.3rem;">
-                            <span class="fire-flame-icon" style="font-size:0.85rem;">🔥</span> <span id="breakoutKpiTextFire">Breaking Out</span>
+                    <div id="breakoutCardOnFire" onclick="app.toggleBreakingOutFilter()" class="card cursor-pointer" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(249,115,22,0.3);border-top:2px solid #f97316;transition:all 0.25s ease;cursor:pointer;user-select:none;" title="Click to filter table to Breaking Out setups only">
+                        <div id="breakoutKpiLabelFire" style="font-size:0.68rem;color:#fb923c;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;display:flex;align-items:center;justify-content:space-between;">
+                            <span style="display:flex;align-items:center;gap:0.3rem;"><span class="fire-flame-icon" style="font-size:0.85rem;">🔥</span> <span id="breakoutKpiTextFire">Breaking Out</span></span>
+                            <span id="breakoutFilterIndicator" style="font-size:0.60rem;background:rgba(249,115,22,0.2);color:#fdba74;border:1px solid rgba(249,115,22,0.4);padding:0.05rem 0.3rem;border-radius:3px;display:none;">FILTER ON</span>
                         </div>
                         <div style="font-size:1.6rem;font-weight:800;color:#fdba74;font-family:var(--font-mono);display:flex;align-items:baseline;gap:0.35rem;">
                             <span id="breakoutStatBreakingCount">0</span>
                             <span id="breakoutStatBreakingSub" style="font-size:0.72rem;font-weight:700;color:#f97316;">Active</span>
                         </div>
-                        <div id="breakoutKpiSubFire" style="font-size:0.67rem;color:#c2410c;margin-top:0.15rem;">Price &ge; Trigger Level</div>
+                        <div id="breakoutKpiSubFire" style="font-size:0.67rem;color:#c2410c;margin-top:0.15rem;">Price &ge; Trigger Level • Click to Filter</div>
                     </div>
                     <!-- Total Candidates -->
-                    <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(59,130,246,0.25);border-top:2px solid #3b82f6;">
+                    <div id="breakoutCardTotal" onclick="app.clearBreakoutFilter()" class="card cursor-pointer" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(59,130,246,0.25);border-top:2px solid #3b82f6;cursor:pointer;transition:all 0.25s ease;user-select:none;" title="Click to show all candidates">
                         <div id="breakoutKpiLabel1" style="font-size:0.68rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;margin-bottom:0.2rem;">Candidates</div>
                         <div style="font-size:1.6rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);"><span id="breakoutStatTotal">—</span></div>
-                        <div id="breakoutKpiSub1" style="font-size:0.67rem;color:#475569;margin-top:0.15rem;">Setups Identified</div>
+                        <div id="breakoutKpiSub1" style="font-size:0.67rem;color:#475569;margin-top:0.15rem;">Setups Identified • Show All</div>
                     </div>
                     <!-- Top Score or Win Rate -->
                     <div class="card" style="padding:0.75rem 0.9rem;background:#0f172a;border:1px solid rgba(234,179,8,0.25);border-top:2px solid #eab308;">
@@ -351,7 +352,10 @@
 
                 <!-- Candidates Table -->
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;font-size:0.68rem;color:#64748b;">
-                    <span>💡 <strong>Moveable Columns:</strong> Drag & drop column headers to reorder • Click headers to sort</span>
+                    <div style="display:flex;align-items:center;gap:0.6rem;">
+                        <span>💡 <strong>Moveable Columns:</strong> Drag & drop column headers to reorder • Click headers to sort</span>
+                        <span id="breakoutFilterNotice" style="display:none;align-items:center;background:rgba(249,115,22,0.15);color:#fb923c;border:1px solid rgba(249,115,22,0.35);padding:0.15rem 0.5rem;border-radius:4px;font-size:0.68rem;font-weight:600;"></span>
+                    </div>
                     <span id="breakoutColOrderNotice" style="color:#38bdf8;font-weight:600;display:none;">Custom Layout Saved</span>
                 </div>
                 <div class="table-wrapper breakout-table-wrapper" style="overflow:auto;max-height:calc(100vh - 240px);min-height:360px;border-radius:0.6rem;border:1px solid rgba(255,255,255,0.08);background:#000000;">

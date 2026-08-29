@@ -15,6 +15,86 @@
         app._breakoutSortKey = 'composite_score';
         app._breakoutSortAsc = false;
         app._breakoutAsofDate = null;
+        app._breakoutFilterBreakingOut = false;
+
+        app.isItemBreaking = function(item) {
+            if (!item) return false;
+            const cp = item.current_price != null ? Number(item.current_price) : null;
+            const tp = item.breakout_trigger != null ? Number(item.breakout_trigger) : null;
+            const ph = item.post_high != null ? Number(item.post_high) : null;
+            return Boolean(
+                item.is_breaking_out ||
+                item.outcome === 'TARGET_HIT' ||
+                item.outcome === 'BREAKOUT_SUCCEEDED' ||
+                (cp != null && tp != null && cp >= tp) ||
+                (ph != null && tp != null && ph >= tp)
+            );
+        };
+
+        app.toggleBreakingOutFilter = function() {
+            app._breakoutFilterBreakingOut = !app._breakoutFilterBreakingOut;
+            app.applyBreakoutFilterAndRender();
+        };
+
+        app.clearBreakoutFilter = function() {
+            app._breakoutFilterBreakingOut = false;
+            app.applyBreakoutFilterAndRender();
+        };
+
+        app.applyBreakoutFilterAndRender = function() {
+            const fireCard = document.getElementById('breakoutCardOnFire');
+            const totalCard = document.getElementById('breakoutCardTotal');
+            const activeNotice = document.getElementById('breakoutFilterNotice');
+            const filterIndicator = document.getElementById('breakoutFilterIndicator');
+            const breakingSub = document.getElementById('breakoutStatBreakingSub');
+
+            let list = app._breakoutData || [];
+            const breakingCount = list.filter(app.isItemBreaking).length;
+
+            if (app._breakoutFilterBreakingOut) {
+                list = list.filter(app.isItemBreaking);
+                if (fireCard) {
+                    fireCard.style.outline = '2px solid #f97316';
+                    fireCard.style.boxShadow = '0 0 20px rgba(249,115,22,0.5)';
+                    fireCard.style.background = '#1e1610';
+                }
+                if (totalCard) {
+                    totalCard.style.opacity = '0.75';
+                }
+                if (filterIndicator) {
+                    filterIndicator.style.display = 'inline-block';
+                }
+                if (breakingSub) {
+                    breakingSub.textContent = 'Filtered 🔍';
+                }
+                if (activeNotice) {
+                    activeNotice.style.display = 'inline-flex';
+                    activeNotice.innerHTML = `🔥 Filtering: <strong>Breaking Out Only (${list.length} setup${list.length === 1 ? '' : 's'})</strong> <button type="button" onclick="app.clearBreakoutFilter(); event.stopPropagation();" style="margin-left:0.45rem;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fdba74;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕ Show All (${app._breakoutData.length})</button>`;
+                }
+            } else {
+                if (fireCard) {
+                    fireCard.style.outline = '';
+                    fireCard.style.boxShadow = '';
+                    fireCard.style.background = '#0f172a';
+                }
+                if (totalCard) {
+                    totalCard.style.opacity = '1';
+                }
+                if (filterIndicator) {
+                    filterIndicator.style.display = 'none';
+                }
+                if (breakingSub) {
+                    breakingSub.textContent = (app._breakoutAsofDate ? 'Fired' : (breakingCount > 0 ? 'Breached' : 'Active'));
+                }
+                if (activeNotice) {
+                    activeNotice.style.display = 'none';
+                }
+            }
+
+            const limitVal = document.getElementById('breakoutLimitSelect')?.value || '10';
+            const limitNum = limitVal === 'all' ? list.length : parseInt(limitVal, 10);
+            app.renderBreakoutTable(list.slice(0, limitNum), app._breakoutAsofDate);
+        };
 
         app.toggleBreakoutExplainer = function() {
             const card = document.getElementById('breakoutExplainerCard');
@@ -527,9 +607,7 @@
                     lastScanEl.textContent = status.status === 'running' ? 'Scanning now\u2026' : (asofDate ? `As-Of ${asofDate}` : 'Waiting for first scan\u2026');
                 }
 
-                const limitVal = document.getElementById('breakoutLimitSelect')?.value || '10';
-                const limitNum = limitVal === 'all' ? app._breakoutData.length : parseInt(limitVal, 10);
-                app.renderBreakoutTable(app._breakoutData.slice(0, limitNum), asofDate);
+                app.applyBreakoutFilterAndRender();
             } catch (err) {
                 console.error('[BREAKOUT] Load error:', err);
                 if (tbody && !silent) tbody.innerHTML = '<tr><td colspan="9" style="padding:2rem;text-align:center;color:#ef4444;font-size:0.8rem;">\u26a1 Failed to load breakout data. Is the server running?</td></tr>';
@@ -826,10 +904,7 @@
                     }
                     return app._breakoutSortAsc ? (valA - valB) : (valB - valA);
                 });
-                const limitVal = document.getElementById('breakoutLimitSelect')?.value || '10';
-                const limitNum = limitVal === 'all' ? app._breakoutData.length : parseInt(limitVal, 10);
-                app.renderBreakoutTableHeader();
-                app.renderBreakoutTable(app._breakoutData.slice(0, limitNum));
+                app.applyBreakoutFilterAndRender();
             }
         };
 
