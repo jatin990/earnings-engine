@@ -106,12 +106,17 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("[TURSO-SYNC] Could not schedule startup upstream sync: %s", e)
 
-        # Start the background category scanner sweep
+        # Start the background category scanner sweep (only if market is open)
         try:
             from earnings_engine.data.category_scanner import compute_and_save_scanner_universe
+            from earnings_engine.data.market_pulse import is_market_open
+            import time
 
             async def _run_startup_scanner_sweep():
                 try:
+                    if not is_market_open(time.time()):
+                        logger.info("[SCANNER] Market closed or weekend; skipping startup scanner sweep.")
+                        return
                     loop = asyncio.get_running_loop()
                     await loop.run_in_executor(None, compute_and_save_scanner_universe, "NSE_TOP", _settings)
                     logger.info("[SCANNER] Startup background multi-category sweep finished.")

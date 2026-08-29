@@ -275,6 +275,10 @@ class SchedulerEngine:
         from earnings_engine.data.market_pulse import is_market_open
         market_open = is_market_open(now_ts)
 
+        # Global weekend & off-market hours guard: immediately skip recurring evaluations
+        if not market_open:
+            return
+
         for sched in schedules:
             job_id = sched.get("job_id")
             if not job_id:

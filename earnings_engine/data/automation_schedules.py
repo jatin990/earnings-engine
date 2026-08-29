@@ -42,8 +42,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🌐 Cold Universe Sweep",
         "category": "Breakout Radar",
         "interval_seconds": 3600,
-        "run_after_hours": 1,
-        "market_session": "all",
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
         "params_json": '{"universe": "NSE_ALL", "min_score": 35}',
         "description": "Full universe multi-factor scan discovering fresh compression and momentum setups.",
     },
@@ -52,8 +52,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "📰 News Catalyst Harvester",
         "category": "Market Catalysts",
         "interval_seconds": 600,
-        "run_after_hours": 1,
-        "market_session": "all",
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
         "params_json": '{"watchlist": "my_watchlist", "limit": 10}',
         "description": "Continuous harvesting of corporate order wins, earnings surprises, and regulatory filings.",
     },
@@ -62,8 +62,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🔍 Multi-Category Scanner",
         "category": "Scanner",
         "interval_seconds": 1800,
-        "run_after_hours": 1,
-        "market_session": "all",
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
         "params_json": '{"universe": "NSE_TOP", "limit": 100}',
         "description": "Multi-category technical scans across 52W Highs, Volume Surges, and Squeeze Coils.",
     },
@@ -72,8 +72,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🔁 Quarter Repeaters Sync",
         "category": "Seasonality",
         "interval_seconds": 7200,
-        "run_after_hours": 1,
-        "market_session": "all",
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
         "params_json": '{"universe": "NSE_ALL"}',
         "description": "Historical quarter-over-quarter earnings surprise repeater pattern evaluation.",
     },
@@ -82,8 +82,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🏛️ Institutional Flows Sync",
         "category": "Institutional",
         "interval_seconds": 7200,
-        "run_after_hours": 1,
-        "market_session": "all",
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
         "params_json": '{"watchlist": "my_watchlist"}',
         "description": "Continuous sync of institutional fund portfolios, FII/DII entries, and block deals.",
     },
@@ -93,7 +93,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "category": "Swing Trading",
         "interval_seconds": 300,
         "run_after_hours": 0,
-        "market_session": "all",
+        "market_session": "market_hours_only",
         "params_json": '{"universe": "ALL", "pool": "hot"}',
         "description": "Rapid 5-minute re-evaluation of stocks actively in the horizontal Support Buy Zone.",
     },
@@ -103,7 +103,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "category": "Swing Trading",
         "interval_seconds": 900,
         "run_after_hours": 0,
-        "market_session": "all",
+        "market_session": "market_hours_only",
         "params_json": '{"universe": "ALL", "pool": "warm"}',
         "description": "15-minute evaluation of coiling swing channels for promotion into Hot Buy Zone.",
     },
@@ -112,8 +112,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🔄 Swing Full Channel Sweep",
         "category": "Swing Trading",
         "interval_seconds": 3600,
-        "run_after_hours": 1,
-        "market_session": "all",
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
         "params_json": '{"universe": "ALL", "min_score": 20}',
         "description": "Hourly universe sweep discovering fresh support/resistance horizontal trading bands.",
     },
@@ -122,8 +122,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🔮 Kronos Hot Pool AI Forecast",
         "category": "AI Forecasting",
         "interval_seconds": 600,
-        "run_after_hours": 1,
-        "market_session": "all",
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
         "params_json": '{"merge_tolerance_pct": 0.5, "lookback": 120, "pred_len": 14}',
         "description": "Background Kronos AI sequence prediction for Hot pool stocks with ±0.5% audit merging.",
     },
@@ -132,8 +132,8 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "job_name": "🧠 Kronos Forecast Warmup",
         "category": "Custom",
         "interval_seconds": 86400,
-        "run_after_hours": 1,
-        "market_session": "all",
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
         "params_json": '{"watchlist": "my_watchlist", "device": "cuda:0"}',
         "description": "Pre-computes and caches Kronos AI 14-day sequence price predictions.",
     },
@@ -152,8 +152,8 @@ def init_automation_schedules(settings: Settings | None = None) -> None:
 
         for s in DEFAULT_SCHEDULES:
             next_iso = (now_dt + timedelta(seconds=s["interval_seconds"])).isoformat()
-            run_after = int(s.get("run_after_hours", 1))
-            session = s.get("market_session", "all")
+            run_after = int(s.get("run_after_hours", 0))
+            session = s.get("market_session", "market_hours_only")
             conn.execute(
                 """
                 INSERT OR IGNORE INTO automation_schedules (
@@ -182,7 +182,7 @@ def init_automation_schedules(settings: Settings | None = None) -> None:
                     session,
                 ),
             )
-            # If params_json, run_after_hours, or market_session is null on existing row, update it
+            # If params_json is null on existing row, update it
             if s.get("params_json"):
                 conn.execute(
                     """
@@ -195,8 +195,8 @@ def init_automation_schedules(settings: Settings | None = None) -> None:
             conn.execute(
                 """
                 UPDATE automation_schedules
-                SET run_after_hours = COALESCE(run_after_hours, ?),
-                    market_session = COALESCE(market_session, ?)
+                SET run_after_hours = ?,
+                    market_session = ?
                 WHERE job_id = ?
                 """,
                 (run_after, session, s["job_id"]),
