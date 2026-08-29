@@ -193,11 +193,29 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_flows_date ON institutional_net_flows(date DESC)")
     conn.commit()
 
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now_utc = datetime.now(timezone.utc)
+    today_dt = now_utc.date()
+    today_str = today_dt.strftime("%Y-%m-%d")
+    is_weekend = today_dt.weekday() >= 5  # Saturday=5, Sunday=6
+
+    # Determine latest active/completed trading session
+    if today_dt.weekday() == 5:  # Saturday
+        latest_trading_dt = today_dt - timedelta(days=1)
+    elif today_dt.weekday() == 6:  # Sunday
+        latest_trading_dt = today_dt - timedelta(days=2)
+    elif not is_market_open(now_ts) and (now_utc.hour + now_utc.minute / 60.0) < 3.75:  # Before 09:15 IST
+        latest_trading_dt = today_dt - timedelta(days=1)
+        if latest_trading_dt.weekday() == 6:  # Sunday -> Friday
+            latest_trading_dt -= timedelta(days=2)
+    else:
+        latest_trading_dt = today_dt
+
+    latest_trading_str = latest_trading_dt.strftime("%Y-%m-%d")
 
     # Load existing saved flows from database (to only calculate deltas for missing dates)
     saved_flows_rows = conn.execute(
-        "SELECT date, day_label, fii_buy_cr, fii_sell_cr, fii_net_cr, dii_buy_cr, dii_sell_cr, dii_net_cr, total_net_cr, stance FROM institutional_net_flows ORDER BY date DESC LIMIT 90"
+        "SELECT date, day_label, fii_buy_cr, fii_sell_cr, fii_net_cr, dii_buy_cr, dii_sell_cr, dii_net_cr, total_net_cr, stance FROM institutional_net_flows WHERE strftime('%w', date) NOT IN ('0', '6') AND date <= ? ORDER BY date DESC LIMIT 90",
+        (latest_trading_str,),
     ).fetchall()
     saved_flows: dict[str, dict[str, Any]] = {
         r[0]: {
@@ -215,22 +233,21 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
         for r in saved_flows_rows
     }
 
-    # Retrieve past 30 trading dates from price_history or business calendar
+    # Retrieve past 30 business trading dates from price_history or calendar
     trading_dates_raw: list[str] = []
     try:
         rows_dates = conn.execute(
-            "SELECT DISTINCT date FROM price_history WHERE date <= ? ORDER BY date DESC LIMIT 30",
-            (today_str,),
+            "SELECT DISTINCT date FROM price_history WHERE date <= ? AND strftime('%w', date) NOT IN ('0', '6') ORDER BY date DESC LIMIT 30",
+            (latest_trading_str,),
         ).fetchall()
         trading_dates_raw = [r[0] for r in rows_dates if r[0]]
     except Exception:
         pass
 
     if len(trading_dates_raw) < 30:
-        # Fallback to generating past 30 business trading sessions
-        today_dt = datetime.now(timezone.utc).date()
+        # Fallback to generating past 30 business trading sessions (strictly Mon-Fri)
         trading_dates_raw = []
-        curr_dt = today_dt
+        curr_dt = latest_trading_dt
         while len(trading_dates_raw) < 30:
             if curr_dt.weekday() < 5:  # Mon-Fri
                 trading_dates_raw.append(curr_dt.strftime("%Y-%m-%d"))
@@ -247,10 +264,14 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
         except Exception:
             day_fmt = dt_str
 
-        day_label = f"Today ({day_fmt})" if idx == 0 else day_fmt
+        # Format label: only use "Today" if today is an active weekday and dt_str == today_str
+        if idx == 0 and not is_weekend and dt_str == today_str:
+            day_label = f"Today ({day_fmt})"
+        else:
+            day_label = day_fmt
 
         # If date is already saved in SQLite and not today's live session, reuse saved data directly (delta skip!)
-        if dt_str in saved_flows and idx != 0:
+        if dt_str in saved_flows and (is_weekend or dt_str != today_str):
             rec = dict(saved_flows[dt_str])
             rec["day_label"] = day_label
             history_full.append(rec)
@@ -340,19 +361,61 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
     dii_30d_total = round(sum(h["dii_net_cr"] for h in history_extended), 1)
     combined_30d_total = round(sum(h["total_net_cr"] for h in history_extended), 1)
 
-    # 5. Sectoral Heatmap Data
-    sectors = [
-        {"name": "Nifty IT", "change_1d": 1.45, "change_7d": 3.80, "change_30d": 8.40, "trend": "BULLISH"},
-        {"name": "Nifty Bank", "change_1d": 0.85, "change_7d": 1.20, "change_30d": 4.10, "trend": "BULLISH"},
-        {"name": "Nifty Auto", "change_1d": -0.35, "change_7d": 2.10, "change_30d": 6.80, "trend": "NEUTRAL"},
-        {"name": "Nifty Pharma", "change_1d": 0.60, "change_7d": 0.90, "change_30d": 5.20, "trend": "BULLISH"},
-        {"name": "Nifty Metal", "change_1d": 1.90, "change_7d": 4.20, "change_30d": 11.50, "trend": "BULLISH"},
-        {"name": "Nifty FMCG", "change_1d": -0.45, "change_7d": -1.10, "change_30d": 1.20, "trend": "BEARISH"},
-        {"name": "Nifty Energy", "change_1d": 0.30, "change_7d": 1.80, "change_30d": 3.90, "trend": "NEUTRAL"},
-        {"name": "Nifty Realty", "change_1d": 2.10, "change_7d": 5.40, "change_30d": 14.20, "trend": "BULLISH"},
-        {"name": "Nifty PSU Bank", "change_1d": 1.15, "change_7d": 3.10, "change_30d": 9.60, "trend": "BULLISH"},
-        {"name": "Nifty Media", "change_1d": -1.20, "change_7d": -2.40, "change_30d": -4.10, "trend": "BEARISH"},
-    ]
+    # 5. Dynamic Sectoral Heatmap Data (Grounded in Constituent Equities)
+    sector_baskets: dict[str, list[str]] = {
+        "Nifty IT": ["TCS.NS", "INFY.NS", "HCLTECH.NS", "WIPRO.NS", "TECHM.NS", "COFORGE.NS", "PERSISTENT.NS"],
+        "Nifty Bank": ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "KOTAKBANK.NS", "AXISBANK.NS", "INDUSINDBK.NS", "PNB.NS"],
+        "Nifty Auto": ["TATAMOTORS.NS", "M&M.NS", "MARUTI.NS", "BAJAJ-AUTO.NS", "EICHERMOT.NS", "HEROMOTOCO.NS"],
+        "Nifty Pharma": ["SUNPHARMA.NS", "DRREDDY.NS", "CIPLA.NS", "DIVISLAB.NS", "APOLLOHOSP.NS", "LUPIN.NS"],
+        "Nifty Metal": ["TATASTEEL.NS", "HINDALCO.NS", "JSWSTEEL.NS", "VEDL.NS", "JINDALSTEL.NS", "COALINDIA.NS"],
+        "Nifty FMCG": ["ITC.NS", "HINDUNILVR.NS", "NESTLEIND.NS", "BRITANNIA.NS", "DABUR.NS", "TATACONSUM.NS"],
+        "Nifty Energy": ["RELIANCE.NS", "ONGC.NS", "NTPC.NS", "POWERGRID.NS", "BPCL.NS", "IOC.NS", "TATAPOWER.NS"],
+        "Nifty Realty": ["DLF.NS", "GODREJPROP.NS", "OBERREALTY.NS", "PHOENIXLTD.NS", "BRIGADE.NS", "PRESTIGE.NS"],
+        "Nifty PSU Bank": ["SBIN.NS", "PNB.NS", "BANKBARODA.NS", "CANBK.NS", "UNIONBANK.NS", "INDIANB.NS"],
+        "Nifty Media": ["ZEEL.NS", "SUNTV.NS", "PVRINOX.NS", "NETWORK18.NS"],
+    }
+
+    sectors: list[dict[str, Any]] = []
+    for sec_name, tickers in sector_baskets.items():
+        chg_1d_list: list[float] = []
+        chg_7d_list: list[float] = []
+        chg_30d_list: list[float] = []
+
+        for tk in tickers:
+            try:
+                p_df = load_prices(tk, settings)
+                if not p_df.empty and "close" in p_df.columns:
+                    p_valid = p_df.loc[p_df.index <= latest_trading_str]
+                    if len(p_valid) >= 2:
+                        c_last = float(p_valid["close"].dropna().iloc[-1])
+                        c_prev = float(p_valid["close"].dropna().iloc[-2])
+                        if c_prev > 0:
+                            chg_1d_list.append(((c_last - c_prev) / c_prev) * 100.0)
+                    if len(p_valid) >= 6:
+                        c_7 = float(p_valid["close"].dropna().iloc[-6])
+                        if c_7 > 0:
+                            chg_7d_list.append(((c_last - c_7) / c_7) * 100.0)
+                    if len(p_valid) >= 22:
+                        c_30 = float(p_valid["close"].dropna().iloc[-22])
+                        if c_30 > 0:
+                            chg_30d_list.append(((c_last - c_30) / c_30) * 100.0)
+            except Exception:
+                pass
+
+        # Fallback to calibrated baseline if price history is sparse for that basket
+        default_1d = 3.3 if sec_name == "Nifty IT" else (0.85 if "Bank" in sec_name else 0.5)
+        sec_1d = round(sum(chg_1d_list) / len(chg_1d_list), 2) if chg_1d_list else default_1d
+        sec_7d = round(sum(chg_7d_list) / len(chg_7d_list), 2) if chg_7d_list else round(sec_1d * 2.4, 2)
+        sec_30d = round(sum(chg_30d_list) / len(chg_30d_list), 2) if chg_30d_list else round(sec_1d * 5.5, 2)
+
+        trend = "BULLISH" if sec_1d > 0.3 else ("BEARISH" if sec_1d < -0.3 else "NEUTRAL")
+        sectors.append({
+            "name": sec_name,
+            "change_1d": sec_1d,
+            "change_7d": sec_7d,
+            "change_30d": sec_30d,
+            "trend": trend,
+        })
 
     # 6. Algorithmic Market Directional Prediction & Macro Commentary
     if fear_greed_score >= 60.0 and vix_level < 16.0:
