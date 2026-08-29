@@ -240,3 +240,49 @@ def run_gbm_with_cache(
     except Exception as e:
         logger.warning("[GBM-CACHE] Failed to save GBM cache: %s", e)
     return result_map
+
+
+def predict_upcoming_from_db(
+    market: str = "ALL",
+    days: int = 14,
+    settings: Settings | None = None,
+    start_date: str | None = None,
+    model_name: str = "gbm",
+    progress_callback: callable | None = None,
+) -> pd.DataFrame:
+    """Convenience helper to score upcoming earnings for a market or universe directly from DB.
+
+    Resolves the market universe (e.g. 'IN', 'US', 'NSE_ALL', 'ALL', or custom universe/watchlist),
+    runs predict_upcoming() with the specified model, and caches/returns the resulting scored events.
+    """
+    settings = settings or Settings()
+    from earnings_engine.data.universe import load_universe, load_all
+
+    market_upper = market.upper() if market else "ALL"
+    if market_upper in ("ALL", "COMBINED"):
+        try:
+            tickers = load_all(settings)
+        except Exception:
+            tickers = load_universe("IN", settings)
+    else:
+        try:
+            tickers = load_universe(market_upper, settings)
+        except Exception:
+            try:
+                tickers = load_all(settings)
+            except Exception:
+                tickers = load_universe("IN", settings)
+
+    if not tickers:
+        logger.warning("[PREDICT-DB] No tickers found for market: %s", market)
+        return pd.DataFrame()
+
+    return predict_upcoming(
+        tickers=tickers,
+        settings=settings,
+        model_name=model_name,
+        days=days,
+        start_date=start_date,
+        progress_callback=progress_callback,
+    )
+
