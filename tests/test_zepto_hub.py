@@ -210,6 +210,52 @@ def test_zepto_api_endpoints(client):
     assert sec_resp.status_code == 200
     assert sec_resp.json()["success"] is True
 
+    # 7. Staffing Targets API
+    target_resp = client.get("/api/v1/zepto/staffing-targets")
+    assert target_resp.status_code == 200
+    target_json = target_resp.json()
+    assert target_json["success"] is True
+    assert "targets" in target_json
+    assert "capacity" in target_json
+    assert target_json["targets"]["PICKER"] >= 1
+
+    # Update targets
+    put_resp = client.put("/api/v1/zepto/staffing-targets", json={"targets": {"PICKER": 9, "SHIFT_INCHARGE": 3, "SECURITY_GUARD": 2, "HOUSEKEEPING": 1}})
+    assert put_resp.status_code == 200
+    assert put_resp.json()["targets"]["PICKER"] == 9
+
+
+def test_customizable_staffing_targets():
+    settings = Settings()
+    # Check default thresholds
+    targets = zepto_db.get_staffing_targets(settings)
+    assert targets["PICKER"] == 9
+    assert targets["SHIFT_INCHARGE"] == 3
+    assert targets["SECURITY_GUARD"] == 2
+    assert targets["HOUSEKEEPING"] == 1
+
+    # Customize thresholds
+    updated = zepto_db.update_staffing_targets(
+        {"PICKER": 12, "SHIFT_INCHARGE": 4, "SECURITY_GUARD": 3, "HOUSEKEEPING": 2},
+        settings
+    )
+    assert updated["PICKER"] == 12
+    assert updated["SHIFT_INCHARGE"] == 4
+
+    # Verify overview capacity calculation
+    overview = zepto_db.get_zepto_overview(settings)
+    cap = overview["headcount"]["capacity"]
+    assert cap["PICKER"]["target"] == 12
+    assert cap["SHIFT_INCHARGE"]["target"] == 4
+    assert "deficit" in cap["PICKER"]
+    assert "fulfilled" in cap["PICKER"]
+
+    # Reset back to default
+    zepto_db.update_staffing_targets(
+        {"PICKER": 9, "SHIFT_INCHARGE": 3, "SECURITY_GUARD": 2, "HOUSEKEEPING": 1},
+        settings
+    )
+
 
 def test_document_upload(client):
     file_content = b"%PDF-1.4 Mock Zepto Training Invoice"

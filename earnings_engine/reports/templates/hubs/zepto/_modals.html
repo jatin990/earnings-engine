@@ -23,12 +23,10 @@
                     <label class="block text-slate-300 font-semibold mb-1">Role Profile *</label>
                     <select id="empFormRole" required
                         class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
-                        <option value="PICKER">🛒 Picker (Items Picker)</option>
-                        <option value="SHIFT_INCHARGE">👔 Shift Incharge</option>
-                        <option value="RIDER">🛵 Delivery Rider</option>
-                        <option value="PACKER">📦 Packer / Bagging</option>
-                        <option value="STORE_MANAGER">🏛️ Store Manager</option>
-                        <option value="INVENTORY">📊 Inventory Associate</option>
+                        <option value="PICKER">🛒 Picker</option>
+                        <option value="SHIFT_INCHARGE">⚡ Shift Incharge</option>
+                        <option value="SECURITY_GUARD">🛡️ Security Guard</option>
+                        <option value="HOUSEKEEPING">🧹 House Keeping</option>
                     </select>
                 </div>
             </div>
@@ -331,10 +329,9 @@
                     <select id="candFormRole" required
                         class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
                         <option value="PICKER">🛒 Picker</option>
-                        <option value="SHIFT_INCHARGE">👔 Shift Incharge</option>
-                        <option value="RIDER">🛵 Delivery Rider</option>
-                        <option value="PACKER">📦 Packer</option>
-                        <option value="STORE_MANAGER">🏛️ Store Manager</option>
+                        <option value="SHIFT_INCHARGE">⚡ Shift Incharge</option>
+                        <option value="SECURITY_GUARD">🛡️ Security Guard</option>
+                        <option value="HOUSEKEEPING">🧹 House Keeping</option>
                     </select>
                 </div>
                 <div>
@@ -520,6 +517,102 @@
                 <button type="submit" id="btnSaveTranche"
                     class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold">Record
                     Tranche</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 6: Configure Staffing Requirements & Thresholds -->
+<div id="modalStaffingTargets" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 hidden">
+    <div class="glass-panel w-full max-w-lg p-6 border-purple-500/40 relative shadow-2xl">
+        <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
+            <div>
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <span>⚙️</span> Dark Store Staffing Requirements
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Customize operational capacity requirements per role.</p>
+            </div>
+            <button type="button" onclick="zeptoApp.closeModal('modalStaffingTargets')" class="text-slate-400 hover:text-white text-lg">✕</button>
+        </div>
+
+        <form id="formStaffingTargets" onsubmit="zeptoApp.saveStaffingTargets(event)" class="space-y-4 text-xs">
+            <div class="space-y-3">
+                <!-- 1. Pickers -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-purple-500/[0.06] border border-purple-500/20">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">🛒</span>
+                        <div>
+                            <div class="text-xs font-bold text-purple-200">Pickers</div>
+                            <div class="text-[10px] text-slate-400">Order item picking, bagging & shelf staging</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="targetInput-PICKER" min="0" max="100" required value="9"
+                            class="w-20 bg-slate-900 border border-purple-500/40 rounded-lg px-3 py-1.5 text-center text-white font-mono font-bold text-sm focus:outline-none focus:border-purple-400">
+                        <span class="text-slate-400 text-xs font-semibold">Staff</span>
+                    </div>
+                </div>
+
+                <!-- 2. Shift Incharges -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-indigo-500/[0.06] border border-indigo-500/20">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">⚡</span>
+                        <div>
+                            <div class="text-xs font-bold text-indigo-200">Shift Incharges</div>
+                            <div class="text-[10px] text-slate-400">Shift supervision, dispatch & accuracy lead</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="targetInput-SHIFT_INCHARGE" min="0" max="50" required value="3"
+                            class="w-20 bg-slate-900 border border-indigo-500/40 rounded-lg px-3 py-1.5 text-center text-white font-mono font-bold text-sm focus:outline-none focus:border-indigo-400">
+                        <span class="text-slate-400 text-xs font-semibold">Staff</span>
+                    </div>
+                </div>
+
+                <!-- 3. Security Guards -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-blue-500/[0.06] border border-blue-500/20">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">🛡️</span>
+                        <div>
+                            <div class="text-xs font-bold text-blue-200">Security Guards</div>
+                            <div class="text-[10px] text-slate-400">Store gate security & 24/7 inventory safety</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="targetInput-SECURITY_GUARD" min="0" max="20" required value="2"
+                            class="w-20 bg-slate-900 border border-blue-500/40 rounded-lg px-3 py-1.5 text-center text-white font-mono font-bold text-sm focus:outline-none focus:border-blue-400">
+                        <span class="text-slate-400 text-xs font-semibold">Staff</span>
+                    </div>
+                </div>
+
+                <!-- 4. House Keeping -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/20">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">🧹</span>
+                        <div>
+                            <div class="text-xs font-bold text-emerald-200">House Keeping</div>
+                            <div class="text-[10px] text-slate-400">Warehouse floor sanitation & spill cleaning</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="targetInput-HOUSEKEEPING" min="0" max="20" required value="1"
+                            class="w-20 bg-slate-900 border border-emerald-500/40 rounded-lg px-3 py-1.5 text-center text-white font-mono font-bold text-sm focus:outline-none focus:border-emerald-400">
+                        <span class="text-slate-400 text-xs font-semibold">Staff</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Target Summary Callout -->
+            <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex justify-between items-center text-xs">
+                <span class="text-slate-300 font-semibold">Total Target Headcount:</span>
+                <span class="font-mono font-extrabold text-purple-300 text-sm" id="modalTargetTotalCount">15 Staff</span>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
+                <button type="button" onclick="zeptoApp.closeModal('modalStaffingTargets')"
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                <button type="submit" id="btnSaveStaffingTargets"
+                    class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition">Save Requirements</button>
             </div>
         </form>
     </div>

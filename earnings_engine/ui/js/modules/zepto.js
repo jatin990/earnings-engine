@@ -97,25 +97,34 @@ const zeptoApp = {
 
         // 1. Staff Headcount & Attrition
         const activeEl = document.getElementById('kpiActiveStaff');
-        if (activeEl) activeEl.textContent = `${hc.active || 0} Active`;
+        const targetTotal = hc.target_total || 15;
+        const staffPct = hc.staffing_pct || Math.round(((hc.active || 0) / targetTotal) * 100);
+        if (activeEl) activeEl.textContent = `${hc.active || 0} / ${targetTotal} Staff`;
 
         const attritionBadge = document.getElementById('kpiAttritionBadge');
         if (attritionBadge) {
-            const rate = hc.attrition_rate_pct || 0;
-            attritionBadge.textContent = `${rate}% Attrition`;
+            attritionBadge.textContent = `${staffPct}% Capacity`;
             attritionBadge.className = `text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
-                rate > 20 ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                staffPct >= 100 ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-purple-500/15 text-purple-200 border-purple-500/30 font-mono'
             }`;
         }
 
         const breakdownEl = document.getElementById('kpiStaffBreakdown');
-        if (breakdownEl && hc.role_breakdown) {
-            const parts = Object.entries(hc.role_breakdown).map(([r, count]) => `${count} ${r.replace('_', ' ').toLowerCase()}`);
-            breakdownEl.textContent = parts.join(' · ') || 'No active staff';
+        if (breakdownEl && hc.capacity) {
+            const parts = [
+                `Pickers: ${hc.capacity.PICKER?.current || 0}/${hc.capacity.PICKER?.target || 9}`,
+                `Shift: ${hc.capacity.SHIFT_INCHARGE?.current || 0}/${hc.capacity.SHIFT_INCHARGE?.target || 3}`,
+                `Guards: ${hc.capacity.SECURITY_GUARD?.current || 0}/${hc.capacity.SECURITY_GUARD?.target || 2}`,
+                `HK: ${hc.capacity.HOUSEKEEPING?.current || 0}/${hc.capacity.HOUSEKEEPING?.target || 1}`,
+            ];
+            breakdownEl.textContent = parts.join(' · ');
         }
 
         const payrollEl = document.getElementById('kpiPayroll');
         if (payrollEl) payrollEl.textContent = this.formatCurrency(hc.monthly_payroll || 0);
+
+        // Render Staffing Requirements Matrix on Employees Tab
+        this.renderStaffingCapacity(hc);
 
         // 2. Total Store Expenses & Reimbursements
         const totalExpEl = document.getElementById('kpiTotalExpenses');
@@ -249,6 +258,115 @@ const zeptoApp = {
 
         const kpiP2Bar = document.getElementById('kpiPartner2Bar');
         if (kpiP2Bar) kpiP2Bar.title = p2.name;
+    },
+
+    // -----------------------------------------------------------------------
+    // Staffing Requirements & Fulfillment Capacity
+    // -----------------------------------------------------------------------
+
+    renderStaffingCapacity(hc) {
+        if (!hc) return;
+
+        const targetTotal = hc.target_total || 15;
+        const staffPct = hc.staffing_pct || Math.round(((hc.active || 0) / targetTotal) * 100);
+
+        const overallBadge = document.getElementById('staffingOverallBadge');
+        if (overallBadge) {
+            overallBadge.textContent = `${hc.active || 0} / ${targetTotal} Active Staff (${staffPct}% Capacity)`;
+            overallBadge.className = `text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border font-mono ${
+                staffPct >= 100 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-purple-500/20 text-purple-200 border-purple-500/40'
+            }`;
+        }
+
+        const capacity = hc.capacity || {};
+        ['PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING'].forEach(role => {
+            const cap = capacity[role] || { current: 0, target: 1, deficit: 1, pct: 0, fulfilled: false };
+
+            const badgeEl = document.getElementById(`capBadge-${role}`);
+            if (badgeEl) badgeEl.textContent = `${cap.current} / ${cap.target}`;
+
+            const barEl = document.getElementById(`capBar-${role}`);
+            if (barEl) barEl.style.width = `${Math.min(100, cap.pct)}%`;
+
+            const pctEl = document.getElementById(`capPct-${role}`);
+            if (pctEl) pctEl.textContent = `${cap.pct}%`;
+
+            const statusEl = document.getElementById(`capStatus-${role}`);
+            if (statusEl) {
+                if (cap.fulfilled) {
+                    statusEl.innerHTML = `<span class="text-emerald-400 font-bold">✅ Fully Staffed</span>`;
+                } else {
+                    statusEl.innerHTML = `<span class="text-amber-300 font-semibold">⚠️ ${cap.deficit} more needed</span>`;
+                }
+            }
+        });
+    },
+
+    openStaffingTargetsModal() {
+        const targets = this.overviewData?.headcount?.targets || {
+            'PICKER': 9,
+            'SHIFT_INCHARGE': 3,
+            'SECURITY_GUARD': 2,
+            'HOUSEKEEPING': 1,
+        };
+
+        ['PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING'].forEach(role => {
+            const input = document.getElementById(`targetInput-${role}`);
+            if (input) {
+                input.value = targets[role] !== undefined ? targets[role] : 1;
+                input.oninput = () => this.updateModalTargetTotal();
+            }
+        });
+
+        this.updateModalTargetTotal();
+        this.openModal('modalStaffingTargets');
+    },
+
+    updateModalTargetTotal() {
+        let total = 0;
+        ['PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING'].forEach(role => {
+            const val = parseInt(document.getElementById(`targetInput-${role}`)?.value || '0', 10);
+            total += isNaN(val) ? 0 : val;
+        });
+        const totalEl = document.getElementById('modalTargetTotalCount');
+        if (totalEl) totalEl.textContent = `${total} Staff`;
+    },
+
+    async saveStaffingTargets(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSaveStaffingTargets');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Saving Requirements...';
+        }
+
+        try {
+            const targets = {
+                'PICKER': parseInt(document.getElementById('targetInput-PICKER')?.value || '9', 10),
+                'SHIFT_INCHARGE': parseInt(document.getElementById('targetInput-SHIFT_INCHARGE')?.value || '3', 10),
+                'SECURITY_GUARD': parseInt(document.getElementById('targetInput-SECURITY_GUARD')?.value || '2', 10),
+                'HOUSEKEEPING': parseInt(document.getElementById('targetInput-HOUSEKEEPING')?.value || '1', 10),
+            };
+
+            const res = await fetch('/api/v1/zepto/staffing-targets', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targets }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to update staffing targets');
+
+            this.closeModal('modalStaffingTargets');
+            await this.loadOverview();
+            await this.loadEmployees();
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Save Requirements';
+            }
+        }
     },
 
     // -----------------------------------------------------------------------
@@ -1302,11 +1420,9 @@ const zeptoApp = {
     getRoleBadge(role) {
         const map = {
             'PICKER': { label: '🛒 Picker', class: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
-            'SHIFT_INCHARGE': { label: '👔 Shift Incharge', class: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' },
-            'RIDER': { label: '🛵 Rider', class: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
-            'PACKER': { label: '📦 Packer', class: 'bg-pink-500/20 text-pink-300 border-pink-500/40' },
-            'STORE_MANAGER': { label: '🏛️ Manager', class: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
-            'INVENTORY': { label: '📊 Inventory', class: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+            'SHIFT_INCHARGE': { label: '⚡ Shift Incharge', class: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40' },
+            'SECURITY_GUARD': { label: '🛡️ Security Guard', class: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
+            'HOUSEKEEPING': { label: '🧹 House Keeping', class: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
         };
         const r = map[role] || { label: role, class: 'bg-slate-500/20 text-slate-300 border-slate-500/40' };
         return `<span class="px-2 py-0.5 rounded text-[11px] font-bold border ${r.class}">${r.label}</span>`;

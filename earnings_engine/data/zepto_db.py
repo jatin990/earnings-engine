@@ -50,6 +50,26 @@ PARTNERS_CONFIG = {
 PARTNER_1_NAME = PARTNERS_CONFIG["partner_1"]["name"]
 PARTNER_2_NAME = PARTNERS_CONFIG["partner_2"]["name"]
 
+# ---------------------------------------------------------------------------
+# Store Roles & Staffing Thresholds
+# ---------------------------------------------------------------------------
+
+VALID_STAFF_ROLES = ["PICKER", "SHIFT_INCHARGE", "SECURITY_GUARD", "HOUSEKEEPING"]
+
+DEFAULT_STAFFING_TARGETS = {
+    "PICKER": 9,
+    "SHIFT_INCHARGE": 3,
+    "SECURITY_GUARD": 2,
+    "HOUSEKEEPING": 1,
+}
+
+ROLE_METADATA = {
+    "PICKER": {"label": "Picker", "icon": "🛒", "color": "purple", "desc": "Item picking, bin staging & UPT speed"},
+    "SHIFT_INCHARGE": {"label": "Shift Incharge", "icon": "⚡", "color": "indigo", "desc": "Shift management, inventory & dispatch audits"},
+    "SECURITY_GUARD": {"label": "Security Guard", "icon": "🛡️", "color": "blue", "desc": "Store entry, asset safety & night surveillance"},
+    "HOUSEKEEPING": {"label": "House Keeping", "icon": "🧹", "color": "emerald", "desc": "Warehouse cleaning, sanitation & spill management"},
+}
+
 UPLOAD_DIR = Path("data/zepto/uploads")
 
 
@@ -144,6 +164,12 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS zepto_staffing_targets (
+                role TEXT PRIMARY KEY,
+                target_count INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_status ON zepto_employees(status);
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_role ON zepto_employees(role);
             CREATE INDEX IF NOT EXISTS idx_zepto_sal_emp ON zepto_salaries(employee_id, year_month);
@@ -151,11 +177,36 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             CREATE INDEX IF NOT EXISTS idx_zepto_cand_stage ON zepto_candidates(stage);
         """)
 
+        # Seed default staffing targets if missing
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for role, count in DEFAULT_STAFFING_TARGETS.items():
+            conn.execute(
+                """
+                INSERT INTO zepto_staffing_targets (role, target_count, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(role) DO NOTHING
+                """,
+                (role, count, now_iso)
+            )
+
         # Migrate existing Partner 1 / Partner 2 rows to centralized names
         conn.execute("UPDATE zepto_expenses SET incurred_by = ? WHERE incurred_by LIKE '%Partner 1%' OR incurred_by LIKE '%Jatin%'", (PARTNER_1_NAME,))
         conn.execute("UPDATE zepto_expenses SET incurred_by = ? WHERE incurred_by LIKE '%Partner 2%' OR incurred_by LIKE '%Harshiv%'", (PARTNER_2_NAME,))
         conn.execute("UPDATE zepto_security_capital SET partner_name = ? WHERE partner_name LIKE '%Partner 1%' OR partner_name LIKE '%Jatin%'", (PARTNER_1_NAME,))
         conn.execute("UPDATE zepto_security_capital SET partner_name = ? WHERE partner_name LIKE '%Partner 2%' OR partner_name LIKE '%Harshiv%'", (PARTNER_2_NAME,))
+
+        # Normalize and migrate any legacy roles to the 4 strict roles
+        conn.execute("UPDATE zepto_employees SET role = 'PICKER' WHERE role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING') AND (role LIKE '%PACK%' OR role LIKE '%RIDER%' OR role LIKE '%CASH%')")
+        conn.execute("UPDATE zepto_employees SET role = 'SHIFT_INCHARGE' WHERE role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING') AND (role LIKE '%MANAGER%' OR role LIKE '%LEAD%')")
+        conn.execute("UPDATE zepto_employees SET role = 'HOUSEKEEPING' WHERE role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING') AND role LIKE '%MAINT%'")
+        conn.execute("UPDATE zepto_employees SET role = 'SECURITY_GUARD' WHERE role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING') AND role LIKE '%SEC%'")
+        conn.execute("UPDATE zepto_employees SET role = 'PICKER' WHERE role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING')")
+
+        conn.execute("UPDATE zepto_candidates SET target_role = 'PICKER' WHERE target_role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING') AND (target_role LIKE '%PACK%' OR target_role LIKE '%RIDER%' OR target_role LIKE '%CASH%')")
+        conn.execute("UPDATE zepto_candidates SET target_role = 'SHIFT_INCHARGE' WHERE target_role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING') AND (target_role LIKE '%MANAGER%' OR target_role LIKE '%LEAD%')")
+        conn.execute("UPDATE zepto_candidates SET target_role = 'HOUSEKEEPING' WHERE target_role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING') AND target_role LIKE '%MAINT%'")
+        conn.execute("UPDATE zepto_candidates SET target_role = 'SECURITY_GUARD' WHERE target_role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING') AND target_role LIKE '%SEC%'")
+        conn.execute("UPDATE zepto_candidates SET target_role = 'PICKER' WHERE target_role NOT IN ('PICKER', 'SHIFT_INCHARGE', 'SECURITY_GUARD', 'HOUSEKEEPING')")
 
         # Check if seed data needed
         row = conn.execute("SELECT COUNT(*) FROM zepto_employees").fetchone()
@@ -167,13 +218,13 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
     """Insert initial starter seed records for store setup demonstration."""
     now_iso = datetime.now(timezone.utc).isoformat()
     
-    # 1. Sample Staff
+    # 1. Sample Staff (Only the 4 Store Roles)
     employees = [
         ("emp_01", "Rajesh Kumar", "SHIFT_INCHARGE", "+91 98765 43210", "rajesh.k@darkstore.in", "2026-06-01", None, None, "ACTIVE", 4.9, 32000.0, 3000.0, None, None, None, "Lead night shift incharge, high inventory accuracy", now_iso, now_iso),
         ("emp_02", "Amit Sharma", "PICKER", "+91 98123 45678", "amit.s@darkstore.in", "2026-06-15", None, None, "ACTIVE", 4.8, 18500.0, 1500.0, None, None, None, "Top picker: avg 48 items/hour", now_iso, now_iso),
         ("emp_03", "Vikas Verma", "PICKER", "+91 98234 56789", "vikas.v@darkstore.in", "2026-07-01", None, None, "ACTIVE", 4.5, 18000.0, 500.0, None, None, None, "Morning shift picker", now_iso, now_iso),
-        ("emp_04", "Sunil Yadav", "PACKER", "+91 98345 67890", "sunil.y@darkstore.in", "2026-06-10", None, None, "ACTIVE", 4.7, 17500.0, 1000.0, None, None, None, "Bagging & cold-chain packing lead", now_iso, now_iso),
-        ("emp_05", "Pooja Singh", "STORE_MANAGER", "+91 98456 78901", "pooja.s@darkstore.in", "2026-05-20", None, None, "ACTIVE", 5.0, 48000.0, 5000.0, None, None, None, "Overall store operations manager", now_iso, now_iso),
+        ("emp_04", "Ramesh Chand", "SECURITY_GUARD", "+91 98345 67890", "ramesh.c@darkstore.in", "2026-06-10", None, None, "ACTIVE", 4.7, 16500.0, 1000.0, None, None, None, "Store entry and night gate security", now_iso, now_iso),
+        ("emp_05", "Kavita Devi", "HOUSEKEEPING", "+91 98456 78901", "kavita.d@darkstore.in", "2026-05-20", None, None, "ACTIVE", 5.0, 14000.0, 1000.0, None, None, None, "Warehouse cleanliness & aisle maintenance", now_iso, now_iso),
         ("emp_06", "Deepak Patel", "PICKER", "+91 98567 89012", "deepak.p@darkstore.in", "2026-06-20", "2026-08-01", "Relocated to hometown", "RESIGNED", 3.8, 18000.0, 0.0, None, None, None, "Resigned due to personal relocation", now_iso, now_iso),
     ]
     conn.executemany(
@@ -193,7 +244,7 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
         (str(uuid.uuid4()), "emp_01", "2026-08", 32000.0, 3000.0, 0.0, 35000.0, "2026-08-28", "PAID", "BANK_TRANSFER", "August on-time shift incentive", now_iso),
         (str(uuid.uuid4()), "emp_02", "2026-07", 18500.0, 1200.0, 0.0, 19700.0, "2026-08-02", "PAID", "BANK_TRANSFER", "July picker speed bonus", now_iso),
         (str(uuid.uuid4()), "emp_02", "2026-08", 18500.0, 1500.0, 0.0, 20000.0, "2026-08-28", "PAID", "BANK_TRANSFER", "August UPT bonus", now_iso),
-        (str(uuid.uuid4()), "emp_05", "2026-07", 48000.0, 4000.0, 0.0, 52000.0, "2026-08-02", "PAID", "BANK_TRANSFER", "Monthly manager compensation", now_iso),
+        (str(uuid.uuid4()), "emp_04", "2026-07", 16500.0, 1000.0, 0.0, 17500.0, "2026-08-02", "PAID", "BANK_TRANSFER", "July security attendance bonus", now_iso),
     ]
     conn.executemany(
         """
@@ -223,11 +274,12 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
         expenses
     )
 
-    # 4. Sample Hiring Candidates
+    # 4. Sample Hiring Candidates (4 Strict Roles)
     candidates = [
         (str(uuid.uuid4()), "Rohit Mehra", "+91 99001 12233", "rohit.m@gmail.com", "PICKER", 18500.0, 4.8, "INTERVIEWING", None, None, "1 yr experience at Blinkit dark store", "2026-08-30", now_iso, now_iso),
         (str(uuid.uuid4()), "Manish Tiwari", "+91 99112 23344", "manish.t@gmail.com", "SHIFT_INCHARGE", 30000.0, 4.6, "SHORTLISTED", None, None, "Strong logistics background, clear communication", "2026-08-29", now_iso, now_iso),
-        (str(uuid.uuid4()), "Kavita Soni", "+91 99223 34455", "kavita.s@gmail.com", "PACKER", 17500.0, 4.2, "APPLIED", None, None, "Applied via referral, local resident", None, now_iso, now_iso),
+        (str(uuid.uuid4()), "Balwan Singh", "+91 99223 34455", "balwan.s@gmail.com", "SECURITY_GUARD", 16500.0, 4.5, "APPLIED", None, None, "Ex-serviceman with physical verification badge", None, now_iso, now_iso),
+        (str(uuid.uuid4()), "Sunita Soni", "+91 99334 45566", "sunita.s@gmail.com", "HOUSEKEEPING", 14000.0, 4.4, "APPLIED", None, None, "Experienced dark store sanitization worker", None, now_iso, now_iso),
     ]
     conn.executemany(
         """
@@ -258,11 +310,49 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Staffing Thresholds Management
+# ---------------------------------------------------------------------------
+
+def get_staffing_targets(settings: Settings | None = None) -> dict[str, int]:
+    """Retrieve target staffing thresholds per role."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT role, target_count FROM zepto_staffing_targets").fetchall()
+        targets = {r["role"]: int(r["target_count"]) for r in rows}
+        for role, default_val in DEFAULT_STAFFING_TARGETS.items():
+            if role not in targets:
+                targets[role] = default_val
+        return targets
+
+
+def update_staffing_targets(targets: dict[str, int], settings: Settings | None = None) -> dict[str, int]:
+    """Update target staffing thresholds per role."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with _connect(settings) as conn:
+        for role in VALID_STAFF_ROLES:
+            if role in targets:
+                cnt = max(0, int(targets[role]))
+                conn.execute(
+                    """
+                    INSERT INTO zepto_staffing_targets (role, target_count, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(role) DO UPDATE SET target_count = excluded.target_count, updated_at = excluded.updated_at
+                    """,
+                    (role, cnt, now_iso)
+                )
+    return get_staffing_targets(settings)
+
+
+# ---------------------------------------------------------------------------
 # Overview & Store Analytics
 # ---------------------------------------------------------------------------
 
 def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
-    """Calculate aggregated store intelligence, headcount, attrition, spend metrics & equity."""
+    """Calculate aggregated store intelligence, headcount, staffing capacity, spend metrics & equity."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
     with _connect(settings) as conn:
@@ -273,22 +363,47 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
         active_count = 0
         resigned_count = 0
         probation_count = 0
-        role_breakdown: dict[str, int] = {}
+        role_breakdown: dict[str, int] = {r: 0 for r in VALID_STAFF_ROLES}
         for r in emp_rows:
             st = r["status"]
             cnt = r["cnt"]
+            role = r["role"]
             if st == "ACTIVE":
                 active_count += cnt
-                role_breakdown[r["role"]] = role_breakdown.get(r["role"], 0) + cnt
+                role_breakdown[role] = role_breakdown.get(role, 0) + cnt
             elif st == "RESIGNED":
                 resigned_count += cnt
             elif st == "ON_PROBATION":
                 probation_count += cnt
                 active_count += cnt
+                role_breakdown[role] = role_breakdown.get(role, 0) + cnt
 
         total_staff_ever = active_count + resigned_count
-        # Attrition / Iteration rate
         attrition_rate = round((resigned_count / max(1, total_staff_ever)) * 100, 1)
+
+        # Staffing Targets & Capacity Calculations
+        targets = get_staffing_targets(settings)
+        total_target_headcount = sum(targets.get(r, DEFAULT_STAFFING_TARGETS.get(r, 0)) for r in VALID_STAFF_ROLES)
+        staffing_capacity = {}
+        for role in VALID_STAFF_ROLES:
+            t = targets.get(role, DEFAULT_STAFFING_TARGETS.get(role, 0))
+            c = role_breakdown.get(role, 0)
+            deficit = max(0, t - c)
+            meta = ROLE_METADATA.get(role, {"label": role, "icon": "👤", "color": "slate", "desc": ""})
+            staffing_capacity[role] = {
+                "role": role,
+                "label": meta["label"],
+                "icon": meta["icon"],
+                "color": meta["color"],
+                "desc": meta["desc"],
+                "current": c,
+                "target": t,
+                "deficit": deficit,
+                "fulfilled": c >= t,
+                "pct": round((c / max(1, t)) * 100, 1),
+            }
+
+        overall_staffing_pct = round((active_count / max(1, total_target_headcount)) * 100, 1)
 
         # Average Rating
         avg_rating_row = conn.execute("SELECT AVG(rating) as avg_r FROM zepto_employees WHERE status = 'ACTIVE'").fetchone()
@@ -365,15 +480,20 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
                 "partners": PARTNERS_CONFIG,
                 "target_security_deposit": target_capital,
                 "target_per_partner": target_per_partner,
+                "roles": ROLE_METADATA,
             },
             "headcount": {
                 "active": active_count,
+                "target_total": total_target_headcount,
+                "staffing_pct": overall_staffing_pct,
                 "resigned": resigned_count,
                 "probation": probation_count,
                 "total_ever": total_staff_ever,
                 "attrition_rate_pct": attrition_rate,
                 "avg_rating": avg_rating,
                 "role_breakdown": role_breakdown,
+                "capacity": staffing_capacity,
+                "targets": targets,
                 "monthly_payroll": current_monthly_payroll,
             },
             "expenses": {

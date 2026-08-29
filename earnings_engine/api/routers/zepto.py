@@ -63,6 +63,43 @@ async def get_zepto_overview_endpoint() -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/v1/zepto/staffing-targets", summary="Get Staffing Targets & Capacity")
+async def get_staffing_targets_endpoint() -> dict[str, Any]:
+    """Retrieve customizable target headcount per store role with live fulfillment capacity."""
+    try:
+        targets = zepto_db.get_staffing_targets(_settings)
+        overview = zepto_db.get_zepto_overview(_settings)
+        return {
+            "success": True,
+            "targets": targets,
+            "capacity": overview["headcount"]["capacity"],
+            "roles": overview["config"]["roles"],
+        }
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error fetching staffing targets: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/api/v1/zepto/staffing-targets", summary="Update Staffing Targets")
+@router.post("/api/v1/zepto/staffing-targets", summary="Update Staffing Targets (POST)")
+async def update_staffing_targets_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+    """Update customizable target headcount per store role."""
+    try:
+        raw_targets = payload.get("targets", payload)
+        targets = {k.upper(): int(v) for k, v in raw_targets.items() if isinstance(v, (int, str)) and str(v).isdigit()}
+        updated = zepto_db.update_staffing_targets(targets, _settings)
+        overview = zepto_db.get_zepto_overview(_settings)
+        return {
+            "success": True,
+            "targets": updated,
+            "capacity": overview["headcount"]["capacity"],
+            "roles": overview["config"]["roles"],
+        }
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error updating staffing targets: %s", e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ---------------------------------------------------------------------------
 # Employees & Salaries
 # ---------------------------------------------------------------------------
