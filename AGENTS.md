@@ -40,6 +40,14 @@ Every metric, delta, signal, accumulation flow, momentum score, and forecast **M
 - **Catalysts & Scanner Setups**: Always include both publication recency (`Published 4h ago / 2026-08-26`) and expected catalyst impact horizon (`Impact Window: 1–3 Days`).
 - **Timestamps & Freshness**: Every table, card, drawer, and modal MUST present its last-updated timestamp or data freshness indicator (e.g., `As of 2026-08-26 15:30 IST`, `Market Feed: 🟢 Live Quote` or `📊 EOD Snapshot`).
 
+### 1.5 Strict Anti-Fabrication & Production Real-Data Integrity Protocol
+**Zero-Tolerance Rule Across All Modules, Pipelines, and UI Views**:
+- **NEVER use static placeholders, mock fallbacks, synthetic seeded data (e.g., `hashlib.md5(...) % N`), or dummy values** in production code.
+- **Strict Data Grounding**:
+  1. Every price, return, moving average, EPS surprise, institutional holding, and sector performance metric MUST be computed dynamically from authoritative database records (`price_history`, `earnings_history`, `ticker_metrics`, etc.) or live verified API scrapers.
+  2. If data is genuinely missing or markets are closed, return empty collections (`[]`), `0.0`, or `None`, and present clear, honest user-facing status indicators (e.g., `Market Closed · Weekend Snapshot`, `No Institutional Filings On Record`, `Pending Exchange Disclosure`). Never hallucinate or synthesize numbers.
+  3. Aggregate sector and index metrics must be dynamically calculated across real constituent price bars.
+
 ---
 
 ## 2. Project Architecture & Directory Layout

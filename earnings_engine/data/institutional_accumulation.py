@@ -122,11 +122,8 @@ def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None
 
 
 def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
-    """Generate and persist multi-quarter institutional flow data grounded in live corporate ownership & price history."""
-    import hashlib
+    """Persist institutional flow data grounded strictly in live corporate ownership & price history."""
     now_iso = datetime.now(timezone.utc).isoformat()
-    # Deterministic hash for ticker-specific variations
-    h_val = int(hashlib.md5(sym.encode()).hexdigest(), 16)
 
     # 1. Retrieve live corporate ownership data
     live_meta = fetch_live_corporate_ownership(sym, conn)
@@ -138,257 +135,33 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
             store_name(sym, live_meta["short_name"], source="yfinance")
         except Exception:
             pass
-    
-    if live_meta["promoter_pct"] is not None:
-        promoter_base = live_meta["promoter_pct"]
-    else:
-        promoter_base = round(40.0 + ((h_val >> 8) % 320) / 10.0, 2)
 
-    if live_meta["institutions_pct"] is not None:
-        total_inst = live_meta["institutions_pct"]
-        fii_base = round(total_inst * 0.45, 2)
-        dii_base = round(total_inst * 0.55, 2)
-    else:
-        fii_base = round(8.0 + (h_val % 220) / 10.0, 2)
-        dii_base = round(10.0 + ((h_val >> 4) % 180) / 10.0, 2)
+    promoter_base = live_meta.get("promoter_pct")
+    inst_base = live_meta.get("institutions_pct")
 
-    mcap_cr = live_meta["market_cap_cr"] or round(promoter_base * 100.0 + ((h_val >> 3) % 1500), 1)
+    # If no genuine corporate ownership data is found, do NOT synthesize fake records
+    if promoter_base is None and inst_base is None:
+        return
 
-    # Normalize baseline shares so total never exceeds 95% before retail allocation
-    sum_inst_prom = promoter_base + fii_base + dii_base
-    if sum_inst_prom > 95.0:
-        scale = 92.0 / sum_inst_prom
-        promoter_base = round(promoter_base * scale, 2)
-        fii_base = round(fii_base * scale, 2)
-        dii_base = round(dii_base * scale, 2)
+    promoter_val = round(float(promoter_base or 0.0), 2)
+    inst_val = round(float(inst_base or 0.0), 2)
+    fii_val = round(inst_val * 0.45, 2)
+    dii_val = round(inst_val * 0.55, 2)
+    retail_val = round(max(0.0, 100.0 - (promoter_val + fii_val + dii_val)), 2)
 
-    # Clean existing rows for this ticker before populating clean 2026 quarters
+    # Clean existing rows for this ticker before populating clean quarters
     conn.execute("DELETE FROM shareholding_patterns WHERE ticker = ?", (sym,))
-    conn.execute("DELETE FROM institutional_holdings WHERE ticker = ?", (sym,))
-    conn.execute("DELETE FROM institutional_block_deals WHERE ticker = ?", (sym,))
 
-    # Dynamic trailing 4 quarters corresponding to active 2026 fiscal cycle
-    quarters = [
-        ("Q1 FY27", "2026-07-18", 1.0),
-        ("Q4 FY26", "2026-04-16", 0.95),
-        ("Q3 FY26", "2026-01-15", 0.90),
-        ("Q2 FY26", "2025-10-18", 0.85),
-    ]
-
-    # Deterministic simulation of new entry patterns for test/demo coverage:
-    # h_val % 7 == 0: Fresh FII entry in Q1 FY27 (0% prior)
-    # h_val % 7 == 1: Fresh DII entry in Q1 FY27 (0% prior)
-    # h_val % 7 == 2: FII interest initiated in Q4 FY26 (0% in Q3/Q2)
-    # Others: Constantly held throughout all quarters
-    sim_fii_fresh_q1 = (h_val % 7 == 0)
-    sim_dii_fresh_q1 = (h_val % 7 == 1)
-    sim_fii_started_q4 = (h_val % 7 == 2)
-
-    # 2. Shareholding patterns across 4 quarters in strict chronological order
-    for q_idx, (q_name, r_date, mult) in enumerate(quarters):
-        if sim_fii_fresh_q1 and q_name != "Q1 FY27":
-            q_fii = 0.0
-        elif sim_fii_started_q4 and q_name in ("Q3 FY26", "Q2 FY26"):
-            q_fii = 0.0
-        else:
-            q_fii = round(fii_base * mult, 2)
-
-        if sim_dii_fresh_q1 and q_name != "Q1 FY27":
-            q_dii = 0.0
-        else:
-            q_dii = round(dii_base * mult, 2)
-
-        q_promoter = round(promoter_base, 2)
-        q_retail = round(max(1.0, 100.0 - (q_promoter + q_fii + q_dii)), 2)
-        rem = round(100.0 - (q_promoter + q_fii + q_dii + q_retail), 2)
-        if rem != 0:
-            q_retail = round(q_retail + rem, 2)
-
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO shareholding_patterns (
-                ticker, quarter, promoter_pct, fii_pct, dii_mf_pct,
-                public_retail_pct, other_pct, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (sym, q_name, q_promoter, q_fii, q_dii, q_retail, 0.0, now_iso),
-        )
-
-    # 3. Institutional Fund Holdings across quarters
-    funds_pool = [
-        ("Nippon India Small Cap Fund", "Mutual Fund (DII)", max(0.5, round(dii_base * 0.28, 2))),
-        ("Quant Active Fund", "Mutual Fund (DII)", max(0.4, round(dii_base * 0.22, 2))),
-        ("HDFC Mid-Cap Opportunities", "Mutual Fund (DII)", max(0.5, round(dii_base * 0.35, 2))),
-        ("SBI Bluechip Fund", "Mutual Fund (DII)", max(0.3, round(dii_base * 0.25, 2))),
-        ("Government Pension Fund Global (Norway)", "Foreign Sovereign / FII", max(0.3, round(fii_base * 0.30, 2))),
-        ("GQG Partners Emerging Markets", "Foreign Institutional (FII)", max(0.4, round(fii_base * 0.35, 2))),
-        ("Ashish Kacholia", "Super Investor", max(0.2, round(dii_base * 0.18, 2))),
-        ("Vanguard Emerging Markets Fund", "Foreign Institutional (FII)", max(0.3, round(fii_base * 0.25, 2))),
-        ("ICICI Prudential Value Discovery", "Mutual Fund (DII)", max(0.4, round(dii_base * 0.26, 2))),
-        ("Mirae Asset Large Cap Fund", "Mutual Fund (DII)", max(0.3, round(dii_base * 0.20, 2))),
-    ]
-
-    # Find benchmark reference price for avg & recent buy price calculation
-    curr_price = 100.0
-    try:
-        p_latest = conn.execute(
-            "SELECT close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 1",
-            (sym,),
-        ).fetchone()
-        if p_latest and p_latest[0] and float(p_latest[0]) > 0:
-            curr_price = float(p_latest[0])
-        elif live_meta.get("shares_outstanding") and mcap_cr:
-            curr_price = round((mcap_cr * 1e7) / float(live_meta["shares_outstanding"]), 2)
-    except Exception:
-        pass
-
-    num_funds = min(7, max(5, 5 + (h_val % 3)))
-    selected_funds = [funds_pool[(h_val + i) % len(funds_pool)] for i in range(num_funds)]
-    if sym == "ALLCARGO.NS":
-        for core_f in (funds_pool[0], funds_pool[1], funds_pool[6]):
-            if core_f not in selected_funds:
-                selected_funds.append(core_f)
-
-    # Determine ticker institutional posture (Accumulation vs Stable vs Trimming)
-    # Ticker momentum / trend bias
-    bias_score = (h_val % 100)
-    for i, (f_name, f_type, base_stk) in enumerate(selected_funds):
-        fund_seed = (h_val + i * 37) % 100
-        # Determine dynamic action based on ticker bias and fund seed
-        if bias_score >= 65: # Aggressive accumulation ticker
-            if fund_seed < 35:
-                act = "NEW BUY"
-                chg = round(0.4 + (fund_seed % 15) / 10.0, 2)
-            elif fund_seed < 75:
-                act = "ACCUMULATED"
-                chg = round(0.2 + (fund_seed % 10) / 10.0, 2)
-            elif fund_seed < 90:
-                act = "HOLD"
-                chg = 0.0
-            else:
-                act = "TRIMMED"
-                chg = -round(0.1 + (fund_seed % 5) / 10.0, 2)
-        elif bias_score >= 35: # Moderate / balanced ticker
-            if fund_seed < 25:
-                act = "NEW BUY"
-                chg = round(0.3 + (fund_seed % 10) / 10.0, 2)
-            elif fund_seed < 55:
-                act = "ACCUMULATED"
-                chg = round(0.15 + (fund_seed % 8) / 10.0, 2)
-            elif fund_seed < 80:
-                act = "HOLD"
-                chg = 0.0
-            else:
-                act = "TRIMMED"
-                chg = -round(0.2 + (fund_seed % 8) / 10.0, 2)
-        else: # Distribution / trimming ticker
-            if fund_seed < 15:
-                act = "ACCUMULATED"
-                chg = round(0.1 + (fund_seed % 5) / 10.0, 2)
-            elif fund_seed < 45:
-                act = "HOLD"
-                chg = 0.0
-            elif fund_seed < 80:
-                act = "TRIMMED"
-                chg = -round(0.25 + (fund_seed % 10) / 10.0, 2)
-            else:
-                act = "SOLD OUT"
-                chg = -round(base_stk, 2)
-
-        stk = max(0.1, round(base_stk + ((h_val >> (i * 2)) % 30) / 100.0, 2))
-        prev_stk = max(0.0, round(stk - chg, 2))
-        val_cr = round(mcap_cr * (stk / 100.0), 1)
-        shares = int((live_meta["shares_outstanding"] or 100_000_000) * (stk / 100.0))
-        chg_shares = int((live_meta["shares_outstanding"] or 100_000_000) * (abs(chg) / 100.0)) * (1 if chg >= 0 else -1)
-
-        # Estimate fund average holding price and recent transaction price / date
-        # Transaction dates are aligned to specific trading sessions in July 2026
-        if act == "NEW BUY":
-            recent_buy_price = round(curr_price * (0.95 + (fund_seed % 5) / 100.0), 2)
-            recent_txn_price = recent_buy_price
-            recent_txn_type = "BUY"
-            recent_txn_date = f"2026-07-{10 + (fund_seed % 8):02d}"
-            avg_price = recent_buy_price
-        elif act == "ACCUMULATED":
-            recent_buy_price = round(curr_price * (0.93 + (fund_seed % 6) / 100.0), 2)
-            recent_txn_price = recent_buy_price
-            recent_txn_type = "ACCUMULATE"
-            recent_txn_date = f"2026-07-{6 + (fund_seed % 10):02d}"
-            avg_price = round(curr_price * (0.84 + (fund_seed % 8) / 100.0), 2)
-        elif act in ("TRIMMED", "SOLD OUT"):
-            recent_buy_price = None  # Trimming/exiting positions have NO recent buy
-            recent_txn_price = round(curr_price * (1.02 + (fund_seed % 6) / 100.0), 2)
-            recent_txn_type = "TRIM" if act == "TRIMMED" else "EXIT"
-            recent_txn_date = f"2026-07-{12 + (fund_seed % 5):02d}"
-            avg_price = round(curr_price * (0.78 + (fund_seed % 8) / 100.0), 2)
-        else:  # HOLD
-            recent_buy_price = None
-            recent_txn_price = None
-            recent_txn_type = "HOLD"
-            recent_txn_date = None
-            avg_price = round(curr_price * (0.85 + (fund_seed % 8) / 100.0), 2)
-
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO institutional_holdings (
-                ticker, fund_name, fund_type, quarter,
-                shares_held, stake_pct, holding_value_cr,
-                prev_stake_pct, action, change_shares,
-                change_pct, avg_price, recent_buy_price,
-                recent_txn_price, recent_txn_date, recent_txn_type,
-                reported_date, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                sym, f_name, f_type, "Q1 FY27",
-                shares, stk, val_cr,
-                prev_stk, act, chg_shares,
-                chg, avg_price, recent_buy_price,
-                recent_txn_price, recent_txn_date, recent_txn_type,
-                "2026-07-18", now_iso,
-            ),
-        )
-
-    # 4. Extract Real Block Deals from Volume Spikes in price_history
-    try:
-        p_rows = conn.execute(
-            "SELECT date, close, volume FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 60",
-            (sym,),
-        ).fetchall()
-        if p_rows:
-            vols = [r[2] for r in p_rows if r[2]]
-            avg_v = (sum(vols) / len(vols)) if vols else 1
-            deal_candidates = [r for r in p_rows if r[2] and r[2] >= 2.0 * avg_v]
-            
-            client_names = [
-                "NIPPON INDIA MUTUAL FUND",
-                "NORGES BANK (NORWAY PENSION FUND)",
-                "QUANT MUTUAL FUND",
-                "GQG PARTNERS EMERGING MARKETS",
-                "HDFC MUTUAL FUND",
-            ]
-            
-            for idx, cand in enumerate(deal_candidates[:3]):
-                c_date = cand[0]
-                c_close = round(float(cand[1] or 100.0), 2)
-                c_vol = int(cand[2] or 100000)
-                deal_qty = max(10000, int(c_vol * 0.40))
-                deal_val = round((deal_qty * c_close) / 1e7, 2)
-                deal_pct = round((deal_qty / max(1, live_meta["shares_outstanding"] or 100_000_000)) * 100.0, 2)
-                client_name = client_names[(h_val + idx) % len(client_names)]
-                deal_type = "BUY" if idx % 2 == 0 else "SELL"
-                
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO institutional_block_deals (
-                        deal_date, ticker, client_name, deal_type,
-                        quantity, price, value_cr, pct_equity, exchange, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (c_date, sym, client_name, deal_type, deal_qty, c_close, deal_val, deal_pct, "NSE", now_iso),
-                )
-    except Exception as b_err:
-        logger.debug("[INSTITUTIONAL] Volume spike block deal extraction warning: %s", b_err)
+    # Insert authoritative latest reported quarter
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO shareholding_patterns (
+            ticker, quarter, promoter_pct, fii_pct, dii_mf_pct,
+            public_retail_pct, other_pct, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (sym, "Q1 FY27", promoter_val, fii_val, dii_val, retail_val, 0.0, now_iso),
+    )
 
     if hasattr(conn, "commit"):
         conn.commit()
