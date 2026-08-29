@@ -673,9 +673,6 @@ const API_BASE = window.location.origin;
                 if (name === 'home') {
                     if (typeof this.loadMarketPulseData === 'function') this.loadMarketPulseData();
                 }
-                if (name === 'institutional') {
-                    if (typeof this.loadInstitutionalData === 'function') this.loadInstitutionalData();
-                }
                 if (name === 'results') {
                     this.updateResultsMonthSummaryCards();
                 }

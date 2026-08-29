@@ -573,6 +573,15 @@ def recalculate_stock_rating(
                 if avg_vol > 0:
                     vol_surge = round(last_vol / avg_vol, 2)
 
+    # If ticker has no market or fundamental data whatsoever, do not persist placeholder ratings
+    if not info and hist.empty and current_price is None:
+        logger.warning("No market or fundamental data available for %s; skipping rating persistence.", ticker)
+        return {
+            "success": False,
+            "error": f"No market or fundamental data available for {ticker}",
+            "ticker": ticker,
+        }
+
     tech_res = evaluate_technical_rating(
         ticker=ticker,
         price=current_price,
