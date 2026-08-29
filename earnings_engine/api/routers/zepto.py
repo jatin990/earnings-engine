@@ -197,19 +197,47 @@ async def add_bonus_endpoint(emp_id: str, payload: dict[str, Any]) -> dict[str, 
 
 @router.get("/api/v1/zepto/employees/{emp_id}/salaries", summary="Get MoM Salary History")
 async def get_employee_salaries_endpoint(emp_id: str) -> dict[str, Any]:
-    """Retrieve Month-on-Month salary history for an employee."""
+    """Retrieve Month-on-Month salary history and ratings for an employee."""
     salaries = zepto_db.get_employee_salaries(emp_id, _settings)
     return {"success": True, "employee_id": emp_id, "salaries": salaries}
 
 
 @router.post("/api/v1/zepto/employees/{emp_id}/salaries", summary="Record Monthly Salary Payout")
 async def record_salary_endpoint(emp_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """Record or update a monthly salary slip for an employee."""
+    """Record or update a monthly salary slip with performance rating for an employee."""
     try:
         sal = zepto_db.record_employee_salary(emp_id, payload, _settings)
         return {"success": True, "salary": sal}
     except Exception as e:
         logger.error("[ZEPTO-API] Error recording salary for %s: %s", emp_id, e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/api/v1/zepto/employees/{emp_id}/ratings", summary="Get Employee Monthly Ratings")
+async def get_employee_ratings_endpoint(emp_id: str) -> dict[str, Any]:
+    """Retrieve all monthly performance ratings for an employee."""
+    ratings = zepto_db.get_employee_monthly_ratings(emp_id, _settings)
+    return {"success": True, "employee_id": emp_id, "ratings": ratings}
+
+
+@router.post("/api/v1/zepto/employees/{emp_id}/ratings", summary="Record Monthly Employee Rating")
+async def record_employee_rating_endpoint(emp_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Record or update an employee's performance rating for a specific month."""
+    year_month = payload.get("year_month")
+    rating = payload.get("rating")
+    if not year_month or rating is None:
+        raise HTTPException(status_code=400, detail="year_month and rating are required")
+    try:
+        res = zepto_db.record_employee_monthly_rating(
+            emp_id=emp_id,
+            year_month=year_month,
+            rating=float(rating),
+            feedback=payload.get("feedback"),
+            settings=_settings,
+        )
+        return {"success": True, "rating": res}
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error recording monthly rating for %s: %s", emp_id, e)
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -494,3 +522,126 @@ async def get_document_endpoint(filename: str) -> FileResponse:
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path, filename=filename)
+
+
+# ---------------------------------------------------------------------------
+# Store Income & Customizable Partner Profit Split
+# ---------------------------------------------------------------------------
+
+@router.get("/api/v1/zepto/income-sources", summary="Get Income Source Categories")
+async def get_income_sources_endpoint() -> dict[str, Any]:
+    """Retrieve metadata for store income sources."""
+    return {"success": True, "sources": zepto_db.INCOME_SOURCE_METADATA}
+
+
+@router.get("/api/v1/zepto/income-split-settings", summary="Get Partner Split Ratio Settings")
+async def get_income_split_settings_endpoint() -> dict[str, Any]:
+    """Retrieve configurable profit split percentage between partners."""
+    settings = zepto_db.get_income_split_settings(_settings)
+    return {"success": True, "settings": settings}
+
+
+@router.post("/api/v1/zepto/income-split-settings", summary="Update Partner Split Ratio Settings (POST)")
+@router.put("/api/v1/zepto/income-split-settings", summary="Update Partner Split Ratio Settings (PUT)")
+async def update_income_split_settings_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+    """Update customizable income split percentage between Jatin and Harshiv."""
+    p1_pct = payload.get("partner_1_share_pct")
+    p2_pct = payload.get("partner_2_share_pct")
+    if p1_pct is None or p2_pct is None:
+        raise HTTPException(status_code=400, detail="partner_1_share_pct and partner_2_share_pct are required")
+    try:
+        updated = zepto_db.update_income_split_settings(
+            partner_1_pct=float(p1_pct),
+            partner_2_pct=float(p2_pct),
+            partner_1_name=payload.get("partner_1_name"),
+            partner_2_name=payload.get("partner_2_name"),
+            settings=_settings,
+        )
+        return {"success": True, "settings": updated}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error updating income split settings: %s", e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/api/v1/zepto/income", summary="List Store Income Records")
+async def get_income_endpoint(
+    year_month: str | None = Query(None, description="Filter by year-month e.g. 2026-08"),
+    income_source: str | None = Query(None, description="Filter by source e.g. COMMISSION, GROWTH_INCENTIVE"),
+    search: str | None = Query(None, description="Search title, UTR, or notes"),
+) -> dict[str, Any]:
+    """Retrieve store income records with live aggregate totals and partner share breakdowns."""
+    try:
+        items = zepto_db.get_store_income(
+            year_month=year_month,
+            income_source=income_source,
+            search=search,
+            settings=_settings,
+        )
+        overview = zepto_db.get_zepto_overview(_settings)
+        split_settings = zepto_db.get_income_split_settings(_settings)
+
+        total_gross = sum(i.get("gross_amount", 0.0) for i in items)
+        total_deductions = sum(i.get("deductions", 0.0) for i in items)
+        total_net = sum(i.get("net_amount", 0.0) for i in items)
+        partner_1_total = sum(i.get("partner_1_share_amount", 0.0) for i in items)
+        partner_2_total = sum(i.get("partner_2_share_amount", 0.0) for i in items)
+
+        return {
+            "success": True,
+            "count": len(items),
+            "total_gross": total_gross,
+            "total_deductions": total_deductions,
+            "total_net": total_net,
+            "partner_1_total": partner_1_total,
+            "partner_2_total": partner_2_total,
+            "split_settings": split_settings,
+            "overview_income": overview.get("income", {}),
+            "items": items,
+        }
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error retrieving store income: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/zepto/income/{income_id}", summary="Get Store Income by ID")
+async def get_income_by_id_endpoint(income_id: str) -> dict[str, Any]:
+    """Retrieve a single income record."""
+    inc = zepto_db.get_store_income_by_id(income_id, _settings)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Income record {income_id} not found")
+    return {"success": True, "income": inc}
+
+
+@router.post("/api/v1/zepto/income", summary="Record Store Income")
+async def create_income_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
+    """Record a new store income payment with custom or default partner split percentage."""
+    if not payload.get("title") or payload.get("gross_amount") is None:
+        raise HTTPException(status_code=400, detail="title and gross_amount are required")
+    try:
+        inc = zepto_db.create_store_income(payload, _settings)
+        return {"success": True, "income": inc}
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error recording store income: %s", e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/api/v1/zepto/income/{income_id}", summary="Update Store Income")
+async def update_income_endpoint(income_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Update a store income record and recalculate partner distributions."""
+    try:
+        inc = zepto_db.update_store_income(income_id, payload, _settings)
+        return {"success": True, "income": inc}
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error updating store income %s: %s", income_id, e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/api/v1/zepto/income/{income_id}", summary="Delete Store Income")
+async def delete_income_endpoint(income_id: str) -> dict[str, Any]:
+    """Delete a store income record."""
+    zepto_db.delete_store_income(income_id, _settings)
+    return {"success": True, "deleted_id": income_id}

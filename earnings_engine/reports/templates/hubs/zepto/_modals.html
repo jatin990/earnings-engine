@@ -124,11 +124,11 @@
 <!-- ================= 2. MOM SALARY DRILLDOWN & BONUS MODAL ================= -->
 <div id="modalSalaryDrilldown" style="display: none;"
     class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-panel max-w-2xl w-full p-6 border-purple-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+    <div class="glass-panel max-w-3xl w-full p-6 border-purple-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <div>
                 <h3 class="text-base font-extrabold text-white flex items-center gap-2" id="modalSalaryEmpName">
-                    <span>💵</span> Month-on-Month Salary History
+                    <span>💵</span> Month-on-Month Salary & Rating History
                 </h3>
                 <p class="text-xs text-slate-400" id="modalSalaryEmpMeta">Base Salary: ₹0 · Role: Picker</p>
             </div>
@@ -141,8 +141,7 @@
             class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 mb-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div>
                 <span class="font-bold text-xs text-purple-300 block">🎁 Award Instant Performance Bonus</span>
-                <span class="text-[11px] text-slate-400">Bonus adds directly to current month compensation
-                    payout.</span>
+                <span class="text-[11px] text-slate-400">Bonus adds directly to current month compensation payout.</span>
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <input type="number" id="quickBonusInput" placeholder="Amount ₹"
@@ -153,23 +152,28 @@
             </div>
         </div>
 
-        <!-- MoM Payouts Table -->
-        <h4 class="font-bold text-xs text-slate-300 uppercase tracking-wider mb-2">Monthly Payout History (MoM)</h4>
+        <!-- MoM Payouts & Rating Table -->
+        <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-xs text-slate-300 uppercase tracking-wider">Monthly Payouts & Performance Ratings (MoM)</h4>
+            <span class="text-[10px] text-slate-400">Ratings tracked per month</span>
+        </div>
         <div class="overflow-x-auto rounded-lg border border-white/10">
             <table class="w-full text-left text-xs">
                 <thead class="bg-slate-900 text-slate-400 font-bold uppercase text-[10px]">
                     <tr>
                         <th class="p-2.5">Month</th>
+                        <th class="p-2.5 text-center">Month Rating</th>
                         <th class="p-2.5 text-right">Base Wage</th>
                         <th class="p-2.5 text-right">Bonus</th>
                         <th class="p-2.5 text-right">Net Paid</th>
                         <th class="p-2.5">Payment Date</th>
                         <th class="p-2.5 text-center">Status</th>
+                        <th class="p-2.5 text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="salaryHistoryTableBody" class="divide-y divide-white/5 font-mono text-slate-200">
                     <tr>
-                        <td colspan="6" class="p-4 text-center text-slate-500">No past salary records logged yet.</td>
+                        <td colspan="8" class="p-4 text-center text-slate-500">No past salary records logged yet.</td>
                     </tr>
                 </tbody>
             </table>
@@ -177,21 +181,88 @@
 
         <!-- Record Monthly Slip Form -->
         <div class="mt-4 pt-4 border-t border-white/10">
-            <h4 class="font-bold text-xs text-slate-300 mb-2">➕ Record New Monthly Payout Slip</h4>
+            <h4 class="font-bold text-xs text-slate-300 mb-2">➕ Record New Monthly Payout Slip & Rating</h4>
             <form id="formRecordSalary" onsubmit="zeptoApp.saveSalarySlip(event)"
-                class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                <input type="month" id="salSlipMonth" required
-                    class="bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
-                <input type="number" id="salSlipBase" required placeholder="Base (₹)"
-                    class="bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
-                <input type="number" id="salSlipBonus" value="0" placeholder="Bonus (₹)"
-                    class="bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
-                <button type="submit"
-                    class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold text-white text-xs">
-                    Log Payout Slip
-                </button>
+                class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                <div>
+                    <label class="block text-[10px] text-slate-400 font-semibold mb-1">Month</label>
+                    <input type="month" id="salSlipMonth" required
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 font-semibold mb-1">Base Wage (₹)</label>
+                    <input type="number" id="salSlipBase" required placeholder="Base (₹)"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 font-semibold mb-1">Bonus (₹)</label>
+                    <input type="number" id="salSlipBonus" value="0" placeholder="Bonus (₹)"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 font-semibold mb-1">Rating (1-5)</label>
+                    <input type="number" id="salSlipRating" value="5.0" min="1.0" max="5.0" step="0.1" placeholder="Rating"
+                        class="w-full bg-slate-900 border border-amber-500/30 rounded-lg px-2 py-1.5 text-amber-300 font-bold">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit"
+                        class="w-full px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-bold text-white text-xs transition">
+                        Log Slip
+                    </button>
+                </div>
             </form>
         </div>
+    </div>
+</div>
+
+
+<!-- ================= 2B. MONTHLY PERFORMANCE RATING MODAL ================= -->
+<div id="modalMonthlyRating" style="display: none;"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel max-w-md w-full p-5 border-amber-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
+            <div>
+                <h3 class="text-sm font-extrabold text-white flex items-center gap-2" id="modalRatingTitle">
+                    <span>⭐</span> Record Monthly Performance Rating
+                </h3>
+                <p class="text-[11px] text-slate-400" id="modalRatingSub">Log monthly review score & feedback</p>
+            </div>
+            <button type="button" onclick="zeptoApp.closeModal('modalMonthlyRating')"
+                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+        </div>
+
+        <form id="formMonthlyRating" onsubmit="zeptoApp.saveMonthlyRating(event)" class="space-y-3.5 text-xs">
+            <input type="hidden" id="ratingEmpId">
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Review Month *</label>
+                <input type="month" id="ratingMonthInput" required
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+            </div>
+
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <label class="block text-slate-300 font-semibold">Monthly Score (1.0 to 5.0) *</label>
+                    <span class="font-mono font-extrabold text-amber-400 text-sm" id="ratingScoreDisplay">⭐ 5.0</span>
+                </div>
+                <input type="range" id="ratingRangeInput" min="1.0" max="5.0" step="0.1" value="5.0"
+                    oninput="document.getElementById('ratingScoreDisplay').textContent = `⭐ ${parseFloat(this.value).toFixed(1)}`"
+                    class="w-full accent-amber-400 cursor-pointer">
+            </div>
+
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Performance Remarks / Operational Feedback</label>
+                <textarea id="ratingFeedbackInput" rows="3"
+                    placeholder="e.g. Maintained 99.8% picking accuracy, zero shift delays, proactive in warehouse organization..."
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
+                <button type="button" onclick="zeptoApp.closeModal('modalMonthlyRating')"
+                    class="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                <button type="submit" id="btnSaveMonthlyRating"
+                    class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition">Save Monthly Rating</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -689,6 +760,236 @@
                     class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
                 <button type="submit" id="btnSaveStaffingTargets"
                     class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition">Save Configurations</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ================= 7. RECORD / EDIT STORE INCOME MODAL ================= -->
+<div id="modalIncome" style="display: none;"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel max-w-xl w-full p-6 border-emerald-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
+            <h3 class="text-base font-extrabold text-white flex items-center gap-2" id="modalIncomeTitle">
+                <span>💵</span> Record Store Income Payment
+            </h3>
+            <button type="button" onclick="zeptoApp.closeModal('modalIncome')"
+                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+        </div>
+
+        <form id="formIncome" onsubmit="zeptoApp.saveIncome(event)" class="space-y-4 text-xs">
+            <input type="hidden" id="incFormId">
+
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Income Title / Payout Description *</label>
+                <input type="text" id="incFormTitle" required
+                    placeholder="e.g. Zepto Dark Store Commission Payout, Peak Surge Incentive..."
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Income Stream / Category *</label>
+                    <select id="incFormSource" required
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        <option value="COMMISSION">🛍️ Order Commission (Base Margin)</option>
+                        <option value="GROWTH_INCENTIVE">🚀 SLA & Growth Incentive</option>
+                        <option value="ORDER_SLOTTING">🏷️ Brand Slotting Fee</option>
+                        <option value="DELIVERY_SURCHARGE">⚡ Delivery Surcharge Margin</option>
+                        <option value="MISC">💵 Operational / Misc Revenue</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Payment Date *</label>
+                    <input type="date" id="incFormDate" required
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                </div>
+            </div>
+
+            <!-- Financials: Gross, Deductions, Net -->
+            <div class="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-3">
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[11px] text-slate-300 font-semibold mb-1">Gross Invoiced (₹) *</label>
+                        <input type="number" id="incFormGross" required min="0" step="0.01"
+                            oninput="zeptoApp.calculateIncomeNetAndSplit()"
+                            placeholder="0.00"
+                            class="w-full bg-slate-900 border border-white/20 rounded-lg px-3 py-1.5 text-white font-mono font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-300 font-semibold mb-1">TDS / Deductions (₹)</label>
+                        <input type="number" id="incFormDeductions" min="0" step="0.01" value="0"
+                            oninput="zeptoApp.calculateIncomeNetAndSplit()"
+                            placeholder="0.00"
+                            class="w-full bg-slate-900 border border-rose-500/30 rounded-lg px-3 py-1.5 text-rose-300 font-mono font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-emerald-400 font-semibold mb-1">Net Received (₹)</label>
+                        <input type="number" id="incFormNet" readonly
+                            class="w-full bg-slate-900/80 border border-emerald-500/40 rounded-lg px-3 py-1.5 text-emerald-300 font-mono font-black text-sm">
+                    </div>
+                </div>
+
+                <!-- Live Partner Split Section -->
+                <div class="pt-2 border-t border-white/10">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Partner Distribution Split</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-slate-400">Jatin %:</span>
+                            <input type="number" id="incFormP1Pct" min="0" max="100" step="0.5" value="50"
+                                oninput="zeptoApp.onFormP1PctChange(this.value)"
+                                class="w-14 bg-slate-900 border border-purple-500/40 rounded px-1.5 py-0.5 text-purple-300 font-mono font-bold text-center text-xs">
+                            <span class="text-[10px] text-slate-400">Harshiv %:</span>
+                            <input type="number" id="incFormP2Pct" min="0" max="100" step="0.5" value="50"
+                                oninput="zeptoApp.onFormP2PctChange(this.value)"
+                                class="w-14 bg-slate-900 border border-pink-500/40 rounded px-1.5 py-0.5 text-pink-300 font-mono font-bold text-center text-xs">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div class="p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/30 flex justify-between items-center">
+                            <div>
+                                <span class="text-[10px] text-slate-400 block font-semibold">Jatin Abrol (<span id="incModalP1PctLabel">50%</span>)</span>
+                                <span class="font-mono font-black text-purple-300 text-sm" id="incModalP1Amt">₹0</span>
+                            </div>
+                            <span class="text-sm">👑</span>
+                        </div>
+                        <div class="p-2.5 rounded-lg bg-pink-500/10 border border-pink-500/30 flex justify-between items-center">
+                            <div>
+                                <span class="text-[10px] text-slate-400 block font-semibold">Harshiv Bargotra (<span id="incModalP2PctLabel">50%</span>)</span>
+                                <span class="font-mono font-black text-pink-300 text-sm" id="incModalP2Amt">₹0</span>
+                            </div>
+                            <span class="text-sm">⚡</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Payment Mode</label>
+                    <select id="incFormPaymentMode"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        <option value="BANK_TRANSFER">🏦 Direct Bank Transfer / NEFT</option>
+                        <option value="ZEPTO_ESCROW">⚡ Zepto Escrow Settlement</option>
+                        <option value="UPI">📱 UPI Payment</option>
+                        <option value="CHEQUE">📜 Cheque Deposit</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Reference UTR / Invoice No.</label>
+                    <input type="text" id="incFormUtr" placeholder="e.g. ZEPTO-COM-202608-9901"
+                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Invoice / Payment Proof Voucher</label>
+                <input type="file" id="incFormProofFile" accept=".pdf,.png,.jpg,.jpeg"
+                    class="w-full text-slate-400 text-xs">
+                <input type="hidden" id="incFormProofUrl">
+            </div>
+
+            <div>
+                <label class="block text-slate-300 font-semibold mb-1">Remarks & Settlement Notes</label>
+                <textarea id="incFormNotes" rows="2"
+                    placeholder="e.g. Approved monthly billing cycle payout from Zepto Hub Escrow..."
+                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
+                <button type="button" onclick="zeptoApp.closeModal('modalIncome')"
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                <button type="submit" id="btnSaveIncome" class="btn-zepto font-bold">Save Income Record</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- ================= 8. CUSTOMIZE PARTNER SPLIT RATIO MODAL ================= -->
+<div id="modalIncomeSplitSettings" style="display: none;"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel max-w-md w-full p-6 border-purple-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
+            <div>
+                <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                    <span>⚙️</span> Customize Profit Split Ratio
+                </h3>
+                <p class="text-xs text-slate-400">Configure default profit share % between Jatin & Harshiv</p>
+            </div>
+            <button type="button" onclick="zeptoApp.closeModal('modalIncomeSplitSettings')"
+                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+        </div>
+
+        <form id="formIncomeSplit" onsubmit="zeptoApp.saveIncomeSplitSettings(event)" class="space-y-4 text-xs">
+            <!-- Preset Buttons -->
+            <div>
+                <label class="block text-slate-400 font-semibold text-[11px] mb-1.5 uppercase">Quick Preset Ratios:</label>
+                <div class="grid grid-cols-4 gap-1.5">
+                    <button type="button" onclick="zeptoApp.setSplitPreset(50, 50)" class="py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 font-mono font-bold text-center transition">
+                        50 - 50
+                    </button>
+                    <button type="button" onclick="zeptoApp.setSplitPreset(60, 40)" class="py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 font-mono font-bold text-center transition">
+                        60 - 40
+                    </button>
+                    <button type="button" onclick="zeptoApp.setSplitPreset(70, 30)" class="py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 font-mono font-bold text-center transition">
+                        70 - 30
+                    </button>
+                    <button type="button" onclick="zeptoApp.setSplitPreset(55, 45)" class="py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 font-mono font-bold text-center transition">
+                        55 - 45
+                    </button>
+                </div>
+            </div>
+
+            <!-- Two-tone split visual -->
+            <div class="space-y-2 p-3.5 rounded-xl bg-black/40 border border-white/10">
+                <div class="flex items-center justify-between text-sm font-bold font-mono">
+                    <div class="text-purple-300">
+                        <span>Jatin Abrol: </span>
+                        <span id="splitModalP1Display">50.0%</span>
+                    </div>
+                    <div class="text-pink-300">
+                        <span>Harshiv Bargotra: </span>
+                        <span id="splitModalP2Display">50.0%</span>
+                    </div>
+                </div>
+
+                <input type="range" id="splitModalSlider" min="0" max="100" step="0.5" value="50"
+                    oninput="zeptoApp.onSplitSliderChange(this.value)"
+                    class="w-full accent-purple-500 cursor-pointer h-2 bg-slate-800 rounded-lg">
+
+                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden flex border border-white/10 mt-2">
+                    <div id="splitModalBarP1" class="bg-gradient-to-r from-purple-600 to-purple-400 h-2.5 transition-all duration-300" style="width: 50%"></div>
+                    <div id="splitModalBarP2" class="bg-gradient-to-r from-pink-400 to-pink-600 h-2.5 transition-all duration-300" style="width: 50%"></div>
+                </div>
+            </div>
+
+            <!-- Numeric Inputs -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Jatin Abrol (%)</label>
+                    <input type="number" id="splitInputP1" min="0" max="100" step="0.1" value="50" required
+                        oninput="zeptoApp.onSplitInputP1Change(this.value)"
+                        class="w-full bg-slate-900 border border-purple-500/40 rounded-lg px-3 py-2 text-purple-300 font-mono font-bold text-center">
+                </div>
+                <div>
+                    <label class="block text-slate-300 font-semibold mb-1">Harshiv Bargotra (%)</label>
+                    <input type="number" id="splitInputP2" min="0" max="100" step="0.1" value="50" required
+                        oninput="zeptoApp.onSplitInputP2Change(this.value)"
+                        class="w-full bg-slate-900 border border-pink-500/40 rounded-lg px-3 py-2 text-pink-300 font-mono font-bold text-center">
+                </div>
+            </div>
+
+            <div class="p-2.5 rounded-lg bg-white/[0.03] border border-white/10 text-[11px] text-slate-400">
+                💡 <strong>Note:</strong> Updating the default ratio will automatically apply to all upcoming income payouts unless explicitly overridden per entry.
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
+                <button type="button" onclick="zeptoApp.closeModal('modalIncomeSplitSettings')"
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                <button type="submit" id="btnSaveSplitSettings"
+                    class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition">Apply Split Ratio</button>
             </div>
         </form>
     </div>

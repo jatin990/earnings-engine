@@ -7,6 +7,7 @@
 const zeptoApp = {
     overview: null,
     employees: [],
+    income: [],
     expenses: [],
     candidates: [],
     security: null,
@@ -19,7 +20,7 @@ const zeptoApp = {
 
         // Tab routing via hash
         const hash = (window.location.hash || '#employees').replace('#', '');
-        if (['employees', 'expenses', 'candidates', 'security'].includes(hash)) {
+        if (['employees', 'income', 'expenses', 'candidates', 'security'].includes(hash)) {
             this.activeTab = hash;
         }
         this.switchTab(this.activeTab, false);
@@ -40,6 +41,7 @@ const zeptoApp = {
         await Promise.all([
             this.loadOverview(),
             this.loadEmployees(),
+            this.loadIncome(),
             this.loadExpenses(),
             this.loadCandidates(),
             this.loadSecurity(),
@@ -56,7 +58,7 @@ const zeptoApp = {
             window.location.hash = tabId;
         }
 
-        ['employees', 'expenses', 'candidates', 'security'].forEach(t => {
+        ['employees', 'income', 'expenses', 'candidates', 'security'].forEach(t => {
             const btn = document.getElementById(`tabBtn-${t}`);
             const content = document.getElementById(`tabContent-${t}`);
             if (btn) {
@@ -689,24 +691,78 @@ const zeptoApp = {
         if (!tbody) return;
 
         if (salaries.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No monthly payout slips recorded yet.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-500">No monthly payout slips recorded yet.</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = salaries.map(sal => `
-            <tr>
-                <td class="p-2.5 font-bold text-white">${sal.year_month}</td>
-                <td class="p-2.5 text-right">${this.formatCurrency(sal.base_amount)}</td>
-                <td class="p-2.5 text-right text-purple-400">${sal.bonus_amount > 0 ? '+' + this.formatCurrency(sal.bonus_amount) : '₹0'}</td>
-                <td class="p-2.5 text-right font-bold text-emerald-400">${this.formatCurrency(sal.net_paid)}</td>
-                <td class="p-2.5 text-slate-400 text-[11px]">${sal.payment_date || '—'}</td>
-                <td class="p-2.5 text-center">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        ${sal.payment_status || 'PAID'}
-                    </span>
-                </td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = salaries.map(sal => {
+            const rVal = parseFloat(sal.performance_rating || 5.0).toFixed(1);
+            const feedbackText = sal.rating_feedback ? ` · "${sal.rating_feedback}"` : '';
+
+            return `
+                <tr>
+                    <td class="p-2.5 font-bold text-white">${sal.year_month}</td>
+                    <td class="p-2.5 text-center font-mono font-bold text-amber-300">
+                        <span class="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 inline-flex items-center gap-1" title="${sal.year_month} Rating${feedbackText}">
+                            ⭐ ${rVal}
+                        </span>
+                    </td>
+                    <td class="p-2.5 text-right">${this.formatCurrency(sal.base_amount)}</td>
+                    <td class="p-2.5 text-right text-purple-400">${sal.bonus_amount > 0 ? '+' + this.formatCurrency(sal.bonus_amount) : '₹0'}</td>
+                    <td class="p-2.5 text-right font-bold text-emerald-400">${this.formatCurrency(sal.net_paid)}</td>
+                    <td class="p-2.5 text-slate-400 text-[11px]">${sal.payment_date || '—'}</td>
+                    <td class="p-2.5 text-center">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            ${sal.payment_status || 'PAID'}
+                        </span>
+                    </td>
+                    <td class="p-2.5 text-center">
+                        <button type="button" onclick="zeptoApp.openMonthlyRatingModal('${this.currentEmpId}', '${sal.year_month}', ${sal.performance_rating || 5.0}, '${(sal.rating_feedback || '').replace(/'/g, "\\'")}')" class="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-[10px] border border-amber-500/30 transition" title="Edit Monthly Rating">
+                            ⭐ Rate
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    openMonthlyRatingModal(empId, yearMonth, currentRating = 5.0, currentFeedback = '') {
+        document.getElementById('ratingEmpId').value = empId;
+        document.getElementById('ratingMonthInput').value = yearMonth || new Date().toISOString().slice(0, 7);
+        const r = parseFloat(currentRating || 5.0);
+        document.getElementById('ratingRangeInput').value = r;
+        document.getElementById('ratingScoreDisplay').textContent = `⭐ ${r.toFixed(1)}`;
+        document.getElementById('ratingFeedbackInput').value = currentFeedback || '';
+        this.openModal('modalMonthlyRating');
+    },
+
+    async saveMonthlyRating(e) {
+        e.preventDefault();
+        const empId = document.getElementById('ratingEmpId').value;
+        const yearMonth = document.getElementById('ratingMonthInput').value;
+        const rating = parseFloat(document.getElementById('ratingRangeInput').value || 5.0);
+        const feedback = document.getElementById('ratingFeedbackInput').value;
+
+        try {
+            const res = await fetch(`/api/v1/zepto/employees/${empId}/ratings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    year_month: yearMonth,
+                    rating: rating,
+                    feedback: feedback,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to save monthly rating');
+
+            this.closeModal('modalMonthlyRating');
+            await this.openSalaryDrilldown(empId);
+            await this.loadOverview();
+            await this.loadEmployees();
+        } catch (err) {
+            alert(err.message);
+        }
     },
 
     async submitQuickBonus() {
@@ -745,6 +801,7 @@ const zeptoApp = {
                 year_month: document.getElementById('salSlipMonth').value,
                 base_amount: parseFloat(document.getElementById('salSlipBase').value || 0),
                 bonus_amount: parseFloat(document.getElementById('salSlipBonus').value || 0),
+                performance_rating: parseFloat(document.getElementById('salSlipRating')?.value || 5.0),
                 deductions: 0.0,
                 payment_date: new Date().toISOString().split('T')[0],
                 payment_status: 'PAID',
@@ -760,6 +817,8 @@ const zeptoApp = {
             if (!res.ok) throw new Error(data.detail || 'Failed to record salary slip');
 
             await this.openSalaryDrilldown(this.currentEmpId);
+            await this.loadOverview();
+            await this.loadEmployees();
         } catch (err) {
             alert(err.message);
         }
@@ -1614,6 +1673,442 @@ const zeptoApp = {
             pills.push(`<a href="${resumeUrl}" target="_blank" class="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-bold border border-purple-500/30 hover:underline" title="View Resume">📄 CV</a>`);
         }
         return pills.length > 0 ? `<div class="flex items-center justify-center gap-1">${pills.join('')}</div>` : `<span class="text-slate-600">—</span>`;
+    },
+
+    getIncomeSourceBadge(source) {
+        const map = {
+            'COMMISSION': { label: '🛍️ Order Commission', class: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+            'GROWTH_INCENTIVE': { label: '🚀 SLA & Growth', class: 'bg-purple-500/20 text-purple-300 border-purple-500/40' },
+            'ORDER_SLOTTING': { label: '🏷️ Brand Slotting', class: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
+            'DELIVERY_SURCHARGE': { label: '⚡ Delivery Margin', class: 'bg-amber-500/20 text-amber-300 border-amber-500/40' },
+            'MISC': { label: '💵 Operational / Misc', class: 'bg-pink-500/20 text-pink-300 border-pink-500/40' },
+        };
+        const s = map[source] || { label: source, class: 'bg-slate-500/20 text-slate-300 border-slate-500/40' };
+        return `<span class="px-2 py-0.5 rounded text-[11px] font-bold border ${s.class}">${s.label}</span>`;
+    },
+
+    // -----------------------------------------------------------------------
+    // Tab: Store Income & Customizable Partner Profit Split
+    // -----------------------------------------------------------------------
+
+    async loadIncome() {
+        const ym = document.getElementById('incMonthFilter')?.value || 'ALL';
+        const src = document.getElementById('incSourceFilter')?.value || 'ALL';
+        const search = document.getElementById('incSearchInput')?.value || '';
+
+        try {
+            const params = new URLSearchParams();
+            if (ym && ym !== 'ALL') params.append('year_month', ym);
+            if (src && src !== 'ALL') params.append('income_source', src);
+            if (search.trim()) params.append('search', search.trim());
+
+            const res = await fetch(`/api/v1/zepto/income?${params.toString()}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to load store income');
+
+            this.income = data.items || [];
+            this.renderIncome(data);
+        } catch (err) {
+            console.error('[ZEPTO] Error loading store income:', err);
+        }
+    },
+
+    filterIncome() {
+        this.loadIncome();
+    },
+
+    resetIncomeFilters() {
+        const ym = document.getElementById('incMonthFilter');
+        const src = document.getElementById('incSourceFilter');
+        const search = document.getElementById('incSearchInput');
+        if (ym) ym.value = 'ALL';
+        if (src) src.value = 'ALL';
+        if (search) search.value = '';
+        this.loadIncome();
+    },
+
+    renderIncome(data) {
+        const items = data.items || [];
+        const split = data.split_settings || { partner_1_share_pct: 50.0, partner_2_share_pct: 50.0, partner_1_name: 'Jatin Abrol', partner_2_name: 'Harshiv Bargotra' };
+        const overviewInc = data.overview_income || {};
+
+        // Top KPIs
+        const totalNetEl = document.getElementById('incTotalNet');
+        if (totalNetEl) totalNetEl.textContent = this.formatCurrency(data.total_net || 0);
+
+        const totalGrossEl = document.getElementById('incTotalGross');
+        if (totalGrossEl) totalGrossEl.textContent = this.formatCurrency(data.total_gross || 0);
+
+        const totalDeductionsEl = document.getElementById('incTotalDeductions');
+        if (totalDeductionsEl) totalDeductionsEl.textContent = this.formatCurrency(data.total_deductions || 0);
+
+        const countBadge = document.getElementById('incCountBadge');
+        if (countBadge) countBadge.textContent = `${items.length} Records`;
+
+        const rateEl = document.getElementById('incRealizationRate');
+        if (rateEl) {
+            const gross = data.total_gross || 0;
+            const net = data.total_net || 0;
+            const rate = gross > 0 ? Math.round((net / gross) * 100) : 100;
+            rateEl.textContent = `${rate}% Realized`;
+        }
+
+        // Partner 1 Share
+        const p1TotalEl = document.getElementById('incPartner1Total');
+        if (p1TotalEl) p1TotalEl.textContent = this.formatCurrency(data.partner_1_total || 0);
+        const p1PctBadge = document.getElementById('incPartner1PctBadge');
+        if (p1PctBadge) p1PctBadge.textContent = `${split.partner_1_share_pct || 50.0}% Share`;
+
+        // Partner 2 Share
+        const p2TotalEl = document.getElementById('incPartner2Total');
+        if (p2TotalEl) p2TotalEl.textContent = this.formatCurrency(data.partner_2_total || 0);
+        const p2PctBadge = document.getElementById('incPartner2PctBadge');
+        if (p2PctBadge) p2PctBadge.textContent = `${split.partner_2_share_pct || 50.0}% Share`;
+
+        // Split Bar
+        const splitBarLabel1 = document.getElementById('splitBarLabel1');
+        if (splitBarLabel1) splitBarLabel1.textContent = `${split.partner_1_name || 'Jatin'}: ${split.partner_1_share_pct}%`;
+        const splitBarLabel2 = document.getElementById('splitBarLabel2');
+        if (splitBarLabel2) splitBarLabel2.textContent = `${split.partner_2_name || 'Harshiv'}: ${split.partner_2_share_pct}%`;
+
+        const splitBarP1 = document.getElementById('incSplitBarP1');
+        const splitBarP2 = document.getElementById('incSplitBarP2');
+        if (splitBarP1) splitBarP1.style.width = `${split.partner_1_share_pct}%`;
+        if (splitBarP2) splitBarP2.style.width = `${split.partner_2_share_pct}%`;
+
+        const currentSplitLabel = document.getElementById('btnCurrentSplitLabel');
+        if (currentSplitLabel) currentSplitLabel.textContent = `${split.partner_1_share_pct?.toFixed(0)}-${split.partner_2_share_pct?.toFixed(0)}`;
+
+        // Source Distribution Tiles
+        const srcBreakdown = overviewInc.source_breakdown || {};
+        ['COMMISSION', 'GROWTH_INCENTIVE', 'ORDER_SLOTTING', 'DELIVERY_SURCHARGE', 'MISC'].forEach(src => {
+            const el = document.getElementById(`srcTotal-${src}`);
+            if (el) el.textContent = this.formatCurrency(srcBreakdown[src] || 0);
+        });
+
+        // Table Body
+        const tbody = document.getElementById('incomeTableBody');
+        const tableBadge = document.getElementById('incTableCountBadge');
+        if (tableBadge) tableBadge.textContent = `${items.length} Records`;
+        if (!tbody) return;
+
+        if (items.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="10" class="p-8 text-center text-slate-500">
+                        No store income records found matching criteria. Click "Record Store Income" to log a settlement.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = items.map(inc => {
+            const srcBadge = this.getIncomeSourceBadge(inc.income_source);
+            const proofHtml = inc.proof_doc_url
+                ? `<a href="${inc.proof_doc_url}" target="_blank" class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 hover:underline" title="View Settlement Invoice">📄 Proof</a>`
+                : `<span class="text-slate-600">—</span>`;
+
+            return `
+                <tr class="hover:bg-white/[0.02] transition">
+                    <td class="p-3 pl-3.5">
+                        <div class="font-bold text-white text-xs">${inc.title}</div>
+                        <div class="mt-1">${srcBadge}</div>
+                        ${inc.notes ? `<div class="text-[10px] text-slate-400 mt-0.5 italic truncate max-w-xs">${inc.notes}</div>` : ''}
+                    </td>
+                    <td class="p-3 text-slate-300 text-[11px] whitespace-nowrap">
+                        <div class="font-mono">${inc.income_date}</div>
+                        <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-white/5 border border-white/10 text-slate-400 font-mono">
+                            ${inc.year_month}
+                        </span>
+                    </td>
+                    <td class="p-3 text-right font-mono font-bold text-slate-200">${this.formatCurrency(inc.gross_amount)}</td>
+                    <td class="p-3 text-right font-mono text-rose-400 font-bold">
+                        ${inc.deductions > 0 ? '-' + this.formatCurrency(inc.deductions) : '₹0'}
+                    </td>
+                    <td class="p-3 text-right font-mono font-black text-emerald-400 text-sm">${this.formatCurrency(inc.net_amount)}</td>
+                    <td class="p-3 text-right font-mono">
+                        <div class="font-bold text-purple-300">${this.formatCurrency(inc.partner_1_share_amount)}</div>
+                        <span class="text-[10px] text-purple-400/80">(${inc.partner_1_share_pct}%)</span>
+                    </td>
+                    <td class="p-3 text-right font-mono">
+                        <div class="font-bold text-pink-300">${this.formatCurrency(inc.partner_2_share_amount)}</div>
+                        <span class="text-[10px] text-pink-400/80">(${inc.partner_2_share_pct}%)</span>
+                    </td>
+                    <td class="p-3 text-[11px] text-slate-300 font-mono">
+                        <div>${inc.reference_utr || '—'}</div>
+                        <div class="text-[10px] text-slate-500 uppercase">${inc.payment_mode || 'BANK_TRANSFER'}</div>
+                    </td>
+                    <td class="p-3 text-center">${proofHtml}</td>
+                    <td class="p-3 pr-3.5 text-center whitespace-nowrap">
+                        <div class="flex items-center justify-center gap-1.5">
+                            <button type="button" onclick="zeptoApp.openEditIncomeModal('${inc.id}')" class="p-1.5 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-xs" title="Edit Income Record">
+                                ✏️
+                            </button>
+                            <button type="button" onclick="zeptoApp.deleteIncome('${inc.id}')" class="p-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs" title="Delete Income Record">
+                                🗑️
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    openAddIncomeModal() {
+        document.getElementById('formIncome')?.reset();
+        document.getElementById('incFormId').value = '';
+        document.getElementById('modalIncomeTitle').innerHTML = '<span>💵</span> Record Store Income Payment';
+        document.getElementById('incFormDate').value = new Date().toISOString().split('T')[0];
+
+        // Fetch current default split settings
+        const defaultP1 = this.overview?.income?.partner_1?.share_pct || 50.0;
+        const defaultP2 = this.overview?.income?.partner_2?.share_pct || 50.0;
+
+        document.getElementById('incFormP1Pct').value = defaultP1;
+        document.getElementById('incFormP2Pct').value = defaultP2;
+        this.calculateIncomeNetAndSplit();
+
+        this.openModal('modalIncome');
+    },
+
+    async openEditIncomeModal(incomeId) {
+        try {
+            const res = await fetch(`/api/v1/zepto/income/${incomeId}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to fetch income record');
+
+            const inc = data.income;
+            document.getElementById('incFormId').value = inc.id;
+            document.getElementById('incFormTitle').value = inc.title;
+            document.getElementById('incFormSource').value = inc.income_source;
+            document.getElementById('incFormDate').value = inc.income_date;
+            document.getElementById('incFormGross').value = inc.gross_amount;
+            document.getElementById('incFormDeductions').value = inc.deductions || 0;
+            document.getElementById('incFormP1Pct').value = inc.partner_1_share_pct || 50.0;
+            document.getElementById('incFormP2Pct').value = inc.partner_2_share_pct || 50.0;
+            document.getElementById('incFormPaymentMode').value = inc.payment_mode || 'BANK_TRANSFER';
+            document.getElementById('incFormUtr').value = inc.reference_utr || '';
+            document.getElementById('incFormProofUrl').value = inc.proof_doc_url || '';
+            document.getElementById('incFormNotes').value = inc.notes || '';
+
+            this.calculateIncomeNetAndSplit();
+            document.getElementById('modalIncomeTitle').innerHTML = `<span>✏️</span> Edit Store Income: ${inc.title}`;
+            this.openModal('modalIncome');
+        } catch (err) {
+            alert(err.message);
+        }
+    },
+
+    calculateIncomeNetAndSplit() {
+        const gross = parseFloat(document.getElementById('incFormGross')?.value || 0);
+        const deductions = parseFloat(document.getElementById('incFormDeductions')?.value || 0);
+        const net = Math.max(0, gross - deductions);
+
+        const netEl = document.getElementById('incFormNet');
+        if (netEl) netEl.value = net.toFixed(2);
+
+        const p1Pct = parseFloat(document.getElementById('incFormP1Pct')?.value || 50);
+        const p2Pct = parseFloat(document.getElementById('incFormP2Pct')?.value || 50);
+
+        const p1Amt = Math.round(net * (p1Pct / 100));
+        const p2Amt = Math.round(net - p1Amt);
+
+        const p1Label = document.getElementById('incModalP1PctLabel');
+        if (p1Label) p1Label.textContent = `${p1Pct}%`;
+        const p2Label = document.getElementById('incModalP2PctLabel');
+        if (p2Label) p2Label.textContent = `${p2Pct}%`;
+
+        const p1AmtEl = document.getElementById('incModalP1Amt');
+        if (p1AmtEl) p1AmtEl.textContent = this.formatCurrency(p1Amt);
+        const p2AmtEl = document.getElementById('incModalP2Amt');
+        if (p2AmtEl) p2AmtEl.textContent = this.formatCurrency(p2Amt);
+    },
+
+    onFormP1PctChange(val) {
+        const p1 = Math.min(100, Math.max(0, parseFloat(val || 0)));
+        const p2 = Math.round((100 - p1) * 10) / 10;
+        document.getElementById('incFormP2Pct').value = p2;
+        this.calculateIncomeNetAndSplit();
+    },
+
+    onFormP2PctChange(val) {
+        const p2 = Math.min(100, Math.max(0, parseFloat(val || 0)));
+        const p1 = Math.round((100 - p2) * 10) / 10;
+        document.getElementById('incFormP1Pct').value = p1;
+        this.calculateIncomeNetAndSplit();
+    },
+
+    async saveIncome(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSaveIncome');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Saving Income...';
+        }
+
+        try {
+            const incId = document.getElementById('incFormId').value;
+            let proofUrl = document.getElementById('incFormProofUrl').value;
+
+            // Upload proof file if selected
+            const proofFile = document.getElementById('incFormProofFile')?.files[0];
+            if (proofFile) {
+                const uploaded = await this.uploadFile(proofFile);
+                proofUrl = uploaded.url;
+            }
+
+            const gross = parseFloat(document.getElementById('incFormGross').value || 0);
+            const deductions = parseFloat(document.getElementById('incFormDeductions').value || 0);
+            const dateVal = document.getElementById('incFormDate').value;
+            const ym = dateVal ? dateVal.slice(0, 7) : new Date().toISOString().slice(0, 7);
+
+            const payload = {
+                title: document.getElementById('incFormTitle').value,
+                income_source: document.getElementById('incFormSource').value,
+                income_date: dateVal,
+                year_month: ym,
+                gross_amount: gross,
+                deductions: deductions,
+                partner_1_share_pct: parseFloat(document.getElementById('incFormP1Pct').value || 50),
+                partner_2_share_pct: parseFloat(document.getElementById('incFormP2Pct').value || 50),
+                payment_mode: document.getElementById('incFormPaymentMode').value,
+                reference_utr: document.getElementById('incFormUtr').value,
+                proof_doc_url: proofUrl || null,
+                notes: document.getElementById('incFormNotes').value,
+            };
+
+            const url = incId ? `/api/v1/zepto/income/${incId}` : '/api/v1/zepto/income';
+            const method = incId ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to save store income');
+
+            this.closeModal('modalIncome');
+            await this.loadOverview();
+            await this.loadIncome();
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Save Income Record';
+            }
+        }
+    },
+
+    async deleteIncome(incomeId) {
+        if (!confirm('Are you sure you want to delete this store income record?')) return;
+        try {
+            const res = await fetch(`/api/v1/zepto/income/${incomeId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete income record');
+            await this.loadOverview();
+            await this.loadIncome();
+        } catch (err) {
+            alert(err.message);
+        }
+    },
+
+    // -----------------------------------------------------------------------
+    // Customizable Partner Profit Split Settings
+    // -----------------------------------------------------------------------
+
+    async openIncomeSplitModal() {
+        try {
+            const res = await fetch('/api/v1/zepto/income-split-settings');
+            const data = await res.json();
+            const split = data.settings || { partner_1_share_pct: 50.0, partner_2_share_pct: 50.0 };
+
+            this.setSplitPreset(split.partner_1_share_pct, split.partner_2_share_pct);
+            this.openModal('modalIncomeSplitSettings');
+        } catch (err) {
+            this.setSplitPreset(50, 50);
+            this.openModal('modalIncomeSplitSettings');
+        }
+    },
+
+    setSplitPreset(p1, p2) {
+        document.getElementById('splitInputP1').value = p1;
+        document.getElementById('splitInputP2').value = p2;
+        document.getElementById('splitModalSlider').value = p1;
+        this.updateSplitVisuals(p1, p2);
+    },
+
+    onSplitSliderChange(val) {
+        const p1 = parseFloat(val);
+        const p2 = Math.round((100 - p1) * 10) / 10;
+        document.getElementById('splitInputP1').value = p1;
+        document.getElementById('splitInputP2').value = p2;
+        this.updateSplitVisuals(p1, p2);
+    },
+
+    onSplitInputP1Change(val) {
+        const p1 = Math.min(100, Math.max(0, parseFloat(val || 0)));
+        const p2 = Math.round((100 - p1) * 10) / 10;
+        document.getElementById('splitInputP2').value = p2;
+        document.getElementById('splitModalSlider').value = p1;
+        this.updateSplitVisuals(p1, p2);
+    },
+
+    onSplitInputP2Change(val) {
+        const p2 = Math.min(100, Math.max(0, parseFloat(val || 0)));
+        const p1 = Math.round((100 - p2) * 10) / 10;
+        document.getElementById('splitInputP1').value = p1;
+        document.getElementById('splitModalSlider').value = p1;
+        this.updateSplitVisuals(p1, p2);
+    },
+
+    updateSplitVisuals(p1, p2) {
+        const p1Display = document.getElementById('splitModalP1Display');
+        const p2Display = document.getElementById('splitModalP2Display');
+        if (p1Display) p1Display.textContent = `${p1.toFixed(1)}%`;
+        if (p2Display) p2Display.textContent = `${p2.toFixed(1)}%`;
+
+        const barP1 = document.getElementById('splitModalBarP1');
+        const barP2 = document.getElementById('splitModalBarP2');
+        if (barP1) barP1.style.width = `${p1}%`;
+        if (barP2) barP2.style.width = `${p2}%`;
+    },
+
+    async saveIncomeSplitSettings(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSaveSplitSettings');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Applying...';
+        }
+
+        try {
+            const p1 = parseFloat(document.getElementById('splitInputP1').value || 50);
+            const p2 = parseFloat(document.getElementById('splitInputP2').value || 50);
+
+            const res = await fetch('/api/v1/zepto/income-split-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    partner_1_share_pct: p1,
+                    partner_2_share_pct: p2,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to update profit split');
+
+            this.closeModal('modalIncomeSplitSettings');
+            await this.loadOverview();
+            await this.loadIncome();
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Apply Split Ratio';
+            }
+        }
     }
 };
 

@@ -119,11 +119,24 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 bonus_amount REAL DEFAULT 0.0,
                 deductions REAL DEFAULT 0.0,
                 net_paid REAL NOT NULL,
+                performance_rating REAL DEFAULT 5.0,
                 payment_date TEXT,
                 payment_status TEXT DEFAULT 'PAID',
                 payment_mode TEXT DEFAULT 'BANK_TRANSFER',
                 notes TEXT,
                 created_at TEXT NOT NULL,
+                FOREIGN KEY(employee_id) REFERENCES zepto_employees(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_monthly_ratings (
+                id TEXT PRIMARY KEY,
+                employee_id TEXT NOT NULL,
+                year_month TEXT NOT NULL,
+                rating REAL NOT NULL DEFAULT 5.0,
+                feedback TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(employee_id, year_month),
                 FOREIGN KEY(employee_id) REFERENCES zepto_employees(id) ON DELETE CASCADE
             );
 
@@ -140,6 +153,36 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
                 is_reimbursed INTEGER DEFAULT 0,
                 notes TEXT,
                 created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_store_income (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                income_source TEXT NOT NULL,
+                gross_amount REAL NOT NULL,
+                deductions REAL DEFAULT 0.0,
+                net_amount REAL NOT NULL,
+                income_date TEXT NOT NULL,
+                year_month TEXT NOT NULL,
+                partner_1_share_pct REAL NOT NULL DEFAULT 50.0,
+                partner_2_share_pct REAL NOT NULL DEFAULT 50.0,
+                partner_1_share_amount REAL NOT NULL,
+                partner_2_share_amount REAL NOT NULL,
+                proof_doc_url TEXT,
+                payment_mode TEXT DEFAULT 'BANK_TRANSFER',
+                reference_utr TEXT,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS zepto_income_split_settings (
+                id TEXT PRIMARY KEY,
+                partner_1_name TEXT NOT NULL DEFAULT 'Jatin Abrol',
+                partner_1_share_pct REAL NOT NULL DEFAULT 50.0,
+                partner_2_name TEXT NOT NULL DEFAULT 'Harshiv Bargotra',
+                partner_2_share_pct REAL NOT NULL DEFAULT 50.0,
+                updated_at TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS zepto_candidates (
@@ -182,9 +225,17 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_status ON zepto_employees(status);
             CREATE INDEX IF NOT EXISTS idx_zepto_emp_role ON zepto_employees(role);
             CREATE INDEX IF NOT EXISTS idx_zepto_sal_emp ON zepto_salaries(employee_id, year_month);
+            CREATE INDEX IF NOT EXISTS idx_zepto_rat_emp ON zepto_monthly_ratings(employee_id, year_month);
             CREATE INDEX IF NOT EXISTS idx_zepto_exp_date ON zepto_expenses(expense_date);
             CREATE INDEX IF NOT EXISTS idx_zepto_cand_stage ON zepto_candidates(stage);
+            CREATE INDEX IF NOT EXISTS idx_zepto_inc_date ON zepto_store_income(income_date);
+            CREATE INDEX IF NOT EXISTS idx_zepto_inc_month ON zepto_store_income(year_month);
         """)
+
+        # Migration: Ensure performance_rating column exists on zepto_salaries
+        sal_cols = [c[1] for c in conn.execute("PRAGMA table_info(zepto_salaries)").fetchall()]
+        if "performance_rating" not in sal_cols:
+            conn.execute("ALTER TABLE zepto_salaries ADD COLUMN performance_rating REAL DEFAULT 5.0")
 
         # Migration: Ensure default_base_salary column exists on zepto_staffing_targets
         cols = [c[1] for c in conn.execute("PRAGMA table_info(zepto_staffing_targets)").fetchall()]
@@ -197,8 +248,18 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
             conn.execute("ALTER TABLE zepto_expenses ADD COLUMN is_reimbursable INTEGER DEFAULT 1")
             conn.execute("UPDATE zepto_expenses SET is_reimbursable = 0, is_reimbursed = 1 WHERE incurred_by = 'STORE_CASH'")
 
-        # Seed default staffing targets and base pay if missing or zero
+        # Ensure default income split settings exist
         now_iso = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO zepto_income_split_settings (
+                id, partner_1_name, partner_1_share_pct, partner_2_name, partner_2_share_pct, updated_at
+            ) VALUES ('default', ?, 50.0, ?, 50.0, ?)
+            """,
+            (PARTNER_1_NAME, PARTNER_2_NAME, now_iso)
+        )
+
+        # Seed default staffing targets and base pay if missing or zero
         for role, count in DEFAULT_STAFFING_TARGETS.items():
             default_pay = DEFAULT_ROLE_BASE_PAY.get(role, 15000.0)
             conn.execute(
@@ -264,25 +325,47 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
         employees
     )
 
-    # 2. Sample Salaries
+        # 2. Sample Salaries (with performance rating)
     salaries = [
-        (str(uuid.uuid4()), "emp_01", "2026-07", 32000.0, 2500.0, 0.0, 34500.0, "2026-08-02", "PAID", "BANK_TRANSFER", "July performance reward included", now_iso),
-        (str(uuid.uuid4()), "emp_01", "2026-08", 32000.0, 3000.0, 0.0, 35000.0, "2026-08-28", "PAID", "BANK_TRANSFER", "August on-time shift incentive", now_iso),
-        (str(uuid.uuid4()), "emp_02", "2026-07", 18500.0, 1200.0, 0.0, 19700.0, "2026-08-02", "PAID", "BANK_TRANSFER", "July picker speed bonus", now_iso),
-        (str(uuid.uuid4()), "emp_02", "2026-08", 18500.0, 1500.0, 0.0, 20000.0, "2026-08-28", "PAID", "BANK_TRANSFER", "August UPT bonus", now_iso),
-        (str(uuid.uuid4()), "emp_04", "2026-07", 16500.0, 1000.0, 0.0, 17500.0, "2026-08-02", "PAID", "BANK_TRANSFER", "July security attendance bonus", now_iso),
+        (str(uuid.uuid4()), "emp_01", "2026-07", 32000.0, 2500.0, 0.0, 34500.0, 4.9, "2026-08-02", "PAID", "BANK_TRANSFER", "July performance reward included", now_iso),
+        (str(uuid.uuid4()), "emp_01", "2026-08", 32000.0, 3000.0, 0.0, 35000.0, 4.9, "2026-08-28", "PAID", "BANK_TRANSFER", "August on-time shift incentive", now_iso),
+        (str(uuid.uuid4()), "emp_02", "2026-07", 18500.0, 1200.0, 0.0, 19700.0, 4.7, "2026-08-02", "PAID", "BANK_TRANSFER", "July picker speed bonus", now_iso),
+        (str(uuid.uuid4()), "emp_02", "2026-08", 18500.0, 1500.0, 0.0, 20000.0, 4.8, "2026-08-28", "PAID", "BANK_TRANSFER", "August UPT bonus", now_iso),
+        (str(uuid.uuid4()), "emp_04", "2026-07", 16500.0, 1000.0, 0.0, 17500.0, 4.7, "2026-08-02", "PAID", "BANK_TRANSFER", "July security attendance bonus", now_iso),
     ]
     conn.executemany(
         """
         INSERT INTO zepto_salaries (
             id, employee_id, year_month, base_amount, bonus_amount, deductions,
-            net_paid, payment_date, payment_status, payment_mode, notes, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            net_paid, performance_rating, payment_date, payment_status, payment_mode, notes, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         salaries
     )
 
-    # 3. Sample Store Expenses
+    # 3. Sample Monthly Ratings (MoM Performance History)
+    monthly_ratings = [
+        (str(uuid.uuid4()), "emp_01", "2026-07", 4.9, "Excellent night shift management and zero dispatch delays", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_01", "2026-08", 4.9, "Maintained 99.8% inventory accuracy during peak surge", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_02", "2026-07", 4.7, "Top picking speed: 46 items/hr", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_02", "2026-08", 4.8, "Achieved store record 52 items/hr UPT speed", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_03", "2026-07", 4.5, "Good picking consistency in morning shifts", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_03", "2026-08", 4.5, "Reliable shift attendance", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_04", "2026-07", 4.7, "Strict night surveillance and visitor logging", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_04", "2026-08", 4.8, "Prevented inventory shrinkage during off-hours", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_05", "2026-07", 5.0, "Flawless aisle hygiene and trash removal", now_iso, now_iso),
+        (str(uuid.uuid4()), "emp_05", "2026-08", 5.0, "Zero pest inspection violations", now_iso, now_iso),
+    ]
+    conn.executemany(
+        """
+        INSERT INTO zepto_monthly_ratings (
+            id, employee_id, year_month, rating, feedback, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        monthly_ratings
+    )
+
+    # 4. Sample Store Expenses
     expenses = [
         (str(uuid.uuid4()), "Initial Picker Onboarding & Zepto Training Batch", "TRAINING", 45000.0, "2026-06-05", PARTNER_1_NAME, None, "training_receipt.pdf", 1, "Offsite training & simulator software fee", now_iso),
         (str(uuid.uuid4()), "Staff Uniforms, Thermal Bags & Reflective Vests", "UNIFORMS_GEAR", 28500.0, "2026-06-12", PARTNER_2_NAME, None, "uniform_invoice.pdf", 0, "20 sets of customized shirts and thermal jackets (Pending Reimbursement)", now_iso),
@@ -300,7 +383,25 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
         expenses
     )
 
-    # 4. Sample Hiring Candidates (4 Strict Roles)
+    # 5. Sample Store Income (50-50 Partner Split)
+    store_income = [
+        (str(uuid.uuid4()), "Zepto Dark Store Monthly Order Commission (July 2026)", "COMMISSION", 420000.0, 4200.0, 415800.0, "2026-08-05", "2026-07", 50.0, 50.0, 207900.0, 207900.0, None, "BANK_TRANSFER", "ZEPTO-COM-202607-9821", "Base dark store order commission payout directly from Zepto Escrow", now_iso, now_iso),
+        (str(uuid.uuid4()), "Zepto Peak Delivery & SLA Incentive Payout", "GROWTH_INCENTIVE", 180000.0, 1800.0, 178200.0, "2026-08-15", "2026-08", 50.0, 50.0, 89100.0, 89100.0, None, "BANK_TRANSFER", "ZEPTO-INC-202608-4412", "SLA < 10 mins dispatch reward for August week 1-2", now_iso, now_iso),
+        (str(uuid.uuid4()), "Brand Slotting & Warehouse End-Cap Promotion Fee", "ORDER_SLOTTING", 95000.0, 950.0, 94050.0, "2026-08-22", "2026-08", 50.0, 50.0, 47025.0, 47025.0, None, "BANK_TRANSFER", "ZEPTO-SLOT-202608-7711", "Beverage & FMCG priority shelf placement revenue", now_iso, now_iso),
+    ]
+    conn.executemany(
+        """
+        INSERT INTO zepto_store_income (
+            id, title, income_source, gross_amount, deductions, net_amount,
+            income_date, year_month, partner_1_share_pct, partner_2_share_pct,
+            partner_1_share_amount, partner_2_share_amount, proof_doc_url,
+            payment_mode, reference_utr, notes, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        store_income
+    )
+
+    # 6. Sample Hiring Candidates (4 Strict Roles)
     candidates = [
         (str(uuid.uuid4()), "Rohit Mehra", "+91 99001 12233", "rohit.m@gmail.com", "PICKER", 18500.0, 4.8, "INTERVIEWING", None, None, "1 yr experience at Blinkit dark store", "2026-08-30", now_iso, now_iso),
         (str(uuid.uuid4()), "Manish Tiwari", "+91 99112 23344", "manish.t@gmail.com", "SHIFT_INCHARGE", 30000.0, 4.6, "SHORTLISTED", None, None, "Strong logistics background, clear communication", "2026-08-29", now_iso, now_iso),
@@ -317,7 +418,7 @@ def _seed_sample_data(conn: sqlite3.Connection) -> None:
         candidates
     )
 
-    # 5. Sample Security Capital Tranches (50-50 Partner Equity Split)
+    # 7. Sample Security Capital Tranches (50-50 Partner Equity Split)
     capital_tranches = [
         (str(uuid.uuid4()), "Initial Franchise Security Tranche 1", 2000000.0, "2026-05-15", PARTNER_1_NAME, "NEFT_RTGS", "HDFC202605159812", None, "First deposit directly to Zepto Operations Escrow", now_iso),
         (str(uuid.uuid4()), "Initial Franchise Security Tranche 1 Match", 2000000.0, "2026-05-16", PARTNER_2_NAME, "NEFT_RTGS", "ICIC202605161142", None, "50% equity matching tranche", now_iso),
@@ -608,6 +709,37 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
         partner_2_progress = round((partner_2_paid / target_per_partner) * 100, 1)
         equalization_diff = round(partner_1_paid - partner_2_paid, 2)
 
+        # Store Income & Customizable Partner Split Ratio
+        split_row = conn.execute("SELECT partner_1_name, partner_1_share_pct, partner_2_name, partner_2_share_pct FROM zepto_income_split_settings WHERE id = 'default'").fetchone()
+        if split_row:
+            p1_split_pct = float(split_row["partner_1_share_pct"] or 50.0)
+            p2_split_pct = float(split_row["partner_2_share_pct"] or 50.0)
+        else:
+            p1_split_pct = 50.0
+            p2_split_pct = 50.0
+
+        inc_summary_row = conn.execute("""
+            SELECT 
+                SUM(gross_amount) as total_gross,
+                SUM(deductions) as total_deductions,
+                SUM(net_amount) as total_net,
+                SUM(partner_1_share_amount) as p1_total,
+                SUM(partner_2_share_amount) as p2_total,
+                COUNT(*) as inc_count
+            FROM zepto_store_income
+        """).fetchone()
+
+        total_inc_gross = float(inc_summary_row["total_gross"] or 0.0)
+        total_inc_deductions = float(inc_summary_row["total_deductions"] or 0.0)
+        total_inc_net = float(inc_summary_row["total_net"] or 0.0)
+        p1_inc_total = float(inc_summary_row["p1_total"] or 0.0)
+        p2_inc_total = float(inc_summary_row["p2_total"] or 0.0)
+        inc_count = int(inc_summary_row["inc_count"] or 0)
+
+        # Income Source Breakdown
+        inc_source_rows = conn.execute("SELECT income_source, SUM(net_amount) as net_src, COUNT(*) as cnt FROM zepto_store_income GROUP BY income_source").fetchall()
+        inc_source_breakdown = {r["income_source"]: float(r["net_src"] or 0.0) for r in inc_source_rows}
+
         return {
             "config": {
                 "partners": PARTNERS_CONFIG,
@@ -640,6 +772,35 @@ def get_zepto_overview(settings: Settings | None = None) -> dict[str, Any]:
                 "pending_by_partner": pending_by_partner,
                 "training_expenses": training_expenses,
                 "spend_per_employee": spend_per_employee,
+            },
+            "income": {
+                "total_gross": total_inc_gross,
+                "total_deductions": total_inc_deductions,
+                "total_net": total_inc_net,
+                "income_count": inc_count,
+                "partner_1": {
+                    "id": "partner_1",
+                    "name": PARTNERS_CONFIG["partner_1"]["name"],
+                    "label": PARTNERS_CONFIG["partner_1"]["label"],
+                    "initials": PARTNERS_CONFIG["partner_1"]["initials"],
+                    "share_pct": p1_split_pct,
+                    "total_amount": p1_inc_total,
+                },
+                "partner_2": {
+                    "id": "partner_2",
+                    "name": PARTNERS_CONFIG["partner_2"]["name"],
+                    "label": PARTNERS_CONFIG["partner_2"]["label"],
+                    "initials": PARTNERS_CONFIG["partner_2"]["initials"],
+                    "share_pct": p2_split_pct,
+                    "total_amount": p2_inc_total,
+                },
+                "split_settings": {
+                    "partner_1_name": PARTNERS_CONFIG["partner_1"]["name"],
+                    "partner_1_share_pct": p1_split_pct,
+                    "partner_2_name": PARTNERS_CONFIG["partner_2"]["name"],
+                    "partner_2_share_pct": p2_split_pct,
+                },
+                "source_breakdown": inc_source_breakdown,
             },
             "candidates": {
                 "active_pipeline": active_candidates,
@@ -810,56 +971,163 @@ def add_employee_bonus(emp_id: str, bonus_amount: float, notes: str | None = Non
 
 
 def get_employee_salaries(emp_id: str, settings: Settings | None = None) -> list[dict[str, Any]]:
-    """Retrieve Month-on-Month salary history for an employee."""
+    """Retrieve Month-on-Month salary history for an employee including monthly ratings."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
     with _connect(settings) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            "SELECT * FROM zepto_salaries WHERE employee_id = ? ORDER BY year_month DESC",
+            """
+            SELECT 
+                s.*,
+                COALESCE(r.rating, s.performance_rating, 5.0) AS performance_rating,
+                r.feedback AS rating_feedback
+            FROM zepto_salaries s
+            LEFT JOIN zepto_monthly_ratings r 
+                ON s.employee_id = r.employee_id AND s.year_month = r.year_month
+            WHERE s.employee_id = ?
+            ORDER BY s.year_month DESC
+            """,
             (emp_id,)
         ).fetchall()
         return [dict(r) for r in rows]
 
 
-def record_employee_salary(emp_id: str, salary_data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
-    """Record or update a monthly salary slip for an employee."""
+def get_employee_monthly_ratings(emp_id: str, settings: Settings | None = None) -> list[dict[str, Any]]:
+    """Retrieve all recorded monthly performance ratings for an employee."""
     settings = settings or Settings()
     ensure_zepto_schema(settings)
-    sal_id = salary_data.get("id") or str(uuid.uuid4())
-    year_month = salary_data.get("year_month", datetime.now().strftime("%Y-%m"))
-    base = float(salary_data.get("base_amount", 0.0))
-    bonus = float(salary_data.get("bonus_amount", 0.0))
-    deductions = float(salary_data.get("deductions", 0.0))
-    net_paid = round(base + bonus - deductions, 2)
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM zepto_monthly_ratings WHERE employee_id = ? ORDER BY year_month DESC",
+            (emp_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def record_employee_monthly_rating(
+    emp_id: str,
+    year_month: str,
+    rating: float,
+    feedback: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Record or update monthly performance rating for an employee and sync MoM records."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    rating_id = str(uuid.uuid4())
     now_iso = datetime.now(timezone.utc).isoformat()
+    r_val = max(1.0, min(5.0, round(float(rating), 2)))
 
     with _connect(settings) as conn:
         conn.execute(
             """
-            INSERT INTO zepto_salaries (
-                id, employee_id, year_month, base_amount, bonus_amount, deductions,
-                net_paid, payment_date, payment_status, payment_mode, notes, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                base_amount = excluded.base_amount,
-                bonus_amount = excluded.bonus_amount,
-                deductions = excluded.deductions,
-                net_paid = excluded.net_paid,
-                payment_date = excluded.payment_date,
-                payment_status = excluded.payment_status,
-                notes = excluded.notes
+            INSERT INTO zepto_monthly_ratings (
+                id, employee_id, year_month, rating, feedback, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(employee_id, year_month) DO UPDATE SET
+                rating = excluded.rating,
+                feedback = excluded.feedback,
+                updated_at = excluded.updated_at
             """,
-            (
-                sal_id, emp_id, year_month, base, bonus, deductions, net_paid,
-                salary_data.get("payment_date", datetime.now().strftime("%Y-%m-%d")),
-                salary_data.get("payment_status", "PAID"),
-                salary_data.get("payment_mode", "BANK_TRANSFER"),
-                salary_data.get("notes", ""),
-                now_iso
-            )
+            (rating_id, emp_id, year_month, r_val, feedback or "", now_iso, now_iso)
         )
-    return {"id": sal_id, "employee_id": emp_id, "year_month": year_month, "net_paid": net_paid}
+        # Sync with salary record if exists
+        conn.execute(
+            "UPDATE zepto_salaries SET performance_rating = ? WHERE employee_id = ? AND year_month = ?",
+            (r_val, emp_id, year_month)
+        )
+        # Update latest rating on employee record
+        conn.execute(
+            "UPDATE zepto_employees SET rating = ?, updated_at = ? WHERE id = ?",
+            (r_val, now_iso, emp_id)
+        )
+
+    return {
+        "id": rating_id,
+        "employee_id": emp_id,
+        "year_month": year_month,
+        "rating": r_val,
+        "feedback": feedback or "",
+        "updated_at": now_iso,
+    }
+
+
+def record_employee_salary(emp_id: str, salary_data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Record monthly salary payout slip with MoM performance rating."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    ym = salary_data.get("year_month", datetime.now(timezone.utc).strftime("%Y-%m"))
+    base = float(salary_data.get("base_amount", 0.0))
+    bonus = float(salary_data.get("bonus_amount", 0.0))
+    deductions = float(salary_data.get("deductions", 0.0))
+    net = round(base + bonus - deductions, 2)
+    p_rating = round(float(salary_data.get("performance_rating", 5.0)), 2)
+    p_date = salary_data.get("payment_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    p_status = salary_data.get("payment_status", "PAID")
+    p_mode = salary_data.get("payment_mode", "BANK_TRANSFER")
+    notes = salary_data.get("notes", "")
+
+    with _connect(settings) as conn:
+        existing = conn.execute(
+            "SELECT id FROM zepto_salaries WHERE employee_id = ? AND year_month = ?",
+            (emp_id, ym)
+        ).fetchone()
+
+        if existing:
+            sal_id = existing[0]
+            conn.execute(
+                """
+                UPDATE zepto_salaries SET
+                    base_amount = ?, bonus_amount = ?, deductions = ?, net_paid = ?,
+                    performance_rating = ?, payment_date = ?, payment_status = ?, payment_mode = ?, notes = ?
+                WHERE id = ?
+                """,
+                (base, bonus, deductions, net, p_rating, p_date, p_status, p_mode, notes, sal_id)
+            )
+        else:
+            sal_id = str(uuid.uuid4())
+            conn.execute(
+                """
+                INSERT INTO zepto_salaries (
+                    id, employee_id, year_month, base_amount, bonus_amount, deductions,
+                    net_paid, performance_rating, payment_date, payment_status, payment_mode, notes, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (sal_id, emp_id, ym, base, bonus, deductions, net, p_rating, p_date, p_status, p_mode, notes, now_iso)
+            )
+
+        # Reset current_month_bonus on employee after recording salary slip
+        conn.execute(
+            "UPDATE zepto_employees SET current_month_bonus = 0.0, updated_at = ? WHERE id = ?",
+            (now_iso, emp_id)
+        )
+        # Also ensure rating is recorded in zepto_monthly_ratings
+        conn.execute(
+            """
+            INSERT INTO zepto_monthly_ratings (
+                id, employee_id, year_month, rating, feedback, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, '', ?, ?)
+            ON CONFLICT(employee_id, year_month) DO UPDATE SET
+                rating = excluded.rating,
+                updated_at = excluded.updated_at
+            """,
+            (str(uuid.uuid4()), emp_id, ym, p_rating, now_iso, now_iso)
+        )
+
+    return {
+        "id": sal_id,
+        "employee_id": emp_id,
+        "year_month": ym,
+        "base_amount": base,
+        "bonus_amount": bonus,
+        "deductions": deductions,
+        "net_paid": net,
+        "performance_rating": p_rating,
+    }
 
 
 def delete_employee(emp_id: str, settings: Settings | None = None) -> bool:
@@ -1387,3 +1655,237 @@ def save_uploaded_file(file_bytes: bytes, filename: str) -> dict[str, str]:
         "url": doc_url,
         "size_bytes": str(len(file_bytes)),
     }
+
+
+# ---------------------------------------------------------------------------
+# Store Income & Customizable Partner Profit Split
+# ---------------------------------------------------------------------------
+
+VALID_INCOME_SOURCES = ["COMMISSION", "GROWTH_INCENTIVE", "ORDER_SLOTTING", "DELIVERY_SURCHARGE", "MISC"]
+
+INCOME_SOURCE_METADATA = {
+    "COMMISSION": {"label": "Order Commission", "icon": "🛍️", "color": "emerald", "desc": "Base dark store order commission payout"},
+    "GROWTH_INCENTIVE": {"label": "SLA & Growth Incentive", "icon": "🚀", "color": "purple", "desc": "Sub-10m SLA speed & surge volume incentives"},
+    "ORDER_SLOTTING": {"label": "Brand Slotting Fee", "icon": "🏷️", "color": "blue", "desc": "FMCG priority bin & category end-cap placement"},
+    "DELIVERY_SURCHARGE": {"label": "Delivery Surcharge", "icon": "⚡", "color": "amber", "desc": "Rain & peak hour dispatch delivery margin"},
+    "MISC": {"label": "Operational / Misc Income", "icon": "💵", "color": "pink", "desc": "Scrap sales, asset return or ancillary earnings"},
+}
+
+
+def get_income_split_settings(settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve current profit/income distribution split ratio between partners."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM zepto_income_split_settings WHERE id = 'default'").fetchone()
+        if row:
+            return {
+                "partner_1_name": row["partner_1_name"] or PARTNER_1_NAME,
+                "partner_1_share_pct": float(row["partner_1_share_pct"] or 50.0),
+                "partner_2_name": row["partner_2_name"] or PARTNER_2_NAME,
+                "partner_2_share_pct": float(row["partner_2_share_pct"] or 50.0),
+                "updated_at": row["updated_at"],
+            }
+        return {
+            "partner_1_name": PARTNER_1_NAME,
+            "partner_1_share_pct": 50.0,
+            "partner_2_name": PARTNER_2_NAME,
+            "partner_2_share_pct": 50.0,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+
+def update_income_split_settings(
+    partner_1_pct: float,
+    partner_2_pct: float,
+    partner_1_name: str | None = None,
+    partner_2_name: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Update customizable income split percentage between Jatin and Harshiv."""
+    if isinstance(partner_1_name, Settings):
+        settings = partner_1_name
+        partner_1_name = None
+    elif isinstance(partner_2_name, Settings):
+        settings = partner_2_name
+        partner_2_name = None
+
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    p1 = round(float(partner_1_pct), 2)
+    p2 = round(float(partner_2_pct), 2)
+    if abs((p1 + p2) - 100.0) > 0.1:
+        raise ValueError(f"Partner split percentages must total 100.0% (received {p1}% + {p2}% = {p1+p2}%)")
+
+    name1 = partner_1_name or PARTNER_1_NAME
+    name2 = partner_2_name or PARTNER_2_NAME
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    with _connect(settings) as conn:
+        conn.execute(
+            """
+            INSERT INTO zepto_income_split_settings (
+                id, partner_1_name, partner_1_share_pct, partner_2_name, partner_2_share_pct, updated_at
+            ) VALUES ('default', ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                partner_1_name = excluded.partner_1_name,
+                partner_1_share_pct = excluded.partner_1_share_pct,
+                partner_2_name = excluded.partner_2_name,
+                partner_2_share_pct = excluded.partner_2_share_pct,
+                updated_at = excluded.updated_at
+            """,
+            (name1, p1, name2, p2, now_iso)
+        )
+    return get_income_split_settings(settings)
+
+
+def get_store_income(
+    year_month: str | None = None,
+    income_source: str | None = None,
+    search: str | None = None,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Retrieve dark store income records with optional filtering."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        query = "SELECT * FROM zepto_store_income WHERE 1=1"
+        params: list[Any] = []
+
+        if year_month and year_month.upper() != "ALL":
+            query += " AND year_month = ?"
+            params.append(year_month.strip())
+        if income_source and income_source.upper() != "ALL":
+            query += " AND income_source = ?"
+            params.append(income_source.upper().strip())
+        if search:
+            query += " AND (title LIKE ? OR reference_utr LIKE ? OR notes LIKE ?)"
+            term = f"%{search.strip()}%"
+            params.extend([term, term, term])
+
+        query += " ORDER BY income_date DESC, created_at DESC"
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_store_income_by_id(income_id: str, settings: Settings | None = None) -> dict[str, Any] | None:
+    """Retrieve single income record by ID."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM zepto_store_income WHERE id = ?", (income_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def create_store_income(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
+    """Record a new store income payment received with partner split distribution."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    inc_id = data.get("id") or str(uuid.uuid4())
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    gross = float(data.get("gross_amount", 0.0))
+    deductions = float(data.get("deductions", 0.0))
+    net = round(gross - deductions, 2)
+
+    # Get default split settings if not specified in data
+    default_splits = get_income_split_settings(settings)
+    p1_pct = float(data.get("partner_1_share_pct", default_splits["partner_1_share_pct"]))
+    p2_pct = float(data.get("partner_2_share_pct", 100.0 - p1_pct))
+
+    p1_amt = round(net * (p1_pct / 100.0), 2)
+    p2_amt = round(net - p1_amt, 2)
+
+    date_str = data.get("income_date", datetime.now().strftime("%Y-%m-%d"))
+    ym = data.get("year_month") or date_str[:7]
+    src = data.get("income_source", "COMMISSION").upper().strip()
+
+    with _connect(settings) as conn:
+        conn.execute(
+            """
+            INSERT INTO zepto_store_income (
+                id, title, income_source, gross_amount, deductions, net_amount,
+                income_date, year_month, partner_1_share_pct, partner_2_share_pct,
+                partner_1_share_amount, partner_2_share_amount, proof_doc_url,
+                payment_mode, reference_utr, notes, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                inc_id,
+                data.get("title", "Zepto Store Income").strip(),
+                src,
+                gross,
+                deductions,
+                net,
+                date_str,
+                ym,
+                p1_pct,
+                p2_pct,
+                p1_amt,
+                p2_amt,
+                data.get("proof_doc_url"),
+                data.get("payment_mode", "BANK_TRANSFER").strip(),
+                data.get("reference_utr", "").strip(),
+                data.get("notes", ""),
+                now_iso,
+                now_iso,
+            )
+        )
+    return get_store_income_by_id(inc_id, settings) or {"id": inc_id, "net_amount": net}
+
+
+def update_store_income(income_id: str, data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any] | None:
+    """Update store income record and recalculate split."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.execute("SELECT * FROM zepto_store_income WHERE id = ?", (income_id,)).fetchone()
+        if not cur:
+            raise ValueError(f"Income record {income_id} not found")
+
+        title = data.get("title", cur["title"]).strip()
+        src = data.get("income_source", cur["income_source"]).upper().strip()
+        gross = float(data.get("gross_amount", cur["gross_amount"]))
+        deductions = float(data.get("deductions", cur["deductions"]))
+        net = round(gross - deductions, 2)
+        date_str = data.get("income_date", cur["income_date"])
+        ym = data.get("year_month", cur["year_month"])
+
+        p1_pct = float(data.get("partner_1_share_pct", cur["partner_1_share_pct"]))
+        p2_pct = float(data.get("partner_2_share_pct", 100.0 - p1_pct))
+        p1_amt = round(net * (p1_pct / 100.0), 2)
+        p2_amt = round(net - p1_amt, 2)
+
+        proof = data.get("proof_doc_url") if "proof_doc_url" in data else cur["proof_doc_url"]
+        mode = data.get("payment_mode", cur["payment_mode"]).strip()
+        utr = data.get("reference_utr", cur["reference_utr"]).strip()
+        notes = data.get("notes", cur["notes"])
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        conn.execute(
+            """
+            UPDATE zepto_store_income SET
+                title = ?, income_source = ?, gross_amount = ?, deductions = ?, net_amount = ?,
+                income_date = ?, year_month = ?, partner_1_share_pct = ?, partner_2_share_pct = ?,
+                partner_1_share_amount = ?, partner_2_share_amount = ?, proof_doc_url = ?,
+                payment_mode = ?, reference_utr = ?, notes = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                title, src, gross, deductions, net, date_str, ym,
+                p1_pct, p2_pct, p1_amt, p2_amt, proof, mode, utr, notes, now_iso, income_id
+            )
+        )
+    return get_store_income_by_id(income_id, settings)
+
+
+def delete_store_income(income_id: str, settings: Settings | None = None) -> bool:
+    """Delete a store income record."""
+    settings = settings or Settings()
+    with _connect(settings) as conn:
+        conn.execute("DELETE FROM zepto_store_income WHERE id = ?", (income_id,))
+    return True

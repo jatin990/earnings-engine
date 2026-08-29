@@ -195,6 +195,9 @@
                 <button type="button" onclick="zeptoApp.openAddEmployeeModal()" class="btn-zepto">
                     <span>➕</span> Add Employee
                 </button>
+                <button type="button" onclick="zeptoApp.openAddIncomeModal()" class="px-3 py-1.5 rounded-md bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-xs font-bold text-emerald-300 transition flex items-center gap-1.5">
+                    <span>💵</span> Record Income
+                </button>
                 <button type="button" onclick="zeptoApp.openAddExpenseModal()" class="px-3 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/15 text-xs font-bold text-slate-200 transition flex items-center gap-1.5">
                     <span>🧾</span> Record Expense
                 </button>
@@ -292,6 +295,9 @@
             <button type="button" class="nav-tab active" id="tabBtn-employees" onclick="zeptoApp.switchTab('employees')">
                 <span>👥</span> Employees & Salaries
             </button>
+            <button type="button" class="nav-tab" id="tabBtn-income" onclick="zeptoApp.switchTab('income')">
+                <span>💵</span> Store Income & Profit Split
+            </button>
             <button type="button" class="nav-tab" id="tabBtn-expenses" onclick="zeptoApp.switchTab('expenses')">
                 <span>🧾</span> Store Expenses & Spend Insights
             </button>
@@ -309,17 +315,22 @@
             {% include "hubs/zepto/_employees.html" %}
         </main>
 
-        <!-- ================= TAB 2: STORE EXPENSES ================= -->
+        <!-- ================= TAB 2: STORE INCOME & PARTNER SPLIT ================= -->
+        <main id="tabContent-income" class="space-y-4" style="display: none;">
+            {% include "hubs/zepto/_income.html" %}
+        </main>
+
+        <!-- ================= TAB 3: STORE EXPENSES ================= -->
         <main id="tabContent-expenses" class="space-y-4" style="display: none;">
             {% include "hubs/zepto/_expenses.html" %}
         </main>
 
-        <!-- ================= TAB 3: FUTURE CANDIDATES ================= -->
+        <!-- ================= TAB 4: FUTURE CANDIDATES ================= -->
         <main id="tabContent-candidates" class="space-y-4" style="display: none;">
             {% include "hubs/zepto/_candidates.html" %}
         </main>
 
-        <!-- ================= TAB 4: ZEPTO SECURITY & CAPITAL LEDGER ================= -->
+        <!-- ================= TAB 5: ZEPTO SECURITY & CAPITAL LEDGER ================= -->
         <main id="tabContent-security" class="space-y-4" style="display: none;">
             {% include "hubs/zepto/_security.html" %}
         </main>
@@ -330,6 +341,6 @@
     {% include "hubs/zepto/_modals.html" %}
 
     <!-- Zepto Module Script -->
-    <script src="/static/js/modules/zepto.js?v=20260829_v10_master_security_edit"></script>
+    <script src="/static/js/modules/zepto.js?v=20260829_v11_store_income_and_monthly_ratings"></script>
 </body>
 </html>

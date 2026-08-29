@@ -401,3 +401,136 @@ def test_document_upload(client):
     doc_resp = client.get(f"/api/v1/zepto/documents/{saved_filename}")
     assert doc_resp.status_code == 200
     assert doc_resp.content == file_content
+
+
+def test_monthly_ratings_and_salary_link(client):
+    settings = Settings()
+    # 1. Create a test employee
+    emp = zepto_db.create_employee({
+        "name": "Arjun Rampal",
+        "role": "PICKER",
+        "base_salary_monthly": 18000.0,
+        "rating": 4.8,
+        "status": "ACTIVE"
+    }, settings)
+    emp_id = emp["id"]
+
+    # 2. Record monthly ratings for 2026-07 and 2026-08
+    r1 = zepto_db.record_employee_monthly_rating(emp_id, "2026-07", 4.7, "Great attendance", settings)
+    assert r1["rating"] == 4.7
+    assert r1["year_month"] == "2026-07"
+
+    r2 = zepto_db.record_employee_monthly_rating(emp_id, "2026-08", 4.95, "Flawless picking speed", settings)
+    assert r2["rating"] == 4.95
+
+    # 3. Fetch monthly ratings
+    ratings = zepto_db.get_employee_monthly_ratings(emp_id, settings)
+    assert len(ratings) == 2
+    assert ratings[0]["year_month"] == "2026-08"
+
+    # 4. Record salary slip with performance rating
+    sal = zepto_db.record_employee_salary(emp_id, {
+        "year_month": "2026-08",
+        "base_amount": 18000.0,
+        "bonus_amount": 1000.0,
+        "performance_rating": 4.95,
+        "deductions": 0.0,
+    }, settings)
+    assert sal["performance_rating"] == 4.95
+    assert sal["net_paid"] == 19000.0
+
+    # 5. Fetch salaries and verify joined rating
+    salaries = zepto_db.get_employee_salaries(emp_id, settings)
+    assert len(salaries) >= 1
+    assert salaries[0]["performance_rating"] == 4.95
+    assert "Flawless picking speed" in salaries[0]["rating_feedback"]
+
+    # 6. Test ratings API
+    api_resp = client.post(
+        f"/api/v1/zepto/employees/{emp_id}/ratings",
+        json={"year_month": "2026-09", "rating": 5.0, "feedback": "Promoted to shift lead candidate"}
+    )
+    assert api_resp.status_code == 200
+    assert api_resp.json()["rating"]["rating"] == 5.0
+
+    get_api_resp = client.get(f"/api/v1/zepto/employees/{emp_id}/ratings")
+    assert get_api_resp.status_code == 200
+    assert len(get_api_resp.json()["ratings"]) == 3
+
+    # Cleanup
+    zepto_db.delete_employee(emp_id, settings)
+
+
+def test_store_income_and_customizable_partner_split(client):
+    settings = Settings()
+    # 1. Check default split settings (50% - 50%)
+    split = zepto_db.get_income_split_settings(settings)
+    assert split["partner_1_share_pct"] == 50.0
+    assert split["partner_2_share_pct"] == 50.0
+
+    # 2. Record store income with default 50-50 split
+    inc1 = zepto_db.create_store_income({
+        "title": "August Order Commission",
+        "income_source": "COMMISSION",
+        "gross_amount": 200000.0,
+        "deductions": 4000.0,
+        "income_date": "2026-08-25",
+        "year_month": "2026-08",
+        "payment_mode": "BANK_TRANSFER",
+        "reference_utr": "ZEPTO-COM-AUG-001",
+    }, settings)
+
+    assert inc1["net_amount"] == 196000.0
+    assert inc1["partner_1_share_pct"] == 50.0
+    assert inc1["partner_2_share_pct"] == 50.0
+    assert inc1["partner_1_share_amount"] == 98000.0
+    assert inc1["partner_2_share_amount"] == 98000.0
+
+    # 3. Update global partner split to 60% Jatin - 40% Harshiv
+    updated_split = zepto_db.update_income_split_settings(60.0, 40.0, settings)
+    assert updated_split["partner_1_share_pct"] == 60.0
+    assert updated_split["partner_2_share_pct"] == 40.0
+
+    # 4. Record new income entry using the new 60-40 default
+    inc2 = zepto_db.create_store_income({
+        "title": "SLA & Growth Surge Bonus",
+        "income_source": "GROWTH_INCENTIVE",
+        "gross_amount": 100000.0,
+        "deductions": 0.0,
+        "income_date": "2026-08-28",
+        "year_month": "2026-08",
+    }, settings)
+
+    assert inc2["net_amount"] == 100000.0
+    assert inc2["partner_1_share_pct"] == 60.0
+    assert inc2["partner_2_share_pct"] == 40.0
+    assert inc2["partner_1_share_amount"] == 60000.0
+    assert inc2["partner_2_share_amount"] == 40000.0
+
+    # 5. Fetch store income list and verify items
+    income_res = zepto_db.get_store_income(year_month="2026-08", settings=settings)
+    assert len(income_res) >= 2
+    assert any(item["id"] == inc1["id"] for item in income_res)
+    assert any(item["id"] == inc2["id"] for item in income_res)
+
+    # 6. Test Store Income API endpoints
+    # GET /income
+    api_inc = client.get("/api/v1/zepto/income?year_month=2026-08")
+    assert api_inc.status_code == 200
+    inc_json = api_inc.json()
+    assert inc_json["total_net"] >= 296000.0
+    assert "split_settings" in inc_json
+    assert inc_json["split_settings"]["partner_1_share_pct"] == 60.0
+
+    # Update split settings via API (change back to 50-50)
+    split_resp = client.post(
+        "/api/v1/zepto/income-split-settings",
+        json={"partner_1_share_pct": 50.0, "partner_2_share_pct": 50.0}
+    )
+    assert split_resp.status_code == 200
+    assert split_resp.json()["settings"]["partner_1_share_pct"] == 50.0
+
+    # Clean up test records
+    zepto_db.delete_store_income(inc1["id"], settings)
+    zepto_db.delete_store_income(inc2["id"], settings)
+
