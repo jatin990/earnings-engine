@@ -139,7 +139,7 @@ def test_zepto_security_and_50_50_equity_split():
         "tranche_title": "Capex Deposit Tranche",
         "amount": 500000.0,
         "payment_date": "2026-08-25",
-        "partner_name": "Partner 1",
+        "partner_name": "Jatin Abrol",
         "payment_mode": "NEFT_RTGS",
         "reference_utr": "HDFC9988776655",
     }

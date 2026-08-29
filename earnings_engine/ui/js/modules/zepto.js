@@ -951,7 +951,7 @@ const zeptoApp = {
                     <td class="p-3.5 pl-4 font-bold text-white">${t.tranche_title}</td>
                     <td class="p-3.5 font-mono text-slate-400 text-[11px]">${t.payment_date}</td>
                     <td class="p-3.5">
-                        <span class="px-2.5 py-1 rounded text-xs font-bold ${t.partner_name.includes('1') ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-pink-500/20 text-pink-300 border border-pink-500/40'}">
+                        <span class="px-2.5 py-1 rounded text-xs font-bold ${(t.partner_name.includes('Jatin') || t.partner_name.includes('1')) ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-pink-500/20 text-pink-300 border border-pink-500/40'}">
                             ${t.partner_name}
                         </span>
                     </td>
