@@ -65,6 +65,7 @@ class SchedulerEngine:
         self._job_handlers["category_scanner_sweep"] = self._handle_category_sweep
         self._job_handlers["quarter_repeaters_sync"] = self._handle_quarter_repeaters
         self._job_handlers["institutional_sync"] = self._handle_institutional_sync
+        self._job_handlers["kronos_hot_pool_rescore"] = self._handle_kronos_hot_rescore
         self._job_handlers["kronos_cache_warmup"] = self._handle_kronos_warmup
 
     def register_handler(self, job_id: str, handler: Callable[[Settings, dict[str, Any]], str]) -> None:
@@ -135,6 +136,60 @@ class SchedulerEngine:
         res = scan_watchlist_institutional(watchlist, settings)
         count = len(res) if isinstance(res, list) else 0
         return f"Institutional ownership synced for {count} stocks in '{watchlist}'."
+
+    def _handle_kronos_hot_rescore(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data.predictions import store_prediction
+        from earnings_engine.kronos_predictor import predict_single_stock
+
+        merge_tol = float(params.get("merge_tolerance_pct", 0.5))
+        lookback = int(params.get("lookback", 120))
+        pred_len = int(params.get("pred_len", 14))
+
+        hot_tickers: set[str] = set()
+        try:
+            from earnings_engine.data.swing_scanner import _pool as swing_pool
+            hot_tickers.update(swing_pool.get("hot", {}).keys())
+        except Exception:
+            pass
+
+        try:
+            from earnings_engine.data.breakout_scanner import _pool as breakout_pool
+            hot_tickers.update(breakout_pool.get("hot", {}).keys())
+        except Exception:
+            pass
+
+        if not hot_tickers:
+            return "No active Hot pool candidates currently require Kronos sequence forecast."
+
+        updated_count = 0
+        for ticker in hot_tickers:
+            try:
+                res = predict_single_stock(ticker, lookback=lookback, pred_len=pred_len, settings=settings)
+                if res and isinstance(res, dict):
+                    # Store with merge tolerance
+                    store_prediction(ticker, settings, res, merge_tolerance_pct=merge_tol)
+
+                    # Update swing pool in memory
+                    try:
+                        from earnings_engine.data.swing_scanner import _pool as s_pool
+                        if ticker in s_pool.get("hot", {}):
+                            s_pool["hot"][ticker]["result"]["kronos_prediction"] = res
+                    except Exception:
+                        pass
+
+                    # Update breakout pool in memory
+                    try:
+                        from earnings_engine.data.breakout_scanner import _pool as b_pool
+                        if ticker in b_pool.get("hot", {}):
+                            b_pool["hot"][ticker]["result"]["kronos_prediction"] = res
+                    except Exception:
+                        pass
+
+                    updated_count += 1
+            except Exception as e:
+                logger.debug("[SCHEDULER-KRONOS] Error predicting for %s: %s", ticker, e)
+
+        return f"Kronos deep sequence re-scored {updated_count}/{len(hot_tickers)} Hot setups (±{merge_tol}% audit merge enabled)."
 
     def _handle_kronos_warmup(self, settings: Settings, params: dict[str, Any]) -> str:
         watchlist = params.get("watchlist", "my_watchlist")

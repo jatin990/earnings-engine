@@ -355,6 +355,7 @@ async def dashboard_predict_run(request: dict | None = None):
 
 
 @router.get("/api/v1/market/pulse")
+@router.get("/api/v1/dashboard/market-pulse")
 async def api_get_market_pulse(
     force_refresh: bool = Query(False, description="Force refresh cache"),
 ):
@@ -365,6 +366,63 @@ async def api_get_market_pulse(
     except Exception as e:
         logger.exception("Error in api_get_market_pulse: %s", e)
         raise HTTPException(status_code=500, detail=f"Error retrieving market pulse: {e}")
+
+
+@router.get("/api/v1/dashboard/market-macro")
+async def api_get_market_macro():
+    """Retrieve concise market sentiment and volatility regime summary."""
+    try:
+        from earnings_engine.data.cross_strategy import get_market_macro_summary
+        return await asyncio.to_thread(get_market_macro_summary, settings=_settings)
+    except Exception as e:
+        logger.exception("Error in api_get_market_macro: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/dashboard/cross-intelligence/{ticker}")
+async def api_get_stock_cross_intelligence(ticker: str):
+    """Retrieve cross-module synergy (Breakout + Swing + AI Consensus + News) for a stock."""
+    try:
+        from earnings_engine.data.cross_strategy import get_stock_confluence
+        return await asyncio.to_thread(get_stock_confluence, ticker=ticker, settings=_settings)
+    except Exception as e:
+        logger.exception("Error in api_get_stock_cross_intelligence for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/dashboard/confluence")
+async def api_get_confluence_setups(
+    min_level: int = Query(1, ge=1, le=3, description="Minimum confluence tier (1: Single, 2: Dual, 3: Triple)"),
+    limit: int = Query(30, ge=1, le=100),
+):
+    """Retrieve top cross-module confluence setups across all active scanners."""
+    try:
+        from earnings_engine.data.cross_strategy import get_stock_confluence
+        from earnings_engine.data.swing_scanner import _pool as swing_pool
+        from earnings_engine.data.breakout_scanner import _pool as breakout_pool
+
+        # Gather active candidates from hot & warm pools
+        candidates = set()
+        candidates.update(swing_pool.get("hot", {}).keys())
+        candidates.update(swing_pool.get("warm", {}).keys())
+        candidates.update(breakout_pool.get("hot", {}).keys())
+        candidates.update(breakout_pool.get("warm", {}).keys())
+
+        confluence_list = []
+        for ticker in candidates:
+            c = get_stock_confluence(ticker, settings=_settings)
+            if c.get("confluence_level", 0) >= min_level:
+                confluence_list.append(c)
+
+        confluence_list.sort(key=lambda x: x.get("confluence_level", 0), reverse=True)
+        return {
+            "success": True,
+            "count": len(confluence_list[:limit]),
+            "setups": confluence_list[:limit],
+        }
+    except Exception as e:
+        logger.exception("Error in api_get_confluence_setups: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/v1/earnings/freshness")

@@ -118,8 +118,9 @@ def store_prediction(
     payload: dict[str, Any],
     run_at: str | None = None,
     predicted_at: str | None = None,
+    merge_tolerance_pct: float = 0.5,
 ) -> int:
-    """Store a single Kronos prediction result as an immutable audit row.
+    """Store a single Kronos prediction result as an audit row, merging ±0.5% close updates.
 
     Parameters
     ----------
@@ -132,23 +133,90 @@ def store_prediction(
         ``symbol``, ``name``, ``current_price``, ``support``, ``resistance``,
         ``return_pct``, ``trend``, ``results_date``, ``explanation``).
     run_at:
-        Optional ISO timestamp for this prediction *run*.  Defaults to now.
+        Optional ISO timestamp for this prediction *run*. Defaults to now.
     predicted_at:
         Optional ISO timestamp of the price-date the forecast was based on.
         Defaults to ``run_at``.
+    merge_tolerance_pct:
+        If the predicted return_pct is within ±merge_tolerance_pct of the latest
+        existing prediction for the same ticker, merge and update the existing row
+        instead of creating a noisy duplicate row. Set to 0 to disable merging.
 
     Returns
     -------
     int
-        The inserted row id.
+        The inserted or updated row id.
     """
     now = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
     run_at = run_at or now
     predicted_at = predicted_at or run_at
 
     prediction_json = json.dumps(payload, sort_keys=True, default=str)
+    new_ret = float(payload.get("return_pct", 0.0)) if payload.get("return_pct") is not None else 0.0
+    new_trend = str(payload.get("trend") or "Neutral")
 
     with _connect(settings) as connection:
+        # Check if we should merge with the latest existing prediction
+        if merge_tolerance_pct > 0:
+            cursor = connection.execute(
+                """
+                SELECT id, return_pct, trend, run_at
+                FROM kronos_predictions
+                WHERE ticker = ?
+                ORDER BY run_at DESC, id DESC
+                LIMIT 1
+                """,
+                (ticker,),
+            )
+            prev_row = cursor.fetchone()
+            if prev_row:
+                prev_id = prev_row[0]
+                prev_ret = float(prev_row[1]) if prev_row[1] is not None else 0.0
+                prev_trend = str(prev_row[2] or "Neutral")
+
+                # If within ±merge_tolerance_pct and same directional stance, merge into existing row
+                if abs(new_ret - prev_ret) <= merge_tolerance_pct and (
+                    new_trend == prev_trend or (new_ret >= 0 and prev_ret >= 0) or (new_ret < 0 and prev_ret < 0)
+                ):
+                    connection.execute(
+                        """
+                        UPDATE kronos_predictions SET
+                            run_at = ?,
+                            predicted_at = ?,
+                            lookback = ?,
+                            pred_len = ?,
+                            prediction_json = ?,
+                            current_price = ?,
+                            support = ?,
+                            resistance = ?,
+                            return_pct = ?,
+                            trend = ?,
+                            explanation = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            run_at,
+                            predicted_at,
+                            int(payload.get("lookback", 0)) if payload.get("lookback") is not None else None,
+                            int(payload.get("pred_len", 0)) if payload.get("pred_len") is not None else None,
+                            prediction_json,
+                            payload.get("current_price"),
+                            payload.get("support"),
+                            payload.get("resistance"),
+                            payload.get("return_pct"),
+                            payload.get("trend"),
+                            payload.get("explanation"),
+                            prev_id,
+                        ),
+                    )
+                    connection.commit()
+                    logger.info(
+                        "[KRONOS-MERGE] Merged prediction for %s (Δ return %.2f%% <= %.2f%%) into row id=%s",
+                        ticker, abs(new_ret - prev_ret), merge_tolerance_pct, prev_id
+                    )
+                    return int(prev_id)
+
+        # Otherwise insert a new audit row
         cursor = connection.execute(
             """
             INSERT INTO kronos_predictions
@@ -173,9 +241,10 @@ def store_prediction(
             ),
         )
         connection.commit()
+        last_id = cursor.lastrowid
 
-    logger.info("stored kronos prediction ticker=%s run_at=%s rowid=%s", ticker, run_at, cursor.lastrowid)
-    return cursor.lastrowid
+    logger.info("stored new kronos prediction ticker=%s run_at=%s rowid=%s", ticker, run_at, last_id)
+    return int(last_id)
 
 
 def load_prediction_history(
@@ -196,6 +265,9 @@ def load_prediction_history(
     """
     if settings is None:
         settings = Settings()
+
+    if isinstance(tickers, str):
+        tickers = [tickers]
 
     query_parts = ["SELECT * FROM kronos_predictions"]
     params: list[Any] = []

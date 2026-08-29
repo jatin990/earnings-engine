@@ -43,6 +43,8 @@
                 this.renderBreadth(data.breadth || {});
                 this.renderInstitutionalFlows(data.institutional_flows || {});
                 this.renderSectors(data.sectors || []);
+                this.renderMacroCharts(data.macro_charts || {});
+                this.loadConfluenceSetups();
 
             } catch (e) {
                 console.error('[MARKET_PULSE] Error loading market pulse:', e);
@@ -370,6 +372,219 @@
                     </div>
                 `;
             }).join('');
+        },
+
+        renderMacroCharts(charts) {
+            if (!charts) return;
+
+            // 1. Fear & Greed 30D Trend Wave Chart
+            const fgSeries = charts.fear_greed || [];
+            if (fgSeries.length) {
+                this.drawSparklineChart('chartFearGreed', fgSeries.map(x => x.score), {
+                    color: '#34d399',
+                    gradientFrom: 'rgba(52, 211, 153, 0.25)',
+                    gradientTo: 'rgba(52, 211, 153, 0.0)',
+                    minVal: 0,
+                    maxVal: 100,
+                    referenceLines: [25, 50, 75],
+                    refLineColors: ['rgba(244,63,94,0.3)', 'rgba(251,191,36,0.3)', 'rgba(16,185,129,0.3)'],
+                });
+            }
+
+            // 2. India VIX Volatility Corridor Chart
+            const vixSeries = charts.vix || [];
+            if (vixSeries.length) {
+                this.drawSparklineChart('chartVix', vixSeries.map(x => x.value), {
+                    color: '#38bdf8',
+                    gradientFrom: 'rgba(56, 189, 248, 0.25)',
+                    gradientTo: 'rgba(56, 189, 248, 0.0)',
+                    referenceLines: [15, 20],
+                    refLineColors: ['rgba(52,211,153,0.3)', 'rgba(248,113,113,0.3)'],
+                });
+            }
+
+            // 3. NIFTY 50 Benchmark Trajectory Chart
+            const niftySeries = charts.nifty || [];
+            if (niftySeries.length) {
+                this.drawSparklineChart('chartNifty', niftySeries.map(x => x.value), {
+                    color: '#818cf8',
+                    gradientFrom: 'rgba(129, 140, 248, 0.25)',
+                    gradientTo: 'rgba(129, 140, 248, 0.0)',
+                });
+            }
+        },
+
+        drawSparklineChart(canvasId, values, options = {}) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas || !values || values.length < 2) return;
+
+            const rect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : { width: 300, height: 100 };
+            const dpr = window.devicePixelRatio || 1;
+            const w = rect.width || 300;
+            const h = rect.height || 100;
+
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+
+            ctx.clearRect(0, 0, w, h);
+
+            const minVal = options.minVal !== undefined ? options.minVal : Math.min(...values) * 0.98;
+            const maxVal = options.maxVal !== undefined ? options.maxVal : Math.max(...values) * 1.02;
+            const valRange = maxVal - minVal || 1.0;
+
+            const padding = 6;
+            const drawW = w - padding * 2;
+            const drawH = h - padding * 2;
+
+            // Draw Reference Lines
+            if (options.referenceLines) {
+                options.referenceLines.forEach((ref, idx) => {
+                    if (ref >= minVal && ref <= maxVal) {
+                        const y = padding + drawH - ((ref - minVal) / valRange) * drawH;
+                        ctx.beginPath();
+                        ctx.strokeStyle = (options.refLineColors && options.refLineColors[idx]) || 'rgba(255,255,255,0.1)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([3, 3]);
+                        ctx.moveTo(padding, y);
+                        ctx.lineTo(w - padding, y);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                });
+            }
+
+            // Calculate points
+            const points = values.map((v, i) => {
+                const x = padding + (i / (values.length - 1)) * drawW;
+                const y = padding + drawH - ((v - minVal) / valRange) * drawH;
+                return { x, y, v };
+            });
+
+            // Fill Area Gradient
+            const gradient = ctx.createLinearGradient(0, padding, 0, h - padding);
+            gradient.addColorStop(0, options.gradientFrom || 'rgba(56,189,248,0.25)');
+            gradient.addColorStop(1, options.gradientTo || 'rgba(56,189,248,0.0)');
+
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                const prev = points[i - 1];
+                const curr = points[i];
+                const cpX = (prev.x + curr.x) / 2;
+                ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
+            }
+            ctx.lineTo(points[points.length - 1].x, h - padding);
+            ctx.lineTo(points[0].x, h - padding);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Stroke Line
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                const prev = points[i - 1];
+                const curr = points[i];
+                const cpX = (prev.x + curr.x) / 2;
+                ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
+            }
+            ctx.strokeStyle = options.color || '#38bdf8';
+            ctx.lineWidth = 2.0;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+
+            // Glowing Last Point
+            const last = points[points.length - 1];
+            ctx.beginPath();
+            ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = options.color || '#38bdf8';
+            ctx.shadowColor = options.color || '#38bdf8';
+            ctx.shadowBlur = 8;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        },
+
+        async loadConfluenceSetups(forceRefresh = false) {
+            const tbody = document.getElementById('pulseConfluenceTableBody');
+            if (!tbody) return;
+
+            try {
+                const res = await fetch(API_BASE + '/api/v1/dashboard/confluence?min_level=1&limit=20');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                const setups = data.setups || [];
+
+                if (!setups.length) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" style="text-align:center;padding:1.25rem;color:#94a3b8;">
+                                🛡️ No multi-strategy confluence setups currently active. All engines operating normally.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = setups.map(s => {
+                    const sym = s.ticker || '';
+                    const cleanSym = sym.replace('.NS', '');
+                    const badgeBg = s.confluence_level >= 3 ? 'rgba(244,63,94,0.2)' : (s.confluence_level >= 2 ? 'rgba(56,189,248,0.2)' : 'rgba(16,185,129,0.15)');
+                    const badgeColor = s.badge_color || '#38bdf8';
+
+                    const breakoutCell = s.breakout_tier === 'HOT' 
+                        ? `<span class="signal-badge" style="background:rgba(244,63,94,0.15);color:#fb7185;font-size:0.65rem;">🔥 HOT Breakout</span>`
+                        : (s.breakout_tier === 'WARM' ? `<span class="signal-badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:0.65rem;">⚡ Coiling (Warm)</span>` : `<span style="color:#64748b;">—</span>`);
+
+                    const swingCell = s.is_swing_buy 
+                        ? `<span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.65rem;">🎯 Buy Zone Floor</span>`
+                        : (s.swing_tier === 'WARM' ? `<span style="color:#fbbf24;font-size:0.68rem;">Channel Compression</span>` : `<span style="color:#64748b;">—</span>`);
+
+                    const aiCell = s.is_ai_buy
+                        ? `<span class="signal-badge" style="background:rgba(168,85,247,0.15);color:#c084fc;font-size:0.65rem;">🤖 ${s.ai_direction} (${s.ai_strength}%)</span>`
+                        : `<span style="color:#94a3b8;font-size:0.68rem;">${s.ai_direction || 'Neutral'}</span>`;
+
+                    const news = s.news || {};
+                    const newsCell = news.has_news
+                        ? `<span style="color:${news.badge_color || '#34d399'};font-size:0.68rem;font-weight:600;">${news.badge_text}</span>`
+                        : `<span style="color:#64748b;font-size:0.68rem;">No Filings (7D)</span>`;
+
+                    return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                            <td style="padding:0.45rem 0.6rem;">
+                                <a href="/stock/${encodeURIComponent(sym)}" style="font-weight:800;color:#f8fafc;text-decoration:none;font-family:var(--font-mono);font-size:0.80rem;">
+                                    ${cleanSym}
+                                </a>
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;">
+                                <span class="signal-badge" style="background:${badgeBg};color:${badgeColor};font-size:0.68rem;border:1px solid ${badgeColor}40;">
+                                    ${s.confluence_badge}
+                                </span>
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;">${breakoutCell}</td>
+                            <td style="padding:0.45rem 0.6rem;">${swingCell}</td>
+                            <td style="padding:0.45rem 0.6rem;">${aiCell}</td>
+                            <td style="padding:0.45rem 0.6rem;">${newsCell}</td>
+                            <td style="padding:0.45rem 0.6rem;text-align:right;">
+                                <button type="button" onclick="window.location.href='/stock/${encodeURIComponent(sym)}'" class="btn btn-secondary btn-sm" style="font-size:0.65rem;padding:0.2rem 0.45rem;">
+                                    Deep Dive ➔
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('[CONFLUENCE] Error loading confluence setups:', e);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align:center;padding:1rem;color:#f87171;">
+                            ⚠️ Error syncing cross-strategy confluence setups: ${e.message}
+                        </td>
+                    </tr>
+                `;
+            }
         }
     };
 
