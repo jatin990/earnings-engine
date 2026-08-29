@@ -1235,6 +1235,16 @@ def get_security_tranches(settings: Settings | None = None) -> list[dict[str, An
         return [dict(r) for r in rows]
 
 
+def get_security_tranche_by_id(tranche_id: str, settings: Settings | None = None) -> dict[str, Any] | None:
+    """Retrieve a single security capital payment tranche by ID."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM zepto_security_capital WHERE id = ?", (tranche_id,)).fetchone()
+        return dict(row) if row else None
+
+
 def create_security_tranche(data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any]:
     """Record a new capital contribution tranche to Zepto."""
     settings = settings or Settings()
@@ -1264,6 +1274,87 @@ def create_security_tranche(data: dict[str, Any], settings: Settings | None = No
             )
         )
     return {"id": tranche_id, "amount": data.get("amount"), "partner_name": data.get("partner_name")}
+
+
+def update_security_tranche(tranche_id: str, data: dict[str, Any], settings: Settings | None = None) -> dict[str, Any] | None:
+    """Update an existing security deposit tranche and/or replace transfer proof slip ad-hoc."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.execute("SELECT * FROM zepto_security_capital WHERE id = ?", (tranche_id,)).fetchone()
+        if not cur:
+            raise ValueError(f"Security tranche {tranche_id} not found")
+
+        tranche_title = data.get("tranche_title", cur["tranche_title"]).strip()
+        amount = float(data.get("amount", cur["amount"]))
+        payment_date = data.get("payment_date", cur["payment_date"])
+        partner_name = data.get("partner_name", cur["partner_name"]).strip()
+        payment_mode = data.get("payment_mode", cur["payment_mode"]).strip()
+        reference_utr = data.get("reference_utr", cur["reference_utr"]).strip()
+        proof_doc_url = data.get("proof_doc_url") if "proof_doc_url" in data else cur["proof_doc_url"]
+        notes = data.get("notes", cur["notes"])
+
+        conn.execute(
+            """
+            UPDATE zepto_security_capital SET
+                tranche_title = ?,
+                amount = ?,
+                payment_date = ?,
+                partner_name = ?,
+                payment_mode = ?,
+                reference_utr = ?,
+                proof_doc_url = ?,
+                notes = ?
+            WHERE id = ?
+            """,
+            (
+                tranche_title, amount, payment_date, partner_name,
+                payment_mode, reference_utr, proof_doc_url, notes, tranche_id
+            )
+        )
+        return {
+            "id": tranche_id,
+            "tranche_title": tranche_title,
+            "amount": amount,
+            "payment_date": payment_date,
+            "partner_name": partner_name,
+            "payment_mode": payment_mode,
+            "reference_utr": reference_utr,
+            "proof_doc_url": proof_doc_url,
+            "notes": notes,
+        }
+
+
+def update_security_proof(
+    tranche_id: str,
+    proof_doc_url: str,
+    reference_utr: str | None = None,
+    notes: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Ad-hoc update of transfer slip document and UTR reference for a capital tranche."""
+    settings = settings or Settings()
+    ensure_zepto_schema(settings)
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.execute("SELECT * FROM zepto_security_capital WHERE id = ?", (tranche_id,)).fetchone()
+        if not cur:
+            raise ValueError(f"Security tranche {tranche_id} not found")
+
+        utr = reference_utr if reference_utr is not None else cur["reference_utr"]
+        n = notes if notes is not None else cur["notes"]
+
+        conn.execute(
+            "UPDATE zepto_security_capital SET proof_doc_url = ?, reference_utr = ?, notes = ? WHERE id = ?",
+            (proof_doc_url, utr, n, tranche_id)
+        )
+        return {
+            "id": tranche_id,
+            "proof_doc_url": proof_doc_url,
+            "reference_utr": utr,
+            "notes": n,
+        }
 
 
 def delete_security_tranche(tranche_id: str, settings: Settings | None = None) -> bool:

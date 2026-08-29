@@ -181,12 +181,45 @@ def test_zepto_security_and_50_50_equity_split():
     tranche = zepto_db.create_security_tranche(tranche_data, settings)
     assert tranche["id"] is not None
 
+    # Retrieve single tranche
+    single = zepto_db.get_security_tranche_by_id(tranche["id"], settings)
+    assert single is not None
+    assert single["amount"] == 500000.0
+
+    # Update tranche
+    updated = zepto_db.update_security_tranche(
+        tranche["id"],
+        {
+            "tranche_title": "Capex Deposit Tranche (Revised)",
+            "amount": 550000.0,
+            "reference_utr": "HDFC9988776655_REV",
+            "proof_doc_url": "/api/v1/zepto/documents/mock_slip.pdf",
+        },
+        settings
+    )
+    assert updated["amount"] == 550000.0
+    assert updated["reference_utr"] == "HDFC9988776655_REV"
+    assert updated["proof_doc_url"] == "/api/v1/zepto/documents/mock_slip.pdf"
+
+    # Ad-hoc patch proof
+    patched = zepto_db.update_security_proof(
+        tranche["id"],
+        proof_doc_url="/api/v1/zepto/documents/new_slip.pdf",
+        reference_utr="HDFC_NEW_UTR",
+        settings=settings
+    )
+    assert patched["proof_doc_url"] == "/api/v1/zepto/documents/new_slip.pdf"
+    assert patched["reference_utr"] == "HDFC_NEW_UTR"
+
     overview = zepto_db.get_zepto_overview(settings)
     sec = overview["security_capital"]
     assert sec["target_total"] == 7500000.0
     assert sec["target_per_partner"] == 3750000.0
-    assert sec["partner_1"]["paid"] >= 500000.0
+    assert sec["partner_1"]["paid"] >= 550000.0
     assert "equalization" in sec
+
+    # Cleanup
+    zepto_db.delete_security_tranche(tranche["id"], settings)
 
 
 def test_zepto_api_endpoints(client):
@@ -225,10 +258,60 @@ def test_zepto_api_endpoints(client):
     assert cand_resp.status_code == 200
     assert cand_resp.json()["success"] is True
 
-    # 6. Security API
+    # 6. Security API (Get, Create, Put, Patch Proof, Delete)
     sec_resp = client.get("/api/v1/zepto/security")
     assert sec_resp.status_code == 200
     assert sec_resp.json()["success"] is True
+
+    post_tranche = client.post(
+        "/api/v1/zepto/security",
+        json={
+            "tranche_title": "Test Capital Tranche",
+            "amount": 250000.0,
+            "payment_date": "2026-08-28",
+            "partner_name": "Harshiv Bargotra",
+            "payment_mode": "IMPS",
+            "reference_utr": "IMPS88776655",
+        }
+    )
+    assert post_tranche.status_code == 200
+    new_t_id = post_tranche.json()["tranche"]["id"]
+
+    # Get single tranche endpoint
+    get_single = client.get(f"/api/v1/zepto/security/{new_t_id}")
+    assert get_single.status_code == 200
+    assert get_single.json()["tranche"]["amount"] == 250000.0
+
+    # Put update tranche endpoint
+    put_tranche = client.put(
+        f"/api/v1/zepto/security/{new_t_id}",
+        json={
+            "tranche_title": "Test Capital Tranche (Updated)",
+            "amount": 300000.0,
+            "payment_date": "2026-08-28",
+            "partner_name": "Harshiv Bargotra",
+            "payment_mode": "IMPS",
+            "reference_utr": "IMPS88776655_EDITED",
+            "notes": "Updated by master",
+        }
+    )
+    assert put_tranche.status_code == 200
+    assert put_tranche.json()["tranche"]["amount"] == 300000.0
+
+    # Patch transfer slip proof endpoint
+    patch_proof = client.patch(
+        f"/api/v1/zepto/security/{new_t_id}/proof",
+        json={
+            "proof_doc_url": "/api/v1/zepto/documents/test_receipt.pdf",
+            "reference_utr": "IMPS88776655_FINAL",
+        }
+    )
+    assert patch_proof.status_code == 200
+    assert patch_proof.json()["tranche"]["proof_doc_url"] == "/api/v1/zepto/documents/test_receipt.pdf"
+
+    # Delete tranche endpoint
+    del_tranche = client.delete(f"/api/v1/zepto/security/{new_t_id}")
+    assert del_tranche.status_code == 200
 
     # 7. Staffing Targets & Base Pay API
     target_resp = client.get("/api/v1/zepto/staffing-targets")

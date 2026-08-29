@@ -1394,9 +1394,14 @@ const zeptoApp = {
                     <td class="p-3.5 text-center">${proofLink}</td>
                     <td class="p-3.5 text-slate-400 text-[11px] max-w-xs truncate">${t.notes || '—'}</td>
                     <td class="p-3.5 pr-4 text-center">
-                        <button type="button" onclick="zeptoApp.deleteTranche('${t.id}')" class="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs" title="Delete Tranche">
-                            🗑️
-                        </button>
+                        <div class="flex items-center justify-center gap-1.5">
+                            <button type="button" onclick="zeptoApp.openEditTrancheModal('${t.id}')" class="px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[11px] font-bold flex items-center gap-1 transition" title="Edit Tranche & Transfer Slip (Master Only)">
+                                ✏️ Edit
+                            </button>
+                            <button type="button" onclick="zeptoApp.deleteTranche('${t.id}')" class="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs" title="Delete Tranche (Master Only)">
+                                🗑️
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -1405,16 +1410,61 @@ const zeptoApp = {
 
     openAddTrancheModal() {
         document.getElementById('formTranche')?.reset();
+        document.getElementById('trancheFormId').value = '';
+        document.getElementById('modalTrancheTitle').innerHTML = '<span>💰</span> Record Zepto Security Capital Tranche';
         document.getElementById('trancheFormDate').value = new Date().toISOString().split('T')[0];
+        
+        const proofBox = document.getElementById('trancheCurrentProof');
+        if (proofBox) proofBox.style.display = 'none';
+
+        const btn = document.getElementById('btnSaveTranche');
+        if (btn) btn.textContent = 'Record Tranche';
+
+        this.openModal('modalTranche');
+    },
+
+    openEditTrancheModal(trancheId) {
+        const t = this.security?.tranches?.find(x => x.id === trancheId);
+        if (!t) return;
+
+        document.getElementById('formTranche')?.reset();
+        document.getElementById('trancheFormId').value = t.id;
+        document.getElementById('modalTrancheTitle').innerHTML = '<span>✏️</span> Edit Capital Tranche & Transfer Slip';
+        document.getElementById('trancheFormTitle').value = t.tranche_title || '';
+        document.getElementById('trancheFormAmount').value = t.amount || '';
+        document.getElementById('trancheFormDate').value = t.payment_date || new Date().toISOString().split('T')[0];
+        document.getElementById('trancheFormPartner').value = t.partner_name || 'Jatin Abrol';
+        document.getElementById('trancheFormMode').value = t.payment_mode || 'NEFT_RTGS';
+        document.getElementById('trancheFormUtr').value = t.reference_utr || '';
+        document.getElementById('trancheFormNotes').value = t.notes || '';
+
+        const proofBox = document.getElementById('trancheCurrentProof');
+        const proofLink = document.getElementById('trancheCurrentProofLink');
+        if (proofBox && proofLink) {
+            if (t.proof_doc_url) {
+                proofBox.style.display = 'flex';
+                proofLink.href = t.proof_doc_url;
+                proofLink.textContent = 'View Current Attached Slip';
+            } else {
+                proofBox.style.display = 'none';
+            }
+        }
+
+        const btn = document.getElementById('btnSaveTranche');
+        if (btn) btn.textContent = 'Update Tranche';
+
         this.openModal('modalTranche');
     },
 
     async saveTranche(e) {
         e.preventDefault();
         const btn = document.getElementById('btnSaveTranche');
+        const trancheId = document.getElementById('trancheFormId')?.value;
+        const isEdit = !!trancheId;
+
         if (btn) {
             btn.disabled = true;
-            btn.textContent = 'Recording...';
+            btn.textContent = isEdit ? 'Updating...' : 'Recording...';
         }
 
         try {
@@ -1432,17 +1482,22 @@ const zeptoApp = {
                 partner_name: document.getElementById('trancheFormPartner').value,
                 payment_mode: document.getElementById('trancheFormMode').value,
                 reference_utr: document.getElementById('trancheFormUtr').value,
-                proof_doc_url: proofUrl,
                 notes: document.getElementById('trancheFormNotes').value,
             };
+            if (proofUrl) {
+                payload.proof_doc_url = proofUrl;
+            }
 
-            const res = await fetch('/api/v1/zepto/security', {
-                method: 'POST',
+            const url = isEdit ? `/api/v1/zepto/security/${trancheId}` : '/api/v1/zepto/security';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Failed to record tranche');
+            if (!res.ok) throw new Error(data.detail || `Failed to ${isEdit ? 'update' : 'record'} tranche`);
 
             this.closeModal('modalTranche');
             await this.loadOverview();
@@ -1452,16 +1507,18 @@ const zeptoApp = {
         } finally {
             if (btn) {
                 btn.disabled = false;
-                btn.textContent = 'Record Tranche';
+                btn.textContent = isEdit ? 'Update Tranche' : 'Record Tranche';
             }
         }
     },
 
     async deleteTranche(trancheId) {
-        if (!confirm('Are you sure you want to delete this capital payment tranche?')) return;
+        if (!confirm('Are you sure you want to delete this capital payment tranche? (Master Portal Admin only)')) return;
         try {
             const res = await fetch(`/api/v1/zepto/security/${trancheId}`, { method: 'DELETE' });
-            if (!res.ok) throw new Error('Failed to delete tranche');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to delete capital tranche');
+
             await this.loadOverview();
             await this.loadSecurity();
         } catch (err) {

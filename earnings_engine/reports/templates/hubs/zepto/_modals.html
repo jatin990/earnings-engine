@@ -439,12 +439,12 @@
 </div>
 
 
-<!-- ================= 6. RECORD CAPITAL TRANCHE MODAL ================= -->
+<!-- ================= 6. RECORD / EDIT CAPITAL TRANCHE MODAL ================= -->
 <div id="modalTranche" style="display: none;"
     class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="glass-panel max-w-lg w-full p-6 border-amber-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
-            <h3 class="text-base font-extrabold text-amber-400 flex items-center gap-2">
+            <h3 id="modalTrancheTitle" class="text-base font-extrabold text-amber-400 flex items-center gap-2">
                 <span>💰</span> Record Zepto Security Capital Tranche
             </h3>
             <button type="button" onclick="zeptoApp.closeModal('modalTranche')"
@@ -452,6 +452,8 @@
         </div>
 
         <form id="formTranche" onsubmit="zeptoApp.saveTranche(event)" class="space-y-4 text-xs">
+            <input type="hidden" id="trancheFormId" value="">
+
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Tranche Title / Description *</label>
                 <input type="text" id="trancheFormTitle" required
@@ -499,8 +501,11 @@
             </div>
 
             <div>
-                <label class="block text-slate-300 font-semibold mb-1">Upload Transfer Slip / Receipt Proof
-                    (PDF/Image)</label>
+                <label class="block text-slate-300 font-semibold mb-1">Transfer Slip / Receipt Proof (PDF/Image)</label>
+                <div id="trancheCurrentProof" style="display: none;" class="mb-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
+                    <span class="text-[11px] text-amber-200">📄 Attached Transfer Slip:</span>
+                    <a id="trancheCurrentProofLink" href="#" target="_blank" class="text-[11px] font-bold text-amber-400 hover:underline">View Current Slip</a>
+                </div>
                 <input type="file" id="trancheFormProofFile" accept=".pdf,.png,.jpg,.jpeg"
                     class="w-full text-slate-400 text-xs">
             </div>
@@ -516,7 +521,7 @@
                 <button type="button" onclick="zeptoApp.closeModal('modalTranche')"
                     class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
                 <button type="submit" id="btnSaveTranche"
-                    class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold">Record
+                    class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold">Save
                     Tranche</button>
             </div>
         </form>

@@ -389,9 +389,25 @@ async def get_security_endpoint() -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/api/v1/zepto/security", summary="Record Capital Tranche")
-async def create_security_tranche_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
-    """Record a capital payment tranche sent to Zepto."""
+def _verify_master_role(request: Request) -> None:
+    """Enforce Master / Owner role permissions for Master Security Deposit mutations."""
+    from earnings_engine.api.dependencies import _get_current_session
+    session = _get_current_session(request)
+    role = session.get("role")
+    scopes = session.get("scopes", [])
+    
+    # If a session role is present, ensure it is master/owner/admin
+    if role and role not in ("owner", "admin") and not ("*" in scopes or "admin" in scopes or "zepto_master" in scopes):
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Only Master Portal Admins have permission to record, edit, or modify Master Security Deposit payment tranches.",
+        )
+
+
+@router.post("/api/v1/zepto/security", summary="Record Capital Tranche (Master Only)")
+async def create_security_tranche_endpoint(payload: dict[str, Any], request: Request) -> dict[str, Any]:
+    """Record a capital payment tranche sent to Zepto (Master Admin Only)."""
+    _verify_master_role(request)
     try:
         tranche = zepto_db.create_security_tranche(payload, _settings)
         return {"success": True, "tranche": tranche}
@@ -400,9 +416,56 @@ async def create_security_tranche_endpoint(payload: dict[str, Any]) -> dict[str,
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/api/v1/zepto/security/{tranche_id}", summary="Delete Capital Tranche")
-async def delete_security_tranche_endpoint(tranche_id: str) -> dict[str, Any]:
-    """Delete a capital tranche record."""
+@router.get("/api/v1/zepto/security/{tranche_id}", summary="Get Single Capital Tranche")
+async def get_security_tranche_endpoint(tranche_id: str) -> dict[str, Any]:
+    """Retrieve a single security capital tranche by ID."""
+    tranche = zepto_db.get_security_tranche_by_id(tranche_id, _settings)
+    if not tranche:
+        raise HTTPException(status_code=404, detail=f"Security tranche {tranche_id} not found")
+    return {"success": True, "tranche": tranche}
+
+
+@router.put("/api/v1/zepto/security/{tranche_id}", summary="Update Capital Tranche (Master Only)")
+async def update_security_tranche_endpoint(tranche_id: str, payload: dict[str, Any], request: Request) -> dict[str, Any]:
+    """Update details of a capital tranche and/or transfer slip (Master Admin Only)."""
+    _verify_master_role(request)
+    try:
+        tranche = zepto_db.update_security_tranche(tranche_id, payload, _settings)
+        return {"success": True, "tranche": tranche}
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error updating capital tranche %s: %s", tranche_id, e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/api/v1/zepto/security/{tranche_id}/proof", summary="Update Transfer Slip Ad-Hoc (Master Only)")
+async def patch_security_proof_endpoint(tranche_id: str, payload: dict[str, Any], request: Request) -> dict[str, Any]:
+    """Ad-hoc upload and update of transfer slip or UTR reference for a tranche (Master Admin Only)."""
+    _verify_master_role(request)
+    proof_url = payload.get("proof_doc_url")
+    if not proof_url:
+        raise HTTPException(status_code=400, detail="proof_doc_url is required")
+    try:
+        res = zepto_db.update_security_proof(
+            tranche_id=tranche_id,
+            proof_doc_url=proof_url,
+            reference_utr=payload.get("reference_utr"),
+            notes=payload.get("notes"),
+            settings=_settings,
+        )
+        return {"success": True, "tranche": res}
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.error("[ZEPTO-API] Error patching proof for tranche %s: %s", tranche_id, e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/api/v1/zepto/security/{tranche_id}", summary="Delete Capital Tranche (Master Only)")
+async def delete_security_tranche_endpoint(tranche_id: str, request: Request) -> dict[str, Any]:
+    """Delete a capital tranche record (Master Admin Only)."""
+    _verify_master_role(request)
     zepto_db.delete_security_tranche(tranche_id, _settings)
     return {"success": True, "deleted_id": tranche_id}
 
