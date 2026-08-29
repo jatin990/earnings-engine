@@ -129,47 +129,70 @@
         if (tbody) {
             tbody.innerHTML = '';
 
-            const m = data.fundamental ? data.fundamental.metrics : {};
+            const m = data.fundamental ? (data.fundamental.metrics || {}) : {};
+            
+            const hasPe = m.pe !== null && m.pe !== undefined && !isNaN(Number(m.pe)) && Number(m.pe) > 0;
+            const peVal = hasPe ? Number(m.pe) : null;
+            const bmPe = (m.benchmark_pe !== null && m.benchmark_pe !== undefined && !isNaN(Number(m.benchmark_pe))) ? Number(m.benchmark_pe) : null;
+            const peDisc = (hasPe && m.pe_discount_pct !== null && m.pe_discount_pct !== undefined && !isNaN(Number(m.pe_discount_pct))) ? Number(m.pe_discount_pct) : (hasPe && bmPe ? Number(((bmPe - peVal) / bmPe * 100).toFixed(1)) : null);
+
+            const hasPb = m.pb !== null && m.pb !== undefined && !isNaN(Number(m.pb)) && Number(m.pb) > 0;
+            const pbVal = hasPb ? Number(m.pb) : null;
+            const bmPb = (m.benchmark_pb !== null && m.benchmark_pb !== undefined && !isNaN(Number(m.benchmark_pb))) ? Number(m.benchmark_pb) : null;
+
+            const hasRoe = m.roe !== null && m.roe !== undefined && !isNaN(Number(m.roe));
+            const roeVal = hasRoe ? Number(m.roe) : null;
+            const bmRoe = (m.benchmark_roe !== null && m.benchmark_roe !== undefined && !isNaN(Number(m.benchmark_roe))) ? Number(m.benchmark_roe) : null;
+            const roeSpread = (hasRoe && m.roe_spread !== null && m.roe_spread !== undefined && !isNaN(Number(m.roe_spread))) ? Number(m.roe_spread) : (hasRoe && bmRoe ? Number((roeVal - bmRoe).toFixed(1)) : null);
+
+            const hasDe = m.debt_to_equity !== null && m.debt_to_equity !== undefined && !isNaN(Number(m.debt_to_equity));
+            const deVal = hasDe ? Number(m.debt_to_equity) : null;
+            const bmDe = (m.benchmark_debt_to_equity !== null && m.benchmark_debt_to_equity !== undefined && !isNaN(Number(m.benchmark_debt_to_equity))) ? Number(m.benchmark_debt_to_equity) : null;
+
+            const hasOp = m.operating_margin !== null && m.operating_margin !== undefined && !isNaN(Number(m.operating_margin));
+            const opVal = hasOp ? Number(m.operating_margin) : null;
+            const bmOp = (m.benchmark_operating_margin !== null && m.benchmark_operating_margin !== undefined && !isNaN(Number(m.benchmark_operating_margin))) ? Number(m.benchmark_operating_margin) : null;
+
             const rows = [
                 {
                     name: 'P/E (Price-to-Earnings)',
-                    val: (m.pe != null && !isNaN(m.pe)) ? `${Number(m.pe).toFixed(1)}x` : '—',
-                    bm: (m.benchmark_pe != null) ? `${Number(m.benchmark_pe).toFixed(1)}x` : '—',
-                    diff: (m.pe != null && m.pe_discount_pct !== undefined) ? `${m.pe_discount_pct > 0 ? '+' : ''}${m.pe_discount_pct}% discount` : '—',
-                    status: (m.pe == null) ? 'Pending Data' : ((m.pe_discount_pct && m.pe_discount_pct > 0) ? 'Undervalued' : 'Premium'),
-                    isPending: m.pe == null
+                    val: hasPe ? `${peVal.toFixed(1)}x` : '—',
+                    bm: bmPe ? `${bmPe.toFixed(1)}x` : '—',
+                    diff: (hasPe && peDisc !== null) ? `${peDisc > 0 ? '+' : ''}${peDisc}% discount` : '—',
+                    status: !hasPe ? 'Pending Data' : (peDisc > 0 ? 'Undervalued' : 'Premium'),
+                    isPending: !hasPe
                 },
                 {
                     name: 'P/B (Price-to-Book)',
-                    val: (m.pb != null && !isNaN(m.pb)) ? `${Number(m.pb).toFixed(1)}x` : '—',
-                    bm: (m.benchmark_pb != null) ? `${Number(m.benchmark_pb).toFixed(1)}x` : '—',
-                    diff: (m.pb != null && m.benchmark_pb) ? `${((m.benchmark_pb - m.pb)/m.benchmark_pb*100).toFixed(1)}%` : '—',
-                    status: (m.pb == null) ? 'Pending Data' : ((m.benchmark_pb && m.pb < m.benchmark_pb) ? 'Favorable' : 'Elevated'),
-                    isPending: m.pb == null
+                    val: hasPb ? `${pbVal.toFixed(1)}x` : '—',
+                    bm: bmPb ? `${bmPb.toFixed(1)}x` : '—',
+                    diff: (hasPb && bmPb) ? `${((bmPb - pbVal) / bmPb * 100).toFixed(1)}%` : '—',
+                    status: !hasPb ? 'Pending Data' : ((bmPb && pbVal < bmPb) ? 'Favorable' : 'Elevated'),
+                    isPending: !hasPb
                 },
                 {
                     name: 'ROE (Return on Equity)',
-                    val: (m.roe != null && !isNaN(m.roe)) ? `${Number(m.roe).toFixed(1)}%` : '—',
-                    bm: (m.benchmark_roe != null) ? `${Number(m.benchmark_roe).toFixed(1)}%` : '—',
-                    diff: (m.roe != null && m.roe_spread !== undefined) ? `${m.roe_spread > 0 ? '+' : ''}${m.roe_spread}% spread` : '—',
-                    status: (m.roe == null) ? 'Pending Data' : ((m.roe_spread && m.roe_spread >= 0) ? 'Outperforming' : 'Lagging'),
-                    isPending: m.roe == null
+                    val: hasRoe ? `${roeVal.toFixed(1)}%` : '—',
+                    bm: bmRoe ? `${bmRoe.toFixed(1)}%` : '—',
+                    diff: (hasRoe && roeSpread !== null) ? `${roeSpread > 0 ? '+' : ''}${roeSpread}% spread` : '—',
+                    status: !hasRoe ? 'Pending Data' : (roeSpread >= 0 ? 'Outperforming' : 'Lagging'),
+                    isPending: !hasRoe
                 },
                 {
                     name: 'Debt to Equity',
-                    val: (m.debt_to_equity != null && !isNaN(m.debt_to_equity)) ? `${Number(m.debt_to_equity).toFixed(2)}x` : '—',
-                    bm: (m.benchmark_debt_to_equity != null) ? `${Number(m.benchmark_debt_to_equity).toFixed(2)}x` : '—',
-                    diff: (m.debt_to_equity != null) ? (m.debt_to_equity < 0.3 ? 'Pristine' : (m.debt_to_equity < 0.8 ? 'Moderate' : 'Elevated')) : '—',
-                    status: (m.debt_to_equity == null) ? 'Pending Data' : (m.debt_to_equity < 0.5 ? 'Low Risk' : 'Leveraged'),
-                    isPending: m.debt_to_equity == null
+                    val: hasDe ? `${deVal.toFixed(2)}x${deVal === 0 ? ' (Debt Free)' : ''}` : '—',
+                    bm: bmDe ? `${bmDe.toFixed(2)}x` : '—',
+                    diff: hasDe ? (deVal < 0.3 ? 'Pristine' : (deVal < 0.8 ? 'Moderate' : 'Elevated')) : '—',
+                    status: !hasDe ? 'Pending Data' : (deVal < 0.5 ? 'Low Risk' : 'Leveraged'),
+                    isPending: !hasDe
                 },
                 {
                     name: 'Operating Margin',
-                    val: (m.operating_margin != null && !isNaN(m.operating_margin)) ? `${Number(m.operating_margin).toFixed(1)}%` : '—',
-                    bm: (m.benchmark_operating_margin != null) ? `${Number(m.benchmark_operating_margin).toFixed(1)}%` : '—',
-                    diff: (m.operating_margin != null && m.benchmark_operating_margin) ? `${(m.operating_margin - m.benchmark_operating_margin).toFixed(1)}% spread` : '—',
-                    status: (m.operating_margin == null) ? 'Pending Data' : ((m.benchmark_operating_margin && m.operating_margin >= m.benchmark_operating_margin) ? 'Healthy' : 'Sub-par'),
-                    isPending: m.operating_margin == null
+                    val: hasOp ? `${opVal.toFixed(1)}%` : '—',
+                    bm: bmOp ? `${bmOp.toFixed(1)}%` : '—',
+                    diff: (hasOp && bmOp) ? `${(opVal - bmOp).toFixed(1)}% spread` : '—',
+                    status: !hasOp ? 'Pending Data' : ((bmOp && opVal >= bmOp) ? 'Healthy' : 'Sub-par'),
+                    isPending: !hasOp
                 }
             ];
 
