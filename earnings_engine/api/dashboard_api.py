@@ -771,6 +771,32 @@ def clear_swing_range_api(watchlist: str = "ALL", ticker: str = "") -> dict[str,
     return {"success": True, "range": None, "message": f"Swing range cleared for {ticker}"}
 
 
+def calculate_trading_range_api(
+    ticker: str,
+    method: str = "20d",
+    watchlist: str = "ALL",
+) -> dict[str, Any]:
+    """Calculate support/resistance trading range across selected quantitative methods."""
+    from earnings_engine.data.market_context import calculate_trading_range_by_method
+
+    settings = _settings()
+    ticker = ticker.strip().upper()
+    if not ticker:
+        return {"success": False, "error": "Ticker is required"}
+
+    prices = prices_mod.load_prices(ticker, settings)
+    if prices.empty:
+        try:
+            prices = prices_mod.fetch_prices(ticker, settings, force=False)
+        except Exception:
+            prices = pd.DataFrame()
+
+    res = calculate_trading_range_by_method(prices, method=method)
+    res["ticker"] = ticker
+    res["watchlist"] = watchlist or "ALL"
+    return res
+
+
 def get_swing_cycle_history_api(watchlist: str = "ALL", ticker: str = "") -> list[dict[str, Any]]:
     """Return cycle history for a ticker."""
     settings = _settings()

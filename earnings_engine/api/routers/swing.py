@@ -119,11 +119,40 @@ async def auto_detect_swing_range_endpoint(request: dict):
         raise HTTPException(status_code=500, detail=f"Auto detection failed: {str(e)}")
 
 
+@router.post("/api/v1/swing-range/calculate")
+@router.post("/api/v1/dashboard/swing-range/calculate")
+async def calculate_swing_range_endpoint(request: dict):
+    """Calculate support/resistance trading range across selected quantitative methods."""
+    ticker = request.get("ticker")
+    method = request.get("method", "20d")
+    watchlist = request.get("watchlist", "ALL")
+    if not ticker:
+        raise HTTPException(status_code=400, detail="ticker is required")
+    try:
+        res = await asyncio.to_thread(
+            dashboard_api.calculate_trading_range_api,
+            ticker=ticker,
+            method=method,
+            watchlist=watchlist,
+        )
+        return res
+    except Exception as e:
+        logger.exception("Error calculating trading range for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Range calculation failed: {str(e)}")
+
+
 @router.post("/api/v1/swing-ranges/auto-detect/{ticker}")
 @router.post("/api/v1/swing-ranges/auto-detect/{watchlist}/{ticker}")
 async def auto_detect_swing_range_path(ticker: str, watchlist: str = "my_watchlist"):
     """Trigger automated swing range detection by path parameter."""
     return await auto_detect_swing_range_endpoint({"ticker": ticker, "watchlist": watchlist})
+
+
+@router.post("/api/v1/swing-ranges/calculate/{ticker}")
+@router.post("/api/v1/swing-ranges/calculate/{watchlist}/{ticker}")
+async def calculate_swing_range_path(ticker: str, watchlist: str = "ALL", method: str = Query("20d")):
+    """Trigger trading range calculation by path parameter."""
+    return await calculate_swing_range_endpoint({"ticker": ticker, "watchlist": watchlist, "method": method})
 
 
 @router.get("/api/v1/dashboard/swing/status")

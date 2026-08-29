@@ -385,6 +385,168 @@ def detect_swing_range(closes: pd.Series) -> dict[str, Any]:
     }
 
 
+def calculate_trading_range_by_method(
+    prices_df: pd.DataFrame,
+    method: str = "20d",
+) -> dict[str, Any]:
+    """Calculate the support/resistance trading range across various methodologies.
+
+    Supported methods:
+      - '20d': 20-Day Swing Channel (min/max of last 20 trading days)
+      - '65d_3m': 3-Month Positional Channel (min/max of last 65 trading days)
+      - 'atr_14': 14-Day ATR Volatility Envelope (Close +/- 2.0 * ATR14)
+      - '52w': 52-Week Range (Min/Max over trailing 252 trading sessions)
+      - 'pivot_classic': Floor Pivot Support S1 / Resistance R1
+      - 'fibonacci': Fibonacci Retracement Levels (23.6% Support / 78.6% Resistance of 65D move)
+    """
+    if prices_df is None or prices_df.empty:
+        return {
+            "success": False,
+            "error": "No price history available",
+            "lower": None,
+            "upper": None,
+            "current_price": None,
+            "spread_pct": 0.0,
+            "method": method,
+        }
+
+    df = prices_df.copy()
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [col[0] for col in df.columns]
+    
+    # Standardize column names
+    col_map = {c: c.lower() for c in df.columns if isinstance(c, str)}
+    df = df.rename(columns=col_map)
+
+    for col in ["open", "high", "low", "close", "volume"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col].squeeze(), errors="coerce")
+    
+    df = df.dropna(subset=["close"])
+    if df.empty:
+        return {
+            "success": False,
+            "error": "Clean price series is empty",
+            "lower": None,
+            "upper": None,
+            "current_price": None,
+            "spread_pct": 0.0,
+            "method": method,
+        }
+
+    # Clean extreme bad ticks or corrupted low/high anomalies
+    if "low" in df.columns:
+        df["low"] = df["low"].where(df["low"] >= 0.5 * df["close"], df["close"])
+    if "high" in df.columns:
+        df["high"] = df["high"].where(df["high"] <= 2.0 * df["close"], df["close"])
+
+    current_price = round(float(df["close"].iloc[-1]), 2)
+    method_key = (method or "20d").lower().strip()
+
+    lower = None
+    upper = None
+    method_name = "20-Day Swing Channel"
+    explanation = ""
+
+    if method_key in ("20d", "20_day", "swing"):
+        seg = df.tail(20)
+        low_val = seg["low"].min() if "low" in seg.columns else seg["close"].min()
+        high_val = seg["high"].max() if "high" in seg.columns else seg["close"].max()
+        lower = round(float(low_val), 2)
+        upper = round(float(high_val), 2)
+        method_name = "20-Day Swing Channel"
+        explanation = f"Detected from 20-day price oscillation extreme lows (₹{lower}) to highs (₹{upper})."
+
+    elif method_key in ("65d_3m", "3m", "quarter", "positional"):
+        seg = df.tail(65)
+        low_val = seg["low"].min() if "low" in seg.columns else seg["close"].min()
+        high_val = seg["high"].max() if "high" in seg.columns else seg["close"].max()
+        lower = round(float(low_val), 2)
+        upper = round(float(high_val), 2)
+        method_name = "3-Month Positional Channel"
+        explanation = f"Calculated over 65 trading sessions (past 3 months): Support ₹{lower}, Resistance ₹{upper}."
+
+    elif method_key in ("atr_14", "atr", "volatility"):
+        if len(df) >= 15 and all(k in df.columns for k in ["high", "low", "close"]):
+            high = df["high"]
+            low = df["low"]
+            close_prev = df["close"].shift(1)
+            tr1 = high - low
+            tr2 = (high - close_prev).abs()
+            tr3 = (low - close_prev).abs()
+            tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+            atr_14 = float(tr.tail(14).mean())
+            lower = round(max(0.01, current_price - (2.0 * atr_14)), 2)
+            upper = round(current_price + (2.0 * atr_14), 2)
+            method_name = "14-Day ATR Volatility Envelope"
+            explanation = f"14-Day ATR is ₹{round(atr_14, 2)}. Range is anchored at +/- 2.0x ATR around CMP (₹{current_price})."
+        else:
+            seg = df.tail(20)
+            lower = round(float(seg["close"].min() * 0.96), 2)
+            upper = round(float(seg["close"].max() * 1.04), 2)
+            method_name = "14-Day Volatility Envelope"
+            explanation = "Calculated using estimated 4% volatility band around recent close prices."
+
+    elif method_key in ("52w", "52_week", "yearly"):
+        seg = df.tail(252)
+        low_val = seg["low"].min() if "low" in seg.columns else seg["close"].min()
+        high_val = seg["high"].max() if "high" in seg.columns else seg["close"].max()
+        lower = round(float(low_val), 2)
+        upper = round(float(high_val), 2)
+        method_name = "52-Week Historical High/Low Range"
+        explanation = f"Annual 52-Week floor at ₹{lower} and ceiling at ₹{upper} across {len(seg)} sessions."
+
+    elif method_key in ("pivot_classic", "pivot", "floor_pivot"):
+        if len(df) >= 2 and all(k in df.columns for k in ["high", "low", "close"]):
+            prev = df.iloc[-2]
+            h = float(prev["high"])
+            l = float(prev["low"])
+            c = float(prev["close"])
+            p = (h + l + c) / 3.0
+            s1 = (2.0 * p) - h
+            r1 = (2.0 * p) - l
+            lower = round(max(0.01, s1), 2)
+            upper = round(r1, 2)
+            method_name = "Classic Floor Pivot Points (S1 / R1)"
+            explanation = f"Classic Pivot Floor Support S1 (₹{lower}) and Resistance R1 (₹{upper}) from previous bar."
+        else:
+            seg = df.tail(20)
+            lower = round(float(seg["close"].min()), 2)
+            upper = round(float(seg["close"].max()), 2)
+            method_name = "Pivot Channel"
+            explanation = "Pivot estimate derived from recent extrema."
+
+    elif method_key in ("fibonacci", "fib"):
+        seg = df.tail(65)
+        h = float(seg["high"].max() if "high" in seg.columns else seg["close"].max())
+        l = float(seg["low"].min() if "low" in seg.columns else seg["close"].min())
+        diff = h - l
+        lower = round(l + (0.236 * diff), 2)
+        upper = round(l + (0.786 * diff), 2)
+        method_name = "Fibonacci Retracement Range (23.6% - 78.6%)"
+        explanation = f"Fibonacci channel based on 65D range (Low: ₹{round(l, 2)}, High: ₹{round(h, 2)})."
+
+    else:
+        seg = df.tail(20)
+        lower = round(float(seg["close"].min()), 2)
+        upper = round(float(seg["close"].max()), 2)
+        method_name = "20-Day Range"
+        explanation = f"Default 20-day channel: ₹{lower} to ₹{upper}."
+
+    spread_pct = round(((upper - lower) / lower * 100), 2) if lower and lower > 0 else 0.0
+
+    return {
+        "success": True,
+        "method": method_key,
+        "method_name": method_name,
+        "current_price": current_price,
+        "lower": lower,
+        "upper": upper,
+        "spread_pct": spread_pct,
+        "explanation": explanation,
+    }
+
+
 def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, force: bool = False) -> pd.DataFrame:
     """Append market-cap, price, and recent earnings context for each ticker.
 

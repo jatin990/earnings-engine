@@ -156,46 +156,31 @@ def get_cuda_status() -> dict[str, Any]:
 
 
 def get_asset_name(symbol: str) -> str:
-    """Resolve the display name for a ticker symbol."""
+    """Resolve the display name for a ticker symbol from DB or yfinance."""
     try:
-        info = yf.Ticker(symbol).info
-        name = info.get("shortName") or info.get("longName") or symbol
-        logger.info("[ASSET] Resolved name for %s: %s", symbol, name)
-        return name
-    except Exception as exc:
-        logger.warning("[ASSET] Could not resolve name for %s: %s", symbol, exc)
-        return symbol
+        from earnings_engine.config import Settings as _Settings
+        from earnings_engine.data.db import get_db_connection
+        conn = get_db_connection(_Settings())
+        row = conn.execute("SELECT name FROM universes WHERE ticker = ? LIMIT 1", (symbol,)).fetchone()
+        if row and row[0]:
+            conn.close()
+            return str(row[0])
+        row2 = conn.execute("SELECT name FROM ticker_market_cap WHERE ticker = ? LIMIT 1", (symbol,)).fetchone()
+        conn.close()
+        if row2 and row2[0]:
+            return str(row2[0])
+    except Exception:
+        pass
+    return symbol
 
 
 def has_results_coming_up(symbol: str, days: int = 7) -> bool:
     """Check if the stock has earnings results in the next N days."""
     try:
-        ticker = yf.Ticker(symbol)
-        earnings_dates = getattr(ticker, "earnings_dates", None)
-        if earnings_dates is None:
-            return False
-
-        if isinstance(earnings_dates, pd.DataFrame):
-            if earnings_dates.empty:
-                return False
-            if "Earnings Date" in earnings_dates.columns:
-                raw_dates = pd.to_datetime(earnings_dates["Earnings Date"], errors="coerce")
-            else:
-                raw_dates = pd.to_datetime(earnings_dates.index, errors="coerce")
-            raw_dates = raw_dates.dropna()
-            if raw_dates.empty:
-                return False
-
-            now = pd.Timestamp.now().tz_localize(None)
-            future_window = now + pd.Timedelta(days=days)
-            for dt in raw_dates:
-                if pd.isna(dt):
-                    continue
-                if dt.tzinfo is not None:
-                    dt = dt.tz_convert(None)
-                if now <= dt <= future_window:
-                    return True
-        return False
+        from earnings_engine.config import Settings as _Settings
+        from earnings_engine.data.earnings import upcoming_earnings
+        df = upcoming_earnings([symbol], _Settings(), days=days)
+        return not df.empty
     except Exception:
         return False
 
@@ -203,53 +188,25 @@ def has_results_coming_up(symbol: str, days: int = 7) -> bool:
 def get_upcoming_earnings_date(symbol: str, days: int = 7) -> str | None:
     """Get the next earnings date within the next N days."""
     try:
-        ticker = yf.Ticker(symbol)
-        earnings_dates = getattr(ticker, "earnings_dates", None)
-        if earnings_dates is None:
-            return None
-
-        if isinstance(earnings_dates, pd.DataFrame):
-            if earnings_dates.empty:
-                return None
-            if "Earnings Date" in earnings_dates.columns:
-                raw_dates = pd.to_datetime(earnings_dates["Earnings Date"], errors="coerce")
-            else:
-                raw_dates = pd.to_datetime(earnings_dates.index, errors="coerce")
-        elif isinstance(earnings_dates, pd.Series):
-            raw_dates = pd.to_datetime(earnings_dates.index, errors="coerce")
-        else:
-            return None
-
-        raw_dates = raw_dates.dropna()
-        if raw_dates.empty:
-            return None
-
-        now = pd.Timestamp.now().tz_localize(None)
-        future_window = now + pd.Timedelta(days=days)
-        upcoming = []
-        for dt in raw_dates:
-            if pd.isna(dt):
-                continue
-            if dt.tzinfo is not None:
-                dt = dt.tz_convert(None)
-            if now <= dt <= future_window:
-                upcoming.append(dt)
-
-        if not upcoming:
-            return None
-        return min(upcoming).strftime("%d %b %Y")
+        from earnings_engine.config import Settings as _Settings
+        from earnings_engine.data.earnings import upcoming_earnings
+        df = upcoming_earnings([symbol], _Settings(), days=days)
+        if not df.empty and "earnings_date" in df.columns:
+            return str(df["earnings_date"].iloc[0])
     except Exception:
-        return None
+        pass
+    return None
 
 
 def get_last_week_change(symbol: str) -> float | None:
-    """Calculate the percentage change over the last week."""
+    """Calculate the percentage change over the last 5 trading days."""
     try:
-        ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="15d", interval="1d")
-        if hist.empty or len(hist) < 5:
+        from earnings_engine.config import Settings as _Settings
+        from earnings_engine.data.prices import load_prices
+        df = load_prices(symbol, _Settings())
+        if df.empty or len(df) < 5:
             return None
-        close = hist["Close"].dropna()
+        close = df["close"].dropna()
         if len(close) < 5:
             return None
         current = float(close.iloc[-1])
@@ -273,36 +230,61 @@ def get_results_metadata(symbol: str) -> dict[str, Any]:
 
 
 def _history_to_clean_df(df: pd.DataFrame) -> pd.DataFrame | None:
-    """Convert a yfinance history DataFrame into the cleaned OHLCV schema.
+    """Convert a yfinance/SQLite history DataFrame into the cleaned OHLCV schema.
 
     Returns None if the frame is empty or lacks the expected columns.
     """
-    if df is None or df.empty:
+    if df is None or (hasattr(df, "empty") and df.empty):
         return None
     try:
+        df = df.copy()
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [
+                col[0] if isinstance(col, tuple) and len(col) >= 1 else str(col)
+                for col in df.columns
+            ]
         df = df.reset_index()
-        date_col = "Date" if "Date" in df.columns else df.columns[0]
+        date_col = "Date" if "Date" in df.columns else ("date" if "date" in df.columns else df.columns[0])
         df["timestamps"] = pd.to_datetime(df[date_col]).dt.tz_localize(None)
-        df = df.rename(columns={
-            "Open": "open", "High": "high", "Low": "low",
-            "Close": "close", "Volume": "volume"
-        })
-        cleaned = df[["timestamps", "open", "high", "low", "close", "volume"]].dropna()
+        renamed = {}
+        for c in df.columns:
+            if isinstance(c, str):
+                c_low = c.lower()
+                if c_low in ("open", "high", "low", "close", "volume"):
+                    renamed[c] = c_low
+        df = df.rename(columns=renamed)
+        req_cols = ["timestamps", "open", "high", "low", "close", "volume"]
+        if not all(c in df.columns for c in req_cols):
+            return None
+        cleaned = df[req_cols].dropna()
+        for col in ["open", "high", "low", "close", "volume"]:
+            cleaned[col] = pd.to_numeric(cleaned[col].squeeze(), errors="coerce")
+        cleaned = cleaned.dropna()
         return cleaned if not cleaned.empty else None
-    except Exception:
+    except Exception as e:
+        logger.warning("[DATA-CLEAN] Error cleaning DataFrame: %s", e)
         return None
 
 
-def fetch_historical_data(symbol: str) -> pd.DataFrame:
+def fetch_historical_data(symbol: str) -> pd.DataFrame | None:
     """Fetch 1 year of historical price data for a stock.
 
-    Handles the transient yfinance ``possibly delisted; no timezone found``
-    warning that commonly affects NSE (``.NS``) tickers like ZOMATO.NS:
-    retries with explicit start/end dates + ``auto_adjust=False``, then falls
-    back to ``yf.download``.  Only if every live path fails do we fall back to
-    synthetic data (and we log that clearly).
+    Prioritizes the authoritative local SQLite price_history database (grounded & fast),
+    then falls back to Yahoo Finance live endpoints if cache is cold.
     """
     logger.info("[DATA] Fetching 1Y history for %s...", symbol)
+
+    # --- Attempt 0: Authoritative SQLite database price history (Instant & grounded) ---
+    try:
+        from earnings_engine.config import Settings as _Settings
+        from earnings_engine.data.prices import load_prices
+        db_df = load_prices(symbol, _Settings())
+        cleaned = _history_to_clean_df(db_df)
+        if cleaned is not None and len(cleaned) >= 60:
+            logger.info("[DATA] Loaded %d rows for %s from local SQLite price_history", len(cleaned), symbol)
+            return cleaned
+    except Exception as exc:
+        logger.warning("[DATA] Local SQLite load failed for %s: %s", symbol, exc)
 
     # --- Attempt 1: Ticker.history(period=...) ---
     try:
@@ -342,21 +324,8 @@ def fetch_historical_data(symbol: str) -> pd.DataFrame:
     except Exception as exc:
         logger.warning("[DATA] yf.download fallback failed for %s: %s", symbol, exc)
 
-    # --- Final fallback: synthetic data (logged clearly, never silent) ---
-    base_price = 24000.0 if symbol == "^NSEI" else (1500.0 if "NS" in symbol else 84.0)
-    dates = pd.date_range(end=pd.Timestamp.now(), periods=180, freq='D')
-    noise = np.random.normal(0, base_price * 0.01, size=len(dates))
-    prices = base_price + np.cumsum(noise)
-    df = pd.DataFrame({
-        'timestamps': dates,
-        'open': prices * 0.998,
-        'high': prices * 1.006,
-        'low': prices * 0.994,
-        'close': prices,
-        'volume': np.random.randint(100000, 5000000, size=len(dates))
-    })
-    logger.warning("[DATA] All live data paths failed for %s; using synthetic fallback with %d rows", symbol, len(df))
-    return df
+    logger.warning("[DATA] All live data paths failed for %s", symbol)
+    return None
 
 
 def generate_local_explanation(
@@ -368,13 +337,19 @@ def generate_local_explanation(
     trend_text: str
 ) -> str:
     """Generate AI-powered trading explanation using Ollama."""
-    logger.info("[EXPLAIN] Generating trader note for %s", symbol_name)
-    prompt = (
-        f"You are a seasoned Indian swing trader managing short-term equity positions. Analyze this 14-day AI forecast for {symbol_name} like a desk trader evaluating setup quality, risk, and reward. "
-        f"Inputs: - Symbol: {symbol_name} - Current price: Rs. {current} - Projected resistance: Rs. {resistance} - Projected support: Rs. {support} - Expected return: {ret_pct}% - Trend direction: {trend_text}. "
-        f"Provide a clear swing-trade read covering: - Trend quality and market structure. - Distance to support and resistance. - Whether upside justifies the downside risk. - Entry style: breakout, pullback, or wait. - Positioning bias over the next 14 days. "
-        f"Style rules: - Professional, concise, and trader-focused. - Use standard market language. - Keep it specific to Indian equities. - Avoid hype, vague statements, and beginner explanations. - Mention key invalidation or caution levels. - Keep it to 4 to 6 sentences, with a direct conclusion."
-    )
+    prompt = f"""
+    Analyze this 14-day price prediction for {symbol_name}:
+    - Current Price: Rs. {current}
+    - 14-Day Expected Return: {ret_pct}% ({trend_text})
+    - Key Support Level: Rs. {support}
+    - Key Resistance Level: Rs. {resistance}
+
+    Give a concise, actionable 2-3 sentence trading thesis covering:
+    1. Overall bias and entry strategy (e.g. accumulate on dips to support).
+    2. Expected risk-reward ratio and invalidation/stop-loss level.
+    Keep it professional and quantitative.
+    """
+    
     try:
         response = requests.post(
             OLLAMA_API,
@@ -409,13 +384,7 @@ def generate_local_explanation(
 
 
 def _get_kronos_predictor(device: str | None = None) -> Any | None:
-    """Get or create a cached Kronos predictor instance.
-
-    The returned ``KronosPredictor`` is a singleton: the same instance is
-    reused across all predictions so the model + tokenizer are loaded exactly
-    once per process and batched GPU inference via ``predict_batch`` operates
-    on a single shared model.
-    """
+    """Get or create a cached Kronos predictor instance."""
     Kronos, KronosTokenizer, KronosPredictor = _import_kronos()
     if KronosPredictor is None:
         return None
@@ -466,10 +435,7 @@ def predict_single_stock(
     pred_len: int = 14,
     device: str | None = None
 ) -> dict[str, Any] | None:
-    """Generate 14-day price prediction for a single stock.
-    
-    Returns a dictionary with prediction results or None if prediction fails.
-    """
+    """Generate 14-day price prediction for a single stock."""
     norm_device = _normalize_device(device)
     predictor = _get_kronos_predictor(norm_device)
     if predictor is None:
@@ -479,8 +445,8 @@ def predict_single_stock(
     try:
         # Fetch data
         df = fetch_historical_data(symbol)
-        if len(df) < lookback:
-            logger.warning("[EXEC] Skipping %s: insufficient data (%d rows)", symbol, len(df))
+        if df is None or len(df) < lookback:
+            logger.warning("[EXEC] Skipping %s: insufficient data (%d rows)", symbol, len(df) if df is not None else 0)
             return None
         
         # Prepare input
@@ -504,11 +470,11 @@ def predict_single_stock(
             verbose=False
         )
         
-        # Extract results
-        curr_close = round(float(x_df["close"].iloc[-1]), 2)
-        proj_close = float(pred_df["close"].iloc[-1])
-        support = round(float(pred_df["low"].min()), 2)
-        resistance = round(float(pred_df["high"].max()), 2)
+        # Extract results safely
+        curr_close = round(float(np.asarray(x_df["close"]).flatten()[-1]), 2)
+        proj_close = round(float(np.asarray(pred_df["close"]).flatten()[-1]), 2)
+        support = round(float(np.asarray(pred_df["low"]).min()), 2)
+        resistance = round(float(np.asarray(pred_df["high"]).max()), 2)
 
         try:
             from earnings_engine.rate_limits import record_request, record_generation
@@ -529,18 +495,17 @@ def predict_single_stock(
         asset_name = get_asset_name(symbol)
         results_meta = get_results_metadata(symbol)
         
-        # Build the full 14-day forecast series (everything Kronos returns:
-        # open/high/low/close/volume/amount per forecast day).
+        # Build the full 14-day forecast series
         forecast_series = []
         for idx, row in pred_df.iterrows():
             forecast_series.append({
                 "date": idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx),
-                "open": round(float(row.get("open", 0)), 2),
-                "high": round(float(row.get("high", 0)), 2),
-                "low": round(float(row.get("low", 0)), 2),
-                "close": round(float(row.get("close", 0)), 2),
-                "volume": int(row.get("volume", 0)) if pd.notna(row.get("volume")) else None,
-                "amount": round(float(row.get("amount", 0)), 2) if pd.notna(row.get("amount")) else None,
+                "open": round(float(np.asarray(row.get("open", 0)).flatten()[0]), 2),
+                "high": round(float(np.asarray(row.get("high", 0)).flatten()[0]), 2),
+                "low": round(float(np.asarray(row.get("low", 0)).flatten()[0]), 2),
+                "close": round(float(np.asarray(row.get("close", 0)).flatten()[0]), 2),
+                "volume": int(np.asarray(row.get("volume", 0)).flatten()[0]) if pd.notna(row.get("volume")) else None,
+                "amount": round(float(np.asarray(row.get("amount", 0)).flatten()[0]), 2) if pd.notna(row.get("amount")) else None,
             })
         
         logger.info("[RESULT] %s -> trend=%s, return=%s%%", asset_name, trend, ret_pct)
@@ -577,13 +542,9 @@ def _prepare_batch_inputs(
     lookback: int,
     pred_len: int,
 ) -> tuple[pd.DataFrame, pd.Series, pd.Series] | None:
-    """Slice a fetched history frame into the (x_df, x_timestamp, y_timestamp)
-    inputs that ``KronosPredictor.predict_batch`` expects.
-
-    Returns None if the frame has fewer than ``lookback`` rows.
-    """
-    if len(df) < lookback:
-        logger.warning("[EXEC] Skipping %s: insufficient data (%d rows)", symbol, len(df))
+    """Slice a fetched history frame into the (x_df, x_timestamp, y_timestamp) inputs."""
+    if df is None or len(df) < lookback:
+        logger.warning("[EXEC] Skipping %s: insufficient data (%d rows)", symbol, len(df) if df is not None else 0)
         return None
     x_df = df.iloc[-lookback:][["open", "high", "low", "close"]].reset_index(drop=True)
     x_timestamp = df.iloc[-lookback:]["timestamps"].reset_index(drop=True)
@@ -599,10 +560,10 @@ def _build_forecast(
     pred_len: int,
 ) -> dict[str, Any]:
     """Assemble the forecast dict from a single prediction DataFrame."""
-    curr_close = round(float(x_df["close"].iloc[-1]), 2)
-    proj_close = float(pred_df["close"].iloc[-1])
-    support = round(float(pred_df["low"].min()), 2)
-    resistance = round(float(pred_df["high"].max()), 2)
+    curr_close = round(float(np.asarray(x_df["close"]).flatten()[-1]), 2)
+    proj_close = round(float(np.asarray(pred_df["close"]).flatten()[-1]), 2)
+    support = round(float(np.asarray(pred_df["low"]).min()), 2)
+    resistance = round(float(np.asarray(pred_df["high"]).max()), 2)
 
     ret_pct = round(((proj_close - curr_close) / curr_close) * 100, 2)
     trend = "Bullish" if ret_pct >= 0.5 else ("Bearish" if ret_pct <= -0.5 else "Neutral")
@@ -614,12 +575,12 @@ def _build_forecast(
     for idx, row in pred_df.iterrows():
         forecast_series.append({
             "date": idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx),
-            "open": round(float(row.get("open", 0)), 2),
-            "high": round(float(row.get("high", 0)), 2),
-            "low": round(float(row.get("low", 0)), 2),
-            "close": round(float(row.get("close", 0)), 2),
-            "volume": int(row.get("volume", 0)) if pd.notna(row.get("volume")) else None,
-            "amount": round(float(row.get("amount", 0)), 2) if pd.notna(row.get("amount")) else None,
+            "open": round(float(np.asarray(row.get("open", 0)).flatten()[0]), 2),
+            "high": round(float(np.asarray(row.get("high", 0)).flatten()[0]), 2),
+            "low": round(float(np.asarray(row.get("low", 0)).flatten()[0]), 2),
+            "close": round(float(np.asarray(row.get("close", 0)).flatten()[0]), 2),
+            "volume": int(np.asarray(row.get("volume", 0)).flatten()[0]) if pd.notna(row.get("volume")) else None,
+            "amount": round(float(np.asarray(row.get("amount", 0)).flatten()[0]), 2) if pd.notna(row.get("amount")) else None,
         })
 
     logger.info("[RESULT] %s -> trend=%s, return=%s%%", asset_name, trend, ret_pct)
@@ -647,34 +608,8 @@ def predict_portfolio(
     progress_callback: callable | None = None,
     on_forecast: callable | None = None,
 ) -> list[dict[str, Any]]:
-    """Generate predictions for a portfolio of stocks.
-
-    Concurrency model (tuned for a 32GB / i7 / RTX 3060 box):
-      1. **Parallel fetch** — historical data + metadata are I/O-bound (yfinance),
-         so they're fetched on a thread pool sized by ``kronos_fetch_workers``.
-      2. **Batched GPU inference** — the fetched sequences are grouped into
-         batches of ``kronos_gpu_batch_size`` (default 2) and fed to
-         ``KronosPredictor.predict_batch``, which runs all sequences in a single
-         forward pass.  This is far more efficient — and safer on a 6GB 3060 —
-         than spawning concurrent threads that hammer the same model.
-      3. **Parallel explanations** — Ollama calls are local-network I/O, so they
-         run on a thread pool sized by ``kronos_explain_workers``.
-
-    Args:
-        symbols: List of ticker symbols to predict
-        lookback: Number of historical days to use for prediction
-        pred_len: Number of days to predict forward
-        device: Device for model inference ('cuda', 'cuda:0', 'cpu', or None for auto)
-        progress_callback: Optional callback function(current, total, symbol) for progress
-        on_forecast: Optional callback function(forecast_dict) called as each forecast
-            completes — used by ``run_kronos_with_cache`` for incremental cache
-            saving so interrupted runs preserve progress.
-
-    Returns:
-        List of prediction dictionaries
-    """
+    """Generate predictions for a portfolio of stocks."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
-
     from earnings_engine.config import Settings as _Settings
 
     settings = _Settings()
@@ -687,7 +622,7 @@ def predict_portfolio(
     # --- Phase 1: parallel historical-data fetch (I/O-bound) ---
     fetch_workers = max(1, getattr(settings, "kronos_fetch_workers", 8))
     fetched: dict[str, pd.DataFrame] = {}
-    with ThreadPoolExecutor(max_workers=min(fetch_workers, total)) as executor:
+    with ThreadPoolExecutor(max_workers=min(fetch_workers, max(1, total))) as executor:
         futures = {executor.submit(fetch_historical_data, symbol): symbol for symbol in symbols}
         for future in as_completed(futures):
             symbol = futures[future]
@@ -750,7 +685,6 @@ def predict_portfolio(
             )
         except Exception as e:
             logger.error("[ERROR] Batch prediction failed for %s: %s", batch_syms, e, exc_info=True)
-            # Fall back to per-symbol single prediction for this batch.
             for sym, (x_df, x_ts_i, y_ts_i) in zip(batch_syms, x_dfs, x_ts):
                 try:
                     pred_df = predictor.predict(
@@ -774,6 +708,10 @@ def predict_portfolio(
             torch.cuda.empty_cache()
         except Exception:
             pass
+
+    if not forecasts:
+        logger.warning("[PRED] No valid forecasts were assembled for symbols: %s", symbols)
+        return []
 
     # --- Phase 3: parallel Ollama explanations (local-network I/O) ---
     explain_workers = max(1, getattr(settings, "kronos_explain_workers", 4))
