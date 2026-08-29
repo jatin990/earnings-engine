@@ -387,46 +387,6 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
             "making individual stock alpha and earnings surprise catalysts significantly more impactful than broad beta."
         )
 
-    pulse_result = {
-        "success": True,
-        "as_of": datetime.now(timezone.utc).isoformat(),
-        "indices": indices_data,
-        "fear_and_greed": {
-            "score": fear_greed_score,
-            "label": fear_greed_label,
-            "color": fear_greed_color,
-            "description": fear_greed_desc,
-            "vix_factor": round(vix_factor, 1),
-            "momentum_factor": round(momentum_factor, 1),
-            "breadth_factor": round(breadth_factor, 1),
-            "safe_haven_factor": round(safe_haven_factor, 1),
-        },
-        "volatility": {
-            "vix_level": vix_level,
-            "regime": vix_regime["label"],
-            "stance": vix_regime["stance"],
-            "description": vix_regime["description"],
-        },
-        "breadth": {
-            "advances": advances,
-            "declines": declines,
-            "unchanged": unchanged,
-            "advance_decline_ratio": round(advances / max(1, declines), 2),
-            "pct_above_20dma": pct_above_20dma,
-            "pct_above_50dma": pct_above_50dma,
-        },
-        "institutional_flows": {
-            "fii_net_cr": fii_net_cr,
-            "dii_net_cr": dii_net_cr,
-            "total_net_cr": total_net_cr,
-            "bias": "NET INFLOWS (BULLISH)" if total_net_cr > 0 else "NET OUTFLOWS (DEFENSIVE)",
-            "fii_7d_total_cr": fii_7d_total,
-            "dii_7d_total_cr": dii_7d_total,
-            "total_7d_total_cr": combined_7d_total,
-            "fii_30d_total_cr": fii_30d_total,
-            "dii_30d_total_cr": dii_30d_total,
-            "total_30d_total_cr": combined_30d_total,
-            "history_7d": history_7d,
     # 6. Generate 30-Day Historical Macro Time-Series for Fear & Greed, India VIX, and NIFTY 50
     macro_charts: dict[str, Any] = {
         "dates": [],
