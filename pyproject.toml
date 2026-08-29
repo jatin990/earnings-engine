@@ -23,6 +23,7 @@ dependencies = [
     "jugaad-data>=0.35.0",
     "nselib>=2.5.0",
     "cryptography>=42.0.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]

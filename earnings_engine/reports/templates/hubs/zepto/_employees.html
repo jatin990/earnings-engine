@@ -1,0 +1,77 @@
+<!-- Tab 1: Staff & Employee Management Matrix -->
+<div class="space-y-4">
+    <!-- Filter & Action Controls -->
+    <div class="glass-panel p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 flex-wrap flex-1">
+            <!-- Search -->
+            <div class="relative min-w-[220px] flex-1">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
+                <input 
+                    type="text" 
+                    id="empSearchInput" 
+                    oninput="zeptoApp.filterEmployees()" 
+                    placeholder="Search employee by name, phone..." 
+                    class="w-full bg-slate-900/80 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition"
+                >
+            </div>
+
+            <!-- Role Filter -->
+            <select id="empRoleFilter" onchange="zeptoApp.filterEmployees()" class="bg-slate-900/90 border border-white/15 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                <option value="ALL" selected>⚡ All Profiles & Roles</option>
+                <option value="PICKER">🛒 Pickers</option>
+                <option value="SHIFT_INCHARGE">👔 Shift Incharges</option>
+                <option value="RIDER">🛵 Delivery Riders</option>
+                <option value="PACKER">📦 Packers</option>
+                <option value="STORE_MANAGER">🏛️ Store Managers</option>
+                <option value="INVENTORY">📊 Inventory Associates</option>
+            </select>
+
+            <!-- Status Filter -->
+            <select id="empStatusFilter" onchange="zeptoApp.filterEmployees()" class="bg-slate-900/90 border border-white/15 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+                <option value="ALL">All Statuses</option>
+                <option value="ACTIVE" selected>🟢 Active Staff</option>
+                <option value="ON_PROBATION">🟡 On Probation</option>
+                <option value="RESIGNED">🔴 Resigned Staff</option>
+            </select>
+
+            <button type="button" onclick="zeptoApp.resetEmployeeFilters()" class="text-xs text-slate-400 hover:text-slate-200 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition">
+                Reset
+            </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400 font-mono" id="empTableCountBadge">0 Staff found</span>
+            <button type="button" onclick="zeptoApp.openAddEmployeeModal()" class="btn-zepto text-xs">
+                <span>➕</span> Add New Staff
+            </button>
+        </div>
+    </div>
+
+    <!-- Employees Table View -->
+    <div class="glass-panel overflow-hidden">
+        <div class="overflow-x-auto custom-scrollbar max-h-[680px]">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="border-b border-white/10 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
+                        <th class="p-3.5 pl-4">Staff Member</th>
+                        <th class="p-3.5">Role Profile</th>
+                        <th class="p-3.5 text-center">Status</th>
+                        <th class="p-3.5 text-center">Rating</th>
+                        <th class="p-3.5 text-right">Base Salary</th>
+                        <th class="p-3.5 text-right">Bonus (Month)</th>
+                        <th class="p-3.5">Joining / Timeline</th>
+                        <th class="p-3.5 text-center">Documents</th>
+                        <th class="p-3.5 pr-4 text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="employeesTableBody" class="divide-y divide-white/5 font-sans">
+                    <tr>
+                        <td colspan="9" class="p-8 text-center text-slate-500 text-xs">
+                            <div class="inline-block animate-spin mr-2">⏳</div> Loading staff records...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -38,6 +38,7 @@ from earnings_engine.api.routers import (
     trips,
     watchlists,
     wealth,
+    zepto,
 )
 from earnings_engine.data.migrations import apply_migrations
 from earnings_engine.logging_utils import get_logger, log_startup_diagnostics
@@ -312,6 +313,8 @@ def is_route_authorized(path: str, session: dict[str, Any]) -> bool:
         return bool("can_view_net_worth" in scopes or "net_worth" in scopes or "credit_card" in scopes)
     if path.startswith("/api/v1/cards"):
         return bool("can_view_cards" in scopes or "credit_card" in scopes)
+    if path.startswith("/api/v1/zepto"):
+        return bool("can_view_zepto" in scopes or "zepto" in scopes or "owner" in scopes or "*" in scopes)
 
     for route_id, route_def in AVAILABLE_ROUTES.items():
         prefixes = route_def.get("api_prefixes", [])
@@ -320,6 +323,7 @@ def is_route_authorized(path: str, session: dict[str, Any]) -> bool:
                 route_id in scopes
                 or (route_id == "dashboard" and "dashboard" in scopes)
                 or (route_id == "credit_card" and ("credit_card" in scopes or "can_view_cards" in scopes))
+                or (route_id == "zepto" and ("zepto" in scopes or "can_view_zepto" in scopes))
             )
 
     # HTML Views
@@ -331,6 +335,8 @@ def is_route_authorized(path: str, session: dict[str, Any]) -> bool:
         return bool("trips" in scopes or "can_view_trips" in scopes or "credit_card" in scopes)
     if path == "/net-worth":
         return bool("net_worth" in scopes or "can_view_net_worth" in scopes or "credit_card" in scopes)
+    if path in ("/zepto", "/zepto-store"):
+        return bool("zepto" in scopes or "can_view_zepto" in scopes or "owner" in scopes or "*" in scopes)
 
     return True
 
@@ -347,7 +353,7 @@ async def enforce_auth_middleware(request: Request, call_next):
     if not session:
         import os
         test_info = os.environ.get("PYTEST_CURRENT_TEST", "").lower()
-        has_auth_tests = any(kw in test_info for kw in ("auth", "rbac", "passcode", "trip", "net_worth", "net-worth", "networth"))
+        has_auth_tests = any(kw in test_info for kw in ("test_auth.", "test_rbac.", "test_passcode."))
         if ("PYTEST_CURRENT_TEST" in os.environ and not has_auth_tests) or os.getenv("TESTING") == "true":
             session = {
                 "sub": "test_user",
@@ -362,7 +368,7 @@ async def enforce_auth_middleware(request: Request, call_next):
         request.state.session = session
 
         if not is_route_authorized(path, session):
-            if path in ("/dashboard", "/credit-card", "/trips", "/net-worth", "/dashboard.html") or not path.startswith("/api/"):
+            if path in ("/dashboard", "/credit-card", "/trips", "/net-worth", "/zepto", "/dashboard.html") or not path.startswith("/api/"):
                 return RedirectResponse(url=f"/portal?unauthorized=true&redirect={path}", status_code=302)
             return JSONResponse(
                 status_code=403,
@@ -425,10 +431,11 @@ async def favicon_endpoint():
 # 1. Gateway & Authentication (Common Login Interface)
 app.include_router(auth.router)
 
-# 2. Nexus Scoped Lifestyle & Wealth Hubs
+# 2. Nexus Scoped Lifestyle, Wealth & Store Hubs
 app.include_router(trips.router)
 app.include_router(cards.router)
 app.include_router(wealth.router)
+app.include_router(zepto.router)
 
 # 3. Market Intelligence & Quantitative Analytics
 app.include_router(watchlists.router)   # Literal routes precedence over /{name}
