@@ -999,8 +999,9 @@
                                 <td class="py-2.5 px-3">${scopesHtml || '<span class="text-slate-500">None</span>'}</td>
                                 <td class="py-2.5 px-3 font-mono text-slate-300">${maxStr}</td>
                                 <td class="py-2.5 px-3">${expDisplay}</td>
-                                <td class="py-2.5 px-3 text-right">
-                                    <button type="button" onclick="portal.copyInviteLink('${inv.code}')" class="px-2 py-1 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold text-xs" title="Copy join link">📋 Copy Link</button>
+                                <td class="py-2.5 px-3 text-right whitespace-nowrap">
+                                    <button type="button" onclick="portal.copyInviteLink('${inv.code}')" class="px-2 py-1 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold text-xs mr-1" title="Copy join link">📋 Copy</button>
+                                    <button type="button" onclick="portal.deleteInvite('${inv.code}')" class="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-xs" title="Revoke & Delete Invite">🗑️</button>
                                 </td>
                             </tr>
                         `;
@@ -1014,6 +1015,16 @@
                 const link = `${window.location.origin}/join?code=${code}`;
                 navigator.clipboard.writeText(link);
                 alert(`📋 Direct Join Link Copied to Clipboard!\n\n${link}`);
+            },
+
+            async deleteInvite(code) {
+                if (!confirm(`Are you sure you want to revoke and delete invite code ${code}?`)) return;
+                try {
+                    await fetch(`/api/v1/invites/${encodeURIComponent(code)}`, { method: 'DELETE' });
+                    this.loadInvitesList();
+                } catch (err) {
+                    alert(err.message);
+                }
             },
 
             async toggleFriendScope(userId, scopeName, isChecked) {

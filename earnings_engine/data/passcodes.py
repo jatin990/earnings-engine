@@ -143,7 +143,19 @@ DEFAULT_PASSCODES = [
     {
         "code": "NEXUS-MASTER",
         "label": "Master Administrator",
-        "allowed_routes": ["dashboard", "credit_card", "playground", "admin"],
+        "allowed_routes": ["dashboard", "credit_card", "playground", "admin", "trips", "net_worth"],
+        "max_uses": None,
+    },
+    {
+        "code": "NEXUS-YOYOHS",
+        "label": "Harshiv Bargotra (yoyohs)",
+        "allowed_routes": ["dashboard", "credit_card", "trips", "net_worth", "playground"],
+        "max_uses": None,
+    },
+    {
+        "code": "ALL-ACCESS",
+        "label": "Full Access Pass (Friend Tier)",
+        "allowed_routes": ["dashboard", "credit_card", "playground", "trips", "net_worth"],
         "max_uses": None,
     },
     {
@@ -155,13 +167,7 @@ DEFAULT_PASSCODES = [
     {
         "code": "CARDS-ACCESS",
         "label": "Credit Card & Wealth Tier",
-        "allowed_routes": ["credit_card"],
-        "max_uses": None,
-    },
-    {
-        "code": "ALL-ACCESS",
-        "label": "Full Access Pass (Friend Tier)",
-        "allowed_routes": ["dashboard", "credit_card", "playground"],
+        "allowed_routes": ["credit_card", "net_worth"],
         "max_uses": None,
     },
 ]

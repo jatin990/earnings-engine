@@ -286,6 +286,18 @@ async def create_invite_endpoint(req: CreateInviteRequest, request: Request):
     return created
 
 
+@router.delete("/api/v1/invites/{code}")
+async def delete_invite_endpoint(code: str, request: Request):
+    """Owner-only deletion and revocation of scoped invite code."""
+    session = _get_current_session(request)
+    if session.get("role") != "owner" and "admin" not in session.get("scopes", []):
+        raise HTTPException(status_code=403, detail="Owner privileges required.")
+
+    from earnings_engine.data.auth import delete_scoped_invite
+    success = delete_scoped_invite(code, settings=_settings)
+    return {"success": success, "code": code}
+
+
 @router.get("/api/v1/friends")
 async def list_friends_endpoint(request: Request):
     """List friend users and their permissions (Owner only)."""

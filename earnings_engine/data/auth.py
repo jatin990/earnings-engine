@@ -581,3 +581,14 @@ def create_scoped_invite(
         "max_uses": actual_max_uses,
         "expires_at": exp_str,
     }
+
+
+def delete_scoped_invite(code: str, settings: Settings | None = None) -> bool:
+    """Delete or revoke an active scoped invite code."""
+    clean_code = code.strip().upper()
+    conn = _connect(settings)
+    with conn:
+        cursor = conn.execute("DELETE FROM invite_codes WHERE code = ?", (clean_code,))
+        conn.commit()
+        return bool(cursor.rowcount > 0)
+
