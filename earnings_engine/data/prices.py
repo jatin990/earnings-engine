@@ -155,16 +155,18 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
     """Return True when cached prices should be reused instead of re-downloading.
 
     Reuses the cache when the last fetch is under ``ttl_minutes`` old, when the
-    market has already closed for the day (prices are settled), or when there is
-    no recorded fetch stamp (legacy/seeded rows) — the last case preserves the
-    original behaviour so existing callers/tests keep working.
+    market has already closed for the day or it is a weekend (prices are settled),
+    or when there is no recorded fetch stamp (legacy/seeded rows).
     """
     sym = canonical_symbol(ticker)
+    now = datetime.now()
+    # On weekends (Saturday & Sunday), markets are closed and Friday prices are fully settled
+    if now.weekday() >= 5:
+        return True
+
     fetched = _fetch_log_time(sym, settings)
     if fetched is None:
-        # No stamp recorded (e.g. rows seeded directly) -> treat as usable.
         return True
-    now = datetime.now()
     if (now - fetched).total_seconds() <= ttl_minutes * 60:
         return True
     if now.hour >= MARKET_CLOSE_HOUR:
@@ -178,7 +180,10 @@ def _write_prices(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
 
     rows = []
     for stamp, row in df.iterrows():
-        date_value = pd.Timestamp(stamp).strftime("%Y-%m-%d")
+        ts = pd.Timestamp(stamp)
+        if ts.weekday() >= 5:  # Strictly skip weekend non-trading days (Sat/Sun)
+            continue
+        date_value = ts.strftime("%Y-%m-%d")
         rows.append(
             (
                 ticker,
@@ -202,20 +207,16 @@ def _write_prices(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
 
 
 def _merge_prices(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
-    """Upsert new price rows into the cache, preserving existing history.
-
-    Unlike ``_write_prices`` (which deletes the ticker's rows first), this
-    INSERT OR REPLACE merges the downloaded delta with what is already cached,
-    so a refreshed ticker keeps its full history while only the new dates are
-    written.  Primary key is ``(ticker, date)`` so existing rows are replaced
-    in place with the same authoritative values.
-    """
+    """Upsert new price rows into the cache, preserving existing history."""
     if df.empty:
         return
 
     rows = []
     for stamp, row in df.iterrows():
-        date_value = pd.Timestamp(stamp).strftime("%Y-%m-%d")
+        ts = pd.Timestamp(stamp)
+        if ts.weekday() >= 5:  # Strictly skip weekend non-trading days (Sat/Sun)
+            continue
+        date_value = ts.strftime("%Y-%m-%d")
         rows.append(
             (
                 ticker,
@@ -676,9 +677,27 @@ def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: boo
     except Exception as e:
         logger.debug("[LIVE-QUOTE] Failed fetching live quote for %s: %s", sym, e)
 
+    now_dt = datetime.now()
+    is_weekend = now_dt.weekday() >= 5
+
+    # If yfinance returned identical last_p and prev_c on weekends, or data is missing, anchor to settled trading history
+    if last_p is None or prev_c is None or (is_weekend and prev_c is not None and abs(last_p - prev_c) < 0.001):
+        try:
+            with _connect(settings) as conn:
+                p_rows = conn.execute(
+                    "SELECT date, close, open, high, low, volume FROM price_history WHERE ticker = ? AND strftime('%w', date) NOT IN ('0', '6') ORDER BY date DESC LIMIT 2",
+                    (sym,),
+                ).fetchall()
+                if p_rows and len(p_rows) >= 1:
+                    last_p = last_p or float(p_rows[0][1] or 0.0)
+                    if len(p_rows) >= 2:
+                        prev_c = float(p_rows[1][1] or 0.0)
+        except Exception:
+            pass
+
     if last_p is not None and last_p > 0:
         quote["current_price"] = round(float(last_p), 2)
-        quote["is_live"] = True
+        quote["is_live"] = False if is_weekend else True
         if prev_c is not None and prev_c > 0:
             quote["previous_close"] = round(float(prev_c), 2)
             quote["day_change"] = round(float(last_p - prev_c), 2)
@@ -698,8 +717,8 @@ def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: boo
         if quote["week_52_low"] and quote["week_52_low"] > 0:
             quote["pct_from_52w_low"] = round((quote["current_price"] / quote["week_52_low"] - 1.0) * 100.0, 2)
 
-        # Sync with SQLite cache
-        if sync_db:
+        # Sync with SQLite cache (strictly on business trading days, never on weekends)
+        if sync_db and not is_weekend:
             try:
                 today_str = datetime.now().strftime("%Y-%m-%d")
                 with _connect(settings) as conn:
