@@ -112,6 +112,13 @@
                     <!-- Operations Filter Toolbar -->
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.45rem;">
                         <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                            <label style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.75rem;color:#cbd5e1;cursor:pointer;background:#030305;border:1px solid rgba(255,255,255,0.15);padding:0.25rem 0.55rem;border-radius:0.35rem;" title="Select all visible news items for batch AI analysis">
+                                <input type="checkbox" id="catSelectAllCheckbox" onchange="app.toggleSelectAllCatalysts(this.checked)" style="cursor:pointer;accent-color:#3b82f6;">
+                                <span style="font-weight:600;">Select All</span>
+                            </label>
+                            <button type="button" id="catAnalyzeBatchBtn" onclick="app.analyzeSelectedCatalysts()" class="btn btn-sm" style="display:none;background:linear-gradient(135deg, rgba(168,85,247,0.3), rgba(59,130,246,0.3));color:#e9d5ff;border:1px solid rgba(168,85,247,0.5);font-weight:700;padding:0.25rem 0.65rem;font-size:0.75rem;" title="Run on-demand AI analysis on selected news items">
+                                <span id="catBatchBtnIcon">⚡</span> Analyze Selected (<span id="catSelectedCount">0</span>)
+                            </button>
                             <input type="text" id="catSearchInput" oninput="app.filterCatalysts()" placeholder="🔍 Search stock, order, FDA..." style="padding:0.25rem 0.55rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;min-width:180px;font-family:var(--font-mono);outline:none;">
                             <select id="catDaysFilter" onchange="app.onCatDaysFilterChange(this.value)" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.35rem;outline:none;font-weight:600;" title="Filter by publication recency timeframe">
                                 <option value="1">⏱️ Last 24 Hours</option>

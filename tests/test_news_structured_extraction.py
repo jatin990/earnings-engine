@@ -208,21 +208,25 @@ def test_pipeline_ingestion_and_sqlite_persistence(test_settings):
     assert "order_value_cr" in saved["financial_projections"]
 
 
-def test_news_ai_deduplication_and_db_caching(test_settings, monkeypatch):
-    """Verify that news items already analyzed and present in the DB are NOT re-queried via AI."""
+def test_news_ai_deduplication_and_ondemand_pipeline(test_settings, monkeypatch):
+    """Verify that automated news ingestion is zero-token default and on-demand calls execute properly."""
     import earnings_engine.data.ai_news_analyzer as analyzer_mod
+    from earnings_engine.data.news_pipeline import (
+        analyze_news_item_ondemand,
+        analyze_news_batch_ondemand,
+    )
 
     call_count = 0
     orig_analyze = analyzer_mod.analyze_news_catalyst_ai
 
-    def mock_analyze(ctx, settings=None):
+    def mock_analyze(ctx, settings=None, model=None):
         nonlocal call_count
         call_count += 1
-        return orig_analyze(ctx, settings=settings)
+        return orig_analyze(ctx, settings=settings, model=model)
 
     monkeypatch.setattr(analyzer_mod, "analyze_news_catalyst_ai", mock_analyze)
 
-    item = {
+    item1 = {
         "ticker": "TATAMOTORS.NS",
         "stock_name": "Tata Motors Ltd",
         "title": "Tata Motors wins ₹5,000 Cr commercial vehicle fleet order with 16% margin",
@@ -232,20 +236,73 @@ def test_news_ai_deduplication_and_db_caching(test_settings, monkeypatch):
         "published_at": "2026-08-30 11:00:00",
         "source": "rss_feed",
     }
+    item2 = {
+        "ticker": "INFY.NS",
+        "stock_name": "Infosys Ltd",
+        "title": "Infosys bags $500M cloud migration deal with European banking conglomerate",
+        "summary": "Infosys expands financial services footprint across Europe.",
+        "link": "https://example.com/infy-deal",
+        "publisher": "TechDaily",
+        "published_at": "2026-08-30 12:00:00",
+        "source": "rss_feed",
+    }
 
-    # 1. First run: should call analyze_news_catalyst_ai once
-    v1 = process_and_verify_news_items([item], settings=test_settings)
-    assert len(v1) == 1
-    assert call_count == 1
+    # 1. Default automated ingestion (run_ai=False): should NOT call analyze_news_catalyst_ai (0 LLM tokens)
+    v1 = process_and_verify_news_items([item1, item2], settings=test_settings, run_ai=False)
+    assert len(v1) == 2
+    assert call_count == 0  # 0 LLM calls! Heuristic used.
     save_verified_news_records(v1, settings=test_settings)
 
-    # 2. Duplicate in subsequent fetch/harvest run: should NOT call analyze_news_catalyst_ai again
-    v2 = process_and_verify_news_items([item, item], settings=test_settings)
-    assert len(v2) == 1
-    assert call_count == 1  # Still 1! Reused from DB / in-memory cache
+    # 2. Single On-Demand Execution for TATAMOTORS
+    res_single = analyze_news_item_ondemand(
+        ticker="TATAMOTORS.NS",
+        title=item1["title"],
+        settings=test_settings,
+    )
+    assert call_count == 1
+    assert res_single["ticker"] == "TATAMOTORS.NS"
+    assert res_single["ai_analysis"] is not None
 
-    # 3. Explicit force_reanalyze: should call AI again
-    v3 = process_and_verify_news_items([item], settings=test_settings, force_reanalyze=True)
-    assert len(v3) == 1
-    assert call_count == 2  # Re-executed because force_reanalyze=True
+    # 3. Batch On-Demand Execution for INFY
+    res_batch = analyze_news_batch_ondemand(
+        items=[{"ticker": "INFY.NS", "title": item2["title"]}],
+        settings=test_settings,
+    )
+    assert call_count == 2
+    assert len(res_batch) == 1
+    assert res_batch[0]["ticker"] == "INFY.NS"
 
+
+def test_api_ondemand_and_batch_endpoints(test_settings, monkeypatch):
+    """Verify FastAPI routes POST /api/v1/news/analyze-ondemand and POST /api/v1/news/analyze-batch."""
+    from fastapi.testclient import TestClient
+    from earnings_engine.api.server import app
+
+    item = {
+        "ticker": "SBIN.NS",
+        "stock_name": "State Bank of India",
+        "title": "SBI reports 25% surge in Q1 net profit, gross NPA drops to 2.1%",
+        "summary": "India's largest lender reports robust asset quality improvements.",
+        "link": "https://example.com/sbi-q1",
+        "publisher": "BankingTimes",
+        "published_at": "2026-08-30 13:00:00",
+        "source": "verified_pipeline",
+    }
+    v = process_and_verify_news_items([item], settings=test_settings, run_ai=False)
+    save_verified_news_records(v, settings=test_settings)
+
+    client = TestClient(app)
+
+    # Single ondemand endpoint
+    r1 = client.post("/api/v1/news/analyze-ondemand", json={"ticker": "SBIN.NS", "title": item["title"]})
+    assert r1.status_code == 200
+    data1 = r1.json()
+    assert data1["success"] is True
+    assert data1["ticker"] == "SBIN.NS"
+
+    # Batch endpoint
+    r2 = client.post("/api/v1/news/analyze-batch", json={"items": [{"ticker": "SBIN.NS", "title": item["title"]}]})
+    assert r2.status_code == 200
+    data2 = r2.json()
+    assert data2["success"] is True
+    assert data2["count"] == 1

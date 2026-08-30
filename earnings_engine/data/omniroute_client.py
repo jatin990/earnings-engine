@@ -400,6 +400,13 @@ class OmniRouteClient:
 
         scored = score_catalyst_headline(title, summary)
         direction = scored.get("direction", "NEUTRAL")
+        if direction == "NEUTRAL":
+            from earnings_engine.data.news_sentiment import calculate_headline_sentiment
+            score, label = calculate_headline_sentiment(title, summary)
+            if label == "Bullish" or (score and score >= 0.20):
+                direction = "BULLISH"
+            elif label == "Bearish" or (score and score <= -0.20):
+                direction = "BEARISH"
         sentiment = direction
         impact_score = scored.get("impact_score", 50)
         impact_level = scored.get("impact_level", "MEDIUM")

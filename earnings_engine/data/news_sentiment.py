@@ -55,7 +55,9 @@ POSITIVE_WORDS = {
     "high", "beat", "beats", "beating", "outperform", "outperformed", "strong",
     "bullish", "profit", "growth", "boost", "boosts", "boosted", "upgrade",
     "upgrades", "upgraded", "dividend", "acquisition", "win", "wins", "won",
-    "expansion", "positive", "breakthrough", "success", "innovative", "rebound"
+    "expansion", "positive", "breakthrough", "success", "innovative", "rebound",
+    "bags", "bagged", "order", "orders", "contract", "contracts", "secures", "secured",
+    "deal", "deals", "approved", "approval", "approvals"
 }
 
 NEGATIVE_WORDS = {

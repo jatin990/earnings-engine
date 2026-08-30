@@ -681,9 +681,12 @@ Object.assign(app, {
                         </div>
                     ` : '';
 
+                    const isSel = (this.selectedCatalysts && this.selectedCatalysts.has(c.ticker + '|||' + c.title)) ? 'checked' : '';
+
                     return '<div class="card" style="margin:0;padding:1rem;background:rgba(255,255,255,0.03);' + cardBorder + 'transition:transform 0.15s ease;">' +
                         '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.45rem;">' +
                             '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">' +
+                                `<input type="checkbox" class="cat-select-checkbox" data-ticker="${c.ticker}" data-title="${encodeURIComponent(c.title)}" ${isSel} onchange="app.onCatalystCheckboxChange(this)" style="cursor:pointer;width:15px;height:15px;accent-color:#3b82f6;margin-right:0.1rem;" title="Select for on-demand AI analysis">` +
                                 ((c.stock_name && c.stock_name.trim().toUpperCase() !== c.ticker.trim().toUpperCase())
                                     ? '<strong style="font-size:1.05rem;color:#f8fafc;">' + c.stock_name + '</strong><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" class="signal-badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;font-size:0.72rem;text-decoration:none;" title="Open stock intelligence">' + c.ticker + ' ↗</a>'
                                     : '<a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="font-size:1.05rem;font-weight:700;color:#60a5fa;text-decoration:none;">' + c.ticker + ' ↗</a>') +
@@ -700,6 +703,7 @@ Object.assign(app, {
                             '</div>' +
                             '<div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">' +
                                 '<span class="timestamp" style="font-size:0.72rem;background:rgba(255,255,255,0.05);padding:0.15rem 0.45rem;border-radius:0.25rem;">' + (c.publisher || 'News') + ' &middot; ⏱️ ' + dateDisplay + '</span>' +
+                                `<button type="button" onclick="app.analyzeSingleCatalyst('${encodeURIComponent(c.ticker)}', '${encodeURIComponent(c.title)}', this)" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(168,85,247,0.2);color:#c084fc;border:1px solid rgba(168,85,247,0.45);border-radius:0.3rem;font-weight:700;" title="Run on-demand OmniRoute AI structured analysis">⚡ Analyze AI</button>` +
                                 `<button type="button" onclick="app.showNewsRawOutput(${filtered.indexOf(c)})" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:0.3rem;" title="Inspect raw OmniRouter AI JSON telemetry">📄 Raw AI</button>` +
                                 `<button type="button" onclick="app.runConsensusForStock('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.45);border-radius:0.3rem;font-weight:700;" title="Run AI Multi-Model Consensus for Target, Resistance, Support & Buy Zone">🧠 Consensus</button>` +
                                 `<button type="button" onclick="app.openAddToWatchlistModal('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐ Watchlist</button>` +
@@ -717,6 +721,155 @@ Object.assign(app, {
                         '</div>' +
                     '</div>';
                 }).join('');
+
+                this.updateCatalystSelectionState();
+            },
+
+            onCatalystCheckboxChange(checkboxEl) {
+                if (!this.selectedCatalysts) this.selectedCatalysts = new Set();
+                const ticker = checkboxEl.getAttribute('data-ticker');
+                const title = decodeURIComponent(checkboxEl.getAttribute('data-title') || '');
+                const key = ticker + '|||' + title;
+                if (checkboxEl.checked) {
+                    this.selectedCatalysts.add(key);
+                } else {
+                    this.selectedCatalysts.delete(key);
+                }
+                this.updateCatalystSelectionState();
+            },
+
+            toggleSelectAllCatalysts(checked) {
+                if (!this.selectedCatalysts) this.selectedCatalysts = new Set();
+                const checkboxes = document.querySelectorAll('.cat-select-checkbox');
+                checkboxes.forEach(cb => {
+                    cb.checked = checked;
+                    const ticker = cb.getAttribute('data-ticker');
+                    const title = decodeURIComponent(cb.getAttribute('data-title') || '');
+                    const key = ticker + '|||' + title;
+                    if (checked) {
+                        this.selectedCatalysts.add(key);
+                    } else {
+                        this.selectedCatalysts.delete(key);
+                    }
+                });
+                this.updateCatalystSelectionState();
+            },
+
+            updateCatalystSelectionState() {
+                const count = (this.selectedCatalysts ? this.selectedCatalysts.size : 0);
+                const batchBtn = document.getElementById('catAnalyzeBatchBtn');
+                const countSpan = document.getElementById('catSelectedCount');
+                const selectAllCb = document.getElementById('catSelectAllCheckbox');
+
+                if (countSpan) countSpan.textContent = count;
+                if (batchBtn) {
+                    batchBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+                }
+                if (selectAllCb) {
+                    const allCbs = document.querySelectorAll('.cat-select-checkbox');
+                    if (allCbs.length > 0) {
+                        selectAllCb.checked = (count === allCbs.length);
+                        selectAllCb.indeterminate = (count > 0 && count < allCbs.length);
+                    } else {
+                        selectAllCb.checked = false;
+                        selectAllCb.indeterminate = false;
+                    }
+                }
+            },
+
+            async analyzeSingleCatalyst(encodedTicker, encodedTitle, btnEl) {
+                const ticker = decodeURIComponent(encodedTicker);
+                const title = decodeURIComponent(encodedTitle);
+                const origHtml = btnEl ? btnEl.innerHTML : '';
+                if (btnEl) {
+                    btnEl.disabled = true;
+                    btnEl.innerHTML = '⏳ Analyzing...';
+                }
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/news/analyze-ondemand', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ticker, title})
+                    });
+                    const data = await res.json();
+                    if (data.success && (data.catalyst || data.id)) {
+                        const updated = data.catalyst || data;
+                        const idx = (this.catalystsData || []).findIndex(x => x.ticker === ticker && x.title === title);
+                        if (idx !== -1) {
+                            this.catalystsData[idx] = { ...this.catalystsData[idx], ...updated };
+                        }
+                        this.renderCatalysts();
+                        if (typeof this.showToast === 'function') {
+                            this.showToast(`Analyzed news for ${ticker}`, 'success');
+                        }
+                    } else {
+                        if (typeof this.showToast === 'function') {
+                            this.showToast(data.detail || 'Analysis failed', 'error');
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error analyzing catalyst:', e);
+                    if (typeof this.showToast === 'function') {
+                        this.showToast('AI analysis request failed', 'error');
+                    }
+                } finally {
+                    if (btnEl) {
+                        btnEl.disabled = false;
+                        btnEl.innerHTML = origHtml || '⚡ Analyze AI';
+                    }
+                }
+            },
+
+            async analyzeSelectedCatalysts() {
+                if (!this.selectedCatalysts || this.selectedCatalysts.size === 0) return;
+                const items = [];
+                this.selectedCatalysts.forEach(key => {
+                    const parts = key.split('|||');
+                    if (parts.length >= 2) {
+                        items.push({ticker: parts[0], title: parts.slice(1).join('|||')});
+                    }
+                });
+                if (!items.length) return;
+
+                const batchBtn = document.getElementById('catAnalyzeBatchBtn');
+                const iconSpan = document.getElementById('catBatchBtnIcon');
+                if (batchBtn) batchBtn.disabled = true;
+                if (iconSpan) iconSpan.textContent = '⏳';
+
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/news/analyze-batch', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({items})
+                    });
+                    const data = await res.json();
+                    if (data.success && data.catalysts) {
+                        data.catalysts.forEach(updated => {
+                            const idx = (this.catalystsData || []).findIndex(x => x.ticker === updated.ticker && x.title === updated.title);
+                            if (idx !== -1) {
+                                this.catalystsData[idx] = { ...this.catalystsData[idx], ...updated };
+                            }
+                        });
+                        this.selectedCatalysts.clear();
+                        this.renderCatalysts();
+                        this.updateCatalystSelectionState();
+                        if (typeof this.showToast === 'function') {
+                            this.showToast(`Successfully analyzed ${data.count} selected news items!`, 'success');
+                        }
+                    } else {
+                        if (typeof this.showToast === 'function') {
+                            this.showToast(data.detail || 'Batch analysis failed', 'error');
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error running batch analysis:', e);
+                    if (typeof this.showToast === 'function') {
+                        this.showToast('Batch AI analysis request failed', 'error');
+                    }
+                } finally {
+                    if (batchBtn) batchBtn.disabled = false;
+                    if (iconSpan) iconSpan.textContent = '⚡';
+                }
             },
 
             showNewsRawOutput(idxOrObj, directObj) {

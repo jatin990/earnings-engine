@@ -46,7 +46,7 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
             "epc contract", "solar project order", "transmission order", "exports order",
             "repeat order", "bags mandate", "wins tender", "clinches order", "emerges l1",
             "secures mandate", "supply agreement", "signs mou", "offtake agreement",
-            "long-term agreement", "commercial agreement"
+            "long-term agreement", "commercial agreement", "supply contract", "order from", "bus order"
         ],
         "base_impact": 82,
         "default_direction": "BULLISH",
@@ -215,6 +215,22 @@ def _connect(settings: Settings) -> Any:
             verified_numbers TEXT DEFAULT '{}',
             entity_confidence REAL DEFAULT 0.85,
             canonical_hash TEXT,
+            signal_price REAL,
+            signal_date TEXT,
+            current_price REAL,
+            price_change_pct REAL,
+            ai_analysis TEXT,
+            ai_takeaway TEXT,
+            ai_direction TEXT,
+            ai_target REAL,
+            ai_stop_loss REAL,
+            ai_model TEXT,
+            ai_analyzed_at TEXT,
+            financial_projections TEXT DEFAULT '{}',
+            sentiment TEXT DEFAULT 'NEUTRAL',
+            temporal_originality TEXT DEFAULT 'NEW_PUBLICATION',
+            is_republication INTEGER DEFAULT 0,
+            originality_rationale TEXT DEFAULT '',
             UNIQUE(ticker, title)
         )
         """
@@ -233,6 +249,22 @@ def _connect(settings: Settings) -> Any:
             ("verified_numbers", "TEXT DEFAULT '{}'"),
             ("entity_confidence", "REAL DEFAULT 0.85"),
             ("canonical_hash", "TEXT"),
+            ("signal_price", "REAL"),
+            ("signal_date", "TEXT"),
+            ("current_price", "REAL"),
+            ("price_change_pct", "REAL"),
+            ("ai_analysis", "TEXT"),
+            ("ai_takeaway", "TEXT"),
+            ("ai_direction", "TEXT"),
+            ("ai_target", "REAL"),
+            ("ai_stop_loss", "REAL"),
+            ("ai_model", "TEXT"),
+            ("ai_analyzed_at", "TEXT"),
+            ("financial_projections", "TEXT DEFAULT '{}'"),
+            ("sentiment", "TEXT DEFAULT 'NEUTRAL'"),
+            ("temporal_originality", "TEXT DEFAULT 'NEW_PUBLICATION'"),
+            ("is_republication", "INTEGER DEFAULT 0"),
+            ("originality_rationale", "TEXT DEFAULT ''"),
         ]:
             if col_name not in existing_cols:
                 conn.execute(f"ALTER TABLE news_catalysts ADD COLUMN {col_name} {col_type}")

@@ -61,6 +61,24 @@ NOISE_PATTERNS = [
     r"\b(scanx\.trade|simplywall\.st|whalesbook|equitypandit|investorgain|ad-hoc-news\.de|finanzen\.net|marketscreener\.com|zacks\.com|fool\.com|tipranks\.com|benzinga\.com)\b",
 ]
 
+# Curated Common Equity Aliases
+COMMON_EQUITY_ALIASES: dict[str, list[str]] = {
+    "INFY": ["infosys", "infy"],
+    "TCS": ["tata consultancy", "tcs"],
+    "SBIN": ["state bank of india", "state bank", "sbi"],
+    "RELIANCE": ["reliance industries", "reliance", "ril", "jio"],
+    "TATAMOTORS": ["tata motors", "tatamotors", "jlr"],
+    "HDFCBANK": ["hdfc bank", "hdfc"],
+    "ICICIBANK": ["icici bank", "icici"],
+    "BHARTIARTL": ["bharti airtel", "airtel", "bharti"],
+    "LT": ["larsen & toubro", "larsen and toubro", "l&t", "lt"],
+    "WIPRO": ["wipro"],
+    "HCLTECH": ["hcl tech", "hcl technologies", "hcl"],
+    "ITC": ["itc limited", "itc ltd", "itc"],
+    "MARUTI": ["maruti suzuki", "maruti"],
+    "SUNPHARMA": ["sun pharma", "sun pharmaceutical"],
+}
+
 # Curated Conglomerate Entity Mappings
 CONGLOMERATE_MAP: dict[str, list[tuple[str, str]]] = {
     "APOLLO": [
@@ -352,7 +370,13 @@ def verify_company_entity(
                 "flags": flags,
             }
 
-    # 5. Direct Entity Name Mention Check
+    # 5. Direct Entity Name Mention & Curated Alias Check
+    if clean_sym in COMMON_EQUITY_ALIASES:
+        aliases = COMMON_EQUITY_ALIASES[clean_sym]
+        if any(re.search(rf"\b{re.escape(a)}\b", full_text) for a in aliases):
+            confidence_score = max(confidence_score, 0.90)
+            flags.append("COMMON_EQUITY_ALIAS_MATCH")
+
     name_clean = re.sub(r"\b(ltd|limited|corp|corporation|industries|india|co)\b", "", official_name.lower()).strip()
     name_tokens = [w for w in name_clean.split() if len(w) >= 3]
     if name_tokens and any(t in full_text for t in name_tokens):
@@ -534,7 +558,7 @@ def verify_category_and_sentiment(
             direction = "BEARISH"
 
     # Strict Sentiment Sanity Overrides for positive corporate catalysts
-    if any(w in full_text for w in ["surges", "surged", "bags order", "secures order", "profit jumps", "net profit up", "profit surges", "upgrade", "approved"]):
+    if any(w in full_text for w in ["surges", "surged", "bags", "order", "contract", "deal", "secures", "profit jumps", "net profit up", "profit surges", "upgrade", "approved"]):
         if "loss" not in full_text and "probe" not in full_text and "warning" not in full_text and "fraud" not in full_text:
             if direction != "BULLISH":
                 flags.append("DIRECTION_CONTRADICTION_CORRECTED_TO_BULLISH")

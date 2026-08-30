@@ -73,18 +73,19 @@ def process_and_verify_news_items(
     raw_items: list[dict[str, Any]],
     settings: Settings | None = None,
     force_reanalyze: bool = False,
+    run_ai: bool = False,
 ) -> list[dict[str, Any]]:
-    """Pass raw news items through NewsVerifier, run AI catalyst analysis ONLY ONCE per news item, and return verified records."""
+    """Pass raw news items through NewsVerifier, use deterministic heuristics by default, and return verified records."""
     settings = settings or Settings()
     verifier = NewsVerifier(settings)
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     from earnings_engine.data.ai_news_analyzer import analyze_news_catalyst_ai
+    from earnings_engine.data.omniroute_client import OmniRouteClient
 
     verified_records: list[dict[str, Any]] = []
     seen_hashes: set[str] = set()
     seen_titles: set[tuple[str, str]] = set()
-    ai_calls_by_ticker: dict[str, int] = {}
 
     for item in raw_items:
         v_res = verifier.verify_news_item(item)
@@ -161,9 +162,6 @@ def process_and_verify_news_items(
                                 sig_row = p_conn.execute(
                                     "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
                                     (ticker, pub_d),
-                                raid_fetch=True).fetchone() if hasattr(p_conn, 'raid_fetch') else p_conn.execute(
-                                    "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
-                                    (ticker, pub_d),
                                 ).fetchone()
                         except Exception as e:
                             logger.debug("[NEWS-PIPELINE] Auto-fetch price delta for %s failed: %s", ticker, e)
@@ -187,7 +185,7 @@ def process_and_verify_news_items(
                 logger.debug("[NEWS-PIPELINE] Price enrichment failed for %s: %s", ticker, e)
 
         # -------------------------------------------------------------------
-        # Cache Check: Reuse Existing AI Analysis from Database (ONLY ONCE per news)
+        # Cache Check: Reuse Existing AI Analysis from Database
         # -------------------------------------------------------------------
         cached_row = None
         if not force_reanalyze:
@@ -211,6 +209,17 @@ def process_and_verify_news_items(
             except Exception as e:
                 logger.debug("[NEWS-PIPELINE] Error querying news AI cache for %s: %s", ticker, e)
 
+        ai_ctx = {
+            "ticker": ticker,
+            "stock_name": v_res["official_name"],
+            "title": title,
+            "summary": summary,
+            "signal_price": signal_price,
+            "current_price": current_price,
+            "published_at": v_res["published_at_utc"],
+            "verified_numbers": v_res.get("verified_numbers", {}),
+        }
+
         if cached_row and (cached_row["ai_analysis"] or cached_row["ai_analyzed_at"]):
             # Reuse existing AI analysis from the database without querying OmniRoute
             try:
@@ -228,33 +237,29 @@ def process_and_verify_news_items(
             ai_orig_rat = cached_row["originality_rationale"] or ai_res.get("originality_rationale") or ""
             ai_model = cached_row["ai_model"] or ai_res.get("ai_model", "omniroute/cached")
             ai_analyzed_at = cached_row["ai_analyzed_at"] or now_str
-            logger.info("[NEWS-PIPELINE] Reusing cached AI analysis from DB for %s: '%s'", ticker, title[:45])
+        elif run_ai:
+            # -------------------------------------------------------------------
+            # Explicit On-Demand AI Catalyst Analysis via OmniRoute
+            # -------------------------------------------------------------------
+            ai_res = analyze_news_catalyst_ai(ai_ctx, settings=settings)
+            ai_model = ai_res.get("ai_model", "free-ai-engine")
+            ai_direction = ai_res.get("direction") or v_res["verified_direction"]
+            ai_sentiment = ai_res.get("sentiment") or ai_direction
+            ai_takeaway = ai_res.get("trading_takeaway") or scored["why_it_matters"]
+            ai_target = ai_res.get("target_price")
+            ai_stop = ai_res.get("stop_loss")
+            ai_proj = ai_res.get("financial_projections") or {}
+            ai_temp_orig = ai_res.get("temporal_originality") or "NEW_PUBLICATION"
+            ai_is_repub = 1 if ai_res.get("is_republication") else 0
+            ai_orig_rat = ai_res.get("original_rationale") or ai_res.get("originality_rationale") or ""
+            ai_analyzed_at = ai_res.get("ai_analyzed_at", now_str)
         else:
             # -------------------------------------------------------------------
-            # Execute Free AI Catalyst Analysis via OmniRoute (Invoked ONLY ONCE)
+            # Zero-Token Deterministic Heuristic Extraction (Default Ingestion)
             # -------------------------------------------------------------------
-            ai_ctx = {
-                "ticker": ticker,
-                "stock_name": v_res["official_name"],
-                "title": title,
-                "summary": summary,
-                "signal_price": signal_price,
-                "current_price": current_price,
-                "published_at": v_res["published_at_utc"],
-                "verified_numbers": v_res.get("verified_numbers", {}),
-            }
-
-            if not force_reanalyze and ai_calls_by_ticker.get(ticker, 0) >= 2:
-                # Fast deterministic analysis for lower-priority excess news items of the same stock in a single batch
-                from earnings_engine.data.omniroute_client import OmniRouteClient
-                client = OmniRouteClient(settings=settings)
-                ai_res = client.fallback_heuristic_analysis(ai_ctx)
-                ai_model = "omniroute/heuristic-throttle"
-            else:
-                ai_res = analyze_news_catalyst_ai(ai_ctx, settings=settings)
-                ai_calls_by_ticker[ticker] = ai_calls_by_ticker.get(ticker, 0) + 1
-                ai_model = ai_res.get("ai_model", "free-ai-engine")
-
+            client = OmniRouteClient(settings=settings)
+            ai_res = client.fallback_heuristic_analysis(ai_ctx)
+            ai_model = "heuristic/deterministic"
             ai_direction = ai_res.get("direction") or v_res["verified_direction"]
             ai_sentiment = ai_res.get("sentiment") or ai_direction
             ai_takeaway = ai_res.get("trading_takeaway") or scored["why_it_matters"]
@@ -264,7 +269,7 @@ def process_and_verify_news_items(
             ai_temp_orig = ai_res.get("temporal_originality") or "NEW_PUBLICATION"
             ai_is_repub = 1 if ai_res.get("is_republication") else 0
             ai_orig_rat = ai_res.get("originality_rationale") or ""
-            ai_analyzed_at = ai_res.get("ai_analyzed_at", now_str)
+            ai_analyzed_at = now_str
 
         # Merge AI impact score if more granular
         if ai_res.get("impact_score") and ai_res["impact_score"] > 0:
@@ -314,6 +319,163 @@ def process_and_verify_news_items(
         verified_records.append(record)
 
     return verified_records
+
+
+def analyze_news_item_ondemand(
+    ticker: str,
+    title: str,
+    settings: Settings | None = None,
+    model: str | None = None,
+    raw_item: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Execute on-demand AI analysis for a single news item via OmniRoute and update database atomically."""
+    settings = settings or Settings()
+    ensure_news_verification_schema(settings)
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    ticker = ticker.strip().upper()
+    title = title.strip()
+
+    row_dict: dict[str, Any] = {}
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM news_catalysts WHERE ticker = ? AND title = ? LIMIT 1",
+            (ticker, title),
+        ).fetchone()
+        if not row and len(title) > 20:
+            row = conn.execute(
+                "SELECT * FROM news_catalysts WHERE ticker = ? AND title LIKE ? LIMIT 1",
+                (ticker, f"%{title[:25]}%"),
+            ).fetchone()
+        if row:
+            row_dict = dict(row)
+
+    if not row_dict:
+        row_dict = dict(raw_item or {})
+        row_dict["ticker"] = ticker
+        row_dict["title"] = title
+
+    # Build quantitative context for AI analysis
+    verified_nums = {}
+    if row_dict.get("verified_numbers"):
+        try:
+            verified_nums = json.loads(row_dict["verified_numbers"]) if isinstance(row_dict["verified_numbers"], str) else row_dict["verified_numbers"]
+        except Exception:
+            pass
+
+    ai_ctx = {
+        "ticker": ticker,
+        "stock_name": row_dict.get("stock_name") or ticker,
+        "title": row_dict.get("title", title),
+        "summary": row_dict.get("summary", ""),
+        "signal_price": row_dict.get("signal_price"),
+        "current_price": row_dict.get("current_price"),
+        "published_at": row_dict.get("published_at"),
+        "verified_numbers": verified_nums,
+    }
+
+    from earnings_engine.data.ai_news_analyzer import analyze_news_catalyst_ai
+    ai_res = analyze_news_catalyst_ai(ai_ctx, settings=settings, model=model)
+
+    # Extract structured fields
+    ai_direction = ai_res.get("direction") or row_dict.get("direction", "NEUTRAL")
+    ai_sentiment = ai_res.get("sentiment") or ai_direction
+    ai_takeaway = ai_res.get("trading_takeaway") or row_dict.get("why_it_matters", "")
+    ai_target = ai_res.get("target_price")
+    ai_stop = ai_res.get("stop_loss")
+    ai_proj = ai_res.get("financial_projections") or {}
+    ai_temp_orig = ai_res.get("temporal_originality") or "NEW_PUBLICATION"
+    ai_is_repub = 1 if ai_res.get("is_republication") else 0
+    ai_orig_rat = ai_res.get("originality_rationale") or ""
+    ai_model_name = ai_res.get("ai_model", model or "omniroute/ai-news-engine")
+    ai_analyzed_at = ai_res.get("ai_analyzed_at", now_str)
+
+    impact_score = row_dict.get("impact_score", 50)
+    impact_level = row_dict.get("impact_level", "MEDIUM")
+    if ai_res.get("impact_score") and ai_res["impact_score"] > 0:
+        impact_score = int(ai_res["impact_score"])
+        impact_level = ai_res.get("impact_level", impact_level)
+
+    # Upsert atomically to news_catalysts
+    rec_to_save = {
+        "ticker": ticker,
+        "stock_name": row_dict.get("stock_name", ticker),
+        "title": row_dict["title"],
+        "publisher": row_dict.get("publisher", "Financial Feed"),
+        "link": row_dict.get("link", f"/stock/{ticker}"),
+        "published_at": row_dict.get("published_at", now_str),
+        "published_at_ist": row_dict.get("published_at_ist", now_str),
+        "summary": row_dict.get("summary", ""),
+        "impact_score": impact_score,
+        "impact_level": impact_level,
+        "category": row_dict.get("category", "General Corporate News"),
+        "direction": ai_direction,
+        "sentiment": ai_sentiment,
+        "expected_horizon": ai_res.get("expected_horizon") or row_dict.get("expected_horizon", "📅 1-3 Days"),
+        "volatility_est": ai_res.get("volatility_est") or row_dict.get("volatility_est", "±1% to ±4%"),
+        "why_it_matters": ai_takeaway,
+        "source": row_dict.get("source", "ondemand_pipeline"),
+        "created_at": row_dict.get("created_at", now_str),
+        "verification_status": "VERIFIED",
+        "verification_flags": row_dict.get("verification_flags", "[]"),
+        "verified_numbers": json.dumps(verified_nums) if isinstance(verified_nums, dict) else str(verified_nums),
+        "entity_confidence": row_dict.get("entity_confidence", 0.90),
+        "canonical_hash": row_dict.get("canonical_hash", ""),
+        "signal_price": row_dict.get("signal_price"),
+        "signal_date": row_dict.get("signal_date"),
+        "current_price": row_dict.get("current_price"),
+        "price_change_pct": row_dict.get("price_change_pct", 0.0),
+        "ai_analysis": json.dumps(ai_res) if isinstance(ai_res, dict) else str(ai_res),
+        "ai_takeaway": ai_takeaway,
+        "ai_direction": ai_direction,
+        "ai_target": ai_target,
+        "ai_stop_loss": ai_stop,
+        "financial_projections": json.dumps(ai_proj) if isinstance(ai_proj, dict) else str(ai_proj),
+        "temporal_originality": ai_temp_orig,
+        "is_republication": ai_is_repub,
+        "originality_rationale": ai_orig_rat,
+        "ai_model": ai_model_name,
+        "ai_analyzed_at": ai_analyzed_at,
+    }
+
+    save_verified_news_records([rec_to_save], settings=settings)
+
+    # Re-fetch updated row from database
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        updated_row = conn.execute(
+            "SELECT * FROM news_catalysts WHERE ticker = ? AND title = ? LIMIT 1",
+            (ticker, row_dict["title"]),
+        ).fetchone()
+        if updated_row:
+            return dict(updated_row)
+
+    return rec_to_save
+
+
+def analyze_news_batch_ondemand(
+    items: list[dict[str, Any]],
+    settings: Settings | None = None,
+    model: str | None = None,
+) -> list[dict[str, Any]]:
+    """Execute on-demand AI analysis for a batch of news items."""
+    settings = settings or Settings()
+    results: list[dict[str, Any]] = []
+
+    for it in items:
+        ticker = it.get("ticker", "").strip().upper()
+        title = it.get("title", "").strip()
+        if not ticker or not title:
+            continue
+        try:
+            res = analyze_news_item_ondemand(ticker, title, settings=settings, model=model, raw_item=it)
+            if res:
+                results.append(res)
+        except Exception as e:
+            logger.error("[NEWS-PIPELINE] Batch analysis error on (%s, %s): %s", ticker, title[:30], e)
+
+    return results
 
 
 def save_verified_news_records(

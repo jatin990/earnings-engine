@@ -67,10 +67,12 @@ def analyze_news_catalyst_ai(
     settings: Settings | None = None,
     preferred_model: str | None = None,
     timeout: int = 15,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Execute AI analysis of a news catalyst using diegosouzapw/OmniRoute with heuristic fallback."""
+    chosen_model = model or preferred_model
     client = get_omniroute_client(settings)
-    return client.analyze_catalyst(item, preferred_model=preferred_model, timeout=timeout)
+    return client.analyze_catalyst(item, preferred_model=chosen_model, timeout=timeout)
 
 
 def extract_structured_news_data(

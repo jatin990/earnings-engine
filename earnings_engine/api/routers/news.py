@@ -232,3 +232,54 @@ async def analyze_with_omniroute_endpoint(payload: dict):
         logger.exception("Error executing OmniRoute analysis: %s", e)
         raise HTTPException(status_code=500, detail=f"OmniRoute analysis error: {str(e)}")
 
+
+@router.post("/api/v1/news/analyze-ondemand")
+async def analyze_news_ondemand_endpoint(payload: dict):
+    """Execute on-demand AI analysis for a single news item and persist structured output atomically."""
+    ticker = payload.get("ticker", "").strip().upper()
+    title = payload.get("title", "").strip()
+    model = payload.get("model")
+    raw_item = payload.get("item")
+    if not ticker or not title:
+        raise HTTPException(status_code=400, detail="Missing required fields: ticker and title")
+
+    try:
+        from earnings_engine.data.news_pipeline import analyze_news_item_ondemand
+        result = await asyncio.to_thread(
+            analyze_news_item_ondemand,
+            ticker=ticker,
+            title=title,
+            settings=_settings,
+            model=model,
+            raw_item=raw_item,
+        )
+        return {"success": True, "catalyst": result, **result}
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        logger.exception("Error during on-demand news analysis for %s (%s): %s", ticker, title[:30], e)
+        raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
+
+
+@router.post("/api/v1/news/analyze-batch")
+async def analyze_news_batch_endpoint(payload: dict):
+    """Execute on-demand AI analysis for a batch of multi-selected news items."""
+    items = payload.get("items", [])
+    model = payload.get("model")
+    if not items or not isinstance(items, list):
+        raise HTTPException(status_code=400, detail="Missing or invalid 'items' list in payload")
+
+    try:
+        from earnings_engine.data.news_pipeline import analyze_news_batch_ondemand
+        results = await asyncio.to_thread(
+            analyze_news_batch_ondemand,
+            items=items,
+            settings=_settings,
+            model=model,
+        )
+        return {"success": True, "count": len(results), "catalysts": results}
+    except Exception as e:
+        logger.exception("Error during batch news analysis: %s", e)
+        raise HTTPException(status_code=500, detail=f"Batch AI analysis failed: {str(e)}")
+
+
