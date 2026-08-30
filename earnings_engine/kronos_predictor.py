@@ -76,7 +76,7 @@ def _import_kronos():
     """Import Kronos classes, setting up paths if needed."""
     _setup_kronos_paths()
     try:
-        from model import Kronos, KronosTokenizer, KronosPredictor
+        from model import Kronos, KronosTokenizer, KronosPredictor  # type: ignore # pyright: ignore[reportMissingImports]
         return Kronos, KronosTokenizer, KronosPredictor
     except ImportError:
         logger.warning("Kronos library not found. Price predictions will be unavailable.")
