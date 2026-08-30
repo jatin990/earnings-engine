@@ -84,6 +84,7 @@ def process_and_verify_news_items(
     verified_records: list[dict[str, Any]] = []
     seen_hashes: set[str] = set()
     seen_titles: set[tuple[str, str]] = set()
+    ai_calls_by_ticker: dict[str, int] = {}
 
     for item in raw_items:
         v_res = verifier.verify_news_item(item)
@@ -242,7 +243,17 @@ def process_and_verify_news_items(
                 "published_at": v_res["published_at_utc"],
                 "verified_numbers": v_res.get("verified_numbers", {}),
             }
-            ai_res = analyze_news_catalyst_ai(ai_ctx, settings=settings)
+
+            if not force_reanalyze and ai_calls_by_ticker.get(ticker, 0) >= 2:
+                # Fast deterministic analysis for lower-priority excess news items of the same stock in a single batch
+                from earnings_engine.data.omniroute_client import OmniRouteClient
+                client = OmniRouteClient(settings=settings)
+                ai_res = client.fallback_heuristic_analysis(ai_ctx)
+                ai_model = "omniroute/heuristic-throttle"
+            else:
+                ai_res = analyze_news_catalyst_ai(ai_ctx, settings=settings)
+                ai_calls_by_ticker[ticker] = ai_calls_by_ticker.get(ticker, 0) + 1
+                ai_model = ai_res.get("ai_model", "free-ai-engine")
 
             ai_direction = ai_res.get("direction") or v_res["verified_direction"]
             ai_sentiment = ai_res.get("sentiment") or ai_direction
@@ -253,7 +264,6 @@ def process_and_verify_news_items(
             ai_temp_orig = ai_res.get("temporal_originality") or "NEW_PUBLICATION"
             ai_is_repub = 1 if ai_res.get("is_republication") else 0
             ai_orig_rat = ai_res.get("originality_rationale") or ""
-            ai_model = ai_res.get("ai_model", "free-ai-engine")
             ai_analyzed_at = ai_res.get("ai_analyzed_at", now_str)
 
         # Merge AI impact score if more granular
