@@ -490,6 +490,8 @@ Object.assign(app, {
                         maxCnt = cnt;
                         topCat = cat;
                     }
+                }
+
                 const totalEl = document.getElementById('catStatTotal');
                 const highEl = document.getElementById('catStatHigh');
                 const biasEl = document.getElementById('catStatBias');
