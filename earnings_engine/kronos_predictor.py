@@ -20,6 +20,8 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+from earnings_engine.config import Settings
+
 try:
     import torch
     TORCH_AVAILABLE = True
@@ -266,7 +268,7 @@ def _history_to_clean_df(df: pd.DataFrame) -> pd.DataFrame | None:
         return None
 
 
-def fetch_historical_data(symbol: str) -> pd.DataFrame | None:
+def fetch_historical_data(symbol: str, settings: Settings | None = None) -> pd.DataFrame | None:
     """Fetch 1 year of historical price data for a stock.
 
     Prioritizes the authoritative local SQLite price_history database (grounded & fast),
@@ -276,9 +278,8 @@ def fetch_historical_data(symbol: str) -> pd.DataFrame | None:
 
     # --- Attempt 0: Authoritative SQLite database price history (Instant & grounded) ---
     try:
-        from earnings_engine.config import Settings as _Settings
         from earnings_engine.data.prices import load_prices
-        db_df = load_prices(symbol, _Settings())
+        db_df = load_prices(symbol, settings or Settings())
         cleaned = _history_to_clean_df(db_df)
         if cleaned is not None and len(cleaned) >= 60:
             logger.info("[DATA] Loaded %d rows for %s from local SQLite price_history", len(cleaned), symbol)
@@ -433,7 +434,8 @@ def predict_single_stock(
     symbol: str,
     lookback: int = 120,
     pred_len: int = 14,
-    device: str | None = None
+    device: str | None = None,
+    settings: Settings | None = None,
 ) -> dict[str, Any] | None:
     """Generate 14-day price prediction for a single stock."""
     norm_device = _normalize_device(device)
@@ -444,7 +446,7 @@ def predict_single_stock(
     
     try:
         # Fetch data
-        df = fetch_historical_data(symbol)
+        df = fetch_historical_data(symbol, settings=settings)
         if df is None or len(df) < lookback:
             logger.warning("[EXEC] Skipping %s: insufficient data (%d rows)", symbol, len(df) if df is not None else 0)
             return None
@@ -685,7 +687,7 @@ def predict_portfolio(
             )
         except Exception as e:
             logger.error("[ERROR] Batch prediction failed for %s: %s", batch_syms, e, exc_info=True)
-            for sym, (x_df, x_ts_i, y_ts_i) in zip(batch_syms, x_dfs, x_ts):
+            for sym, x_df, x_ts_i, y_ts_i in zip(batch_syms, x_dfs, x_ts, y_ts):
                 try:
                     pred_df = predictor.predict(
                         df=x_df, x_timestamp=x_ts_i, y_timestamp=y_ts_i,

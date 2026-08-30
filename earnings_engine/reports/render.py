@@ -11,6 +11,7 @@ from __future__ import annotations
 import html
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import re
 from jinja2 import Environment, FileSystemLoader

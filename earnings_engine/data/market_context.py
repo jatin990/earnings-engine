@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 import pandas as pd
 import yfinance as yf
+from typing import Any
 
 from earnings_engine.config import Settings
 from earnings_engine.data import prices as prices_mod

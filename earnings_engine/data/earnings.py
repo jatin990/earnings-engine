@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
+from typing import Any
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path as _prices_cache_path
@@ -981,7 +982,7 @@ def refresh_earnings_from_source(
         # 2. If NSE stock, ingest NSE calendar as well
         if sym.endswith(".NS"):
             try:
-                ingest_nse_calendar(settings)
+                ingest_nse_result_calendar(settings)
             except Exception as nse_err:
                 logger.debug("NSE calendar refresh error for %s: %s", sym, nse_err)
 
