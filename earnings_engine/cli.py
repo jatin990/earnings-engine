@@ -1028,11 +1028,36 @@ def dashboard(host: str, port: int) -> None:
     import uvicorn
     from earnings_engine.api.server import app as api_app
     
+    import urllib.request
     logger = _get_cli_logger()
-    
+    dashboard_url = f"http://{host}:{port}/dashboard"
+    health_url = f"http://{host}:{port}/health"
+
+    # Check if a server instance is ALREADY running on this host:port
+    is_already_running = False
+    try:
+        with urllib.request.urlopen(health_url, timeout=1.0) as resp:
+            if resp.status == 200:
+                is_already_running = True
+    except Exception:
+        is_already_running = False
+
+    if is_already_running:
+        click.echo(f"ℹ️ Earnings Engine dashboard server is already running on http://{host}:{port}")
+        click.echo(f"✅ Dashboard available at: {dashboard_url}")
+        click.echo("🌐 Opening in browser...")
+        webbrowser.open(dashboard_url)
+        click.echo("Press Ctrl+C to exit.")
+        logger.info("dashboard already running, opened url=%s", dashboard_url)
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            return
+
     click.echo(f"🌐 Starting API server on http://{host}:{port} ...")
     logger.info("dashboard command started host=%s port=%s", host, port)
-    
+
     # Start the API server in a background thread
     server_thread = threading.Thread(
         target=uvicorn.run,
@@ -1040,27 +1065,25 @@ def dashboard(host: str, port: int) -> None:
         daemon=True,
     )
     server_thread.start()
-    
+
     # Wait for the server to be ready
-    import urllib.request
-    dashboard_url = f"http://{host}:{port}/dashboard"
     for attempt in range(30):
         try:
-            with urllib.request.urlopen(f"http://{host}:{port}/health", timeout=1):
+            with urllib.request.urlopen(health_url, timeout=1.0):
                 break
         except Exception:
             time.sleep(0.5)
     else:
         click.echo("❌ API server failed to start. Check logs for errors.")
-        logger.error("dashboard command failed to start API server")
+        logger.error("dashboard command failed to start API server on port %s", port)
         return
-    
+
     click.echo(f"✅ Dashboard available at: {dashboard_url}")
     click.echo(f"🌐 Opening in browser...")
-    
+
     # Open the dashboard in the default browser
     webbrowser.open(dashboard_url)
-    
+
     click.echo("Press Ctrl+C to stop the server.")
     logger.info("dashboard opened url=%s", dashboard_url)
     

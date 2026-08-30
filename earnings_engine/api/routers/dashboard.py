@@ -109,6 +109,12 @@ async def dashboard_results_month_summary(
             market=market,
             past_days=past_days,
         )
+    except (RuntimeError, asyncio.CancelledError) as e:
+        if "shutdown" in str(e).lower() or isinstance(e, asyncio.CancelledError):
+            logger.debug("[DASHBOARD] Month summary request interrupted during server shutdown.")
+            return {"success": False, "months": [], "message": "Server shutting down"}
+        logger.exception("Error in month summary: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching month summary: {str(e)}")
     except Exception as e:
         logger.exception("Error in month summary: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching month summary: {str(e)}")
