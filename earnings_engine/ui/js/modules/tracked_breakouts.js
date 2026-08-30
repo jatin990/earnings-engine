@@ -17,22 +17,33 @@
     app.switchBreakoutSubtab = function(subtab) {
         app._activeBreakoutSubtab = subtab;
         const scannerView = document.getElementById('breakoutLiveScannerContainer');
+        const backtestView = document.getElementById('breakoutBacktestContainer');
         const trackedView = document.getElementById('breakoutTrackedContainer');
 
         const btnScanner = document.getElementById('btnBreakoutSubtabScanner');
+        const btnBacktest = document.getElementById('btnBreakoutSubtabBacktest');
         const btnTracked = document.getElementById('btnBreakoutSubtabTracked');
         const contextLabel = document.getElementById('bkSubtabContextLabel');
 
         if (scannerView) scannerView.style.display = 'none';
+        if (backtestView) backtestView.style.display = 'none';
         if (trackedView) trackedView.style.display = 'none';
 
         if (btnScanner) btnScanner.classList.remove('bk-subtab-active');
+        if (btnBacktest) btnBacktest.classList.remove('bk-subtab-active');
         if (btnTracked) btnTracked.classList.remove('bk-subtab-active');
 
-        if (subtab === 'tracked') {
+        if (subtab === 'backtest') {
+            if (backtestView) backtestView.style.display = 'block';
+            if (btnBacktest) btnBacktest.classList.add('bk-subtab-active');
+            if (contextLabel) contextLabel.textContent = '📅 Historical Point-in-Time Date Backtest Simulator';
+            if (typeof app.loadBreakoutBacktest === 'function') {
+                app.loadBreakoutBacktest();
+            }
+        } else if (subtab === 'tracked') {
             if (trackedView) trackedView.style.display = 'block';
             if (btnTracked) btnTracked.classList.add('bk-subtab-active');
-            if (contextLabel) contextLabel.textContent = '📜 Permanent Tracked Breakout History & Audited Performance';
+            if (contextLabel) contextLabel.textContent = '📜 Permanent Tracked Breakout History (14D Horizon & Live Active Setups)';
             app.loadTrackedBreakouts();
         } else {
             // Default: 'scanner' (Active Setup Pool)
@@ -187,7 +198,12 @@
 
             const sigDate = c.signal_date || '—';
             const daysElapsed = c.days_elapsed != null ? c.days_elapsed : 0;
-            const ageLabel = daysElapsed === 0 ? 'Today' : `${daysElapsed}d ago`;
+            const isLiveRecent = c.is_live_recent || daysElapsed < 14;
+            const isSettled14D = c.settled_14d || daysElapsed >= 14;
+
+            const ageLabel = isLiveRecent
+                ? `<span style="color:#34d399;font-weight:700;">🟢 Day ${daysElapsed}/14 (Live)</span>`
+                : `<span style="color:#94a3b8;">${daysElapsed}d ago (14D Settled)</span>`;
 
             const sigP = c.signal_price != null ? `₹${Number(c.signal_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
             const trigP = c.breakout_trigger != null ? `₹${Number(c.breakout_trigger).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
@@ -215,43 +231,28 @@
 
             // Outcome badge
             const outcome = c.outcome || 'ACTIVE';
-            let outcomeLabel = '⏳ Coiling';
+            let outcomeLabel = c.outcome_label || (isLiveRecent ? `🟢 Live Active (D${daysElapsed}/14)` : '14D Settled');
             let outcomeColor = '#94a3b8';
             let outcomeBg = 'rgba(148,163,184,0.12)';
             let outcomeBorder = 'rgba(148,163,184,0.25)';
 
             if (outcome === 'TARGET_HIT') {
-                outcomeLabel = '🎯 Target Hit';
                 outcomeColor = '#34d399';
                 outcomeBg = 'rgba(16,185,129,0.18)';
                 outcomeBorder = 'rgba(16,185,129,0.45)';
             } else if (outcome === 'TRIGGERED' || outcome === 'BREAKOUT_SUCCEEDED') {
-                outcomeLabel = c.confirmation_badge || '🚀 Breakout Succeeded';
-                outcomeColor = c.confirmation_color || '#38bdf8';
-                outcomeBg = 'rgba(56,189,248,0.18)';
-                outcomeBorder = 'rgba(56,189,248,0.45)';
+                outcomeColor = isLiveRecent ? '#34d399' : '#38bdf8';
+                outcomeBg = isLiveRecent ? 'rgba(16,185,129,0.18)' : 'rgba(56,189,248,0.18)';
+                outcomeBorder = isLiveRecent ? 'rgba(16,185,129,0.45)' : 'rgba(56,189,248,0.45)';
             } else if (outcome === 'STOP_HIT' || outcome === 'STOP_LOSS_HIT') {
-                outcomeLabel = '🛑 Stop Hit';
                 outcomeColor = '#f87171';
                 outcomeBg = 'rgba(239,68,68,0.18)';
                 outcomeBorder = 'rgba(239,68,68,0.45)';
             } else if (outcome === 'SETUP_FAILED' || outcome === 'BREAKOUT_FAILED') {
-                outcomeLabel = '❌ Setup Failed';
                 outcomeColor = '#f87171';
                 outcomeBg = 'rgba(239,68,68,0.14)';
                 outcomeBorder = 'rgba(239,68,68,0.38)';
             } else if (outcome === 'BREAKOUT_RETRACED') {
-                outcomeLabel = '⚠️ Retraced';
-                outcomeColor = '#fbbf24';
-                outcomeBg = 'rgba(245,158,11,0.15)';
-                outcomeBorder = 'rgba(245,158,11,0.35)';
-            } else if (outcome === 'COILING_IN_PROFIT') {
-                outcomeLabel = '🟢 In Green';
-                outcomeColor = '#34d399';
-                outcomeBg = 'rgba(16,185,129,0.15)';
-                outcomeBorder = 'rgba(16,185,129,0.35)';
-            } else {
-                outcomeLabel = '⏳ Active Coiling';
                 outcomeColor = '#fbbf24';
                 outcomeBg = 'rgba(245,158,11,0.15)';
                 outcomeBorder = 'rgba(245,158,11,0.35)';
@@ -261,11 +262,9 @@
             let rowClass = 'bk-table-row';
             if (outcome === 'TARGET_HIT' || outcome === 'BREAKOUT_SUCCEEDED') {
                 rowClass += ' bk-row-success';
-            } else if (outcome === 'STOP_HIT' || outcome === 'STOP_LOSS_HIT') {
+            } else if (outcome === 'STOP_HIT' || outcome === 'STOP_LOSS_HIT' || outcome === 'SETUP_FAILED') {
                 rowClass += ' bk-row-stop';
-            } else if (outcome === 'SETUP_FAILED' || outcome === 'BREAKOUT_FAILED') {
-                rowClass += ' bk-row-stop';
-            } else if (tier === 'HOT' || outcome === 'TRIGGERED') {
+            } else if (isLiveRecent) {
                 rowClass += ' bk-row-hot';
             } else {
                 rowClass += ' bk-row-warm';
@@ -278,6 +277,10 @@
 
             const archetype = c.setup_archetype || (score >= 60 ? '🔥 Breakout Setup' : '📈 Resistance Coil');
 
+            const horizonBadge = isLiveRecent
+                ? `<span style="font-size:0.58rem;background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.04rem 0.32rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Live Active Breakout (within 14-day window)"><span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#34d399;box-shadow:0 0 6px #34d399;"></span> LIVE D${daysElapsed}/14</span>`
+                : `<span style="font-size:0.58rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-weight:700;" title="14-Day Horizon Settled Outcome">14D SETTLED</span>`;
+
             return `
                 <tr class="${rowClass}" data-ticker="${sym}">
                     <!-- Stock & Archetype -->
@@ -287,9 +290,7 @@
                                 ${sym}
                             </a>
                             <span style="font-size:0.60rem;color:#38bdf8;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;">${archetype}</span>
-                            <span style="font-size:0.60rem;background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.04rem 0.32rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Real-Time Tracked Entry recorded in SQLite database archive">
-                                <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#34d399;box-shadow:0 0 6px #34d399;"></span> REAL TRACKED
-                            </span>
+                            ${horizonBadge}
                             ${c.confirmation_badge ? `<span style="font-size:0.58rem;color:${c.confirmation_color || '#34d399'};background:rgba(255,255,255,0.05);border:1px solid ${c.confirmation_color || '#34d399'}44;padding:0.02rem 0.3rem;border-radius:3px;font-weight:700;">${c.confirmation_badge}</span>` : ''}
                         </div>
                         <div style="font-size:0.67rem;color:#94a3b8;margin-top:2px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.company_name || sym}">${name} &middot; <span style="color:#64748b;">${ind}</span></div>
@@ -298,7 +299,7 @@
                     <!-- Signal Date & Age -->
                     <td style="padding:0.46rem 0.65rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
                         <div style="font-family:var(--font-mono);font-weight:700;color:#f1f5f9;font-size:0.75rem;">${sigDate}</div>
-                        <div style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);margin-top:1px;">🕒 ${ageLabel}</div>
+                        <div style="font-size:0.62rem;font-family:var(--font-mono);margin-top:1px;">${ageLabel}</div>
                     </td>
 
                     <!-- Tier -->
@@ -329,6 +330,7 @@
                     <!-- Current Price -->
                     <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-weight:800;color:#f8fafc;font-size:0.80rem;border-right:1px solid rgba(255,255,255,0.03);">
                         ${curP}
+                        ${isLiveRecent ? `<span style="font-size:0.58rem;color:#34d399;font-weight:700;display:block;">Live Quote</span>` : `<span style="font-size:0.58rem;color:#64748b;display:block;">Day 14 Price</span>`}
                     </td>
 
                     <!-- Return % -->
@@ -336,6 +338,7 @@
                         <span style="display:inline-block;font-family:var(--font-mono);font-weight:800;font-size:0.76rem;color:${retColor};background:${retBg};border:1px solid ${retBorder};padding:0.12rem 0.42rem;border-radius:4px;">
                             ${retFormatted}
                         </span>
+                        <div style="font-size:0.58rem;color:#64748b;font-family:var(--font-mono);margin-top:1px;">${isLiveRecent ? 'Live Return' : '14D Return'}</div>
                     </td>
 
                     <!-- Max Gain & Peak -->

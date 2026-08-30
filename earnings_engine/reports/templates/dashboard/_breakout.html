@@ -9,6 +9,9 @@
                     <button type="button" id="btnBreakoutSubtabScanner" onclick="app.switchBreakoutSubtab('scanner')" class="bk-subtab-btn bk-subtab-active" style="padding:0.4rem 0.85rem;font-size:0.78rem;font-weight:700;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:0.35rem;" title="View all active coiling and breakout setups in the scan pool">
                         <span>⚡</span> Active Setup Pool
                     </button>
+                    <button type="button" id="btnBreakoutSubtabBacktest" onclick="app.switchBreakoutSubtab('backtest')" class="bk-subtab-btn" style="padding:0.4rem 0.85rem;font-size:0.78rem;font-weight:700;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:0.35rem;" title="Run point-in-time backtest on historical dates">
+                        <span>📅</span> Quick Date Backtest
+                    </button>
                     <button type="button" id="btnBreakoutSubtabTracked" onclick="app.switchBreakoutSubtab('tracked')" class="bk-subtab-btn" style="padding:0.4rem 0.85rem;font-size:0.78rem;font-weight:700;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:0.35rem;" title="View permanently tracked breakout history & outcome metrics">
                         <span>📜</span> Tracked Breakout History
                         <span id="bkTrackedCountBadge" style="font-size:0.65rem;background:rgba(56,189,248,0.2);color:#38bdf8;padding:0.05rem 0.4rem;border-radius:10px;font-family:var(--font-mono);font-weight:700;">0</span>
@@ -303,7 +306,111 @@
             </div>
 
             <!-- ============================================================= -->
-            <!-- SUBTAB 2: 📜 TRACKED BREAKOUT HISTORY                         -->
+            <!-- SUBTAB 2: 📅 QUICK DATE BACKTEST                             -->
+            <!-- ============================================================= -->
+            <div id="breakoutBacktestContainer" class="breakout-subview" style="display:none;">
+                <!-- Controls & Filters Row -->
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.6rem;margin-bottom:0.85rem;">
+                    <div style="display:flex;align-items:center;gap:0.6rem;">
+                        <span style="font-size:1.3rem;">📅</span>
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.45rem;">
+                                <div style="font-size:1rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.01em;">Quick Date Backtest</div>
+                                <span style="font-size:0.65rem;font-weight:700;background:rgba(234,179,8,0.15);color:#fbbf24;border:1px solid rgba(234,179,8,0.3);padding:0.1rem 0.45rem;border-radius:4px;">POINT-IN-TIME SIMULATOR</span>
+                            </div>
+                            <div style="font-size:0.7rem;color:#64748b;font-family:var(--font-mono);">
+                                Simulate and audit historical breakout scanner performance on any date
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Controls (Date picker, presets, run button) -->
+                    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <!-- Date Input -->
+                        <div style="display:flex;align-items:center;gap:0.35rem;background:#0f172a;border:1px solid rgba(255,255,255,0.12);padding:0.15rem 0.5rem;border-radius:6px;">
+                            <span style="font-size:0.75rem;">📅</span>
+                            <input type="date" id="breakoutBacktestDateInput" style="background:transparent;border:none;color:#f1f5f9;font-size:0.74rem;font-family:var(--font-mono);outline:none;cursor:pointer;" onchange="app.loadBreakoutBacktest()" />
+                        </div>
+
+                        <!-- Presets -->
+                        <div style="display:flex;align-items:center;gap:0.25rem;">
+                            <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="0" onclick="app.setBreakoutBacktestPresetDays(0)" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:0.68rem;padding:0.25rem 0.45rem;border-radius:4px;cursor:pointer;">Today</button>
+                            <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="1" onclick="app.setBreakoutBacktestPresetDays(1)" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:0.68rem;padding:0.25rem 0.45rem;border-radius:4px;cursor:pointer;">Yesterday</button>
+                            <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="7" onclick="app.setBreakoutBacktestPresetDays(7)" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:0.68rem;padding:0.25rem 0.45rem;border-radius:4px;cursor:pointer;">7d Ago</button>
+                            <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="14" onclick="app.setBreakoutBacktestPresetDays(14)" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:0.68rem;padding:0.25rem 0.45rem;border-radius:4px;cursor:pointer;">14d Ago</button>
+                            <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="30" onclick="app.setBreakoutBacktestPresetDays(30)" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:0.68rem;padding:0.25rem 0.45rem;border-radius:4px;cursor:pointer;">30d Ago</button>
+                            <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="60" onclick="app.setBreakoutBacktestPresetDays(60)" style="background:#0f172a;border:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:0.68rem;padding:0.25rem 0.45rem;border-radius:4px;cursor:pointer;">60d Ago</button>
+                        </div>
+
+                        <!-- Backtest Universe Selector -->
+                        <div style="display:flex;align-items:center;gap:0.35rem;background:#0f172a;border:1px solid rgba(255,255,255,0.12);padding:0.15rem 0.5rem;border-radius:6px;">
+                            <span style="font-size:0.75rem;">🏛️</span>
+                            <select id="breakoutBacktestUniverseSelect" onchange="app.loadBreakoutBacktest()" style="background:transparent;border:none;color:#38bdf8;font-size:0.74rem;font-weight:600;font-family:var(--font-mono);cursor:pointer;outline:none;">
+                                <option value="all" selected>🌐 All Monitored</option>
+                                <option value="nifty_50">🇮🇳 Nifty 50</option>
+                                <option value="nse_large_cap">🏛️ NSE Large Cap</option>
+                                <option value="my_watchlist">⭐ My Watchlist</option>
+                            </select>
+                        </div>
+
+                        <!-- Backtest Action Button -->
+                        <button type="button" onclick="app.loadBreakoutBacktest()" class="btn btn-primary btn-sm" style="padding:0.35rem 0.85rem;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;">
+                            <span>⚡</span> Run Date Backtest
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Backtest KPI Cards -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:0.6rem;margin-bottom:0.85rem;">
+                    <div class="card" style="padding:0.6rem 0.85rem;background:#0b1120;border:1px solid rgba(234,179,8,0.25);">
+                        <div style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;">Target Backtest Date</div>
+                        <div id="bkBacktestStatDate" style="font-size:1.1rem;font-weight:800;color:#fbbf24;font-family:var(--font-mono);margin-top:0.2rem;">—</div>
+                    </div>
+                    <div class="card" style="padding:0.6rem 0.85rem;background:#0b1120;border:1px solid rgba(56,189,248,0.25);">
+                        <div style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;">Evaluated Setups</div>
+                        <div id="bkBacktestStatEvaluated" style="font-size:1.1rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:0.2rem;">0</div>
+                    </div>
+                    <div class="card" style="padding:0.6rem 0.85rem;background:#0b1120;border:1px solid rgba(249,115,22,0.25);">
+                        <div style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;">Breakouts Fired</div>
+                        <div id="bkBacktestStatFired" style="font-size:1.1rem;font-weight:800;color:#f97316;font-family:var(--font-mono);margin-top:0.2rem;">0</div>
+                    </div>
+                    <div class="card" style="padding:0.6rem 0.85rem;background:#0b1120;border:1px solid rgba(16,185,129,0.25);">
+                        <div style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;">Win / Target Hit Rate</div>
+                        <div id="bkBacktestStatWinRate" style="font-size:1.1rem;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:0.2rem;">0.0%</div>
+                    </div>
+                    <div class="card" style="padding:0.6rem 0.85rem;background:#0b1120;border:1px solid rgba(168,85,247,0.25);">
+                        <div style="font-size:0.68rem;color:#94a3b8;text-transform:uppercase;font-weight:700;">Avg Composite Score</div>
+                        <div id="bkBacktestStatAvgScore" style="font-size:1.1rem;font-weight:800;color:#c084fc;font-family:var(--font-mono);margin-top:0.2rem;">—</div>
+                    </div>
+                </div>
+
+                <!-- Backtest Results Table Container -->
+                <div class="card" style="padding:0;background:#090d16;border:1px solid rgba(255,255,255,0.08);overflow-x:auto;">
+                    <table class="table" style="width:100%;border-collapse:collapse;margin:0;">
+                        <thead>
+                            <tr style="background:#0f172a;border-bottom:1px solid rgba(255,255,255,0.08);font-size:0.72rem;color:#94a3b8;text-transform:uppercase;font-family:var(--font-mono);">
+                                <th style="padding:0.6rem 0.75rem;text-align:left;">Stock & Quality</th>
+                                <th style="padding:0.6rem 0.75rem;text-align:right;">Signal Price</th>
+                                <th style="padding:0.6rem 0.75rem;text-align:right;">Trigger Level</th>
+                                <th style="padding:0.6rem 0.75rem;text-align:right;">Target / Stop</th>
+                                <th style="padding:0.6rem 0.75rem;text-align:right;">Realized Return</th>
+                                <th style="padding:0.6rem 0.75rem;text-align:left;">Historical Outcome</th>
+                                <th style="padding:0.6rem 0.75rem;text-align:center;">⚡ Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="breakoutBacktestTableBody">
+                            <tr>
+                                <td colspan="7" style="padding:2.5rem;text-align:center;color:#64748b;font-size:0.8rem;">
+                                    📅 Select an <strong>As Of Date</strong> above and click <strong>Run Date Backtest</strong> to evaluate historical breakout performance.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- SUBTAB 3: 📜 TRACKED BREAKOUT HISTORY                         -->
             <!-- ============================================================= -->
             <div id="breakoutTrackedContainer" class="breakout-subview" style="display:none;">
                 <!-- Controls & Filters Row -->
