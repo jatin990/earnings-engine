@@ -34,6 +34,10 @@ def ensure_news_verification_schema(settings: Settings | None = None) -> None:
             ("verified_numbers", "TEXT DEFAULT '{}'"),
             ("entity_confidence", "REAL DEFAULT 0.85"),
             ("canonical_hash", "TEXT"),
+            ("signal_price", "REAL"),
+            ("signal_date", "TEXT"),
+            ("current_price", "REAL"),
+            ("price_change_pct", "REAL"),
         ]
 
         for col_name, col_type in new_columns:
@@ -57,7 +61,7 @@ def process_and_verify_news_items(
     raw_items: list[dict[str, Any]],
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Pass raw news items through NewsVerifier and return verified, enriched records."""
+    """Pass raw news items through NewsVerifier and return verified, enriched records with ground-truth last close data."""
     settings = settings or Settings()
     verifier = NewsVerifier(settings)
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -80,13 +84,88 @@ def process_and_verify_news_items(
         title = item.get("title", "").strip()
         summary = item.get("summary", "").strip()
         scored = score_catalyst_headline(title, summary)
+        ticker = v_res["resolved_ticker"]
+        pub_d = (v_res.get("published_at_utc") or "")[:10]
+
+        # Calculate on last close's data; fetch price delta from market if not present or stale
+        signal_price: float | None = None
+        signal_date: str | None = None
+        current_price: float | None = None
+        price_change_pct: float = 0.0
+
+        if ticker and pub_d:
+            try:
+                # Determine whether news broke before market close (< 15:30 IST) or after market close (>= 15:30 IST)
+                pub_dt_ist = v_res.get("dt_ist")
+                is_post_close = False
+                if pub_dt_ist:
+                    is_post_close = (pub_dt_ist.hour > 15) or (pub_dt_ist.hour == 15 and pub_dt_ist.minute >= 30)
+                date_comp = "<=" if is_post_close else "<"
+
+                with _connect(settings) as p_conn:
+                    sig_row = p_conn.execute(
+                        f"SELECT close, date FROM price_history WHERE ticker = ? AND date {date_comp} ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                        (ticker, pub_d),
+                    ).fetchone()
+                    
+                    if not sig_row and not is_post_close:
+                        sig_row = p_conn.execute(
+                            "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                            (ticker, pub_d),
+                        ).fetchone()
+
+                    needs_fetch = False
+                    if not sig_row:
+                        needs_fetch = True
+                    else:
+                        try:
+                            d_pub = datetime.strptime(pub_d[:10], "%Y-%m-%d").date()
+                            d_sig = datetime.strptime(str(sig_row[1])[:10], "%Y-%m-%d").date()
+                            if (d_pub - d_sig).days > 4:
+                                needs_fetch = True
+                        except Exception:
+                            pass
+
+                    if needs_fetch:
+                        try:
+                            from earnings_engine.data.prices import fetch_prices
+                            fetch_prices(ticker, settings, force=True)
+                            sig_row = p_conn.execute(
+                                f"SELECT close, date FROM price_history WHERE ticker = ? AND date {date_comp} ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                                (ticker, pub_d),
+                            ).fetchone()
+                            if not sig_row and not is_post_close:
+                                sig_row = p_conn.execute(
+                                    "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                                    (ticker, pub_d),
+                                ).fetchone()
+                        except Exception as e:
+                            logger.debug("[NEWS-PIPELINE] Auto-fetch price delta for %s failed: %s", ticker, e)
+
+                    if sig_row and sig_row[0] is not None:
+                        signal_price = float(sig_row[0])
+                        signal_date = str(sig_row[1])
+
+                    latest_row = p_conn.execute(
+                        "SELECT close FROM price_history WHERE ticker = ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                        (ticker,),
+                    ).fetchone()
+                    if latest_row and latest_row[0] is not None:
+                        current_price = float(latest_row[0])
+                    else:
+                        current_price = signal_price
+
+                    if signal_price and current_price and signal_price > 0:
+                        price_change_pct = round(((current_price - signal_price) / signal_price) * 100.0, 2)
+            except Exception as e:
+                logger.debug("[NEWS-PIPELINE] Price enrichment failed for %s: %s", ticker, e)
 
         record = {
-            "ticker": v_res["resolved_ticker"],
+            "ticker": ticker,
             "stock_name": v_res["official_name"],
             "title": title,
             "publisher": item.get("publisher", "Financial Feed"),
-            "link": item.get("link", f"/stock/{v_res['resolved_ticker']}"),
+            "link": item.get("link", f"/stock/{ticker}"),
             "published_at": v_res["published_at_utc"],
             "published_at_ist": v_res["published_at_ist"],
             "summary": summary,
@@ -104,6 +183,10 @@ def process_and_verify_news_items(
             "verified_numbers": json.dumps(v_res.get("verified_numbers", {})),
             "entity_confidence": v_res.get("confidence_score", 0.85),
             "canonical_hash": c_hash,
+            "signal_price": signal_price,
+            "signal_date": signal_date,
+            "current_price": current_price,
+            "price_change_pct": price_change_pct,
         }
         verified_records.append(record)
 
@@ -114,7 +197,7 @@ def save_verified_news_records(
     records: list[dict[str, Any]],
     settings: Settings | None = None,
 ) -> int:
-    """Save verified news records into the database with atomic upsert."""
+    """Save verified news records into the database with atomic upsert and price fields."""
     settings = settings or Settings()
     ensure_news_verification_schema(settings)
 
@@ -132,8 +215,9 @@ def save_verified_news_records(
                         summary, impact_score, impact_level, category, direction,
                         expected_horizon, volatility_est, why_it_matters, source, created_at,
                         verification_status, verification_flags, verified_numbers,
-                        entity_confidence, canonical_hash
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        entity_confidence, canonical_hash, signal_price, signal_date,
+                        current_price, price_change_pct
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(ticker, title) DO UPDATE SET
                         stock_name = excluded.stock_name,
                         publisher = excluded.publisher,
@@ -151,7 +235,11 @@ def save_verified_news_records(
                         verification_flags = excluded.verification_flags,
                         verified_numbers = excluded.verified_numbers,
                         entity_confidence = excluded.entity_confidence,
-                        canonical_hash = excluded.canonical_hash
+                        canonical_hash = excluded.canonical_hash,
+                        signal_price = COALESCE(excluded.signal_price, news_catalysts.signal_price),
+                        signal_date = COALESCE(excluded.signal_date, news_catalysts.signal_date),
+                        current_price = COALESCE(excluded.current_price, news_catalysts.current_price),
+                        price_change_pct = COALESCE(excluded.price_change_pct, news_catalysts.price_change_pct)
                     """,
                     (
                         r["ticker"], r["stock_name"], r["title"], r["publisher"],
@@ -161,6 +249,8 @@ def save_verified_news_records(
                         r["source"], r["created_at"], r["verification_status"],
                         r["verification_flags"], r["verified_numbers"],
                         r["entity_confidence"], r["canonical_hash"],
+                        r.get("signal_price"), r.get("signal_date"),
+                        r.get("current_price"), r.get("price_change_pct", 0.0),
                     ),
                 )
                 inserted_count += 1
