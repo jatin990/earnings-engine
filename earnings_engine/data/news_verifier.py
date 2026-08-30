@@ -251,7 +251,30 @@ def verify_company_entity(
             confidence_score = max(confidence_score, 0.85)
             flags.append("DICTIONARY_TICKER_ALIAS_VERIFIED")
 
-    # 3. Direct Entity Name Mention Check
+    # 3. Foreign Exchange Ticker Collision Protection (e.g. "SFL (NYSE:SFL)" mapped to Indian "SFL.NS")
+    is_indian = raw_sym.endswith(".NS") or raw_sym.endswith(".BO")
+    if is_indian:
+        foreign_exchanges = [
+            r"\b(?:nyse|nasdaq|tsx|asx|lse|hkg|sgx|fra|etr|cboe)\s*[:/]\s*([a-z0-9\.\-]+)",
+            r"\((?:nyse|nasdaq|tsx|asx|lse|hkg|sgx|fra|etr|cboe)\s*:\s*([a-z0-9\.\-]+)\)",
+        ]
+        has_foreign_ticker = any(re.search(pat, full_text) for pat in foreign_exchanges)
+        if has_foreign_ticker and not any(ind in full_text for ind in ["(nse:", "(bse:", "nse:", "bse:", "sebi", "lodr", "india"]):
+            # Check if official corporate name (e.g. Sheela Foam) is explicitly present (excluding the bare ticker symbol)
+            name_clean = re.sub(r"\b(ltd|limited|corp|corporation|industries|india|co)\b", "", official_name.lower()).strip()
+            name_tokens = [w for w in name_clean.split() if len(w) >= 3 and w != clean_sym.lower()]
+            if not name_tokens or not any(t in full_text for t in name_tokens):
+                flags.append("FOREIGN_EXCHANGE_TICKER_COLLISION_REJECTED")
+                return {
+                    "is_verified": False,
+                    "confidence_score": 0.05,
+                    "resolved_ticker": resolved_ticker,
+                    "official_name": official_name,
+                    "rejection_reason": f"Headline refers to foreign exchange listing (NYSE/NASDAQ/LSE) rather than Indian equity {raw_sym}.",
+                    "flags": flags,
+                }
+
+    # 4. Direct Entity Name Mention Check
     name_clean = re.sub(r"\b(ltd|limited|corp|corporation|industries|india|co)\b", "", official_name.lower()).strip()
     name_tokens = [w for w in name_clean.split() if len(w) >= 3]
     if name_tokens and any(t in full_text for t in name_tokens):

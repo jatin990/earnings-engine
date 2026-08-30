@@ -149,3 +149,14 @@ def test_news_verifier_full_pipeline():
     res_noise = verifier.verify_news_item(item_noise)
     assert res_noise["verification_status"] == "REJECTED"
     assert "noise" in res_noise["rejection_reason"].lower()
+
+    # 3. Foreign exchange ticker collision (SFL NYSE:SFL misattributed to Indian SFL.NS)
+    item_foreign = {
+        "ticker": "SFL.NS",
+        "title": "SFL (NYSE:SFL) Stock Draws Fresh Interest As Profit Rebounds Meet Capex Questions - simplywall.st",
+        "summary": "SFL Corporation Ltd results",
+        "published_at": recent_utc,
+    }
+    res_foreign = verifier.verify_news_item(item_foreign)
+    assert res_foreign["verification_status"] == "REJECTED"
+    assert "foreign exchange" in res_foreign["rejection_reason"].lower()

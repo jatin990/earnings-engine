@@ -546,10 +546,20 @@ def get_historical_premarket_outcomes(
                 (ticker, candle_date),
             ).fetchone()
 
-            prev_close = float(prev_row[0]) if prev_row and prev_row[0] is not None else (open_p or close_p or 0.0)
-
-            if not prev_close or prev_close <= 0:
+            if not prev_row or prev_row[0] is None or float(prev_row[0]) <= 0:
                 continue
+
+            # Trading day gap sanity check: reject if previous close is > 7 calendar days stale
+            try:
+                d_candle = datetime.strptime(str(candle_date)[:10], "%Y-%m-%d").date()
+                d_prev = datetime.strptime(str(prev_row[1])[:10], "%Y-%m-%d").date()
+                if (d_candle - d_prev).days > 7:
+                    logger.debug("[PREMARKET-OUTCOMES] Rejecting %s due to stale baseline price (%s vs %s)", ticker, prev_row[1], candle_date)
+                    continue
+            except Exception:
+                pass
+
+            prev_close = float(prev_row[0])
 
             # Self-healing & outlier protection against corrupted candle bars
             if close_p is None or close_p <= 0:

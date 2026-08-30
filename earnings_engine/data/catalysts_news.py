@@ -661,8 +661,18 @@ def get_short_term_catalysts(
                                 (t, pub_d),
                             ).fetchone()
                             if sig_row and sig_row[0] is not None:
-                                v["signal_price"] = float(sig_row[0])
-                                v["signal_date"] = sig_row[1]
+                                try:
+                                    d_pub = datetime.strptime(pub_d[:10], "%Y-%m-%d").date()
+                                    d_sig = datetime.strptime(str(sig_row[1])[:10], "%Y-%m-%d").date()
+                                    if (d_pub - d_sig).days <= 7:
+                                        v["signal_price"] = float(sig_row[0])
+                                        v["signal_date"] = sig_row[1]
+                                    else:
+                                        v["signal_price"] = cur_price
+                                        v["signal_date"] = pub_d
+                                except Exception:
+                                    v["signal_price"] = float(sig_row[0])
+                                    v["signal_date"] = sig_row[1]
                             else:
                                 v["signal_price"] = cur_price
                                 v["signal_date"] = pub_d
