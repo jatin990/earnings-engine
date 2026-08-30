@@ -38,6 +38,7 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
     "Order Wins & Contracts": {
         "keywords": [
             "order win", "bags order", "secures order", "awarded contract", "receives order",
+            "bags contract", "wins contract", "wins deal", "bags deal",
             "major contract", "multi-year deal", "commercial deal", "strategic deal",
             "crore order", "million order", "billion contract", "pact with", "signs agreement",
             "wins bid", "lowest bidder", "l1 bidder", "defense order", "railway contract",
@@ -378,9 +379,16 @@ def score_catalyst_headline(title: str, summary: str = "") -> dict[str, Any]:
 
     # Sentiment adjustment
     sentiment_score, sentiment_label = calculate_headline_sentiment(title, summary)
+    
+    bearish_earnings_patterns = [
+        "profit plunges", "net loss", "loss widens", "profit falls", "profit declines",
+        "profit drops", "guidance slashed", "revenue misses", "misses estimates",
+        "weak q1", "weak q2", "weak q3", "weak q4", "margin contracts", "plunges",
+        "plunges 60%", "downgraded to sell", "cuts price target"
+    ]
     if best_category == "Litigation, Risk & Probes":
         direction = "BEARISH"
-    elif sentiment_label == "Bearish" and ("profit" in full_text and ("plunge" in full_text or "drop" in full_text or "loss" in full_text)):
+    elif any(bp in full_text for bp in bearish_earnings_patterns):
         direction = "BEARISH"
     elif sentiment_label == "Bearish":
         direction = "BEARISH"

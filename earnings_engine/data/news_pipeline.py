@@ -38,6 +38,13 @@ def ensure_news_verification_schema(settings: Settings | None = None) -> None:
             ("signal_date", "TEXT"),
             ("current_price", "REAL"),
             ("price_change_pct", "REAL"),
+            ("ai_analysis", "TEXT"),
+            ("ai_takeaway", "TEXT"),
+            ("ai_direction", "TEXT"),
+            ("ai_target", "REAL"),
+            ("ai_stop_loss", "REAL"),
+            ("ai_model", "TEXT"),
+            ("ai_analyzed_at", "TEXT"),
         ]
 
         for col_name, col_type in new_columns:
@@ -61,10 +68,12 @@ def process_and_verify_news_items(
     raw_items: list[dict[str, Any]],
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Pass raw news items through NewsVerifier and return verified, enriched records with ground-truth last close data."""
+    """Pass raw news items through NewsVerifier, run OpenRouter free AI catalyst analysis, and return verified records."""
     settings = settings or Settings()
     verifier = NewsVerifier(settings)
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    from earnings_engine.data.ai_news_analyzer import analyze_news_catalyst_ai
 
     verified_records: list[dict[str, Any]] = []
     seen_hashes: set[str] = set()
@@ -160,6 +169,33 @@ def process_and_verify_news_items(
             except Exception as e:
                 logger.debug("[NEWS-PIPELINE] Price enrichment failed for %s: %s", ticker, e)
 
+        # -------------------------------------------------------------------
+        # Execute Free AI Catalyst Analysis via OpenRouter
+        # -------------------------------------------------------------------
+        ai_ctx = {
+            "ticker": ticker,
+            "stock_name": v_res["official_name"],
+            "title": title,
+            "summary": summary,
+            "signal_price": signal_price,
+            "current_price": current_price,
+            "published_at": v_res["published_at_utc"],
+            "verified_numbers": v_res.get("verified_numbers", {}),
+        }
+        ai_res = analyze_news_catalyst_ai(ai_ctx, settings=settings)
+
+        ai_direction = ai_res.get("direction") or v_res["verified_direction"]
+        ai_takeaway = ai_res.get("trading_takeaway") or scored["why_it_matters"]
+        ai_target = ai_res.get("target_price")
+        ai_stop = ai_res.get("stop_loss")
+        ai_model = ai_res.get("ai_model", "free-ai-engine")
+        ai_analyzed_at = ai_res.get("ai_analyzed_at", now_str)
+
+        # Merge AI impact score if more granular
+        if ai_res.get("impact_score") and ai_res["impact_score"] > 0:
+            scored["impact_score"] = int(ai_res["impact_score"])
+            scored["impact_level"] = ai_res.get("impact_level", scored["impact_level"])
+
         record = {
             "ticker": ticker,
             "stock_name": v_res["official_name"],
@@ -172,10 +208,10 @@ def process_and_verify_news_items(
             "impact_score": scored["impact_score"],
             "impact_level": scored["impact_level"],
             "category": scored["category"],
-            "direction": v_res["verified_direction"],
-            "expected_horizon": scored["expected_horizon"],
-            "volatility_est": scored["volatility_est"],
-            "why_it_matters": scored["why_it_matters"],
+            "direction": ai_direction,
+            "expected_horizon": ai_res.get("expected_horizon") or scored["expected_horizon"],
+            "volatility_est": ai_res.get("volatility_est") or scored["volatility_est"],
+            "why_it_matters": ai_takeaway,
             "source": item.get("source", "verified_pipeline"),
             "created_at": now_str,
             "verification_status": "VERIFIED",
@@ -187,6 +223,13 @@ def process_and_verify_news_items(
             "signal_date": signal_date,
             "current_price": current_price,
             "price_change_pct": price_change_pct,
+            "ai_analysis": json.dumps(ai_res),
+            "ai_takeaway": ai_takeaway,
+            "ai_direction": ai_direction,
+            "ai_target": ai_target,
+            "ai_stop_loss": ai_stop,
+            "ai_model": ai_model,
+            "ai_analyzed_at": ai_analyzed_at,
         }
         verified_records.append(record)
 
@@ -197,7 +240,7 @@ def save_verified_news_records(
     records: list[dict[str, Any]],
     settings: Settings | None = None,
 ) -> int:
-    """Save verified news records into the database with atomic upsert and price fields."""
+    """Save verified news records into the database with atomic upsert and AI analysis fields."""
     settings = settings or Settings()
     ensure_news_verification_schema(settings)
 
@@ -216,8 +259,9 @@ def save_verified_news_records(
                         expected_horizon, volatility_est, why_it_matters, source, created_at,
                         verification_status, verification_flags, verified_numbers,
                         entity_confidence, canonical_hash, signal_price, signal_date,
-                        current_price, price_change_pct
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        current_price, price_change_pct, ai_analysis, ai_takeaway,
+                        ai_direction, ai_target, ai_stop_loss, ai_model, ai_analyzed_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(ticker, title) DO UPDATE SET
                         stock_name = excluded.stock_name,
                         publisher = excluded.publisher,
@@ -239,7 +283,14 @@ def save_verified_news_records(
                         signal_price = COALESCE(excluded.signal_price, news_catalysts.signal_price),
                         signal_date = COALESCE(excluded.signal_date, news_catalysts.signal_date),
                         current_price = COALESCE(excluded.current_price, news_catalysts.current_price),
-                        price_change_pct = COALESCE(excluded.price_change_pct, news_catalysts.price_change_pct)
+                        price_change_pct = COALESCE(excluded.price_change_pct, news_catalysts.price_change_pct),
+                        ai_analysis = COALESCE(excluded.ai_analysis, news_catalysts.ai_analysis),
+                        ai_takeaway = COALESCE(excluded.ai_takeaway, news_catalysts.ai_takeaway),
+                        ai_direction = COALESCE(excluded.ai_direction, news_catalysts.ai_direction),
+                        ai_target = COALESCE(excluded.ai_target, news_catalysts.ai_target),
+                        ai_stop_loss = COALESCE(excluded.ai_stop_loss, news_catalysts.ai_stop_loss),
+                        ai_model = COALESCE(excluded.ai_model, news_catalysts.ai_model),
+                        ai_analyzed_at = COALESCE(excluded.ai_analyzed_at, news_catalysts.ai_analyzed_at)
                     """,
                     (
                         r["ticker"], r["stock_name"], r["title"], r["publisher"],
@@ -251,6 +302,10 @@ def save_verified_news_records(
                         r["entity_confidence"], r["canonical_hash"],
                         r.get("signal_price"), r.get("signal_date"),
                         r.get("current_price"), r.get("price_change_pct", 0.0),
+                        r.get("ai_analysis"), r.get("ai_takeaway"),
+                        r.get("ai_direction"), r.get("ai_target"),
+                        r.get("ai_stop_loss"), r.get("ai_model"),
+                        r.get("ai_analyzed_at"),
                     ),
                 )
                 inserted_count += 1
