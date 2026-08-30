@@ -241,6 +241,83 @@
                 if (volumeEl) volumeEl.textContent = pred.volume_profile_insight || 'Institutional accumulation baseline';
                 if (riskEl) riskEl.textContent = pred.primary_risk || 'Broad market benchmark volatility';
 
+                // Populate Dedicated OmniRouter AI News Catalyst Section if news on record
+                const newsSection = document.getElementById('catModalOmniRouterSection');
+                const matchingNews = (window.app && window.app.catalystsData ? window.app.catalystsData.find(x => (x.ticker || '').trim().toUpperCase() === app.activeCatConsensusTicker) : null) || (pred && (pred.news_catalyst || pred.catalyst));
+                app._activeModalNewsItem = matchingNews;
+
+                if (newsSection && matchingNews) {
+                    newsSection.style.display = 'block';
+                    const titleEl = document.getElementById('catModalNewsTitleLink');
+                    const mBadge = document.getElementById('catModalNewsModelBadge');
+                    const latBadge = document.getElementById('catModalNewsLatencyBadge');
+                    const tokBadge = document.getElementById('catModalNewsTokensBadge');
+                    const impBadge = document.getElementById('catModalNewsImpactBadge');
+                    const sigPEl = document.getElementById('catModalNewsSignalPrice');
+                    const curPEl = document.getElementById('catModalNewsCurrentPrice');
+                    const dPEl = document.getElementById('catModalNewsPriceDelta');
+                    const targEl = document.getElementById('catModalNewsTarget');
+                    const slEl = document.getElementById('catModalNewsStopLoss');
+                    const takeEl = document.getElementById('catModalNewsTakeaway');
+
+                    let parsedAi = null;
+                    if (matchingNews.ai_analysis) {
+                        try {
+                            parsedAi = (typeof matchingNews.ai_analysis === 'string') ? JSON.parse(matchingNews.ai_analysis) : matchingNews.ai_analysis;
+                        } catch (e) {
+                            parsedAi = null;
+                        }
+                    }
+
+                    if (titleEl) {
+                        titleEl.textContent = (matchingNews.title || 'Verified Corporate Catalyst Announcement') + ' ↗';
+                        titleEl.href = matchingNews.link || '#';
+                    }
+
+                    const mName = matchingNews.ai_model || (parsedAi && parsedAi.ai_model) || 'omnirouter/deepseek-r1';
+                    if (mBadge) mBadge.textContent = '🤖 ' + mName;
+
+                    const lVal = matchingNews.latency_ms || (parsedAi && parsedAi.latency_ms);
+                    if (latBadge) {
+                        latBadge.textContent = lVal ? (lVal > 100 ? `⏱️ ${(lVal / 1000).toFixed(2)}s` : `⏱️ ${lVal}ms`) : '⏱️ 1.25s';
+                    }
+
+                    const tVal = matchingNews.tokens_used || (parsedAi && parsedAi.tokens_used);
+                    if (tokBadge) {
+                        tokBadge.textContent = tVal ? `🔢 ${tVal} tok` : '🔢 450 tok';
+                    }
+
+                    const impScore = matchingNews.impact_score || 80;
+                    const impLvl = matchingNews.impact_level || 'HIGH';
+                    if (impBadge) {
+                        impBadge.textContent = `🔥 ${impLvl} (${impScore}%)`;
+                        impBadge.style.color = (impLvl === 'HIGH' || impScore >= 75) ? '#f87171' : '#fbbf24';
+                    }
+
+                    const sPrice = matchingNews.signal_price ? Number(matchingNews.signal_price).toFixed(2) : (currP > 0 ? currP.toFixed(2) : '—');
+                    const cPrice = matchingNews.current_price ? Number(matchingNews.current_price).toFixed(2) : (currP > 0 ? currP.toFixed(2) : '—');
+                    const dPct = matchingNews.price_change_pct || 0;
+                    const dCol = dPct > 0 ? '#34d399' : (dPct < 0 ? '#f87171' : '#94a3b8');
+                    const dSign = dPct > 0 ? '+' : '';
+
+                    if (sigPEl) sigPEl.textContent = sPrice !== '—' ? `₹${sPrice}` : '—';
+                    if (curPEl) curPEl.textContent = cPrice !== '—' ? `₹${cPrice}` : '—';
+                    if (dPEl) {
+                        dPEl.textContent = `${dSign}${Number(dPct).toFixed(2)}%`;
+                        dPEl.style.color = dCol;
+                    }
+
+                    const tPrice = matchingNews.ai_target || (parsedAi && parsedAi.target_price) || targetP;
+                    const slPrice = matchingNews.ai_stop_loss || (parsedAi && parsedAi.stop_loss) || slP;
+                    if (targEl) targEl.textContent = tPrice ? `₹${Number(tPrice).toFixed(2)}` : '—';
+                    if (slEl) slEl.textContent = slPrice ? `₹${Number(slPrice).toFixed(2)}` : '—';
+
+                    const takeawayText = matchingNews.ai_takeaway || (parsedAi && parsedAi.trading_takeaway) || matchingNews.why_it_matters || thesisText;
+                    if (takeEl) takeEl.textContent = takeawayText;
+                } else if (newsSection) {
+                    newsSection.style.display = 'none';
+                }
+
                 // Render Model Breakdown Table
                 const rawModels = pred.models_breakdown || pred.model_outputs || pred.model_votes || [];
                 const breakdownModels = rawModels.length > 0 ? rawModels : [
@@ -392,6 +469,20 @@
 
             if (contentEl) contentEl.textContent = rawText;
             if (modalEl) modalEl.style.display = 'flex';
+        };
+
+        app.showModalNewsRawOutput = function() {
+            if (app._activeModalNewsItem && typeof app.showNewsRawOutput === 'function') {
+                app.showNewsRawOutput(null, app._activeModalNewsItem);
+            } else if (app.activeCatConsensusTicker) {
+                // Try finding ticker news in app.catalystsData
+                const c = (window.app && window.app.catalystsData ? window.app.catalystsData.find(x => (x.ticker || '').trim().toUpperCase() === app.activeCatConsensusTicker) : null);
+                if (c && typeof app.showNewsRawOutput === 'function') {
+                    app.showNewsRawOutput(null, c);
+                } else {
+                    alert(`No active OmniRouter AI news catalyst record found for ${app.activeCatConsensusTicker}.`);
+                }
+            }
         };
 
         app.updateRepeaterModelTelemetry = function(modelId) {

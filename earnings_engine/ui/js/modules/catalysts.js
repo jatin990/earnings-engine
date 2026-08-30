@@ -502,6 +502,8 @@ Object.assign(app, {
                 if (biasEl) biasEl.innerHTML = '<span style="color:#34d399;">' + bullCount + '</span> / <span style="color:#f87171;">' + bearCount + '</span>';
                 if (topCatEl) topCatEl.textContent = topCat;
 
+                this._lastFilteredCatalysts = filtered;
+
                 if (!filtered.length) {
                     feedGrid.innerHTML = '<div class="card" style="padding:1.5rem;text-align:center;color:var(--muted);">No catalysts matching selected filter criteria. Click "⚡ Scan Feeds" to discover live headlines.</div>';
                     return;
@@ -611,8 +613,20 @@ Object.assign(app, {
                 }).join('');
             },
 
-            showNewsRawOutput(idx) {
-                const c = (this.catalystsData || [])[idx];
+            showNewsRawOutput(idxOrObj, directObj) {
+                let c = directObj;
+                if (!c && typeof idxOrObj === 'object' && idxOrObj !== null) {
+                    c = idxOrObj;
+                }
+                if (!c && typeof idxOrObj === 'number') {
+                    c = (this._lastFilteredCatalysts && this._lastFilteredCatalysts[idxOrObj]) || 
+                        (this.catalystsData && this.catalystsData[idxOrObj]) ||
+                        (window.app && window.app.catalystsData && window.app.catalystsData[idxOrObj]);
+                }
+                if (!c && typeof idxOrObj === 'string') {
+                    c = (this.catalystsData || []).find(x => x.id === idxOrObj || (x.ticker && x.ticker.trim().toUpperCase() === idxOrObj.trim().toUpperCase())) ||
+                        (this._lastFilteredCatalysts || []).find(x => x.id === idxOrObj || (x.ticker && x.ticker.trim().toUpperCase() === idxOrObj.trim().toUpperCase()));
+                }
                 if (!c) return;
 
                 const modal = document.getElementById('modalNewsRawOutput');
@@ -706,6 +720,7 @@ Object.assign(app, {
                 };
                 if (preEl) preEl.textContent = JSON.stringify(rawPayload, null, 2);
 
+                modal.style.zIndex = '999999';
                 modal.style.display = 'flex';
             },
 
