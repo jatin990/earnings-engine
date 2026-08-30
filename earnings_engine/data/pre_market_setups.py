@@ -204,8 +204,7 @@ def score_premarket_setup(
     category = item.get("category", "General Financial News")
     direction = (item.get("direction") or "BULLISH").upper()
     impact_score = float(item.get("impact_score") or 60.0)
-
-    base_price = prev_close or current_price or 100.0
+    base_price = prev_close or current_price or 0.0
 
     # Determine catalyst source badge
     full_text = f"{title} {summary}".lower()
@@ -541,16 +540,29 @@ def get_historical_premarket_outcomes(
             prev_row = conn.execute(
                 """
                 SELECT close, date FROM price_history 
-                WHERE ticker = ? AND date < ? 
+                WHERE ticker = ? AND date < ? AND close > 0
                 ORDER BY date DESC LIMIT 1
                 """,
                 (ticker, candle_date),
             ).fetchone()
 
-            prev_close = float(prev_row[0]) if prev_row and prev_row[0] is not None else (open_p or 100.0)
+            prev_close = float(prev_row[0]) if prev_row and prev_row[0] is not None else (open_p or close_p or 0.0)
 
-            if not prev_close or prev_close <= 0 or not open_p or not high_p or not low_p or not close_p:
+            if not prev_close or prev_close <= 0:
                 continue
+
+            # Self-healing & outlier protection against corrupted candle bars
+            if close_p is None or close_p <= 0:
+                close_p = open_p or prev_close
+
+            if open_p is None or open_p <= 0 or (prev_close > 0 and (open_p < 0.3 * prev_close or open_p > 3.0 * prev_close)):
+                open_p = close_p or prev_close
+
+            if high_p is None or high_p < max(open_p, close_p):
+                high_p = max(open_p, close_p)
+
+            if low_p is None or low_p <= 0 or (prev_close > 0 and low_p < 0.2 * prev_close):
+                low_p = min(open_p, close_p)
 
             # Compute planned levels
             scored = score_premarket_setup(c, prev_close=prev_close, current_price=close_p)
@@ -561,7 +573,7 @@ def get_historical_premarket_outcomes(
             # Realized gaps and price action
             actual_gap_pct = round(((open_p - prev_close) / prev_close) * 100.0, 2)
             day_return_pct = round(((close_p - prev_close) / prev_close) * 100.0, 2)
-            intraday_run_pct = round(((high_p - open_p) / open_p) * 100.0, 2)
+            intraday_run_pct = round(((high_p - open_p) / open_p) * 100.0, 2) if open_p > 0 else 0.0
             max_gain_pct = round(((high_p - prev_close) / prev_close) * 100.0, 2)
             max_drawdown_pct = round(((low_p - prev_close) / prev_close) * 100.0, 2)
 
