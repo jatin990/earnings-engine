@@ -258,6 +258,46 @@
         </div>
     </div>
 
+    <!-- 4.5. Participant Derivatives Open Interest (OI) & Long/Short Positioning Matrix -->
+    <div class="card" style="padding:1rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);margin-bottom:1rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.4rem;">
+            <div style="display:flex;align-items:center;gap:0.4rem;">
+                <span style="font-size:1rem;">📊</span>
+                <div>
+                    <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;">Participant Derivatives Open Interest (OI) &amp; Long/Short Matrix</div>
+                    <div id="pulseOiSessionSub" style="font-size:0.65rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.1rem;">Institutional FII / DII vs Pro Algo Desks vs Retail Positioning Breakdown</div>
+                </div>
+            </div>
+            <span id="pulseOiRegimeBadge" style="font-size:0.68rem;padding:0.18rem 0.55rem;border-radius:4px;background:rgba(249,115,22,0.15);color:#fb923c;font-family:var(--font-mono);font-weight:700;border:1px solid rgba(249,115,22,0.3);">
+                ⏳ Calculating Derivatives Sentiment...
+            </span>
+        </div>
+
+        <div style="overflow-x:auto;border-radius:6px;border:1px solid rgba(255,255,255,0.06);margin-bottom:0.75rem;">
+            <table class="results-table" style="width:100%;font-size:0.72rem;border-collapse:collapse;margin:0;">
+                <thead>
+                    <tr style="background:#060a16;">
+                        <th style="padding:0.45rem 0.6rem;text-align:left;">Market Participant</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">Futures (L / S)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">Calls (L / S)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">Puts (L / S)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">Net Contracts</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:center;">Long / Short Ratio</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:left;">Positioning Stance &amp; Bias</th>
+                    </tr>
+                </thead>
+                <tbody id="pulseParticipantOiTableBody">
+                    <!-- Populated dynamically via market_pulse.js -->
+                </tbody>
+            </table>
+        </div>
+
+        <div id="pulseOiCommentaryBox" style="background:#060a16;padding:0.55rem 0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.05);font-size:0.72rem;color:#cbd5e1;display:flex;align-items:center;gap:0.5rem;">
+            <span style="font-size:0.9rem;">🧠</span>
+            <span id="pulseOiCommentary">Analyzing Smart Money vs Retail derivatives positioning...</span>
+        </div>
+    </div>
+
     <!-- 5. Sector Relative Strength Heatmap -->
     <div class="card" style="padding:1rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);margin-bottom:1rem;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">

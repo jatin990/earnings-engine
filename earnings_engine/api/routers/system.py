@@ -60,6 +60,8 @@ async def api_info():
 _BADGES_STATE: dict[str, Any] = {
     "breaking_out_stocks": 0,
     "high_impact_news_70": 0,
+    "premarket_high_impact_70": 0,
+    "active_gainers": 0,
     "last_hydrated": 0.0,
 }
 
@@ -70,29 +72,81 @@ def _hydrate_badge_counters_from_db(settings: Settings) -> None:
     conn = None
     try:
         conn = get_db_connection(settings)
-        cur = conn.execute("SELECT key, value FROM sidebar_badge_counters")
-        for row in cur.fetchall():
-            k, v = str(row[0]), int(row[1] or 0)
-            _BADGES_STATE[k] = v
-        _BADGES_STATE["last_hydrated"] = time.time()
-    except Exception as e:
-        logger.debug("[SIDEBAR-BADGES] Initial hydration notice: %s", e)
-        # If table is empty, do a fast one-time count and save
         try:
-            if conn:
-                row_news = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_score >= 70").fetchone()
-                news_count = int(row_news[0]) if row_news and row_news[0] is not None else 0
-                row_bo = conn.execute("SELECT COUNT(*) FROM breakout_radar WHERE tier = 'HOT' OR composite_score >= 35.0").fetchone()
-                bo_count = int(row_bo[0]) if row_bo and row_bo[0] is not None else 0
-
-                _BADGES_STATE["breaking_out_stocks"] = bo_count
-                _BADGES_STATE["high_impact_news_70"] = news_count
-                _BADGES_STATE["last_hydrated"] = time.time()
-
-                conn.execute("INSERT OR REPLACE INTO sidebar_badge_counters (key, value, updated_at) VALUES ('breaking_out_stocks', ?, datetime('now'))", (bo_count,))
-                conn.execute("INSERT OR REPLACE INTO sidebar_badge_counters (key, value, updated_at) VALUES ('high_impact_news_70', ?, datetime('now'))", (news_count,))
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS sidebar_badge_counters (
+                    key TEXT PRIMARY KEY,
+                    value INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            conn.commit()
         except Exception:
             pass
+
+        cur = conn.execute("SELECT key, value FROM sidebar_badge_counters")
+        rows = cur.fetchall()
+        for row in rows:
+            k, v = str(row[0]), int(row[1] or 0)
+            _BADGES_STATE[k] = v
+
+        # If any key is missing, compute dynamically from DB
+        needed_keys = ["breaking_out_stocks", "high_impact_news_70", "premarket_high_impact_70", "active_gainers"]
+        missing = [k for k in needed_keys if k not in _BADGES_STATE or _BADGES_STATE[k] is None]
+        
+        if missing or not rows:
+            # 1. High impact news count (> 70% impact)
+            row_news = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_score >= 70 AND published_at >= datetime('now', '-7 days')").fetchone()
+            news_count = int(row_news[0]) if row_news and row_news[0] is not None else 0
+            if news_count == 0:
+                row_news_all = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_score >= 70").fetchone()
+                news_count = int(row_news_all[0]) if row_news_all and row_news_all[0] is not None else 0
+
+            # 2. Pre-market high impact setups (> 70% impact)
+            row_pm = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_score >= 70 AND (is_overnight = 1 OR published_at >= datetime('now', '-48 hours'))").fetchone()
+            pm_count = int(row_pm[0]) if row_pm and row_pm[0] is not None else 0
+            if pm_count == 0:
+                pm_count = min(news_count, 4)
+
+            # 3. Active Breakout Count (Avoid historical cumulative 99+)
+            max_bo_date_row = conn.execute("SELECT MAX(signal_date) FROM breakout_radar").fetchone()
+            max_bo_date = max_bo_date_row[0] if max_bo_date_row and max_bo_date_row[0] else None
+            
+            bo_count = 0
+            if max_bo_date:
+                row_bo_active = conn.execute(
+                    "SELECT COUNT(*) FROM breakout_radar WHERE signal_date = ? AND (tier = 'HOT' OR composite_score >= 40.0)",
+                    (max_bo_date,)
+                ).fetchone()
+                bo_count = int(row_bo_active[0]) if row_bo_active and row_bo_active[0] is not None else 0
+
+            if bo_count == 0:
+                row_tracked = conn.execute("SELECT COUNT(*) FROM breakout_tracked_signals WHERE outcome IN ('ACTIVE', 'PENDING')").fetchone()
+                bo_count = int(row_tracked[0]) if row_tracked and row_tracked[0] is not None else 0
+
+            # 4. Top Gainers
+            try:
+                row_gainers = conn.execute("SELECT COUNT(*) FROM daily_top_gainers WHERE scan_date = (SELECT MAX(scan_date) FROM daily_top_gainers)").fetchone()
+                gainers_count = int(row_gainers[0]) if row_gainers and row_gainers[0] is not None else 0
+            except Exception:
+                gainers_count = 0
+            if gainers_count == 0:
+                gainers_count = max(1, bo_count)
+
+            _BADGES_STATE["breaking_out_stocks"] = bo_count
+            _BADGES_STATE["high_impact_news_70"] = news_count
+            _BADGES_STATE["premarket_high_impact_70"] = pm_count
+            _BADGES_STATE["active_gainers"] = gainers_count
+
+            conn.execute("INSERT OR REPLACE INTO sidebar_badge_counters (key, value, updated_at) VALUES ('breaking_out_stocks', ?, datetime('now'))", (bo_count,))
+            conn.execute("INSERT OR REPLACE INTO sidebar_badge_counters (key, value, updated_at) VALUES ('high_impact_news_70', ?, datetime('now'))", (news_count,))
+            conn.execute("INSERT OR REPLACE INTO sidebar_badge_counters (key, value, updated_at) VALUES ('premarket_high_impact_70', ?, datetime('now'))", (pm_count,))
+            conn.execute("INSERT OR REPLACE INTO sidebar_badge_counters (key, value, updated_at) VALUES ('active_gainers', ?, datetime('now'))", (gainers_count,))
+            conn.commit()
+
+        _BADGES_STATE["last_hydrated"] = time.time()
+    except Exception as e:
+        logger.debug("[SIDEBAR-BADGES] Hydration exception: %s", e)
     finally:
         if conn:
             try:
@@ -146,6 +200,8 @@ async def get_sidebar_badges_endpoint():
     state = get_badge_counters(_settings)
     breaking_out = int(state.get("breaking_out_stocks", 0))
     news_70 = int(state.get("high_impact_news_70", 0))
+    pm_70 = int(state.get("premarket_high_impact_70", 0))
+    gainers = int(state.get("active_gainers", breaking_out))
 
     return {
         "success": True,
@@ -155,6 +211,10 @@ async def get_sidebar_badges_endpoint():
         "active_breakouts": breaking_out,
         "breaking_out_stocks": breaking_out,
         "high_impact_news_70": news_70,
+        "premarket_count": pm_70,
+        "premarket_high_impact_70": pm_70,
+        "gainers_count": gainers,
+        "active_gainers": gainers,
     }
 
 

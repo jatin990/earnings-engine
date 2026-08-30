@@ -42,6 +42,7 @@
                 this.renderPrediction(data.prediction || {});
                 this.renderBreadth(data.breadth || {});
                 this.renderInstitutionalFlows(data.institutional_flows || {});
+                this.renderParticipantOI(data.participant_oi || {});
                 this.renderSectors(data.sectors || []);
                 this.renderMacroCharts(data.macro_charts || {});
                 this.loadConfluenceSetups();
@@ -350,6 +351,111 @@
                 || (window.app && window.app.pulseData?.institutional_flows)
                 || {};
             this.renderInstitutionalFlows(flows);
+        },
+
+        renderParticipantOI(oiData) {
+            const tableBody = document.getElementById('pulseParticipantOiTableBody');
+            const badgeEl = document.getElementById('pulseOiRegimeBadge');
+            const sessionSub = document.getElementById('pulseOiSessionSub');
+            const commentaryEl = document.getElementById('pulseOiCommentary');
+
+            if (!oiData || !oiData.participants || !oiData.participants.length) {
+                if (tableBody) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="7" style="padding:1rem;text-align:center;color:#64748b;font-size:0.75rem;">
+                                Participant derivatives positioning data loading...
+                            </td>
+                        </tr>
+                    `;
+                }
+                return;
+            }
+
+            if (sessionSub && oiData.session_label) {
+                sessionSub.textContent = `As of ${oiData.session_label} · Multi-Participant Derivatives Breakdown (FII vs DII vs Pro vs Retail)`;
+            }
+
+            if (badgeEl && oiData.regime_verdict) {
+                badgeEl.textContent = oiData.regime_verdict;
+                if (oiData.regime_sentiment === 'BULLISH_CONVERGENCE') {
+                    badgeEl.style.background = 'rgba(16,185,129,0.15)';
+                    badgeEl.style.color = '#34d399';
+                    badgeEl.style.borderColor = 'rgba(16,185,129,0.3)';
+                } else if (oiData.regime_sentiment === 'BEARISH_DIVERGENCE') {
+                    badgeEl.style.background = 'rgba(239,68,68,0.15)';
+                    badgeEl.style.color = '#f87171';
+                    badgeEl.style.borderColor = 'rgba(239,68,68,0.3)';
+                } else {
+                    badgeEl.style.background = 'rgba(249,115,22,0.15)';
+                    badgeEl.style.color = '#fb923c';
+                    badgeEl.style.borderColor = 'rgba(249,115,22,0.3)';
+                }
+            }
+
+            if (commentaryEl && oiData.commentary) {
+                commentaryEl.textContent = oiData.commentary;
+            }
+
+            if (tableBody) {
+                tableBody.innerHTML = oiData.participants.map(p => {
+                    const netVal = p.net_contracts || 0;
+                    const netCol = netVal > 0 ? '#34d399' : (netVal < 0 ? '#f87171' : '#94a3b8');
+                    const netSign = netVal > 0 ? '+' : '';
+                    
+                    const lsRatio = p.long_short_ratio || 1.0;
+                    let lsCol = '#94a3b8';
+                    let lsBg = 'rgba(255,255,255,0.05)';
+                    if (lsRatio >= 1.25) {
+                        lsCol = '#34d399';
+                        lsBg = 'rgba(16,185,129,0.12)';
+                    } else if (lsRatio <= 0.85) {
+                        lsCol = '#f87171';
+                        lsBg = 'rgba(239,68,68,0.12)';
+                    }
+
+                    const stance = p.stance || 'Balanced';
+                    let stanceBg = 'rgba(255,255,255,0.04)';
+                    let stanceCol = '#cbd5e1';
+                    if (stance.includes('🟢') || stance.includes('Long')) {
+                        stanceBg = 'rgba(16,185,129,0.1)';
+                        stanceCol = '#34d399';
+                    } else if (stance.includes('🔴') || stance.includes('Short')) {
+                        stanceBg = 'rgba(239,68,68,0.1)';
+                        stanceCol = '#f87171';
+                    }
+
+                    return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                            <td style="padding:0.45rem 0.6rem;text-align:left;font-weight:700;color:#f8fafc;">
+                                ${p.category_label || p.participant}
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#cbd5e1;">
+                                <span style="color:#34d399;">${(p.futures_long || 0).toLocaleString()}</span> / <span style="color:#f87171;">${(p.futures_short || 0).toLocaleString()}</span>
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#cbd5e1;">
+                                <span style="color:#34d399;">${(p.calls_long || 0).toLocaleString()}</span> / <span style="color:#f87171;">${(p.calls_short || 0).toLocaleString()}</span>
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#cbd5e1;">
+                                <span style="color:#34d399;">${(p.puts_long || 0).toLocaleString()}</span> / <span style="color:#f87171;">${(p.puts_short || 0).toLocaleString()}</span>
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${netCol};">
+                                ${netSign}${netVal.toLocaleString()}
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;text-align:center;">
+                                <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${lsBg};color:${lsCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${lsCol}33;">
+                                    ${lsRatio.toFixed(2)}x (${(p.long_pct || 50).toFixed(0)}% L)
+                                </span>
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;text-align:left;">
+                                <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:600;font-family:var(--font-mono);">
+                                    ${stance}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
         },
 
         renderSectors(sectors) {

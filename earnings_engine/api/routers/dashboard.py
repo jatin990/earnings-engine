@@ -431,6 +431,21 @@ async def api_get_market_sentiment_matrix():
         raise HTTPException(status_code=500, detail=f"Error retrieving market sentiment: {e}")
 
 
+@router.get("/api/v1/market-pulse/participant-oi")
+@router.get("/api/v1/market_pulse/participant_oi")
+async def api_get_participant_oi(
+    force_refresh: bool = Query(False, description="Force refresh cache"),
+):
+    """Retrieve Participant Derivatives Open Interest (OI) & Long/Short positioning breakdown."""
+    try:
+        from earnings_engine.data.market_pulse import compute_participant_oi_matrix
+        oi_data = await asyncio.to_thread(compute_participant_oi_matrix, settings=_settings, force_refresh=force_refresh)
+        return {"success": True, "participant_oi": oi_data}
+    except Exception as e:
+        logger.exception("Error in api_get_participant_oi: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error retrieving participant OI data: {e}")
+
+
 @router.get("/api/v1/dashboard/market-macro")
 async def api_get_market_macro():
     """Retrieve concise market sentiment and volatility regime summary."""
