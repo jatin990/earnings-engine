@@ -170,3 +170,22 @@ def test_news_verifier_full_pipeline():
     }
     res_scraper = verifier.verify_news_item(item_scraper)
     assert res_scraper["verification_status"] == "REJECTED"
+
+    # 5. Multinational Parent vs Indian Subsidiary (Pfizer US Q2 2026 vs Pfizer Limited India)
+    item_pfizer_global = {
+        "ticker": "PFIZER.NS",
+        "title": "Pfizer stock holds near analyst targets as Q2 2026 earnings beat expectations - Ad-hoc-news.de",
+        "summary": "Pfizer Q2 2026 adjusted EPS of $0.60 beats consensus",
+        "published_at": recent_utc,
+    }
+    res_pfizer_global = verifier.verify_news_item(item_pfizer_global)
+    assert res_pfizer_global["verification_status"] == "REJECTED"
+
+    item_pfizer_india = {
+        "ticker": "PFIZER.NS",
+        "title": "Pfizer Limited Q1 net profit rises 14% to Rs 158 crore - Moneycontrol",
+        "summary": "Pfizer India Q1FY27 revenue up 6% amid domestic formulation growth",
+        "published_at": recent_utc,
+    }
+    res_pfizer_india = verifier.verify_news_item(item_pfizer_india)
+    assert res_pfizer_india["verification_status"] == "VERIFIED"

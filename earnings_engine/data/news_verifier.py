@@ -51,14 +51,14 @@ DICTIONARY_TICKERS = {
     "GLOBAL": ["global health", "medanta"],
 }
 
-# Non-corporate / noise exclusion keywords (sports, gossip, low-fidelity recycled scrapers, crypto spam)
+# Non-corporate / noise exclusion keywords (sports, gossip, low-fidelity recycled scrapers, foreign syndication feeds)
 NOISE_PATTERNS = [
     r"\b(barcelona|real madrid|manchester united|arsenal|chelsea|liverpool|world cup|fifa|la liga|premier league|champions league)\b",
     r"\b(boeing|airbus|f-15|f-35|pentagon|us air force|lockheed)\b",
     r"\b(coca-cola europacific|fair oaks income|prudential declares|ccep)\b",
     r"\b(cryptocurrency|bitcoin|ethereum|solana|memecoin|dogecoin|shiba inu)\b",
     r"\b(top 10 stocks for 2030|how to get rich|multibagger penny stocks to buy today|astrology prediction)\b",
-    r"\b(scanx\.trade|simplywall\.st|whalesbook|equitypandit|investorgain)\b",
+    r"\b(scanx\.trade|simplywall\.st|whalesbook|equitypandit|investorgain|ad-hoc-news\.de|finanzen\.net|marketscreener\.com|zacks\.com|fool\.com|tipranks\.com|benzinga\.com)\b",
 ]
 
 # Curated Conglomerate Entity Mappings
@@ -100,6 +100,27 @@ CONGLOMERATE_MAP: dict[str, list[tuple[str, str]]] = {
         (r"\b(reliance\s+power|rpower)\b", "RPOWER.NS"),
         (r"\b(reliance\s+infra|rinfra)\b", "RINFRA.NS"),
     ],
+}
+
+# Multinational Subsidiaries where Global Parent News (e.g. Pfizer US Q2 2026) Collides with Indian Entity
+MULTINATIONAL_SUBSIDIARY_TICKERS: dict[str, tuple[str, list[str]]] = {
+    "PFIZER.NS": ("Pfizer Limited", ["pfizer india", "pfizer limited", "pfizer ltd", "nse:pfizer", "bse:500680"]),
+    "NESTLEIND.NS": ("Nestle India", ["nestle india", "nestlé india", "nse:nestleind"]),
+    "HINDUNILVR.NS": ("Hindustan Unilever", ["hindustan unilever", "hul", "unilever india"]),
+    "ABB.NS": ("ABB India", ["abb india", "abb limited", "abb ltd"]),
+    "SIEMENS.NS": ("Siemens India", ["siemens india", "siemens ltd", "siemens limited"]),
+    "BOSCHLTD.NS": ("Bosch India", ["bosch india", "bosch limited"]),
+    "GLAXO.NS": ("GlaxoSmithKline Pharmaceuticals", ["gsk india", "glaxo india", "glaxosmithkline pharma"]),
+    "SANOFI.NS": ("Sanofi India", ["sanofi india", "sanofi consumer"]),
+    "3MINDIA.NS": ("3M India", ["3m india", "3m limited"]),
+    "COLPAL.NS": ("Colgate-Palmolive India", ["colgate india", "colgate-palmolive india", "colpal"]),
+    "PROCTER.NS": ("P&G Hygiene", ["pg hygiene", "procter & gamble hygiene", "p&g india"]),
+    "HONAUT.NS": ("Honeywell Automation India", ["honeywell automation", "honeywell india"]),
+    "CUMMINSIND.NS": ("Cummins India", ["cummins india", "cummins ltd"]),
+    "SCHAEFFLER.NS": ("Schaeffler India", ["schaeffler india", "schaeffler ltd"]),
+    "CASTROLIND.NS": ("Castrol India", ["castrol india", "castrol limited"]),
+    "TIMKEN.NS": ("Timken India", ["timken india", "timken limited"]),
+    "AKZOINDIA.NS": ("Akzo Nobel India", ["akzo nobel india", "dulux india"]),
 }
 
 
@@ -312,7 +333,26 @@ def verify_company_entity(
                     "flags": flags,
                 }
 
-    # 4. Direct Entity Name Mention Check
+    # 4. Multinational Parent vs Indian Subsidiary Disambiguation (e.g. Pfizer Inc US Q2 2026 vs Pfizer Limited India)
+    if raw_sym in MULTINATIONAL_SUBSIDIARY_TICKERS:
+        parent_name, indian_markers = MULTINATIONAL_SUBSIDIARY_TICKERS[raw_sym]
+        has_foreign_currency = bool(re.search(r"(\$|usd|eur|chf|\beuro\b|\bgbp\b|\bcents?\b|\bbillion\b)", full_text))
+        has_us_calendar_quarter = bool(re.search(r"\bq[1-4]\s*202\d\b", full_text))
+        has_foreign_domain = bool(re.search(r"\b(ad-hoc-news\.de|finanzen\.net|marketscreener|fool\.com|zacks\.com|benzinga|tipranks)\b", full_text))
+        has_indian_context = any(m in full_text for m in indian_markers) or any(ind in full_text for ind in ["(nse:", "(bse:", "nse:", "bse:", "sebi", "lodr", "rs.", "rs ", "₹", "crore", "cr.", "lakh"])
+        
+        if (has_foreign_currency or has_us_calendar_quarter or has_foreign_domain) and not has_indian_context:
+            flags.append("MULTINATIONAL_PARENT_ENTITY_COLLISION_REJECTED")
+            return {
+                "is_verified": False,
+                "confidence_score": 0.05,
+                "resolved_ticker": resolved_ticker,
+                "official_name": official_name,
+                "rejection_reason": f"Headline discusses global parent company rather than Indian listed entity {parent_name}.",
+                "flags": flags,
+            }
+
+    # 5. Direct Entity Name Mention Check
     name_clean = re.sub(r"\b(ltd|limited|corp|corporation|industries|india|co)\b", "", official_name.lower()).strip()
     name_tokens = [w for w in name_clean.split() if len(w) >= 3]
     if name_tokens and any(t in full_text for t in name_tokens):
