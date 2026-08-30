@@ -1061,7 +1061,7 @@ def get_tracked_breakouts(
 
         # 6. Summary metrics calculation
         total_tracked = len(items)
-        positive_count = sum(1 for it in items if (it.get("realized_return_pct") or 0) > 0 or it.get("outcome") in ("TARGET_HIT", "TRIGGERED"))
+        positive_count = sum(1 for it in items if (it.get("realized_return_pct") or 0) > 0 or it.get("outcome") in ("TARGET_HIT", "BREAKOUT_SUCCEEDED"))
         win_rate_pct = round((positive_count / total_tracked) * 100, 1) if total_tracked > 0 else 0.0
 
         all_rets = [it.get("realized_return_pct") or 0.0 for it in items]
@@ -1072,10 +1072,10 @@ def get_tracked_breakouts(
         max_return_ticker = best_item.get("ticker", "—") if best_item else "—"
 
         target_hit_count = sum(1 for it in items if it.get("outcome") == "TARGET_HIT")
-        triggered_count = sum(1 for it in items if it.get("outcome") in ("TRIGGERED", "BREAKOUT_SUCCEEDED"))
+        triggered_count = sum(1 for it in items if it.get("outcome") in ("TRIGGERED", "BREAKOUT_SUCCEEDED", "TARGET_HIT", "BREAKOUT_RETRACED"))
         stop_hit_count = sum(1 for it in items if it.get("outcome") in ("STOP_HIT", "STOP_LOSS_HIT"))
         setup_failed_count = sum(1 for it in items if it.get("outcome") in ("SETUP_FAILED", "BREAKOUT_FAILED"))
-        active_count = sum(1 for it in items if it.get("outcome") in ("ACTIVE", "COILING_IN_PROFIT", "COILING_IN_RANGE"))
+        active_count = sum(1 for it in items if not it.get("settled_14d", False) and (it.get("days_elapsed") or 0) < 14)
 
         return {
             "success": True,
