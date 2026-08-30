@@ -58,6 +58,44 @@
                     </div>
                 </div>
 
+                <!-- 🔍 Shared Filter Controls Bar for Active Setups & Historical Accuracy -->
+                <div class="card" style="padding: 0.65rem 0.85rem; margin-bottom: 0.75rem;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; justify-content: space-between;">
+                        <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; flex: 1;">
+                            <div style="position: relative; min-width: 180px; flex: 1; max-width: 320px;">
+                                <span style="position: absolute; left: 0.55rem; top: 50%; transform: translateY(-50%); font-size: 0.75rem; color: #71717a;">🔍</span>
+                                <input type="text" id="pmSearchInput" oninput="app.onPremarketFilterChange()" placeholder="Search ticker, order, deal..." style="width: 100%; padding: 0.32rem 0.6rem 0.32rem 1.7rem; background: #000000; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px; color: #ededed; font-size: 0.75rem; font-family: var(--font-sans); outline: none;" autocomplete="off">
+                            </div>
+
+                            <select id="pmCategorySelect" onchange="app.onPremarketFilterChange()" style="height:30px;padding:0 0.5rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-weight:500;outline:none;">
+                                <option value="ALL">📦 All Categories</option>
+                                <option value="Order Wins & Contracts">📦 Order Wins &amp; Contracts</option>
+                                <option value="Regulatory, Approvals & Policy">💊 Regulatory &amp; USFDA</option>
+                                <option value="Earnings & Guidance Surprise">📊 Earnings Surprises</option>
+                                <option value="M&A, Stake & Expansion">🤝 M&amp;A &amp; Expansion</option>
+                                <option value="Management, Governance & Ratings">🏛️ Management, Ratings &amp; Pledges</option>
+                                <option value="Corporate Action & Dividends">⚡ Corporate Actions</option>
+                                <option value="Litigation, Risk & Probes">⚠️ Litigation &amp; Probes</option>
+                                <option value="Miscellaneous Corporate Disclosures">📑 Misc / General Disclosures</option>
+                                <option value="Analyst Ratings & Targets">🎯 Analyst Ratings</option>
+                            </select>
+
+                            <select id="pmDirectionSelect" onchange="app.onPremarketFilterChange()" style="height:30px;padding:0 0.5rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-weight:500;outline:none;">
+                                <option value="ALL">⚡ All Directions</option>
+                                <option value="BULLISH">🟢 Bullish Gap Up</option>
+                                <option value="BEARISH">🔴 Bearish Gap Down</option>
+                            </select>
+
+                            <select id="pmMinImpactSelect" onchange="app.onPremarketFilterChange()" style="height:30px;padding:0 0.5rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-weight:500;outline:none;">
+                                <option value="0">📊 Any Impact</option>
+                                <option value="70">⚡ Medium+ (≥70%)</option>
+                                <option value="80">🔥 High Conviction (≥80%)</option>
+                                <option value="85">💥 Extreme Impact (≥85%)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ⚡ Top KPI Summary Cards -->
                 <div id="pmKpiGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
                     <div class="card card-glow-orange" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
@@ -103,44 +141,6 @@
                         </div>
                         <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="pmStatBearish">0</strong> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Adverse</span></div>
                         <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Regulatory cautions / misses</div>
-                    </div>
-                </div>
-
-                <!-- 🔍 Filter Controls Bar -->
-                <div class="card" style="padding: 0.65rem 0.85rem; margin-bottom: 0.75rem;">
-                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; justify-content: space-between;">
-                        <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; flex: 1;">
-                            <div style="position: relative; min-width: 180px; flex: 1; max-width: 320px;">
-                                <span style="position: absolute; left: 0.55rem; top: 50%; transform: translateY(-50%); font-size: 0.75rem; color: #71717a;">🔍</span>
-                                <input type="text" id="pmSearchInput" oninput="app.onPremarketFilterChange()" placeholder="Search ticker, order, deal..." style="width: 100%; padding: 0.32rem 0.6rem 0.32rem 1.7rem; background: #000000; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px; color: #ededed; font-size: 0.75rem; font-family: var(--font-sans); outline: none;" autocomplete="off">
-                            </div>
-
-                            <select id="pmCategorySelect" onchange="app.onPremarketFilterChange()" style="height:30px;padding:0 0.5rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-weight:500;outline:none;">
-                                <option value="ALL">📦 All Categories</option>
-                                <option value="Order Wins & Contracts">📦 Order Wins &amp; Contracts</option>
-                                <option value="Regulatory, Approvals & Policy">💊 Regulatory &amp; USFDA</option>
-                                <option value="Earnings & Guidance Surprise">📊 Earnings Surprises</option>
-                                <option value="M&A, Stake & Expansion">🤝 M&amp;A &amp; Expansion</option>
-                                <option value="Management, Governance & Ratings">🏛️ Management, Ratings &amp; Pledges</option>
-                                <option value="Corporate Action & Dividends">⚡ Corporate Actions</option>
-                                <option value="Litigation, Risk & Probes">⚠️ Litigation &amp; Probes</option>
-                                <option value="Miscellaneous Corporate Disclosures">📑 Misc / General Disclosures</option>
-                                <option value="Analyst Ratings & Targets">🎯 Analyst Ratings</option>
-                            </select>
-
-                            <select id="pmDirectionSelect" onchange="app.onPremarketFilterChange()" style="height:30px;padding:0 0.5rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-weight:500;outline:none;">
-                                <option value="ALL">⚡ All Directions</option>
-                                <option value="BULLISH">🟢 Bullish Gap Up</option>
-                                <option value="BEARISH">🔴 Bearish Gap Down</option>
-                            </select>
-
-                            <select id="pmMinImpactSelect" onchange="app.onPremarketFilterChange()" style="height:30px;padding:0 0.5rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-weight:500;outline:none;">
-                                <option value="0">📊 Any Impact</option>
-                                <option value="70">⚡ Medium+ (≥70%)</option>
-                                <option value="80">🔥 High Conviction (≥80%)</option>
-                                <option value="85">💥 Extreme Impact (≥85%)</option>
-                            </select>
-                        </div>
                     </div>
                 </div>
 

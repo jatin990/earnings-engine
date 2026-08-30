@@ -348,17 +348,33 @@
         },
 
         async loadPremarketOutcomes() {
+            const category = (document.getElementById('pmCategorySelect')?.value) || 'ALL';
+            const direction = (document.getElementById('pmDirectionSelect')?.value) || 'ALL';
+            const minImpact = parseFloat(document.getElementById('pmMinImpactSelect')?.value || '0');
+            const search = (document.getElementById('pmSearchInput')?.value || '').trim();
+
             const tbody = document.getElementById('tblPremarketOutcomesLogBody');
             const matrixBody = document.getElementById('tblPremarketCategoryAccuracyBody');
 
             if (tbody && (!this.premarketOutcomesData || this.premarketOutcomesData.length === 0)) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:#64748b;">Evaluating historical pre-market setups against Day T market candles...</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:#64748b;">Evaluating historical pre-market setups against Day T market candles...</td></tr>';
             }
 
+            const fetchFn = (window.app?.apiFetch ? window.app.apiFetch.bind(window.app) : fetch);
             try {
-                const res = await fetch(`${API_BASE}/api/v1/premarket/outcomes?days=90&limit=150`);
+                const params = new URLSearchParams({
+                    days: '90',
+                    limit: '150',
+                    category: category,
+                    direction: direction,
+                    min_impact: minImpact.toString(),
+                    search: search,
+                });
+
+                const res = await fetchFn(`${API_BASE}/api/v1/premarket/outcomes?${params.toString()}`, {}, 'premarket_outcomes');
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
+                if (data && data.aborted) return;
 
                 this.premarketOutcomesData = data.items || [];
                 this.premarketOutcomesSummary = data.track_record_summary || {};
@@ -367,9 +383,10 @@
                 this.renderPremarketAccuracyMatrix(data.accuracy_by_category || []);
                 this.renderPremarketOutcomesTable(this.premarketOutcomesData);
             } catch (err) {
+                if (err.name === 'AbortError') return;
                 console.error('[PREMARKET] Failed loading outcomes:', err);
                 if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:#f87171;">⚠️ Failed loading previous setups: ${err.message}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:2rem;color:#f87171;">⚠️ Failed loading previous setups: ${err.message}</td></tr>`;
                 }
             }
         },
