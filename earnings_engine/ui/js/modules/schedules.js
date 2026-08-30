@@ -101,6 +101,10 @@
             if (elNews && newsSched) elNews.innerHTML = formatTimer(newsSched);
         },
 
+        updateHarvesterScheduleDisplay() {
+            this.renderAutomationSchedules();
+        },
+
         // =========================================================================
         // Multi-Strategy Breakout Scheduler Modal & Controls
         // =========================================================================

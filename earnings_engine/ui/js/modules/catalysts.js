@@ -95,11 +95,23 @@ Object.assign(app, {
                     this.catalystsData = itemsData.catalysts || [];
                     this.renderCatalystsStats(statsData.stats || {});
                     this.renderCatalysts();
-                    this.updateHarvesterScheduleDisplay();
+                    if (typeof this.updateHarvesterScheduleDisplay === 'function') {
+                        this.updateHarvesterScheduleDisplay();
+                    } else if (typeof this.renderAutomationSchedules === 'function') {
+                        this.renderAutomationSchedules();
+                    }
                     this.probeOmniRouteGateway(false);
                 } catch (e) {
                     console.error('Error loading catalysts:', e);
                     feedGrid.innerHTML = '<div class="card" style="padding:1.5rem;text-align:center;color:#f87171;">Failed to load catalysts feed.</div>';
+                }
+            },
+
+            updateHarvesterScheduleDisplay() {
+                if (typeof this.renderAutomationSchedules === 'function') {
+                    this.renderAutomationSchedules();
+                } else if (typeof this.loadAutomationSchedules === 'function') {
+                    this.loadAutomationSchedules();
                 }
             },
 
