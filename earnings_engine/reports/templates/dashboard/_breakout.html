@@ -92,13 +92,23 @@
 
 
                         <!-- Formula breakdown toggle -->
-                        <button type="button" onclick="app.toggleBreakoutExplainer()" class="btn btn-secondary" style="padding:0.35rem 0.65rem;font-size:0.74rem;display:flex;align-items:center;gap:0.25rem;">
+                        <button type="button" onclick="app.toggleBreakoutExplainer()" class="btn btn-secondary" style="padding:0.35rem 0.65rem;font-size:0.74rem;display:flex;align-items:center;gap:0.25rem;" title="View quantitative formula & weights">
                             <span>📐</span> Logic
                         </button>
 
-                        <!-- Refresh button -->
-                        <button type="button" id="breakoutRefreshBtn" onclick="app.refreshBreakoutScan()" class="btn btn-primary" style="padding:0.35rem 0.85rem;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;">
-                            <span id="breakoutRefreshIcon">⚡</span> Scan Now
+                        <!-- Schedules & Parallel Scans Modal Trigger -->
+                        <button type="button" onclick="app.openBreakoutScheduleModal()" class="btn btn-secondary" style="padding:0.35rem 0.7rem;font-size:0.74rem;display:flex;align-items:center;gap:0.3rem;color:#38bdf8;border-color:rgba(56,189,248,0.35);background:rgba(56,189,248,0.06);" title="Manage background schedule cadence and run all 5 strategies in parallel">
+                            <span>⏱️</span> Schedules
+                        </button>
+
+                        <!-- Refresh Single Strategy Scan button -->
+                        <button type="button" id="breakoutRefreshBtn" onclick="app.refreshBreakoutScan()" class="btn btn-secondary" style="padding:0.35rem 0.75rem;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;">
+                            <span id="breakoutRefreshIcon">⚡</span> Scan Strategy
+                        </button>
+
+                        <!-- Run All 5 in Parallel Master Button -->
+                        <button type="button" id="breakoutParallelScanBtn" onclick="app.triggerAllBreakoutStrategiesParallel()" class="btn btn-primary" style="padding:0.35rem 0.85rem;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);border-color:#818cf8;box-shadow:0 0 15px rgba(99,102,241,0.35);" title="Trigger parallel scan across all 5 strategies simultaneously">
+                            <span id="breakoutParallelIcon">🚀</span> Run All 5 in Parallel
                         </button>
                     </div>
                 </div>
@@ -677,6 +687,201 @@
 }
 .bk-subtab-btn.bk-subtab-active {
     background: rgba(56,189,248,0.15) !important;
+                        <button type="button" id="btnBkTrackedPreset_all" onclick="app.setTrackedBreakoutPreset('all')" class="btn-micro bk-tracked-preset" data-days="all">🌐 All Time</button>
+                    </div>
+
+                    <!-- Custom Date Range Picker -->
+                    <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                        <span style="font-size:0.72rem;color:#94a3b8;font-weight:600;">📅 Date Range:</span>
+                        <input id="breakoutTrackedStartDate" type="date" style="background:#030712;border:1px solid rgba(255,255,255,0.18);border-radius:4px;color:#f8fafc;font-size:0.72rem;padding:0.2rem 0.4rem;font-family:var(--font-mono);outline:none;" />
+                        <span style="color:#64748b;font-size:0.72rem;">to</span>
+                        <input id="breakoutTrackedEndDate" type="date" style="background:#030712;border:1px solid rgba(255,255,255,0.18);border-radius:4px;color:#f8fafc;font-size:0.72rem;padding:0.2rem 0.4rem;font-family:var(--font-mono);outline:none;" />
+                        <button type="button" onclick="app.applyTrackedBreakoutDateRange()" class="btn btn-primary btn-sm" style="padding:0.25rem 0.65rem;font-size:0.72rem;font-weight:700;">
+                            Apply Range
+                        </button>
+                        <button type="button" onclick="app.clearTrackedBreakoutDateRange()" class="btn btn-secondary btn-sm" style="padding:0.25rem 0.45rem;font-size:0.72rem;" title="Reset date filters">
+                            ✕
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Performance Summary Cards for Tracked Signals (Compact Flowey Ribbon) -->
+                <div id="breakoutTrackedKpiCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:0.45rem;margin-bottom:0.75rem;">
+                    <!-- Total Tracked Setups -->
+                    <div class="card" style="padding:0.45rem 0.7rem;background:rgba(15,23,42,0.65);border:1px solid rgba(56,189,248,0.2);border-radius:6px;backdrop-filter:blur(8px);">
+                        <div style="font-size:0.60rem;color:#7dd3fc;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Total Tracked</div>
+                        <div style="font-size:1.15rem;font-weight:800;color:#f0f9ff;font-family:var(--font-mono);margin-top:0.15rem;"><span id="bkTrackedKpiTotal">—</span></div>
+                    </div>
+
+                    <!-- Win Rate / Target Hit % -->
+                    <div class="card" style="padding:0.45rem 0.7rem;background:rgba(15,23,42,0.65);border:1px solid rgba(52,211,153,0.2);border-radius:6px;backdrop-filter:blur(8px);">
+                        <div style="font-size:0.60rem;color:#6ee7b7;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Win / Target Hit</div>
+                        <div style="font-size:1.15rem;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:0.15rem;"><span id="bkTrackedKpiWinRate">—</span></div>
+                    </div>
+
+                    <!-- Avg Realized Return % -->
+                    <div class="card" style="padding:0.45rem 0.7rem;background:rgba(15,23,42,0.65);border:1px solid rgba(59,130,246,0.2);border-radius:6px;backdrop-filter:blur(8px);">
+                        <div style="font-size:0.60rem;color:#93c5fd;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Avg Return</div>
+                        <div style="font-size:1.15rem;font-weight:800;color:#60a5fa;font-family:var(--font-mono);margin-top:0.15rem;"><span id="bkTrackedKpiAvgReturn">—</span></div>
+                    </div>
+
+                    <!-- Top Peak Performer -->
+                    <div class="card" style="padding:0.45rem 0.7rem;background:rgba(15,23,42,0.65);border:1px solid rgba(251,191,36,0.2);border-radius:6px;backdrop-filter:blur(8px);">
+                        <div style="font-size:0.60rem;color:#fde047;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Top Return</div>
+                        <div style="font-size:1.15rem;font-weight:800;color:#fde68a;font-family:var(--font-mono);display:flex;align-items:baseline;gap:0.3rem;margin-top:0.15rem;">
+                            <span id="bkTrackedKpiMaxReturn">—</span>
+                            <span id="bkTrackedKpiTopTicker" style="font-size:0.62rem;color:#fbbf24;font-family:var(--font-mono);"></span>
+                        </div>
+                    </div>
+
+                    <!-- Active vs Triggered Count -->
+                    <div class="card" style="padding:0.45rem 0.7rem;background:rgba(15,23,42,0.65);border:1px solid rgba(249,115,22,0.2);border-radius:6px;backdrop-filter:blur(8px);">
+                        <div style="font-size:0.60rem;color:#fdba74;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Fired & Active</div>
+                        <div style="font-size:1.15rem;font-weight:800;color:#fed7aa;font-family:var(--font-mono);margin-top:0.15rem;"><span id="bkTrackedKpiActiveCount">—</span></div>
+                    </div>
+                </div>
+
+                <!-- Tracked Signals Archive Data Table -->
+                <div class="table-wrapper" style="overflow:auto;max-height:calc(100vh - 270px);min-height:380px;border-radius:0.6rem;border:1px solid rgba(255,255,255,0.08);background:#000000;">
+                    <table id="breakoutTrackedTable" style="width:100%;border-collapse:collapse;font-size:0.74rem;">
+                        <thead>
+                            <tr style="background:#0a0f1e;border-bottom:1px solid rgba(255,255,255,0.1);">
+                                <th style="padding:0.65rem 0.85rem;text-align:left;color:#94a3b8;font-weight:700;">Stock & Archetype</th>
+                                <th style="padding:0.65rem 0.85rem;text-align:left;color:#94a3b8;font-weight:700;">Signal Date & Age</th>
+                                <th style="padding:0.65rem 0.6rem;text-align:center;color:#94a3b8;font-weight:700;">Tier</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Signal Price</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Trigger Level</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Target Price</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Stop Loss</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Current Price</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Return %</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:right;color:#94a3b8;font-weight:700;">Max Gain %</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:center;color:#94a3b8;font-weight:700;">Outcome Status</th>
+                                <th style="padding:0.65rem 0.6rem;text-align:center;color:#94a3b8;font-weight:700;">Score</th>
+                                <th style="padding:0.65rem 0.75rem;text-align:center;color:#94a3b8;font-weight:700;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="breakoutTrackedTableBody">
+                            <tr>
+                                <td colspan="13" style="padding:3rem;text-align:center;color:#64748b;font-size:0.85rem;">
+                                    📜 Loading tracked breakouts archive...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Footer note -->
+                <div style="margin-top:0.55rem;font-size:0.68rem;color:#475569;display:flex;align-items:center;gap:0.4rem;">
+                    <span>🛡️ Permanent archive tracks real-world outcome accuracy from the moment a breakout setup was identified.</span>
+                    <span>·</span>
+                    <span>Click on any stock to open deep multi-model consensus and quantitative trajectory matrix.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Breakout Reasoning & AI Notes Modal -->
+        <div id="breakoutNotesModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;align-items:center;justify-content:center;padding:1rem;">
+            <div style="background:#090d16;border:1px solid rgba(59,130,246,0.35);border-radius:12px;max-width:720px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,0.9);padding:1.5rem;position:relative;">
+                <button type="button" onclick="document.getElementById('breakoutNotesModal').style.display='none'" style="position:absolute;top:1rem;right:1rem;background:transparent;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;">✕</button>
+                <div id="breakoutNotesModalContent">
+                    <!-- Injected via JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Breakout Backtest Audit Report Modal -->
+        <div id="breakoutBacktestModal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;align-items:center;justify-content:center;padding:1rem;">
+            <div style="background:#090d16;border:1px solid rgba(56,189,248,0.35);border-radius:12px;max-width:850px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,0.9);padding:1.5rem;position:relative;">
+                <button type="button" onclick="document.getElementById('breakoutBacktestModal').style.display='none'" style="position:absolute;top:1rem;right:1rem;background:transparent;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;">✕</button>
+                <div id="breakoutBacktestModalContent">
+                    <!-- Injected via JavaScript -->
+                </div>
+            </div>
+        </div>
+
+<style>
+@keyframes breakoutPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* Modern Compact Table Aesthetics & Zebra Striping */
+#breakoutTable, #breakoutTrackedTable {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.73rem;
+}
+
+#breakoutTable tbody tr, #breakoutTrackedTable tbody tr {
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#breakoutTable tbody tr:nth-child(even), #breakoutTrackedTable tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.018);
+}
+
+#breakoutTable tbody tr:nth-child(odd), #breakoutTrackedTable tbody tr:nth-child(odd) {
+    background: rgba(10, 15, 28, 0.4);
+}
+
+#breakoutTable tbody tr:hover, #breakoutTrackedTable tbody tr:hover {
+    background: rgba(56, 189, 248, 0.09) !important;
+    box-shadow: inset 3px 0 0 #38bdf8, 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+/* Row Tier Indicators */
+.bk-row-hot {
+    border-left: 3px solid #ef4444 !important;
+}
+.bk-row-warm {
+    border-left: 3px solid #f59e0b !important;
+}
+.bk-row-success {
+    border-left: 3px solid #10b981 !important;
+}
+.bk-row-stop {
+    border-left: 3px solid #f43f5e !important;
+}
+
+/* Compact Table Headers */
+#breakoutTable thead th, #breakoutTrackedTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #090e1a;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    user-select: none;
+}
+
+/* Table Cells */
+#breakoutTable tbody td, #breakoutTrackedTable tbody td {
+    padding: 0.46rem 0.65rem;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+/* Sub-tab button styles */
+.bk-subtab-btn {
+    background: rgba(255,255,255,0.04);
+    color: #94a3b8;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.2s ease;
+}
+.bk-subtab-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: #f8fafc;
+}
+.bk-subtab-btn.bk-subtab-active {
+    background: rgba(56,189,248,0.15) !important;
     color: #38bdf8 !important;
     border-color: rgba(56,189,248,0.45) !important;
     box-shadow: 0 0 0 1px rgba(56,189,248,0.25);
@@ -729,7 +934,6 @@
 
         <!-- Modal Body: Scrollable -->
         <div id="bkHistContent" style="padding:1.25rem;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:1.2rem;">
-            <!-- Rendered dynamically by app.renderBreakoutHistoryTimeline -->
             <div style="text-align:center;padding:3rem;color:#94a3b8;">
                 <div style="font-size:1.6rem;margin-bottom:0.5rem;animation:spin 1s linear infinite;">⏳</div>
                 <div style="font-size:0.88rem;color:#f8fafc;font-weight:600;">Loading Breakout History &amp; Transition Notes...</div>
@@ -749,6 +953,79 @@
             <button type="button" onclick="app.closeBreakoutHistoryModal()" class="btn btn-sm" style="background:rgba(255,255,255,0.08);color:#e2e8f0;border:1px solid rgba(255,255,255,0.12);font-size:0.75rem;padding:0.3rem 0.85rem;">
                 Close
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- ⏱️ MODAL: MULTI-STRATEGY BREAKOUT SCHEDULE & PARALLEL RUN STUDIO         -->
+<!-- ========================================================================= -->
+<div id="breakoutScheduleModal" class="modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
+    <div class="modal-card" style="background:#090d16;border:1px solid rgba(56,189,248,0.35);border-radius:14px;width:100%;max-width:880px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.9);overflow:hidden;">
+        <!-- Header -->
+        <div style="padding:1.1rem 1.4rem;border-bottom:1px solid rgba(255,255,255,0.08);background:#0f172a;display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:0.65rem;">
+                <div style="width:36px;height:36px;border-radius:8px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.35);display:flex;align-items:center;justify-content:center;font-size:1.25rem;">⏱️</div>
+                <div>
+                    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <h3 style="margin:0;font-size:1.15rem;font-weight:800;color:#ffffff;letter-spacing:-0.01em;">Multi-Strategy Breakout Scheduler</h3>
+                        <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.68rem;padding:0.12rem 0.5rem;border-radius:4px;">🟢 GLOBAL ENGINE SYNC</span>
+                    </div>
+                    <p style="margin:0.15rem 0 0 0;font-size:0.74rem;color:#94a3b8;">Configure autonomous background scan schedules per strategy or trigger full parallel sweeps across the universe.</p>
+                </div>
+            </div>
+            <button type="button" onclick="app.closeBreakoutScheduleModal()" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#cbd5e1;border-radius:6px;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.9rem;" onmouseover="this.style.background='rgba(239,68,68,0.2)';this.style.color='#f87171'" onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='#cbd5e1'">✕</button>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:1.25rem 1.4rem;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:1.15rem;">
+            <!-- Master Action Callout: Parallel 5-Strategy Execution -->
+            <div style="background:linear-gradient(135deg,rgba(99,102,241,0.15) 0%,rgba(139,92,246,0.1) 100%);border:1px solid rgba(129,140,248,0.35);border-radius:10px;padding:1rem 1.15rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.8rem;">
+                <div style="max-width:560px;">
+                    <div style="display:flex;align-items:center;gap:0.45rem;margin-bottom:0.25rem;">
+                        <span style="font-size:1.15rem;">🚀</span>
+                        <strong style="color:#ffffff;font-size:0.92rem;">Master Parallel Multi-Strategy Sweep</strong>
+                        <span id="bkMasterSchedStatusBadge" class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">🟢 Active (30m)</span>
+                    </div>
+                    <div style="font-size:0.74rem;color:#cbd5e1;line-height:1.4;">
+                        Dispatches 5 concurrent quantitative worker pipelines across the market universe in parallel: Classic Technical + Delivery Absorption + Call OI Wall + Volume Profile VAH + Donchian TTM Squeeze.
+                    </div>
+                    <div id="bkMasterSchedCountdown" style="font-size:0.72rem;color:#a5b4fc;font-family:var(--font-mono);margin-top:0.35rem;">
+                        Next automated sweep: <strong>--</strong>
+                    </div>
+                </div>
+                <button type="button" id="bkModalParallelTriggerBtn" onclick="app.triggerAllBreakoutStrategiesParallel(true)" class="btn btn-primary" style="padding:0.45rem 1.1rem;font-size:0.82rem;font-weight:700;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);border-color:#818cf8;box-shadow:0 0 20px rgba(99,102,241,0.4);display:flex;align-items:center;gap:0.35rem;">
+                    <span id="bkModalParallelTriggerIcon">⚡</span> Run All 5 Now
+                </button>
+            </div>
+
+            <!-- Strategy Schedules Grid -->
+            <div>
+                <div style="font-size:0.78rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.65rem;display:flex;align-items:center;justify-content:space-between;">
+                    <span>Individual Strategy Automation Cadences</span>
+                    <span style="font-size:0.70rem;color:#64748b;text-transform:none;">Synchronized with Central Scheduler Engine</span>
+                </div>
+                <div id="bkStrategySchedulesContainer" style="display:flex;flex-direction:column;gap:0.65rem;">
+                    <div style="text-align:center;padding:2rem;color:#64748b;font-size:0.78rem;">
+                        <div class="spinner" style="display:inline-block;margin-right:0.35rem;"></div> Loading strategy schedules...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:0.75rem 1.4rem;border-top:1px solid rgba(255,255,255,0.08);background:#05070f;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+            <div style="font-size:0.72rem;color:#64748b;">
+                💡 Changes save automatically to database &amp; scheduler engine.
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <button type="button" onclick="app.loadBreakoutSchedules()" class="btn btn-secondary btn-sm" style="font-size:0.74rem;padding:0.3rem 0.75rem;">
+                    🔄 Refresh Status
+                </button>
+                <button type="button" onclick="app.closeBreakoutScheduleModal()" class="btn btn-sm" style="background:rgba(255,255,255,0.08);color:#e2e8f0;border:1px solid rgba(255,255,255,0.12);font-size:0.74rem;padding:0.3rem 0.85rem;">
+                    Close
+                </button>
+            </div>
         </div>
     </div>
 </div>

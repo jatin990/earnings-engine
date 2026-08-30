@@ -2701,29 +2701,180 @@ def _resolve_universe_tickers(settings: Settings, universe: str | None = None) -
     return sorted(tickers)
 
 
-def run_cold_scan(settings: Settings, universe: str | None = None, min_score: float | None = None, **kwargs: Any) -> None:
-    """T0 Cold Scan: score the entire universe and populate warm/hot pools."""
+def run_multi_strategy_parallel_scan(
+    settings: Settings | None = None,
+    universe: str | None = None,
+    min_score: float | None = 30.0,
+    strategies: list[str] | None = None,
+    tickers: list[str] | None = None,
+    job_id: str = "breakout_all_strategies_parallel",
+    max_workers_per_strat: int = 6,
+    record_schedule_event: bool = True,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Execute all 5 (or selected) breakout strategies in parallel across the universe.
+
+    Spawns concurrent worker threads for each strategy to scan the market universe
+    simultaneously, discovers setups, updates cache/pools, persists to SQLite/Turso,
+    and logs run metrics to automation_schedules.
+    """
+    settings = settings or Settings()
+    t0 = time.perf_counter()
+    _pool["status"] = "running"
+    _pool["error"] = None
+
+    if record_schedule_event:
+        from earnings_engine.data.automation_schedules import record_job_start, record_job_finish
+        record_job_start(job_id, settings)
+
+    strategies_to_run = strategies or list(BREAKOUT_STRATEGIES.keys())
+    ticker_list = tickers if (tickers is not None and len(tickers) > 0) else _resolve_universe_tickers(settings, universe)
+
+    if not ticker_list:
+        summary_msg = "No tickers found in universe to scan."
+        if record_schedule_event:
+            record_job_finish(job_id, 0.0, summary_msg, settings=settings)
+        return {"success": False, "message": summary_msg, "strategies": {}, "total_candidates": 0}
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    strategy_results: dict[str, Any] = {}
+
+    def _scan_strategy(strat_id: str) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
+        s_t0 = time.perf_counter()
+        meta = BREAKOUT_STRATEGIES.get(strat_id, {})
+        strat_candidates: list[dict[str, Any]] = []
+
+        def _score_one(t: str) -> dict[str, Any] | None:
+            return _score_single_ticker(t, settings, strategy=strat_id)
+
+        with ThreadPoolExecutor(max_workers=max_workers_per_strat) as executor:
+            scored_list = list(executor.map(_score_one, ticker_list))
+
+        for res in scored_list:
+            if res and (res.get("composite_score") or 0) >= (min_score or 30.0):
+                strat_candidates.append(res)
+
+        s_elapsed = round(time.perf_counter() - s_t0, 2)
+        top_ticker = None
+        top_score = 0.0
+        if strat_candidates:
+            strat_candidates.sort(key=lambda x: x.get("composite_score", 0), reverse=True)
+            top_ticker = strat_candidates[0].get("ticker")
+            top_score = strat_candidates[0].get("composite_score", 0)
+
+        stats = {
+            "strategy_id": strat_id,
+            "strategy_name": meta.get("name", strat_id),
+            "candidates_found": len(strat_candidates),
+            "top_candidate": top_ticker,
+            "top_score": top_score,
+            "elapsed_seconds": s_elapsed,
+        }
+        return strat_id, strat_candidates, stats
+
+    # Run all strategies in parallel
+    with ThreadPoolExecutor(max_workers=len(strategies_to_run)) as strat_executor:
+        parallel_outputs = list(strat_executor.map(_scan_strategy, strategies_to_run))
+
+    total_candidates = 0
+    for strat_id, strat_candidates, stats in parallel_outputs:
+        strategy_results[strat_id] = stats
+        total_candidates += len(strat_candidates)
+
+        # Populate in-memory pool for candidates
+        for res in strat_candidates:
+            ticker = res.get("ticker")
+            if ticker:
+                _promote(ticker, res, settings=settings)
+
+    _rebuild_candidates()
+    save_breakout_pool_to_db(settings)
+
+    elapsed = round(time.perf_counter() - t0, 2)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    _pool.update({
+        "last_cold_scan_at": now_iso,
+        "last_scan_at": now_iso,
+        "last_scan_duration_s": elapsed,
+        "cold_tickers_scanned": len(ticker_list),
+        "status": "done",
+        "error": None,
+    })
+
+    strat_summary_items = [
+        f"{BREAKOUT_STRATEGIES.get(s, {}).get('short_name', s)}: {strategy_results.get(s, {}).get('candidates_found', 0)}"
+        for s in strategies_to_run
+    ]
+    summary_msg = f"Multi-Strategy Parallel Sweep ({len(strategies_to_run)} strats, {len(ticker_list)} tickers in {elapsed}s): {', '.join(strat_summary_items)} → {total_candidates} setups."
+
+    if record_schedule_event:
+        record_job_finish(job_id, elapsed, summary_msg, settings=settings)
+
+    logger.info("[BREAKOUT-PARALLEL] %s", summary_msg)
+
+    return {
+        "success": True,
+        "job_id": job_id,
+        "universe": universe or "NSE_ALL",
+        "tickers_scanned": len(ticker_list),
+        "total_candidates": total_candidates,
+        "elapsed_seconds": elapsed,
+        "strategy_results": strategy_results,
+        "summary": summary_msg,
+    }
+
+
+def run_cold_scan(
+    settings: Settings,
+    universe: str | None = None,
+    min_score: float | None = None,
+    strategy: str = "CLASSIC_TECHNICAL",
+    **kwargs: Any,
+) -> None:
+    """T0 Cold Scan: score the entire universe for a single strategy or all strategies in parallel."""
+    strat_clean = strategy.upper()
+    if strat_clean in ("ALL", "MULTI_STRATEGY_PARALLEL", "PARALLEL"):
+        run_multi_strategy_parallel_scan(
+            settings=settings,
+            universe=universe,
+            min_score=min_score or 30.0,
+            record_schedule_event=True,
+            **kwargs,
+        )
+        return
+
+    job_id_map = {
+        "CLASSIC_TECHNICAL": "breakout_cold_scan",
+        "NSE_DELIVERY_ABSORPTION": "breakout_delivery_absorption_scan",
+        "NSE_FO_CALL_WALL": "breakout_fo_call_wall_scan",
+        "VOLUME_PROFILE_VAH": "breakout_volume_profile_scan",
+        "DONCHIAN_TTM_SQUEEZE": "breakout_donchian_squeeze_scan",
+    }
+    job_id = job_id_map.get(strat_clean, "breakout_cold_scan")
+
     t0 = time.perf_counter()
     _pool["status"] = "running"
     _pool["error"] = None
 
     from earnings_engine.data.automation_schedules import record_job_start, record_job_finish
-    record_job_start("breakout_cold_scan", settings)
+    record_job_start(job_id, settings)
 
     ticker_list = _resolve_universe_tickers(settings, universe)
     if not ticker_list:
-        logger.info("[BREAKOUT-COLD] No tickers found to scan.")
+        logger.info("[BREAKOUT-COLD] No tickers found to scan for %s.", strat_clean)
         _pool["status"] = "done"
         _pool["cold_tickers_scanned"] = 0
-        _pool["last_cold_scan_at"] = datetime.now(timezone.utc).isoformat()
-        _pool["last_scan_at"] = _pool["last_cold_scan_at"]
-        record_job_finish("breakout_cold_scan", 0.0, "No tickers found to scan.", settings=settings)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        _pool["last_cold_scan_at"] = now_iso
+        _pool["last_scan_at"] = now_iso
+        record_job_finish(job_id, 0.0, f"No tickers found to scan for {strat_clean}.", settings=settings)
         return
 
     from concurrent.futures import ThreadPoolExecutor
 
     def _score(ticker: str) -> tuple[str, dict | None]:
-        result = _score_single_ticker(ticker, settings)
+        result = _score_single_ticker(ticker, settings, strategy=strat_clean)
         return ticker, result
 
     with ThreadPoolExecutor(max_workers=8) as executor:
@@ -2731,9 +2882,12 @@ def run_cold_scan(settings: Settings, universe: str | None = None, min_score: fl
 
     promoted_hot = 0
     promoted_warm = 0
+    cands_found = 0
     for ticker, result in scored:
         if result is None:
             continue
+        if (result.get("composite_score") or 0) >= (min_score or 30.0):
+            cands_found += 1
         _promote(ticker, result, settings=settings)
         if ticker in _pool["hot"]:
             promoted_hot += 1
@@ -2754,13 +2908,11 @@ def run_cold_scan(settings: Settings, universe: str | None = None, min_score: fl
         "error": None,
     })
 
-    summary_msg = f"Full scan: {len(ticker_list)} tickers → {len(_pool['hot'])} hot, {len(_pool['warm'])} warm, {len(_pool['candidates'])} candidates"
-    record_job_finish("breakout_cold_scan", elapsed, summary_msg, settings=settings)
+    strat_name = BREAKOUT_STRATEGIES.get(strat_clean, {}).get("name", strat_clean)
+    summary_msg = f"{strat_name} sweep: {len(ticker_list)} tickers → {len(_pool['hot'])} hot, {len(_pool['warm'])} warm, {cands_found} setups"
+    record_job_finish(job_id, elapsed, summary_msg, settings=settings)
 
-    logger.info(
-        "[BREAKOUT-COLD] %s in %.1fs",
-        summary_msg, elapsed,
-    )
+    logger.info("[BREAKOUT-COLD] %s in %.1fs", summary_msg, elapsed)
 
 
 def run_warm_rescore(settings: Settings) -> None:

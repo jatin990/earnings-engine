@@ -449,3 +449,89 @@ async def get_breakout_ai_reasoning_endpoint(
     except Exception as e:
         logger.exception("Error fetching breakout AI reasoning for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Error fetching AI reasoning: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# Multi-Strategy Parallel Scheduling & Automation Integration
+# ---------------------------------------------------------------------------
+
+@router.get("/api/v1/breakout-radar/schedules")
+async def get_breakout_schedules_endpoint():
+    """Retrieve all active and registered breakout scanning schedules and cadence states."""
+    from earnings_engine.data.automation_schedules import get_all_schedules
+    all_s = await asyncio.to_thread(get_all_schedules, _settings)
+    breakout_schedules = [s for s in all_s if s.get("category") == "Breakout Radar" or str(s.get("job_id", "")).startswith("breakout")]
+    return {"success": True, "count": len(breakout_schedules), "schedules": breakout_schedules}
+
+
+@router.post("/api/v1/breakout-radar/schedules/parallel-scan")
+async def trigger_breakout_parallel_scan_endpoint(
+    universe: str | None = Query(None, description="Universe to scan in parallel (e.g. NSE_ALL)"),
+    min_score: float = Query(30.0, description="Minimum composite score threshold"),
+    background: bool = Query(False, description="Run in background thread without waiting"),
+):
+    """Trigger parallel multi-strategy breakout scan across all 5 quantitative models simultaneously."""
+    if background:
+        from earnings_engine.data.scheduler_engine import get_scheduler_engine
+        engine = get_scheduler_engine()
+        dispatched = engine.dispatch_job("breakout_all_strategies_parallel", _settings)
+        return {
+            "success": True,
+            "job_id": "breakout_all_strategies_parallel",
+            "dispatched": dispatched,
+            "message": "Dispatched parallel 5-strategy breakout scan in background thread.",
+        }
+
+    # Synchronous execution
+    try:
+        res = await asyncio.to_thread(
+            breakout_scanner_mod.run_multi_strategy_parallel_scan,
+            settings=_settings,
+            universe=universe,
+            min_score=min_score,
+            record_schedule_event=True,
+        )
+        return res
+    except Exception as e:
+        logger.exception("Error executing parallel multi-strategy breakout scan: %s", e)
+        raise HTTPException(status_code=500, detail=f"Parallel scan failed: {str(e)}")
+
+
+@router.post("/api/v1/breakout-radar/schedules/configure")
+async def configure_breakout_schedule_endpoint(
+    job_id: str = Query(..., description="Job ID (e.g. breakout_all_strategies_parallel, breakout_delivery_absorption_scan)"),
+    interval_seconds: int | None = Query(None, ge=30, le=86400, description="Scan interval in seconds"),
+    is_enabled: bool | None = Query(None, description="Enable or disable schedule"),
+    status: str | None = Query(None, description="Status: 'active' or 'paused'"),
+):
+    """Update cadence interval or enabled state for any breakout strategy schedule."""
+    from earnings_engine.data.automation_schedules import update_schedule
+    updates = {}
+    if interval_seconds is not None:
+        updates["interval_seconds"] = interval_seconds
+    if is_enabled is not None:
+        updates["is_enabled"] = is_enabled
+    if status is not None:
+        updates["status"] = status
+
+    try:
+        updated = await asyncio.to_thread(update_schedule, job_id, updates, _settings)
+        return {"success": True, "message": f"Updated schedule '{job_id}'", "schedule": updated}
+    except Exception as e:
+        logger.exception("Error configuring breakout schedule %s: %s", job_id, e)
+        raise HTTPException(status_code=500, detail=f"Failed to configure schedule: {str(e)}")
+
+
+@router.post("/api/v1/breakout-radar/schedules/{job_id}/trigger")
+async def trigger_breakout_single_schedule_endpoint(job_id: str):
+    """Trigger immediate execution of a specific breakout strategy schedule."""
+    from earnings_engine.data.scheduler_engine import get_scheduler_engine
+    engine = get_scheduler_engine()
+    dispatched = engine.dispatch_job(job_id, _settings)
+    return {
+        "success": True,
+        "job_id": job_id,
+        "dispatched": dispatched,
+        "message": f"Triggered execution for '{job_id}' in background." if dispatched else f"Job '{job_id}' is already running.",
+    }
+

@@ -55,6 +55,11 @@ class SchedulerEngine:
 
     def _register_default_handlers(self) -> None:
         """Register built-in job execution handlers."""
+        self._job_handlers["breakout_all_strategies_parallel"] = self._handle_breakout_all_parallel
+        self._job_handlers["breakout_delivery_absorption_scan"] = self._handle_breakout_delivery_scan
+        self._job_handlers["breakout_fo_call_wall_scan"] = self._handle_breakout_call_wall_scan
+        self._job_handlers["breakout_volume_profile_scan"] = self._handle_breakout_volume_profile_scan
+        self._job_handlers["breakout_donchian_squeeze_scan"] = self._handle_breakout_donchian_squeeze_scan
         self._job_handlers["breakout_hot_rescore"] = self._handle_breakout_hot
         self._job_handlers["breakout_warm_rescore"] = self._handle_breakout_warm
         self._job_handlers["breakout_cold_scan"] = self._handle_breakout_cold
@@ -76,6 +81,67 @@ class SchedulerEngine:
     # Built-in Job Handlers
     # -------------------------------------------------------------------------
 
+    def _handle_breakout_all_parallel(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data import breakout_scanner as breakout_scanner_mod
+        universe = params.get("universe") or params.get("watchlist") or "NSE_ALL"
+        min_score = float(params.get("min_score", 30))
+        res = breakout_scanner_mod.run_multi_strategy_parallel_scan(
+            settings=settings,
+            universe=universe,
+            min_score=min_score,
+            job_id="breakout_all_strategies_parallel",
+            record_schedule_event=False,  # Managed by SchedulerEngine
+        )
+        return res.get("summary") or f"Parallel scan across all 5 strategies completed ({res.get('total_candidates', 0)} setups)."
+
+    def _handle_breakout_delivery_scan(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data import breakout_scanner as breakout_scanner_mod
+        universe = params.get("universe") or params.get("watchlist") or "NSE_ALL"
+        min_score = float(params.get("min_score", 30))
+        breakout_scanner_mod.run_cold_scan(
+            settings=settings,
+            universe=universe,
+            min_score=min_score,
+            strategy="NSE_DELIVERY_ABSORPTION",
+        )
+        return f"NSE Institutional Delivery Absorption sweep completed for {universe}."
+
+    def _handle_breakout_call_wall_scan(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data import breakout_scanner as breakout_scanner_mod
+        universe = params.get("universe") or params.get("watchlist") or "NSE_ALL"
+        min_score = float(params.get("min_score", 30))
+        breakout_scanner_mod.run_cold_scan(
+            settings=settings,
+            universe=universe,
+            min_score=min_score,
+            strategy="NSE_FO_CALL_WALL",
+        )
+        return f"NSE F&O Call OI Wall gamma squeeze sweep completed for {universe}."
+
+    def _handle_breakout_volume_profile_scan(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data import breakout_scanner as breakout_scanner_mod
+        universe = params.get("universe") or params.get("watchlist") or "NSE_ALL"
+        min_score = float(params.get("min_score", 30))
+        breakout_scanner_mod.run_cold_scan(
+            settings=settings,
+            universe=universe,
+            min_score=min_score,
+            strategy="VOLUME_PROFILE_VAH",
+        )
+        return f"Volume Profile VAH & POC compression sweep completed for {universe}."
+
+    def _handle_breakout_donchian_squeeze_scan(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data import breakout_scanner as breakout_scanner_mod
+        universe = params.get("universe") or params.get("watchlist") or "NSE_ALL"
+        min_score = float(params.get("min_score", 30))
+        breakout_scanner_mod.run_cold_scan(
+            settings=settings,
+            universe=universe,
+            min_score=min_score,
+            strategy="DONCHIAN_TTM_SQUEEZE",
+        )
+        return f"Donchian 55D + TTM Squeeze sweep completed for {universe}."
+
     def _handle_breakout_hot(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data import breakout_scanner as breakout_scanner_mod
         breakout_scanner_mod.run_hot_rescore(settings)
@@ -90,8 +156,11 @@ class SchedulerEngine:
         from earnings_engine.data import breakout_scanner as breakout_scanner_mod
         universe = params.get("universe") or params.get("watchlist") or "NSE_ALL"
         min_score = float(params.get("min_score", 35))
-        breakout_scanner_mod.run_cold_scan(settings, universe=universe, min_score=min_score)
-        return f"Full breakout sweep completed for {universe} (min score: {min_score})."
+        strategy = params.get("strategy", "CLASSIC_TECHNICAL")
+        if strategy.upper() in ("ALL", "MULTI_STRATEGY_PARALLEL", "PARALLEL"):
+            return self._handle_breakout_all_parallel(settings, params)
+        breakout_scanner_mod.run_cold_scan(settings, universe=universe, min_score=min_score, strategy=strategy)
+        return f"Breakout scan ({strategy}) completed for {universe} (min score: {min_score})."
 
     def _handle_swing_hot(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data import swing_scanner as swing_scanner_mod
