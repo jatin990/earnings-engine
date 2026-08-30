@@ -57,12 +57,15 @@ async def api_info():
     }
 
 
-@router.get("/api/v1/sidebar/badges")
-@router.get("/api/v1/system/sidebar-badges")
-async def get_sidebar_badges_endpoint():
-    """Retrieve dynamic notification badge counters for sidebar navigation items."""
+_BADGES_CACHE: dict[str, Any] = {}
+_BADGES_CACHE_TTL: float = 30.0  # 30-second TTL cache for instant sub-millisecond responses
+
+
+def _compute_sidebar_badges_sync(settings: Settings) -> dict[str, Any]:
+    """Execute direct, lightweight indexed SQL queries to compute sidebar badge counters."""
+    conn = None
     try:
-        conn = get_db_connection(_settings)
+        conn = get_db_connection(settings)
         # 1. High-impact catalysts count (>50% impact or HIGH in last 14 days)
         cat_count = 0
         try:
@@ -73,38 +76,38 @@ async def get_sidebar_badges_endpoint():
                   AND published_at >= datetime('now', '-14 days')
                 """
             ).fetchone()
-            cat_count = int(row[0]) if row else 0
+            cat_count = int(row[0]) if row and row[0] is not None else 0
         except Exception:
             try:
                 row = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE (impact_score >= 50 OR impact_level = 'HIGH')").fetchone()
-                cat_count = int(row[0]) if row else 0
+                cat_count = int(row[0]) if row and row[0] is not None else 0
             except Exception:
                 pass
 
-        # 2. Breakout Radar active / breached candidates count (hot + warm + breached setups)
+        # 2. Breakout Radar active / breached setups count directly from indexed table
         bo_count = 0
         try:
-            from earnings_engine.data import breakout_scanner as breakout_scanner_mod
-            candidates = breakout_scanner_mod.get_cached_scan_results(universe="all", settings=_settings)
-            if candidates:
-                # Count hot and warm setups with composite score >= 35 or breached setups
-                bo_count = sum(1 for c in candidates if (c.get("composite_score") or 0) >= 35.0 or c.get("is_breaking_out") or c.get("breakout_fired"))
-            
-            # Also check permanently tracked active/triggered breakouts
-            try:
-                row_tracked = conn.execute(
-                    """
-                    SELECT COUNT(*) FROM breakout_tracked_signals
-                    WHERE outcome IN ('ACTIVE', 'TRIGGERED', 'TARGET_HIT', 'BREAKOUT_SUCCEEDED', 'COILING_IN_PROFIT')
-                      OR breakout_happened = 1
-                    """
-                ).fetchone()
-                if row_tracked and int(row_tracked[0]) > 0:
-                    bo_count = max(bo_count, int(row_tracked[0]))
-            except Exception:
-                pass
-        except Exception as e:
-            logger.debug("[SIDEBAR-BADGES] Error calculating breakout badge count: %s", e)
+            row_bo = conn.execute(
+                "SELECT COUNT(*) FROM breakout_radar WHERE tier IN ('HOT', 'WARM') OR composite_score >= 35.0"
+            ).fetchone()
+            if row_bo and row_bo[0] is not None:
+                bo_count = int(row_bo[0])
+        except Exception:
+            pass
+
+        # Check permanently tracked active/triggered breakouts
+        try:
+            row_tracked = conn.execute(
+                """
+                SELECT COUNT(*) FROM breakout_tracked_signals
+                WHERE outcome IN ('ACTIVE', 'TRIGGERED', 'TARGET_HIT', 'BREAKOUT_SUCCEEDED', 'COILING_IN_PROFIT')
+                  OR breakout_happened = 1
+                """
+            ).fetchone()
+            if row_tracked and row_tracked[0] is not None:
+                bo_count = max(bo_count, int(row_tracked[0]))
+        except Exception:
+            pass
 
         return {
             "success": True,
@@ -115,6 +118,44 @@ async def get_sidebar_badges_endpoint():
         }
     except Exception as e:
         logger.debug("[SIDEBAR-BADGES] Error calculating badge counts: %s", e)
+        return {
+            "success": True,
+            "catalysts_count": 0,
+            "breakouts_count": 0,
+            "high_impact_catalysts": 0,
+            "active_breakouts": 0,
+        }
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+@router.get("/api/v1/sidebar/badges")
+@router.get("/api/v1/system/sidebar-badges")
+async def get_sidebar_badges_endpoint():
+    """Retrieve dynamic notification badge counters for sidebar navigation items (< 1ms cached)."""
+    import time
+    global _BADGES_CACHE
+    now = time.time()
+
+    # Fast in-memory cache check (< 0.1ms)
+    if "data" in _BADGES_CACHE and (now - _BADGES_CACHE.get("ts", 0)) < _BADGES_CACHE_TTL:
+        return _BADGES_CACHE["data"]
+
+    try:
+        data = await asyncio.wait_for(
+            asyncio.to_thread(_compute_sidebar_badges_sync, _settings),
+            timeout=3.0,
+        )
+        _BADGES_CACHE = {"ts": now, "data": data}
+        return data
+    except Exception as e:
+        logger.debug("[SIDEBAR-BADGES] Fallback during badge fetch: %s", e)
+        if "data" in _BADGES_CACHE:
+            return _BADGES_CACHE["data"]
         return {
             "success": True,
             "catalysts_count": 0,
