@@ -17,51 +17,92 @@ const API_BASE = window.location.origin;
 
 
             activeFetchControllers: {},
+            tabDataCache: {},
 
-            fetchWithAbort(taskName, url, options = {}) {
-                if (this.activeFetchControllers[taskName]) {
-                    try {
-                        const prev = this.activeFetchControllers[taskName];
-                        if (prev.controller) prev.controller.abort('Superseded by new request');
-                        if (prev.reqId) {
-                            fetch('/api/v1/tasks/' + encodeURIComponent(prev.reqId) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
-                        }
-                    } catch (e) {}
+            getTabCache(tabKey, maxAgeMs = 60000) {
+                const entry = this.tabDataCache ? this.tabDataCache[tabKey] : null;
+                if (!entry) return null;
+                if (Date.now() - entry.ts < maxAgeMs) {
+                    return entry.data;
                 }
-                const controller = new AbortController();
-                const reqId = 'req_' + taskName + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-                const opts = { ...options, signal: controller.signal };
-                opts.headers = { ...(opts.headers || {}), 'X-Request-ID': reqId };
+                delete this.tabDataCache[tabKey];
+                return null;
+            },
 
-                this.activeFetchControllers[taskName] = { controller, reqId };
+            setTabCache(tabKey, data) {
+                if (!this.tabDataCache) this.tabDataCache = {};
+                this.tabDataCache[tabKey] = { ts: Date.now(), data: data };
+            },
+
+            clearTabCache(tabKey = null) {
+                if (!this.tabDataCache) return;
+                if (tabKey) {
+                    delete this.tabDataCache[tabKey];
+                } else {
+                    this.tabDataCache = {};
+                }
+            },
+
+            apiFetch(url, options = {}, tabContext = null) {
+                const tab = tabContext || this.currentTab || 'global';
+                const controller = new AbortController();
+                const reqId = 'req_' + tab + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+                const reqKey = reqId;
+
+                const opts = { ...options, signal: controller.signal };
+                opts.headers = { ...(opts.headers || {}), 'X-Request-ID': reqId, 'X-Tab-Context': tab };
+
+                if (!this.activeFetchControllers) this.activeFetchControllers = {};
+                this.activeFetchControllers[reqKey] = { controller, reqId, tabName: tab };
 
                 return fetch(url, opts)
+                    .catch(err => {
+                        if (err.name === 'AbortError' || err.message === 'The user aborted a request.') {
+                            console.debug(`[REQUEST-CANCELLED] ${tab} -> ${url}`);
+                            return new Response(JSON.stringify({ success: false, aborted: true, message: 'Request cancelled' }), {
+                                status: 499,
+                                headers: { 'Content-Type': 'application/json' }
+                            });
+                        }
+                        throw err;
+                    })
                     .finally(() => {
-                        const current = this.activeFetchControllers[taskName];
-                        if (current && current.controller === controller) {
-                            delete this.activeFetchControllers[taskName];
+                        if (this.activeFetchControllers && this.activeFetchControllers[reqKey]) {
+                            delete this.activeFetchControllers[reqKey];
                         }
                     });
             },
 
+            fetchWithAbort(taskName, url, options = {}) {
+                return this.apiFetch(url, options, taskName);
+            },
+
+            cancelTabRequests(tabName, reason = 'Tab switched') {
+                if (!this.activeFetchControllers) return;
+                Object.keys(this.activeFetchControllers).forEach(key => {
+                    const entry = this.activeFetchControllers[key];
+                    if (entry && (entry.tabName === tabName || entry.tabName === ('tab-' + tabName))) {
+                        try {
+                            if (entry.controller) entry.controller.abort(reason);
+                            if (entry.reqId) {
+                                fetch('/api/v1/tasks/' + encodeURIComponent(entry.reqId) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
+                            }
+                        } catch (e) {}
+                        delete this.activeFetchControllers[key];
+                    }
+                });
+            },
+
             cancelReportLoad(taskName) {
-                const entry = this.activeFetchControllers[taskName];
-                if (entry) {
-                    try {
-                        if (entry.controller) entry.controller.abort('User cancelled');
-                        if (entry.reqId) {
-                            fetch('/api/v1/tasks/' + encodeURIComponent(entry.reqId) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
-                        }
-                    } catch (e) {}
-                    delete this.activeFetchControllers[taskName];
-                }
+                this.cancelTabRequests(taskName, 'User cancelled');
                 this.resetTaskLoadingUI(taskName, '⚠️ Request cancelled by user.');
             },
 
             cancelAllPendingRequests(reason = 'Tab switched') {
-                Object.keys(this.activeFetchControllers || {}).forEach(taskName => {
+                if (!this.activeFetchControllers) return;
+                Object.keys(this.activeFetchControllers).forEach(key => {
                     try {
-                        const entry = this.activeFetchControllers[taskName];
+                        const entry = this.activeFetchControllers[key];
                         if (entry) {
                             if (entry.controller) entry.controller.abort(reason);
                             if (entry.reqId) {
@@ -69,7 +110,7 @@ const API_BASE = window.location.origin;
                             }
                         }
                     } catch (e) {}
-                    this.resetTaskLoadingUI(taskName, '⚠️ Loading cancelled (' + reason + ').');
+                    delete this.activeFetchControllers[key];
                 });
                 this.activeFetchControllers = {};
             },
