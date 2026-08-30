@@ -19,38 +19,73 @@ def client():
 
 
 def test_overnight_window_calculation():
+    from earnings_engine.data.pre_market_setups import IST_OFFSET
+    friday_now = datetime(2026, 8, 28, 8, 0, 0, tzinfo=timezone(IST_OFFSET))
+
     # 1. Evening filing at 19:45 IST (14:15 UTC) -> Should match standard_6pm & full_post_market
     pub_evening = "2026-08-27T14:15:00Z"
-    is_match, phase, desc = is_in_overnight_window(pub_evening, window_mode="standard_6pm")
+    is_match, phase, desc = is_in_overnight_window(pub_evening, window_mode="standard_6pm", now_ist=friday_now)
     assert is_match is True
     assert phase == "EVENING_FILING"
     assert "After 6 PM" in desc
 
     # 2. Post-close filing at 16:30 IST (11:00 UTC) -> Not standard_6pm, but matches full_post_market
     pub_postclose = "2026-08-27T11:00:00Z"
-    is_match_std, phase_std, _ = is_in_overnight_window(pub_postclose, window_mode="standard_6pm")
+    is_match_std, phase_std, _ = is_in_overnight_window(pub_postclose, window_mode="standard_6pm", now_ist=friday_now)
     assert is_match_std is False
 
-    is_match_full, phase_full, desc_full = is_in_overnight_window(pub_postclose, window_mode="full_post_market")
+    is_match_full, phase_full, desc_full = is_in_overnight_window(pub_postclose, window_mode="full_post_market", now_ist=friday_now)
     assert is_match_full is True
     assert phase_full == "POST_CLOSE"
     assert "Post-Close" in desc_full
 
     # 3. Early morning filing at 07:15 IST (01:45 UTC) -> Matches standard_6pm, full_post_market, and early_morning
     pub_morning = "2026-08-28T01:45:00Z"
-    is_match_morn, phase_morn, desc_morn = is_in_overnight_window(pub_morning, window_mode="standard_6pm")
+    is_match_morn, phase_morn, desc_morn = is_in_overnight_window(pub_morning, window_mode="standard_6pm", now_ist=friday_now)
     assert is_match_morn is True
     assert phase_morn == "PRE_OPEN"
     assert "Pre-Market Open" in desc_morn
 
-    is_match_early, _, _ = is_in_overnight_window(pub_morning, window_mode="early_morning")
+    is_match_early, _, _ = is_in_overnight_window(pub_morning, window_mode="early_morning", now_ist=friday_now)
     assert is_match_early is True
 
     # 4. Intraday headline at 12:30 IST (07:00 UTC) -> Should NOT match premarket overnight window
     pub_intraday = "2026-08-28T07:00:00Z"
-    is_match_intra, phase_intra, _ = is_in_overnight_window(pub_intraday, window_mode="standard_6pm")
+    is_match_intra, phase_intra, _ = is_in_overnight_window(pub_intraday, window_mode="standard_6pm", now_ist=friday_now)
     assert is_match_intra is False
     assert phase_intra == "INTRADAY"
+
+
+def test_weekend_overnight_window_calculation():
+    from datetime import timedelta
+    from earnings_engine.data.pre_market_setups import IST_OFFSET
+
+    # Simulated Current Time: Sunday 2026-08-30 10:00:00 IST
+    sunday_now = datetime(2026, 8, 30, 10, 0, 0, tzinfo=timezone(IST_OFFSET))
+
+    # 1. Friday post-close filing at 17:30 IST (2026-08-28 17:30:00 IST) -> Should match weekend window
+    pub_fri_postclose = "2026-08-28T12:00:00Z"  # 12:00 UTC = 17:30 IST
+    is_match, phase, desc = is_in_overnight_window(pub_fri_postclose, window_mode="standard_6pm", now_ist=sunday_now)
+    assert is_match is True
+    assert phase == "WEEKEND_OVERNIGHT"
+    assert "Fri 3:15 PM – Mon 9:15 AM" in desc
+
+    # 2. Saturday filing at 11:00 IST (2026-08-29 11:00:00 IST) -> Should match weekend window
+    pub_sat = "2026-08-29T05:30:00Z"  # 05:30 UTC = 11:00 IST
+    is_match_sat, phase_sat, _ = is_in_overnight_window(pub_sat, window_mode="standard_6pm", now_ist=sunday_now)
+    assert is_match_sat is True
+    assert phase_sat == "WEEKEND_OVERNIGHT"
+
+    # 3. Friday intraday filing at 14:00 IST (2026-08-28 14:00:00 IST) -> Before 15:15 close, so should NOT match
+    pub_fri_intraday = "2026-08-28T08:30:00Z"  # 08:30 UTC = 14:00 IST
+    is_match_intra, _, _ = is_in_overnight_window(pub_fri_intraday, window_mode="standard_6pm", now_ist=sunday_now)
+    assert is_match_intra is False
+
+    # 4. Monday Pre-Market test: Simulated Current Time: Monday 2026-08-31 08:30:00 IST
+    monday_preopen = datetime(2026, 8, 31, 8, 30, 0, tzinfo=timezone(IST_OFFSET))
+    is_match_mon, phase_mon, _ = is_in_overnight_window(pub_fri_postclose, window_mode="standard_6pm", now_ist=monday_preopen)
+    assert is_match_mon is True
+    assert phase_mon == "WEEKEND_OVERNIGHT"
 
 
 def test_score_premarket_setup_bullish_order_win():

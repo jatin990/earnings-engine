@@ -54,17 +54,57 @@ def parse_to_ist(published_at_str: str) -> tuple[datetime | None, str]:
         return None, published_at_str
 
 
+def get_dynamic_overnight_max_hours(now_ist: datetime | None = None) -> float:
+    """Compute maximum hours lookback for the current post-market overnight window.
+
+    Rules:
+    - On Weekends (Saturday / Sunday) & Monday pre-market (up to Monday 15:15 IST):
+      The overnight window spans from Friday 15:15 IST (3:15 PM) to Monday 09:15 IST.
+      The lookback needs to span up to 76.0 hours to capture all Friday post-close filings.
+    - On Regular Weekdays (Tuesday to Friday):
+      Standard overnight window from T-1 post-close (15:15/18:00 IST) to today 09:15 IST (~28.0 hours).
+    """
+    if now_ist is None:
+        now_ist = datetime.now(timezone(IST_OFFSET))
+
+    weekday = now_ist.weekday()  # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+    time_float = now_ist.hour + (now_ist.minute / 60.0)
+
+    # Saturday (weekday 5): Friday 15:15 IST was 1 day ago (~36h max)
+    if weekday == 5:
+        friday_close = (now_ist - timedelta(days=1)).replace(hour=15, minute=15, second=0, microsecond=0)
+        elapsed = (now_ist - friday_close).total_seconds() / 3600.0
+        return max(36.0, elapsed + 4.0)
+
+    # Sunday (weekday 6): Friday 15:15 IST was 2 days ago (~60h max)
+    if weekday == 6:
+        friday_close = (now_ist - timedelta(days=2)).replace(hour=15, minute=15, second=0, microsecond=0)
+        elapsed = (now_ist - friday_close).total_seconds() / 3600.0
+        return max(60.0, elapsed + 4.0)
+
+    # Monday (weekday 0): Before Monday 15:15 close, Friday 15:15 IST was 3 days ago (~76h max)
+    if weekday == 0 and time_float <= 15.25:
+        friday_close = (now_ist - timedelta(days=3)).replace(hour=15, minute=15, second=0, microsecond=0)
+        elapsed = (now_ist - friday_close).total_seconds() / 3600.0
+        return max(76.0, elapsed + 4.0)
+
+    # Regular weekday default
+    return 28.0
+
+
 def is_in_overnight_window(
     published_at_str: str,
     window_mode: str = "standard_6pm",
     target_date: str | None = None,
     max_hours_ago: float | None = None,
+    now_ist: datetime | None = None,
 ) -> tuple[bool, str, str]:
     """Determine if publication timestamp falls in the after-hours / overnight pre-market window.
 
     Window modes:
     - 'standard_6pm' (Default): Post-18:00 (6:00 PM) on T-1 to 09:15 AM on T.
-    - 'full_post_market': Post-15:30 (3:30 PM) on T-1 to 09:15 AM on T.
+      * Note: On weekends (Sat/Sun) & Monday pre-market, automatically expands to Friday 15:15 IST – Monday 09:15 AM.
+    - 'full_post_market': Post-15:15 (3:15 PM) on T-1 to 09:15 AM on T.
     - 'early_morning': 05:00 AM to 09:15 AM on T.
     - 'all_recent': Any publication in last 7 days falling in after-hours (>=18:00 or <=09:15).
 
@@ -75,33 +115,69 @@ def is_in_overnight_window(
     if not ist_dt:
         return False, "UNKNOWN", time_label
 
-    now_ist = datetime.now(timezone(IST_OFFSET))
+    if now_ist is None:
+        if target_date:
+            parsed_target, _ = parse_to_ist(f"{target_date} 08:30:00 IST")
+            if parsed_target:
+                now_ist = parsed_target
+        if now_ist is None:
+            now_ist = datetime.now(timezone(IST_OFFSET))
+
     hours_ago = (now_ist - ist_dt).total_seconds() / 3600.0
 
-    # If a maximum lookback in hours is enforced and the news is older, reject from current overnight window
-    if max_hours_ago is not None and hours_ago > max_hours_ago:
+    weekday = now_ist.weekday()  # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+    time_float_now = now_ist.hour + (now_ist.minute / 60.0)
+
+    # Dynamic lookback max hours if not explicitly forced
+    effective_max_hours = max_hours_ago if max_hours_ago is not None else get_dynamic_overnight_max_hours(now_ist)
+
+    if window_mode != "all_recent" and hours_ago > effective_max_hours:
         return False, "HISTORICAL", time_label
+
+    # Check Weekend / Monday Pre-Market Window: Friday 15:15 IST to Monday 09:15 AM
+    is_weekend_or_monday = (weekday in (5, 6)) or (weekday == 0 and time_float_now <= 15.25)
+    if is_weekend_or_monday and window_mode in ("standard_6pm", "full_post_market"):
+        days_to_friday = 1 if weekday == 5 else (2 if weekday == 6 else 3)
+        friday_1515 = (now_ist - timedelta(days=days_to_friday)).replace(
+            hour=15, minute=15, second=0, microsecond=0
+        )
+        
+        # End of pre-market window on Monday 09:15 AM
+        if weekday == 0:
+            monday_0915 = now_ist.replace(hour=9, minute=15, second=0, microsecond=0)
+        else:
+            days_to_monday = (7 - weekday)
+            monday_0915 = (now_ist + timedelta(days=days_to_monday)).replace(
+                hour=9, minute=15, second=0, microsecond=0
+            )
+
+        cutoff_end = min(now_ist, monday_0915) if weekday == 0 else now_ist
+
+        if ist_dt >= friday_1515 and ist_dt <= cutoff_end + timedelta(minutes=15):
+            timing_desc = f"{ist_dt.strftime('%b %d %H:%M')} IST (🌙 Weekend Post-Close Fri 3:15 PM – Mon 9:15 AM)"
+            session_phase = "WEEKEND_OVERNIGHT"
+            return True, session_phase, timing_desc
 
     hour = ist_dt.hour
     minute = ist_dt.minute
     time_float = hour + (minute / 60.0)
 
-    # Classification by time of day
+    # Standard weekday classification by time of day
     if time_float >= 18.0:
-        timing_desc = f"{ist_dt.strftime('%b %d')} {ist_dt.strftime('%H:%M')} IST (🌙 After 6 PM)"
+        timing_desc = f"{ist_dt.strftime('%b %d %H:%M')} IST (🌙 After 6 PM)"
         session_phase = "EVENING_FILING"
-    elif time_float >= 15.5 and time_float < 18.0:
-        timing_desc = f"{ist_dt.strftime('%b %d')} {ist_dt.strftime('%H:%M')} IST (🌆 Post-Close 3:30–6 PM)"
+    elif time_float >= 15.25 and time_float < 18.0:
+        timing_desc = f"{ist_dt.strftime('%b %d %H:%M')} IST (🌆 Post-Close 3:15–6 PM)"
         session_phase = "POST_CLOSE"
     elif time_float <= 9.25:  # <= 09:15 AM
-        timing_desc = f"{ist_dt.strftime('%b %d')} {ist_dt.strftime('%H:%M')} IST (🌅 Pre-Market Open)"
+        timing_desc = f"{ist_dt.strftime('%b %d %H:%M')} IST (🌅 Pre-Market Open)"
         session_phase = "PRE_OPEN"
     else:
-        timing_desc = f"{ist_dt.strftime('%b %d')} {ist_dt.strftime('%H:%M')} IST (☀️ Intraday Market Session)"
+        timing_desc = f"{ist_dt.strftime('%b %d %H:%M')} IST (☀️ Intraday Market Session)"
         session_phase = "INTRADAY"
 
     if window_mode == "all_recent":
-        is_match = (time_float >= 18.0 or time_float <= 9.25 or time_float >= 15.5)
+        is_match = (time_float >= 18.0 or time_float <= 9.25 or time_float >= 15.25)
         return is_match, session_phase, timing_desc
 
     if window_mode == "early_morning":
@@ -109,7 +185,7 @@ def is_in_overnight_window(
         return is_match, session_phase, timing_desc
 
     if window_mode == "full_post_market":
-        is_match = (time_float >= 15.5 or time_float <= 9.25)
+        is_match = (time_float >= 15.25 or time_float <= 9.25)
         return is_match, session_phase, timing_desc
 
     # Default 'standard_6pm': >= 18.0 (6:00 PM) or <= 09:15 AM
@@ -247,9 +323,20 @@ def get_premarket_setups(
     """Query, filter, score, and rank pre-market setups from overnight filings and news."""
     settings = settings or Settings()
     
-    # 1. Fetch recent raw catalysts
+    now_ist = datetime.now(timezone(IST_OFFSET))
+
+    # Active overnight window lookback:
+    # If standard_6pm, full_post_market, early_morning: adapt max_hours to weekend/weekday context
+    # If all_recent: allow full archive lookback (e.g. 7-14 days)
+    if window_mode == "all_recent":
+        max_hours = days_lookback * 24.0
+    else:
+        max_hours = get_dynamic_overnight_max_hours(now_ist)
+
+    # 1. Fetch recent raw catalysts (ensure lookback window is at least 4 days on weekends/Monday)
+    fetch_days = max(days_lookback, 4 if now_ist.weekday() in (0, 5, 6) else 2)
     raw_catalysts = get_short_term_catalysts(
-        days=days_lookback,
+        days=fetch_days,
         impact_filter="ALL",
         category_filter="ALL",
         direction_filter="ALL",
@@ -257,11 +344,6 @@ def get_premarket_setups(
         limit=500,
         settings=settings,
     )
-
-    # Active overnight window lookback:
-    # If standard_6pm, full_post_market, early_morning: only show filings from the current overnight window (last 28h)
-    # If all_recent: allow full archive lookback (e.g. 7-14 days)
-    max_hours = (days_lookback * 24.0) if window_mode == "all_recent" else 28.0
 
     setups: list[dict[str, Any]] = []
 
@@ -272,6 +354,7 @@ def get_premarket_setups(
             pub_at,
             window_mode=window_mode,
             max_hours_ago=max_hours,
+            now_ist=now_ist,
         )
         if not is_match:
             continue
