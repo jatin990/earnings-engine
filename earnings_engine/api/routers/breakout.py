@@ -301,6 +301,23 @@ async def get_breakout_audit_log_endpoint(
         raise HTTPException(status_code=500, detail=f"Error fetching breakout audit log: {str(e)}")
 
 
+@router.get("/api/v1/breakout-radar/history/{ticker}")
+async def get_breakout_stock_history_endpoint(
+    ticker: str,
+):
+    """Retrieve full chronological lifecycle timeline & transition notes for a single stock."""
+    try:
+        data = await asyncio.to_thread(
+            breakout_scanner_mod.get_stock_breakout_timeline,
+            ticker=ticker,
+            settings=_settings,
+        )
+        return data
+    except Exception as e:
+        logger.exception("Error in get_breakout_stock_history: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching stock breakout history: {str(e)}")
+
+
 @router.get("/api/v1/breakout/tracked")
 @router.get("/api/v1/breakout-radar/tracked")
 async def get_tracked_breakouts_endpoint(

@@ -676,6 +676,9 @@
                             <div style="font-size:0.67rem;color:#94a3b8;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.company_name || ctx.ticker}">${ctx.company}</div>
                             <div style="margin-top:0.1rem;display:flex;gap:0.25rem;flex-wrap:wrap;align-items:center;">
                                 <span style="font-size:0.60rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;">${ctx.archetype}</span>
+                                <button type="button" onclick="app.openBreakoutHistoryModal('${ctx.ticker}', event)" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-size:0.60rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.2rem;" title="View Transition Lifecycle & Notes Timeline (Warm ➔ Hot ➔ Breakout)">
+                                    📜 History
+                                </button>
                                 ${(c.institutional_flow && c.institutional_flow.funds_in > 0) ? `<span style="font-size:0.60rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.04rem 0.3rem;border-radius:3px;font-weight:700;" title="Institutional Accumulation: +${c.institutional_flow.funds_in} Funds Buying">🏛️ +${c.institutional_flow.funds_in}</span>` : ''}
                                 ${c.is_real_tracked ? `
                                     <span style="font-size:0.60rem;background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.04rem 0.32rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Real-Time Tracked Entry recorded in SQLite database archive">
@@ -822,6 +825,9 @@
                 render: (c, ctx) => `
                     <td style="padding:0.46rem 0.65rem;text-align:center;white-space:nowrap;">
                         <div style="display:flex;align-items:center;justify-content:center;gap:0.25rem;">
+                            <button type="button" onclick="app.openBreakoutHistoryModal('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:0.65rem;padding:0.18rem 0.45rem;border-radius:4px;cursor:pointer;" title="View Transition Lifecycle & Notes Timeline (Warm ➔ Hot ➔ Breakout)">
+                                📜 History
+                            </button>
                             <button type="button" id="btnReeval-${ctx.ticker.replace(/[^a-zA-Z0-9]/g, '_')}" onclick="app.reevaluateBreakoutStock('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(234,179,8,0.15);color:#fbbf24;border:1px solid rgba(234,179,8,0.3);font-size:0.65rem;padding:0.18rem 0.42rem;border-radius:4px;cursor:pointer;" title="Re-evaluate with fresh market prices and recalculate conviction">
                                 ⚡ Re-eval
                             </button>
@@ -1293,6 +1299,226 @@
                     bodyEl.innerHTML = `<div style="color:#f87171;">AI reasoning call failed: ${e.message}. Using rule-based calculation notes above.</div>`;
                 }
             }
+        };
+
+        // =========================================================================
+        // 📜 BREAKOUT LIFECYCLE & TIER TRANSITION HISTORY NOTE MODAL
+        // =========================================================================
+        app.closeBreakoutHistoryModal = function() {
+            const modal = document.getElementById('breakoutHistoryModal');
+            if (modal) modal.style.display = 'none';
+        };
+
+        app.openBreakoutHistoryModal = async function(ticker, event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            const sym = (ticker || '').trim().toUpperCase();
+            if (!sym) return;
+
+            const modal = document.getElementById('breakoutHistoryModal');
+            const content = document.getElementById('bkHistContent');
+            const tickerEl = document.getElementById('bkHistTicker');
+            const compEl = document.getElementById('bkHistCompany');
+            const badgeEl = document.getElementById('bkHistTierBadge');
+            const btnStock = document.getElementById('bkHistBtnStockDetail');
+            const btnIntel = document.getElementById('bkHistBtnIntelNote');
+
+            if (!modal || !content) return;
+
+            modal.style.display = 'flex';
+            if (tickerEl) tickerEl.textContent = sym;
+            if (compEl) compEl.textContent = 'Loading lifecycle history...';
+            if (badgeEl) {
+                badgeEl.textContent = '…';
+                badgeEl.className = 'signal-badge';
+                badgeEl.style.background = 'rgba(255,255,255,0.08)';
+                badgeEl.style.color = '#94a3b8';
+            }
+
+            if (btnStock) btnStock.onclick = () => window.open('/stock/' + encodeURIComponent(sym), '_blank');
+            if (btnIntel) btnIntel.onclick = () => { app.closeBreakoutHistoryModal(); app.openStockNote(sym); };
+
+            content.innerHTML = `
+                <div style="text-align:center;padding:3rem;color:#94a3b8;">
+                    <div style="font-size:1.8rem;margin-bottom:0.6rem;display:inline-block;animation:spin 1s linear infinite;">⏳</div>
+                    <div style="font-size:0.95rem;color:#f8fafc;font-weight:700;">Retrieving Transition Lifecycle for ${sym}...</div>
+                    <div style="font-size:0.75rem;color:#64748b;margin-top:0.25rem;">Fetching tier movements (Warm ➔ Hot ➔ Breakout), score deltas &amp; live prices</div>
+                </div>
+            `;
+
+            try {
+                const res = await fetch(API_BASE + '/api/v1/breakout-radar/history/' + encodeURIComponent(sym));
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                app.renderBreakoutHistoryTimeline(data);
+            } catch (err) {
+                console.error('[BREAKOUT-HISTORY] Error loading timeline:', err);
+                content.innerHTML = `
+                    <div style="padding:2rem;text-align:center;color:#f87171;">
+                        <div style="font-size:1.4rem;margin-bottom:0.4rem;">⚠️ Error Loading Transition History</div>
+                        <div style="font-size:0.8rem;color:#e2e8f0;margin-bottom:1rem;">${err.message || err}</div>
+                        <button type="button" onclick="app.openBreakoutHistoryModal('${sym}')" class="btn btn-sm" style="background:#2563eb;color:#fff;">🔄 Retry</button>
+                    </div>
+                `;
+            }
+        };
+
+        app.renderBreakoutHistoryTimeline = function(data) {
+            const content = document.getElementById('bkHistContent');
+            const tickerEl = document.getElementById('bkHistTicker');
+            const compEl = document.getElementById('bkHistCompany');
+            const badgeEl = document.getElementById('bkHistTierBadge');
+
+            if (!content || !data) return;
+
+            const sym = data.ticker || '';
+            const comp = data.company_name || sym.replace('.NS', '');
+            const tier = (data.tier || 'WARM').toUpperCase();
+            const curP = data.current_price != null ? '₹' + Number(data.current_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+            const trigP = data.breakout_trigger != null ? '₹' + Number(data.breakout_trigger).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+            const targetP = data.target_price != null ? '₹' + Number(data.target_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+            const stopP = data.stop_loss != null ? '₹' + Number(data.stop_loss).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+            const score = data.composite_score != null ? Number(data.composite_score).toFixed(0) : '—';
+            const retPct = data.realized_return_pct != null ? Number(data.realized_return_pct) : null;
+            const retStr = retPct != null ? (retPct >= 0 ? '+' : '') + retPct.toFixed(2) + '%' : '—';
+            const retColor = retPct != null ? (retPct >= 0 ? '#34d399' : '#f87171') : '#94a3b8';
+            const activeStep = data.active_step != null ? Number(data.active_step) : 1;
+
+            if (tickerEl) tickerEl.textContent = sym;
+            if (compEl) compEl.textContent = comp + (data.industry ? ` · ${data.industry}` : '');
+            if (badgeEl) {
+                badgeEl.textContent = tier === 'HOT' ? '🔥 HOT POOL' : '⚡ WARM POOL';
+                badgeEl.style.background = tier === 'HOT' ? 'rgba(248,113,113,0.15)' : 'rgba(251,191,36,0.15)';
+                badgeEl.style.color = tier === 'HOT' ? '#f87171' : '#fbbf24';
+                badgeEl.style.border = '1px solid ' + (tier === 'HOT' ? 'rgba(248,113,113,0.35)' : 'rgba(251,191,36,0.35)');
+            }
+
+            // Stepper stages
+            const steps = [
+                { idx: 0, label: 'Discovery', icon: '❄️', desc: 'Cold scan discovery' },
+                { idx: 1, label: 'Warm Pool', icon: '⚡', desc: 'Pre-breakout coiling' },
+                { idx: 2, label: 'Hot Priority', icon: '🔥', desc: 'Imminent setup' },
+                { idx: 3, label: 'Breakout Fired', icon: '🚀', desc: 'Trigger breached' },
+                { idx: 4, label: 'Target / Settle', icon: '🎯', desc: 'Live target tracking' },
+            ];
+
+            const stepperHtml = `
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:0.9rem 1rem;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;position:relative;margin:0 0.5rem;">
+                        <div style="position:absolute;top:15px;left:0;right:0;height:2px;background:rgba(255,255,255,0.1);z-index:1;"></div>
+                        <div style="position:absolute;top:15px;left:0;width:${Math.min(100, Math.max(0, activeStep * 25))}%;height:2px;background:linear-gradient(90deg, #38bdf8, #34d399);z-index:2;transition:width 0.4s ease;"></div>
+                        ${steps.map((s) => {
+                            const isPast = s.idx < activeStep;
+                            const isCurrent = s.idx === activeStep;
+                            const bg = isCurrent ? '#38bdf8' : (isPast ? '#10b981' : '#1e293b');
+                            const border = isCurrent ? '#38bdf8' : (isPast ? '#10b981' : 'rgba(255,255,255,0.15)');
+                            const color = isCurrent || isPast ? '#ffffff' : '#64748b';
+                            const shadow = isCurrent ? '0 0 12px rgba(56,189,248,0.6)' : 'none';
+                            return `
+                                <div style="display:flex;flex-direction:column;align-items:center;z-index:3;cursor:default;">
+                                    <div style="width:30px;height:30px;border-radius:50%;background:${bg};border:2px solid ${border};display:flex;align-items:center;justify-content:center;font-size:0.8rem;box-shadow:${shadow};color:${color};font-weight:700;">
+                                        ${s.icon}
+                                    </div>
+                                    <div style="font-size:0.68rem;font-weight:${isCurrent ? '800' : '600'};color:${isCurrent ? '#38bdf8' : (isPast ? '#f8fafc' : '#64748b')};margin-top:0.4rem;text-align:center;">
+                                        ${s.label}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+
+            // Key levels & score metrics strip
+            const metricsHtml = `
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:0.6rem;">
+                    <div style="background:#0b1120;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                        <div style="font-size:0.65rem;color:#64748b;font-weight:600;text-transform:uppercase;">Current Price</div>
+                        <div style="font-size:0.95rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);margin-top:0.15rem;">${curP}</div>
+                    </div>
+                    <div style="background:#0b1120;border:1px solid rgba(56,189,248,0.25);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                        <div style="font-size:0.65rem;color:#38bdf8;font-weight:600;text-transform:uppercase;">Trigger Price</div>
+                        <div style="font-size:0.95rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:0.15rem;">${trigP}</div>
+                    </div>
+                    <div style="background:#0b1120;border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                        <div style="font-size:0.65rem;color:#34d399;font-weight:600;text-transform:uppercase;">Target (1:2 R:R)</div>
+                        <div style="font-size:0.95rem;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:0.15rem;">${targetP}</div>
+                    </div>
+                    <div style="background:#0b1120;border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                        <div style="font-size:0.65rem;color:#f87171;font-weight:600;text-transform:uppercase;">Stop Loss</div>
+                        <div style="font-size:0.95rem;font-weight:800;color:#f87171;font-family:var(--font-mono);margin-top:0.15rem;">${stopP}</div>
+                    </div>
+                    <div style="background:#0b1120;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                        <div style="font-size:0.65rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Score</div>
+                        <div style="font-size:0.95rem;font-weight:800;color:#fbbf24;font-family:var(--font-mono);margin-top:0.15rem;">${score}<span style="font-size:0.68rem;color:#64748b;">/100</span></div>
+                    </div>
+                    <div style="background:#0b1120;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                        <div style="font-size:0.65rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Outcome Return</div>
+                        <div style="font-size:0.95rem;font-weight:800;color:${retColor};font-family:var(--font-mono);margin-top:0.15rem;">${retStr}</div>
+                    </div>
+                </div>
+            `;
+
+            // Timeline cards
+            const events = data.events || [];
+            const eventsHtml = events.length ? `
+                <div style="display:flex;flex-direction:column;gap:0.75rem;position:relative;padding-left:1.5rem;">
+                    <!-- Vertical connecting line -->
+                    <div style="position:absolute;top:10px;bottom:10px;left:7px;width:2px;background:rgba(255,255,255,0.1);"></div>
+
+                    ${events.map((ev) => {
+                        const pxStr = ev.price != null ? '₹' + Number(ev.price).toFixed(2) : null;
+                        const scoreStr = ev.score != null ? 'Score: ' + Number(ev.score).toFixed(1) : null;
+                        return `
+                            <div style="position:relative;background:#0c1322;border:1px solid rgba(255,255,255,0.08);border-left:3px solid ${ev.badge_color || '#38bdf8'};border-radius:8px;padding:0.75rem 0.9rem;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+                                <!-- Node bullet on line -->
+                                <div style="position:absolute;left:-1.9rem;top:1.1rem;width:12px;height:12px;border-radius:50%;background:${ev.badge_color || '#38bdf8'};border:2px solid #090d16;box-shadow:0 0 6px ${ev.badge_color || '#38bdf8'}aa;"></div>
+
+                                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.35rem;">
+                                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                                        <span style="font-size:0.86rem;font-weight:800;color:#f8fafc;">${ev.title}</span>
+                                        <span style="font-size:0.64rem;font-weight:700;background:${ev.badge_color || '#38bdf8'}22;color:${ev.badge_color || '#38bdf8'};border:1px solid ${ev.badge_color || '#38bdf8'}44;padding:0.08rem 0.4rem;border-radius:4px;">
+                                            ${ev.badge || 'EVENT'}
+                                        </span>
+                                    </div>
+                                    <div style="font-size:0.70rem;color:#94a3b8;font-family:var(--font-mono);">
+                                        ⏱️ ${ev.timestamp}
+                                    </div>
+                                </div>
+
+                                <div style="font-size:0.78rem;color:#cbd5e1;line-height:1.45;margin-bottom:0.4rem;">
+                                    ${ev.reason || 'Transition evaluated by multi-factor scanner.'}
+                                </div>
+
+                                ${(pxStr || scoreStr || ev.catalyst_impact) ? `
+                                    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,0.05);padding-top:0.35rem;font-size:0.70rem;">
+                                        ${pxStr ? `<span style="color:#94a3b8;"><strong style="color:#e2e8f0;">Price:</strong> ${pxStr}</span>` : ''}
+                                        ${scoreStr ? `<span style="color:#94a3b8;"><strong style="color:#fbbf24;">${scoreStr}</strong></span>` : ''}
+                                        ${ev.catalyst_impact ? `<span style="color:#c084fc;">📰 ${ev.catalyst_impact}</span>` : ''}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            ` : `
+                <div style="text-align:center;padding:2rem;color:#64748b;font-size:0.8rem;">
+                    No transition history events recorded for this ticker yet.
+                </div>
+            `;
+
+            content.innerHTML = `
+                ${stepperHtml}
+                ${metricsHtml}
+                <div style="margin-top:0.5rem;">
+                    <div style="font-size:0.8rem;font-weight:700;color:#38bdf8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.35rem;">
+                        <span>📋 Chronological Movement &amp; Lifecycle Notes</span>
+                    </div>
+                    ${eventsHtml}
+                </div>
+            `;
         };
 
         app.reevaluateBreakoutStock = async function(ticker, forceTier = null) {

@@ -308,6 +308,9 @@
                                 ${sym}
                             </a>
                             <span style="font-size:0.60rem;color:#38bdf8;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;">${archetype}</span>
+                            <button type="button" onclick="app.openBreakoutHistoryModal('${sym}', event)" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-size:0.60rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.2rem;" title="View Transition Lifecycle & Notes Timeline (Warm ➔ Hot ➔ Breakout)">
+                                📜 History
+                            </button>
                             ${horizonBadge}
                             ${c.confirmation_badge ? `<span style="font-size:0.58rem;color:${c.confirmation_color || '#34d399'};background:rgba(255,255,255,0.05);border:1px solid ${c.confirmation_color || '#34d399'}44;padding:0.02rem 0.3rem;border-radius:3px;font-weight:700;">${c.confirmation_badge}</span>` : ''}
                         </div>
@@ -384,6 +387,9 @@
                     <!-- Actions -->
                     <td style="padding:0.46rem 0.65rem;text-align:center;white-space:nowrap;">
                         <div style="display:flex;align-items:center;justify-content:center;gap:0.25rem;">
+                            <button type="button" onclick="app.openBreakoutHistoryModal('${sym}')" class="btn btn-sm" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:0.65rem;padding:0.18rem 0.45rem;border-radius:4px;cursor:pointer;" title="View Transition Lifecycle & Notes Timeline (Warm ➔ Hot ➔ Breakout)">
+                                📜 History
+                            </button>
                             <a href="/stock/${encodeURIComponent(sym)}" target="_blank" class="btn btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);font-size:0.65rem;padding:0.18rem 0.45rem;border-radius:4px;text-decoration:none;" title="Open Stock Intelligence">
                                 📊 Intel
                             </a>
