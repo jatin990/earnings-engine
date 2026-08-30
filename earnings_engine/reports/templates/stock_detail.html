@@ -1525,21 +1525,39 @@
         const ACTIVE_SYM = "{{ ticker }}";
         let stockState = null;
 
-        async function fetchStockDetails(isManualRefresh = false) {
+        async function fetchStockDetails(isManualRefresh = false, retryCount = 0) {
             const refreshBtn = document.getElementById('btnRefreshQuote');
             if (isManualRefresh && refreshBtn) {
                 refreshBtn.disabled = true;
                 refreshBtn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Syncing...';
             }
             try {
-                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/overview`);
-                if (!res.ok) throw new Error('Could not retrieve stock overview');
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/overview`, {
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        window.location.href = `/portal?redirect=${encodeURIComponent(window.location.pathname)}`;
+                        return;
+                    }
+                    throw new Error(`Server returned HTTP ${res.status}`);
+                }
                 const data = await res.json();
                 stockState = data;
                 renderUI(data);
             } catch (err) {
-                console.error(err);
-                document.getElementById('lblCompanyName').textContent = 'Error loading stock: ' + err.message;
+                console.warn('[StockDetail] Overview fetch error:', err);
+                if (retryCount < 2 && !isManualRefresh) {
+                    setTimeout(() => fetchStockDetails(false, retryCount + 1), 1200);
+                    return;
+                }
+                const lbl = document.getElementById('lblCompanyName');
+                if (lbl && (lbl.textContent.includes('Loading') || lbl.textContent === ACTIVE_SYM)) {
+                    lbl.innerHTML = `<span style="color:#f87171;">⚠️ Network connection issue</span> <button type="button" onclick="fetchStockDetails(true)" class="btn-micro" style="margin-left:0.5rem;padding:0.2rem 0.5rem;background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);border-radius:4px;cursor:pointer;">🔄 Retry</button>`;
+                }
             } finally {
                 if (isManualRefresh && refreshBtn) {
                     refreshBtn.disabled = false;
