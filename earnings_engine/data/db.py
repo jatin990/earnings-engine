@@ -454,8 +454,13 @@ def measure_db_latencies(settings: Settings | None = None) -> dict[str, Any]:
     token = os.getenv("TURSO_AUTH_TOKEN", "").strip()
     if url and token:
         try:
-            t0 = time.perf_counter()
             tconn = TursoConnection(url, token)
+            # Warm up TCP / TLS connection if cold so pooled Keep-Alive is active
+            try:
+                tconn.execute("SELECT 1")
+            except Exception:
+                pass
+            t0 = time.perf_counter()
             tconn.execute("SELECT 1")
             elapsed_turso = (time.perf_counter() - t0) * 1000.0
             results["turso_ms"] = round(elapsed_turso, 2)
