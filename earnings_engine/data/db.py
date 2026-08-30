@@ -409,7 +409,14 @@ def get_db_connection(settings: Settings | None = None, force_remote: bool = Fal
         logger.debug("[DB-LOCAL] Using local SQLite database at %s", _cache_path(s))
 
     s.ensure_dirs()
-    return sqlite3.connect(str(_cache_path(s)))
+    conn = sqlite3.connect(str(_cache_path(s)), timeout=30.0)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=10000;")
+    except Exception:
+        pass
+    return conn
 
 
 def measure_db_latencies(settings: Settings | None = None) -> dict[str, Any]:
@@ -431,6 +438,10 @@ def measure_db_latencies(settings: Settings | None = None) -> dict[str, Any]:
         db_path = str(_cache_path(s))
         t0 = time.perf_counter()
         conn = sqlite3.connect(db_path, timeout=5.0)
+        try:
+            conn.execute("PRAGMA busy_timeout=5000;")
+        except Exception:
+            pass
         cur = conn.cursor()
         cur.execute("SELECT sqlite_version()")
         ver = cur.fetchone()
