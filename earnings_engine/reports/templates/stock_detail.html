@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         :root {
             --bg-void: #090a0f;
@@ -1004,6 +1005,59 @@
             </div>
         </div>
 
+        <!-- 📈 TRADINGVIEW INTERACTIVE TECHNICAL CHART & MOVING AVERAGES -->
+        <section class="card" id="cardTradingViewChart" style="border: 1px solid rgba(99, 102, 241, 0.3); background: linear-gradient(180deg, #0a0d18 0%, #060810 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.6);">
+            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.65rem;">
+                <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; font-weight: 800; color: #ffffff;">
+                    <span style="color: #6366f1;">📈</span>
+                    <span>Interactive Price Chart &amp; Moving Averages</span>
+                    <span id="tvChartModeBadge" style="font-size: 0.7rem; color: #34d399; font-weight: 700; font-family: var(--font-mono); background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25); padding: 0.15rem 0.5rem; border-radius: 4px;">Lightweight Charts™</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                    <!-- Indicator Toggles -->
+                    <div style="display: inline-flex; align-items: center; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 2px; gap: 2px;">
+                        <button type="button" id="btnTvEma20" onclick="toggleTvIndicator('ema20')" class="tf-pill-btn active" style="color: #38bdf8; font-size: 0.7rem;">EMA 20</button>
+                        <button type="button" id="btnTvEma50" onclick="toggleTvIndicator('ema50')" class="tf-pill-btn active" style="color: #fbbf24; font-size: 0.7rem;">EMA 50</button>
+                        <button type="button" id="btnTvEma200" onclick="toggleTvIndicator('ema200')" class="tf-pill-btn active" style="color: #f43f5e; font-size: 0.7rem;">EMA 200</button>
+                        <button type="button" id="btnTvVol" onclick="toggleTvIndicator('vol')" class="tf-pill-btn active" style="color: #94a3b8; font-size: 0.7rem;">Volume</button>
+                    </div>
+                    <!-- Chart Type Toggle -->
+                    <div style="display: inline-flex; align-items: center; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 2px; gap: 2px;">
+                        <button type="button" id="btnTvCandles" onclick="setTvChartType('candles')" class="tf-pill-btn active" style="font-size: 0.7rem;">🕯️ Candles</button>
+                        <button type="button" id="btnTvLine" onclick="setTvChartType('line')" class="tf-pill-btn" style="font-size: 0.7rem;">📈 Line</button>
+                    </div>
+                    <!-- External TradingView / Fullscreen -->
+                    <a id="lnkTradingViewExt" href="https://in.tradingview.com/chart/?symbol={{ ticker }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.72rem; text-decoration: none;">
+                        ↗ TradingView.com
+                    </a>
+                </div>
+            </div>
+
+            <!-- Price & OHLC Legend Bar -->
+            <div id="tvChartLegend" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; font-size: 0.76rem; font-family: var(--font-mono); color: #94a3b8; margin-bottom: 0.6rem; padding: 0.35rem 0.6rem; background: rgba(0,0,0,0.3); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="display: flex; gap: 0.8rem; flex-wrap: wrap;" id="tvLegendOhlc">
+                    <span>O: <strong id="tvLegO" style="color:#e2e8f0;">—</strong></span>
+                    <span>H: <strong id="tvLegH" style="color:#e2e8f0;">—</strong></span>
+                    <span>L: <strong id="tvLegL" style="color:#e2e8f0;">—</strong></span>
+                    <span>C: <strong id="tvLegC" style="color:#e2e8f0;">—</strong></span>
+                    <span>Vol: <strong id="tvLegV" style="color:#e2e8f0;">—</strong></span>
+                </div>
+                <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+                    <span style="color: #38bdf8;">■ EMA 20: <strong id="tvLegEma20">—</strong></span>
+                    <span style="color: #fbbf24;">■ EMA 50: <strong id="tvLegEma50">—</strong></span>
+                    <span style="color: #f43f5e;">■ EMA 200: <strong id="tvLegEma200">—</strong></span>
+                </div>
+            </div>
+
+            <!-- Chart Canvas Container -->
+            <div id="tvChartContainer" style="width: 100%; height: 420px; position: relative; border-radius: 8px; overflow: hidden; background: #080b14; border: 1px solid rgba(255,255,255,0.06);">
+                <div id="tvChartLoader" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; background: rgba(8,11,20,0.85); z-index: 10;">
+                    <span class="spinner" style="width: 24px; height: 24px; border-width: 3px;"></span>
+                    <span style="font-size: 0.8rem; color: #94a3b8;">Loading price action &amp; technical indicators...</span>
+                </div>
+            </div>
+        </section>
+
         <!-- ⚖️ STANDARDIZED 6-PILLAR FACTOR EVALUATION MATRIX -->
         <section class="card" id="cardFactorEvaluation" style="border: 1px solid rgba(56, 189, 248, 0.25); background: linear-gradient(180deg, #0b111e 0%, #070a12 100%); border-radius: var(--radius-lg); padding: 1.35rem; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
             <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.85rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
@@ -1588,12 +1642,253 @@
 
             // Render subsections safely
             try { renderConsensus(c, curr); } catch (e) { console.warn('renderConsensus error:', e); }
+            try { renderTradingViewChart(data); } catch (e) { console.warn('renderTradingViewChart error:', e); }
             try { renderFactorEvaluation(data.factor_evaluation); } catch (e) { console.warn('renderFactorEvaluation error:', e); }
             try { renderInstantStats(t, data.institutional, data.factor_evaluation, curr, p, q); } catch (e) { console.warn('renderInstantStats error:', e); }
             try { renderInstitutional(data.institutional); } catch (e) { console.warn('renderInstitutional error:', e); }
             try { renderTechnicalSection(t, curr, p, q); } catch (e) { console.warn('renderTechnicalSection error:', e); }
             try { renderEarnings(data.earnings_history || []); } catch (e) { console.warn('renderEarnings error:', e); }
             try { renderCatalysts(data.catalysts || []); } catch (e) { console.warn('renderCatalysts error:', e); }
+        }
+
+        let _tvChart = null;
+        let _tvCandleSeries = null;
+        let _tvLineSeries = null;
+        let _tvVolSeries = null;
+        let _tvEma20Series = null;
+        let _tvEma50Series = null;
+        let _tvEma200Series = null;
+        let _tvChartType = 'candles';
+        let _tvVisibility = { ema20: true, ema50: true, ema200: true, vol: true };
+        let _tvHistoryData = [];
+
+        function calculateEMA(data, period) {
+            const k = 2 / (period + 1);
+            let emaArray = [];
+            let ema = null;
+            for (let i = 0; i < data.length; i++) {
+                const close = data[i].close;
+                if (i < period - 1) {
+                    continue;
+                } else if (i === period - 1) {
+                    let sum = 0;
+                    for (let j = 0; j < period; j++) sum += data[j].close;
+                    ema = sum / period;
+                    emaArray.push({ time: data[i].time, value: ema });
+                } else {
+                    ema = (close * k) + (ema * (1 - k));
+                    emaArray.push({ time: data[i].time, value: ema });
+                }
+            }
+            return emaArray;
+        }
+
+        async function renderTradingViewChart(data) {
+            const container = document.getElementById('tvChartContainer');
+            const loader = document.getElementById('tvChartLoader');
+            if (!container) return;
+
+            try {
+                if (!_tvHistoryData || _tvHistoryData.length === 0) {
+                    const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/price-history`);
+                    if (res.ok) {
+                        const raw = await res.json();
+                        if (Array.isArray(raw) && raw.length > 0) {
+                            _tvHistoryData = raw.map(r => ({
+                                time: r.date,
+                                open: Number(r.open),
+                                high: Number(r.high),
+                                low: Number(r.low),
+                                close: Number(r.close),
+                                value: Number(r.close),
+                                volume: Number(r.volume || 0),
+                            })).sort((a, b) => (a.time > b.time ? 1 : -1));
+                        }
+                    }
+                }
+
+                if (!_tvHistoryData || _tvHistoryData.length === 0) {
+                    if (loader) loader.innerHTML = '<div style="color:#f87171;font-size:0.8rem;">No historical price bars on record for this symbol.</div>';
+                    return;
+                }
+
+                if (typeof LightweightCharts === 'undefined') {
+                    if (loader) loader.innerHTML = '<div style="color:#f87171;font-size:0.8rem;">TradingView charts script is loading...</div>';
+                    return;
+                }
+
+                if (loader) loader.style.display = 'none';
+
+                if (!_tvChart) {
+                    _tvChart = LightweightCharts.createChart(container, {
+                        width: container.clientWidth,
+                        height: container.clientHeight || 420,
+                        layout: {
+                            background: { type: 'solid', color: '#080b14' },
+                            textColor: '#94a3b8',
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: 11,
+                        },
+                        grid: {
+                            vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                            horzLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                        },
+                        crosshair: {
+                            mode: LightweightCharts.CrosshairMode.Normal,
+                            vertLine: { color: 'rgba(99, 102, 241, 0.5)', width: 1, style: 3 },
+                            horzLine: { color: 'rgba(99, 102, 241, 0.5)', width: 1, style: 3 },
+                        },
+                        rightPriceScale: {
+                            borderColor: 'rgba(255, 255, 255, 0.08)',
+                            scaleMargins: { top: 0.1, bottom: 0.25 },
+                        },
+                        timeScale: {
+                            borderColor: 'rgba(255, 255, 255, 0.08)',
+                            timeVisible: true,
+                            secondsVisible: false,
+                        },
+                    });
+
+                    // Add volume series first (at bottom)
+                    _tvVolSeries = _tvChart.addHistogramSeries({
+                        color: 'rgba(99, 102, 241, 0.35)',
+                        priceFormat: { type: 'volume' },
+                        priceScaleId: '',
+                        scaleMargins: { top: 0.8, bottom: 0 },
+                    });
+
+                    // Add candlestick series
+                    _tvCandleSeries = _tvChart.addCandlestickSeries({
+                        upColor: '#10b981',
+                        downColor: '#f43f5e',
+                        borderUpColor: '#10b981',
+                        borderDownColor: '#f43f5e',
+                        wickUpColor: '#10b981',
+                        wickDownColor: '#f43f5e',
+                    });
+
+                    // Add line series for toggle
+                    _tvLineSeries = _tvChart.addLineSeries({
+                        color: '#38bdf8',
+                        lineWidth: 2,
+                        visible: false,
+                    });
+
+                    // Add EMAs
+                    _tvEma20Series = _tvChart.addLineSeries({
+                        color: '#38bdf8',
+                        lineWidth: 1.5,
+                        title: 'EMA 20',
+                    });
+                    _tvEma50Series = _tvChart.addLineSeries({
+                        color: '#fbbf24',
+                        lineWidth: 1.5,
+                        title: 'EMA 50',
+                    });
+                    _tvEma200Series = _tvChart.addLineSeries({
+                        color: '#f43f5e',
+                        lineWidth: 2,
+                        title: 'EMA 200',
+                    });
+
+                    // Crosshair hover legend updater
+                    _tvChart.subscribeCrosshairMove(param => {
+                        if (!param || !param.time || !param.seriesData) return;
+                        const cData = param.seriesData.get(_tvCandleSeries) || param.seriesData.get(_tvLineSeries);
+                        const vData = param.seriesData.get(_tvVolSeries);
+                        const e20 = param.seriesData.get(_tvEma20Series);
+                        const e50 = param.seriesData.get(_tvEma50Series);
+                        const e200 = param.seriesData.get(_tvEma200Series);
+
+                        if (cData) {
+                            if (cData.open != null) document.getElementById('tvLegO').textContent = `₹${cData.open.toFixed(2)}`;
+                            if (cData.high != null) document.getElementById('tvLegH').textContent = `₹${cData.high.toFixed(2)}`;
+                            if (cData.low != null) document.getElementById('tvLegL').textContent = `₹${cData.low.toFixed(2)}`;
+                            if (cData.close != null) document.getElementById('tvLegC').textContent = `₹${cData.close.toFixed(2)}`;
+                        }
+                        if (vData && vData.value != null) {
+                            document.getElementById('tvLegV').textContent = vData.value >= 1000000 ? `${(vData.value/1000000).toFixed(2)}M` : `${(vData.value/1000).toFixed(0)}k`;
+                        }
+                        if (e20 && e20.value != null) document.getElementById('tvLegEma20').textContent = `₹${e20.value.toFixed(2)}`;
+                        if (e50 && e50.value != null) document.getElementById('tvLegEma50').textContent = `₹${e50.value.toFixed(2)}`;
+                        if (e200 && e200.value != null) document.getElementById('tvLegEma200').textContent = `₹${e200.value.toFixed(2)}`;
+                    });
+
+                    // Responsive resize
+                    window.addEventListener('resize', () => {
+                        if (_tvChart && container) {
+                            _tvChart.applyOptions({ width: container.clientWidth });
+                        }
+                    });
+                }
+
+                // Populate series data
+                _tvCandleSeries.setData(_tvHistoryData);
+                _tvLineSeries.setData(_tvHistoryData.map(d => ({ time: d.time, value: d.close })));
+
+                const volData = _tvHistoryData.map(d => ({
+                    time: d.time,
+                    value: d.volume,
+                    color: d.close >= d.open ? 'rgba(16, 185, 129, 0.35)' : 'rgba(244, 63, 94, 0.35)',
+                }));
+                _tvVolSeries.setData(volData);
+
+                const ema20 = calculateEMA(_tvHistoryData, 20);
+                const ema50 = calculateEMA(_tvHistoryData, 50);
+                const ema200 = calculateEMA(_tvHistoryData, 200);
+
+                _tvEma20Series.setData(ema20);
+                _tvEma50Series.setData(ema50);
+                _tvEma200Series.setData(ema200);
+
+                if (_tvHistoryData.length > 0) {
+                    const lastBar = _tvHistoryData[_tvHistoryData.length - 1];
+                    document.getElementById('tvLegO').textContent = `₹${lastBar.open.toFixed(2)}`;
+                    document.getElementById('tvLegH').textContent = `₹${lastBar.high.toFixed(2)}`;
+                    document.getElementById('tvLegL').textContent = `₹${lastBar.low.toFixed(2)}`;
+                    document.getElementById('tvLegC').textContent = `₹${lastBar.close.toFixed(2)}`;
+                    document.getElementById('tvLegV').textContent = lastBar.volume >= 1000000 ? `${(lastBar.volume/1000000).toFixed(2)}M` : `${(lastBar.volume/1000).toFixed(0)}k`;
+                    if (ema20.length > 0) document.getElementById('tvLegEma20').textContent = `₹${ema20[ema20.length - 1].value.toFixed(2)}`;
+                    if (ema50.length > 0) document.getElementById('tvLegEma50').textContent = `₹${ema50[ema50.length - 1].value.toFixed(2)}`;
+                    if (ema200.length > 0) document.getElementById('tvLegEma200').textContent = `₹${ema200[ema200.length - 1].value.toFixed(2)}`;
+                }
+
+                _tvChart.timeScale().fitContent();
+            } catch (err) {
+                console.error('Error rendering TradingView chart:', err);
+                if (loader) loader.innerHTML = `<div style="color:#f87171;font-size:0.8rem;">Chart Error: ${err.message}</div>`;
+            }
+        }
+
+        function toggleTvIndicator(ind) {
+            _tvVisibility[ind] = !_tvVisibility[ind];
+            const isVisible = _tvVisibility[ind];
+            const btn = document.getElementById(`btnTv${ind.charAt(0).toUpperCase() + ind.slice(1)}`);
+            if (btn) {
+                if (isVisible) btn.classList.add('active');
+                else btn.classList.remove('active');
+            }
+            if (ind === 'ema20' && _tvEma20Series) _tvEma20Series.applyOptions({ visible: isVisible });
+            if (ind === 'ema50' && _tvEma50Series) _tvEma50Series.applyOptions({ visible: isVisible });
+            if (ind === 'ema200' && _tvEma200Series) _tvEma200Series.applyOptions({ visible: isVisible });
+            if (ind === 'vol' && _tvVolSeries) _tvVolSeries.applyOptions({ visible: isVisible });
+        }
+
+        function setTvChartType(type) {
+            _tvChartType = type;
+            const btnCandles = document.getElementById('btnTvCandles');
+            const btnLine = document.getElementById('btnTvLine');
+            if (type === 'candles') {
+                if (btnCandles) btnCandles.classList.add('active');
+                if (btnLine) btnLine.classList.remove('active');
+                if (_tvCandleSeries) _tvCandleSeries.applyOptions({ visible: true });
+                if (_tvLineSeries) _tvLineSeries.applyOptions({ visible: false });
+            } else {
+                if (btnLine) btnLine.classList.add('active');
+                if (btnCandles) btnCandles.classList.remove('active');
+                if (_tvCandleSeries) _tvCandleSeries.applyOptions({ visible: false });
+                if (_tvLineSeries) _tvLineSeries.applyOptions({ visible: true });
+            }
         }
 
         function renderInstantStats(t, inst, fe, curr, p, q) {

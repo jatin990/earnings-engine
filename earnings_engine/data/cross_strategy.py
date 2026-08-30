@@ -330,3 +330,298 @@ def get_stock_confluence(
         "news_aligned": news_aligned,
         "synthesis": " • ".join(summary_parts),
     }
+
+
+# ---------------------------------------------------------------------------
+# Cross-Strategy Confluence Radar Persistence & Background Job
+# ---------------------------------------------------------------------------
+
+_CONFLUENCE_CACHE: dict[str, Any] = {}
+_CONFLUENCE_CACHE_TTL: float = 120.0  # 2-minute memory cache
+
+
+def _init_confluence_db(conn: Any) -> None:
+    """Initialize confluence_radar table and composite index."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS confluence_radar (
+            ticker TEXT PRIMARY KEY,
+            company_name TEXT,
+            industry TEXT,
+            confluence_level INTEGER DEFAULT 0,
+            confluence_tag TEXT,
+            confluence_badge TEXT,
+            badge_color TEXT,
+            is_swing_buy INTEGER DEFAULT 0,
+            is_breakout INTEGER DEFAULT 0,
+            is_ai_buy INTEGER DEFAULT 0,
+            ai_direction TEXT,
+            ai_strength REAL,
+            swing_tier TEXT,
+            breakout_tier TEXT,
+            current_price REAL,
+            signal_price REAL,
+            target_price REAL,
+            stop_loss REAL,
+            risk_reward_ratio REAL,
+            composite_score REAL DEFAULT 0,
+            synthesis TEXT,
+            data_json TEXT,
+            scanned_at TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )
+        """
+    )
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_confluence_level_score ON confluence_radar(confluence_level DESC, composite_score DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_confluence_scanned_at ON confluence_radar(scanned_at DESC)")
+    except Exception:
+        pass
+
+
+def compute_and_save_confluence_radar(settings: Settings | None = None) -> list[dict[str, Any]]:
+    """Background scheduled job to evaluate cross-module synergy and persist ranked confluence setups."""
+    import json
+    import time
+    from datetime import datetime, timezone
+
+    settings = settings or Settings()
+    conn = None
+    try:
+        from earnings_engine.data.swing_scanner import _pool as swing_pool, load_swing_pool_from_db
+        from earnings_engine.data.breakout_scanner import _pool as breakout_pool, load_breakout_pool_from_db
+
+        # Ensure pools are hydrated
+        if not swing_pool.get("hot") and not swing_pool.get("warm"):
+            load_swing_pool_from_db(settings)
+        if not breakout_pool.get("hot") and not breakout_pool.get("warm") and not breakout_pool.get("candidates"):
+            load_breakout_pool_from_db(settings)
+
+        candidates = set()
+        candidates.update(swing_pool.get("hot", {}).keys())
+        candidates.update(swing_pool.get("warm", {}).keys())
+
+        # Extract tickers from breakout pool keys (sym::strategy)
+        for k in breakout_pool.get("hot", {}).keys():
+            candidates.add(k.split("::")[0])
+        for k in breakout_pool.get("warm", {}).keys():
+            candidates.add(k.split("::")[0])
+        for r in breakout_pool.get("candidates", []):
+            if r.get("ticker"):
+                candidates.add(str(r["ticker"]).upper().strip())
+
+        # Also pull top setups from breakout_radar and swing_radar DB
+        conn = get_db_connection(settings)
+        _init_confluence_db(conn)
+
+        try:
+            b_rows = conn.execute("SELECT DISTINCT ticker FROM breakout_radar WHERE tier IN ('HOT', 'WARM')").fetchall()
+            for r in b_rows:
+                if r and r[0]:
+                    candidates.add(str(r[0]).upper().strip())
+            s_rows = conn.execute("SELECT DISTINCT ticker FROM swing_radar WHERE tier IN ('HOT', 'WARM')").fetchall()
+            for r in s_rows:
+                if r and r[0]:
+                    candidates.add(str(r[0]).upper().strip())
+        except Exception:
+            pass
+
+        confluence_list: list[dict[str, Any]] = []
+        now_str = datetime.now(timezone.utc).isoformat()
+
+        for ticker in candidates:
+            if not ticker or "TEST" in ticker or "MOCK" in ticker:
+                continue
+            c = get_stock_confluence(ticker, settings=settings)
+            
+            # Augment with pricing & scoring metadata
+            comp_score = 0.0
+            cur_p = None
+            sig_p = None
+            targ_p = None
+            stop_l = None
+            rrr = None
+            co_name = ticker
+            ind = "General"
+
+            # Check breakout details
+            try:
+                b_row = conn.execute(
+                    "SELECT company_name, industry, current_price, signal_price, target_price, stop_loss, risk_reward_ratio, composite_score FROM breakout_radar WHERE ticker = ? ORDER BY composite_score DESC LIMIT 1",
+                    (ticker,),
+                ).fetchone()
+                if b_row:
+                    co_name = b_row[0] or co_name
+                    ind = b_row[1] or ind
+                    cur_p = float(b_row[2]) if b_row[2] is not None else None
+                    sig_p = float(b_row[3]) if b_row[3] is not None else None
+                    targ_p = float(b_row[4]) if b_row[4] is not None else None
+                    stop_l = float(b_row[5]) if b_row[5] is not None else None
+                    rrr = float(b_row[6]) if b_row[6] is not None else None
+                    comp_score = max(comp_score, float(b_row[7] or 0))
+            except Exception:
+                pass
+
+            # Check swing details
+            try:
+                s_row = conn.execute(
+                    "SELECT company_name, industry, current_price, support_level, resistance_level, composite_score FROM swing_radar WHERE ticker = ? LIMIT 1",
+                    (ticker,),
+                ).fetchone()
+                if s_row:
+                    co_name = s_row[0] or co_name
+                    ind = s_row[1] or ind
+                    if cur_p is None and s_row[2] is not None:
+                        cur_p = float(s_row[2])
+                    if stop_l is None and s_row[3] is not None:
+                        stop_l = float(s_row[3])
+                    if targ_p is None and s_row[4] is not None:
+                        targ_p = float(s_row[4])
+                    comp_score = max(comp_score, float(s_row[5] or 0))
+            except Exception:
+                pass
+
+            c["company_name"] = co_name
+            c["industry"] = ind
+            c["current_price"] = cur_p
+            c["signal_price"] = sig_p or cur_p
+            c["target_price"] = targ_p
+            c["stop_loss"] = stop_l
+            c["risk_reward_ratio"] = rrr
+            c["composite_score"] = comp_score
+            c["scanned_at"] = now_str
+
+            confluence_list.append(c)
+
+        confluence_list.sort(
+            key=lambda x: (x.get("confluence_level", 0), x.get("composite_score", 0)),
+            reverse=True,
+        )
+
+        # Batch insert/update into confluence_radar table
+        insert_rows = []
+        for c in confluence_list:
+            insert_rows.append((
+                c["ticker"], c.get("company_name"), c.get("industry"),
+                int(c.get("confluence_level", 0)), c.get("confluence_tag"), c.get("confluence_badge"), c.get("badge_color"),
+                1 if c.get("is_swing_buy") else 0, 1 if c.get("is_breakout") else 0, 1 if c.get("is_ai_buy") else 0,
+                c.get("ai_direction"), float(c.get("ai_strength", 50)),
+                c.get("swing_tier"), c.get("breakout_tier"),
+                c.get("current_price"), c.get("signal_price"), c.get("target_price"), c.get("stop_loss"), c.get("risk_reward_ratio"),
+                float(c.get("composite_score", 0)),
+                c.get("synthesis"), json.dumps(c), now_str, now_str, now_str,
+            ))
+
+        if insert_rows:
+            conn.executemany(
+                """
+                INSERT INTO confluence_radar (
+                    ticker, company_name, industry,
+                    confluence_level, confluence_tag, confluence_badge, badge_color,
+                    is_swing_buy, is_breakout, is_ai_buy, ai_direction, ai_strength,
+                    swing_tier, breakout_tier,
+                    current_price, signal_price, target_price, stop_loss, risk_reward_ratio,
+                    composite_score, synthesis, data_json, scanned_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(ticker) DO UPDATE SET
+                    company_name = excluded.company_name,
+                    industry = excluded.industry,
+                    confluence_level = excluded.confluence_level,
+                    confluence_tag = excluded.confluence_tag,
+                    confluence_badge = excluded.confluence_badge,
+                    badge_color = excluded.badge_color,
+                    is_swing_buy = excluded.is_swing_buy,
+                    is_breakout = excluded.is_breakout,
+                    is_ai_buy = excluded.is_ai_buy,
+                    ai_direction = excluded.ai_direction,
+                    ai_strength = excluded.ai_strength,
+                    swing_tier = excluded.swing_tier,
+                    breakout_tier = excluded.breakout_tier,
+                    current_price = excluded.current_price,
+                    signal_price = excluded.signal_price,
+                    target_price = excluded.target_price,
+                    stop_loss = excluded.stop_loss,
+                    risk_reward_ratio = excluded.risk_reward_ratio,
+                    composite_score = excluded.composite_score,
+                    synthesis = excluded.synthesis,
+                    data_json = excluded.data_json,
+                    scanned_at = excluded.scanned_at,
+                    updated_at = excluded.updated_at
+                """,
+                insert_rows,
+            )
+            conn.commit()
+            logger.info("[CONFLUENCE] Saved %d cross-strategy setups to confluence_radar table.", len(insert_rows))
+
+        global _CONFLUENCE_CACHE
+        _CONFLUENCE_CACHE = {"ts": time.time(), "data": confluence_list}
+        return confluence_list
+    except Exception as e:
+        logger.warning("[CONFLUENCE] Error in compute_and_save_confluence_radar: %s", e)
+        return []
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def load_confluence_radar_from_db(
+    min_level: int = 1,
+    limit: int = 30,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Instant sub-millisecond loader for pre-computed confluence setups."""
+    import json
+    import time
+    global _CONFLUENCE_CACHE
+    now_ts = time.time()
+
+    # Fast in-memory cache check
+    if "data" in _CONFLUENCE_CACHE:
+        if (now_ts - _CONFLUENCE_CACHE.get("ts", 0)) < _CONFLUENCE_CACHE_TTL:
+            cached = _CONFLUENCE_CACHE["data"]
+            filtered = [c for c in cached if c.get("confluence_level", 0) >= min_level]
+            return filtered[:limit]
+
+    settings = settings or Settings()
+    conn = None
+    try:
+        conn = get_db_connection(settings)
+        _init_confluence_db(conn)
+
+        cur = conn.execute(
+            """
+            SELECT data_json FROM confluence_radar
+            WHERE confluence_level >= ?
+            ORDER BY confluence_level DESC, composite_score DESC
+            LIMIT ?
+            """,
+            (min_level, limit),
+        )
+        rows = cur.fetchall()
+        results: list[dict[str, Any]] = []
+        for r in rows:
+            if r and r[0]:
+                try:
+                    results.append(json.loads(r[0]))
+                except Exception:
+                    pass
+
+        if results:
+            _CONFLUENCE_CACHE = {"ts": now_ts, "data": results}
+            return results
+
+        # If DB is empty, trigger on-demand background run
+        return compute_and_save_confluence_radar(settings)[:limit]
+    except Exception as e:
+        logger.warning("[CONFLUENCE] Error loading confluence radar from DB: %s", e)
+        return []
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass

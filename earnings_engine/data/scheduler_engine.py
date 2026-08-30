@@ -72,6 +72,7 @@ class SchedulerEngine:
         self._job_handlers["institutional_sync"] = self._handle_institutional_sync
         self._job_handlers["kronos_hot_pool_rescore"] = self._handle_kronos_hot_rescore
         self._job_handlers["kronos_cache_warmup"] = self._handle_kronos_warmup
+        self._job_handlers["confluence_radar_sweep"] = self._handle_confluence_sweep
 
     def register_handler(self, job_id: str, handler: Callable[[Settings, dict[str, Any]], str]) -> None:
         """Register or override a custom job handler."""
@@ -264,6 +265,12 @@ class SchedulerEngine:
         watchlist = params.get("watchlist", "my_watchlist")
         device = params.get("device", "cuda:0")
         return f"Kronos sequence forecast cache verified on {device} for '{watchlist}'."
+
+    def _handle_confluence_sweep(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data.cross_strategy import compute_and_save_confluence_radar
+        setups = compute_and_save_confluence_radar(settings)
+        count = len(setups)
+        return f"Cross-Strategy Confluence Radar updated: {count} multi-module setups discovered and persisted."
 
     # -------------------------------------------------------------------------
     # Engine Lifecycle

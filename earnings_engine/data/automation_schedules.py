@@ -178,6 +178,16 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "description": "Background Kronos AI sequence prediction for Hot pool stocks with ±0.5% audit merging.",
     },
     {
+        "job_id": "confluence_radar_sweep",
+        "job_name": "🎯 Cross-Strategy Confluence Radar Sweep",
+        "category": "Confluence Radar",
+        "interval_seconds": 900,
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
+        "params_json": '{"min_level": 1, "limit": 50}',
+        "description": "15-minute background sweep discovering high-conviction multi-module confluence setups across Breakout, Swing, AI Consensus, and Institutional Delivery.",
+    },
+    {
         "job_id": "kronos_cache_warmup",
         "job_name": "🧠 Kronos Forecast Warmup",
         "category": "Custom",

@@ -19,6 +19,12 @@ def force_local_sqlite_in_tests(monkeypatch, tmp_path):
     test_db_path = tmp_path / f"test_suite_{os.getpid()}.sqlite3"
     monkeypatch.setenv("EARNINGS_ENGINE_DB_PATH", str(test_db_path))
     monkeypatch.setenv("EARNINGS_ENGINE_DB_NAME", test_db_path.name)
+
+    try:
+        apply_migrations(Settings())
+    except Exception:
+        pass
+
     yield
     try:
         if test_db_path.exists():
