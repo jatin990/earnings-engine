@@ -50,6 +50,13 @@ Object.assign(app, {
 
             const formatTimer = (s) => {
                 if (!s) return 'Next run: <strong style="color:#38bdf8;">--</strong>';
+                const now = new Date();
+                const day = now.getDay(); // 0 is Sunday, 6 is Saturday
+                const isMarketHoursOnly = !s.market_session || s.market_session === 'market_hours_only' || s.run_after_hours === 0;
+                if ((day === 0 || day === 6) && isMarketHoursOnly) {
+                    const lastRun = s.last_run_formatted || 'Weekend Snapshot';
+                    return `Market: <strong style="color:#fbbf24;">Closed (Weekend)</strong> | Last: ${lastRun}`;
+                }
                 const sec = s.seconds_until_next;
                 const timeIn = sec <= 0 ? 'Due now' : (sec < 60 ? `${sec}s` : `${Math.floor(sec/60)}m ${sec%60}s`);
                 const lastRun = s.last_run_formatted || 'Never';

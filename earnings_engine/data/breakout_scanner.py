@@ -349,15 +349,27 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
         rows_for_tracked = []
         for r_tuple in rows_to_insert:
             # Tuple: ticker, tier, company_name, ..., updated_at (34 items)
-            # For tracked, we need created_at and updated_at (35 items)
-            # signal_date is index 10; ensure non-empty
+            # For tracked, we only archive setups that have actually breached/triggered
             t_list = list(r_tuple)
             if not t_list[10]:
                 t_list[10] = t_list[31][:10] if t_list[31] else now_iso[:10]
-            # Add created_at, updated_at
-            rows_for_tracked.append(tuple(t_list + [now_iso]))
+            
+            sig_px = t_list[11]
+            trig_px = t_list[13]
+            curr_px = t_list[17]
+            happened = t_list[21]
+            outc = str(t_list[22] or "").upper()
 
-        if hasattr(conn, "executemany"):
+            is_breached = (
+                bool(happened)
+                or (sig_px is not None and trig_px is not None and sig_px >= trig_px)
+                or (curr_px is not None and trig_px is not None and curr_px >= trig_px)
+                or (outc not in ("PENDING", "ACTIVE", ""))
+            )
+            if is_breached:
+                rows_for_tracked.append(tuple(t_list + [now_iso]))
+
+        if hasattr(conn, "executemany") and rows_for_tracked:
             try:
                 conn.executemany(upsert_tracked_sql, rows_for_tracked)
             except Exception as e_track:
@@ -366,7 +378,7 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
         if hasattr(conn, "commit"):
             conn.commit()
 
-        logger.debug("[BREAKOUT-DB] Persisted %d candidates to breakout_radar and breakout_tracked_signals.", len(rows_to_insert))
+        logger.debug("[BREAKOUT-DB] Persisted %d candidates to breakout_radar and %d breached setups to breakout_tracked_signals.", len(rows_to_insert), len(rows_for_tracked))
     except Exception as e:
         logger.warning("[BREAKOUT-DB] Failed to persist breakout pool to DB: %s", e)
 
@@ -577,7 +589,11 @@ def get_tracked_breakouts(
         apply_migrations(settings)
         conn = get_db_connection(settings)
 
-        query_clauses = ["1=1", "signal_date >= '2026-08-26'"]
+        query_clauses = [
+            "1=1",
+            "signal_date >= '2026-08-26'",
+            "(breakout_happened = 1 OR signal_price >= breakout_trigger OR current_price >= breakout_trigger OR outcome NOT IN ('PENDING', 'ACTIVE', ''))",
+        ]
         params: list[Any] = []
 
         # 1. Date Filtering

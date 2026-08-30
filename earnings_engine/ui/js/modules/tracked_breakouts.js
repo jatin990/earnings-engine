@@ -17,20 +17,16 @@
     app.switchBreakoutSubtab = function(subtab) {
         app._activeBreakoutSubtab = subtab;
         const scannerView = document.getElementById('breakoutLiveScannerContainer');
-        const backtestView = document.getElementById('breakoutBacktestContainer');
         const trackedView = document.getElementById('breakoutTrackedContainer');
 
         const btnScanner = document.getElementById('btnBreakoutSubtabScanner');
-        const btnBacktest = document.getElementById('btnBreakoutSubtabBacktest');
         const btnTracked = document.getElementById('btnBreakoutSubtabTracked');
         const contextLabel = document.getElementById('bkSubtabContextLabel');
 
         if (scannerView) scannerView.style.display = 'none';
-        if (backtestView) backtestView.style.display = 'none';
         if (trackedView) trackedView.style.display = 'none';
 
         if (btnScanner) btnScanner.classList.remove('bk-subtab-active');
-        if (btnBacktest) btnBacktest.classList.remove('bk-subtab-active');
         if (btnTracked) btnTracked.classList.remove('bk-subtab-active');
 
         if (subtab === 'tracked') {
@@ -38,11 +34,6 @@
             if (btnTracked) btnTracked.classList.add('bk-subtab-active');
             if (contextLabel) contextLabel.textContent = '📜 Permanent Tracked Breakout Signals & Audited Outcome Matrix';
             app.loadTrackedBreakouts();
-        } else if (subtab === 'backtest') {
-            if (backtestView) backtestView.style.display = 'block';
-            if (btnBacktest) btnBacktest.classList.add('bk-subtab-active');
-            if (contextLabel) contextLabel.textContent = '📅 Point-in-Time Date Backtest & Historical Setup Simulator';
-            app.loadBreakoutBacktest();
         } else {
             // Default: 'scanner' (Active Setup Pool)
             if (scannerView) scannerView.style.display = 'block';

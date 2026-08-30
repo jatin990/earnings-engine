@@ -1069,7 +1069,9 @@ def _migration_018_breakout_tracked_signals(conn: Any) -> None:
                 breakout_happened, outcome, outcome_label, outcome_badge, days_elapsed,
                 scanned_at, data_json, created_at, updated_at
             FROM breakout_radar
-            WHERE ticker IS NOT NULL AND signal_date >= '2026-08-26'
+            WHERE ticker IS NOT NULL 
+              AND signal_date >= '2026-08-26'
+              AND (breakout_happened = 1 OR signal_price >= breakout_trigger OR current_price >= breakout_trigger OR outcome != 'PENDING')
         """)
     except Exception as e:
         logger.debug("[MIGRATION-018] Backfill from breakout_radar notice: %s", e)
