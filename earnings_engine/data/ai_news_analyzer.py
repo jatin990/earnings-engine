@@ -26,6 +26,10 @@ logger = logging.getLogger("earnings_engine.data.ai_news_analyzer")
 DEFAULT_OMNIROUTER_URL = "https://api.omnirouter.ai/v1/chat/completions"
 
 DEFAULT_OMNIROUTER_MODELS = [
+    "deepseek/deepseek-r1:free",
+    "google/gemma-4-31b-it:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemini-2.0-flash-001",
     "deepseek/deepseek-r1",
     "meta-llama/llama-3.3-70b-instruct",
     "google/gemini-2.0-flash",
@@ -73,15 +77,20 @@ def get_omnirouter_endpoint() -> str:
         base = base.strip().rstrip("/")
         return f"{base}/chat/completions" if "/v1" in base else f"{base}/v1/chat/completions"
 
+    # If OPENROUTER_API_KEY is configured in .env and no custom OMNIROUTER_URL, use OpenRouter gateway
+    if os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_BASE_URL"):
+        return os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1/chat/completions"
+
     return DEFAULT_OMNIROUTER_URL
 
 
 def get_omnirouter_api_key() -> str:
-    """Resolve OmniRouter API key from environment."""
+    """Resolve OmniRouter API key from environment with OpenRouter/OpenAI fallback."""
     return (
         os.getenv("OMNIROUTER_API_KEY")
         or os.getenv("OMNI_API_KEY")
         or os.getenv("OMNIROUTER_KEY")
+        or os.getenv("OPENROUTER_API_KEY")
         or os.getenv("OPENAI_API_KEY", "")
     ).strip()
 
@@ -215,7 +224,7 @@ def analyze_news_catalyst_ai(
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.2,
-                    "max_tokens": 600,
+                    "max_tokens": 350,
                 },
                 timeout=timeout,
             )
