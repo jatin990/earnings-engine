@@ -526,6 +526,48 @@ def get_historical_premarket_outcomes(
                 (ticker, pub_date),
             ).fetchall()
 
+            # Dynamic delta fetch: if candle bars or baseline price are missing or have a gap > 4 days, fetch latest delta & merge to DB
+            needs_fetch = False
+            if not candle_rows:
+                needs_fetch = True
+            else:
+                day_candle = candle_rows[0]
+                candle_date = day_candle["date"]
+                prev_row = conn.execute(
+                    """
+                    SELECT close, date FROM price_history 
+                    WHERE ticker = ? AND date < ? AND close > 0
+                    ORDER BY date DESC LIMIT 1
+                    """,
+                    (ticker, candle_date),
+                ).fetchone()
+                if not prev_row:
+                    needs_fetch = True
+                else:
+                    try:
+                        d_candle = datetime.strptime(str(candle_date)[:10], "%Y-%m-%d").date()
+                        d_prev = datetime.strptime(str(prev_row[1])[:10], "%Y-%m-%d").date()
+                        if (d_candle - d_prev).days > 4:
+                            needs_fetch = True
+                    except Exception:
+                        pass
+
+            if needs_fetch:
+                try:
+                    from earnings_engine.data.prices import fetch_prices
+                    fetch_prices(ticker, settings, force=True)
+                    candle_rows = conn.execute(
+                        """
+                        SELECT date, open, high, low, close, volume 
+                        FROM price_history 
+                        WHERE ticker = ? AND date >= ? 
+                        ORDER BY date ASC LIMIT 2
+                        """,
+                        (ticker, pub_date),
+                    ).fetchall()
+                except Exception as e:
+                    logger.debug("[PREMARKET-OUTCOMES] Failed to delta fetch %s: %s", ticker, e)
+
             if not candle_rows:
                 continue
 
@@ -549,7 +591,7 @@ def get_historical_premarket_outcomes(
             if not prev_row or prev_row[0] is None or float(prev_row[0]) <= 0:
                 continue
 
-            # Trading day gap sanity check: reject if previous close is > 7 calendar days stale
+            # Trading day gap sanity check: reject if previous close is > 7 calendar days stale even after delta fetch
             try:
                 d_candle = datetime.strptime(str(candle_date)[:10], "%Y-%m-%d").date()
                 d_prev = datetime.strptime(str(prev_row[1])[:10], "%Y-%m-%d").date()
