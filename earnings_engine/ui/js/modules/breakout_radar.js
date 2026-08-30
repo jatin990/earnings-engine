@@ -619,14 +619,24 @@
                     setEl('breakoutKpiSub5', intervals.hot_min ? `Hot: ${intervals.hot_min}m · Warm: ${intervals.warm_min}m · Cold: ${intervals.cold_min}m` : 'Last Full Scan');
                 }
 
-                if (lastScanEl && status.last_scan_at) {
-                    try {
-                        const d = new Date(status.last_scan_at);
-                        const uniLabel = universe === 'nifty_50' ? 'Nifty 50' : (universe === 'all' ? 'All' : universe);
-                        lastScanEl.textContent = `${uniLabel} • ${asofDate ? 'As-Of ' + asofDate : 'Live • Last scan: ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
-                    } catch { lastScanEl.textContent = 'Last scan: ' + status.last_scan_at; }
-                } else if (lastScanEl) {
-                    lastScanEl.textContent = status.status === 'running' ? 'Scanning now\u2026' : (asofDate ? `As-Of ${asofDate}` : 'Waiting for first scan\u2026');
+                if (lastScanEl) {
+                    const uniLabel = universe === 'nifty_50' ? 'Nifty 50' : (universe === 'all' ? 'All Monitored' : universe);
+                    if (asofDate) {
+                        lastScanEl.textContent = `${uniLabel} • Point-in-Time Backtest (${asofDate})`;
+                    } else if (status.last_scan_at) {
+                        try {
+                            const d = new Date(status.last_scan_at);
+                            lastScanEl.textContent = `${uniLabel} • Live Pool (${d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })})`;
+                        } catch {
+                            lastScanEl.textContent = `${uniLabel} • Active Setup Pool`;
+                        }
+                    } else if (total > 0) {
+                        lastScanEl.textContent = `${uniLabel} • Active Setup Pool (${total} setups)`;
+                    } else if (status.status === 'running') {
+                        lastScanEl.textContent = `${uniLabel} • Scanning now…`;
+                    } else {
+                        lastScanEl.textContent = `${uniLabel} • Active Setup Pool`;
+                    }
                 }
 
                 app.applyBreakoutFilterAndRender();

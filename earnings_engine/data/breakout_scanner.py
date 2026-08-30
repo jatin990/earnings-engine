@@ -437,6 +437,14 @@ def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
 
         _rebuild_candidates()
         _pool["status"] = "done"
+        try:
+            cur_time = conn.execute("SELECT MAX(scanned_at) FROM breakout_radar WHERE scanned_at IS NOT NULL").fetchone()
+            if cur_time and cur_time[0]:
+                _pool["last_scan_at"] = str(cur_time[0])
+            else:
+                _pool["last_scan_at"] = datetime.now(timezone.utc).isoformat()
+        except Exception:
+            _pool["last_scan_at"] = datetime.now(timezone.utc).isoformat()
         logger.info("[BREAKOUT-DB] Loaded %d hot and %d warm candidates from database.", hot_count, warm_count)
         return True
     except Exception as e:
@@ -817,12 +825,18 @@ def get_tracked_breakouts(
                                     item_d["outcome_badge"] = "STOP_HIT"
                                     item_d["breakout_happened"] = False
                                     item_d["what_happened_summary"] = f"🛑 Hit stop loss ₹{stop_p:,.2f} on Day {days_elapsed}/14."
-                                else:
+                                elif sig_p and cur_p >= sig_p:
                                     item_d["outcome"] = "TRIGGERED"
-                                    item_d["outcome_label"] = f"Live Active 🟢 (Day {days_elapsed}/14)"
+                                    item_d["outcome_label"] = f"Live Active 🟢 (+{item_d.get('realized_return_pct',0):.1f}% D{days_elapsed})"
                                     item_d["outcome_badge"] = "TRIGGERED"
                                     item_d["breakout_happened"] = True
-                                    item_d["what_happened_summary"] = f"🟢 Recently broken out (Day {days_elapsed}/14). Current price ₹{cur_p:,.2f} ({item_d.get('realized_return_pct',0):+.2f}% live return)."
+                                    item_d["what_happened_summary"] = f"🟢 Holding breakout gains at ₹{cur_p:,.2f} ({item_d.get('realized_return_pct',0):+.1f}% live return on Day {days_elapsed}/14)."
+                                else:
+                                    item_d["outcome"] = "BREAKOUT_RETRACED"
+                                    item_d["outcome_label"] = f"Breakout Retraced ⚠️ ({item_d.get('realized_return_pct',0):+.1f}% Live D{days_elapsed})"
+                                    item_d["outcome_badge"] = "BREAKOUT_RETRACED"
+                                    item_d["breakout_happened"] = False
+                                    item_d["what_happened_summary"] = f"⚠️ Breached trigger to peak ₹{post_high:,.2f} (+{item_d.get('max_gain_pct',0):.1f}%) but retraced to ₹{cur_p:,.2f} ({item_d.get('realized_return_pct',0):+.1f}% live return)."
                 except Exception as ex:
                     logger.debug("Failed processing tracked breakout for %s: %s", t, ex)
 
