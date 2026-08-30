@@ -65,7 +65,7 @@
             }
         };
 
-        app.runConsensusForStock = async function(ticker, models = null, force = true) {
+        app.runConsensusForStock = async function(ticker, targetModels = null, force = true) {
             if (!ticker) return;
             app.activeCatConsensusTicker = ticker.trim().toUpperCase();
             app.activeConsensusResult = null;
@@ -95,7 +95,7 @@
             if (tickerEl) tickerEl.textContent = app.activeCatConsensusTicker;
             if (priceEl) priceEl.textContent = 'Polling live price...';
             
-            const modelCountDesc = models && models.length === 1 ? models[0].split('/').pop() : '4 AI Engines';
+            const modelCountDesc = targetModels && targetModels.length === 1 ? targetModels[0].split('/').pop() : '4 AI Engines';
             if (dirBadge) {
                 dirBadge.textContent = `POLLING ${modelCountDesc.toUpperCase()}...`;
                 dirBadge.style.background = 'rgba(99,102,241,0.2)';
@@ -114,7 +114,7 @@
             if (buyZoneEl) buyZoneEl.innerHTML = '<span style="font-size:0.9rem;color:#a1a1aa;">Calculating...</span>';
             if (resEl) resEl.innerHTML = '<span style="font-size:0.9rem;color:#a1a1aa;">Calculating...</span>';
             if (strEl) strEl.textContent = '...';
-            if (modelCountEl) modelCountEl.textContent = `${models && models.length === 1 ? '1 Model Polled' : '4 Models Polled'}`;
+            if (modelCountEl) modelCountEl.textContent = `${targetModels && targetModels.length === 1 ? '1 Model Polled' : '4 Models Polled'}`;
             if (patternEl) patternEl.textContent = 'Scanning technical chart...';
             if (volumeEl) volumeEl.textContent = 'Analyzing delivery volume...';
             if (riskEl) riskEl.textContent = 'Evaluating downside risks...';
@@ -132,8 +132,8 @@
                     timeframe_days: 14,
                     force: force
                 };
-                if (models && models.length) {
-                    reqBody.models = models;
+                if (targetModels && targetModels.length) {
+                    reqBody.models = targetModels;
                 }
 
                 const res = await fetch(API_BASE + '/api/v1/consensus/predict', {
@@ -243,7 +243,7 @@
 
                 // Render Model Breakdown Table
                 const rawModels = pred.models_breakdown || pred.model_outputs || pred.model_votes || [];
-                const models = rawModels.length > 0 ? rawModels : [
+                const breakdownModels = rawModels.length > 0 ? rawModels : [
                     { model_name: 'DeepSeek-R1', model_id: 'deepseek/deepseek-r1', direction: dir, confidence_pct: 88, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 3.1, recommended_action: 'STRONG BUY' },
                     { model_name: 'Llama-3.3-70B', model_id: 'meta-llama/llama-3.3-70b-instruct', direction: dir, confidence_pct: 85, target_price: targetP ? targetP * 1.01 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.8, recommended_action: 'ACCUMULATE' },
                     { model_name: 'Qwen-2.5-72B', model_id: 'qwen/qwen-2.5-72b-instruct', direction: dir, confidence_pct: 82, target_price: targetP ? targetP * 0.99 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.5, recommended_action: 'ACCUMULATE' },
@@ -251,10 +251,10 @@
                     { model_name: 'Gemma-4-31B', model_id: 'google/gemma-4-31b-it:free', direction: dir, confidence_pct: 86, target_price: targetP, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 2.9, recommended_action: 'STRONG BUY' },
                     { model_name: 'GLM-5.2', model_id: 'z-ai/glm-5.2', direction: dir, confidence_pct: 87, target_price: targetP ? targetP * 1.02 : null, support_level: supportP, stop_loss_price: slP, risk_reward_ratio: 3.0, recommended_action: 'ACCUMULATE ON DIPS' }
                 ];
-                app.activeConsensusModels = models;
+                app.activeConsensusModels = breakdownModels;
 
                 if (tbody) {
-                    tbody.innerHTML = models.map((m, idx) => {
+                    tbody.innerHTML = breakdownModels.map((m, idx) => {
                         const mId = m.model_id || '';
                         const mName = m.model_name || m.name || mId.split('/').pop() || 'AI Model';
                         const mDir = (m.direction || 'NEUTRAL').toUpperCase();
