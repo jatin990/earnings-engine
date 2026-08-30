@@ -41,6 +41,19 @@
             app.applyBreakoutFilterAndRender();
         };
 
+        app.toggleBreakoutRealTrackedOnly = function() {
+            const sw = document.getElementById('breakoutRealTrackedSwitch');
+            app._breakoutRealTrackedOnly = sw ? sw.checked : !app._breakoutRealTrackedOnly;
+            app.applyBreakoutFilterAndRender();
+        };
+
+        app.clearBreakoutRealTrackedFilter = function() {
+            app._breakoutRealTrackedOnly = false;
+            const sw = document.getElementById('breakoutRealTrackedSwitch');
+            if (sw) sw.checked = false;
+            app.applyBreakoutFilterAndRender();
+        };
+
         app.applyBreakoutFilterAndRender = function() {
             const fireCard = document.getElementById('breakoutCardOnFire');
             const totalCard = document.getElementById('breakoutCardTotal');
@@ -50,6 +63,10 @@
 
             let list = app._breakoutData || [];
             const breakingCount = list.filter(app.isItemBreaking).length;
+
+            if (app._breakoutRealTrackedOnly) {
+                list = list.filter(item => Boolean(item.is_real_tracked));
+            }
 
             if (app._breakoutFilterBreakingOut) {
                 list = list.filter(app.isItemBreaking);
@@ -70,6 +87,11 @@
                 if (activeNotice) {
                     activeNotice.style.display = 'inline-flex';
                     activeNotice.innerHTML = `🔥 Filtering: <strong>Breaking Out Only (${list.length} setup${list.length === 1 ? '' : 's'})</strong> <button type="button" onclick="app.clearBreakoutFilter(); event.stopPropagation();" style="margin-left:0.45rem;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fdba74;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕ Show All (${app._breakoutData.length})</button>`;
+                }
+            } else if (app._breakoutRealTrackedOnly) {
+                if (activeNotice) {
+                    activeNotice.style.display = 'inline-flex';
+                    activeNotice.innerHTML = `🟢 Filtering: <strong>Real Tracked Entries Only (${list.length} setup${list.length === 1 ? '' : 's'})</strong> <button type="button" onclick="app.clearBreakoutRealTrackedFilter(); event.stopPropagation();" style="margin-left:0.45rem;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#34d399;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕ Show All (${app._breakoutData.length})</button>`;
                 }
             } else {
                 if (fireCard) {
@@ -645,6 +667,15 @@
                             <div style="margin-top:0.1rem;display:flex;gap:0.25rem;flex-wrap:wrap;align-items:center;">
                                 <span style="font-size:0.60rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;">${ctx.archetype}</span>
                                 ${(c.institutional_flow && c.institutional_flow.funds_in > 0) ? `<span style="font-size:0.60rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.04rem 0.3rem;border-radius:3px;font-weight:700;" title="Institutional Accumulation: +${c.institutional_flow.funds_in} Funds Buying">🏛️ +${c.institutional_flow.funds_in}</span>` : ''}
+                                ${c.is_real_tracked ? `
+                                    <span style="font-size:0.60rem;background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.04rem 0.32rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Real-Time Tracked Entry recorded in SQLite database archive">
+                                        <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#34d399;box-shadow:0 0 6px #34d399;"></span> REAL TRACKED
+                                    </span>
+                                ` : `
+                                    <span style="font-size:0.60rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;display:inline-flex;align-items:center;gap:0.2rem;" title="Dynamic live scan setup">
+                                        📊 DYNAMIC SCAN
+                                    </span>
+                                `}
                             </div>
                         </div>
                     </td>

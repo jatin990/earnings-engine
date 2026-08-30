@@ -23,6 +23,7 @@ async def get_breakout_radar_endpoint(
     sort_by: str = Query("composite_score", description="Sort field (composite_score, fundamental_score, resistance_score, volume_score, realized_return_pct)"),
     asof_date: str | None = Query(None, description="Point-in-time scan date in YYYY-MM-DD format"),
     live: bool = Query(False, description="Force live real-time price fetching for candidates"),
+    real_tracked_only: bool = Query(False, description="Filter to show ONLY real-time tracked entries persisted in database archive"),
 ):
     """Return breakout candidates from the background scanner or point-in-time historical backtest."""
     import pandas as pd
@@ -39,6 +40,10 @@ async def get_breakout_radar_endpoint(
 
         # Apply min_score filter
         candidates = [c for c in candidates if (c.get("composite_score") or 0) >= min_score]
+
+        # Apply real_tracked_only filter if requested
+        if real_tracked_only:
+            candidates = [c for c in candidates if bool(c.get("is_real_tracked"))]
 
         # Live parallel price fetching if requested
         if live and candidates and not asof_date:

@@ -100,6 +100,14 @@
                             </select>
                         </div>
 
+                        <!-- 🟢 Real Tracked Only Switch -->
+                        <div style="display:flex;align-items:center;gap:0.35rem;background:#0f172a;border:1px solid rgba(52,211,153,0.35);padding:0.25rem 0.55rem;border-radius:6px;" title="Switch to view ONLY real-time tracked entries persisted in database archive">
+                            <input type="checkbox" id="breakoutRealTrackedSwitch" onchange="app.toggleBreakoutRealTrackedOnly()" style="cursor:pointer;accent-color:#10b981;width:14px;height:14px;">
+                            <label for="breakoutRealTrackedSwitch" style="font-size:0.73rem;color:#34d399;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.25rem;user-select:none;">
+                                <span>🟢</span> Real Tracked Only
+                            </label>
+                        </div>
+
                         <!-- Live Tracking & Auto-Refresh Interval Controls -->
                         <button type="button" id="breakoutLiveToggleBtn" onclick="app.toggleBreakoutLiveTracking()" class="btn btn-sm" style="background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-weight:700;display:flex;align-items:center;gap:0.35rem;" title="Start/Stop live real-time price tracking for breakout setups">
                             <span id="breakoutLiveIndicator" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f87171;"></span>

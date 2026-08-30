@@ -281,6 +281,9 @@
                                 ${sym}
                             </a>
                             <span style="font-size:0.60rem;color:#38bdf8;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.25);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;">${archetype}</span>
+                            <span style="font-size:0.60rem;background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.04rem 0.32rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Real-Time Tracked Entry recorded in SQLite database archive">
+                                <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#34d399;box-shadow:0 0 6px #34d399;"></span> REAL TRACKED
+                            </span>
                             ${c.confirmation_badge ? `<span style="font-size:0.58rem;color:${c.confirmation_color || '#34d399'};background:rgba(255,255,255,0.05);border:1px solid ${c.confirmation_color || '#34d399'}44;padding:0.02rem 0.3rem;border-radius:3px;font-weight:700;">${c.confirmation_badge}</span>` : ''}
                         </div>
                         <div style="font-size:0.67rem;color:#94a3b8;margin-top:2px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.company_name || sym}">${name} &middot; <span style="color:#64748b;">${ind}</span></div>

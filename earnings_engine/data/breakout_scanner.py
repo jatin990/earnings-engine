@@ -972,9 +972,22 @@ def _demote_warm(ticker: str, settings: Settings | None = None) -> None:
         del _pool["warm"][ticker]
 
 
-# ---------------------------------------------------------------------------
-# Public API (backward-compatible)
-# ---------------------------------------------------------------------------
+def get_tracked_ticker_set(settings: Settings | None = None) -> set[str]:
+    """Return set of ticker symbols permanently persisted and tracked in breakout_tracked_signals / breakout_radar database."""
+    settings = settings or Settings()
+    try:
+        conn = get_db_connection(settings)
+        cur = conn.execute("SELECT DISTINCT UPPER(ticker) FROM breakout_tracked_signals WHERE ticker IS NOT NULL")
+        tracked = {str(r[0]) for r in cur.fetchall() if r and r[0]}
+        cur2 = conn.execute("SELECT DISTINCT UPPER(ticker) FROM breakout_radar WHERE ticker IS NOT NULL")
+        for r in cur2.fetchall():
+            if r and r[0]:
+                tracked.add(str(r[0]))
+        return tracked
+    except Exception as e:
+        logger.debug("[BREAKOUT] Error querying tracked ticker set: %s", e)
+        return set()
+
 
 def get_cached_scan_results(
     universe: str | None = None,
@@ -984,14 +997,23 @@ def get_cached_scan_results(
     """Return breakout candidates, optionally filtered by universe and point-in-time as-of date."""
     settings = settings or Settings()
     if asof_date:
-        return run_breakout_scan(settings, universe=universe, asof_date=asof_date)
+        candidates = run_breakout_scan(settings, universe=universe, asof_date=asof_date)
+    else:
+        if not _pool.get("candidates"):
+            load_breakout_pool_from_db(settings)
+        candidates = list(_pool["candidates"])
 
-    if not _pool.get("candidates"):
-        load_breakout_pool_from_db(settings)
+    # Enrich candidates with real-tracked status badge
+    tracked_set = get_tracked_ticker_set(settings)
+    for c in candidates:
+        t = str(c.get("ticker", "")).upper()
+        is_tracked = bool(t in tracked_set or c.get("scanned_at") or c.get("id"))
+        c["is_real_tracked"] = is_tracked
+        c["tracked_badge"] = "🟢 Real Tracked" if is_tracked else "📊 Dynamic Scan"
+        c["tracking_status"] = "REAL_TIME_TRACKED" if is_tracked else "DYNAMIC_SCAN"
 
-    all_candidates = list(_pool["candidates"])
     if not universe or universe.lower() in ("all", "any", "global", "monitored"):
-        return all_candidates
+        return candidates
 
     # Filter candidates by the requested universe / watchlist
     try:
@@ -1016,11 +1038,11 @@ def get_cached_scan_results(
 
         if uni_tickers:
             uni_normalized = {t.upper() for t in uni_tickers}
-            return [c for c in all_candidates if c.get("ticker", "").upper() in uni_normalized]
+            return [c for c in candidates if c.get("ticker", "").upper() in uni_normalized]
     except Exception as e:
         logger.debug("[BREAKOUT] Error filtering by universe %s: %s", universe, e)
 
-    return all_candidates
+    return candidates
 
 
 def get_scan_status(universe: str | None = None) -> dict[str, Any]:
