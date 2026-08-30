@@ -1374,12 +1374,12 @@ def score_breakout(
             outcome_badge = "slate"
     else:
         breakout_fired = False
-        breakout_happened = None
-        outcome = "PENDING"
-        outcome_label = "Pending Breakout ⏳"
-        outcome_badge = "blue"
+        breakout_happened = True
+        outcome = "TRIGGERED"
+        outcome_label = f"Live Active 🟢 (+{realized_return_pct:+.1f}% D{days_elapsed})"
+        outcome_badge = "emerald"
         realized_return_pct = 0.0
-        max_gain_pct = None
+        max_gain_pct = 0.0
         days_elapsed = 0
         post_high = signal_price
 
