@@ -194,3 +194,25 @@ def test_api_breakout_radar_strategy_param():
     assert resp.status_code == 200
     data = resp.json()
     assert "candidates" in data
+
+
+def test_trigger_price_is_strictly_above_signal_price(sample_prices_df):
+    """Verify that all 5 breakout strategies establish an overhead breakout_trigger above signal_price."""
+    for strat in (
+        "CLASSIC_TECHNICAL",
+        "NSE_DELIVERY_ABSORPTION",
+        "NSE_FO_CALL_WALL",
+        "VOLUME_PROFILE_VAH",
+        "DONCHIAN_TTM_SQUEEZE",
+    ):
+        res = score_breakout("INFY.NS", sample_prices_df, strategy=strat)
+        assert res is not None
+        assert res["breakout_trigger"] > res["signal_price"], (
+            f"Strategy {strat} produced trigger {res['breakout_trigger']} <= signal_price {res['signal_price']}"
+        )
+        assert res["target_price"] > res["breakout_trigger"], (
+            f"Strategy {strat} produced target {res['target_price']} <= trigger {res['breakout_trigger']}"
+        )
+        assert res["stop_loss"] < res["signal_price"], (
+            f"Strategy {strat} produced SL {res['stop_loss']} >= signal_price {res['signal_price']}"
+        )

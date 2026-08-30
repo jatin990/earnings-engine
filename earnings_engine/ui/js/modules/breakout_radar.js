@@ -1058,7 +1058,7 @@
                         curPriceBadgeBorder = 'rgba(16,185,129,0.5)';
                         curPriceBadgeText = '#34d399';
                         curPriceBadgeLabel = '🎯 Target Hit';
-                    } else if (trigVal != null && curVal >= trigVal) {
+                    } else if (trigVal != null && curVal >= trigVal * 1.002) {
                         curPriceColor = '#34d399';
                         curPriceBadgeBg = 'rgba(16,185,129,0.18)';
                         curPriceBadgeBorder = 'rgba(16,185,129,0.45)';
@@ -1070,7 +1070,7 @@
                         curPriceBadgeBorder = 'rgba(239,68,68,0.5)';
                         curPriceBadgeText = '#f87171';
                         curPriceBadgeLabel = '🔴 SL Hit';
-                    } else if (trigVal != null && stopVal != null) {
+                    } else if (trigVal != null && curVal >= trigVal * 0.985) {
                         curPriceColor = '#fcd34d';
                         curPriceBadgeBg = 'rgba(146,64,14,0.28)';
                         curPriceBadgeBorder = 'rgba(217,119,6,0.45)';
@@ -1093,9 +1093,17 @@
                     ? `<span style="display:inline-block;font-weight:800;color:${retColor};background:${retBg};border:1px solid ${retBorder};font-family:var(--font-mono);font-size:0.76rem;padding:0.12rem 0.42rem;border-radius:4px;">${retPct >= 0 ? '+' : ''}${Number(retPct).toFixed(2)}%</span>`
                     : '<span style="color:#64748b;">—</span>';
 
-                const gapPct = c.pct_from_high != null
-                    ? `<span style="font-size:0.62rem;color:${c.pct_from_high >= 0 ? '#34d399' : '#f87171'};font-weight:600;">(${c.pct_from_high >= 0 ? '+' : ''}${c.pct_from_high.toFixed(1)}%)</span>`
-                    : '';
+                let gapPct = '';
+                if (curVal != null && trigVal != null && trigVal > 0) {
+                    const diffPct = ((curVal - trigVal) / trigVal) * 100;
+                    if (diffPct >= 0.2) {
+                        gapPct = `<span style="font-size:0.62rem;color:#34d399;font-weight:700;">(+${diffPct.toFixed(1)}% breached)</span>`;
+                    } else {
+                        gapPct = `<span style="font-size:0.62rem;color:#fbbf24;font-weight:600;">(${diffPct.toFixed(1)}% to trigger)</span>`;
+                    }
+                } else if (c.pct_from_high != null) {
+                    gapPct = `<span style="font-size:0.62rem;color:${c.pct_from_high >= 0 ? '#34d399' : '#f87171'};font-weight:600;">(${c.pct_from_high >= 0 ? '+' : ''}${c.pct_from_high.toFixed(1)}%)</span>`;
+                }
 
                 const archetype = c.setup_archetype || (score >= 60 ? '🔥 Strong Breakout' : '📈 Resistance Coil');
 
@@ -1104,8 +1112,8 @@
                     c.is_breaking_out ||
                     c.outcome === 'TARGET_HIT' ||
                     c.outcome === 'BREAKOUT_SUCCEEDED' ||
-                    (curVal != null && trigVal != null && curVal >= trigVal) ||
-                    (postHighVal != null && trigVal != null && postHighVal >= trigVal)
+                    (curVal != null && trigVal != null && curVal >= trigVal * 1.002) ||
+                    (postHighVal != null && trigVal != null && postHighVal >= trigVal * 1.002)
                 );
 
                 const cellCtx = {

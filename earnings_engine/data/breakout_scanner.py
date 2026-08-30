@@ -1758,10 +1758,14 @@ def _score_classic_technical(
 
     window = min(len(closes), 252)
     resistance_high = float(high_series.tail(window).max())
-    breakout_trigger = round(resistance_high, 2)
 
     atr_pct_val = atr_pct if (atr_pct is not None and not np.isnan(atr_pct)) else 2.0
     atr_val = signal_price * (atr_pct_val / 100.0)
+    if resistance_high <= signal_price:
+        breakout_trigger = round(signal_price + max(signal_price * 0.0075, 0.5 * atr_val), 2)
+    else:
+        breakout_trigger = round(resistance_high, 2)
+
     target_price = round(max(breakout_trigger * 1.08, breakout_trigger + 2.0 * atr_val), 2)
     stop_loss = round(min(signal_price * 0.95, signal_price - 1.5 * atr_val), 2)
 
@@ -1845,7 +1849,19 @@ def _score_nse_delivery_absorption(
     top_vol_idx = volumes.tail(20).nlargest(3).index if len(volumes) >= 5 else closes.tail(20).index
     delivery_highs = high_series.loc[high_series.index.isin(top_vol_idx)]
     delivery_resistance = float(delivery_highs.max()) if not delivery_highs.empty else float(closes.tail(20).max())
-    delivery_trigger = round(max(delivery_resistance, signal_price), 2)
+
+    daily_range = closes.pct_change().abs()
+    atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
+    atr_val = signal_price * (atr_pct / 100.0)
+
+    if delivery_resistance <= signal_price:
+        recent_high = float(high_series.tail(20).max()) if len(high_series) >= 5 else signal_price
+        if recent_high > signal_price:
+            delivery_trigger = round(recent_high, 2)
+        else:
+            delivery_trigger = round(signal_price + max(signal_price * 0.008, 0.75 * atr_val), 2)
+    else:
+        delivery_trigger = round(delivery_resistance, 2)
 
     pct_from_deliv = ((signal_price - delivery_trigger) / delivery_trigger) * 100
     if pct_from_deliv >= -1.0:
@@ -1863,9 +1879,6 @@ def _score_nse_delivery_absorption(
 
     composite = round(deliv_score + inst_score + deliv_res_score + fund_score_norm, 1)
 
-    daily_range = closes.pct_change().abs()
-    atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
-    atr_val = signal_price * (atr_pct / 100.0)
     target_price = round(delivery_trigger + max(delivery_trigger * 0.10, 2.5 * atr_val), 2)
 
     base_lows = low_series.tail(20)
@@ -1923,6 +1936,8 @@ def _score_fo_call_wall(
         pass
 
     call_oi_strike = round(float(call_oi_strike), 2)
+    if call_oi_strike <= signal_price:
+        call_oi_strike = round(signal_price * 1.025, 2)
     dist_to_call_wall = ((call_oi_strike - signal_price) / signal_price) * 100
 
     # 1. Call OI Wall Proximity (0-35)
@@ -2027,8 +2042,12 @@ def _score_volume_profile_vah(
 
     composite = round(vah_score + lvn_score + poc_score + rel_vol_score, 1)
 
-    breakout_trigger = round(max(vah, signal_price), 2)
     va_height = max(signal_price * 0.05, vah - poc)
+    if vah <= signal_price:
+        breakout_trigger = round(signal_price + max(signal_price * 0.008, va_height * 0.25), 2)
+    else:
+        breakout_trigger = round(vah, 2)
+
     target_price = round(breakout_trigger + va_height * 1.5, 2)
     stop_loss = round(min(signal_price * 0.95, poc), 2)
 
@@ -2104,7 +2123,11 @@ def _score_donchian_squeeze(
     atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
     atr_val = signal_price * (atr_pct / 100.0)
 
-    breakout_trigger = round(max(donchian_55, signal_price), 2)
+    if donchian_55 <= signal_price:
+        breakout_trigger = round(signal_price + max(signal_price * 0.008, 0.75 * atr_val), 2)
+    else:
+        breakout_trigger = round(donchian_55, 2)
+
     target_price = round(breakout_trigger + 3.0 * atr_val, 2)
     sma_20 = float(closes.tail(20).mean())
     stop_loss = round(min(signal_price * 0.95, sma_20), 2)
