@@ -32,6 +32,7 @@
             const scanBtn = document.getElementById('pmScanBtn');
             const refreshBtn = document.getElementById('pmRefreshBtn');
             const windowSel = document.getElementById('pmWindowModeSelect');
+            const lookbackSel = document.getElementById('pmLookbackDaysSelect');
 
             const sideSubActive = document.getElementById('sidebarSubPremarketActive');
             const sideSubOutcomes = document.getElementById('sidebarSubPremarketOutcomes');
@@ -44,6 +45,7 @@
                 if (scanBtn) scanBtn.style.display = 'inline-flex';
                 if (refreshBtn) refreshBtn.style.display = 'inline-flex';
                 if (windowSel) windowSel.style.display = 'inline-block';
+                if (lookbackSel) lookbackSel.style.display = 'none';
 
                 if (activeBtn) {
                     activeBtn.style.background = 'rgba(249, 115, 22, 0.2)';
@@ -63,6 +65,7 @@
                 if (scanBtn) scanBtn.style.display = 'none';
                 if (refreshBtn) refreshBtn.style.display = 'none';
                 if (windowSel) windowSel.style.display = 'none';
+                if (lookbackSel) lookbackSel.style.display = 'inline-block';
 
                 if (outcomesBtn) {
                     outcomesBtn.style.background = 'rgba(249, 115, 22, 0.2)';
@@ -81,7 +84,7 @@
         },
 
         async loadPremarketSetups() {
-            const windowMode = (document.getElementById('pmWindowModeSelect')?.value) || 'standard_6pm';
+            const windowMode = (document.getElementById('pmWindowModeSelect')?.value) || 'full_post_market';
             const category = (document.getElementById('pmCategorySelect')?.value) || 'ALL';
             const direction = (document.getElementById('pmDirectionSelect')?.value) || 'ALL';
             const minImpact = parseFloat(document.getElementById('pmMinImpactSelect')?.value || '0');
@@ -352,6 +355,7 @@
             const direction = (document.getElementById('pmDirectionSelect')?.value) || 'ALL';
             const minImpact = parseFloat(document.getElementById('pmMinImpactSelect')?.value || '0');
             const search = (document.getElementById('pmSearchInput')?.value || '').trim();
+            const lookbackDays = (document.getElementById('pmLookbackDaysSelect')?.value) || '90';
 
             const tbody = document.getElementById('tblPremarketOutcomesLogBody');
             const matrixBody = document.getElementById('tblPremarketCategoryAccuracyBody');
@@ -363,7 +367,7 @@
             const fetchFn = (window.app?.apiFetch ? window.app.apiFetch.bind(window.app) : fetch);
             try {
                 const params = new URLSearchParams({
-                    days: '90',
+                    days: lookbackDays,
                     limit: '150',
                     category: category,
                     direction: direction,

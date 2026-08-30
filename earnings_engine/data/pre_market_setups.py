@@ -94,7 +94,7 @@ def get_dynamic_overnight_max_hours(now_ist: datetime | None = None) -> float:
 
 def is_in_overnight_window(
     published_at_str: str,
-    window_mode: str = "standard_6pm",
+    window_mode: str = "full_post_market",
     target_date: str | None = None,
     max_hours_ago: float | None = None,
     now_ist: datetime | None = None,
@@ -102,11 +102,11 @@ def is_in_overnight_window(
     """Determine if publication timestamp falls in the after-hours / overnight pre-market window.
 
     Window modes:
-    - 'standard_6pm' (Default): Post-18:00 (6:00 PM) on T-1 to 09:15 AM on T.
+    - 'full_post_market' (Default): Post-15:15 (3:15 PM) on T-1 to 09:15 AM on T.
       * Note: On weekends (Sat/Sun) & Monday pre-market, automatically expands to Friday 15:15 IST – Monday 09:15 AM.
-    - 'full_post_market': Post-15:15 (3:15 PM) on T-1 to 09:15 AM on T.
+    - 'standard_6pm': Post-18:00 (6:00 PM) on T-1 to 09:15 AM on T.
     - 'early_morning': 05:00 AM to 09:15 AM on T.
-    - 'all_recent': Any publication in last 7 days falling in after-hours (>=18:00 or <=09:15).
+    - 'all_recent': Any publication in last 7-14 days falling in after-hours (>=15:15 or <=09:15).
 
     Returns:
         (is_match, session_tag, timing_description)
@@ -177,19 +177,19 @@ def is_in_overnight_window(
         session_phase = "INTRADAY"
 
     if window_mode == "all_recent":
-        is_match = (time_float >= 18.0 or time_float <= 9.25 or time_float >= 15.25)
+        is_match = (time_float >= 15.25 or time_float <= 9.25 or time_float >= 18.0)
         return is_match, session_phase, timing_desc
 
     if window_mode == "early_morning":
         is_match = (time_float >= 5.0 and time_float <= 9.25)
         return is_match, session_phase, timing_desc
 
-    if window_mode == "full_post_market":
-        is_match = (time_float >= 15.25 or time_float <= 9.25)
+    if window_mode == "standard_6pm":
+        is_match = (time_float >= 18.0 or time_float <= 9.25)
         return is_match, session_phase, timing_desc
 
-    # Default 'standard_6pm': >= 18.0 (6:00 PM) or <= 09:15 AM
-    is_match = (time_float >= 18.0 or time_float <= 9.25)
+    # Default 'full_post_market': >= 15.25 (3:15 PM) or <= 09:15 AM
+    is_match = (time_float >= 15.25 or time_float <= 9.25)
     return is_match, session_phase, timing_desc
 
 
@@ -309,7 +309,7 @@ def score_premarket_setup(
 
 
 def get_premarket_setups(
-    window_mode: str = "standard_6pm",
+    window_mode: str = "full_post_market",
     days_lookback: int = 7,
     category_filter: str = "ALL",
     direction_filter: str = "ALL",
@@ -758,14 +758,82 @@ def _compute_accuracy_grouping(items: list[dict[str, Any]], group_key: str) -> l
     return results
 
 
-def scan_premarket_filings(settings: Settings | None = None) -> dict[str, Any]:
-    """Trigger background sweep of overnight corporate filings and news feeds."""
+def scan_premarket_filings(
+    custom_tickers: list[str] | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Trigger background sweep of overnight corporate filings and news feeds across all watchlists and active universe."""
     settings = settings or Settings()
-    from earnings_engine.data.catalysts_news import scan_watchlist_catalysts
-    res = scan_watchlist_catalysts(watchlist_name="my_watchlist", limit_per_stock=3, force=True, settings=settings)
+    from earnings_engine.data.catalysts_news import scan_watchlist_catalysts, fetch_ticker_catalysts
+
+    tickers_to_scan: list[str] = list(custom_tickers or [])
+    
+    with _connect(settings) as conn:
+        conn.row_factory = sqlite3.Row
+        # 1. Gather all watchlists tickers
+        try:
+            wl_rows = conn.execute("SELECT DISTINCT ticker FROM watchlists WHERE ticker IS NOT NULL").fetchall()
+            for r in wl_rows:
+                t = (r["ticker"] or "").strip().upper()
+                if t and t not in tickers_to_scan:
+                    tickers_to_scan.append(t)
+        except Exception:
+            pass
+
+        # 2. Gather recent breakout candidates
+        try:
+            br_rows = conn.execute("SELECT DISTINCT ticker FROM breakout_radar WHERE detected_at >= datetime('now', '-7 days')").fetchall()
+            for r in br_rows:
+                t = (r["ticker"] or "").strip().upper()
+                if t and t not in tickers_to_scan:
+                    tickers_to_scan.append(t)
+        except Exception:
+            pass
+
+        # 3. Core high-impact and active tickers
+        core_tickers = [
+            "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
+            "BHARTIARTL.NS", "SBIN.NS", "LT.NS", "PCJEWELLER.NS", "FORCEMOT.NS",
+            "AKUMS.NS", "ZOMATO.NS", "SWIGGY.NS", "TATAMOTORS.NS", "SUNPHARMA.NS"
+        ]
+        for ct in core_tickers:
+            if ct not in tickers_to_scan:
+                tickers_to_scan.append(ct)
+
+    # Perform concurrent scan
+    import time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    t0 = time.perf_counter()
+    all_found = 0
+    high_impact_found = 0
+
+    def _worker(t: str):
+        try:
+            items = fetch_ticker_catalysts(t, limit=4, force=True, settings=settings)
+            return len(items), sum(1 for i in items if i.get("impact_level") == "HIGH" or (i.get("impact_score") or 0) >= 80)
+        except Exception as e:
+            logger.debug("Catalyst scan error for %s: %s", t, e)
+            return 0, 0
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        future_map = {pool.submit(_worker, t): t for t in tickers_to_scan[:60]}
+        for fut in as_completed(future_map):
+            cnt, hi_cnt = fut.result()
+            all_found += cnt
+            high_impact_found += hi_cnt
+
+    elapsed = time.perf_counter() - t0
+
     return {
         "success": True,
-        "scanned_summary": res,
+        "scanned_summary": {
+            "tickers_scanned": len(tickers_to_scan[:60]),
+            "catalysts_found": all_found,
+            "high_impact_catalysts": high_impact_found,
+            "elapsed_seconds": round(elapsed, 2),
+        },
         "timestamp": datetime.now(timezone(IST_OFFSET)).strftime("%Y-%m-%d %H:%M:%S IST"),
     }
+
 

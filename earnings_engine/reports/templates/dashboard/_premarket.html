@@ -19,9 +19,7 @@
 
                 <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
                     <select id="pmWindowModeSelect" onchange="app.onPremarketFilterChange()" style="height:32px;padding:0 0.65rem;font-size:0.75rem;background:#090d16;color:#ededed;border:1px solid rgba(249,115,22,0.3);border-radius:6px;font-weight:600;outline:none;" title="Select overnight timing window">
-                        <option value="standard_6pm" selected>🌙 Standard Overnight (6:00 PM – 9:15 AM)</option>
-                        <option value="full_post_market">🌆 Full Post-Market (3:30 PM – 9:15 AM)</option>
-                        <option value="early_morning">🌅 Early Morning (5:00 AM – 9:15 AM)</option>
+                        <option value="full_post_market" selected>🌙 Full Post-Market (3:15 PM – 9:15 AM)</option>
                         <option value="all_recent">🌐 7-Day After-Hours Archive</option>
                     </select>
                     <button type="button" onclick="app.scanPremarketNow()" id="pmScanBtn" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #ea580c, #f97316); border-color: #f97316; font-weight: 700;">
@@ -66,10 +64,16 @@
 
                         <select id="pmMinImpactSelect" onchange="app.onPremarketFilterChange()" style="height:30px;padding:0 0.5rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-weight:500;outline:none;">
                             <option value="0">📊 Any Impact</option>
-                            <option value="60">⚡ Impact ≥60%</option>
                             <option value="70">⚡ Medium+ (≥70%)</option>
                             <option value="80">🔥 High Conviction (≥80%)</option>
                             <option value="85">💥 Extreme Impact (≥85%)</option>
+                        </select>
+
+                        <select id="pmLookbackDaysSelect" onchange="app.onPremarketFilterChange()" style="display:none;height:30px;padding:0 0.5rem;font-size:0.75rem;background:#090d16;color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:6px;font-weight:600;outline:none;" title="Historical verification timeframe">
+                            <option value="30">📅 Last 30 Days</option>
+                            <option value="60">📅 Last 60 Days</option>
+                            <option value="90" selected>📅 Last 90 Days</option>
+                            <option value="180">📅 Last 180 Days</option>
                         </select>
                     </div>
                 </div>
@@ -84,10 +88,10 @@
                         <div>
                             <div style="display:flex;align-items:center;gap:0.35rem;">
                                 <span style="font-size:0.75rem;font-weight:700;color:#f8fafc;">Overnight Market Window Status</span>
-                                <span id="pmLiveSessionTag" style="font-size:0.65rem;color:#38bdf8;font-family:var(--font-mono);background:rgba(56,189,248,0.15);padding:0.05rem 0.35rem;border-radius:4px;font-weight:700;">🌙 Active After-Hours Ingestion</span>
+                                <span id="pmLiveSessionTag" style="font-size:0.65rem;color:#38bdf8;font-family:var(--font-mono);background:rgba(56,189,248,0.15);padding:0.05rem 0.35rem;border-radius:4px;font-weight:700;">🌙 Active Post-Market Ingestion</span>
                             </div>
                             <div id="pmSessionDetails" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.1rem;">
-                                Capturing corporate filings submitted after 18:00 IST for next morning execution. Last updated: <span id="pmLastUpdated" style="color:#ededed;">--</span>
+                                Capturing corporate filings submitted after 15:15 IST (including full weekend) for next morning execution. Last updated: <span id="pmLastUpdated" style="color:#ededed;">--</span>
                             </div>
                         </div>
                     </div>
@@ -102,7 +106,7 @@
                     <div class="card card-glow-orange" style="padding:0.75rem 0.9rem; margin-bottom: 0;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
                             <span style="font-size:0.7rem;color:#fb923c;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Overnight Setups</span>
-                            <span class="signal-badge" style="background:rgba(249,115,22,0.15);color:#fb923c;font-size:0.62rem;">6 PM – 9:15 AM</span>
+                            <span class="signal-badge" style="background:rgba(249,115,22,0.15);color:#fb923c;font-size:0.62rem;">Post-Close – 9:15 AM</span>
                         </div>
                         <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="pmStatTotal">0</strong> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Setups</span></div>
                         <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">SEBI filings &amp; news</div>
@@ -265,7 +269,7 @@
                                     <th style="padding:0.45rem 0.6rem;text-align:right;">DAY HIGH &bull; RETURN</th>
                                     <th style="padding:0.45rem 0.6rem;text-align:center;">OUTCOME STATUS</th>
                                     <th style="padding:0.45rem 0.6rem;text-align:right;">ACTIONS</th>
-                                 </tr>
+                                </tr>
                             </thead>
                             <tbody id="tblPremarketOutcomesLogBody">
                                 <tr><td colspan="10" style="text-align:center;padding:2.5rem;color:#64748b;">Loading previous setups log...</td></tr>
