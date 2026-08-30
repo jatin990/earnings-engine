@@ -644,13 +644,40 @@ def _fetch_nse_large_cap_from_yfinance(settings: Settings | None = None) -> list
     return large_cap_tickers
 
 
+_LOAD_UNIVERSE_CACHE: dict[str, tuple[float, list[str]]] = {}
+_UNIVERSE_CACHE_TTL_SECS: float = 300.0  # 5-minute fast in-memory cache
+
+
 def load_nse_large_cap(force_refresh: bool = False, settings: Settings | None = None) -> list[str]:
-    """Load NSE stocks with market cap > 1000cr from SQLite, refreshing from yfinance if stale."""
-    if not force_refresh and is_universe_fresh("NSE_LARGE_CAP", NSE_ALL_MAX_AGE_DAYS, settings):
-        tickers = get_universe("NSE_LARGE_CAP", settings)
-        if tickers:
-            logger.debug("loaded cached NSE_LARGE_CAP from SQLite (%s tickers)", len(tickers))
-            return tickers
+    """Load NSE stocks with market cap > 1000cr from SQLite, with sub-millisecond fallback."""
+    settings = settings or Settings()
+    if not force_refresh:
+        # 1. Check existing universe in SQLite
+        if is_universe_fresh("NSE_LARGE_CAP", NSE_ALL_MAX_AGE_DAYS, settings):
+            tickers = get_universe("NSE_LARGE_CAP", settings)
+            if tickers:
+                return tickers
+
+        # 2. Fast query from indexed tickers table
+        try:
+            min_market_cap = NSE_LARGE_CAP_MIN_CR * 1e7
+            with _connect(settings) as connection:
+                rows = connection.execute(
+                    "SELECT ticker FROM tickers WHERE market_cap >= ? ORDER BY market_cap DESC",
+                    (min_market_cap,)
+                ).fetchall()
+                if rows and len(rows) >= 30:
+                    tickers = [r[0] for r in rows if r[0]]
+                    store_universe("NSE_LARGE_CAP", tickers, settings)
+                    return tickers
+        except Exception:
+            pass
+
+        # 3. Fallback immediately to broad index (Nifty 500 / 200) without blocking on yfinance
+        fallback = get_universe("nifty_500", settings) or get_universe("nifty_200", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100))
+        if fallback:
+            store_universe("NSE_LARGE_CAP", fallback, settings)
+            return fallback
 
     logger.info("refreshing NSE_LARGE_CAP from yfinance")
     try:
@@ -671,37 +698,47 @@ def load_nse_large_cap(force_refresh: bool = False, settings: Settings | None = 
 # ---------------------------------------------------------------------------
 
 def load_universe(market: str, settings: Settings | None = None) -> list[str]:
-    """Load the configured ticker universe for one market from SQLite."""
-    market_key = market.upper()
+    """Load the configured ticker universe for one market with fast in-memory caching."""
+    import time
+    settings = settings or Settings()
+    market_key = str(market or "IN").upper().strip()
+
+    # Fast in-memory cache check (<0.01ms)
+    now = time.monotonic()
+    if market_key in _LOAD_UNIVERSE_CACHE:
+        cached_time, cached_tickers = _LOAD_UNIVERSE_CACHE[market_key]
+        if (now - cached_time) < _UNIVERSE_CACHE_TTL_SECS and cached_tickers:
+            return cached_tickers
+
+    res: list[str] = []
     if market_key in {"IN", "NSE_TOP", "NIFTY_50", "NSE_50"}:
-        res = get_universe("nifty_50", settings) or get_universe("IN", settings) or get_universe("nse_top", settings)
-        return res or list(_SEED_NIFTY_50)
-    if market_key in {"NIFTY_NEXT_50", "NEXT_50"}:
-        return get_universe("nifty_next_50", settings) or list(_SEED_NIFTY_NEXT_50)
-    if market_key in {"NIFTY_100", "NSE_100"}:
-        return get_universe("nifty_100", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50))
-    if market_key in {"NIFTY_MIDCAP_100", "NSE_MID_CAP", "NSE_MIDCAP", "MID_CAP"}:
-        return get_universe("nse_mid_cap", settings) or list(_SEED_NIFTY_MIDCAP_100)
-    if market_key in {"NIFTY_SMALLCAP_100", "NSE_SMALL_CAP", "NSE_SMALLCAP", "SMALL_CAP"}:
-        return get_universe("nse_small_cap", settings) or list(_SEED_NIFTY_SMALLCAP_100)
-    if market_key in {"NIFTY_200", "NSE_200"}:
-        return get_universe("nifty_200", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100))
-    if market_key in {"NIFTY_500", "NSE_500"}:
-        return get_universe("nifty_500", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100 + _SEED_NIFTY_SMALLCAP_100))
-    if market_key in {"US", "US_TOP", "US_50"}:
-        res = get_universe("US", settings) or get_universe("us_top", settings)
-        return res or list(_SEED_US_TOP)
-    if market_key == "NSE_ALL":
-        return load_nse_all(settings=settings)
-    if market_key == "NSE_LARGE_CAP":
-        return load_nse_large_cap(settings=settings)
+        res = get_universe("nifty_50", settings) or get_universe("IN", settings) or get_universe("nse_top", settings) or list(_SEED_NIFTY_50)
+    elif market_key in {"NIFTY_NEXT_50", "NEXT_50"}:
+        res = get_universe("nifty_next_50", settings) or list(_SEED_NIFTY_NEXT_50)
+    elif market_key in {"NIFTY_100", "NSE_100"}:
+        res = get_universe("nifty_100", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50))
+    elif market_key in {"NIFTY_MIDCAP_100", "NSE_MID_CAP", "NSE_MIDCAP", "MID_CAP"}:
+        res = get_universe("nse_mid_cap", settings) or list(_SEED_NIFTY_MIDCAP_100)
+    elif market_key in {"NIFTY_SMALLCAP_100", "NSE_SMALL_CAP", "NSE_SMALLCAP", "SMALL_CAP"}:
+        res = get_universe("nse_small_cap", settings) or list(_SEED_NIFTY_SMALLCAP_100)
+    elif market_key in {"NIFTY_200", "NSE_200"}:
+        res = get_universe("nifty_200", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100))
+    elif market_key in {"NIFTY_500", "NSE_500"}:
+        res = get_universe("nifty_500", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100 + _SEED_NIFTY_SMALLCAP_100))
+    elif market_key in {"US", "US_TOP", "US_50"}:
+        res = get_universe("US", settings) or get_universe("us_top", settings) or list(_SEED_US_TOP)
+    elif market_key == "NSE_ALL":
+        res = load_nse_all(settings=settings)
+    elif market_key == "NSE_LARGE_CAP":
+        res = load_nse_large_cap(settings=settings)
+    else:
+        res = get_universe(market, settings) or get_universe(market_key, settings)
+        if not res:
+            raise ValueError(f"Unsupported market: {market}")
 
-    # Custom universe from SQLite
-    res = get_universe(market, settings) or get_universe(market_key, settings)
     if res:
-        return res
-
-    raise ValueError(f"Unsupported market: {market}")
+        _LOAD_UNIVERSE_CACHE[market_key] = (now, res)
+    return res
 
 
 def load_universe_from_file(path: str | Path) -> list[str]:

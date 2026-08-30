@@ -273,6 +273,8 @@ def _init_breakout_db(conn: Any) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_score ON breakout_radar(composite_score DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_scanned_at ON breakout_radar(scanned_at DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_strategy ON breakout_radar(strategy)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_strat_score ON breakout_radar(strategy, composite_score DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_strat_tier ON breakout_radar(strategy, tier)")
     except Exception:
         pass
 
@@ -280,6 +282,7 @@ def _init_breakout_db(conn: Any) -> None:
 def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
     """Persist current in-memory Hot, Warm, and candidate breakout setups into SQLite & Turso."""
     settings = settings or Settings()
+    conn = None
     try:
         conn = get_db_connection(settings)
         _init_breakout_db(conn)
@@ -581,6 +584,12 @@ def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
     except Exception as e:
         logger.warning("[BREAKOUT-DB] Failed to load breakout pool from DB: %s", e)
         return False
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def _should_be_hot(result: dict) -> bool:
@@ -1404,6 +1413,7 @@ def _demote_warm(ticker: str, settings: Settings | None = None) -> None:
 def get_tracked_ticker_set(settings: Settings | None = None) -> set[str]:
     """Return set of ticker symbols permanently persisted and tracked in breakout_tracked_signals / breakout_radar database."""
     settings = settings or Settings()
+    conn = None
     try:
         conn = get_db_connection(settings)
         cur = conn.execute("SELECT DISTINCT UPPER(ticker) FROM breakout_tracked_signals WHERE ticker IS NOT NULL")
@@ -1416,6 +1426,12 @@ def get_tracked_ticker_set(settings: Settings | None = None) -> set[str]:
     except Exception as e:
         logger.debug("[BREAKOUT] Error querying tracked ticker set: %s", e)
         return set()
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def get_cached_scan_results(
