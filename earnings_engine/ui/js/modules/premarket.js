@@ -630,6 +630,42 @@
         },
 
         exportPremarketCsv() {
+            if (this.activePremarketView === 'outcomes') {
+                if (!this.premarketOutcomesData || !this.premarketOutcomesData.length) {
+                    alert('No historical outcomes to export.');
+                    return;
+                }
+
+                const headers = ['Ticker', 'Stock Name', 'Session Date', 'Published At IST', 'Source', 'Category', 'Headline', 'Prev Close', 'Actual Open', 'Realized Gap %', 'Day High', 'Day Close', 'Day Return %', 'Outcome'];
+                const rows = this.premarketOutcomesData.map(s => [
+                    s.ticker,
+                    `"${(s.stock_name || '').replace(/"/g, '""')}"`,
+                    `"${s.session_date || ''}"`,
+                    `"${s.published_at || ''}"`,
+                    `"${(s.source_badge || '').replace(/"/g, '""')}"`,
+                    `"${(s.category || '').replace(/"/g, '""')}"`,
+                    `"${(s.title || '').replace(/"/g, '""')}"`,
+                    s.prev_close || '',
+                    s.actual_open || '',
+                    s.actual_gap_pct != null ? s.actual_gap_pct : '',
+                    s.day_high || '',
+                    s.day_close || '',
+                    s.day_return_pct != null ? s.day_return_pct : '',
+                    `"${(s.outcome_badge || '').replace(/"/g, '""')}"`
+                ]);
+
+                const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `premarket_outcomes_history_${new Date().toISOString().substring(0, 10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                return;
+            }
+
             if (!this.premarketData || !this.premarketData.length) {
                 alert('No pre-market setups to export.');
                 return;
