@@ -35,6 +35,7 @@ from earnings_engine.api.routers import (
     stocks,
     swing,
     system,
+    trading_agents,
     trips,
     watchlists,
     wealth,
@@ -463,6 +464,7 @@ app.include_router(scanner.router)
 app.include_router(repeaters.router)
 app.include_router(institutional.router)
 app.include_router(swing.router)
+app.include_router(trading_agents.router)
 app.include_router(audit.router)
 app.include_router(playground.router)
 

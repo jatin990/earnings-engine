@@ -169,7 +169,7 @@ Object.assign(app, {
                     '<td>' + resultBadge(r.result_class) + '</td>' +
                     '<td class="' + cls(r.reaction_return_pct, true) + '">' + (r.reaction_return_pct !== null && r.reaction_return_pct !== undefined ? r.reaction_return_pct.toFixed(2) + '%' : '—') + '</td>' +
                     '<td>' + fmt(r.day_open) + '</td><td>' + fmt(r.day_high) + '</td><td>' + fmt(r.day_low) + '</td><td>' + fmt(r.day_close) + '</td>' +
-                    '<td>' + this.renderConsensusBadge(r.ticker, 'IN') + '</td>' +
+                    '<td><div style="display:flex;flex-direction:column;gap:0.3rem;">' + this.renderConsensusBadge(r.ticker, 'IN') + (typeof this.renderTradingAgentsBadge === 'function' ? this.renderTradingAgentsBadge(r.ticker, 'IN') : '') + '</div></td>' +
                     '<td>' + badge(r.dipped) + '</td>' +
                     '<td>' + badge(r.comeback_50) + '</td>' +
                     '<td>' + badge(r.kept_dipping) + '</td>' +

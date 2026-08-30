@@ -266,7 +266,7 @@ Object.assign(app, {
                         '<td>' + (r.earnings_week_move_pct !== null ? r.earnings_week_move_pct.toFixed(2) + '%' : 'N/A') + '</td>' +
                         '<td>' + (r.prev_quarter_earnings_score !== null ? r.prev_quarter_earnings_score + '/9' : 'N/A') + '</td>' +
                         '<td class="' + trendCls + '">' + trend + '</td>' +
-                        '<td>' + this.renderConsensusBadge(r.ticker, this.currentMarket) + '</td>' +
+                        '<td><div style="display:flex;flex-direction:column;gap:0.3rem;">' + this.renderConsensusBadge(r.ticker, this.currentMarket) + (typeof this.renderTradingAgentsBadge === 'function' ? this.renderTradingAgentsBadge(r.ticker, this.currentMarket) : '') + '</div></td>' +
                         '<td><span class="signal-badge ' + (mom > 3 ? 'price-positive' : mom < -3 ? 'price-negative' : '') + '">' + signal + '</span></td>' +
                         '</tr>';
                 }).join('');

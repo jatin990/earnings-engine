@@ -253,6 +253,19 @@ AVAILABLE_AI_MODELS: list[dict[str, Any]] = [
         "default_limit_1h": 9999,
         "default_limit_24h": 9999,
     },
+    {
+        "id": "tauric/trading-agents",
+        "name": "TradingAgents Suite",
+        "icon": "🏛️",
+        "badge": "7-Agent Multi-Model",
+        "description": "TauricResearch multi-agent financial trading team (Analysts + Bull/Bear Debate + Risk Manager + Head Trader).",
+        "color": "#10b981",
+        "benchmark_avg_s": 2.4,
+        "benchmark_success_rate_pct": 99.8,
+        "default_limit_1m": 30,
+        "default_limit_1h": 200,
+        "default_limit_24h": 500,
+    },
 ]
 
 

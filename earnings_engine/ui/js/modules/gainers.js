@@ -210,7 +210,7 @@ Object.assign(app, {
                         '<td><strong style="color:#fbbf24;font-size:0.85rem;">' + currSym + Number(s.trigger_level).toFixed(2) + '</strong></td>' +
                         '<td><span style="color:#34d399;font-weight:700;">' + s.confidence_score + '%</span></td>' +
                         '<td style="max-width:320px;font-size:0.75rem;color:#cbd5e1;line-height:1.35;">' + s.why_it_matches + '</td>' +
-                        '<td>' + this.renderConsensusBadge(s.ticker, 'ALL') + '</td>' +
+                        '<td><div style="display:flex;flex-direction:column;gap:0.3rem;">' + this.renderConsensusBadge(s.ticker, 'ALL') + (typeof this.renderTradingAgentsBadge === 'function' ? this.renderTradingAgentsBadge(s.ticker, 'ALL') : '') + '</div></td>' +
                         '<td style="text-align:center;">' +
                             '<button type="button" onclick="event.stopPropagation(); app.runPredictionForTickerSingle(\'' + s.ticker + '\')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run AI Prediction">🔮 Predict</button>' +
                         '</td>' +

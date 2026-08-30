@@ -228,6 +228,9 @@ const API_BASE = window.location.origin;
                 this.populateWatchlistDropdowns();
                 this.loadOverview();
                 this.loadConsensusCache();
+                if (typeof this.loadTradingAgentsCache === 'function') {
+                    this.loadTradingAgentsCache();
+                }
                 this.updateTopRateLimitPill();
                 this.updateWatchlistFreshnessPill(localStorage.getItem('selectedGlobalWatchlist') || '');
                 setInterval(() => {

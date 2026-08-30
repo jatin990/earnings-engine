@@ -6,7 +6,103 @@
     const API_BASE = window.API_BASE || window.location.origin;
     window.app = window.app || {};
     const app = window.app;
-Object.assign(app, {            // =========================================================================
+Object.assign(app, {
+            tradingAgentsMap: {},
+
+            // =========================================================================
+            // 🏛️ TradingAgents Multi-Agent Trading Suite (TauricResearch Architecture)
+            // =========================================================================
+            async loadTradingAgentsCache() {
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/trading-agents/all?limit=500');
+                    const data = await res.json();
+                    if (data && data.reports) {
+                        data.reports.forEach(r => {
+                            if (r.ticker) {
+                                this.tradingAgentsMap[r.ticker.toUpperCase()] = r;
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Failed to load TradingAgents cache:', e);
+                }
+            },
+
+            renderTradingAgentsBadge(ticker, market) {
+                if (!ticker) return '—';
+                const sym = String(ticker).trim().toUpperCase();
+                const rep = this.tradingAgentsMap[sym];
+                const safeSym = sym.replace(/'/g, "\\'");
+                const domId = 'trading-agents-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
+
+                if (rep && rep.action) {
+                    const act = (rep.action || 'HOLD').toUpperCase();
+                    const isBull = act.includes('BUY');
+                    const isBear = act.includes('SELL');
+                    const color = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
+                    const bg = isBull ? 'rgba(16,185,129,0.18)' : isBear ? 'rgba(239,68,68,0.18)' : 'rgba(251,191,36,0.18)';
+                    const border = isBull ? 'rgba(16,185,129,0.35)' : isBear ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)';
+                    const score = rep.conviction_score || 50;
+                    const rrr = rep.risk_reward_ratio ? ` · ${Number(rep.risk_reward_ratio).toFixed(1)}R` : '';
+
+                    return '<div id="' + domId + '" style="display:inline-flex;align-items:center;gap:0.3rem;white-space:nowrap;">' +
+                        '<span class="signal-badge" style="background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';font-size:0.70rem;padding:0.15rem 0.45rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.25rem;" onclick="event.stopPropagation(); app.openTradingAgentsWarRoom(\'' + safeSym + '\', event)" title="TradingAgents 7-Agent Synthesis: ' + act + ' (' + score + '% Conviction' + rrr + ') · Click for 7-Agent War Room">' +
+                        '🏛️ ' + act + ' (' + score + '%)' +
+                        '</span>' +
+                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runTradingAgentsWorkflow(\'' + safeSym + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="Re-run 7-Agent Trading Team for ' + safeSym + '">⚡</button>' +
+                        '</div>';
+                } else {
+                    return '<div id="' + domId + '" style="white-space:nowrap;">' +
+                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runTradingAgentsWorkflow(\'' + safeSym + '\', this)" style="padding:0.16rem 0.42rem;font-size:0.68rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;font-weight:600;white-space:nowrap;" title="Run 7-Agent Trading Team (TauricResearch) for ' + safeSym + '">🏛️ TradingAgents</button>' +
+                        '</div>';
+                }
+            },
+
+            async runTradingAgentsWorkflow(ticker, btnEl) {
+                if (!ticker) return;
+                const sym = String(ticker).trim().toUpperCase();
+                if (btnEl) {
+                    btnEl.disabled = true;
+                    btnEl.innerHTML = '<span class="loading-spinner" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#34d399;animation:spin 0.8s linear infinite;"></span>';
+                }
+
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/trading-agents/analyze', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ticker: sym, timeframe_days: 14, force_refresh: true })
+                    });
+                    const data = await res.json();
+                    if (data && data.report) {
+                        this.tradingAgentsMap[sym] = data.report;
+                        
+                        // Update all cells matching this ticker across all open tables
+                        const domId = 'trading-agents-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
+                        const cells = document.querySelectorAll('[id="' + domId + '"]');
+                        const newHtml = this.renderTradingAgentsBadge(sym, this.currentMarket || 'ALL');
+                        cells.forEach(el => {
+                            el.outerHTML = newHtml;
+                        });
+
+                        if (typeof this.showToast === 'function') {
+                            this.showToast('🏛️ TradingAgents 7-Agent Synthesis for ' + sym + ': ' + data.report.action + ' (' + data.report.conviction_score + '% conviction)');
+                        }
+                        return data.report;
+                    }
+                } catch (e) {
+                    console.error('Error running TradingAgents for ' + sym + ':', e);
+                    if (typeof this.showToast === 'function') {
+                        this.showToast('Failed running TradingAgents for ' + sym + ': ' + e.message, 'error');
+                    }
+                } finally {
+                    if (btnEl) {
+                        btnEl.disabled = false;
+                        btnEl.innerHTML = '⚡';
+                    }
+                }
+            },
+
+            // =========================================================================
             // 🤖 AI Multi-Model Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral)
             // =========================================================================
             async loadConsensusCache() {
@@ -1950,38 +2046,263 @@ Object.assign(app, {            // =============================================
             app.openStockModal(sym);
         };
 
-        // Global report popup handlers
-        window.openPopup = function (ticker) {
+        app.openTradingAgentsWarRoom = async function(ticker, event) {
+            if (event && event.stopPropagation) event.stopPropagation();
             if (!ticker) return;
-            const safeId = ticker.replace(/\./g, '_').replace(/[^a-zA-Z0-9_-]/g, '_');
-            let el = document.getElementById('popup-' + safeId) || document.getElementById('popup-' + ticker);
-            if (!el) {
-                const all = document.querySelectorAll('.popup-modal');
-                for (const p of all) {
-                    if (p.id.toLowerCase().includes(safeId.toLowerCase()) || p.id.toLowerCase().includes(ticker.toLowerCase())) {
-                        el = p;
-                        break;
-                    }
-                }
+            const sym = String(ticker).trim().toUpperCase();
+
+            // Ensure modal element exists
+            let modal = document.getElementById('tradingAgentsWarRoomModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'tradingAgentsWarRoomModal';
+                modal.className = 'modal-backdrop';
+                modal.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(2,6,23,0.85);backdrop-filter:blur(8px);z-index:99999;overflow-y:auto;padding:1.5rem 1rem;';
+                modal.onclick = function(e) {
+                    if (e.target === modal) app.closeTradingAgentsWarRoom();
+                };
+                document.body.appendChild(modal);
             }
-            if (el) {
-                document.querySelectorAll('.popup-modal').forEach(p => p.style.display = 'none');
-                el.style.display = 'block';
-                document.body.style.overflow = 'hidden';
-            } else {
-                console.warn('Popup modal not found for ticker:', ticker);
+
+            modal.style.display = 'flex';
+            modal.style.justifyContent = 'center';
+            modal.style.alignItems = 'flex-start';
+            document.body.style.overflow = 'hidden';
+
+            modal.innerHTML = `
+                <div style="background:#090d16;border:1px solid rgba(16,185,129,0.3);border-radius:14px;width:100%;max-width:960px;box-shadow:0 25px 60px -15px rgba(0,0,0,0.9), 0 0 30px rgba(16,185,129,0.15);overflow:hidden;animation:modalFadeIn 0.2s ease-out;margin:auto;">
+                    <div style="padding:1.2rem 1.5rem;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg, rgba(16,185,129,0.08) 0%, transparent 100%);">
+                        <div style="display:flex;align-items:center;gap:0.75rem;">
+                            <span style="font-size:1.6rem;">🏛️</span>
+                            <div>
+                                <div style="display:flex;align-items:center;gap:0.5rem;">
+                                    <h2 style="margin:0;font-size:1.2rem;font-weight:800;color:#f8fafc;letter-spacing:-0.02em;">TradingAgents War Room</h2>
+                                    <span style="font-size:0.68rem;font-weight:800;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.15rem 0.5rem;border-radius:4px;font-family:var(--font-mono);">${sym}</span>
+                                    <span style="font-size:0.65rem;color:#94a3b8;font-weight:600;">7-Agent Multi-Model Firm</span>
+                                </div>
+                                <div style="font-size:0.72rem;color:#64748b;margin-top:2px;">TauricResearch Autonomous Multi-Agent Trading Architecture</div>
+                            </div>
+                        </div>
+                        <button type="button" onclick="app.closeTradingAgentsWarRoom()" style="background:transparent;border:none;color:#94a3b8;font-size:1.5rem;cursor:pointer;padding:0.2rem 0.5rem;line-height:1;" title="Close">&times;</button>
+                    </div>
+                    <div id="tradingAgentsWarRoomContent" style="padding:1.5rem;max-height:80vh;overflow-y:auto;">
+                        <div style="text-align:center;padding:3rem 0;color:#94a3b8;">
+                            <div class="loading-spinner" style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.15);border-top-color:#34d399;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1rem;"></div>
+                            <div style="font-weight:600;font-size:0.95rem;color:#e2e8f0;">Convening 7-Agent Trading Committee for ${sym}...</div>
+                            <div style="font-size:0.75rem;color:#64748b;margin-top:0.3rem;">Running Fundamental, Technical & Sentiment Analysts · Executing Bull vs Bear Debate · Calculating Risk Boundaries</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            try {
+                let rep = app.tradingAgentsMap[sym];
+                if (!rep) {
+                    const res = await fetch(API_BASE + '/api/v1/trading-agents/report/' + encodeURIComponent(sym));
+                    const data = await res.json();
+                    rep = data.report;
+                    if (rep) app.tradingAgentsMap[sym] = rep;
+                }
+
+                if (!rep) {
+                    throw new Error('No report generated');
+                }
+
+                app.renderTradingAgentsWarRoomModalContent(rep);
+            } catch (err) {
+                const contentEl = document.getElementById('tradingAgentsWarRoomContent');
+                if (contentEl) {
+                    contentEl.innerHTML = `
+                        <div style="text-align:center;padding:2rem;color:#f87171;">
+                            <div style="font-size:1.5rem;margin-bottom:0.5rem;">⚠️</div>
+                            <div style="font-weight:700;">Failed generating TradingAgents analysis for ${sym}</div>
+                            <div style="font-size:0.78rem;color:#94a3b8;margin-top:0.4rem;">${err.message}</div>
+                            <button type="button" class="btn btn-sm" onclick="app.runTradingAgentsWorkflow('${sym}', this)" style="margin-top:1rem;background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.4rem 1rem;">⚡ Retry 7-Agent Execution</button>
+                        </div>
+                    `;
+                }
             }
         };
 
-        window.closePopups = function () {
-            document.querySelectorAll('.popup-modal').forEach(p => p.style.display = 'none');
+        app.closeTradingAgentsWarRoom = function() {
+            const modal = document.getElementById('tradingAgentsWarRoomModal');
+            if (modal) modal.style.display = 'none';
             document.body.style.overflow = '';
         };
 
+        app.renderTradingAgentsWarRoomModalContent = function(rep) {
+            const contentEl = document.getElementById('tradingAgentsWarRoomContent');
+            if (!contentEl || !rep) return;
+
+            const isBull = rep.direction === 'BULLISH' || (rep.action || '').includes('BUY');
+            const isBear = rep.direction === 'BEARISH' || (rep.action || '').includes('SELL');
+            const actionColor = isBull ? '#34d399' : (isBear ? '#f87171' : '#fbbf24');
+            const actionBg = isBull ? 'rgba(16,185,129,0.15)' : (isBear ? 'rgba(239,68,68,0.15)' : 'rgba(251,191,36,0.15)');
+            const actionBorder = isBull ? 'rgba(16,185,129,0.35)' : (isBear ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)');
+
+            const fa = rep.fundamental_analyst || {};
+            const ta = rep.technical_analyst || {};
+            const sa = rep.sentiment_analyst || {};
+            const bull = rep.bull_researcher || {};
+            const bear = rep.bear_researcher || {};
+            const rm = rep.risk_manager || {};
+
+            contentEl.innerHTML = `
+                <!-- 1. Executive Head Trader Verdict Banner -->
+                <div style="background:linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(9,13,22,0.95) 100%);border:1px solid ${actionBorder};padding:1.2rem;border-radius:10px;margin-bottom:1.2rem;position:relative;overflow:hidden;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
+                                <span style="font-size:0.75rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">🏛️ Head Trader Synthesis</span>
+                                <span style="background:${actionBg};color:${actionColor};border:1px solid ${actionBorder};font-size:0.82rem;font-weight:800;padding:0.18rem 0.65rem;border-radius:4px;">${rep.action || 'HOLD'}</span>
+                                <span style="background:rgba(255,255,255,0.06);color:#f1f5f9;font-size:0.75rem;font-weight:700;padding:0.18rem 0.5rem;border-radius:4px;font-family:var(--font-mono);">${rep.conviction_score || 50}% Conviction</span>
+                            </div>
+                            <div style="font-size:0.85rem;color:#cbd5e1;line-height:1.5;max-width:620px;">${rep.executive_summary || 'Executive trade synthesis completed across all 7 agents.'}</div>
+                        </div>
+
+                        <!-- Key Numerical Trade Box -->
+                        <div style="display:flex;gap:0.75rem;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.08);padding:0.6rem 0.9rem;border-radius:8px;text-align:center;">
+                            <div>
+                                <div style="font-size:0.65rem;color:#94a3b8;">Target Price</div>
+                                <div style="font-size:0.95rem;font-weight:800;color:#34d399;font-family:var(--font-mono);">₹${Number(rep.target_price || 0).toLocaleString('en-IN', {minimumFractionDigits:2})}</div>
+                                <div style="font-size:0.62rem;color:#34d399;font-weight:700;">+${Number(rep.target_return_pct || 0).toFixed(1)}%</div>
+                            </div>
+                            <div style="width:1px;background:rgba(255,255,255,0.1);"></div>
+                            <div>
+                                <div style="font-size:0.65rem;color:#94a3b8;">Stop Loss</div>
+                                <div style="font-size:0.95rem;font-weight:800;color:#f87171;font-family:var(--font-mono);">₹${Number(rep.stop_loss_price || 0).toLocaleString('en-IN', {minimumFractionDigits:2})}</div>
+                                <div style="font-size:0.62rem;color:#f87171;font-weight:700;">Defensive Floor</div>
+                            </div>
+                            <div style="width:1px;background:rgba(255,255,255,0.1);"></div>
+                            <div>
+                                <div style="font-size:0.65rem;color:#94a3b8;">Risk-Reward</div>
+                                <div style="font-size:0.95rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);">${Number(rep.risk_reward_ratio || 2.0).toFixed(2)}R</div>
+                                <div style="font-size:0.62rem;color:#38bdf8;font-weight:700;">Asymmetry</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Specialized Analyst Team (3 Columns) -->
+                <div style="font-size:0.78rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.4rem;">
+                    <span>👥 1. Specialized Analyst Team</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(270px, 1fr));gap:0.75rem;margin-bottom:1.2rem;">
+                    <!-- Fundamental Analyst -->
+                    <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.08);padding:0.9rem;border-radius:8px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                            <div style="display:flex;align-items:center;gap:0.4rem;font-weight:700;color:#38bdf8;font-size:0.82rem;">
+                                <span>📊</span> Fundamental Analyst
+                            </div>
+                            <span style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.70rem;font-weight:800;padding:0.1rem 0.4rem;border-radius:4px;font-family:var(--font-mono);">${Number(fa.score || 5.0).toFixed(1)}/10</span>
+                        </div>
+                        <div style="font-size:0.74rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.5rem;">${fa.summary || 'Fundamental evaluation.'}</div>
+                        <div style="display:flex;flex-direction:column;gap:0.2rem;font-size:0.68rem;color:#94a3b8;background:rgba(0,0,0,0.3);padding:0.4rem 0.6rem;border-radius:4px;">
+                            ${(fa.key_metrics || []).map(m => `<div>• ${m}</div>`).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Technical Analyst -->
+                    <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.08);padding:0.9rem;border-radius:8px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                            <div style="display:flex;align-items:center;gap:0.4rem;font-weight:700;color:#c084fc;font-size:0.82rem;">
+                                <span>📈</span> Technical Analyst
+                            </div>
+                            <span style="background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);font-size:0.70rem;font-weight:800;padding:0.1rem 0.4rem;border-radius:4px;font-family:var(--font-mono);">${Number(ta.score || 5.0).toFixed(1)}/10</span>
+                        </div>
+                        <div style="font-size:0.74rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.5rem;">${ta.summary || 'Technical evaluation.'}</div>
+                        <div style="display:flex;flex-direction:column;gap:0.2rem;font-size:0.68rem;color:#94a3b8;background:rgba(0,0,0,0.3);padding:0.4rem 0.6rem;border-radius:4px;">
+                            ${(ta.key_signals || []).map(s => `<div>• ${s}</div>`).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Sentiment Analyst -->
+                    <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.08);padding:0.9rem;border-radius:8px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                            <div style="display:flex;align-items:center;gap:0.4rem;font-weight:700;color:#f59e0b;font-size:0.82rem;">
+                                <span>📰</span> Sentiment & Catalysts
+                            </div>
+                            <span style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);font-size:0.70rem;font-weight:800;padding:0.1rem 0.4rem;border-radius:4px;font-family:var(--font-mono);">${Number(sa.score || 5.0).toFixed(1)}/10</span>
+                        </div>
+                        <div style="font-size:0.74rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.5rem;">${sa.summary || 'Sentiment evaluation.'}</div>
+                        <div style="display:flex;flex-direction:column;gap:0.2rem;font-size:0.68rem;color:#94a3b8;background:rgba(0,0,0,0.3);padding:0.4rem 0.6rem;border-radius:4px;">
+                            <div>• Institutional: ${sa.institutional_verdict || 'Neutral'} (${sa.funds_accumulating_count || 0} funds in)</div>
+                            <div>• Macro Regime: ${sa.macro_regime_pill || '🟡 Neutral'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Debate Arena (Bull vs Bear) -->
+                <div style="font-size:0.78rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.4rem;">
+                    <span>🥊 2. Debate Arena (Bullish Researcher vs Bearish Researcher)</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:0.75rem;margin-bottom:1.2rem;">
+                    <!-- Bull Researcher -->
+                    <div style="background:rgba(16,185,129,0.04);border:1px solid rgba(16,185,129,0.25);padding:0.9rem;border-radius:8px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                            <div style="font-weight:800;color:#34d399;font-size:0.82rem;display:flex;align-items:center;gap:0.4rem;">
+                                <span>🐂</span> Bull Researcher Thesis
+                            </div>
+                            <span style="font-size:0.68rem;color:#34d399;font-weight:700;">${bull.conviction_pct || 50}% Bull Conviction</span>
+                        </div>
+                        <div style="font-size:0.74rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.5rem;">${bull.core_thesis || 'Upside growth thesis.'}</div>
+                        <div style="font-size:0.68rem;color:#94a3b8;background:rgba(0,0,0,0.3);padding:0.4rem 0.6rem;border-radius:4px;display:flex;flex-direction:column;gap:0.2rem;">
+                            ${(bull.top_catalysts || []).map(c => `<div style="color:#a7f3d0;">↑ ${c}</div>`).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Bear Researcher -->
+                    <div style="background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.25);padding:0.9rem;border-radius:8px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                            <div style="font-weight:800;color:#f87171;font-size:0.82rem;display:flex;align-items:center;gap:0.4rem;">
+                                <span>🐻</span> Bear Researcher Thesis
+                            </div>
+                            <span style="font-size:0.68rem;color:#f87171;font-weight:700;">${bear.conviction_pct || 50}% Bear Conviction</span>
+                        </div>
+                        <div style="font-size:0.74rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.5rem;">${bear.core_thesis || 'Downside risk thesis.'}</div>
+                        <div style="font-size:0.68rem;color:#94a3b8;background:rgba(0,0,0,0.3);padding:0.4rem 0.6rem;border-radius:4px;display:flex;flex-direction:column;gap:0.2rem;">
+                            ${(bear.top_risks || []).map(r => `<div style="color:#fecaca;">↓ ${r}</div>`).join('')}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Risk Manager & Portfolio Sizing -->
+                <div style="font-size:0.78rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.4rem;">
+                    <span>🛡️ 3. Risk & Sizing Assessment</span>
+                </div>
+                <div style="background:#0f172a;border:1px solid rgba(56,189,248,0.2);padding:0.9rem;border-radius:8px;margin-bottom:1.2rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+                        <div style="font-weight:700;color:#38bdf8;font-size:0.80rem;">Risk Manager Sizing Constraints</div>
+                        <span style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.68rem;font-weight:700;padding:0.1rem 0.45rem;border-radius:4px;">Volatility: ${rm.volatility_risk || 'MODERATE'}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:0.5rem;font-size:0.72rem;color:#cbd5e1;">
+                        ${(rm.risk_notes || []).map(n => `<div style="background:rgba(0,0,0,0.3);padding:0.35rem 0.55rem;border-radius:4px;border-left:2px solid #38bdf8;">${n}</div>`).join('')}
+                    </div>
+                </div>
+
+                <!-- 5. Interactive Actions & Footer -->
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.6rem;padding-top:0.8rem;border-top:1px solid rgba(255,255,255,0.08);">
+                    <div style="font-size:0.68rem;color:#64748b;font-family:var(--font-mono);">
+                        Analyzed in ${rep.duration_s || 0.5}s · ${rep.created_at ? new Date(rep.created_at).toLocaleString() : 'Just now'}
+                    </div>
+                    <div style="display:flex;gap:0.5rem;">
+                        <button type="button" class="btn btn-secondary" onclick="window.location.href='/stock/${encodeURIComponent(rep.ticker)}'" style="padding:0.35rem 0.75rem;font-size:0.75rem;">🔍 View Stock Detail</button>
+                        <button type="button" class="btn btn-primary" onclick="app.runTradingAgentsWorkflow('${rep.ticker}', this); app.openTradingAgentsWarRoom('${rep.ticker}', event);" style="padding:0.35rem 0.85rem;font-size:0.75rem;background:linear-gradient(135deg, #10b981 0%, #059669 100%);border-color:#10b981;">⚡ Re-Run 7-Agent Analysis</button>
+                    </div>
+                </div>
+            `;
+        };
+
+        window.openTradingAgentsWarRoom = app.openTradingAgentsWarRoom;
+        window.closeTradingAgentsWarRoom = app.closeTradingAgentsWarRoom;
+        window.openPopup = window.openPopup;
+        window.closePopups = window.closePopups;
         window.runRowPrediction = function(ticker, engine, btn) {
             app.runRowPrediction(ticker, engine, btn);
         };
     app.openPopup = window.openPopup;
     app.closePopups = window.closePopups;
     app.runRowPrediction = app.runRowPrediction;
+    app.openTradingAgentsWarRoom = app.openTradingAgentsWarRoom;
+    app.closeTradingAgentsWarRoom = app.closeTradingAgentsWarRoom;
 })(); // end consensus IIFE
