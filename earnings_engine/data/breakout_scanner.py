@@ -508,6 +508,12 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
         if hasattr(conn, "commit"):
             conn.commit()
         logger.debug("[BREAKOUT-DB] Persisted %d candidates to breakout_radar and %d breached setups to breakout_tracked_signals.", len(rows_to_insert), len(rows_for_tracked))
+        try:
+            from earnings_engine.api.routers.system import set_badge_counter
+            hot_breaking = sum(1 for r in rows_to_insert if len(r) > 2 and (str(r[2]).upper() == "HOT" or (len(r) > 17 and (r[17] or 0) >= 35.0)))
+            set_badge_counter("breaking_out_stocks", hot_breaking, settings)
+        except Exception:
+            pass
     except Exception as e:
         logger.error("[BREAKOUT-DB] Failed persisting breakout setups to DB: %s", e)
 
@@ -580,6 +586,11 @@ def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
         except Exception:
             _pool["last_scan_at"] = datetime.now(timezone.utc).isoformat()
         logger.info("[BREAKOUT-DB] Loaded %d hot and %d warm candidates from database.", hot_count, warm_count)
+        try:
+            from earnings_engine.api.routers.system import set_badge_counter
+            set_badge_counter("breaking_out_stocks", hot_count, settings)
+        except Exception:
+            pass
         return True
     except Exception as e:
         logger.warning("[BREAKOUT-DB] Failed to load breakout pool from DB: %s", e)

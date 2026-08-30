@@ -169,6 +169,15 @@ def save_verified_news_records(
 
         conn.commit()
 
+    if inserted_count > 0:
+        try:
+            high_70 = sum(1 for r in records if (r.get("impact_score") or 0) >= 70)
+            if high_70 > 0:
+                from earnings_engine.api.routers.system import increment_badge_counter
+                increment_badge_counter("high_impact_news_70", high_70, settings)
+        except Exception:
+            pass
+
     return inserted_count
 
 

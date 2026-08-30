@@ -7,9 +7,6 @@
     window.app = window.app || {};
     const app = window.app;
 Object.assign(app, {
-            // =========================================================================
-            // 📰 Short-Term Catalysts & High-Impact News Tab
-            // =========================================================================
             catalystsData: [],
             catalystsActiveView: 'feed',
             outcomesData: [],
@@ -48,6 +45,31 @@ Object.assign(app, {
                 }
             },
 
+            filterCatalystsHighImpact70() {
+                const impactSelect = document.getElementById('catImpactFilter');
+                const btn = document.getElementById('catViewHighImpactBtn');
+                if (!this._highImpact70Only) {
+                    this._highImpact70Only = true;
+                    if (impactSelect) impactSelect.value = 'HIGH';
+                    if (btn) {
+                        btn.style.background = 'rgba(251, 191, 36, 0.2)';
+                        btn.style.color = '#fbbf24';
+                        btn.style.borderColor = 'rgba(251, 191, 36, 0.4)';
+                        btn.style.fontWeight = '700';
+                    }
+                } else {
+                    this._highImpact70Only = false;
+                    if (impactSelect) impactSelect.value = 'ALL';
+                    if (btn) {
+                        btn.style.background = 'transparent';
+                        btn.style.color = '#fbbf24';
+                        btn.style.borderColor = 'transparent';
+                        btn.style.fontWeight = '600';
+                    }
+                }
+                this.renderCatalysts();
+            },
+
             async loadCatalysts(watchlist, days) {
                 const feedGrid = document.getElementById('catalystsFeedGrid');
                 if (!feedGrid) return;
@@ -59,19 +81,22 @@ Object.assign(app, {
                 const statsParam = (wl && wl !== 'GLOBAL') ? '?watchlist=' + encodeURIComponent(wl) + '&days=' + encodeURIComponent(d) : '?days=' + encodeURIComponent(d);
                 feedGrid.innerHTML = '<div class="card" style="padding:1.5rem;text-align:center;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading short-term market moving catalysts' + (wl ? ' for "' + wl + '"' : '') + '...</div>';
                 
+                const fetchFn = (this.apiFetch ? this.apiFetch.bind(this) : fetch);
                 try {
-                    // Fetch stats and items in parallel
                     const [itemsRes, statsRes] = await Promise.all([
-                        fetch(API_BASE + '/api/v1/news/catalysts' + wlParam),
-                        fetch(API_BASE + '/api/v1/news/catalyst-stats' + statsParam)
+                        fetchFn(API_BASE + '/api/v1/news/catalysts' + wlParam, {}, 'catalysts'),
+                        fetchFn(API_BASE + '/api/v1/news/catalyst-stats' + statsParam, {}, 'catalysts')
                     ]);
                     const itemsData = await itemsRes.json();
                     const statsData = await statsRes.json();
+
+                    if (itemsData && itemsData.aborted) return;
 
                     this.catalystsData = itemsData.catalysts || [];
                     this.renderCatalystsStats(statsData.stats || {});
                     this.renderCatalysts();
                 } catch (e) {
+                    if (e.name === 'AbortError') return;
                     console.error('Error loading catalysts:', e);
                     if (feedGrid) feedGrid.innerHTML = '<div class="card" style="padding:1rem;color:var(--red);">Failed loading catalysts feed. Click "⚡ Scan Feeds" to refresh.</div>';
                 }
@@ -81,13 +106,16 @@ Object.assign(app, {
                 const tableBody = document.getElementById('outcomesTableBody');
                 if (tableBody) tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading historical verified news outcomes & performance metrics...</td></tr>';
                 
+                const fetchFn = (this.apiFetch ? this.apiFetch.bind(this) : fetch);
                 try {
                     const [metricsRes, outcomesRes] = await Promise.all([
-                        fetch(API_BASE + '/api/v1/news/trade-metrics'),
-                        fetch(API_BASE + '/api/v1/news/outcomes?limit=100')
+                        fetchFn(API_BASE + '/api/v1/news/trade-metrics', {}, 'catalysts'),
+                        fetchFn(API_BASE + '/api/v1/news/outcomes?limit=100', {}, 'catalysts')
                     ]);
                     const metricsData = await metricsRes.json();
                     const outcomesData = await outcomesRes.json();
+
+                    if (outcomesData && outcomesData.aborted) return;
 
                     this.outcomesMetrics = metricsData.metrics || {};
                     this.outcomesData = outcomesData.outcomes || [];
@@ -95,6 +123,7 @@ Object.assign(app, {
                     this.renderNewsTradeMetrics(this.outcomesMetrics);
                     this.renderNewsOutcomes();
                 } catch (e) {
+                    if (e.name === 'AbortError') return;
                     console.error('Error loading news outcomes:', e);
                     if (tableBody) tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:1.5rem;color:var(--red);">Failed loading outcomes track record. Click "🎯 Re-Verify Outcomes" to calculate.</td></tr>';
                 }
@@ -143,8 +172,6 @@ Object.assign(app, {
                 if (totalEl) totalEl.textContent = m.total_evaluated || 0;
                 if (verEl) verEl.textContent = m.verified_count || 0;
                 if (actEl) actEl.textContent = (m.total_evaluated || 0) - (m.verified_count || 0);
-
-                if (m.horizon_performance) {
                     const h1 = m.horizon_performance.avg_1d_pct || 0;
                     const h3 = m.horizon_performance.avg_3d_pct || 0;
                     const h5 = m.horizon_performance.avg_5d_pct || 0;

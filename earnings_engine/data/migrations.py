@@ -1116,6 +1116,24 @@ def _migration_020_breakout_strategy_tracking(conn: Any) -> None:
         logger.debug("[MIGRATION-020] Index creation notice: %s", e)
 
 
+def _migration_021_sidebar_badge_counters(conn: sqlite3.Connection | TursoConnection) -> None:
+    """Create dedicated sidebar_badge_counters table for instant sub-millisecond badge counters."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sidebar_badge_counters (
+            key TEXT PRIMARY KEY,
+            value INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    try:
+        conn.execute("INSERT OR IGNORE INTO sidebar_badge_counters (key, value, updated_at) VALUES ('breaking_out_stocks', 0, datetime('now'))")
+        conn.execute("INSERT OR IGNORE INTO sidebar_badge_counters (key, value, updated_at) VALUES ('high_impact_news_70', 0, datetime('now'))")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1138,6 +1156,7 @@ MIGRATIONS: list[Migration] = [
     Migration(18, "018_breakout_tracked_signals", _migration_018_breakout_tracked_signals),
     Migration(19, "019_automation_schedules_market_hours", _migration_019_automation_schedules_market_hours),
     Migration(20, "020_breakout_strategy_tracking", _migration_020_breakout_strategy_tracking),
+    Migration(21, "021_sidebar_badge_counters", _migration_021_sidebar_badge_counters),
 ]
 
 

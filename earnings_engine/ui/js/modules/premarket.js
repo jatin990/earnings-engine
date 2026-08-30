@@ -102,6 +102,7 @@
             }
 
             this.premarketLoading = true;
+            const fetchFn = (window.app?.apiFetch ? window.app.apiFetch.bind(window.app) : fetch);
             try {
                 const params = new URLSearchParams({
                     window: windowMode,
@@ -113,9 +114,10 @@
                     days: windowMode === 'all_recent' ? '7' : '3'
                 });
 
-                const res = await fetch(`${API_BASE}/api/v1/premarket/setups?${params.toString()}`);
+                const res = await fetchFn(`${API_BASE}/api/v1/premarket/setups?${params.toString()}`, {}, 'premarket');
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
+                if (data && data.aborted) return;
 
                 this.premarketData = data.items || [];
                 this.premarketSummary = data.summary || {};
@@ -135,12 +137,13 @@
                     }
                 }
             } catch (err) {
-                console.error('[PREMARKET] Failed loading setups:', err);
+                if (err.name === 'AbortError') return;
+                console.error('[PREMARKET] Failed to load setups:', err);
                 if (tbody) {
                     tbody.innerHTML = `
                         <tr>
                             <td colspan="8" style="text-align:center;padding:2rem;color:#f87171;">
-                                ⚠️ Failed to load pre-market setups: ${err.message}
+                                ⚠️ Failed loading pre-market setups: ${err.message || 'Server error'}
                             </td>
                         </tr>
                     `;

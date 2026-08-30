@@ -57,74 +57,42 @@ async def api_info():
     }
 
 
-_BADGES_CACHE: dict[str, Any] = {}
-_BADGES_CACHE_TTL: float = 30.0  # 30-second TTL cache for instant sub-millisecond responses
+_BADGES_STATE: dict[str, Any] = {
+    "breaking_out_stocks": 0,
+    "high_impact_news_70": 0,
+    "last_hydrated": 0.0,
+}
 
 
-def _compute_sidebar_badges_sync(settings: Settings) -> dict[str, Any]:
-    """Execute direct, lightweight indexed SQL queries to compute sidebar badge counters."""
+def _hydrate_badge_counters_from_db(settings: Settings) -> None:
+    """Hydrate in-memory badge counters from the dedicated sidebar_badge_counters table."""
+    global _BADGES_STATE
     conn = None
     try:
         conn = get_db_connection(settings)
-        # 1. High-impact catalysts count (>50% impact or HIGH in last 14 days)
-        cat_count = 0
-        try:
-            row = conn.execute(
-                """
-                SELECT COUNT(*) FROM news_catalysts
-                WHERE (impact_score >= 50 OR impact_level = 'HIGH')
-                  AND published_at >= datetime('now', '-14 days')
-                """
-            ).fetchone()
-            cat_count = int(row[0]) if row and row[0] is not None else 0
-        except Exception:
-            try:
-                row = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE (impact_score >= 50 OR impact_level = 'HIGH')").fetchone()
-                cat_count = int(row[0]) if row and row[0] is not None else 0
-            except Exception:
-                pass
-
-        # 2. Breakout Radar active / breached setups count directly from indexed table
-        bo_count = 0
-        try:
-            row_bo = conn.execute(
-                "SELECT COUNT(*) FROM breakout_radar WHERE tier IN ('HOT', 'WARM') OR composite_score >= 35.0"
-            ).fetchone()
-            if row_bo and row_bo[0] is not None:
-                bo_count = int(row_bo[0])
-        except Exception:
-            pass
-
-        # Check permanently tracked active/triggered breakouts
-        try:
-            row_tracked = conn.execute(
-                """
-                SELECT COUNT(*) FROM breakout_tracked_signals
-                WHERE outcome IN ('ACTIVE', 'TRIGGERED', 'TARGET_HIT', 'BREAKOUT_SUCCEEDED', 'COILING_IN_PROFIT')
-                  OR breakout_happened = 1
-                """
-            ).fetchone()
-            if row_tracked and row_tracked[0] is not None:
-                bo_count = max(bo_count, int(row_tracked[0]))
-        except Exception:
-            pass
-
-        return {
-            "success": True,
-            "catalysts_count": cat_count,
-            "breakouts_count": bo_count,
-            "high_impact_catalysts": cat_count,
-            "active_breakouts": bo_count,
-        }
+        cur = conn.execute("SELECT key, value FROM sidebar_badge_counters")
+        for row in cur.fetchall():
+            k, v = str(row[0]), int(row[1] or 0)
+            _BADGES_STATE[k] = v
+        _BADGES_STATE["last_hydrated"] = time.time()
     except Exception as e:
-        logger.debug("[SIDEBAR-BADGES] Error calculating badge counts: %s", e)
-        return {
-            "success": True,
-            "catalysts_count": 0,
-            "breakouts_count": 0,
-            "high_impact_catalysts": 0,
-            "active_breakouts": 0,
-        }
+        logger.debug("[SIDEBAR-BADGES] Initial hydration notice: %s", e)
+        # If table is empty, do a fast one-time count and save
+        try:
+            if conn:
+                row_news = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_score >= 70").fetchone()
+                news_count = int(row_news[0]) if row_news and row_news[0] is not None else 0
+                row_bo = conn.execute("SELECT COUNT(*) FROM breakout_radar WHERE tier = 'HOT' OR composite_score >= 35.0").fetchone()
+                bo_count = int(row_bo[0]) if row_bo and row_bo[0] is not None else 0
+
+                _BADGES_STATE["breaking_out_stocks"] = bo_count
+                _BADGES_STATE["high_impact_news_70"] = news_count
+                _BADGES_STATE["last_hydrated"] = time.time()
+
+                conn.execute("INSERT OR REPLACE INTO sidebar_badge_counters (key, value, updated_at) VALUES ('breaking_out_stocks', ?, datetime('now'))", (bo_count,))
+                conn.execute("INSERT OR REPLACE INTO sidebar_badge_counters (key, value, updated_at) VALUES ('high_impact_news_70', ?, datetime('now'))", (news_count,))
+        except Exception:
+            pass
     finally:
         if conn:
             try:
@@ -133,36 +101,61 @@ def _compute_sidebar_badges_sync(settings: Settings) -> dict[str, Any]:
                 pass
 
 
+def get_badge_counters(settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve badge counters instantly from memory (< 0.05ms)."""
+    global _BADGES_STATE
+    if _BADGES_STATE.get("last_hydrated", 0.0) == 0.0:
+        _hydrate_badge_counters_from_db(settings or _settings)
+    return _BADGES_STATE
+
+
+def set_badge_counter(key: str, value: int, settings: Settings | None = None) -> None:
+    """Set a badge counter in memory and persist asynchronously to sidebar_badge_counters table."""
+    global _BADGES_STATE
+    _BADGES_STATE[key] = int(value)
+    _BADGES_STATE["last_hydrated"] = time.time()
+
+    def _persist():
+        try:
+            conn = get_db_connection(settings or _settings)
+            try:
+                conn.execute(
+                    "INSERT OR REPLACE INTO sidebar_badge_counters (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+                    (key, int(value)),
+                )
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.debug("[SIDEBAR-BADGES] Persist counter error: %s", e)
+
+    import threading
+    threading.Thread(target=_persist, daemon=True).start()
+
+
+def increment_badge_counter(key: str, delta: int = 1, settings: Settings | None = None) -> None:
+    """Increment a badge counter in memory and persist to database."""
+    global _BADGES_STATE
+    current = int(_BADGES_STATE.get(key, 0)) + delta
+    set_badge_counter(key, max(0, current), settings)
+
+
 @router.get("/api/v1/sidebar/badges")
 @router.get("/api/v1/system/sidebar-badges")
 async def get_sidebar_badges_endpoint():
-    """Retrieve dynamic notification badge counters for sidebar navigation items (< 1ms cached)."""
-    import time
-    global _BADGES_CACHE
-    now = time.time()
+    """Retrieve dynamic notification badge counters for sidebar navigation items (< 0.1ms instant memory read)."""
+    state = get_badge_counters(_settings)
+    breaking_out = int(state.get("breaking_out_stocks", 0))
+    news_70 = int(state.get("high_impact_news_70", 0))
 
-    # Fast in-memory cache check (< 0.1ms)
-    if "data" in _BADGES_CACHE and (now - _BADGES_CACHE.get("ts", 0)) < _BADGES_CACHE_TTL:
-        return _BADGES_CACHE["data"]
-
-    try:
-        data = await asyncio.wait_for(
-            asyncio.to_thread(_compute_sidebar_badges_sync, _settings),
-            timeout=3.0,
-        )
-        _BADGES_CACHE = {"ts": now, "data": data}
-        return data
-    except Exception as e:
-        logger.debug("[SIDEBAR-BADGES] Fallback during badge fetch: %s", e)
-        if "data" in _BADGES_CACHE:
-            return _BADGES_CACHE["data"]
-        return {
-            "success": True,
-            "catalysts_count": 0,
-            "breakouts_count": 0,
-            "high_impact_catalysts": 0,
-            "active_breakouts": 0,
-        }
+    return {
+        "success": True,
+        "catalysts_count": news_70,
+        "breakouts_count": breaking_out,
+        "high_impact_catalysts": news_70,
+        "active_breakouts": breaking_out,
+        "breaking_out_stocks": breaking_out,
+        "high_impact_news_70": news_70,
+    }
 
 
 # ---------------------------------------------------------------------------
