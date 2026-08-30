@@ -135,17 +135,67 @@ def _connect(settings: Settings) -> Any:
 
 
 def _is_fresh(ticker: str, settings: Settings) -> bool:
-    """Check if earnings data is fresh in SQLite for the given ticker."""
+    """Check if earnings data is fresh in SQLite for the given ticker.
+
+    Refresh should ONLY happen if:
+    1. The next earnings date is not present in SQLite (None / missing).
+    2. OR the next earnings date is in the next 7 days (0 <= (next_date - today).days <= 7).
+
+    If the next earnings date is present and > 7 days in the future, the data is
+    considered fresh and does NOT need to be re-downloaded.
+    """
     with _connect(settings) as connection:
+        # Check when this ticker's earnings was last fetched
         row = connection.execute(
             "SELECT earnings_fetched_at FROM tickers WHERE ticker = ?",
             (ticker,),
         ).fetchone()
-    if not row or not row[0]:
+
+        fetched_at_str = row[0] if row and row[0] else None
+
+        # If fetched within the last 12 hours, treat as fresh to avoid hammering APIs within the same session
+        if fetched_at_str:
+            try:
+                fetched_at = pd.Timestamp(fetched_at_str)
+                age_hours = (pd.Timestamp.now() - fetched_at).total_seconds() / 3600.0
+                if age_hours < 12.0:
+                    return True
+            except Exception:
+                pass
+
+        # Query the next upcoming earnings date for this ticker (>= today)
+        today_str = pd.Timestamp.today().normalize().strftime("%Y-%m-%d")
+        next_row = connection.execute(
+            "SELECT MIN(earnings_date) FROM earnings_history WHERE ticker = ? AND earnings_date >= ?",
+            (ticker, today_str),
+        ).fetchone()
+
+        next_earnings_date_str = next_row[0] if next_row and next_row[0] else None
+
+    # Condition 1: Next earnings date is NOT present -> needs refresh
+    if not next_earnings_date_str:
         return False
-    fetched_at = pd.Timestamp(row[0])
-    age_days = (pd.Timestamp.now() - fetched_at).total_seconds() / 86400
-    return age_days <= settings.cache_max_age_days
+
+    try:
+        next_dt = pd.Timestamp(next_earnings_date_str).normalize()
+        today_dt = pd.Timestamp.today().normalize()
+        days_to_next = (next_dt - today_dt).days
+
+        # Condition 2: Next earnings date is in the next 7 days -> needs refresh (unless fetched today)
+        if 0 <= days_to_next <= 7:
+            if fetched_at_str:
+                age_days = (pd.Timestamp.now() - pd.Timestamp(fetched_at_str)).total_seconds() / 86400.0
+                if age_days < 1.0:
+                    return True
+            return False
+
+        # Next earnings date is > 7 days away -> Fresh! No refresh needed
+        if days_to_next > 7:
+            return True
+    except Exception:
+        return False
+
+    return True
 
 
 def _mark_fresh(ticker: str, settings: Settings) -> None:

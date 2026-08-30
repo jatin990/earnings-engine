@@ -65,6 +65,8 @@ async def lifespan(app: FastAPI):
         or os.getenv("SERVERLESS") == "1"
         or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
         or os.getenv("K_SERVICE")
+        or os.getenv("PYTEST_CURRENT_TEST")
+        or os.getenv("TESTING") == "1"
     )
 
     try:

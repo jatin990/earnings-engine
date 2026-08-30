@@ -88,4 +88,50 @@ def test_universe_freshness_resolution(temp_settings):
         assert fresh["relative_time"] != "No tickers in watchlist"
 
 
+def test_earnings_refresh_rule_7_days_and_missing(temp_settings):
+    """Verify earnings refresh ONLY happens if next date is missing or within next 7 days."""
+    from earnings_engine.data.earnings import _is_fresh
+    apply_migrations(temp_settings)
+    conn = get_db_connection(temp_settings)
+
+    today = pd.Timestamp.today().normalize()
+    date_in_3d = (today + pd.Timedelta(days=3)).strftime("%Y-%m-%d")
+    date_in_15d = (today + pd.Timedelta(days=15)).strftime("%Y-%m-%d")
+    past_date = (today - pd.Timedelta(days=20)).strftime("%Y-%m-%d")
+
+    # Case 1: Ticker with NO upcoming earnings date -> NOT fresh (must refresh)
+    with conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO tickers (ticker, earnings_fetched_at) VALUES ('NO_UPCOMING.NS', '2026-08-01 10:00:00')"
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO earnings_history (ticker, earnings_date, eps_reported) VALUES ('NO_UPCOMING.NS', ?, 10.0)",
+            (past_date,),
+        )
+    assert _is_fresh("NO_UPCOMING.NS", temp_settings) is False
+
+    # Case 2: Ticker with next earnings date 3 days away (<= 7 days) and fetched 3 days ago -> NOT fresh (must refresh)
+    with conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO tickers (ticker, earnings_fetched_at) VALUES ('UPCOMING_3D.NS', '2026-08-20 10:00:00')"
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO earnings_history (ticker, earnings_date) VALUES ('UPCOMING_3D.NS', ?)",
+            (date_in_3d,),
+        )
+    assert _is_fresh("UPCOMING_3D.NS", temp_settings) is False
+
+    # Case 3: Ticker with next earnings date 15 days away (> 7 days) -> IS fresh (NO refresh needed!)
+    with conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO tickers (ticker, earnings_fetched_at) VALUES ('UPCOMING_15D.NS', '2026-08-01 10:00:00')"
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO earnings_history (ticker, earnings_date) VALUES ('UPCOMING_15D.NS', ?)",
+            (date_in_15d,),
+        )
+    assert _is_fresh("UPCOMING_15D.NS", temp_settings) is True
+
+
+
 
