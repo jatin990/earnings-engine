@@ -220,6 +220,14 @@
             this._lastFlowsData = flows;
             if (window.app) window.app._lastFlowsData = flows;
 
+            const sessionLabel = flows.session_label || flows.as_of_date || 'Latest Session';
+            const fiiLbl = document.getElementById('pulseSessionFiiLabel');
+            const diiLbl = document.getElementById('pulseSessionDiiLabel');
+            const totLbl = document.getElementById('pulseSessionTotLabel');
+            if (fiiLbl) fiiLbl.textContent = `${sessionLabel} FII`;
+            if (diiLbl) diiLbl.textContent = `${sessionLabel} DII`;
+            if (totLbl) totLbl.textContent = `${sessionLabel} Total`;
+
             if (fiiEl && flows.fii_net_cr !== undefined && flows.fii_net_cr !== null) {
                 const s = flows.fii_net_cr >= 0 ? '+' : '';
                 fiiEl.textContent = `${s}₹${flows.fii_net_cr.toLocaleString()} Cr`;
@@ -235,9 +243,10 @@
                 totEl.textContent = `${s}₹${flows.total_net_cr.toLocaleString()} Cr`;
                 totEl.style.color = flows.total_net_cr >= 0 ? '#38bdf8' : '#f87171';
             }
-            if (biasEl && flows.bias) {
-                biasEl.textContent = flows.bias;
-                biasEl.style.color = flows.bias.includes('BULLISH') ? '#34d399' : '#f87171';
+            const biasText = flows.bias || flows.regime_badge;
+            if (biasEl && biasText) {
+                biasEl.textContent = biasText;
+                biasEl.style.color = biasText.includes('BULLISH') || biasText.includes('Accumulation') ? '#34d399' : (biasText.includes('Distribution') || biasText.includes('DEFENSIVE') ? '#f87171' : '#94a3b8');
             }
 
             const isExpanded = !!(this._isFlowHistoryExpanded || (window.app && window.app._isFlowHistoryExpanded));

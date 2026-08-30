@@ -168,10 +168,11 @@ Object.assign(app, {
                     if (topGValEl) topGValEl.textContent = '+' + Number(topG.max_gain_pct).toFixed(1) + '%';
                     if (topGTickEl) topGTickEl.textContent = `${topG.ticker}: ${topG.title}`;
                 }
-
                 if (totalEl) totalEl.textContent = m.total_evaluated || 0;
                 if (verEl) verEl.textContent = m.verified_count || 0;
                 if (actEl) actEl.textContent = (m.total_evaluated || 0) - (m.verified_count || 0);
+
+                if (m.horizon_performance) {
                     const h1 = m.horizon_performance.avg_1d_pct || 0;
                     const h3 = m.horizon_performance.avg_3d_pct || 0;
                     const h5 = m.horizon_performance.avg_5d_pct || 0;

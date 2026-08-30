@@ -206,7 +206,7 @@ SECTOR_CONFIG = [
 
 
 def compute_sector_heatmap(settings: Settings | None = None, force_refresh: bool = False) -> list[dict[str, Any]]:
-    """Compute Sectoral Heatmap using authoritative NSE index prices with constituent breadth."""
+    """Compute Sectoral Heatmap using authoritative NSE index prices or market-cap weighted constituent returns across active weekday trading sessions."""
     global _SECTORS_CACHE
     now_ts = time.time()
     if not force_refresh and "data" in _SECTORS_CACHE:
@@ -216,14 +216,39 @@ def compute_sector_heatmap(settings: Settings | None = None, force_refresh: bool
     settings = settings or Settings()
     conn = get_db_connection(settings)
 
-    # 1. Determine latest trading day
-    latest_trading_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    try:
-        max_dt = conn.execute("SELECT MAX(date) FROM price_history WHERE ticker = '^NSEI'").fetchone()
-        if max_dt and max_dt[0]:
-            latest_trading_str = str(max_dt[0])
-    except Exception:
-        pass
+    # 1. Determine active weekday market sessions (Monday to Friday)
+    active_dates_rows = conn.execute("""
+        SELECT date, COUNT(*) as cnt, SUM(volume) as tot_vol 
+        FROM price_history 
+        WHERE date <= date('now')
+        GROUP BY date 
+        HAVING cnt >= 30 AND tot_vol > 1000000
+        ORDER BY date DESC 
+        LIMIT 40
+    """).fetchall()
+
+    weekday_dates: list[str] = []
+    for r in active_dates_rows:
+        dt_str = str(r[0])
+        try:
+            dt_obj = datetime.strptime(dt_str, "%Y-%m-%d")
+            if dt_obj.weekday() < 5:  # Monday to Friday
+                weekday_dates.append(dt_str)
+        except Exception:
+            weekday_dates.append(dt_str)
+
+    if not weekday_dates:
+        # Fallback to recent weekdays
+        cur = datetime.now(timezone.utc).date()
+        while len(weekday_dates) < 30:
+            if cur.weekday() < 5:
+                weekday_dates.append(cur.strftime("%Y-%m-%d"))
+            cur -= timedelta(days=1)
+
+    t0 = weekday_dates[0]
+    t1 = weekday_dates[min(1, len(weekday_dates) - 1)]
+    t5 = weekday_dates[min(4, len(weekday_dates) - 1)]
+    t21 = weekday_dates[min(20, len(weekday_dates) - 1)]
 
     sectors: list[dict[str, Any]] = []
 
@@ -241,7 +266,7 @@ def compute_sector_heatmap(settings: Settings | None = None, force_refresh: bool
         try:
             idx_df = load_prices(idx_sym, settings)
             if not idx_df.empty and "close" in idx_df.columns:
-                valid_idx = idx_df.loc[idx_df.index <= latest_trading_str]
+                valid_idx = idx_df.loc[idx_df.index <= t0]
                 if len(valid_idx) >= 1:
                     current_index_price = float(valid_idx["close"].dropna().iloc[-1])
                 if len(valid_idx) >= 2:
@@ -249,12 +274,12 @@ def compute_sector_heatmap(settings: Settings | None = None, force_refresh: bool
                     c_prev = float(valid_idx["close"].dropna().iloc[-2])
                     if c_prev > 0:
                         sec_1d = round(((c_now - c_prev) / c_prev) * 100.0, 2)
-                if len(valid_idx) >= 6:
-                    c_7 = float(valid_idx["close"].dropna().iloc[-6])
+                if len(valid_idx) >= 5:
+                    c_7 = float(valid_idx["close"].dropna().iloc[-5])
                     if c_7 > 0:
                         sec_7d = round(((c_now - c_7) / c_7) * 100.0, 2)
-                if len(valid_idx) >= 22:
-                    c_30 = float(valid_idx["close"].dropna().iloc[-22])
+                if len(valid_idx) >= 21:
+                    c_30 = float(valid_idx["close"].dropna().iloc[-21])
                     if c_30 > 0:
                         sec_30d = round(((c_now - c_30) / c_30) * 100.0, 2)
         except Exception as e:
@@ -265,32 +290,48 @@ def compute_sector_heatmap(settings: Settings | None = None, force_refresh: bool
         dec_count = 0
         constituent_returns_1d: list[tuple[str, float]] = []
         weighted_1d_sum = 0.0
+        weighted_7d_sum = 0.0
+        weighted_30d_sum = 0.0
         weighted_cap_sum = 0.0
 
         for tk in basket:
             try:
                 p_df = load_prices(tk, settings)
                 if not p_df.empty and "close" in p_df.columns:
-                    p_valid = p_df.loc[p_df.index <= latest_trading_str]
-                    if len(p_valid) >= 2:
-                        c_last = float(p_valid["close"].dropna().iloc[-1])
-                        c_prev = float(p_valid["close"].dropna().iloc[-2])
-                        if c_prev > 0:
-                            ret_1d = ((c_last - c_prev) / c_prev) * 100.0
-                            constituent_returns_1d.append((tk.replace(".NS", ""), ret_1d))
-                            if ret_1d > 0.05:
-                                adv_count += 1
-                            elif ret_1d < -0.05:
-                                dec_count += 1
+                    closes = p_df["close"].dropna()
+                    
+                    sub_t0 = closes.loc[closes.index <= t0]
+                    sub_t1 = closes.loc[closes.index <= t1]
+                    sub_t5 = closes.loc[closes.index <= t5]
+                    sub_t21 = closes.loc[closes.index <= t21]
 
-                            # Get market cap for weighted fallback
-                            try:
-                                cap_row = conn.execute("SELECT market_cap FROM tickers WHERE ticker = ?", (tk,)).fetchone()
-                                cap_val = float(cap_row[0]) if cap_row and cap_row[0] else 10000000000.0
-                            except Exception:
-                                cap_val = 10000000000.0
-                            weighted_1d_sum += ret_1d * cap_val
-                            weighted_cap_sum += cap_val
+                    p_t0 = float(sub_t0.iloc[-1]) if len(sub_t0) > 0 else None
+                    p_t1 = float(sub_t1.iloc[-1]) if len(sub_t1) > 0 else None
+                    p_t5 = float(sub_t5.iloc[-1]) if len(sub_t5) > 0 else None
+                    p_t21 = float(sub_t21.iloc[-1]) if len(sub_t21) > 0 else None
+
+                    if p_t0 is not None and p_t1 is not None and p_t1 > 0:
+                        ret_1d = ((p_t0 - p_t1) / p_t1) * 100.0
+                        ret_7d = ((p_t0 - p_t5) / p_t5) * 100.0 if (p_t5 and p_t5 > 0) else ret_1d
+                        ret_30d = ((p_t0 - p_t21) / p_t21) * 100.0 if (p_t21 and p_t21 > 0) else ret_7d
+
+                        constituent_returns_1d.append((tk.replace(".NS", ""), ret_1d))
+                        if ret_1d > 0.05:
+                            adv_count += 1
+                        elif ret_1d < -0.05:
+                            dec_count += 1
+
+                        # Get market cap for weighted fallback
+                        try:
+                            cap_row = conn.execute("SELECT market_cap FROM tickers WHERE ticker = ?", (tk,)).fetchone()
+                            cap_val = float(cap_row[0]) if cap_row and cap_row[0] else 10000000000.0
+                        except Exception:
+                            cap_val = 10000000000.0
+
+                        weighted_1d_sum += ret_1d * cap_val
+                        weighted_7d_sum += ret_7d * cap_val
+                        weighted_30d_sum += ret_30d * cap_val
+                        weighted_cap_sum += cap_val
             except Exception:
                 pass
 
@@ -299,13 +340,19 @@ def compute_sector_heatmap(settings: Settings | None = None, force_refresh: bool
             if weighted_cap_sum > 0:
                 sec_1d = round(weighted_1d_sum / weighted_cap_sum, 2)
             else:
-                default_baseline = 3.51 if sec_name == "Nifty IT" else (0.85 if "Bank" in sec_name else 0.5)
-                sec_1d = default_baseline
+                sec_1d = 0.0
 
         if sec_7d is None:
-            sec_7d = round(sec_1d * 2.2, 2)
+            if weighted_cap_sum > 0:
+                sec_7d = round(weighted_7d_sum / weighted_cap_sum, 2)
+            else:
+                sec_7d = sec_1d
+
         if sec_30d is None:
-            sec_30d = round(sec_1d * 4.8, 2)
+            if weighted_cap_sum > 0:
+                sec_30d = round(weighted_30d_sum / weighted_cap_sum, 2)
+            else:
+                sec_30d = sec_7d
 
         # Sort constituent gainers/losers
         top_gainer = None
@@ -352,33 +399,53 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
     settings = settings or Settings()
     conn = get_db_connection(settings)
 
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS institutional_net_flows (
-            date TEXT PRIMARY KEY,
-            day_label TEXT NOT NULL,
-            fii_buy_cr REAL NOT NULL,
-            fii_sell_cr REAL NOT NULL,
-            fii_net_cr REAL NOT NULL,
-            dii_buy_cr REAL NOT NULL,
-            dii_sell_cr REAL NOT NULL,
-            dii_net_cr REAL NOT NULL,
-            total_net_cr REAL NOT NULL,
-            stance TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_flows_date ON institutional_net_flows(date DESC)")
-    conn.commit()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS institutional_net_flows (
+                date TEXT PRIMARY KEY,
+                day_label TEXT NOT NULL,
+                fii_buy_cr REAL NOT NULL,
+                fii_sell_cr REAL NOT NULL,
+                fii_net_cr REAL NOT NULL,
+                dii_buy_cr REAL NOT NULL,
+                dii_sell_cr REAL NOT NULL,
+                dii_net_cr REAL NOT NULL,
+                total_net_cr REAL NOT NULL,
+                stance TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_flows_date ON institutional_net_flows(date DESC)")
+        conn.execute("DELETE FROM institutional_net_flows WHERE fii_buy_cr = 0 AND fii_sell_cr = 0 AND dii_buy_cr = 0 AND dii_sell_cr = 0")
+        conn.commit()
+    except Exception:
+        pass
 
     now_utc = datetime.now(timezone.utc)
     today_dt = now_utc.date()
     today_str = today_dt.strftime("%Y-%m-%d")
 
-    # Query trading dates from price_history
+    # Query trading dates from price_history filtering for weekdays
     trading_dates_raw: list[str] = []
     try:
-        dt_rows = conn.execute("SELECT DISTINCT date FROM price_history ORDER BY date DESC LIMIT 45").fetchall()
-        trading_dates_raw = [r[0] for r in dt_rows if r[0]]
+        dt_rows = conn.execute("""
+            SELECT DISTINCT date 
+            FROM price_history 
+            WHERE date <= date('now')
+            GROUP BY date 
+            HAVING COUNT(*) >= 30 AND SUM(volume) > 1000000
+            ORDER BY date DESC 
+            LIMIT 45
+        """).fetchall()
+        for r in dt_rows:
+            if r[0]:
+                d_str = str(r[0])
+                try:
+                    d_obj = datetime.strptime(d_str, "%Y-%m-%d")
+                    if d_obj.weekday() < 5:  # Only weekdays
+                        trading_dates_raw.append(d_str)
+                except Exception:
+                    trading_dates_raw.append(d_str)
     except Exception:
         pass
 
@@ -391,7 +458,7 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
 
     cached_flows_map: dict[str, dict[str, Any]] = {}
     try:
-        c_rows = conn.execute("SELECT * FROM institutional_net_flows ORDER BY date DESC LIMIT 45").fetchall()
+        c_rows = conn.execute("SELECT * FROM institutional_net_flows WHERE (fii_buy_cr > 0 OR fii_sell_cr > 0 OR dii_buy_cr > 0 OR dii_sell_cr > 0) ORDER BY date DESC LIMIT 45").fetchall()
         for r in c_rows:
             r_dict = dict(r) if hasattr(r, "keys") else {
                 "date": r[0], "day_label": r[1], "fii_buy_cr": r[2], "fii_sell_cr": r[3],
@@ -413,7 +480,7 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
 
         try:
             dt_obj = datetime.strptime(dt_str, "%Y-%m-%d").date()
-            day_fmt = dt_obj.strftime("%a, %b %d")
+            day_fmt = dt_obj.strftime("%d %b (%a)")
         except Exception:
             day_fmt = dt_str
 
@@ -486,8 +553,8 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
     history_7d = history_full[:7]
     history_30d = history_full
 
-    fii_net_cr = history_7d[0]["fii_net_cr"] if history_7d else 850.5
-    dii_net_cr = history_7d[0]["dii_net_cr"] if history_7d else 1420.0
+    fii_net_cr = history_7d[0]["fii_net_cr"] if history_7d else 0.0
+    dii_net_cr = history_7d[0]["dii_net_cr"] if history_7d else 0.0
     total_net_cr = round(fii_net_cr + dii_net_cr, 1)
 
     fii_7d_total = round(sum(h["fii_net_cr"] for h in history_7d), 1)
@@ -500,22 +567,35 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
 
     if combined_7d_total > 500:
         regime_badge = "🟢 Institutional Accumulation"
+        bias_str = "NET INFLOW (BULLISH)"
     elif combined_7d_total < -500:
         regime_badge = "🔴 Institutional Distribution"
+        bias_str = "NET OUTFLOW (DEFENSIVE)"
     else:
         regime_badge = "⚪ Neutral / Balanced Flow"
+        bias_str = "BALANCED FLOWS"
+
+    session_label = history_full[0]["day_label"] if history_full else today_str
 
     liquidity_data = {
         "as_of_date": history_full[0]["date"] if history_full else today_str,
+        "session_label": session_label,
         "fii_net_cr": fii_net_cr,
         "dii_net_cr": dii_net_cr,
         "total_net_cr": total_net_cr,
+        "bias": bias_str,
         "fii_7d_total": fii_7d_total,
         "dii_7d_total": dii_7d_total,
         "combined_7d_total": combined_7d_total,
+        "fii_7d_total_cr": fii_7d_total,
+        "dii_7d_total_cr": dii_7d_total,
+        "total_7d_total_cr": combined_7d_total,
         "fii_30d_total": fii_30d_total,
         "dii_30d_total": dii_30d_total,
         "combined_30d_total": combined_30d_total,
+        "fii_30d_total_cr": fii_30d_total,
+        "dii_30d_total_cr": dii_30d_total,
+        "total_30d_total_cr": combined_30d_total,
         "regime_badge": regime_badge,
         "history_7d": history_7d,
         "history_30d": history_30d,
