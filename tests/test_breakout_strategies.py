@@ -216,3 +216,41 @@ def test_trigger_price_is_strictly_above_signal_price(sample_prices_df):
         assert res["stop_loss"] < res["signal_price"], (
             f"Strategy {strat} produced SL {res['stop_loss']} >= signal_price {res['signal_price']}"
         )
+        # Ensure minimum 1.5 Risk-Reward Ratio
+        assert res["risk_reward_ratio"] >= 1.5
+
+
+def test_confirm_breakout_outcomes():
+    """Test confirm_breakout_outcomes execution."""
+    from earnings_engine.data.breakout_scanner import confirm_breakout_outcomes
+    settings = Settings()
+    res = confirm_breakout_outcomes(settings=settings)
+    assert res is not None
+    assert res["success"] is True
+    assert "audited_count" in res
+    assert "resolved_count" in res
+
+
+def test_breakout_backtest_engine(sample_prices_df, monkeypatch):
+    """Test walk-forward breakout backtesting engine."""
+    from earnings_engine.backtest.breakout_backtest import (
+        BreakoutBacktestConfig,
+        run_breakout_backtest,
+    )
+    import earnings_engine.backtest.breakout_backtest as bb_mod
+
+    # Patch load_prices to return sample dataframe
+    monkeypatch.setattr(bb_mod, "load_prices", lambda sym, s: sample_prices_df)
+
+    cfg = BreakoutBacktestConfig(
+        strategy="CLASSIC_TECHNICAL",
+        universe="nifty_50",
+        min_score=30.0,
+        lookback_days=60,
+    )
+    result = run_breakout_backtest(config=cfg, tickers=["INFY.NS", "TCS.NS"])
+    assert result is not None
+    assert result.strategy == "CLASSIC_TECHNICAL"
+    assert "total_return_pct" in result.to_dict()
+    assert isinstance(result.trades, list)
+

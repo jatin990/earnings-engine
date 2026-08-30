@@ -2248,7 +2248,8 @@ def score_breakout(
         max_gain_pct = round(((post_high - signal_price) / signal_price) * 100, 2)
         days_elapsed = len(future_df)
 
-        breakout_fired = bool(post_high >= breakout_trigger or current_price >= breakout_trigger)
+        # Require a 0.15% confirmation buffer above trigger to confirm a real breach vs tick noise
+        breakout_fired = bool(post_high >= breakout_trigger * 1.0015 or current_price >= breakout_trigger * 1.0015)
 
         if post_high >= target_price:
             breakout_happened = True
@@ -2333,7 +2334,12 @@ def score_breakout(
         confirmation_badge = f"📊 Normal Vol ({vol_expansion_str})"
         confirmation_color = "#94a3b8"
 
-    risk_reward_ratio = round((target_price - signal_price) / max(0.01, (signal_price - stop_loss)), 2)
+    # Enforce minimum 1.5 Risk-Reward Ratio
+    downside_risk = max(0.01, signal_price - stop_loss)
+    if (target_price - signal_price) < 1.5 * downside_risk:
+        target_price = round(max(target_price, signal_price + 1.5 * downside_risk), 2)
+
+    risk_reward_ratio = round((target_price - signal_price) / downside_risk, 2)
     notes["risk_reward_ratio"] = risk_reward_ratio
 
     # Institutional Flow
@@ -3621,6 +3627,142 @@ def run_historical_backtest(
         "duration_s": duration,
         "run_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def confirm_breakout_outcomes(settings: Settings | None = None) -> dict[str, Any]:
+    """Reconcile and confirm real-world outcomes for all tracked breakout setups against latest price history.
+
+    Audits pending/active setups, evaluates post-signal candles against breakout_trigger,
+    target_price, and stop_loss with a 0.15% confirmation buffer, and updates database records.
+    """
+    settings = settings or Settings()
+    t_start = time.perf_counter()
+    from earnings_engine.data.prices import load_prices, _connect
+
+    updated_count = 0
+    resolved_count = 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    try:
+        with _connect(settings) as conn:
+            _init_breakout_db(conn)
+            rows = conn.execute(
+                """
+                SELECT ticker, strategy, signal_date, signal_price, breakout_trigger,
+                       target_price, stop_loss, outcome, created_at
+                FROM breakout_radar
+                WHERE outcome IN ('ACTIVE', 'PENDING', 'COILING', 'COILING_IN_PROFIT', 'COILING_IN_RANGE')
+                   OR outcome IS NULL
+                """
+            ).fetchall()
+
+            if not rows:
+                return {"success": True, "audited_count": 0, "resolved_count": 0, "duration_s": 0.0}
+
+            updates = []
+            for row in rows:
+                ticker, strat, sig_date, sig_price, trigger, target, stop, prev_outcome, _ = row
+                if not ticker or not sig_date or not trigger:
+                    continue
+
+                prices_df = load_prices(ticker, settings)
+                if prices_df is None or prices_df.empty:
+                    continue
+
+                sig_clean = str(sig_date).strip()[:10]
+                future_df = prices_df.loc[prices_df.index > sig_clean]
+                if future_df.empty:
+                    continue
+
+                all_closes = pd.to_numeric(prices_df["close"], errors="coerce").dropna()
+                cur_price = float(all_closes.iloc[-1])
+                cur_date = str(prices_df.index[-1])[:10]
+
+                f_highs = pd.to_numeric(future_df["high"], errors="coerce") if "high" in future_df.columns else pd.to_numeric(future_df["close"], errors="coerce")
+                f_lows = pd.to_numeric(future_df["low"], errors="coerce") if "low" in future_df.columns else pd.to_numeric(future_df["close"], errors="coerce")
+                post_high = float(f_highs.max()) if not f_highs.empty else sig_price
+                post_low = float(f_lows.min()) if not f_lows.empty else sig_price
+
+                realized_ret = round(((cur_price - sig_price) / sig_price) * 100, 2)
+                max_gain = round(((post_high - sig_price) / sig_price) * 100, 2)
+                days_el = len(future_df)
+
+                # 0.15% trigger confirmation buffer
+                breakout_fired = bool(post_high >= trigger * 1.0015 or cur_price >= trigger * 1.0015)
+
+                if target and post_high >= target:
+                    outcome = "TARGET_HIT"
+                    outcome_label = f"Target Hit 🎯 (+{max_gain}%)"
+                    outcome_badge = "emerald"
+                    broke_happened = 1
+                elif breakout_fired:
+                    if stop and (post_low <= stop or cur_price <= stop):
+                        outcome = "STOP_LOSS_HIT"
+                        outcome_label = f"Stop Hit 🛑 ({realized_ret:+0.1f}%)"
+                        outcome_badge = "rose"
+                        broke_happened = 0
+                    elif cur_price >= sig_price:
+                        outcome = "BREAKOUT_SUCCEEDED"
+                        outcome_label = f"Breakout Succeeded ✅ ({realized_ret:+0.1f}%)"
+                        outcome_badge = "emerald"
+                        broke_happened = 1
+                    else:
+                        outcome = "BREAKOUT_RETRACED"
+                        outcome_label = f"Breakout Retraced ⚠️ ({realized_ret:+0.1f}%)"
+                        outcome_badge = "amber"
+                        broke_happened = 0
+                elif stop and (post_low <= stop or cur_price <= stop):
+                    outcome = "SETUP_FAILED"
+                    outcome_label = f"Setup Failed ❌ ({realized_ret:+0.1f}%)"
+                    outcome_badge = "rose"
+                    broke_happened = 0
+                elif cur_price >= sig_price:
+                    outcome = "COILING_IN_PROFIT"
+                    outcome_label = f"Coiling In Green 🟢 ({realized_ret:+0.1f}%)"
+                    outcome_badge = "emerald"
+                    broke_happened = 0
+                else:
+                    outcome = "COILING_IN_RANGE"
+                    outcome_label = f"Coiling In Range 🗜️ ({realized_ret:+0.1f}%)"
+                    outcome_badge = "slate"
+                    broke_happened = 0
+
+                if outcome in ("TARGET_HIT", "BREAKOUT_SUCCEEDED", "STOP_LOSS_HIT", "SETUP_FAILED", "BREAKOUT_RETRACED"):
+                    resolved_count += 1
+
+                updates.append((
+                    cur_price, cur_date, realized_ret, max_gain, broke_happened,
+                    outcome, outcome_label, outcome_badge, days_el, now_iso,
+                    ticker, strat
+                ))
+
+            if updates:
+                conn.executemany(
+                    """
+                    UPDATE breakout_radar
+                    SET current_price = ?, current_date = ?, realized_return_pct = ?,
+                        max_gain_pct = ?, breakout_happened = ?, outcome = ?,
+                        outcome_label = ?, outcome_badge = ?, days_elapsed = ?,
+                        updated_at = ?
+                    WHERE ticker = ? AND strategy = ?
+                    """,
+                    updates
+                )
+                conn.commit()
+                updated_count = len(updates)
+
+    except Exception as e:
+        logger.error("[BREAKOUT-OUTCOMES] Failed confirming breakout outcomes: %s", e)
+        return {"success": False, "error": str(e), "audited_count": 0, "resolved_count": 0}
+
+    return {
+        "success": True,
+        "audited_count": updated_count,
+        "resolved_count": resolved_count,
+        "duration_s": round(time.perf_counter() - t_start, 2),
+        "run_at": now_iso,
+    }
+
 
 
 # ---------------------------------------------------------------------------
