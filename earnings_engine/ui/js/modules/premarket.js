@@ -17,7 +17,14 @@
         },
 
         switchPremarketView(view) {
-            this.activePremarketView = view || 'active';
+            view = view || 'active';
+            this.activePremarketView = view;
+            try {
+                localStorage.setItem('subtab_premarket', view);
+                if (!app._subtabState) app._subtabState = {};
+                app._subtabState['premarket'] = view;
+            } catch (e) {}
+
             const activeView = document.getElementById('premarketActiveView');
             const outcomesView = document.getElementById('premarketOutcomesView');
             const activeBtn = document.getElementById('pmViewActiveBtn');
@@ -25,6 +32,11 @@
             const scanBtn = document.getElementById('pmScanBtn');
             const refreshBtn = document.getElementById('pmRefreshBtn');
             const windowSel = document.getElementById('pmWindowModeSelect');
+
+            const sideSubActive = document.getElementById('sidebarSubPremarketActive');
+            const sideSubOutcomes = document.getElementById('sidebarSubPremarketOutcomes');
+            if (sideSubActive) sideSubActive.classList.toggle('active', view === 'active');
+            if (sideSubOutcomes) sideSubOutcomes.classList.toggle('active', view === 'outcomes');
 
             if (this.activePremarketView === 'active') {
                 if (activeView) activeView.style.display = 'block';

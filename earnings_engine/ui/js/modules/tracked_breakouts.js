@@ -15,7 +15,14 @@
     app._activeBreakoutSubtab = 'scanner';
 
     app.switchBreakoutSubtab = function(subtab) {
+        subtab = subtab || 'scanner';
         app._activeBreakoutSubtab = subtab;
+        try {
+            localStorage.setItem('subtab_breakout', subtab);
+            if (!app._subtabState) app._subtabState = {};
+            app._subtabState['breakout'] = subtab;
+        } catch (e) {}
+
         const scannerView = document.getElementById('breakoutLiveScannerContainer');
         const backtestView = document.getElementById('breakoutBacktestContainer');
         const trackedView = document.getElementById('breakoutTrackedContainer');

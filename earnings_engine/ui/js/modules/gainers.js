@@ -16,13 +16,27 @@ Object.assign(app, {
             upcomingSetupsData: [],
 
             switchGainersSubTab(subTab) {
+                subTab = subTab || 'gainers';
                 this.gainersSubTab = subTab;
+                try {
+                    localStorage.setItem('subtab_gainers', subTab);
+                    if (!app._subtabState) app._subtabState = {};
+                    app._subtabState['gainers'] = subTab;
+                } catch (e) {}
+
                 ['gainers', 'patterns', 'setups'].forEach(t => {
                     const view = document.getElementById('gainersSubView_' + t);
                     const btn = document.getElementById('gainersSubTabBtn_' + t);
                     if (view) view.style.display = (t === subTab) ? 'block' : 'none';
                     if (btn) btn.classList.toggle('active', t === subTab);
                 });
+
+                const sideTop = document.getElementById('sidebarSubGainersTop');
+                const sidePatterns = document.getElementById('sidebarSubGainersPatterns');
+                const sideSetups = document.getElementById('sidebarSubGainersSetups');
+                if (sideTop) sideTop.classList.toggle('active', subTab === 'gainers');
+                if (sidePatterns) sidePatterns.classList.toggle('active', subTab === 'patterns');
+                if (sideSetups) sideSetups.classList.toggle('active', subTab === 'setups');
 
                 if (subTab === 'patterns' && !this.patternMatrixData.length) {
                     this.loadPatternMatrix();

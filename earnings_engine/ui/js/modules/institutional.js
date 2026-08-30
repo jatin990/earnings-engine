@@ -40,6 +40,52 @@ Object.assign(app, {
                 });
             },
 
+            switchInstitutionalPage(page) {
+                const pages = ['equities', 'top-additions', 'investors'];
+                const p = pages.includes(page) ? page : 'equities';
+                this.institutionalSubPage = p;
+                try {
+                    localStorage.setItem('subtab_institutional', p);
+                    localStorage.setItem('ee_institutional_subpage', p);
+                    if (!app._subtabState) app._subtabState = {};
+                    app._subtabState['institutional'] = p;
+                } catch (e) {}
+
+                pages.forEach(name => {
+                    const el = document.getElementById('instPage-' + name);
+                    const btn = document.getElementById('btnInstPage-' + name);
+                    if (el) el.style.display = (name === p) ? 'block' : 'none';
+                    if (btn) {
+                        if (name === p) {
+                            btn.style.background = '#1e293b';
+                            btn.style.color = '#38bdf8';
+                            btn.style.borderColor = 'rgba(56,189,248,0.4)';
+                            btn.style.fontWeight = '700';
+                        } else {
+                            btn.style.background = 'transparent';
+                            btn.style.color = '#94a3b8';
+                            btn.style.borderColor = 'transparent';
+                            btn.style.fontWeight = '500';
+                        }
+                    }
+                });
+
+                const sideEquities = document.getElementById('sidebarSubInstEquities');
+                const sideAdditions = document.getElementById('sidebarSubInstAdditions');
+                const sideInvestors = document.getElementById('sidebarSubInstInvestors');
+                if (sideEquities) sideEquities.classList.toggle('active', p === 'equities');
+                if (sideAdditions) sideAdditions.classList.toggle('active', p === 'top-additions');
+                if (sideInvestors) sideInvestors.classList.toggle('active', p === 'investors');
+
+                if (p === 'investors' && typeof this.loadSuperInvestors === 'function') {
+                    this.loadSuperInvestors();
+                } else if (p === 'top-additions' && typeof this.loadTopAdditions === 'function') {
+                    this.loadTopAdditions();
+                } else if (typeof this.loadInstitutionalData === 'function') {
+                    this.loadInstitutionalData();
+                }
+            },
+
             _accLimit: 25,
             _distLimit: 20,
             _fundsLimit: 50,

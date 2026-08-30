@@ -599,32 +599,46 @@ Object.assign(app, {            // =============================================
             },
 
             switchKronosTab(name) {
+                name = name || 'latest';
+                try {
+                    localStorage.setItem('subtab_kronos', name);
+                    if (!app._subtabState) app._subtabState = {};
+                    app._subtabState['kronos'] = name;
+                } catch (e) {}
+
                 const latest = document.getElementById('kronosLatestView');
                 const list = document.getElementById('kronosListView');
                 const audit = document.getElementById('kronosAuditView');
                 const btnLatest = document.getElementById('kronosTabLatest');
                 const btnList = document.getElementById('kronosTabList');
                 const btnAudit = document.getElementById('kronosTabAudit');
+
+                const sideLatest = document.getElementById('sidebarSubKronosLatest');
+                const sideList = document.getElementById('sidebarSubKronosList');
+                const sideAudit = document.getElementById('sidebarSubKronosAudit');
+                if (sideLatest) sideLatest.classList.toggle('active', name === 'latest');
+                if (sideList) sideList.classList.toggle('active', name === 'list');
+                if (sideAudit) sideAudit.classList.toggle('active', name === 'audit');
                 
                 // Hide all views
-                latest.style.display = 'none';
-                list.style.display = 'none';
-                audit.style.display = 'none';
-                btnLatest.classList.remove('active');
-                btnList.classList.remove('active');
-                btnAudit.classList.remove('active');
+                if (latest) latest.style.display = 'none';
+                if (list) list.style.display = 'none';
+                if (audit) audit.style.display = 'none';
+                if (btnLatest) btnLatest.classList.remove('active');
+                if (btnList) btnList.classList.remove('active');
+                if (btnAudit) btnAudit.classList.remove('active');
                 
                 if (name === 'audit') {
-                    audit.style.display = 'block';
-                    btnAudit.classList.add('active');
+                    if (audit) audit.style.display = 'block';
+                    if (btnAudit) btnAudit.classList.add('active');
                     this.loadKronosAudit();
                 } else if (name === 'list') {
-                    list.style.display = 'block';
-                    btnList.classList.add('active');
+                    if (list) list.style.display = 'block';
+                    if (btnList) btnList.classList.add('active');
                     this.loadKronosList();
                 } else {
-                    latest.style.display = 'block';
-                    btnLatest.classList.add('active');
+                    if (latest) latest.style.display = 'block';
+                    if (btnLatest) btnLatest.classList.add('active');
                     this.loadKronosLatest();
                 }
             },

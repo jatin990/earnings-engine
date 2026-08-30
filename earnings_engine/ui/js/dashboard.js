@@ -599,11 +599,28 @@ const API_BASE = window.location.origin;
                     }
                 });
 
-                // Sync Vercel Sidebar Active Item
+                // Subtab state registry
+                if (!app._subtabState) {
+                    app._subtabState = {
+                        breakout: localStorage.getItem('subtab_breakout') || 'scanner',
+                        premarket: localStorage.getItem('subtab_premarket') || 'active',
+                        gainers: localStorage.getItem('subtab_gainers') || 'gainers',
+                        institutional: localStorage.getItem('subtab_institutional') || localStorage.getItem('ee_institutional_subpage') || 'equities',
+                        kronos: localStorage.getItem('subtab_kronos') || 'latest'
+                    };
+                }
+
+                // Sync Vercel Sidebar Active Item & Accordion Trees
                 document.querySelectorAll('.sidebar-nav-item').forEach(el => {
                     const tabKey = el.getAttribute('data-tab');
                     const isActive = (tabKey === name);
                     el.classList.toggle('active', isActive);
+                });
+
+                document.querySelectorAll('.sidebar-nav-tree').forEach(tree => {
+                    const parentTab = tree.getAttribute('data-parent-tab');
+                    const isOpen = (parentTab === name);
+                    tree.classList.toggle('open', isOpen);
                 });
 
                 // Update Breadcrumb Tab Title
@@ -701,14 +718,12 @@ const API_BASE = window.location.origin;
                     this.initBacktestTab();
                 }
                 if (name === 'breakout') {
-                    // Lazy-load on first visit; start auto-polling while active
+                    const activeSub = (app._subtabState && app._subtabState['breakout']) || localStorage.getItem('subtab_breakout') || 'scanner';
+                    if (typeof this.switchBreakoutSubtab === 'function') {
+                        this.switchBreakoutSubtab(activeSub);
+                    }
                     if (!this._breakoutLoaded) {
                         this._breakoutLoaded = true;
-                        if (this._activeBreakoutSubtab === 'tracked') {
-                            this.loadTrackedBreakouts();
-                        } else {
-                            this.loadBreakoutRadar();
-                        }
                     }
                     this.loadAutomationSchedules();
                     this.loadBreakoutAuditLog();
@@ -736,19 +751,30 @@ const API_BASE = window.location.origin;
                     this.loadAutomationSchedules();
                 }
                 if (name === 'premarket') {
+                    const activeSub = (app._subtabState && app._subtabState['premarket']) || localStorage.getItem('subtab_premarket') || 'active';
+                    if (typeof this.switchPremarketView === 'function') {
+                        this.switchPremarketView(activeSub);
+                    }
                     if (typeof this.loadPremarketSetups === 'function') {
                         this.loadPremarketSetups();
                     }
                 }
+                if (name === 'gainers') {
+                    const activeSub = (app._subtabState && app._subtabState['gainers']) || localStorage.getItem('subtab_gainers') || 'gainers';
+                    if (typeof this.switchGainersSubTab === 'function') {
+                        this.switchGainersSubTab(activeSub);
+                    }
+                }
                 if (name === 'institutional') {
-                    if (!this._institutionalLoaded) {
-                        this._institutionalLoaded = true;
-                        if (typeof this.loadInstitutionalData === 'function') this.loadInstitutionalData();
-                    } else {
-                        const savedSub = localStorage.getItem('ee_institutional_subpage') || 'equities';
-                        if (typeof this.switchInstitutionalPage === 'function') {
-                            this.switchInstitutionalPage(savedSub);
-                        }
+                    const activeSub = (app._subtabState && app._subtabState['institutional']) || localStorage.getItem('subtab_institutional') || localStorage.getItem('ee_institutional_subpage') || 'equities';
+                    if (typeof this.switchInstitutionalPage === 'function') {
+                        this.switchInstitutionalPage(activeSub);
+                    }
+                }
+                if (name === 'kronos') {
+                    const activeSub = (app._subtabState && app._subtabState['kronos']) || localStorage.getItem('subtab_kronos') || 'latest';
+                    if (typeof this.switchKronosTab === 'function') {
+                        this.switchKronosTab(activeSub);
                     }
                 }
                 if (name === 'repeaters') {

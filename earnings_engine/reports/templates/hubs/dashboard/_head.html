@@ -153,6 +153,21 @@
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
         }
 
+        .sidebar-sub-items {
+            display: none !important;
+            flex-direction: column;
+            gap: 0.15rem;
+            margin-left: 1.4rem;
+            padding-left: 0.45rem;
+            border-left: 1px solid rgba(255, 255, 255, 0.08);
+            margin-top: 0.15rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .sidebar-nav-tree.open .sidebar-sub-items {
+            display: flex !important;
+        }
+
         .sidebar-sub-item {
             display: flex;
             align-items: center;
