@@ -1911,4 +1911,122 @@
             }
         };
 
+        // 📅 QUICK DATE BACKTEST MODULE
+        app.loadBreakoutBacktest = async function() {
+            const dateInput = document.getElementById('breakoutBacktestDateInput');
+            let dateVal = dateInput?.value;
+            if (!dateVal) {
+                const d = new Date();
+                dateVal = d.toISOString().split('T')[0];
+                if (dateInput) dateInput.value = dateVal;
+            }
+
+            const universe = document.getElementById('breakoutBacktestUniverseSelect')?.value || 'all';
+            const minScore = document.getElementById('breakoutBacktestMinScore')?.value || 35;
+            const sortBy = document.getElementById('breakoutBacktestSortBy')?.value || 'composite_score';
+
+            try {
+                const params = new URLSearchParams({
+                    universe: universe,
+                    sort_by: sortBy,
+                    min_score: minScore,
+                    asof_date: dateVal,
+                    limit: 100
+                });
+                const res = await fetch(API_BASE + '/api/v1/breakout-radar?' + params.toString());
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+
+                const candidates = data.candidates || [];
+                const summary = data.backtest_summary || {};
+                const total = candidates.length;
+                const avgScore = total > 0
+                    ? (candidates.reduce((s, c) => s + (c.composite_score || 0), 0) / total).toFixed(1)
+                    : '—';
+
+                const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+                setEl('bkBacktestStatDate', dateVal);
+                setEl('bkBacktestStatEvaluated', summary.total_evaluated != null ? summary.total_evaluated : total);
+                setEl('bkBacktestStatFired', summary.breakout_fired_count != null ? summary.breakout_fired_count : candidates.filter(app.isItemBreaking).length);
+                setEl('bkBacktestStatWinRate', (summary.win_rate_pct != null ? Number(summary.win_rate_pct).toFixed(1) : '0.0') + '%');
+                setEl('bkBacktestStatAvgScore', avgScore);
+
+                app.renderBreakoutBacktestTable(candidates, dateVal);
+            } catch (err) {
+                console.error('[BREAKOUT BACKTEST] Load error:', err);
+            }
+        };
+
+        app.setBreakoutBacktestPresetDays = function(daysAgo) {
+            const d = new Date();
+            d.setDate(d.getDate() - daysAgo);
+            const iso = d.toISOString().split('T')[0];
+            const dateInput = document.getElementById('breakoutBacktestDateInput');
+            if (dateInput) dateInput.value = iso;
+
+            document.querySelectorAll('.bk-backtest-preset-btn').forEach(btn => {
+                const btnDays = btn.getAttribute('data-days');
+                if (String(btnDays) === String(daysAgo)) {
+                    btn.classList.add('bk-preset-active');
+                    btn.style.background = 'rgba(56,189,248,0.2)';
+                    btn.style.borderColor = '#38bdf8';
+                    btn.style.color = '#38bdf8';
+                } else {
+                    btn.classList.remove('bk-preset-active');
+                    btn.style.background = '#0f172a';
+                    btn.style.borderColor = 'rgba(255,255,255,0.12)';
+                    btn.style.color = '#94a3b8';
+                }
+            });
+
+            app.loadBreakoutBacktest();
+        };
+
+        app.renderBreakoutBacktestTable = function(candidates, dateVal) {
+            const tbody = document.getElementById('breakoutBacktestTableBody');
+            if (!tbody) return;
+
+            if (!candidates || candidates.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="padding:2.5rem;text-align:center;color:#64748b;font-size:0.8rem;">⚡ No historical breakout candidates found for date <strong>${dateVal}</strong> above threshold.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = candidates.map(c => {
+                const ticker = c.ticker || '—';
+                const company = (c.company_name || ticker).substring(0, 22);
+                const score = c.composite_score || 0;
+                const scoreColor = score >= 75 ? '#fde68a' : (score >= 55 ? '#34d399' : '#60a5fa');
+                const scoreBg = score >= 75 ? 'rgba(234,179,8,0.18)' : (score >= 55 ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.12)');
+
+                const sigPriceStr = c.signal_price != null ? `₹${Number(c.signal_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+                const triggerStr = c.breakout_trigger != null ? `₹${Number(c.breakout_trigger).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+                const targetStr = c.target_price != null ? `₹${Number(c.target_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+                const stopStr = c.stop_loss != null ? `₹${Number(c.stop_loss).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+                const retPct = c.realized_return_pct != null ? c.realized_return_pct : c.post_return_pct;
+                const retStr = retPct != null ? `<span style="color:${retPct >= 0 ? '#34d399' : '#f87171'};font-weight:700;">${retPct >= 0 ? '+' : ''}${Number(retPct).toFixed(2)}%</span>` : '—';
+
+                const outcomeLabel = c.outcome_label || (c.breakout_happened ? 'Breakout Succeeded ✅' : 'Coiling ⏳');
+
+                return `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                        <td style="padding:0.5rem 0.75rem;">
+                            <div style="font-weight:800;color:#ffffff;font-family:var(--font-mono);font-size:0.82rem;"><a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="color:#ffffff;text-decoration:none;">${ticker}</a></div>
+                            <div style="font-size:0.67rem;color:#94a3b8;">${company}</div>
+                        </td>
+                        <td style="padding:0.5rem 0.75rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#94a3b8;">${sigPriceStr}</td>
+                        <td style="padding:0.5rem 0.75rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#38bdf8;font-weight:700;">${triggerStr}</td>
+                        <td style="padding:0.5rem 0.75rem;text-align:right;font-family:var(--font-mono);font-size:0.70rem;">
+                            <div style="color:#34d399;">T: ${targetStr}</div>
+                            <div style="color:#f87171;">SL: ${stopStr}</div>
+                        </td>
+                        <td style="padding:0.5rem 0.75rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;">${retStr}</td>
+                        <td style="padding:0.5rem 0.75rem;font-size:0.72rem;color:#e2e8f0;">${outcomeLabel}</td>
+                        <td style="padding:0.5rem 0.75rem;text-align:center;">
+                            <span style="background:${scoreBg};color:${scoreColor};border:1px solid ${scoreColor}44;font-size:0.75rem;font-weight:800;font-family:var(--font-mono);padding:0.1rem 0.4rem;border-radius:4px;">${score}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
 })(); // end breakout_radar IIFE
