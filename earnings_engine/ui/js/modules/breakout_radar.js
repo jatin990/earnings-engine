@@ -482,6 +482,12 @@
             }
         };
 
+        app._breakoutStrategy = 'CLASSIC_TECHNICAL';
+        app.onBreakoutStrategyChange = function(strategy) {
+            app._breakoutStrategy = strategy || 'CLASSIC_TECHNICAL';
+            app.loadBreakoutRadar();
+        };
+
         app.loadBreakoutRadar = async function(forceLive = false, silent = false) {
             if (!app._breakoutAutocompleteWired) {
                 app.wireBreakoutStockAutocomplete();
@@ -496,6 +502,7 @@
             if (badge && !silent) badge.style.display = 'inline-block';
 
             const universe = document.getElementById('breakoutUniverseSelect')?.value || 'all';
+            const strategy = document.getElementById('breakoutStrategySelect')?.value || app._breakoutStrategy || 'CLASSIC_TECHNICAL';
             const sortBy = document.getElementById('breakoutSortBy')?.value || 'composite_score';
             const minScore = document.getElementById('breakoutMinScore')?.value || 35;
             const asofDate = app._breakoutAsofDate || document.getElementById('breakoutDateInput')?.value || null;
@@ -523,7 +530,7 @@
             }
 
             try {
-                const params = new URLSearchParams({ universe: universe, sort_by: sortBy, min_score: minScore, limit: 100 });
+                const params = new URLSearchParams({ universe: universe, strategy: strategy, sort_by: sortBy, min_score: minScore, limit: 100 });
                 if (asofDate) {
                     params.set('asof_date', asofDate);
                 }
@@ -1713,10 +1720,11 @@
             const btn = document.getElementById('breakoutRefreshBtn');
             const icon = document.getElementById('breakoutRefreshIcon');
             const universe = document.getElementById('breakoutUniverseSelect')?.value || 'nifty_50';
+            const strategy = document.getElementById('breakoutStrategySelect')?.value || app._breakoutStrategy || 'CLASSIC_TECHNICAL';
             if (btn) btn.disabled = true;
             if (icon) icon.textContent = '\u23f3';
             try {
-                const res = await fetch(API_BASE + '/api/v1/breakout-radar/refresh?universe=' + encodeURIComponent(universe), { method: 'POST' });
+                const res = await fetch(API_BASE + '/api/v1/breakout-radar/refresh?universe=' + encodeURIComponent(universe) + '&strategy=' + encodeURIComponent(strategy), { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
                     setTimeout(() => app.loadBreakoutRadar(), 3000);
@@ -1729,6 +1737,16 @@
                     if (btn) btn.disabled = false;
                     if (icon) icon.textContent = '\u26a1';
                 }, 5000);
+            }
+        };
+
+        app.toggleBreakoutExplainer = function() {
+            const card = document.getElementById('breakoutExplainerCard');
+            if (!card) return;
+            if (card.style.display === 'none' || !card.style.display) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
             }
         };
 

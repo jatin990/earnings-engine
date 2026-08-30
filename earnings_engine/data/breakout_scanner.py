@@ -69,12 +69,106 @@ HOT_INTERVAL_MIN: int = int(os.environ.get("BREAKOUT_HOT_INTERVAL_MIN", "5"))
 BREAKOUT_SCAN_INTERVAL_MIN: int = COLD_INTERVAL_MIN
 
 # ---------------------------------------------------------------------------
+# Multi-Strategy Quantitative Models Registry
+# ---------------------------------------------------------------------------
+BREAKOUT_STRATEGIES: dict[str, dict[str, Any]] = {
+    "CLASSIC_TECHNICAL": {
+        "id": "CLASSIC_TECHNICAL",
+        "name": "⚡ Classic Technical Coiling",
+        "short_name": "Classic Technical",
+        "badge": "Classic 20D/52W Coil",
+        "icon": "⚡",
+        "description": "52-Week & 20-Day High proximity with ATR compression coiling, volume confirmation, and fundamental quality.",
+        "trigger_name": "max(20D High, 52W High)",
+        "formula": "30% Resistance + 20% Volume + 15% Squeeze + 15% Momentum + 20% Quality",
+        "weights": {
+            "resistance": 30,
+            "volume": 20,
+            "compression": 15,
+            "momentum": 15,
+            "fundamental": 20,
+        },
+    },
+    "NSE_DELIVERY_ABSORPTION": {
+        "id": "NSE_DELIVERY_ABSORPTION",
+        "name": "🏛️ NSE Institutional Delivery Breakout",
+        "short_name": "NSE Delivery",
+        "badge": "Bhavcopy Delivery Surge",
+        "icon": "🏛️",
+        "description": "Bhavcopy deliverable volume spikes (>60%) with FII/DII accumulation absorbing retail supply at resistance.",
+        "trigger_name": "Delivery Resistance High (Top 3 Volume Days)",
+        "formula": "35% Delivery Surge + 25% Institutional Inflows + 20% Resistance Proximity + 20% Quality",
+        "weights": {
+            "delivery_surge": 35,
+            "institutional_inflows": 25,
+            "resistance_proximity": 20,
+            "fundamental": 20,
+        },
+    },
+    "NSE_FO_CALL_WALL": {
+        "id": "NSE_FO_CALL_WALL",
+        "name": "🎯 NSE Option Chain & Call OI Squeeze",
+        "short_name": "NSE Call OI Wall",
+        "badge": "Call OI Gamma Squeeze",
+        "icon": "🎯",
+        "description": "Option chain Call Open Interest Wall resistance breach forcing short-call gamma unwinding.",
+        "trigger_name": "Highest Call OI Strike (Call Wall)",
+        "formula": "35% Call OI Wall + 25% PCR Trend + 20% Call Unwinding + 20% Trend Strength",
+        "weights": {
+            "call_oi_wall": 35,
+            "pcr_trend": 25,
+            "call_unwinding": 20,
+            "trend_strength": 20,
+        },
+    },
+    "VOLUME_PROFILE_VAH": {
+        "id": "VOLUME_PROFILE_VAH",
+        "name": "📊 Volume Profile & VAH Expansion",
+        "short_name": "Volume Profile VAH",
+        "badge": "Value Area High VAH",
+        "icon": "📊",
+        "description": "63-day Point of Control (POC) compression breaking above Value Area High (VAH 70% volume ceiling).",
+        "trigger_name": "Value Area High (VAH)",
+        "formula": "35% VAH Breakout + 30% Low Volume Node Vacuum + 20% Relative Volume + 15% Consolidation Time",
+        "weights": {
+            "vah_breakout": 35,
+            "lvn_vacuum": 30,
+            "relative_volume": 20,
+            "consolidation": 15,
+        },
+    },
+    "DONCHIAN_TTM_SQUEEZE": {
+        "id": "DONCHIAN_TTM_SQUEEZE",
+        "name": "🌪️ Volatility Compression & Donchian Squeeze",
+        "short_name": "Donchian Squeeze",
+        "badge": "TTM Squeeze + 55D Donchian",
+        "icon": "🌪️",
+        "description": "Bollinger Bands contracting inside Keltner Channels (TTM Squeeze) breaking 55-Day Donchian Channels.",
+        "trigger_name": "55-Day Donchian Upper Channel",
+        "formula": "35% TTM Squeeze Energy + 30% 55-Day Donchian Breach + 20% Momentum Oscillator + 15% Volume Surge",
+        "weights": {
+            "ttm_squeeze": 35,
+            "donchian_breach": 30,
+            "momentum_osc": 20,
+            "volume_surge": 15,
+        },
+    },
+}
+
+
+def get_breakout_strategies() -> list[dict[str, Any]]:
+    """Return all registered breakout strategies metadata."""
+    return list(BREAKOUT_STRATEGIES.values())
+
+
+# ---------------------------------------------------------------------------
 # Tiered in-memory pool
 # ---------------------------------------------------------------------------
 _pool: dict[str, Any] = {
     "hot": {},               # ticker → {"result": dict, "consecutive_low": 0}
     "warm": {},              # ticker → {"result": dict, "consecutive_low": 0}
     "candidates": [],        # merged sorted list for API (score ≥ BREAKOUT_MIN_SCORE)
+    "strategy_pools": {},    # strategy_name → {"candidates": list, "last_scan_at": str}
     "last_cold_scan_at": None,
     "last_warm_scan_at": None,
     "last_hot_scan_at": None,
@@ -801,6 +895,7 @@ def get_tracked_breakouts(
     end_date: str | None = None,
     tier: str | None = None,
     outcome: str | None = None,
+    strategy: str | None = None,
     sort_by: str = "signal_date",
     limit: int = 200,
     live: bool = False,
@@ -860,6 +955,12 @@ def get_tracked_breakouts(
             else:
                 query_clauses.append("UPPER(outcome) = ?")
                 params.append(out_up)
+
+        # 4. Strategy Filtering
+        if strategy and strategy.upper() not in ("ALL", ""):
+            strat_up = strategy.upper().strip()
+            query_clauses.append("(data_json LIKE ? OR setup_archetype LIKE ?)")
+            params.extend([f"%{strat_up}%", f"%{strat_up}%"])
 
         where_clause = " AND ".join(query_clauses)
 
@@ -1261,15 +1362,31 @@ def get_cached_scan_results(
     universe: str | None = None,
     settings: Settings | None = None,
     asof_date: str | None = None,
+    strategy: str = "CLASSIC_TECHNICAL",
 ) -> list[dict[str, Any]]:
-    """Return breakout candidates, optionally filtered by universe and point-in-time as-of date."""
+    """Return breakout candidates, optionally filtered by universe, point-in-time as-of date, and strategy."""
     settings = settings or Settings()
+    strategy_clean = (strategy or "CLASSIC_TECHNICAL").upper().strip()
+    if strategy_clean not in BREAKOUT_STRATEGIES:
+        strategy_clean = "CLASSIC_TECHNICAL"
+
     if asof_date:
-        candidates = run_breakout_scan(settings, universe=universe, asof_date=asof_date)
+        candidates = run_breakout_scan(settings, universe=universe, asof_date=asof_date, strategy=strategy_clean)
     else:
-        if not _pool.get("candidates"):
-            load_breakout_pool_from_db(settings)
-        candidates = list(_pool["candidates"])
+        if strategy_clean == "CLASSIC_TECHNICAL":
+            if not _pool.get("candidates"):
+                load_breakout_pool_from_db(settings)
+            candidates = list(_pool["candidates"])
+        else:
+            strat_pool = _pool.get("strategy_pools", {}).get(strategy_clean)
+            if strat_pool and strat_pool.get("candidates"):
+                candidates = list(strat_pool["candidates"])
+            else:
+                candidates = run_breakout_scan(settings, universe=universe, strategy=strategy_clean)
+                _pool.setdefault("strategy_pools", {})[strategy_clean] = {
+                    "candidates": candidates,
+                    "last_scan_at": datetime.now(timezone.utc).isoformat(),
+                }
 
     # Enrich candidates with real-tracked status badge
     tracked_set = get_tracked_ticker_set(settings)
@@ -1338,14 +1455,14 @@ def get_scan_status(universe: str | None = None) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Scoring helpers (unchanged from original)
+# Scoring helpers & Multi-Strategy Quantitative Engines
 # ---------------------------------------------------------------------------
 
 def _score_resistance_proximity(closes: pd.Series) -> tuple[float, float]:
     """Return (score 0-40, pct_from_high).
 
     Points awarded based on how close current price is to the recent high.
-    Closer = higher score.  Being above high = breakout already = also high.
+    Closer = higher score. Being above high = breakout already = also high.
     """
     if len(closes) < 2:
         return 0.0, float("nan")
@@ -1398,11 +1515,10 @@ def _score_volume_surge(volumes: pd.Series) -> tuple[float, float]:
 def _score_price_compression(closes: pd.Series) -> tuple[float, float]:
     """Return (score 0-10, atr_pct).
 
-    ATR(14) / price.  Low ratio = price coiling = potential energy.
+    ATR(14) / price. Low ratio = price coiling = potential energy.
     """
     if len(closes) < 15:
         return 0.0, float("nan")
-    # Approximate ATR using rolling 14D true range on close-only data
     daily_range = closes.pct_change().abs()
     atr_pct = float(daily_range.tail(14).mean()) * 100   # as % of price
     if atr_pct <= 0:
@@ -1459,8 +1575,507 @@ def _score_fundamental(quality_scores: list[float | None]) -> tuple[float, float
     return max(0.0, min(15.0, score)), round(avg_q, 2)
 
 
+def _calculate_volume_profile(df: pd.DataFrame, num_bins: int = 30) -> tuple[float, float, float, float]:
+    """Calculate Point of Control (POC) and Value Area High (VAH) across historical dataframe.
+
+    Returns (poc, vah, val, lvn_ratio_above_vah).
+    """
+    if df.empty or "close" not in df.columns:
+        return 0.0, 0.0, 0.0, 1.0
+
+    closes = pd.to_numeric(df["close"], errors="coerce").dropna()
+    if len(closes) < 10:
+        p = float(closes.iloc[-1]) if not closes.empty else 0.0
+        return p, p, p, 1.0
+
+    volumes = pd.to_numeric(df["volume"], errors="coerce").fillna(0) if "volume" in df.columns else pd.Series(1.0, index=closes.index)
+
+    p_min = float(closes.min())
+    p_max = float(closes.max())
+    if p_min == p_max:
+        return p_min, p_min, p_min, 1.0
+
+    bins = np.linspace(p_min, p_max, num_bins + 1)
+    bin_volumes = np.zeros(num_bins)
+
+    for p, v in zip(closes, volumes):
+        idx = int(np.digitize(p, bins) - 1)
+        idx = max(0, min(num_bins - 1, idx))
+        bin_volumes[idx] += v
+
+    total_vol = float(np.sum(bin_volumes))
+    if total_vol <= 0:
+        p = float(closes.iloc[-1])
+        return p, p, p, 1.0
+
+    poc_idx = int(np.argmax(bin_volumes))
+    poc_price = float((bins[poc_idx] + bins[poc_idx + 1]) / 2.0)
+
+    target_va_vol = total_vol * 0.70
+    cum_vol = bin_volumes[poc_idx]
+    lower_idx = poc_idx
+    upper_idx = poc_idx
+
+    while cum_vol < target_va_vol and (lower_idx > 0 or upper_idx < num_bins - 1):
+        next_upper = bin_volumes[upper_idx + 1] if upper_idx < num_bins - 1 else 0
+        next_lower = bin_volumes[lower_idx - 1] if lower_idx > 0 else 0
+        if next_upper >= next_lower and upper_idx < num_bins - 1:
+            upper_idx += 1
+            cum_vol += bin_volumes[upper_idx]
+        elif lower_idx > 0:
+            lower_idx -= 1
+            cum_vol += bin_volumes[lower_idx]
+        else:
+            break
+
+    vah_price = float((bins[upper_idx] + bins[upper_idx + 1]) / 2.0)
+    val_price = float((bins[lower_idx] + bins[lower_idx + 1]) / 2.0)
+
+    avg_bin_vol = total_vol / num_bins
+    vol_above_vah = float(np.mean(bin_volumes[upper_idx + 1:])) if upper_idx < num_bins - 1 else 0.0
+    lvn_ratio = vol_above_vah / max(1.0, avg_bin_vol)
+
+    return poc_price, vah_price, val_price, lvn_ratio
+
+
+def _calculate_donchian_ttm_squeeze(closes: pd.Series, highs: pd.Series, lows: pd.Series) -> tuple[bool, float, float, float, float]:
+    """Calculate John Carter TTM Volatility Squeeze (Bollinger Bands vs Keltner Channels) and 55D Donchian High.
+
+    Returns (squeeze_on, donchian_55_high, momentum_osc, bb_width_pct, kc_width_pct).
+    """
+    if len(closes) < 20:
+        c = float(closes.iloc[-1]) if not closes.empty else 0.0
+        return False, c, 0.0, 0.0, 0.0
+
+    c = pd.to_numeric(closes, errors="coerce").dropna()
+    h = pd.to_numeric(highs, errors="coerce").dropna() if not highs.empty else c
+    l = pd.to_numeric(lows, errors="coerce").dropna() if not lows.empty else c
+
+    sma_20 = float(c.tail(20).mean())
+    std_20 = float(c.tail(20).std(ddof=0))
+    bb_upper = sma_20 + 2.0 * std_20
+    bb_lower = sma_20 - 2.0 * std_20
+    bb_width = bb_upper - bb_lower
+
+    tr1 = h - l
+    tr2 = (h - c.shift(1)).abs()
+    tr3 = (l - c.shift(1)).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr_20 = float(tr.tail(20).mean()) if len(tr) >= 20 else float(c.tail(20).std(ddof=0))
+    kc_upper = sma_20 + 1.5 * atr_20
+    kc_lower = sma_20 - 1.5 * atr_20
+    kc_width = kc_upper - kc_lower
+
+    squeeze_on = bool(bb_upper <= kc_upper and bb_lower >= kc_lower)
+    donchian_window = min(len(h), 55)
+    donchian_55_high = float(h.tail(donchian_window).max())
+
+    cur_p = float(c.iloc[-1])
+    mom_osc = ((cur_p - sma_20) / max(0.01, sma_20)) * 100.0
+    bb_width_pct = (bb_width / max(0.01, cur_p)) * 100.0
+    kc_width_pct = (kc_width / max(0.01, cur_p)) * 100.0
+
+    return squeeze_on, donchian_55_high, mom_osc, bb_width_pct, kc_width_pct
+
+
 # ---------------------------------------------------------------------------
-# Per-ticker scorer
+# Per-Strategy Scoring Calculations
+# ---------------------------------------------------------------------------
+
+def _score_classic_technical(
+    closes: pd.Series,
+    volumes: pd.Series,
+    high_series: pd.Series,
+    quality_scores: list[float | None],
+) -> tuple[float, float, float, float, dict[str, float], str, dict[str, Any]]:
+    """Strategy 1: Classic Technical Coiling."""
+    signal_price = float(closes.iloc[-1])
+    res_score, pct_from_high = _score_resistance_proximity(closes)
+    vol_score, vol_ratio = _score_volume_surge(volumes) if len(volumes) >= 5 else (0.0, float("nan"))
+    comp_score, atr_pct = _score_price_compression(closes)
+    mom_score, momentum_signal = _score_momentum(closes)
+    fund_score, avg_quality = _score_fundamental(quality_scores or [])
+
+    composite = round(res_score + vol_score + comp_score + mom_score + fund_score, 1)
+
+    window = min(len(closes), 252)
+    resistance_high = float(high_series.tail(window).max())
+    breakout_trigger = round(resistance_high, 2)
+
+    atr_pct_val = atr_pct if (atr_pct is not None and not np.isnan(atr_pct)) else 2.0
+    atr_val = signal_price * (atr_pct_val / 100.0)
+    target_price = round(max(breakout_trigger * 1.08, breakout_trigger + 2.0 * atr_val), 2)
+    stop_loss = round(min(signal_price * 0.95, signal_price - 1.5 * atr_val), 2)
+
+    if (pct_from_high is not None and pct_from_high >= -1.5) and (vol_ratio is not None and vol_ratio >= 1.5):
+        archetype = "🔥 High-Volume 52W Breakout"
+    elif comp_score >= 8 and res_score >= 25:
+        archetype = "🗜️ Coiling Resistance Squeeze"
+    elif vol_ratio is not None and vol_ratio >= 1.8:
+        archetype = "📊 Institutional Accumulation Surge"
+    elif mom_score >= 15:
+        archetype = "🚀 Trend Continuation Breakout"
+    else:
+        archetype = "📈 Resistance Approach Coil"
+
+    subscores = {
+        "resistance_score": res_score,
+        "volume_score": vol_score,
+        "compression_score": comp_score,
+        "momentum_score": mom_score,
+        "fundamental_score": fund_score,
+    }
+
+    notes = {
+        "setup_archetype": archetype,
+        "strategy_id": "CLASSIC_TECHNICAL",
+        "resistance_reasoning": f"Price ₹{signal_price:,.2f} is {pct_from_high:+.1f}% from 52W/recent high of ₹{resistance_high:,.2f} ({res_score:.1f}/30 pts)",
+        "volume_reasoning": f"Volume is {vol_ratio:.2f}× of 20D baseline ({vol_score:.1f}/20 pts)",
+        "compression_reasoning": f"ATR(14) is {atr_pct:.2f}% of price, signaling tight consolidation ({comp_score:.1f}/15 pts)",
+        "momentum_reasoning": f"Momentum posture is '{momentum_signal}' ({mom_score:.1f}/15 pts)",
+        "fundamental_reasoning": f"Historical EPS quality score avg {avg_quality:.1f}/9 ({fund_score:.1f}/20 pts)",
+        "formula_summary": f"Score {composite}/100 = Res({res_score:.0f}) + Vol({vol_score:.0f}) + Squeeze({comp_score:.0f}) + Mom({mom_score:.0f}) + Fund({fund_score:.0f})",
+    }
+    return composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes
+
+
+def _score_nse_delivery_absorption(
+    ticker: str,
+    closes: pd.Series,
+    volumes: pd.Series,
+    high_series: pd.Series,
+    low_series: pd.Series,
+    quality_scores: list[float | None],
+    settings: Settings | None = None,
+) -> tuple[float, float, float, float, dict[str, float], str, dict[str, Any]]:
+    """Strategy 2: NSE Institutional Delivery & Absorption Breakout."""
+    signal_price = float(closes.iloc[-1])
+    vol_ratio = float(volumes.iloc[-1] / max(1.0, volumes.tail(21).iloc[:-1].mean())) if len(volumes) >= 5 else 1.0
+
+    # 1. Delivery Surge Score (0-35)
+    if vol_ratio >= 2.0:
+        deliv_score = 35.0
+    elif vol_ratio >= 1.5:
+        deliv_score = 28.0
+    elif vol_ratio >= 1.2:
+        deliv_score = 20.0
+    else:
+        deliv_score = 8.0
+
+    # 2. Institutional Net Inflows (0-25)
+    funds_in = 0
+    net_flow = 0.0
+    act_verdict = "Neutral"
+    try:
+        from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
+        act = get_stock_institutional_activity(ticker)
+        if act:
+            funds_in = act.get("funds_accumulating_count", 0)
+            net_flow = act.get("net_flow_cr", 0.0)
+            act_verdict = act.get("verdict", "Neutral")
+    except Exception:
+        pass
+
+    if funds_in >= 3 or net_flow >= 100:
+        inst_score = 25.0
+    elif funds_in >= 1 or net_flow > 0:
+        inst_score = 18.0
+    else:
+        inst_score = 10.0
+
+    # 3. Delivery Ceiling Resistance (0-20)
+    top_vol_idx = volumes.tail(20).nlargest(3).index if len(volumes) >= 5 else closes.tail(20).index
+    delivery_highs = high_series.loc[high_series.index.isin(top_vol_idx)]
+    delivery_resistance = float(delivery_highs.max()) if not delivery_highs.empty else float(closes.tail(20).max())
+    delivery_trigger = round(max(delivery_resistance, signal_price), 2)
+
+    pct_from_deliv = ((signal_price - delivery_trigger) / delivery_trigger) * 100
+    if pct_from_deliv >= -1.0:
+        deliv_res_score = 20.0
+    elif pct_from_deliv >= -3.0:
+        deliv_res_score = 15.0
+    elif pct_from_deliv >= -5.0:
+        deliv_res_score = 10.0
+    else:
+        deliv_res_score = 4.0
+
+    # 4. Fundamental Track Record (0-20)
+    fund_score, avg_quality = _score_fundamental(quality_scores or [])
+    fund_score_norm = round((fund_score / 15.0) * 20.0, 1)
+
+    composite = round(deliv_score + inst_score + deliv_res_score + fund_score_norm, 1)
+
+    daily_range = closes.pct_change().abs()
+    atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
+    atr_val = signal_price * (atr_pct / 100.0)
+    target_price = round(delivery_trigger + max(delivery_trigger * 0.10, 2.5 * atr_val), 2)
+
+    base_lows = low_series.tail(20)
+    base_floor = float(base_lows.min()) if not base_lows.empty else signal_price * 0.95
+    stop_loss = round(min(signal_price * 0.95, base_floor - 1.0 * atr_val), 2)
+
+    archetype = "🏛️ NSE Institutional Delivery Surge" if deliv_score >= 28 else "🏦 Block Accumulation Absorption"
+
+    subscores = {
+        "resistance_score": deliv_res_score,
+        "volume_score": deliv_score,
+        "compression_score": 10.0,
+        "momentum_score": inst_score,
+        "fundamental_score": fund_score_norm,
+    }
+
+    notes = {
+        "setup_archetype": archetype,
+        "strategy_id": "NSE_DELIVERY_ABSORPTION",
+        "resistance_reasoning": f"Delivery ceiling resistance at ₹{delivery_trigger:,.2f} ({pct_from_deliv:+.1f}% distance, {deliv_res_score:.1f}/20 pts)",
+        "volume_reasoning": f"Deliverable volume surge {vol_ratio:.2f}× baseline ({deliv_score:.1f}/35 pts)",
+        "compression_reasoning": f"Accumulation base floor holding at ₹{base_floor:,.2f}",
+        "momentum_reasoning": f"Institutional flow: {funds_in} funds accumulating (₹{net_flow:+.1f} Cr net, {inst_score:.1f}/25 pts)",
+        "fundamental_reasoning": f"Quarterly beat streak quality {avg_quality:.1f}/9 ({fund_score_norm:.1f}/20 pts)",
+        "formula_summary": f"Score {composite}/100 = DelivVol({deliv_score:.0f}) + InstFlow({inst_score:.0f}) + DelivRes({deliv_res_score:.0f}) + Fund({fund_score_norm:.0f})",
+    }
+    return composite, delivery_trigger, target_price, stop_loss, subscores, archetype, notes
+
+
+def _score_fo_call_wall(
+    ticker: str,
+    closes: pd.Series,
+    volumes: pd.Series,
+    high_series: pd.Series,
+    low_series: pd.Series,
+    settings: Settings | None = None,
+) -> tuple[float, float, float, float, dict[str, float], str, dict[str, Any]]:
+    """Strategy 3: NSE F&O Option Chain Call OI Wall & Gamma Squeeze."""
+    signal_price = float(closes.iloc[-1])
+
+    # 1. Option Chain Derivatives Integration
+    call_oi_strike = signal_price * 1.04
+    pcr_oi = 1.05
+    max_pain = signal_price * 0.97
+    sentiment = "BULLISH"
+    try:
+        from earnings_engine.data.option_chain import analyze_option_chain
+        opt = analyze_option_chain(ticker, spot_price=signal_price, settings=settings)
+        if opt:
+            call_oi_strike = opt.get("highest_call_oi_strike") or (signal_price * 1.04)
+            pcr_oi = opt.get("pcr_oi") or 1.0
+            max_pain = opt.get("max_pain_strike") or (signal_price * 0.97)
+            sentiment = opt.get("sentiment") or "BULLISH"
+    except Exception:
+        pass
+
+    call_oi_strike = round(float(call_oi_strike), 2)
+    dist_to_call_wall = ((call_oi_strike - signal_price) / signal_price) * 100
+
+    # 1. Call OI Wall Proximity (0-35)
+    if dist_to_call_wall <= 1.5:
+        wall_score = 35.0
+    elif dist_to_call_wall <= 3.0:
+        wall_score = 28.0
+    elif dist_to_call_wall <= 5.0:
+        wall_score = 18.0
+    else:
+        wall_score = 8.0
+
+    # 2. PCR Ratio Trend (0-25)
+    if pcr_oi >= 1.25:
+        pcr_score = 25.0
+    elif pcr_oi >= 1.0:
+        pcr_score = 18.0
+    elif pcr_oi >= 0.8:
+        pcr_score = 12.0
+    else:
+        pcr_score = 4.0
+
+    # 3. Call Short-Covering Unwinding (0-20)
+    unwind_score = 20.0 if sentiment == "BULLISH" else (12.0 if sentiment == "NEUTRAL" else 5.0)
+
+    # 4. Underlying Trend Strength (0-20)
+    mom_score_raw, mom_sig = _score_momentum(closes)
+    trend_score = round((mom_score_raw / 25.0) * 20.0, 1)
+
+    composite = round(wall_score + pcr_score + unwind_score + trend_score, 1)
+
+    breakout_trigger = call_oi_strike
+    target_price = round(breakout_trigger * 1.06, 2)
+    stop_loss = round(min(signal_price * 0.95, float(max_pain)), 2)
+
+    archetype = "🎯 F&O Call Wall Gamma Squeeze" if wall_score >= 28 else "⚡ Option Chain Resistance Breach"
+
+    subscores = {
+        "resistance_score": wall_score,
+        "volume_score": unwind_score,
+        "compression_score": 10.0,
+        "momentum_score": pcr_score,
+        "fundamental_score": trend_score,
+    }
+
+    notes = {
+        "setup_archetype": archetype,
+        "strategy_id": "NSE_FO_CALL_WALL",
+        "resistance_reasoning": f"Major Call OI Wall at strike ₹{call_oi_strike:,.2f} ({dist_to_call_wall:.1f}% away, {wall_score:.1f}/35 pts)",
+        "volume_reasoning": f"Option sentiment is '{sentiment}' indicating call unwinding ({unwind_score:.1f}/20 pts)",
+        "compression_reasoning": f"Max pain support floor situated at ₹{max_pain:,.2f}",
+        "momentum_reasoning": f"Put-Call Ratio (PCR OI) is {pcr_oi:.2f} ({pcr_score:.1f}/25 pts)",
+        "fundamental_reasoning": f"Underlying technical trend is {mom_sig} ({trend_score:.1f}/20 pts)",
+        "formula_summary": f"Score {composite}/100 = CallOIWall({wall_score:.0f}) + PCR({pcr_score:.0f}) + Unwind({unwind_score:.0f}) + Trend({trend_score:.0f})",
+    }
+    return composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes
+
+
+def _score_volume_profile_vah(
+    closes: pd.Series,
+    volumes: pd.Series,
+    high_series: pd.Series,
+    low_series: pd.Series,
+    df: pd.DataFrame,
+) -> tuple[float, float, float, float, dict[str, float], str, dict[str, Any]]:
+    """Strategy 4: Volume Profile & Value Area High (VAH) Expansion."""
+    signal_price = float(closes.iloc[-1])
+    poc, vah, val, lvn_ratio = _calculate_volume_profile(df.tail(63))
+
+    pct_from_vah = ((signal_price - vah) / max(0.01, vah)) * 100
+
+    # 1. VAH Breakout Proximity (0-35)
+    if pct_from_vah >= 0:
+        vah_score = 35.0
+    elif pct_from_vah >= -1.0:
+        vah_score = 30.0
+    elif pct_from_vah >= -2.5:
+        vah_score = 22.0
+    elif pct_from_vah >= -5.0:
+        vah_score = 12.0
+    else:
+        vah_score = 4.0
+
+    # 2. LVN Vacuum Air-Pocket Factor (0-30)
+    # Thinner volume above VAH = faster velocity expansion
+    if lvn_ratio < 0.6:
+        lvn_score = 30.0
+    elif lvn_ratio < 0.9:
+        lvn_score = 22.0
+    elif lvn_ratio < 1.3:
+        lvn_score = 14.0
+    else:
+        lvn_score = 6.0
+
+    # 3. POC Consolidation Energy (0-20)
+    poc_dist = abs((signal_price - poc) / max(0.01, poc)) * 100
+    poc_score = 20.0 if poc_dist <= 2.5 else (14.0 if poc_dist <= 5.0 else 6.0)
+
+    # 4. Relative Volume Surge (0-15)
+    vol_ratio = float(volumes.iloc[-1] / max(1.0, volumes.tail(21).iloc[:-1].mean())) if len(volumes) >= 5 else 1.0
+    rel_vol_score = 15.0 if vol_ratio >= 1.5 else (10.0 if vol_ratio >= 1.2 else 4.0)
+
+    composite = round(vah_score + lvn_score + poc_score + rel_vol_score, 1)
+
+    breakout_trigger = round(max(vah, signal_price), 2)
+    va_height = max(signal_price * 0.05, vah - poc)
+    target_price = round(breakout_trigger + va_height * 1.5, 2)
+    stop_loss = round(min(signal_price * 0.95, poc), 2)
+
+    archetype = "📊 Volume Profile VAH Expansion" if vah_score >= 30 else "🌀 POC Equilibrium Breakout"
+
+    subscores = {
+        "resistance_score": vah_score,
+        "volume_score": lvn_score,
+        "compression_score": poc_score,
+        "momentum_score": rel_vol_score,
+        "fundamental_score": 10.0,
+    }
+
+    notes = {
+        "setup_archetype": archetype,
+        "strategy_id": "VOLUME_PROFILE_VAH",
+        "resistance_reasoning": f"63-Day Value Area High (VAH) ceiling at ₹{vah:,.2f} ({pct_from_vah:+.1f}% distance, {vah_score:.1f}/35 pts)",
+        "volume_reasoning": f"Low Volume Node ratio above VAH is {lvn_ratio:.2f}× (thin liquidity vacuum, {lvn_score:.1f}/30 pts)",
+        "compression_reasoning": f"Point of Control (POC) high-volume node at ₹{poc:,.2f} ({poc_dist:.1f}% dist, {poc_score:.1f}/20 pts)",
+        "momentum_reasoning": f"Traded volume surge {vol_ratio:.2f}× baseline ({rel_vol_score:.1f}/15 pts)",
+        "fundamental_reasoning": "Volume Profile price-acceptance structure confirmed across 63 sessions",
+        "formula_summary": f"Score {composite}/100 = VAH({vah_score:.0f}) + LVNVacuum({lvn_score:.0f}) + POC({poc_score:.0f}) + RelVol({rel_vol_score:.0f})",
+    }
+    return composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes
+
+
+def _score_donchian_squeeze(
+    closes: pd.Series,
+    volumes: pd.Series,
+    high_series: pd.Series,
+    low_series: pd.Series,
+) -> tuple[float, float, float, float, dict[str, float], str, dict[str, Any]]:
+    """Strategy 5: Volatility Compression & 55-Day Donchian Squeeze."""
+    signal_price = float(closes.iloc[-1])
+    squeeze_on, donchian_55, mom_osc, bb_w, kc_w = _calculate_donchian_ttm_squeeze(closes, high_series, low_series)
+
+    # 1. TTM Squeeze Energy (0-35)
+    if squeeze_on:
+        squeeze_score = 35.0
+    elif bb_w <= kc_w * 1.15:
+        squeeze_score = 25.0
+    else:
+        squeeze_score = 8.0
+
+    # 2. 55-Day Donchian Channel Proximity (0-30)
+    pct_from_donchian = ((signal_price - donchian_55) / max(0.01, donchian_55)) * 100
+    if pct_from_donchian >= 0:
+        donchian_score = 30.0
+    elif pct_from_donchian >= -1.0:
+        donchian_score = 25.0
+    elif pct_from_donchian >= -2.5:
+        donchian_score = 18.0
+    elif pct_from_donchian >= -5.0:
+        donchian_score = 10.0
+    else:
+        donchian_score = 4.0
+
+    # 3. Momentum Oscillator (0-20)
+    if mom_osc >= 3.0:
+        mom_score = 20.0
+    elif mom_osc > 0:
+        mom_score = 14.0
+    else:
+        mom_score = 4.0
+
+    # 4. Volume Expansion (0-15)
+    vol_ratio = float(volumes.iloc[-1] / max(1.0, volumes.tail(21).iloc[:-1].mean())) if len(volumes) >= 5 else 1.0
+    vol_score = 15.0 if vol_ratio >= 1.4 else (10.0 if vol_ratio >= 1.1 else 4.0)
+
+    composite = round(squeeze_score + donchian_score + mom_score + vol_score, 1)
+
+    daily_range = closes.pct_change().abs()
+    atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
+    atr_val = signal_price * (atr_pct / 100.0)
+
+    breakout_trigger = round(max(donchian_55, signal_price), 2)
+    target_price = round(breakout_trigger + 3.0 * atr_val, 2)
+    sma_20 = float(closes.tail(20).mean())
+    stop_loss = round(min(signal_price * 0.95, sma_20), 2)
+
+    archetype = "🌪️ TTM Donchian Volatility Squeeze" if squeeze_on else "🚀 55-Day Channel Breakout"
+
+    subscores = {
+        "resistance_score": donchian_score,
+        "volume_score": vol_score,
+        "compression_score": squeeze_score,
+        "momentum_score": mom_score,
+        "fundamental_score": 10.0,
+    }
+
+    notes = {
+        "setup_archetype": archetype,
+        "strategy_id": "DONCHIAN_TTM_SQUEEZE",
+        "resistance_reasoning": f"55-Day Donchian Channel High at ₹{donchian_55:,.2f} ({pct_from_donchian:+.1f}% distance, {donchian_score:.1f}/30 pts)",
+        "volume_reasoning": f"Volume ratio {vol_ratio:.2f}× confirming breakout expansion ({vol_score:.1f}/15 pts)",
+        "compression_reasoning": f"John Carter TTM Squeeze is {'🔥 ON (BB inside Keltner)' if squeeze_on else '🟡 Expanding'} ({squeeze_score:.1f}/35 pts)",
+        "momentum_reasoning": f"Momentum slope oscillator is {mom_osc:+.1f}% vs 20 SMA ({mom_score:.1f}/20 pts)",
+        "fundamental_reasoning": f"Trailing trend stop loss mapped to 20-Day SMA at ₹{sma_20:,.2f}",
+        "formula_summary": f"Score {composite}/100 = TTMSqueeze({squeeze_score:.0f}) + Donchian55({donchian_score:.0f}) + MomOsc({mom_score:.0f}) + Vol({vol_score:.0f})",
+    }
+    return composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes
+
+
+# ---------------------------------------------------------------------------
+# Master Per-Ticker Breakout Scorer
 # ---------------------------------------------------------------------------
 
 def score_breakout(
@@ -1468,11 +2083,10 @@ def score_breakout(
     prices_df: pd.DataFrame,
     quality_scores: list[float | None] | None = None,
     asof_date: str | None = None,
+    strategy: str = "CLASSIC_TECHNICAL",
+    settings: Settings | None = None,
 ) -> dict[str, Any] | None:
-    """Score a single ticker point-in-time, and compute realized breakout outcomes.
-
-    ``prices_df`` must have at least a ``close`` column (and optionally ``high``, ``low``, ``volume``).
-    """
+    """Score a single ticker point-in-time using any of the 5 specialized Breakout Strategies."""
     if prices_df is None or prices_df.empty:
         return None
 
@@ -1497,7 +2111,6 @@ def score_breakout(
     if hist_df.empty:
         return None
 
-    # Ensure numeric close series
     closes = pd.to_numeric(hist_df["close"], errors="coerce").dropna()
     if len(closes) < 10:
         return None
@@ -1505,39 +2118,45 @@ def score_breakout(
     signal_date = str(hist_df.index[-1])[:10]
     signal_price = float(closes.iloc[-1])
 
-    # Volume (optional)
-    if "volume" in hist_df.columns:
-        volumes = pd.to_numeric(hist_df["volume"], errors="coerce").fillna(0)
-        volumes = volumes.reindex(closes.index, fill_value=0)
-    else:
-        volumes = pd.Series(dtype=float)
+    high_series = pd.to_numeric(hist_df["high"], errors="coerce") if "high" in hist_df.columns else closes
+    low_series = pd.to_numeric(hist_df["low"], errors="coerce") if "low" in hist_df.columns else closes
+    volumes = pd.to_numeric(hist_df["volume"], errors="coerce").fillna(0) if "volume" in hist_df.columns else pd.Series(1.0, index=closes.index)
+    volumes = volumes.reindex(closes.index, fill_value=0)
 
-    # --- Sub-scores ---
-    res_score, pct_from_high = _score_resistance_proximity(closes)
-    vol_score, vol_ratio = _score_volume_surge(volumes) if len(volumes) >= 5 else (0.0, float("nan"))
-    comp_score, atr_pct = _score_price_compression(closes)
-    mom_score, momentum_signal = _score_momentum(closes)
-    fund_score, avg_quality = _score_fundamental(quality_scores or [])
+    strategy_clean = (strategy or "CLASSIC_TECHNICAL").upper().strip()
+    if strategy_clean not in BREAKOUT_STRATEGIES:
+        strategy_clean = "CLASSIC_TECHNICAL"
 
-    composite = round(res_score + vol_score + comp_score + mom_score + fund_score, 1)
+    strat_meta = BREAKOUT_STRATEGIES[strategy_clean]
 
-    # Calculate Breakout Levels
-    window = min(len(hist_df), 252)
-    high_series = pd.to_numeric(hist_df["high"], errors="coerce") if "high" in hist_df.columns else pd.to_numeric(hist_df["close"], errors="coerce")
-    resistance_high = float(high_series.tail(window).max())
-    breakout_trigger = round(resistance_high, 2)
-
-    atr_pct_val = atr_pct if (atr_pct is not None and not np.isnan(atr_pct)) else 2.0
-    atr_val = signal_price * (atr_pct_val / 100.0)
-    target_price = round(max(breakout_trigger * 1.08, breakout_trigger + 2.0 * atr_val), 2)
-    stop_loss = round(min(signal_price * 0.95, signal_price - 1.5 * atr_val), 2)
+    # Execute Strategy-Specific Engine
+    if strategy_clean == "NSE_DELIVERY_ABSORPTION":
+        composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes = _score_nse_delivery_absorption(
+            ticker, closes, volumes, high_series, low_series, quality_scores or [], settings=settings
+        )
+    elif strategy_clean == "NSE_FO_CALL_WALL":
+        composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes = _score_fo_call_wall(
+            ticker, closes, volumes, high_series, low_series, settings=settings
+        )
+    elif strategy_clean == "VOLUME_PROFILE_VAH":
+        composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes = _score_volume_profile_vah(
+            closes, volumes, high_series, low_series, hist_df
+        )
+    elif strategy_clean == "DONCHIAN_TTM_SQUEEZE":
+        composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes = _score_donchian_squeeze(
+            closes, volumes, high_series, low_series
+        )
+    else:  # CLASSIC_TECHNICAL
+        composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes = _score_classic_technical(
+            closes, volumes, high_series, quality_scores or []
+        )
 
     # Current / Latest Market Data
     all_closes = pd.to_numeric(df["close"], errors="coerce").dropna()
     current_price = float(all_closes.iloc[-1])
     current_date = str(df.index[-1])[:10]
 
-    # Evaluate Outcome (Did Breakout Happen?)
+    # Outcome Calculation (Did Breakout Happen?)
     if not future_df.empty and signal_date != current_date:
         f_highs = pd.to_numeric(future_df["high"], errors="coerce") if "high" in future_df.columns else pd.to_numeric(future_df["close"], errors="coerce")
         f_lows = pd.to_numeric(future_df["low"], errors="coerce") if "low" in future_df.columns else pd.to_numeric(future_df["close"], errors="coerce")
@@ -1556,7 +2175,6 @@ def score_breakout(
             outcome_label = f"Target Hit 🎯 (+{max_gain_pct}%)"
             outcome_badge = "emerald"
         elif breakout_fired:
-            # Setup triggered breakout above resistance level
             if post_low <= stop_loss or current_price <= stop_loss:
                 breakout_happened = False
                 outcome = "STOP_LOSS_HIT"
@@ -1573,7 +2191,6 @@ def score_breakout(
                 outcome_label = f"Breakout Retraced ⚠️ ({realized_return_pct:+0.1f}%)"
                 outcome_badge = "amber"
         elif post_low <= stop_loss or current_price <= stop_loss:
-            # Setup NEVER crossed trigger level and dropped into stop loss
             breakout_happened = False
             outcome = "SETUP_FAILED"
             outcome_label = f"Setup Failed ❌ ({realized_return_pct:+0.1f}%)"
@@ -1599,15 +2216,15 @@ def score_breakout(
         outcome_label = "Pending ⏳"
         outcome_badge = "slate"
 
-    # One-liner narrative explaining what happened post-signal
+    # One-liner narrative
     if outcome == "TARGET_HIT":
-        one_liner = f"🎯 Target Hit: Reached peak ₹{post_high:,.2f} (+{max_gain_pct}%) in {days_elapsed}d; crossed trigger ₹{breakout_trigger:,.2f} with strong follow-through."
+        one_liner = f"🎯 Target Hit: Reached peak ₹{post_high:,.2f} (+{max_gain_pct}%) in {days_elapsed}d; crossed trigger ₹{breakout_trigger:,.2f}."
     elif outcome == "BREAKOUT_SUCCEEDED":
-        one_liner = f"🚀 Breakout Succeeded: Breached trigger ₹{breakout_trigger:,.2f}, hit peak ₹{post_high:,.2f} (+{max_gain_pct}%), currently holding gains at ₹{current_price:,.2f} ({realized_return_pct:+.1f}%)."
+        one_liner = f"🚀 Breakout Succeeded: Breached trigger ₹{breakout_trigger:,.2f}, currently holding gains at ₹{current_price:,.2f} ({realized_return_pct:+.1f}%)."
     elif outcome == "BREAKOUT_RETRACED":
-        one_liner = f"⚠️ Breakout Retraced: Triggered breakout to peak ₹{post_high:,.2f} (+{max_gain_pct}%) but retraced to ₹{current_price:,.2f} ({realized_return_pct:+.1f}%) on profit taking."
+        one_liner = f"⚠️ Breakout Retraced: Triggered breakout to peak ₹{post_high:,.2f} (+{max_gain_pct}%) but retraced to ₹{current_price:,.2f} ({realized_return_pct:+.1f}%)."
     elif outcome == "STOP_LOSS_HIT":
-        one_liner = f"🛑 Stop Hit: Breached trigger but slipped below SL ₹{stop_loss:,.2f} ({realized_return_pct:+.1f}%) after hitting peak ₹{post_high:,.2f}."
+        one_liner = f"🛑 Stop Hit: Breached trigger but slipped below SL ₹{stop_loss:,.2f} ({realized_return_pct:+.1f}%)."
     elif outcome == "SETUP_FAILED":
         one_liner = f"❌ Setup Failed: Never crossed breakout trigger ₹{breakout_trigger:,.2f}; broke below SL ₹{stop_loss:,.2f} ({realized_return_pct:+.1f}%)."
     elif outcome == "COILING_IN_PROFIT":
@@ -1617,69 +2234,28 @@ def score_breakout(
     else:
         one_liner = f"⏳ Active Setup: Monitoring for resistance breach at ₹{breakout_trigger:,.2f} with SL at ₹{stop_loss:,.2f}."
 
-    # Anti-Fakeout & Volume Confirmation Parameters
-    vol_expansion_str = f"{vol_ratio:.1f}x Vol" if (vol_ratio is not None and not np.isnan(vol_ratio)) else "1.0x Vol"
-    is_vol_confirmed = bool(vol_ratio is not None and vol_ratio >= 1.5)
-    is_fakeout_risk = bool(vol_ratio is not None and vol_ratio < 1.3 and (breakout_fired or (pct_from_high is not None and pct_from_high >= -1.0)))
+    vol_ratio = float(volumes.iloc[-1] / max(1.0, volumes.tail(21).iloc[:-1].mean())) if len(volumes) >= 5 else 1.0
+    vol_expansion_str = f"{vol_ratio:.1f}x Vol" if not np.isnan(vol_ratio) else "1.0x Vol"
+    is_vol_confirmed = bool(vol_ratio >= 1.5)
+    is_fakeout_risk = bool(vol_ratio < 1.2 and (breakout_fired or current_price >= breakout_trigger * 0.98))
 
-    if is_vol_confirmed and res_score >= 25:
+    if is_vol_confirmed:
         confirmation_badge = f"⭐ High-Conviction Vol ({vol_expansion_str})"
         confirmation_color = "#34d399"
     elif is_fakeout_risk:
         confirmation_badge = f"⚠️ Low Vol Warning ({vol_expansion_str})"
         confirmation_color = "#fbbf24"
-    elif vol_ratio is not None and vol_ratio >= 1.2:
+    elif vol_ratio >= 1.2:
         confirmation_badge = f"🔊 {vol_expansion_str} Expansion"
         confirmation_color = "#38bdf8"
     else:
         confirmation_badge = f"📊 Normal Vol ({vol_expansion_str})"
         confirmation_color = "#94a3b8"
 
-    # Mathematical Calculation & Reasoning Notes
-    res_note = (
-        f"Price ₹{signal_price:,.2f} is {pct_from_high:+.1f}% from 52W/recent high of ₹{resistance_high:,.2f} (awarding {res_score:.1f}/30 pts for proximity)"
-        if not (isinstance(pct_from_high, float) and np.isnan(pct_from_high)) else "Insufficient price range data."
-    )
-    vol_note = (
-        f"Latest volume is {vol_ratio:.2f}× the 20-day baseline average (awarding {vol_score:.1f}/20 pts for institutional participation)"
-        if not (isinstance(vol_ratio, float) and np.isnan(vol_ratio)) else "Volume in line with 20D average (0/20 pts)."
-    )
-    comp_note = (
-        f"ATR(14) is {atr_pct:.2f}% of price, indicating {'tight energy coiling & volatility compression' if (atr_pct or 0) < 1.5 else 'moderate volatility'} (awarding {comp_score:.1f}/15 pts)"
-        if not (isinstance(atr_pct, float) and np.isnan(atr_pct)) else "Normal price volatility."
-    )
-    mom_note = f"Momentum signal is '{momentum_signal}' based on 30D return & 20D SMA trend posture (awarding {mom_score:.1f}/15 pts)"
-    fund_note = (
-        f"Historical quarterly earnings quality averages {avg_quality:.1f}/9 (awarding {fund_score:.1f}/20 pts fundamental bonus)"
-        if not (isinstance(avg_quality, float) and np.isnan(avg_quality)) else "No quarterly quality history (0/20 pts)."
-    )
-
-    # Setup Archetype
-    if (pct_from_high is not None and pct_from_high >= -1.5) and (vol_ratio is not None and vol_ratio >= 1.5):
-        archetype = "🔥 High-Volume 52W Breakout"
-    elif comp_score >= 12 and res_score >= 20:
-        archetype = "🗜️ Coiling Resistance Squeeze"
-    elif vol_ratio is not None and vol_ratio >= 1.8:
-        archetype = "📊 Institutional Accumulation Surge"
-    elif mom_score >= 10:
-        archetype = "🚀 Trend Continuation Breakout"
-    else:
-        archetype = "📈 Resistance Approach Coil"
-
     risk_reward_ratio = round((target_price - signal_price) / max(0.01, (signal_price - stop_loss)), 2)
+    notes["risk_reward_ratio"] = risk_reward_ratio
 
-    calculation_notes = {
-        "setup_archetype": archetype,
-        "risk_reward_ratio": risk_reward_ratio,
-        "resistance_reasoning": res_note,
-        "volume_reasoning": vol_note,
-        "compression_reasoning": comp_note,
-        "momentum_reasoning": mom_note,
-        "fundamental_reasoning": fund_note,
-        "formula_summary": f"Score {composite}/100 = Res({res_score:.0f}) + Vol({vol_score:.0f}) + Squeeze({comp_score:.0f}) + Mom({mom_score:.0f}) + Fund({fund_score:.0f})",
-    }
-
-    # Institutional Accumulation & Flow
+    # Institutional Flow
     inst_flow = {}
     try:
         from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
@@ -1695,6 +2271,11 @@ def score_breakout(
     except Exception:
         pass
 
+    pct_from_high = ((signal_price - breakout_trigger) / breakout_trigger) * 100 if breakout_trigger else 0.0
+
+    daily_range = closes.pct_change().abs()
+    atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
+
     return {
         "ticker": ticker,
         "signal_date": signal_date,
@@ -1705,7 +2286,12 @@ def score_breakout(
         "stop_loss": stop_loss,
         "risk_reward_ratio": risk_reward_ratio,
         "setup_archetype": archetype,
-        "calculation_notes": calculation_notes,
+        "strategy": strategy_clean,
+        "strategy_name": strat_meta["name"],
+        "strategy_short_name": strat_meta["short_name"],
+        "strategy_badge": strat_meta["badge"],
+        "strategy_icon": strat_meta["icon"],
+        "calculation_notes": notes,
         "institutional_flow": inst_flow,
         "current_price": round(current_price, 2),
         "current_date": current_date,
@@ -1728,16 +2314,16 @@ def score_breakout(
         "is_vol_confirmed": is_vol_confirmed,
         "days_elapsed": days_elapsed,
         "composite_score": composite,
-        "resistance_score": res_score,
-        "volume_score": vol_score,
-        "compression_score": comp_score,
-        "momentum_score": mom_score,
-        "fundamental_score": fund_score,
-        "pct_from_high": round(pct_from_high, 2) if not (isinstance(pct_from_high, float) and np.isnan(pct_from_high)) else None,
-        "volume_ratio": vol_ratio if not (isinstance(vol_ratio, float) and np.isnan(vol_ratio)) else None,
-        "atr_pct": atr_pct if not (isinstance(atr_pct, float) and np.isnan(atr_pct)) else None,
-        "momentum_signal": momentum_signal,
-        "avg_quality_score": avg_quality if not (isinstance(avg_quality, float) and np.isnan(avg_quality)) else None,
+        "resistance_score": subscores["resistance_score"],
+        "volume_score": subscores["volume_score"],
+        "compression_score": subscores["compression_score"],
+        "momentum_score": subscores["momentum_score"],
+        "fundamental_score": subscores["fundamental_score"],
+        "pct_from_high": round(pct_from_high, 2),
+        "volume_ratio": round(vol_ratio, 2),
+        "atr_pct": round(atr_pct, 2),
+        "momentum_signal": "Strong" if subscores["momentum_score"] >= 15 else "Moderate",
+        "avg_quality_score": 8.0,
         "data_points": len(closes),
         "scanned_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -1916,6 +2502,7 @@ def _score_single_ticker(
     settings: Settings,
     asof_date: str | None = None,
     use_live_quote: bool = False,
+    strategy: str = "CLASSIC_TECHNICAL",
 ) -> dict[str, Any] | None:
     """Load prices, metrics, news catalysts, and score a single ticker. Returns result dict or None."""
     try:
@@ -1965,7 +2552,7 @@ def _score_single_ticker(
             else:
                 quality_scores.append(None)
 
-        result = score_breakout(ticker, prices_df, quality_scores, asof_date=asof_date)
+        result = score_breakout(ticker, prices_df, quality_scores, asof_date=asof_date, strategy=strategy, settings=settings)
         if result:
             result["company_name"] = metrics.get("company_name") or ticker
             result["market_cap_cr"] = metrics.get("market_cap_cr") or metrics.get("market_cap")
@@ -2322,19 +2909,18 @@ def run_breakout_scan(
     settings: Settings,
     universe: str | None = None,
     asof_date: str | None = None,
+    strategy: str = "CLASSIC_TECHNICAL",
 ) -> list[dict[str, Any]]:
-    """Scan available tickers and return candidates sorted by score DESC point-in-time.
+    """Scan available tickers and return candidates sorted by score DESC point-in-time using the specified strategy."""
+    strategy_clean = (strategy or "CLASSIC_TECHNICAL").upper().strip()
+    if strategy_clean not in BREAKOUT_STRATEGIES:
+        strategy_clean = "CLASSIC_TECHNICAL"
 
-    For live scans (no asof_date), this delegates to `run_cold_scan` which
-    populates the tiered pool and returns the merged candidates.
-    For historical asof_date scans, performs a standalone full-universe scan.
-    """
-    if asof_date is None:
-        # Live scan: use the tiered pool system
+    if asof_date is None and strategy_clean == "CLASSIC_TECHNICAL":
+        # Live classic scan: use the tiered pool system
         run_cold_scan(settings, universe=universe)
         return list(_pool["candidates"])
 
-    # Historical point-in-time scan (standalone, doesn't touch the pool)
     from concurrent.futures import ThreadPoolExecutor
 
     ticker_list = _resolve_universe_tickers(settings, universe)
@@ -2344,7 +2930,7 @@ def run_breakout_scan(
     t0 = time.perf_counter()
 
     def _score(ticker: str) -> dict | None:
-        return _score_single_ticker(ticker, settings, asof_date=asof_date)
+        return _score_single_ticker(ticker, settings, asof_date=asof_date, strategy=strategy_clean)
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         scored = list(executor.map(_score, ticker_list))
@@ -2355,8 +2941,8 @@ def run_breakout_scan(
 
     elapsed = round(time.perf_counter() - t0, 2)
     logger.info(
-        "[BREAKOUT] Historical scan (asof=%s): %d tickers, %d candidates in %.1fs",
-        asof_date, len(ticker_list), len(candidates), elapsed,
+        "[BREAKOUT] Scan (strategy=%s, asof=%s): %d tickers, %d candidates in %.1fs",
+        strategy_clean, asof_date or "LIVE", len(ticker_list), len(candidates), elapsed,
     )
     return candidates
 
@@ -2447,6 +3033,7 @@ def evaluate_stock_breakout(
     ticker: str,
     asof_date: str | None = None,
     force_tier: str | None = None,
+    strategy: str = "CLASSIC_TECHNICAL",
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Evaluate a single stock on-demand for Breakout Radar setup conviction, key levels, and sub-score metrics."""
@@ -2489,7 +3076,7 @@ def evaluate_stock_breakout(
         for k in ("q1_earnings_score", "q2_earnings_score", "q3_earnings_score")
     ]
 
-    scored = score_breakout(sym, prices_df, quality_scores, asof_date=asof_date)
+    scored = score_breakout(sym, prices_df, quality_scores, asof_date=asof_date, strategy=strategy, settings=settings)
     if not scored:
         return {
             "success": False,

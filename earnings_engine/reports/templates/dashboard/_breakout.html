@@ -25,6 +25,18 @@
                     </div>
 
                     <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <!-- Strategy Selector -->
+                        <div style="display:flex;align-items:center;gap:0.35rem;background:#0f172a;border:1px solid rgba(168,85,247,0.3);padding:0.15rem 0.5rem;border-radius:6px;">
+                            <span style="font-size:0.75rem;">🎯</span>
+                            <select id="breakoutStrategySelect" onchange="app.onBreakoutStrategyChange(this.value)" style="background:transparent;border:none;color:#c084fc;font-size:0.74rem;font-weight:700;font-family:var(--font-mono);cursor:pointer;outline:none;" title="Breakout Strategy Engine">
+                                <option value="CLASSIC_TECHNICAL" selected>⚡ Classic Coiling (52W+ATR)</option>
+                                <option value="NSE_DELIVERY_ABSORPTION">🏛️ NSE Delivery Absorption</option>
+                                <option value="NSE_FO_CALL_WALL">🎯 NSE F&O Call OI Wall</option>
+                                <option value="VOLUME_PROFILE_VAH">📊 Volume Profile VAH</option>
+                                <option value="DONCHIAN_TTM_SQUEEZE">🌪️ Donchian TTM Squeeze</option>
+                            </select>
+                        </div>
+
                         <!-- Universe Selector -->
                         <div style="display:flex;align-items:center;gap:0.35rem;background:#0f172a;border:1px solid rgba(255,255,255,0.12);padding:0.15rem 0.5rem;border-radius:6px;">
                             <span style="font-size:0.75rem;">🏛️</span>
@@ -402,8 +414,21 @@
                         </div>
                     </div>
 
-                    <!-- Right Controls (Tier, Outcome, Sort, Refresh) -->
+                    <!-- Right Controls (Strategy, Tier, Outcome, Sort, Refresh) -->
                     <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                        <!-- Strategy Filter -->
+                        <div style="display:flex;align-items:center;gap:0.3rem;">
+                            <span style="font-size:0.72rem;color:#64748b;">Strategy</span>
+                            <select id="breakoutTrackedStrategyFilter" onchange="app.loadTrackedBreakouts()" style="background:#0f172a;border:1px solid rgba(168,85,247,0.3);color:#c084fc;font-size:0.74rem;font-weight:600;padding:0.35rem 0.55rem;border-radius:6px;font-family:var(--font-mono);cursor:pointer;">
+                                <option value="ALL">All Strategies</option>
+                                <option value="CLASSIC_TECHNICAL">⚡ Classic Coiling</option>
+                                <option value="NSE_DELIVERY_ABSORPTION">🏛️ NSE Delivery</option>
+                                <option value="NSE_FO_CALL_WALL">🎯 NSE F&amp;O Call Wall</option>
+                                <option value="VOLUME_PROFILE_VAH">📊 Volume Profile VAH</option>
+                                <option value="DONCHIAN_TTM_SQUEEZE">🌪️ Donchian TTM Squeeze</option>
+                            </select>
+                        </div>
+
                         <!-- Tier Filter -->
                         <div style="display:flex;align-items:center;gap:0.3rem;">
                             <span style="font-size:0.72rem;color:#64748b;">Tier</span>

@@ -15,9 +15,17 @@ logger = get_logger("earnings_engine.api.routers.breakout")
 router = APIRouter(tags=["Breakout Radar & Scanner"])
 
 
+@router.get("/api/v1/breakout-radar/strategies")
+async def get_breakout_strategies_endpoint():
+    """Retrieve all available multi-strategy breakout models with descriptions and mathematical formulas."""
+    strategies = breakout_scanner_mod.get_breakout_strategies()
+    return {"success": True, "count": len(strategies), "strategies": strategies}
+
+
 @router.get("/api/v1/breakout-radar")
 async def get_breakout_radar_endpoint(
     universe: str | None = Query(None, description="Universe or watchlist to filter/scan (e.g. nifty_50, nse_top, nse_large_cap, us_top, all)"),
+    strategy: str = Query("CLASSIC_TECHNICAL", description="Breakout strategy model (CLASSIC_TECHNICAL, NSE_DELIVERY_ABSORPTION, NSE_FO_CALL_WALL, VOLUME_PROFILE_VAH, DONCHIAN_TTM_SQUEEZE)"),
     min_score: float = Query(35.0, description="Minimum composite score to include"),
     limit: int = Query(50, ge=1, le=200, description="Max candidates to return"),
     sort_by: str = Query("composite_score", description="Sort field (composite_score, fundamental_score, resistance_score, volume_score, realized_return_pct)"),
@@ -33,6 +41,7 @@ async def get_breakout_radar_endpoint(
             universe=universe,
             settings=_settings,
             asof_date=asof_date,
+            strategy=strategy,
         )
         if candidates is None:
             candidates = []
@@ -239,19 +248,20 @@ async def evaluate_breakout_candidates_endpoint(request: dict | None = None):
 @router.post("/api/v1/breakout-radar/refresh")
 async def refresh_breakout_radar(
     universe: str | None = Query(None, description="Universe or watchlist to refresh scan for"),
+    strategy: str = Query("CLASSIC_TECHNICAL", description="Breakout strategy model (CLASSIC_TECHNICAL, NSE_DELIVERY_ABSORPTION, NSE_FO_CALL_WALL, VOLUME_PROFILE_VAH, DONCHIAN_TTM_SQUEEZE)"),
 ):
     """Trigger an immediate re-scan of tickers (runs in a background thread)."""
     import threading
 
     def _run():
         try:
-            breakout_scanner_mod.run_breakout_scan(_settings, universe=universe)
+            breakout_scanner_mod.run_breakout_scan(_settings, universe=universe, strategy=strategy)
         except Exception as e:
             logger.error("[BREAKOUT] Manual refresh error: %s", e)
 
     t = threading.Thread(target=_run, daemon=True, name="breakout_manual_refresh")
     t.start()
-    return {"success": True, "message": f"Breakout scan triggered for {universe or 'all universes'} in background. Check /api/v1/breakout-radar shortly."}
+    return {"success": True, "message": f"Breakout scan ({strategy}) triggered for {universe or 'all universes'} in background. Check /api/v1/breakout-radar shortly."}
 
 
 @router.get("/api/v1/breakout-radar/search")
@@ -326,6 +336,7 @@ async def get_tracked_breakouts_endpoint(
     end_date: str | None = Query(None, description="End date filter in YYYY-MM-DD format"),
     tier: str | None = Query(None, description="Filter by tier: ALL, HOT, WARM"),
     outcome: str | None = Query(None, description="Filter by outcome: ALL, TRIGGERED, TARGET_HIT, ACTIVE, STOP_HIT"),
+    strategy: str | None = Query(None, description="Filter by breakout strategy model"),
     sort_by: str = Query("signal_date", description="Sort field (signal_date, return_pct, max_gain, score, days_elapsed)"),
     limit: int = Query(200, ge=1, le=500, description="Max records to return"),
     live: bool = Query(False, description="Optionally refresh current prices and realized returns"),
@@ -339,6 +350,7 @@ async def get_tracked_breakouts_endpoint(
             end_date=end_date,
             tier=tier,
             outcome=outcome,
+            strategy=strategy,
             sort_by=sort_by,
             limit=limit,
             live=live,
@@ -372,6 +384,7 @@ async def evaluate_single_breakout(
     ticker: str,
     asof_date: str | None = Query(None, description="Point-in-time evaluation date in YYYY-MM-DD format"),
     force_tier: str | None = Query(None, description="Force promotion into 'hot' or 'warm' tier pool"),
+    strategy: str = Query("CLASSIC_TECHNICAL", description="Breakout strategy model"),
 ):
     """Evaluate breakout potential for a single ticker."""
     sym = ticker.strip().upper()
@@ -381,6 +394,7 @@ async def evaluate_single_breakout(
             ticker=sym,
             asof_date=asof_date,
             force_tier=force_tier,
+            strategy=strategy,
             settings=_settings,
         )
         return result

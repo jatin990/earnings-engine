@@ -126,6 +126,7 @@
 
         const tier = document.getElementById('breakoutTrackedTierFilter')?.value || 'ALL';
         const outcome = document.getElementById('breakoutTrackedOutcomeFilter')?.value || 'ALL';
+        const strategy = document.getElementById('breakoutTrackedStrategyFilter')?.value || 'ALL';
         const sortBy = document.getElementById('breakoutTrackedSortBy')?.value || 'signal_date';
         const startVal = document.getElementById('breakoutTrackedStartDate')?.value || '';
         const endVal = document.getElementById('breakoutTrackedEndDate')?.value || '';
@@ -138,6 +139,7 @@
         }
         if (tier && tier !== 'ALL') params.set('tier', tier);
         if (outcome && outcome !== 'ALL') params.set('outcome', outcome);
+        if (strategy && strategy !== 'ALL') params.set('strategy', strategy);
         if (sortBy) params.set('sort_by', sortBy);
         if (isLive) params.set('live', 'true');
         params.set('limit', '200');
