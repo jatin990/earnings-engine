@@ -569,13 +569,23 @@ def compute_and_save_confluence_radar(settings: Settings | None = None) -> list[
 
 
 def load_confluence_radar_from_db(
-    min_level: int = 1,
+    min_level: int | Settings = 1,
     limit: int = 30,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     """Instant sub-millisecond loader for pre-computed confluence setups."""
     import json
     import time
+
+    if isinstance(min_level, Settings):
+        settings = min_level
+        min_level = 1
+
+    try:
+        min_level = int(min_level)
+    except Exception:
+        min_level = 1
+
     global _CONFLUENCE_CACHE
     now_ts = time.time()
 

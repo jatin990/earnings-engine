@@ -117,7 +117,7 @@ async def lifespan(app: FastAPI):
 
             load_swing_pool_from_db(_settings)
             load_breakout_pool_from_db(_settings)
-            load_confluence_radar_from_db(_settings)
+            load_confluence_radar_from_db(min_level=1, limit=30, settings=_settings)
             logger.info("[STARTUP:3/5] In-memory scanner pools (Swing, Breakout, Confluence) hydrated from DB.")
         except Exception as e:
             logger.warning("[STARTUP:3/5] Scanner pool hydration warning: %s", e)
