@@ -126,10 +126,10 @@ def test_news_verifier_full_pipeline():
     verifier = NewsVerifier()
     recent_utc = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
 
-    # 1. Valid corporate news
+    # 1. Valid corporate news from mainstream publisher
     item_valid = {
         "ticker": "AKUMS.NS",
-        "title": "Akums Drugs Q1FY27 net profit surges 56% to Rs 140 crore - scanx.trade",
+        "title": "Akums Drugs Q1FY27 net profit surges 56% to Rs 140 crore - Moneycontrol",
         "summary": "Strong quarterly performance driven by CDMO expansion",
         "published_at": recent_utc,
     }
@@ -153,10 +153,20 @@ def test_news_verifier_full_pipeline():
     # 3. Foreign exchange ticker collision (SFL NYSE:SFL misattributed to Indian SFL.NS)
     item_foreign = {
         "ticker": "SFL.NS",
-        "title": "SFL (NYSE:SFL) Stock Draws Fresh Interest As Profit Rebounds Meet Capex Questions - simplywall.st",
+        "title": "SFL (NYSE:SFL) Stock Draws Fresh Interest As Profit Rebounds Meet Capex Questions - Simply Wall St",
         "summary": "SFL Corporation Ltd results",
         "published_at": recent_utc,
     }
     res_foreign = verifier.verify_news_item(item_foreign)
     assert res_foreign["verification_status"] == "REJECTED"
     assert "foreign exchange" in res_foreign["rejection_reason"].lower()
+
+    # 4. Untrusted scraper / recycled old news (Sterlite ₹1500 Cr QIP on scanx.trade)
+    item_scraper = {
+        "ticker": "STLTECH.NS",
+        "title": "Sterlite Technologies raises ₹1500 crore via QIP to de-leverage - scanx.trade",
+        "summary": "Sterlite Technologies QIP update",
+        "published_at": recent_utc,
+    }
+    res_scraper = verifier.verify_news_item(item_scraper)
+    assert res_scraper["verification_status"] == "REJECTED"

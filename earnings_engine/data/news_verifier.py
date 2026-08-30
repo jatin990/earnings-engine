@@ -51,13 +51,14 @@ DICTIONARY_TICKERS = {
     "GLOBAL": ["global health", "medanta"],
 }
 
-# Non-corporate / noise exclusion keywords (sports, gossip, foreign political/defence contracts unrelated to Indian equities)
+# Non-corporate / noise exclusion keywords (sports, gossip, low-fidelity recycled scrapers, crypto spam)
 NOISE_PATTERNS = [
     r"\b(barcelona|real madrid|manchester united|arsenal|chelsea|liverpool|world cup|fifa|la liga|premier league|champions league)\b",
     r"\b(boeing|airbus|f-15|f-35|pentagon|us air force|lockheed)\b",
     r"\b(coca-cola europacific|fair oaks income|prudential declares|ccep)\b",
     r"\b(cryptocurrency|bitcoin|ethereum|solana|memecoin|dogecoin|shiba inu)\b",
     r"\b(top 10 stocks for 2030|how to get rich|multibagger penny stocks to buy today|astrology prediction)\b",
+    r"\b(scanx\.trade|simplywall\.st|whalesbook|equitypandit|investorgain)\b",
 ]
 
 # Curated Conglomerate Entity Mappings
@@ -157,21 +158,58 @@ def parse_and_verify_date(
     if is_stale:
         flags.append("DATE_STALE")
 
-    # In-text historical date mention scan (e.g. "meeting held on July 10" published in late August)
+    # In-text historical date mention scan (e.g. "2nd July", "July 2", "during June 2026", "in 2024")
     full_text = (title + " " + summary).lower()
     in_text_historical = False
     in_text_date_desc = None
-    date_matches = re.findall(r"\b(sets|on|held|dated|meeting\s+on|for)\s+([a-z]+)\s+(\d{1,2})\b", full_text)
-    for prefix, m_name, d_str in date_matches:
+
+    # 1. Day Month (e.g. "2nd july", "2 july", "15th june 2026")
+    day_month_matches = re.findall(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]+)(?:\s+(\d{4}))?\b", full_text)
+    for d_str, m_name, y_str in day_month_matches:
         m_num = MONTH_MAP.get(m_name)
         if m_num:
             day = int(d_str)
-            # If the month is prior to current publication month or >10 days past
-            if m_num < dt_ist.month or (m_num == dt_ist.month and day < (dt_ist.day - 7)):
+            year = int(y_str) if y_str else dt_ist.year
+            if year < dt_ist.year or (year == dt_ist.year and (m_num < dt_ist.month or (m_num == dt_ist.month and day < (dt_ist.day - 7)))):
                 in_text_historical = True
-                in_text_date_desc = f"{m_name.capitalize()} {day}"
+                in_text_date_desc = f"{day} {m_name.capitalize()} {year}"
                 flags.append(f"IN_TEXT_HISTORICAL_DATE_{m_name.upper()}_{day}")
                 break
+
+    # 2. Month Day (e.g. "july 2", "july 2nd", "july 02, 2026")
+    if not in_text_historical:
+        month_day_matches = re.findall(r"\b([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?\b", full_text)
+        for m_name, d_str, y_str in month_day_matches:
+            m_num = MONTH_MAP.get(m_name)
+            if m_num:
+                day = int(d_str)
+                year = int(y_str) if y_str else dt_ist.year
+                if year < dt_ist.year or (year == dt_ist.year and (m_num < dt_ist.month or (m_num == dt_ist.month and day < (dt_ist.day - 7)))):
+                    in_text_historical = True
+                    in_text_date_desc = f"{m_name.capitalize()} {day} {year}"
+                    flags.append(f"IN_TEXT_HISTORICAL_DATE_{m_name.upper()}_{day}")
+                    break
+
+    # 3. In/During Month (e.g. "in july 2026", "during june")
+    if not in_text_historical:
+        in_month_matches = re.findall(r"\b(?:in|during|of|as of|since)\s+([a-z]+)(?:\s+(\d{4}))?\b", full_text)
+        for m_name, y_str in in_month_matches:
+            m_num = MONTH_MAP.get(m_name)
+            if m_num:
+                year = int(y_str) if y_str else dt_ist.year
+                if year < dt_ist.year or (year == dt_ist.year and m_num < dt_ist.month):
+                    in_text_historical = True
+                    in_text_date_desc = f"{m_name.capitalize()} {year}"
+                    flags.append(f"IN_TEXT_HISTORICAL_MONTH_{m_name.upper()}")
+                    break
+
+    # 4. Explicit past years (e.g. "in 2024", "during 2025", "fy24", "fy25" when running in 2026)
+    if not in_text_historical:
+        past_year_match = re.search(r"\b(202[0-5]|fy2[0-5])\b", full_text)
+        if past_year_match:
+            in_text_historical = True
+            in_text_date_desc = f"Past Year {past_year_match.group(1).upper()}"
+            flags.append(f"IN_TEXT_HISTORICAL_YEAR_{past_year_match.group(1).upper()}")
 
     # Extract reporting quarter / fiscal period
     reporting_quarter = None
