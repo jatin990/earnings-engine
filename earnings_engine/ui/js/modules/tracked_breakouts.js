@@ -25,6 +25,10 @@
         const btnTracked = document.getElementById('btnBreakoutSubtabTracked');
         const contextLabel = document.getElementById('bkSubtabContextLabel');
 
+        const sideSubScanner = document.getElementById('sidebarSubBreakoutScanner');
+        const sideSubBacktest = document.getElementById('sidebarSubBreakoutBacktest');
+        const sideSubTracked = document.getElementById('sidebarSubBreakoutTracked');
+
         if (scannerView) scannerView.style.display = 'none';
         if (backtestView) backtestView.style.display = 'none';
         if (trackedView) trackedView.style.display = 'none';
@@ -33,9 +37,14 @@
         if (btnBacktest) btnBacktest.classList.remove('bk-subtab-active');
         if (btnTracked) btnTracked.classList.remove('bk-subtab-active');
 
+        if (sideSubScanner) sideSubScanner.classList.remove('active');
+        if (sideSubBacktest) sideSubBacktest.classList.remove('active');
+        if (sideSubTracked) sideSubTracked.classList.remove('active');
+
         if (subtab === 'backtest') {
             if (backtestView) backtestView.style.display = 'block';
             if (btnBacktest) btnBacktest.classList.add('bk-subtab-active');
+            if (sideSubBacktest) sideSubBacktest.classList.add('active');
             if (contextLabel) contextLabel.textContent = '📅 Historical Point-in-Time Date Backtest Simulator';
             if (typeof app.loadBreakoutBacktest === 'function') {
                 app.loadBreakoutBacktest();
@@ -43,12 +52,14 @@
         } else if (subtab === 'tracked') {
             if (trackedView) trackedView.style.display = 'block';
             if (btnTracked) btnTracked.classList.add('bk-subtab-active');
+            if (sideSubTracked) sideSubTracked.classList.add('active');
             if (contextLabel) contextLabel.textContent = '📜 Permanent Tracked Breakout History (14D Horizon & Live Active Setups)';
             app.loadTrackedBreakouts();
         } else {
             // Default: 'scanner' (Active Setup Pool)
             if (scannerView) scannerView.style.display = 'block';
             if (btnScanner) btnScanner.classList.add('bk-subtab-active');
+            if (sideSubScanner) sideSubScanner.classList.add('active');
             if (contextLabel) contextLabel.textContent = '⚡ Active Breakout Radar & Coiling Pool Engine';
             app._breakoutAsofDate = null;
             app.loadBreakoutRadar();

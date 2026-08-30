@@ -153,6 +153,34 @@
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
         }
 
+        .sidebar-sub-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.35rem;
+            font-size: 0.72rem;
+            color: #71717a;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+            border: 1px solid transparent;
+        }
+
+        .sidebar-sub-item:hover {
+            color: #e4e4e7;
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar-sub-item.active {
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.12);
+            border-color: rgba(56, 189, 248, 0.25);
+            font-weight: 600;
+        }
+
         .sidebar-icon {
             font-size: 0.85rem;
             width: 18px;

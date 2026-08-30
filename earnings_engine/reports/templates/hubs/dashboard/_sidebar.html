@@ -74,11 +74,28 @@
                     <span class="sidebar-label">Gainers &amp; Breakouts</span>
                     <span id="sidebarGainersCountBadge" class="sidebar-pill" style="display:none;background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">0</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="breakout" onclick="app.switchTab('breakout')">
-                    <span class="sidebar-icon">⚡</span>
-                    <span class="sidebar-label">Breakout Radar</span>
-                    <span id="sidebarBreakoutCountBadge" class="sidebar-pill" style="display:none;background:rgba(245,158,11,0.22);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Active Breakout Setups & Candidates">0</span>
-                </a>
+                <!-- Breakout Radar with Nested Subtabs -->
+                <div class="sidebar-nav-tree" id="sidebarBreakoutTree">
+                    <a class="sidebar-nav-item" data-tab="breakout" onclick="app.switchTab('breakout')">
+                        <span class="sidebar-icon">⚡</span>
+                        <span class="sidebar-label">Breakout Radar</span>
+                        <span id="sidebarBreakoutCountBadge" class="sidebar-pill" style="display:none;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:700;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Active Breakout Setups & Candidates">0</span>
+                    </a>
+                    <div class="sidebar-sub-items" id="sidebarBreakoutSubItems" style="display:flex;flex-direction:column;gap:0.15rem;margin-left:1.4rem;padding-left:0.45rem;border-left:1px solid rgba(255,255,255,0.08);margin-top:0.15rem;margin-bottom:0.35rem;">
+                        <a class="sidebar-sub-item active" id="sidebarSubBreakoutScanner" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('scanner');">
+                            <span style="font-size:0.75rem;">⚡</span>
+                            <span>Active Setup Pool</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubBreakoutBacktest" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('backtest');">
+                            <span style="font-size:0.75rem;">📅</span>
+                            <span>Date Backtest</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubBreakoutTracked" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('tracked');">
+                            <span style="font-size:0.75rem;">📜</span>
+                            <span>Tracked History</span>
+                        </a>
+                    </div>
+                </div>
                 <a class="sidebar-nav-item" data-tab="institutional" onclick="app.switchTab('institutional')">
                     <span class="sidebar-icon">🏛️</span>
                     <span class="sidebar-label">Institutional Flows</span>
