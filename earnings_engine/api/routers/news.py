@@ -68,6 +68,25 @@ async def get_news_catalysts_endpoint(
         raise HTTPException(status_code=500, detail=f"Error fetching catalysts: {str(e)}")
 
 
+@router.get("/api/v1/news/catalyst/{catalyst_id}")
+async def get_single_news_catalyst_endpoint(catalyst_id: int):
+    """Retrieve complete verified catalyst record with raw OmniRouter AI telemetry."""
+    try:
+        from earnings_engine.data.db import _connect
+        import sqlite3
+        with _connect(_settings) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM news_catalysts WHERE id = ?", (catalyst_id,)).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Catalyst record not found")
+            return {"success": True, "catalyst": dict(row)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error fetching single catalyst %s: %s", catalyst_id, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching catalyst: {str(e)}")
+
+
 @router.get("/api/v1/news/catalyst-stats")
 async def get_news_catalyst_stats(
     watchlist_or_universe: str | None = Query(None),

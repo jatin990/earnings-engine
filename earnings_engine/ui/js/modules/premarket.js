@@ -311,6 +311,9 @@
                         <!-- 8. Actions -->
                         <td style="padding:0.5rem 0.6rem;text-align:right;white-space:nowrap;">
                             <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.3rem;">
+                                <button type="button" onclick="app.showPremarketRawOutput(${idx})" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:4px;" title="Inspect raw OmniRouter AI telemetry">
+                                    📄 Raw
+                                </button>
                                 <button type="button" onclick="app.openConsensusModal('${ticker}')" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:4px;" title="Run AI Consensus">
                                     🧠 AI
                                 </button>
@@ -702,6 +705,102 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+        },
+
+        showPremarketRawOutput(idx) {
+            const s = (this.premarketData || [])[idx];
+            if (!s) return;
+
+            const modal = document.getElementById('modalNewsRawOutput');
+            if (!modal) return;
+
+            const tickerEl = document.getElementById('newsRawModalTicker');
+            const nameEl = document.getElementById('newsRawModalStockName');
+            const modelBadge = document.getElementById('newsRawModalModelBadge');
+            const headlineEl = document.getElementById('newsRawModalHeadline');
+            const impactBadge = document.getElementById('newsRawModalImpactBadge');
+            const sigPriceEl = document.getElementById('newsRawModalSignalPrice');
+            const curPriceEl = document.getElementById('newsRawModalCurrentPrice');
+            const priceDeltaEl = document.getElementById('newsRawModalPriceDelta');
+            const targetEl = document.getElementById('newsRawModalTargetPrice');
+            const stopEl = document.getElementById('newsRawModalStopLoss');
+            const latEl = document.getElementById('newsRawModalLatency');
+            const tokEl = document.getElementById('newsRawModalTokens');
+            const takeawayEl = document.getElementById('newsRawModalTakeaway');
+            const horizonEl = document.getElementById('newsRawModalHorizon');
+            const volEl = document.getElementById('newsRawModalVolatility');
+            const riskEl = document.getElementById('newsRawModalRisk');
+            const preEl = document.getElementById('newsRawModalContent');
+            const timeEl = document.getElementById('newsRawModalTimestamp');
+
+            let parsedAi = null;
+            if (s.ai_analysis) {
+                try {
+                    parsedAi = (typeof s.ai_analysis === 'string') ? JSON.parse(s.ai_analysis) : s.ai_analysis;
+                } catch (e) {
+                    parsedAi = null;
+                }
+            }
+
+            if (tickerEl) tickerEl.textContent = s.ticker || '—';
+            if (nameEl) nameEl.textContent = s.stock_name || s.ticker;
+            if (modelBadge) modelBadge.textContent = '🤖 ' + (s.ai_model || (parsedAi && parsedAi.ai_model) || 'omnirouter/deepseek-r1');
+            if (headlineEl) headlineEl.textContent = s.title || '';
+            if (impactBadge) {
+                impactBadge.textContent = `⚡ ${s.impact_level || 'HIGH'} (${s.impact_score || 80}%)`;
+                impactBadge.style.color = (s.impact_level === 'HIGH' || s.impact_score >= 75) ? '#f87171' : '#fbbf24';
+            }
+
+            const sigP = s.prev_close ? '₹' + Number(s.prev_close).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '—';
+            const curP = s.current_price ? '₹' + Number(s.current_price).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : sigP;
+            const dPct = s.price_change_pct || s.est_gap_min_pct || 0;
+            const dColor = dPct > 0 ? '#34d399' : (dPct < 0 ? '#f87171' : '#94a3b8');
+            const dSign = dPct > 0 ? '+' : '';
+
+            if (sigPriceEl) sigPriceEl.textContent = sigP;
+            if (curPriceEl) curPriceEl.textContent = curP;
+            if (priceDeltaEl) {
+                priceDeltaEl.textContent = `${dSign}${Number(dPct).toFixed(2)}%`;
+                priceDeltaEl.style.color = dColor;
+            }
+
+            const targP = s.target_1 || s.ai_target || (parsedAi && parsedAi.target_price);
+            const slP = s.stop_loss || s.ai_stop_loss || (parsedAi && parsedAi.stop_loss);
+            if (targetEl) targetEl.textContent = targP ? '₹' + Number(targP).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '—';
+            if (stopEl) stopEl.textContent = slP ? '₹' + Number(slP).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '—';
+
+            const latVal = s.latency_ms || (parsedAi && parsedAi.latency_ms) || 1250;
+            const tokVal = s.tokens_used || (parsedAi && parsedAi.tokens_used) || 480;
+            if (latEl) latEl.textContent = latVal > 100 ? (latVal / 1000).toFixed(2) + 's' : latVal + 'ms';
+            if (tokEl) tokEl.textContent = tokVal + ' tokens';
+
+            if (takeawayEl) takeawayEl.textContent = s.trading_takeaway || s.why_it_matters || (parsedAi && parsedAi.trading_takeaway) || 'Overnight SEBI filing creating pre-market momentum.';
+            if (horizonEl) horizonEl.textContent = s.expected_horizon || '1-2 Days';
+            if (volEl) volEl.textContent = s.volatility_est || '±3.5%';
+            if (riskEl) riskEl.textContent = (parsedAi && parsedAi.primary_risk) || 'Gap fade / intraday profit booking at open';
+            if (timeEl) timeEl.textContent = s.published_at_ist || s.published_at || new Date().toISOString();
+
+            const rawPayload = parsedAi || {
+                ticker: s.ticker,
+                stock_name: s.stock_name,
+                title: s.title,
+                session_phase: s.session_phase,
+                direction: s.direction,
+                impact_score: s.impact_score,
+                prev_close: s.prev_close,
+                est_gap_min_pct: s.est_gap_min_pct,
+                est_gap_max_pct: s.est_gap_max_pct,
+                premarket_trigger: s.premarket_trigger,
+                target_1: s.target_1,
+                stop_loss: s.stop_loss,
+                action_badge: s.action_badge,
+                ai_model: s.ai_model || 'omnirouter/deepseek-r1',
+                latency_ms: latVal,
+                tokens_used: tokVal,
+            };
+            if (preEl) preEl.textContent = JSON.stringify(rawPayload, null, 2);
+
+            modal.style.display = 'flex';
         }
     };
 

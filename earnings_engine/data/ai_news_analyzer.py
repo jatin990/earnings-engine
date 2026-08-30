@@ -158,6 +158,18 @@ def _heuristic_fallback_analysis(item: dict[str, Any]) -> dict[str, Any]:
         "primary_risk": "Broader market volatility or immediate profit booking at open.",
         "ai_model": "heuristic-engine-v1",
         "ai_analyzed_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "latency_ms": 0.4,
+        "tokens_used": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "raw_response": json.dumps({
+            "direction": direction,
+            "impact_score": impact_score,
+            "impact_level": impact_level,
+            "target_price": target_price,
+            "stop_loss": stop_loss,
+            "engine": "heuristic-engine-v1"
+        }, indent=2),
     }
 
 
@@ -192,6 +204,7 @@ def analyze_news_catalyst_ai(
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
 
+            t0 = time.perf_counter()
             resp = requests.post(
                 endpoint,
                 headers=headers,
@@ -206,12 +219,15 @@ def analyze_news_catalyst_ai(
                 },
                 timeout=timeout,
             )
+            latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
             if resp.status_code == 200:
                 data = resp.json()
                 choice = (data.get("choices") or [{}])[0]
                 msg = choice.get("message") or {}
                 raw_content = (msg.get("content") or msg.get("reasoning") or "").strip()
+                usage = data.get("usage") or {}
+                total_toks = usage.get("total_tokens") or (usage.get("prompt_tokens", 0) + usage.get("completion_tokens", 0))
 
                 # Clean markdown wrapper if model returns ```json ... ```
                 clean_json = re.sub(r"^```(?:json)?", "", raw_content, flags=re.MULTILINE).strip()
@@ -221,8 +237,14 @@ def analyze_news_catalyst_ai(
                     parsed = json.loads(clean_json)
                     parsed["ai_model"] = f"omnirouter/{model_name}"
                     parsed["ai_analyzed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-                    logger.info("[OMNIROUTER] Successfully analyzed %s with %s (direction=%s, impact=%s)",
-                                item.get("ticker"), model_name, parsed.get("direction"), parsed.get("impact_score"))
+                    parsed["latency_ms"] = latency_ms
+                    parsed["tokens_used"] = total_toks
+                    parsed["prompt_tokens"] = usage.get("prompt_tokens")
+                    parsed["completion_tokens"] = usage.get("completion_tokens")
+                    parsed["raw_response"] = raw_content or clean_json
+                    parsed["prompt_used"] = prompt
+                    logger.info("[OMNIROUTER] Successfully analyzed %s with %s in %sms (direction=%s, impact=%s)",
+                                item.get("ticker"), model_name, latency_ms, parsed.get("direction"), parsed.get("impact_score"))
                     return parsed
                 except json.JSONDecodeError:
                     m = re.search(r"\{.*\}", clean_json, re.DOTALL)
@@ -231,6 +253,12 @@ def analyze_news_catalyst_ai(
                             parsed = json.loads(m.group(0))
                             parsed["ai_model"] = f"omnirouter/{model_name}"
                             parsed["ai_analyzed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                            parsed["latency_ms"] = latency_ms
+                            parsed["tokens_used"] = total_toks
+                            parsed["prompt_tokens"] = usage.get("prompt_tokens")
+                            parsed["completion_tokens"] = usage.get("completion_tokens")
+                            parsed["raw_response"] = raw_content or clean_json
+                            parsed["prompt_used"] = prompt
                             return parsed
                         except Exception:
                             pass

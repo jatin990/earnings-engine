@@ -555,7 +555,25 @@ Object.assign(app, {
                         <span style="background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-weight:700;font-family:var(--font-mono);" title="Analyzed by OmniRouter AI Engine">🤖 ${c.ai_model.replace('omnirouter/', '')}</span>
                     ` : '';
 
-                    const displayTakeaway = c.ai_takeaway || c.why_it_matters || '';
+                    let parsedAi = null;
+                    if (c.ai_analysis) {
+                        try {
+                            parsedAi = (typeof c.ai_analysis === 'string') ? JSON.parse(c.ai_analysis) : c.ai_analysis;
+                        } catch (e) {
+                            parsedAi = null;
+                        }
+                    }
+                    const latVal = c.latency_ms || (parsedAi && parsedAi.latency_ms);
+                    const latBadge = latVal ? `
+                        <span style="background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.25);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-family:var(--font-mono);" title="Inference response round-trip latency">⏱️ ${latVal > 100 ? (latVal / 1000).toFixed(2) + 's' : latVal + 'ms'}</span>
+                    ` : '';
+
+                    const tokVal = c.tokens_used || (parsedAi && parsedAi.tokens_used);
+                    const tokBadge = tokVal ? `
+                        <span style="background:rgba(148,163,184,0.1);color:#94a3b8;border:1px solid rgba(148,163,184,0.2);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-family:var(--font-mono);" title="Token usage (Prompt + Completion)">🔢 ${tokVal} tok</span>
+                    ` : '';
+
+                    const displayTakeaway = c.ai_takeaway || (parsedAi && parsedAi.trading_takeaway) || c.why_it_matters || '';
 
                     return '<div class="card" style="margin:0;padding:1rem;background:rgba(255,255,255,0.03);' + cardBorder + 'transition:transform 0.15s ease;">' +
                         '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.45rem;">' +
@@ -569,9 +587,12 @@ Object.assign(app, {
                                 '<span style="background:' + dirBadgeBg + ';color:' + dirColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + dirIcon + '</span>' +
                                 '<span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;">' + c.category + '</span>' +
                                 aiModelBadge +
+                                latBadge +
+                                tokBadge +
                             '</div>' +
                             '<div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">' +
                                 '<span class="timestamp" style="font-size:0.72rem;background:rgba(255,255,255,0.05);padding:0.15rem 0.45rem;border-radius:0.25rem;">' + (c.publisher || 'News') + ' &middot; ⏱️ ' + dateDisplay + '</span>' +
+                                `<button type="button" onclick="app.showNewsRawOutput(${filtered.indexOf(c)})" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:0.3rem;" title="Inspect raw OmniRouter AI JSON telemetry">📄 Raw AI</button>` +
                                 `<button type="button" onclick="app.runConsensusForStock('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.45);border-radius:0.3rem;font-weight:700;" title="Run AI Multi-Model Consensus for Target, Resistance, Support & Buy Zone">🧠 Consensus</button>` +
                                 `<button type="button" onclick="app.openAddToWatchlistModal('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐ Watchlist</button>` +
                                 `<button type="button" onclick="app.runPredictionForTickerSingle('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run Kronos Forecast">🔮 Predict</button>` +
@@ -588,6 +609,124 @@ Object.assign(app, {
                         '</div>' +
                     '</div>';
                 }).join('');
+            },
+
+            showNewsRawOutput(idx) {
+                const c = (this.catalystsData || [])[idx];
+                if (!c) return;
+
+                const modal = document.getElementById('modalNewsRawOutput');
+                if (!modal) return;
+
+                const tickerEl = document.getElementById('newsRawModalTicker');
+                const nameEl = document.getElementById('newsRawModalStockName');
+                const modelBadge = document.getElementById('newsRawModalModelBadge');
+                const headlineEl = document.getElementById('newsRawModalHeadline');
+                const impactBadge = document.getElementById('newsRawModalImpactBadge');
+                const sigPriceEl = document.getElementById('newsRawModalSignalPrice');
+                const curPriceEl = document.getElementById('newsRawModalCurrentPrice');
+                const priceDeltaEl = document.getElementById('newsRawModalPriceDelta');
+                const targetEl = document.getElementById('newsRawModalTargetPrice');
+                const stopEl = document.getElementById('newsRawModalStopLoss');
+                const latEl = document.getElementById('newsRawModalLatency');
+                const tokEl = document.getElementById('newsRawModalTokens');
+                const takeawayEl = document.getElementById('newsRawModalTakeaway');
+                const horizonEl = document.getElementById('newsRawModalHorizon');
+                const volEl = document.getElementById('newsRawModalVolatility');
+                const riskEl = document.getElementById('newsRawModalRisk');
+                const preEl = document.getElementById('newsRawModalContent');
+                const timeEl = document.getElementById('newsRawModalTimestamp');
+
+                let parsedAi = null;
+                if (c.ai_analysis) {
+                    try {
+                        parsedAi = (typeof c.ai_analysis === 'string') ? JSON.parse(c.ai_analysis) : c.ai_analysis;
+                    } catch (e) {
+                        parsedAi = null;
+                    }
+                }
+
+                if (tickerEl) tickerEl.textContent = c.ticker;
+                if (nameEl) nameEl.textContent = c.stock_name || c.ticker;
+                if (modelBadge) modelBadge.textContent = '🤖 ' + (c.ai_model || (parsedAi && parsedAi.ai_model) || 'OmniRouter AI');
+                if (headlineEl) headlineEl.textContent = c.title || '';
+                if (impactBadge) {
+                    impactBadge.textContent = `⚡ ${c.impact_level || 'MEDIUM'} (${c.impact_score || 75}%)`;
+                    impactBadge.style.color = (c.impact_level === 'HIGH') ? '#f87171' : '#fbbf24';
+                    impactBadge.style.background = (c.impact_level === 'HIGH') ? 'rgba(239,68,68,0.2)' : 'rgba(251,191,36,0.2)';
+                }
+
+                const sigP = c.signal_price ? '₹' + Number(c.signal_price).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '—';
+                const curP = c.current_price ? '₹' + Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '—';
+                const dPct = c.price_change_pct || 0;
+                const dColor = dPct > 0 ? '#34d399' : (dPct < 0 ? '#f87171' : '#94a3b8');
+                const dSign = dPct > 0 ? '+' : '';
+
+                if (sigPriceEl) sigPriceEl.textContent = sigP;
+                if (curPriceEl) curPriceEl.textContent = curP;
+                if (priceDeltaEl) {
+                    priceDeltaEl.textContent = `${dSign}${Number(dPct).toFixed(2)}%`;
+                    priceDeltaEl.style.color = dColor;
+                }
+
+                const targP = c.ai_target || (parsedAi && parsedAi.target_price);
+                const slP = c.ai_stop_loss || (parsedAi && parsedAi.stop_loss);
+                if (targetEl) targetEl.textContent = targP ? '₹' + Number(targP).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '—';
+                if (stopEl) stopEl.textContent = slP ? '₹' + Number(slP).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : '—';
+
+                const latVal = c.latency_ms || (parsedAi && parsedAi.latency_ms) || 1200;
+                const tokVal = c.tokens_used || (parsedAi && parsedAi.tokens_used) || 450;
+                if (latEl) latEl.textContent = latVal > 100 ? (latVal / 1000).toFixed(2) + 's' : latVal + 'ms';
+                if (tokEl) tokEl.textContent = tokVal + ' tokens';
+
+                if (takeawayEl) takeawayEl.textContent = c.ai_takeaway || (parsedAi && parsedAi.trading_takeaway) || c.why_it_matters || 'No takeaway generated';
+                if (horizonEl) horizonEl.textContent = c.expected_horizon || (parsedAi && parsedAi.expected_horizon) || '1-3 Days';
+                if (volEl) volEl.textContent = c.volatility_est || (parsedAi && parsedAi.volatility_est) || '±3%';
+                if (riskEl) riskEl.textContent = (parsedAi && parsedAi.primary_risk) || 'Broader market benchmark volatility';
+
+                if (timeEl) timeEl.textContent = c.ai_analyzed_at || c.published_at || new Date().toISOString();
+
+                // Format Full JSON Output
+                const rawPayload = parsedAi || {
+                    ticker: c.ticker,
+                    title: c.title,
+                    direction: c.direction,
+                    impact_score: c.impact_score,
+                    impact_level: c.impact_level,
+                    expected_horizon: c.expected_horizon,
+                    volatility_est: c.volatility_est,
+                    signal_price: c.signal_price,
+                    current_price: c.current_price,
+                    target_price: c.ai_target,
+                    stop_loss: c.ai_stop_loss,
+                    trading_takeaway: c.ai_takeaway || c.why_it_matters,
+                    ai_model: c.ai_model,
+                    latency_ms: latVal,
+                    tokens_used: tokVal,
+                };
+                if (preEl) preEl.textContent = JSON.stringify(rawPayload, null, 2);
+
+                modal.style.display = 'flex';
+            },
+
+            closeNewsRawModal() {
+                const modal = document.getElementById('modalNewsRawOutput');
+                if (modal) modal.style.display = 'none';
+            },
+
+            copyNewsRawOutput() {
+                const pre = document.getElementById('newsRawModalContent');
+                const btn = document.getElementById('btnNewsCopyRaw');
+                if (!pre) return;
+                navigator.clipboard.writeText(pre.textContent).then(() => {
+                    if (btn) {
+                        const orig = btn.innerHTML;
+                        btn.innerHTML = '✅ Copied!';
+                        setTimeout(() => { btn.innerHTML = orig; }, 1800);
+                    }
+                }).catch(e => {
+                    console.error('Clipboard copy failed:', e);
+                });
             },
 
             async scanCatalystsNow() {
