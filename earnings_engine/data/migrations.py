@@ -1150,6 +1150,22 @@ def _migration_022_institutional_amount_metrics(conn: sqlite3.Connection | Turso
             pass
 
 
+def _migration_023_news_structured_extraction(conn: sqlite3.Connection | TursoConnection) -> None:
+    """Add structured extraction fields (projections, sentiment, temporal originality) to news_catalysts."""
+    cols = [
+        ("financial_projections", "TEXT DEFAULT '{}'"),
+        ("sentiment", "TEXT DEFAULT 'NEUTRAL'"),
+        ("temporal_originality", "TEXT DEFAULT 'NEW_PUBLICATION'"),
+        ("is_republication", "INTEGER DEFAULT 0"),
+        ("originality_rationale", "TEXT DEFAULT ''"),
+    ]
+    for c_name, c_type in cols:
+        try:
+            conn.execute(f"ALTER TABLE news_catalysts ADD COLUMN {c_name} {c_type}")
+        except Exception:
+            pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1174,6 +1190,7 @@ MIGRATIONS: list[Migration] = [
     Migration(20, "020_breakout_strategy_tracking", _migration_020_breakout_strategy_tracking),
     Migration(21, "021_sidebar_badge_counters", _migration_021_sidebar_badge_counters),
     Migration(22, "022_institutional_amount_metrics", _migration_022_institutional_amount_metrics),
+    Migration(23, "023_news_structured_extraction", _migration_023_news_structured_extraction),
 ]
 
 

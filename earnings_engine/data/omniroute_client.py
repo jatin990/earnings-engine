@@ -43,18 +43,32 @@ DEFAULT_OMNIROUTER_MODELS = DEFAULT_OMNIROUTE_MODELS
 
 OMNIROUTE_SYSTEM_PROMPT = """You are an institutional trading analyst and financial quantitative engine.
 Analyze the provided corporate news headline and context for an Indian or global equity.
-Evaluate the market sentiment, short-term volatility impact, price trajectory, and key catalyst drivers.
+Perform structured information extraction identifying the primary instrument, financial projections, sentiment polarity, and temporal originality.
 
 Return your response strictly as a JSON object with the following schema:
 {
+  "ticker": "<primary financial instrument's ticker symbol, e.g. 'TCS.NS', 'RELIANCE.NS'>",
+  "sentiment": "BULLISH" | "BEARISH" | "NEUTRAL",
   "direction": "BULLISH" | "BEARISH" | "NEUTRAL",
+  "target_price": <float or null, projected short-term price target based on signal_price>,
+  "stop_loss": <float or null, defensive technical invalidation price based on signal_price>,
+  "financial_projections": {
+    "target_price": <float or null>,
+    "stop_loss": <float or null>,
+    "order_value_cr": <float or null, explicit order/contract value in Crore>,
+    "revenue_projection_cr": <float or null, projected revenue in Crore>,
+    "ebitda_margin_pct": <float or null, projected margin %>,
+    "growth_rate_pct": <float or null, projected growth rate %>,
+    "raw_projections": ["<extracted forward projection or numeric quote>"]
+  },
+  "temporal_originality": "NEW_PUBLICATION" | "BREAKING" | "DEVELOPING" | "REPUBLICATION",
+  "is_republication": <boolean, true if article is a re-hash/republication of older news, false if fresh/new>,
+  "originality_rationale": "<1 sentence explaining why this is a new publication or republication>",
   "impact_score": <integer from 25 to 99 representing catalyst magnitude>,
   "impact_level": "HIGH" | "MEDIUM" | "LOW",
   "expected_horizon": "📅 1-3 Days" | "📅 1-2 Weeks" | "📅 Positional",
   "volatility_est": "±1% to ±3%" | "±2% to ±6%" | "±5% to ±12%",
   "trading_takeaway": "<1-2 sentences concise institutional trade rationale / setup explanation>",
-  "target_price": <float or null, projected short-term price target based on signal_price>,
-  "stop_loss": <float or null, defensive technical invalidation price based on signal_price>,
   "confidence_pct": <integer 0-100>,
   "key_catalyst_triggers": ["<short trigger 1>", "<short trigger 2>"],
   "primary_risk": "<single biggest risk to this thesis>"
@@ -64,6 +78,7 @@ Directives:
 - Respond with ONLY the raw JSON object. No markdown code blocks, no backticks, no commentary.
 - target_price must be above signal_price for BULLISH, below signal_price for BEARISH.
 - If signal_price is provided, calculate realistic price targets (typically 2% to 8% move).
+- Explicitly assess temporal originality: detect if content is fresh primary news or a republication of past events.
 - Focus on material revenue accretion, margin expansion/contraction, and institutional order book impact."""
 
 
@@ -309,6 +324,32 @@ class OmniRouteClient:
 
                     try:
                         parsed = json.loads(clean_json)
+                        ticker_extracted = (parsed.get("ticker") or item.get("ticker") or "UNKNOWN").strip().upper()
+                        parsed["ticker"] = ticker_extracted
+                        sentiment_val = (parsed.get("sentiment") or parsed.get("direction") or "NEUTRAL").strip().upper()
+                        parsed["sentiment"] = sentiment_val if sentiment_val in ("BULLISH", "BEARISH", "NEUTRAL") else "NEUTRAL"
+                        parsed["direction"] = parsed["sentiment"]
+
+                        # Financial projections structured object
+                        raw_proj = parsed.get("financial_projections") or {}
+                        if not isinstance(raw_proj, dict):
+                            raw_proj = {}
+                        if parsed.get("target_price") and not raw_proj.get("target_price"):
+                            raw_proj["target_price"] = parsed.get("target_price")
+                        if parsed.get("stop_loss") and not raw_proj.get("stop_loss"):
+                            raw_proj["stop_loss"] = parsed.get("stop_loss")
+                        parsed["financial_projections"] = raw_proj
+
+                        # Temporal originality assessment
+                        temp_orig = (parsed.get("temporal_originality") or "NEW_PUBLICATION").strip().upper()
+                        if temp_orig not in ("NEW_PUBLICATION", "BREAKING", "DEVELOPING", "REPUBLICATION"):
+                            temp_orig = "REPUBLICATION" if parsed.get("is_republication") else "NEW_PUBLICATION"
+                        parsed["temporal_originality"] = temp_orig
+                        parsed["is_republication"] = bool(parsed.get("is_republication", temp_orig == "REPUBLICATION"))
+                        parsed["originality_rationale"] = str(parsed.get("originality_rationale") or (
+                            "Repetitive or historical recap of past event." if parsed["is_republication"] else "Novel primary news disclosure."
+                        ))
+
                         parsed["ai_model"] = f"omniroute/{model_name}"
                         parsed["ai_analyzed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
                         parsed["latency_ms"] = latency_ms
@@ -324,12 +365,16 @@ class OmniRouteClient:
                         if sig_p and sig_p > 0:
                             if parsed.get("direction") == "BULLISH" and (not parsed.get("target_price") or parsed.get("target_price") <= sig_p):
                                 parsed["target_price"] = round(sig_p * 1.045, 2)
+                                raw_proj["target_price"] = parsed["target_price"]
                             if parsed.get("direction") == "BULLISH" and (not parsed.get("stop_loss") or parsed.get("stop_loss") >= sig_p):
                                 parsed["stop_loss"] = round(sig_p * 0.98, 2)
+                                raw_proj["stop_loss"] = parsed["stop_loss"]
                             if parsed.get("direction") == "BEARISH" and (not parsed.get("target_price") or parsed.get("target_price") >= sig_p):
                                 parsed["target_price"] = round(sig_p * 0.955, 2)
+                                raw_proj["target_price"] = parsed["target_price"]
                             if parsed.get("direction") == "BEARISH" and (not parsed.get("stop_loss") or parsed.get("stop_loss") <= sig_p):
                                 parsed["stop_loss"] = round(sig_p * 1.02, 2)
+                                raw_proj["stop_loss"] = parsed["stop_loss"]
 
                         logger.info("[OMNIROUTE] Completed %s analysis via %s in %.1fms (%d tokens)", item.get("ticker"), model_name, latency_ms, total_toks)
                         return parsed
@@ -350,10 +395,12 @@ class OmniRouteClient:
         """Fast deterministic rule-based analysis used when OmniRoute is offline."""
         title = item.get("title", "")
         summary = item.get("summary", "")
+        ticker = (item.get("ticker") or "UNKNOWN").strip().upper()
         sig_p = item.get("signal_price") or item.get("current_price") or 100.0
 
         scored = score_catalyst_headline(title, summary)
         direction = scored.get("direction", "NEUTRAL")
+        sentiment = direction
         impact_score = scored.get("impact_score", 50)
         impact_level = scored.get("impact_level", "MEDIUM")
         horizon = scored.get("expected_horizon", "📅 1-3 Days")
@@ -370,7 +417,76 @@ class OmniRouteClient:
                 target_price = round(sig_p * 0.955, 2)
                 stop_loss = round(sig_p * 1.02, 2)
 
+        # Extract explicit financial projections from text and verified numbers
+        order_val: float | None = None
+        rev_proj: float | None = None
+        margin_pct: float | None = None
+        growth_pct: float | None = None
+        raw_projections: list[str] = []
+
+        combined_text = f"{title} {summary}"
+        order_match = re.search(r"(?:₹|rs\.?|inr)?\s*(\d[\d,]*(?:\.\d+)?)\s*(?:cr|crore|cr\b)", combined_text, re.IGNORECASE)
+        if order_match:
+            try:
+                order_val = float(order_match.group(1).replace(",", ""))
+                raw_projections.append(f"Order/Value: ₹{order_val:,.1f} Cr")
+            except Exception:
+                pass
+
+        margin_match = re.search(
+            r"(?:ebitda|operating\s+margin|margin)\s*(?:expected\s*at|at|of|is)?\s*(\d[\d,]*(?:\.\d+)?)\s*%",
+            combined_text,
+            re.IGNORECASE,
+        ) or re.search(
+            r"(\d[\d,]*(?:\.\d+)?)\s*%\s*(?:ebitda|margin|operating\s+margin)",
+            combined_text,
+            re.IGNORECASE,
+        )
+        if margin_match:
+            try:
+                margin_pct = float(margin_match.group(1).replace(",", ""))
+                raw_projections.append(f"Margin Target: {margin_pct:.1f}%")
+            except Exception:
+                pass
+
+        growth_match = re.search(r"(?:grows?|surges?|up|jumps?|surge\s+by)\s*(?:by\s*)?(\d[\d,]*(?:\.\d+)?)\s*%", combined_text, re.IGNORECASE)
+        if growth_match:
+            try:
+                growth_pct = float(growth_match.group(1).replace(",", ""))
+                raw_projections.append(f"Growth Projection: +{growth_pct:.1f}%")
+            except Exception:
+                pass
+
+        # Temporal Originality Rule Assessment
+        repub_patterns = [
+            r"\breiterates\b", r"\brepeats\b", r"\bflashback\b", r"\bearlier reported\b",
+            r"\bas reported earlier\b", r"\bin 2024\b", r"\bin 2023\b", r"\bmonths ago\b",
+            r"\bhistorical recap\b", r"\bthrowback\b"
+        ]
+        is_repub = any(re.search(p, combined_text, re.IGNORECASE) for p in repub_patterns)
+        if is_repub:
+            temporal_orig = "REPUBLICATION"
+            orig_rationale = "Text explicitly references historical disclosures or previously reported events."
+        elif impact_score >= 80:
+            temporal_orig = "BREAKING"
+            orig_rationale = "High-urgency primary disclosure with immediate price discovery impact."
+        else:
+            temporal_orig = "NEW_PUBLICATION"
+            orig_rationale = "Fresh primary market announcement breaking new corporate developments."
+
+        financial_projections = {
+            "target_price": target_price,
+            "stop_loss": stop_loss,
+            "order_value_cr": order_val,
+            "revenue_projection_cr": rev_proj,
+            "ebitda_margin_pct": margin_pct,
+            "growth_rate_pct": growth_pct,
+            "raw_projections": raw_projections,
+        }
+
         return {
+            "ticker": ticker,
+            "sentiment": sentiment,
             "direction": direction,
             "impact_score": impact_score,
             "impact_level": impact_level,
@@ -379,6 +495,10 @@ class OmniRouteClient:
             "trading_takeaway": why_it_matters or f"Calculated {direction} catalyst trigger ({volatility}) over {horizon}.",
             "target_price": target_price,
             "stop_loss": stop_loss,
+            "financial_projections": financial_projections,
+            "temporal_originality": temporal_orig,
+            "is_republication": is_repub,
+            "originality_rationale": orig_rationale,
             "confidence_pct": min(95, max(60, impact_score + 10)),
             "key_catalyst_triggers": [scored.get("category", "General Corporate News")],
             "primary_risk": "Broader market volatility or immediate profit booking at open.",
@@ -390,11 +510,17 @@ class OmniRouteClient:
             "completion_tokens": 0,
             "gateway": "diegosouzapw/OmniRoute (Heuristic Fallback)",
             "raw_response": json.dumps({
+                "ticker": ticker,
+                "sentiment": sentiment,
                 "direction": direction,
                 "impact_score": impact_score,
                 "impact_level": impact_level,
                 "target_price": target_price,
                 "stop_loss": stop_loss,
+                "financial_projections": financial_projections,
+                "temporal_originality": temporal_orig,
+                "is_republication": is_repub,
+                "originality_rationale": orig_rationale,
                 "gateway": "diegosouzapw/OmniRoute"
             }, indent=2),
         }

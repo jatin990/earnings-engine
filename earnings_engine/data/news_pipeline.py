@@ -45,6 +45,11 @@ def ensure_news_verification_schema(settings: Settings | None = None) -> None:
             ("ai_stop_loss", "REAL"),
             ("ai_model", "TEXT"),
             ("ai_analyzed_at", "TEXT"),
+            ("financial_projections", "TEXT DEFAULT '{}'"),
+            ("sentiment", "TEXT DEFAULT 'NEUTRAL'"),
+            ("temporal_originality", "TEXT DEFAULT 'NEW_PUBLICATION'"),
+            ("is_republication", "INTEGER DEFAULT 0"),
+            ("originality_rationale", "TEXT DEFAULT ''"),
         ]
 
         for col_name, col_type in new_columns:
@@ -185,9 +190,14 @@ def process_and_verify_news_items(
         ai_res = analyze_news_catalyst_ai(ai_ctx, settings=settings)
 
         ai_direction = ai_res.get("direction") or v_res["verified_direction"]
+        ai_sentiment = ai_res.get("sentiment") or ai_direction
         ai_takeaway = ai_res.get("trading_takeaway") or scored["why_it_matters"]
         ai_target = ai_res.get("target_price")
         ai_stop = ai_res.get("stop_loss")
+        ai_proj = ai_res.get("financial_projections") or {}
+        ai_temp_orig = ai_res.get("temporal_originality") or "NEW_PUBLICATION"
+        ai_is_repub = 1 if ai_res.get("is_republication") else 0
+        ai_orig_rat = ai_res.get("originality_rationale") or ""
         ai_model = ai_res.get("ai_model", "free-ai-engine")
         ai_analyzed_at = ai_res.get("ai_analyzed_at", now_str)
 
@@ -209,6 +219,7 @@ def process_and_verify_news_items(
             "impact_level": scored["impact_level"],
             "category": scored["category"],
             "direction": ai_direction,
+            "sentiment": ai_sentiment,
             "expected_horizon": ai_res.get("expected_horizon") or scored["expected_horizon"],
             "volatility_est": ai_res.get("volatility_est") or scored["volatility_est"],
             "why_it_matters": ai_takeaway,
@@ -228,6 +239,10 @@ def process_and_verify_news_items(
             "ai_direction": ai_direction,
             "ai_target": ai_target,
             "ai_stop_loss": ai_stop,
+            "financial_projections": json.dumps(ai_proj) if isinstance(ai_proj, dict) else str(ai_proj),
+            "temporal_originality": ai_temp_orig,
+            "is_republication": ai_is_repub,
+            "originality_rationale": ai_orig_rat,
             "ai_model": ai_model,
             "ai_analyzed_at": ai_analyzed_at,
         }
@@ -260,8 +275,9 @@ def save_verified_news_records(
                         verification_status, verification_flags, verified_numbers,
                         entity_confidence, canonical_hash, signal_price, signal_date,
                         current_price, price_change_pct, ai_analysis, ai_takeaway,
-                        ai_direction, ai_target, ai_stop_loss, ai_model, ai_analyzed_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ai_direction, ai_target, ai_stop_loss, ai_model, ai_analyzed_at,
+                        financial_projections, sentiment, temporal_originality, is_republication, originality_rationale
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(ticker, title) DO UPDATE SET
                         stock_name = excluded.stock_name,
                         publisher = excluded.publisher,
@@ -290,7 +306,12 @@ def save_verified_news_records(
                         ai_target = COALESCE(excluded.ai_target, news_catalysts.ai_target),
                         ai_stop_loss = COALESCE(excluded.ai_stop_loss, news_catalysts.ai_stop_loss),
                         ai_model = COALESCE(excluded.ai_model, news_catalysts.ai_model),
-                        ai_analyzed_at = COALESCE(excluded.ai_analyzed_at, news_catalysts.ai_analyzed_at)
+                        ai_analyzed_at = COALESCE(excluded.ai_analyzed_at, news_catalysts.ai_analyzed_at),
+                        financial_projections = COALESCE(excluded.financial_projections, news_catalysts.financial_projections),
+                        sentiment = COALESCE(excluded.sentiment, news_catalysts.sentiment),
+                        temporal_originality = COALESCE(excluded.temporal_originality, news_catalysts.temporal_originality),
+                        is_republication = COALESCE(excluded.is_republication, news_catalysts.is_republication),
+                        originality_rationale = COALESCE(excluded.originality_rationale, news_catalysts.originality_rationale)
                     """,
                     (
                         r["ticker"], r["stock_name"], r["title"], r["publisher"],
@@ -306,6 +327,11 @@ def save_verified_news_records(
                         r.get("ai_direction"), r.get("ai_target"),
                         r.get("ai_stop_loss"), r.get("ai_model"),
                         r.get("ai_analyzed_at"),
+                        r.get("financial_projections", "{}"),
+                        r.get("sentiment", "NEUTRAL"),
+                        r.get("temporal_originality", "NEW_PUBLICATION"),
+                        r.get("is_republication", 0),
+                        r.get("originality_rationale", ""),
                     ),
                 )
                 inserted_count += 1

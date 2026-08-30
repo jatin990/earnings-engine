@@ -71,3 +71,59 @@ def analyze_news_catalyst_ai(
     """Execute AI analysis of a news catalyst using diegosouzapw/OmniRoute with heuristic fallback."""
     client = get_omniroute_client(settings)
     return client.analyze_catalyst(item, preferred_model=preferred_model, timeout=timeout)
+
+
+def extract_structured_news_data(
+    item: dict[str, Any],
+    settings: Settings | None = None,
+    preferred_model: str | None = None,
+    timeout: int = 15,
+) -> Any:
+    """Execute structured information extraction returning a type-safe NewsExtractedData model instance."""
+    from earnings_engine.data.models import FinancialProjections, NewsExtractedData, SentimentPolarity, TemporalOriginality
+
+    raw = analyze_news_catalyst_ai(item, settings=settings, preferred_model=preferred_model, timeout=timeout)
+    proj_raw = raw.get("financial_projections") or {}
+    if not isinstance(proj_raw, dict):
+        proj_raw = {}
+
+    financial_projections = FinancialProjections.from_dict(proj_raw)
+    if raw.get("target_price") and not financial_projections.target_price:
+        financial_projections.target_price = raw.get("target_price")
+    if raw.get("stop_loss") and not financial_projections.stop_loss:
+        financial_projections.stop_loss = raw.get("stop_loss")
+
+    raw_sentiment = (raw.get("sentiment") or raw.get("direction") or "NEUTRAL").upper()
+    try:
+        sentiment = SentimentPolarity(raw_sentiment)
+    except Exception:
+        sentiment = SentimentPolarity.NEUTRAL
+
+    raw_orig = (raw.get("temporal_originality") or "NEW_PUBLICATION").upper()
+    try:
+        temporal_orig = TemporalOriginality(raw_orig)
+    except Exception:
+        temporal_orig = TemporalOriginality.REPUBLICATION if raw.get("is_republication") else TemporalOriginality.NEW_PUBLICATION
+
+    return NewsExtractedData(
+        ticker=(raw.get("ticker") or item.get("ticker") or "UNKNOWN").strip().upper(),
+        stock_name=item.get("stock_name"),
+        target_price=raw.get("target_price"),
+        stop_loss=raw.get("stop_loss"),
+        financial_projections=financial_projections,
+        sentiment=sentiment,
+        direction=sentiment.value,
+        temporal_originality=temporal_orig,
+        is_republication=bool(raw.get("is_republication", temporal_orig == TemporalOriginality.REPUBLICATION)),
+        originality_rationale=raw.get("originality_rationale", ""),
+        impact_score=int(raw.get("impact_score", 50)),
+        impact_level=raw.get("impact_level", "MEDIUM"),
+        expected_horizon=raw.get("expected_horizon", "📅 1-3 Days"),
+        volatility_est=raw.get("volatility_est", "±2% to ±5%"),
+        trading_takeaway=raw.get("trading_takeaway", ""),
+        confidence_pct=int(raw.get("confidence_pct", 75)),
+        key_catalyst_triggers=raw.get("key_catalyst_triggers") or [],
+        primary_risk=raw.get("primary_risk", ""),
+        ai_model=raw.get("ai_model", "omniroute/ai-news-agent"),
+        ai_analyzed_at=raw.get("ai_analyzed_at", ""),
+    )

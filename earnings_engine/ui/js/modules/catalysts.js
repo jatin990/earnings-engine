@@ -640,6 +640,35 @@ Object.assign(app, {
 
                     const displayTakeaway = c.ai_takeaway || (parsedAi && parsedAi.trading_takeaway) || c.why_it_matters || '';
 
+                    const isRePub = c.is_republication === 1 || c.is_republication === true || c.temporal_originality === 'REPUBLICATION';
+                    const origType = c.temporal_originality || (isRePub ? 'REPUBLICATION' : 'NEW_PUBLICATION');
+                    const origRationale = c.originality_rationale || (isRePub ? 'Repetitive or historical recap of past event.' : 'Novel primary news disclosure.');
+                    
+                    const origBadge = isRePub ? `
+                        <span style="background:rgba(245,158,11,0.18);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-weight:700;" title="${origRationale}">🔄 Republication</span>
+                    ` : (origType === 'BREAKING' ? `
+                        <span style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-weight:700;" title="${origRationale}">⚡ Fresh Breaking</span>
+                    ` : `
+                        <span style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-weight:600;" title="${origRationale}">📰 New Publication</span>
+                    `);
+
+                    let parsedProj = null;
+                    if (c.financial_projections) {
+                        try {
+                            parsedProj = (typeof c.financial_projections === 'string') ? JSON.parse(c.financial_projections) : c.financial_projections;
+                        } catch (e) {
+                            parsedProj = null;
+                        }
+                    }
+                    const projBadge = (parsedProj && (parsedProj.order_value_cr || parsedProj.revenue_projection_cr || parsedProj.ebitda_margin_pct || parsedProj.growth_rate_pct)) ? `
+                        <div style="display:inline-flex;align-items:center;gap:0.3rem;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);border-radius:5px;padding:0.12rem 0.45rem;font-size:0.70rem;color:#fcd34d;" title="Extracted Financial Projections">
+                            ${parsedProj.order_value_cr ? `<span>💼 Order: <strong>₹${parsedProj.order_value_cr} Cr</strong></span>` : ''}
+                            ${parsedProj.revenue_projection_cr ? `<span>📊 Rev: <strong>₹${parsedProj.revenue_projection_cr} Cr</strong></span>` : ''}
+                            ${parsedProj.ebitda_margin_pct ? `<span>📈 Margin: <strong>${parsedProj.ebitda_margin_pct}%</strong></span>` : ''}
+                            ${parsedProj.growth_rate_pct ? `<span>🚀 Growth: <strong>+${parsedProj.growth_rate_pct}%</strong></span>` : ''}
+                        </div>
+                    ` : '';
+
                     return '<div class="card" style="margin:0;padding:1rem;background:rgba(255,255,255,0.03);' + cardBorder + 'transition:transform 0.15s ease;">' +
                         '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.45rem;">' +
                             '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">' +
@@ -648,6 +677,8 @@ Object.assign(app, {
                                     : '<a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="font-size:1.05rem;font-weight:700;color:#60a5fa;text-decoration:none;">' + c.ticker + ' ↗</a>') +
                                 priceBadge +
                                 aiTargetBadge +
+                                projBadge +
+                                origBadge +
                                 '<span style="background:' + impactBadgeBg + ';color:' + impactBadgeColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + impactLabel + '</span>' +
                                 '<span style="background:' + dirBadgeBg + ';color:' + dirColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + dirIcon + '</span>' +
                                 '<span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;">' + c.category + '</span>' +
