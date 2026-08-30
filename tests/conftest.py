@@ -9,31 +9,36 @@ from earnings_engine.data.migrations import apply_migrations
 
 from pathlib import Path
 
-SHARED_TEST_DB = Path("data/cache/prices/test_shared.sqlite3").resolve()
+STATIC_TEST_DB = Path("data/cache/prices/test_static.sqlite3").resolve()
 
+# Point environment to static test DB immediately at import time
+os.environ["TURSO_DATABASE_URL"] = ""
+os.environ["TURSO_AUTH_TOKEN"] = ""
+os.environ["EARNINGS_ENGINE_DB_PATH"] = str(STATIC_TEST_DB)
+os.environ["EARNINGS_ENGINE_DB_NAME"] = STATIC_TEST_DB.name
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_shared_test_db():
-    """Initialize a single shared test database once per session."""
-    os.environ["TURSO_DATABASE_URL"] = ""
-    os.environ["TURSO_AUTH_TOKEN"] = ""
-    SHARED_TEST_DB.parent.mkdir(parents=True, exist_ok=True)
-    os.environ["EARNINGS_ENGINE_DB_PATH"] = str(SHARED_TEST_DB)
-    os.environ["EARNINGS_ENGINE_DB_NAME"] = SHARED_TEST_DB.name
-
+# One-time static setup: only runs if test_static.sqlite3 does NOT exist on disk
+if not STATIC_TEST_DB.exists():
+    STATIC_TEST_DB.parent.mkdir(parents=True, exist_ok=True)
+    _conn = sqlite3.connect(str(STATIC_TEST_DB))
+    try:
+        _conn.execute("PRAGMA journal_mode=WAL;")
+        _conn.execute("PRAGMA synchronous=NORMAL;")
+    finally:
+        _conn.close()
     try:
         apply_migrations(Settings())
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[STATIC-TEST-DB] Error in one-time static setup: {e}")
 
 
 @pytest.fixture(autouse=True)
 def force_local_sqlite_in_tests(monkeypatch):
-    """Ensure all tests reuse the same shared local SQLite database without creating new files per test."""
+    """Ensure all tests reuse the same permanent static SQLite database."""
     monkeypatch.setenv("TURSO_DATABASE_URL", "")
     monkeypatch.setenv("TURSO_AUTH_TOKEN", "")
-    monkeypatch.setenv("EARNINGS_ENGINE_DB_PATH", str(SHARED_TEST_DB))
-    monkeypatch.setenv("EARNINGS_ENGINE_DB_NAME", SHARED_TEST_DB.name)
+    monkeypatch.setenv("EARNINGS_ENGINE_DB_PATH", str(STATIC_TEST_DB))
+    monkeypatch.setenv("EARNINGS_ENGINE_DB_NAME", STATIC_TEST_DB.name)
 
 
 from unittest.mock import MagicMock
