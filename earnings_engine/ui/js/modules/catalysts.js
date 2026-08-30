@@ -490,8 +490,6 @@ Object.assign(app, {
                         maxCnt = cnt;
                         topCat = cat;
                     }
-                }
-
                 const totalEl = document.getElementById('catStatTotal');
                 const highEl = document.getElementById('catStatHigh');
                 const biasEl = document.getElementById('catStatBias');
@@ -544,6 +542,19 @@ Object.assign(app, {
                         </div>
                     ` : '');
 
+                    const aiTargetBadge = (c.ai_target != null && c.ai_target > 0) ? `
+                        <div style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:5px;padding:0.12rem 0.45rem;font-size:0.70rem;" title="OmniRouter AI Target Price & Defensive Invalidation Stop">
+                            <span style="color:#34d399;font-weight:700;font-family:var(--font-mono);">🎯 Target: ₹${Number(c.ai_target).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2})}</span>
+                            ${(c.ai_stop_loss != null && c.ai_stop_loss > 0) ? `<span style="color:#64748b;">|</span><span style="color:#f87171;font-weight:600;font-family:var(--font-mono);">🛡️ Stop: ₹${Number(c.ai_stop_loss).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2})}</span>` : ''}
+                        </div>
+                    ` : '';
+
+                    const aiModelBadge = c.ai_model ? `
+                        <span style="background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-weight:700;font-family:var(--font-mono);" title="Analyzed by OmniRouter AI Engine">🤖 ${c.ai_model.replace('omnirouter/', '')}</span>
+                    ` : '';
+
+                    const displayTakeaway = c.ai_takeaway || c.why_it_matters || '';
+
                     return '<div class="card" style="margin:0;padding:1rem;background:rgba(255,255,255,0.03);' + cardBorder + 'transition:transform 0.15s ease;">' +
                         '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.45rem;">' +
                             '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">' +
@@ -551,9 +562,11 @@ Object.assign(app, {
                                     ? '<strong style="font-size:1.05rem;color:#f8fafc;">' + c.stock_name + '</strong><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" class="signal-badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;font-size:0.72rem;text-decoration:none;" title="Open stock intelligence">' + c.ticker + ' ↗</a>'
                                     : '<a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="font-size:1.05rem;font-weight:700;color:#60a5fa;text-decoration:none;">' + c.ticker + ' ↗</a>') +
                                 priceBadge +
+                                aiTargetBadge +
                                 '<span style="background:' + impactBadgeBg + ';color:' + impactBadgeColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + impactLabel + '</span>' +
                                 '<span style="background:' + dirBadgeBg + ';color:' + dirColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + dirIcon + '</span>' +
                                 '<span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;">' + c.category + '</span>' +
+                                aiModelBadge +
                             '</div>' +
                             '<div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">' +
                                 '<span class="timestamp" style="font-size:0.72rem;background:rgba(255,255,255,0.05);padding:0.15rem 0.45rem;border-radius:0.25rem;">' + (c.publisher || 'News') + ' &middot; ⏱️ ' + dateDisplay + '</span>' +
@@ -565,7 +578,7 @@ Object.assign(app, {
                         '<div style="margin-bottom:0.5rem;">' + headlineLink + '</div>' +
                         (c.summary ? '<p style="margin:0 0 0.5rem 0;font-size:0.82rem;color:#cbd5e1;line-height:1.45;">' + c.summary + '</p>' : '') +
                         '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;background:rgba(0,0,0,0.2);padding:0.45rem 0.65rem;border-radius:0.4rem;border:1px solid rgba(255,255,255,0.06);font-size:0.75rem;">' +
-                            '<div style="color:#38bdf8;font-weight:600;"><span style="color:var(--muted);">💡 Why this matters: </span>' + (c.why_it_matters || '') + '</div>' +
+                            '<div style="color:#38bdf8;font-weight:600;"><span style="color:#c084fc;font-weight:700;">💡 AI Takeaway: </span>' + displayTakeaway + '</div>' +
                             '<div style="display:flex;gap:0.6rem;color:var(--muted);white-space:nowrap;">' +
                                 '<span>Expected Horizon: <strong style="color:var(--light);">' + (c.expected_horizon || '1-3 Days') + '</strong></span>' +
                                 '<span>Move Est: <strong style="color:#fbbf24;">' + (c.volatility_est || '±3%') + '</strong></span>' +
