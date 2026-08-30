@@ -32,7 +32,7 @@
         if (subtab === 'tracked') {
             if (trackedView) trackedView.style.display = 'block';
             if (btnTracked) btnTracked.classList.add('bk-subtab-active');
-            if (contextLabel) contextLabel.textContent = '📜 Permanent Tracked Breakout Signals & Audited Outcome Matrix';
+            if (contextLabel) contextLabel.textContent = '📜 Permanent Tracked Breakout History & Audited Performance';
             app.loadTrackedBreakouts();
         } else {
             // Default: 'scanner' (Active Setup Pool)
@@ -88,7 +88,7 @@
         const tbody = document.getElementById('breakoutTrackedTableBody');
         const liveBtn = document.getElementById('btnTrackedLiveRefresh');
         if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="13" style="text-align:center;padding:2.5rem;color:#64748b;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading permanently tracked breakouts...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="13" style="text-align:center;padding:2.5rem;color:#64748b;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading tracked breakout history...</td></tr>`;
         }
         if (isLive && liveBtn) {
             liveBtn.disabled = true;
@@ -134,7 +134,7 @@
                 } else if (timeframe.preset_days) {
                     tfLabel.textContent = `Last ${timeframe.preset_days} Day(s) window (${data.total_count || 0} setups) • As of ${new Date().toLocaleTimeString()}`;
                 } else {
-                    tfLabel.textContent = `All-Time Tracked Archive (${data.total_count || 0} setups) • As of ${new Date().toLocaleTimeString()}`;
+                    tfLabel.textContent = `All-Time Tracked Breakout History (${data.total_count || 0} setups) • As of ${new Date().toLocaleTimeString()}`;
                 }
             }
 

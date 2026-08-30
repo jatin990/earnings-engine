@@ -9,8 +9,8 @@
                     <button type="button" id="btnBreakoutSubtabScanner" onclick="app.switchBreakoutSubtab('scanner')" class="bk-subtab-btn bk-subtab-active" style="padding:0.4rem 0.85rem;font-size:0.78rem;font-weight:700;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:0.35rem;" title="View all active coiling and breakout setups in the scan pool">
                         <span>⚡</span> Active Setup Pool
                     </button>
-                    <button type="button" id="btnBreakoutSubtabTracked" onclick="app.switchBreakoutSubtab('tracked')" class="bk-subtab-btn" style="padding:0.4rem 0.85rem;font-size:0.78rem;font-weight:700;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:0.35rem;" title="View permanent database archive of tracked breakout signals & outcome metrics">
-                        <span>📜</span> Tracked Signals Archive
+                    <button type="button" id="btnBreakoutSubtabTracked" onclick="app.switchBreakoutSubtab('tracked')" class="bk-subtab-btn" style="padding:0.4rem 0.85rem;font-size:0.78rem;font-weight:700;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:0.35rem;" title="View permanently tracked breakout history & outcome metrics">
+                        <span>📜</span> Tracked Breakout History
                         <span id="bkTrackedCountBadge" style="font-size:0.65rem;background:rgba(56,189,248,0.2);color:#38bdf8;padding:0.05rem 0.4rem;border-radius:10px;font-family:var(--font-mono);font-weight:700;">0</span>
                     </button>
                 </div>
@@ -303,7 +303,7 @@
             </div>
 
             <!-- ============================================================= -->
-            <!-- SUBTAB 2: 📜 TRACKED BREAKOUTS HISTORY ARCHIVE                -->
+            <!-- SUBTAB 2: 📜 TRACKED BREAKOUT HISTORY                         -->
             <!-- ============================================================= -->
             <div id="breakoutTrackedContainer" class="breakout-subview" style="display:none;">
                 <!-- Controls & Filters Row -->
@@ -312,11 +312,11 @@
                         <span style="font-size:1.3rem;">📜</span>
                         <div>
                             <div style="display:flex;align-items:center;gap:0.45rem;">
-                                <div style="font-size:1rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.01em;">Tracked Breakouts History</div>
-                                <span style="font-size:0.65rem;font-weight:700;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.1rem 0.45rem;border-radius:4px;">AUDITED ARCHIVE</span>
+                                <div style="font-size:1rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.01em;">Tracked Breakout History</div>
+                                <span style="font-size:0.65rem;font-weight:700;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.1rem 0.45rem;border-radius:4px;">AUDITED HISTORY</span>
                             </div>
                             <div id="breakoutTrackedTimeframeLabel" style="font-size:0.7rem;color:#64748b;font-family:var(--font-mono);">
-                                All-time tracked signals repository
+                                All-time tracked breakout history repository
                             </div>
                         </div>
                     </div>
