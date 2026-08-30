@@ -1134,6 +1134,22 @@ def _migration_021_sidebar_badge_counters(conn: sqlite3.Connection | TursoConnec
         pass
 
 
+def _migration_022_institutional_amount_metrics(conn: sqlite3.Connection | TursoConnection) -> None:
+    """Add increase_amount_cr, total_amount_cr, and recent transaction columns to institutional_holdings."""
+    cols = [
+        ("increase_amount_cr", "REAL DEFAULT 0.0"),
+        ("total_amount_cr", "REAL DEFAULT 0.0"),
+        ("recent_txn_price", "REAL DEFAULT 0.0"),
+        ("recent_txn_date", "TEXT"),
+        ("recent_txn_type", "TEXT"),
+    ]
+    for c_name, c_type in cols:
+        try:
+            conn.execute(f"ALTER TABLE institutional_holdings ADD COLUMN {c_name} {c_type}")
+        except Exception:
+            pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1157,6 +1173,7 @@ MIGRATIONS: list[Migration] = [
     Migration(19, "019_automation_schedules_market_hours", _migration_019_automation_schedules_market_hours),
     Migration(20, "020_breakout_strategy_tracking", _migration_020_breakout_strategy_tracking),
     Migration(21, "021_sidebar_badge_counters", _migration_021_sidebar_badge_counters),
+    Migration(22, "022_institutional_amount_metrics", _migration_022_institutional_amount_metrics),
 ]
 
 

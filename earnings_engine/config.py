@@ -82,6 +82,22 @@ class Settings:
     owner_passcode: str = field(
         default_factory=lambda: os.getenv("OWNER_PASSCODE") or os.getenv("NEXUS_MASTER_PASSCODE") or "NEXUS-MASTER"
     )
+    # diegosouzapw/OmniRoute Self-Hosted AI Gateway settings (default: http://localhost:20128/v1)
+    omniroute_base_url: str = field(
+        default_factory=lambda: os.getenv("OMNIROUTE_BASE_URL") or os.getenv("OMNIROUTE_URL") or "http://localhost:20128/v1"
+    )
+    omniroute_api_key: str = field(
+        default_factory=lambda: (os.getenv("OMNIROUTE_API_KEY") or os.getenv("OMNI_API_KEY") or "").strip()
+    )
+    omniroute_model: str = field(
+        default_factory=lambda: os.getenv("OMNIROUTE_MODEL") or "deepseek/deepseek-r1"
+    )
+    omniroute_timeout: int = field(
+        default_factory=lambda: _env_int("OMNIROUTE_TIMEOUT", 15)
+    )
+    omniroute_fallback_url: str = field(
+        default_factory=lambda: os.getenv("OMNIROUTE_FALLBACK_URL") or os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1"
+    )
 
     def resolve_device(self, preferred: str | None = None) -> str:
         """Resolve the model inference device for Kronos."""

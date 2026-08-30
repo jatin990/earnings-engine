@@ -196,3 +196,39 @@ async def get_news_activity_stream(limit: int = Query(50, ge=1, le=200)):
     except Exception as e:
         logger.exception("Error in get_news_activity_stream: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching activity stream: {str(e)}")
+
+
+@router.get("/api/v1/omniroute/status")
+async def get_omniroute_status_endpoint():
+    """Probe and return the real-time health and status of the diegosouzapw/OmniRoute gateway."""
+    try:
+        from earnings_engine.data.omniroute_client import OmniRouteClient
+        client = OmniRouteClient(settings=_settings)
+        health = await asyncio.to_thread(client.probe_health)
+        return {"success": True, "gateway": "diegosouzapw/OmniRoute", **health}
+    except Exception as e:
+        logger.exception("Error probing OmniRoute status: %s", e)
+        return {
+            "success": False,
+            "gateway": "diegosouzapw/OmniRoute",
+            "status": "offline",
+            "error": str(e),
+        }
+
+
+@router.post("/api/v1/omniroute/analyze")
+async def analyze_with_omniroute_endpoint(payload: dict):
+    """Directly execute AI news analysis for any corporate headline using diegosouzapw/OmniRoute."""
+    try:
+        from earnings_engine.data.omniroute_client import OmniRouteClient
+        client = OmniRouteClient(settings=_settings)
+        result = await asyncio.to_thread(
+            client.analyze_catalyst,
+            item=payload,
+            preferred_model=payload.get("model"),
+        )
+        return {"success": True, "analysis": result, **result}
+    except Exception as e:
+        logger.exception("Error executing OmniRoute analysis: %s", e)
+        raise HTTPException(status_code=500, detail=f"OmniRoute analysis error: {str(e)}")
+

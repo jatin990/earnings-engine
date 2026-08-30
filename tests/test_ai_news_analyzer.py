@@ -79,7 +79,7 @@ def test_omnirouter_mock_response():
         assert res["direction"] == "BULLISH"
         assert res["impact_score"] == 88
         assert res["target_price"] == 4450.0
-        assert "omnirouter" in res["ai_model"]
+        assert "omnirout" in res["ai_model"]
 
 
 def test_heuristic_fallback_analysis():

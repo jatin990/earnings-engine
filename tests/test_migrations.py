@@ -8,7 +8,11 @@ from earnings_engine.data.migrations import apply_migrations, MIGRATIONS
 
 
 @pytest.fixture
-def test_settings(tmp_path):
+def test_settings(tmp_path, monkeypatch):
+    monkeypatch.delenv("TURSO_DATABASE_URL", raising=False)
+    monkeypatch.delenv("TURSO_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("EARNINGS_ENGINE_DB_PATH", raising=False)
+    monkeypatch.setenv("EARNINGS_ENGINE_DB_NAME", f"test_{tmp_path.name}.sqlite3")
     s = Settings()
     s.data_dirs["prices"] = tmp_path
     s.data_dirs["earnings"] = tmp_path

@@ -311,7 +311,7 @@
                         <!-- 8. Actions -->
                         <td style="padding:0.5rem 0.6rem;text-align:right;white-space:nowrap;">
                             <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.3rem;">
-                                <button type="button" onclick="app.showPremarketRawOutput(${idx})" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:4px;" title="Inspect raw OmniRouter AI telemetry">
+                                <button type="button" onclick="app.showPremarketRawOutput(${idx})" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:4px;" title="Inspect raw diegosouzapw/OmniRoute AI telemetry">
                                     📄 Raw
                                 </button>
                                 <button type="button" onclick="app.openConsensusModal('${ticker}')" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:4px;" title="Run AI Consensus">

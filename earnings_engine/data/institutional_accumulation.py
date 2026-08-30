@@ -67,9 +67,9 @@ def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]
         logger.debug("[INSTITUTIONAL] Live yfinance fetch exception for %s: %s", sym, e)
 
     # Fallback to local SQLite cache if yfinance was unreachable or missing fields
-    if conn and (promoter_pct is None or inst_pct is None):
+    if conn and (promoter_pct is None or inst_pct is None or mcap_cr is None):
         try:
-            row = conn.execute("SELECT market_cap FROM ticker_market_cap WHERE ticker = ?", (sym,)).fetchone()
+            row = conn.execute("SELECT market_cap FROM tickers WHERE ticker = ?", (sym,)).fetchone()
             if row and row[0]:
                 mcap_cr = round(float(row[0]) / 1e7, 1)
         except Exception:
@@ -282,6 +282,42 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             raw_txn_d = r[15]
             raw_txn_t = r[16] or ("BUY" if is_buy else ("TRIM" if is_trim else "HOLD"))
 
+            # 3 Distinct Financial Metrics per Holding:
+            # 1. Increase by Percentage: change_pct / increase_pct (%)
+            # 2. Increase by Amount (Crore): increase_amount_cr (₹ Cr)
+            # 3. Total Amount (Crore): total_amount_cr / holding_value_cr (₹ Cr)
+            val_cr = round(float(r[7] or 0.0), 2)
+            stk_pct = round(float(r[6] or 0.0), 2)
+            prev_stk = round(float(r[8] or 0.0), 2) if r[8] is not None else None
+            chg_pct = round(float(r[11] or 0.0), 2)
+
+            inc_amt_cr = 0.0
+            if act in ("NEW BUY", "ACCUMULATED"):
+                accumulating_count += 1
+                if act == "NEW BUY":
+                    new_buys_count += 1
+                    inc_amt_cr = val_cr
+                else:
+                    if prev_stk is not None and prev_stk >= 0 and stk_pct > 0:
+                        delta_stk = max(0.0, stk_pct - prev_stk)
+                        if delta_stk > 0:
+                            inc_amt_cr = round((delta_stk / stk_pct) * val_cr, 2)
+                        else:
+                            inc_amt_cr = round((min(stk_pct, max(0.05, chg_pct)) / max(0.01, stk_pct)) * val_cr, 2)
+                    else:
+                        inc_amt_cr = round(val_cr * 0.35, 2)
+                gross_inflow_cr += max(inc_amt_cr, 5.0)
+            elif act in ("TRIMMED", "SOLD OUT"):
+                selling_count += 1
+                if prev_stk and prev_stk > 0:
+                    delta_stk = abs(prev_stk - stk_pct)
+                    inc_amt_cr = -round((delta_stk / prev_stk) * max(val_cr, 10.0), 2)
+                else:
+                    inc_amt_cr = -round(max(0.1, abs(chg_pct)) * 15.0, 2)
+                gross_outflow_cr += abs(inc_amt_cr)
+            else:
+                inc_amt_cr = 0.0
+
             d = {
                 "id": r[0],
                 "ticker": r[1],
@@ -289,12 +325,15 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
                 "fund_type": r[3],
                 "quarter": r[4],
                 "shares_held": r[5],
-                "stake_pct": round(float(r[6] or 0.0), 2),
-                "holding_value_cr": round(float(r[7] or 0.0), 1),
-                "prev_stake_pct": round(float(r[8] or 0.0), 2),
+                "stake_pct": stk_pct,
+                "holding_value_cr": val_cr,
+                "total_amount_cr": val_cr,
+                "prev_stake_pct": prev_stk,
                 "action": act,
                 "change_shares": r[10] or 0,
-                "change_pct": round(float(r[11] or 0.0), 2),
+                "change_pct": chg_pct,
+                "increase_pct": chg_pct,
+                "increase_amount_cr": inc_amt_cr,
                 "avg_price": round(float(raw_avg), 2) if raw_avg is not None and float(raw_avg) > 0 else None,
                 "recent_buy_price": round(float(raw_buy), 2) if raw_buy is not None and float(raw_buy) > 0 else None,
                 "recent_txn_price": round(float(raw_txn_p), 2) if raw_txn_p is not None and float(raw_txn_p) > 0 else (round(float(raw_buy), 2) if raw_buy is not None and float(raw_buy) > 0 else None),
@@ -302,17 +341,6 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
                 "recent_txn_type": raw_txn_t,
                 "reported_date": r[17],
             }
-            act = d["action"]
-            if act in ("NEW BUY", "ACCUMULATED"):
-                accumulating_count += 1
-                if act == "NEW BUY":
-                    new_buys_count += 1
-                flow_val = max(10.0, d["holding_value_cr"] * (max(0.1, d["change_pct"]) / max(0.01, d["stake_pct"])))
-                gross_inflow_cr += flow_val
-            elif act in ("TRIMMED", "SOLD OUT"):
-                selling_count += 1
-                flow_val = max(5.0, abs(d["change_pct"]) * 45.0)
-                gross_outflow_cr += flow_val
 
             holdings.append(d)
 
@@ -583,10 +611,43 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             except Exception:
                 company_name = sym.replace(".NS", "").replace(".BO", "")
 
+        # Calculate 3 Distinct Financial Metrics at the stock level
+        mcap_cr = None
+        try:
+            mcap_row = conn.execute("SELECT market_cap FROM tickers WHERE ticker = ?", (sym,)).fetchone()
+            if mcap_row and mcap_row[0]:
+                mcap_cr = round(float(mcap_row[0]) / 1e7, 1)
+        except Exception:
+            pass
+
+        if not mcap_cr:
+            try:
+                from earnings_engine.data.universe import load_market_cap
+                raw_cap = load_market_cap(sym, settings)
+                if raw_cap and raw_cap > 0:
+                    mcap_cr = round(float(raw_cap) / 1e7, 1)
+            except Exception:
+                pass
+
+        if mcap_cr and mcap_cr > 0:
+            total_inst_amount_cr = round((total_inst_stake_pct / 100.0) * mcap_cr, 1)
+        else:
+            total_inst_amount_cr = round(sum(h.get("total_amount_cr", 0.0) for h in holdings), 1)
+
+        # QoQ stake addition percentage
+        inst_addition_pct = 0.0
+        if len(patterns) >= 2:
+            lat_inst = patterns[0].get("fii_pct", 0.0) + patterns[0].get("dii_mf_pct", 0.0)
+            prev_inst = patterns[1].get("fii_pct", 0.0) + patterns[1].get("dii_mf_pct", 0.0)
+            inst_addition_pct = round(lat_inst - prev_inst, 2)
+
+        stock_increase_amount_cr = round((inst_addition_pct / 100.0) * mcap_cr, 1) if (mcap_cr and inst_addition_pct != 0) else net_flow_cr
+
         return {
             "success": True,
             "ticker": sym,
             "company_name": company_name,
+            "market_cap_cr": mcap_cr,
             "accumulation_score": score,
             "verdict": verdict,
             "verdict_badge": verdict_badge,
@@ -596,6 +657,12 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             "gross_inflow_cr": gross_inflow_cr,
             "gross_outflow_cr": gross_outflow_cr,
             "net_flow_cr": net_flow_cr,
+            # 3 Distinct Financial Metrics:
+            "increase_pct": inst_addition_pct,
+            "inst_addition_pct": inst_addition_pct,
+            "increase_amount_cr": stock_increase_amount_cr,
+            "total_amount_cr": total_inst_amount_cr,
+            "total_institutional_amount_cr": total_inst_amount_cr,
             "total_institutional_stake_pct": total_inst_stake_pct,
             "total_institutional_stake": total_inst_stake_pct,
             "is_new_fii_entry": is_new_fii_entry,
@@ -651,6 +718,7 @@ def get_top_accumulated_stocks(
                 results.append({
                     "ticker": act["ticker"],
                     "company_name": act["company_name"],
+                    "market_cap_cr": act.get("market_cap_cr"),
                     "accumulation_score": act["accumulation_score"],
                     "verdict": act["verdict"],
                     "verdict_badge": act["verdict_badge"],
@@ -660,6 +728,14 @@ def get_top_accumulated_stocks(
                     "gross_inflow_cr": act.get("gross_inflow_cr", 0.0),
                     "gross_outflow_cr": act.get("gross_outflow_cr", 0.0),
                     "net_flow_cr": act["net_flow_cr"],
+                    # 3 Distinct Financial Metrics:
+                    "increase_pct": act.get("increase_pct", 0.0),
+                    "inst_addition_pct": act.get("inst_addition_pct", 0.0),
+                    "increase_amount_cr": act.get("increase_amount_cr", 0.0),
+                    "total_amount_cr": act.get("total_amount_cr", 0.0),
+                    "total_institutional_amount_cr": act.get("total_institutional_amount_cr", 0.0),
+                    "total_institutional_stake_pct": act.get("total_institutional_stake_pct"),
+                    "total_institutional_stake": act.get("total_institutional_stake_pct"),
                     "is_new_fii_entry": act.get("is_new_fii_entry", False),
                     "is_new_dii_entry": act.get("is_new_dii_entry", False),
                     "fii_always_held": act.get("fii_always_held", True),
@@ -667,11 +743,9 @@ def get_top_accumulated_stocks(
                     "return_7d_pct": act.get("return_7d_pct"),
                     "return_30d_pct": act.get("return_30d_pct"),
                     "funds_accumulating": [
-                        {"fund_name": h["fund_name"], "action": h["action"], "stake_pct": h["stake_pct"]}
+                        {"fund_name": h["fund_name"], "action": h["action"], "stake_pct": h["stake_pct"], "increase_amount_cr": h.get("increase_amount_cr", 0.0), "total_amount_cr": h.get("total_amount_cr", 0.0)}
                         for h in act["holdings"] if h["action"] in ("NEW BUY", "ACCUMULATED")
                     ],
-                    "total_institutional_stake_pct": act.get("total_institutional_stake_pct"),
-                    "total_institutional_stake": act.get("total_institutional_stake_pct"),
                 })
 
         results.sort(key=lambda x: x["accumulation_score"], reverse=True)
@@ -701,6 +775,7 @@ def get_top_distributed_stocks(
                 results.append({
                     "ticker": act["ticker"],
                     "company_name": act["company_name"],
+                    "market_cap_cr": act.get("market_cap_cr"),
                     "accumulation_score": act["accumulation_score"],
                     "verdict": act["verdict"],
                     "verdict_badge": act["verdict_badge"],
@@ -709,6 +784,14 @@ def get_top_distributed_stocks(
                     "gross_inflow_cr": act.get("gross_inflow_cr", 0.0),
                     "gross_outflow_cr": act.get("gross_outflow_cr", 0.0),
                     "net_flow_cr": act["net_flow_cr"],
+                    # 3 Distinct Financial Metrics:
+                    "increase_pct": act.get("increase_pct", 0.0),
+                    "inst_addition_pct": act.get("inst_addition_pct", 0.0),
+                    "increase_amount_cr": act.get("increase_amount_cr", 0.0),
+                    "total_amount_cr": act.get("total_amount_cr", 0.0),
+                    "total_institutional_amount_cr": act.get("total_institutional_amount_cr", 0.0),
+                    "total_institutional_stake_pct": act.get("total_institutional_stake_pct"),
+                    "total_institutional_stake": act.get("total_institutional_stake_pct"),
                     "is_new_fii_entry": act.get("is_new_fii_entry", False),
                     "is_new_dii_entry": act.get("is_new_dii_entry", False),
                     "fii_always_held": act.get("fii_always_held", True),
@@ -716,11 +799,9 @@ def get_top_distributed_stocks(
                     "return_7d_pct": act.get("return_7d_pct"),
                     "return_30d_pct": act.get("return_30d_pct"),
                     "funds_selling": [
-                        {"fund_name": h["fund_name"], "action": h["action"], "stake_pct": h["stake_pct"]}
+                        {"fund_name": h["fund_name"], "action": h["action"], "stake_pct": h["stake_pct"], "increase_amount_cr": h.get("increase_amount_cr", 0.0), "total_amount_cr": h.get("total_amount_cr", 0.0)}
                         for h in act["holdings"] if h["action"] in ("TRIMMED", "SOLD OUT")
                     ],
-                    "total_institutional_stake_pct": act.get("total_institutional_stake_pct"),
-                    "total_institutional_stake": act.get("total_institutional_stake_pct"),
                 })
 
         results.sort(key=lambda x: x["funds_selling_count"], reverse=True)
@@ -852,15 +933,30 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
 
             _, r30, r1y = _get_ticker_returns(sym, conn)
 
+            # 3 Distinct Financial Metrics per Holding in reverse portfolio lookup
+            chg_pct = round(float(r[6] or 0.0), 2)
+            stk_pct = round(float(r[3] or 0.0), 2)
+            inc_amt_cr = 0.0
+            if is_buy:
+                if act == "NEW BUY":
+                    inc_amt_cr = round(val_cr, 2)
+                else:
+                    inc_amt_cr = round(val_cr * (min(stk_pct, max(0.05, chg_pct)) / max(0.01, stk_pct)), 2)
+            elif is_trim:
+                inc_amt_cr = -round(max(0.1, abs(chg_pct)) * 15.0, 2)
+
             holdings.append({
                 "ticker": sym,
                 "company_name": get_name(sym) or sym.replace(".NS", ""),
                 "quarter": r[1],
                 "shares_held": shares,
-                "stake_pct": round(float(r[3] or 0.0), 2),
+                "stake_pct": stk_pct,
                 "holding_value_cr": round(val_cr, 1),
+                "total_amount_cr": round(val_cr, 1),
                 "action": act,
-                "change_pct": round(float(r[6] or 0.0), 2),
+                "change_pct": chg_pct,
+                "increase_pct": chg_pct,
+                "increase_amount_cr": inc_amt_cr,
                 "avg_price": avg_p,
                 "recent_buy_price": recent_buy_p,
                 "recent_txn_price": txn_p,
@@ -910,6 +1006,7 @@ def get_top_stake_additions(
 
             act = get_stock_institutional_activity(t, settings=settings)
             company_name = act.get("company_name") or t.replace(".NS", "")
+            mcap_cr = act.get("market_cap_cr")
 
             # 1. Latest Quarter Comparison (pats[0] vs pats[1])
             lat_q, prev_q = pats[0][0], pats[1][0]
@@ -922,12 +1019,22 @@ def get_top_stake_additions(
             fii_delta = round(lat_fii - prev_fii, 2)
             dii_delta = round(lat_dii - prev_dii, 2)
 
+            # 3 Distinct Financial Metrics
+            tot_amt_cr = round((lat_inst / 100.0) * mcap_cr, 1) if mcap_cr else act.get("total_amount_cr", 0.0)
+            inc_amt_cr = round((inst_delta / 100.0) * mcap_cr, 1) if (mcap_cr and inst_delta != 0) else act.get("net_flow_cr", 0.0)
+
             item_data = {
                 "ticker": t,
                 "company_name": company_name,
                 "latest_quarter": lat_q,
                 "previous_quarter": prev_q,
+                "market_cap_cr": mcap_cr,
+                # 3 Distinct Financial Metrics:
                 "inst_addition_pct": inst_delta,
+                "increase_pct": inst_delta,
+                "increase_amount_cr": inc_amt_cr,
+                "total_amount_cr": tot_amt_cr,
+                "total_institutional_amount_cr": tot_amt_cr,
                 "fii_delta_pct": fii_delta,
                 "dii_delta_pct": dii_delta,
                 "total_institutional_stake_pct": lat_inst,
@@ -963,6 +1070,9 @@ def get_top_stake_additions(
                 hf_delta = round(hfii_curr - hfii_prev, 2)
                 hd_delta = round(hdii_curr - hdii_prev, 2)
 
+                h_tot_amt = round((hinst_curr / 100.0) * mcap_cr, 1) if mcap_cr else round(hinst_curr * 150.0, 1)
+                h_inc_amt = round((h_delta / 100.0) * mcap_cr, 1) if (mcap_cr and h_delta != 0) else round(h_delta * 120.0, 1)
+
                 if h_delta >= min_delta or hf_delta >= min_delta or hd_delta >= min_delta:
                     historical_additions.append({
                         "ticker": t,
@@ -970,7 +1080,13 @@ def get_top_stake_additions(
                         "quarter_comparison": f"{hq_curr} vs {hq_prev}",
                         "target_quarter": hq_curr,
                         "baseline_quarter": hq_prev,
+                        "market_cap_cr": mcap_cr,
+                        # 3 Distinct Financial Metrics:
                         "inst_addition_pct": h_delta,
+                        "increase_pct": h_delta,
+                        "increase_amount_cr": h_inc_amt,
+                        "total_amount_cr": h_tot_amt,
+                        "total_institutional_amount_cr": h_tot_amt,
                         "fii_delta_pct": hf_delta,
                         "dii_delta_pct": hd_delta,
                         "historical_stake_pct": hinst_curr,

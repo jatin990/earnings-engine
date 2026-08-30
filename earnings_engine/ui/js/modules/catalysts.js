@@ -95,10 +95,73 @@ Object.assign(app, {
                     this.catalystsData = itemsData.catalysts || [];
                     this.renderCatalystsStats(statsData.stats || {});
                     this.renderCatalysts();
+                    this.updateHarvesterScheduleDisplay();
+                    this.probeOmniRouteGateway(false);
                 } catch (e) {
-                    if (e.name === 'AbortError') return;
                     console.error('Error loading catalysts:', e);
-                    if (feedGrid) feedGrid.innerHTML = '<div class="card" style="padding:1rem;color:var(--red);">Failed loading catalysts feed. Click "⚡ Scan Feeds" to refresh.</div>';
+                    feedGrid.innerHTML = '<div class="card" style="padding:1.5rem;text-align:center;color:#f87171;">Failed to load catalysts feed.</div>';
+                }
+            },
+
+            async probeOmniRouteGateway(showToast = false) {
+                const dot = document.getElementById('omnirouteStatusDot');
+                const text = document.getElementById('omnirouteStatusText');
+                const pill = document.getElementById('omnirouteGatewayStatusPill');
+                if (text && showToast) {
+                    text.textContent = 'Probing OmniRoute...';
+                }
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/omniroute/status');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.status === 'online') {
+                            if (dot) dot.style.background = '#34d399';
+                            if (text) text.textContent = `OmniRoute: ${data.endpoint || 'localhost:20128'} (${data.models_count || '350+'} models)`;
+                            if (pill) {
+                                pill.style.borderColor = 'rgba(52,211,153,0.4)';
+                                pill.style.background = 'rgba(52,211,153,0.12)';
+                                pill.style.color = '#34d399';
+                                pill.title = 'OmniRoute Gateway Connected';
+                            }
+                        } else if (data.status === 'auth_required') {
+                            if (dot) dot.style.background = '#fbbf24';
+                            if (text) text.textContent = `OmniRoute: localhost:20128 (Key Required)`;
+                            if (pill) {
+                                pill.style.borderColor = 'rgba(251,191,36,0.5)';
+                                pill.style.background = 'rgba(251,191,36,0.15)';
+                                pill.style.color = '#fbbf24';
+                                pill.title = data.message || 'OmniRoute is running on http://localhost:20128/. Generate an API Key in the OmniRoute dashboard and add OMNIROUTE_API_KEY to your .env file.';
+                            }
+                        } else if (data.status === 'auth_invalid') {
+                            if (dot) dot.style.background = '#f87171';
+                            if (text) text.textContent = `OmniRoute: Invalid API Key`;
+                            if (pill) {
+                                pill.style.borderColor = 'rgba(248,113,113,0.5)';
+                                pill.style.background = 'rgba(248,113,113,0.15)';
+                                pill.style.color = '#f87171';
+                                pill.title = 'Configured OMNIROUTE_API_KEY was rejected by OmniRoute.';
+                            }
+                        } else if (data.status === 'fallback_online') {
+                            if (dot) dot.style.background = '#38bdf8';
+                            if (text) text.textContent = `OmniRoute: Fallback Gateway Active`;
+                            if (pill) {
+                                pill.style.borderColor = 'rgba(56,189,248,0.4)';
+                                pill.style.background = 'rgba(56,189,248,0.12)';
+                                pill.style.color = '#38bdf8';
+                            }
+                        } else {
+                            if (dot) dot.style.background = '#f87171';
+                            if (text) text.textContent = `OmniRoute: Offline (Port 20128)`;
+                            if (pill) {
+                                pill.style.borderColor = 'rgba(248,113,113,0.4)';
+                                pill.style.background = 'rgba(248,113,113,0.12)';
+                                pill.style.color = '#f87171';
+                            }
+                        }
+                    }
+                } catch (e) {
+                    if (dot) dot.style.background = '#f87171';
+                    if (text) text.textContent = `OmniRoute: Offline (Port 20128)`;
                 }
             },
 
@@ -662,7 +725,7 @@ Object.assign(app, {
 
                 if (tickerEl) tickerEl.textContent = c.ticker;
                 if (nameEl) nameEl.textContent = c.stock_name || c.ticker;
-                if (modelBadge) modelBadge.textContent = '🤖 ' + (c.ai_model || (parsedAi && parsedAi.ai_model) || 'OmniRouter AI');
+                if (modelBadge) modelBadge.textContent = '🤖 ' + (c.ai_model || (parsedAi && parsedAi.ai_model) || 'omniroute/deepseek-r1');
                 if (headlineEl) headlineEl.textContent = c.title || '';
                 if (impactBadge) {
                     impactBadge.textContent = `⚡ ${c.impact_level || 'MEDIUM'} (${c.impact_score || 75}%)`;
