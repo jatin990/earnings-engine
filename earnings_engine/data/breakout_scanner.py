@@ -577,7 +577,7 @@ def get_tracked_breakouts(
         apply_migrations(settings)
         conn = get_db_connection(settings)
 
-        query_clauses = ["1=1"]
+        query_clauses = ["1=1", "signal_date >= '2026-08-26'"]
         params: list[Any] = []
 
         # 1. Date Filtering
