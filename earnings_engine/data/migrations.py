@@ -1089,6 +1089,33 @@ def _migration_019_automation_schedules_market_hours(conn: Any) -> None:
             pass
 
 
+def _migration_020_breakout_strategy_tracking(conn: Any) -> None:
+    """Add strategy column to breakout_radar and breakout_tracked_signals and purge test data."""
+    for tbl in ["breakout_radar", "breakout_tracked_signals"]:
+        try:
+            cols = {r[1] for r in conn.execute(f"PRAGMA table_info({tbl})").fetchall()}
+            if "strategy" not in cols:
+                conn.execute(f"ALTER TABLE {tbl} ADD COLUMN strategy TEXT NOT NULL DEFAULT 'CLASSIC_TECHNICAL'")
+        except Exception as e:
+            logger.debug("[MIGRATION-020] Add strategy to %s notice: %s", tbl, e)
+
+    # Purge any test/dummy/mock records across tables
+    for tbl in ["breakout_radar", "breakout_tracked_signals", "breakout_audit_log", "consensus_predictions", "tickers"]:
+        try:
+            conn.execute(f"DELETE FROM {tbl} WHERE UPPER(ticker) LIKE '%TEST%' OR UPPER(ticker) LIKE '%MOCK%' OR UPPER(ticker) LIKE '%DUMMY%'")
+        except Exception:
+            pass
+
+    try:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_breakout_ticker_strat ON breakout_radar(ticker, strategy)")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_breakout_tracked_uniq ON breakout_tracked_signals(ticker, strategy, signal_date)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_strategy ON breakout_radar(strategy)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_tracked_strat ON breakout_tracked_signals(strategy)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_tracked_date ON breakout_tracked_signals(signal_date DESC)")
+    except Exception as e:
+        logger.debug("[MIGRATION-020] Index creation notice: %s", e)
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1110,6 +1137,7 @@ MIGRATIONS: list[Migration] = [
     Migration(17, "017_clean_fabricated_earnings_and_guard_rails", _migration_017_clean_fabricated_earnings_and_guard_rails),
     Migration(18, "018_breakout_tracked_signals", _migration_018_breakout_tracked_signals),
     Migration(19, "019_automation_schedules_market_hours", _migration_019_automation_schedules_market_hours),
+    Migration(20, "020_breakout_strategy_tracking", _migration_020_breakout_strategy_tracking),
 ]
 
 

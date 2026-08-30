@@ -102,13 +102,13 @@
                         </button>
 
                         <!-- Refresh Single Strategy Scan button -->
-                        <button type="button" id="breakoutRefreshBtn" onclick="app.refreshBreakoutScan()" class="btn btn-secondary" style="padding:0.35rem 0.75rem;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;">
-                            <span id="breakoutRefreshIcon">⚡</span> Scan Strategy
+                        <button type="button" id="breakoutRefreshBtn" onclick="app.refreshBreakoutScan()" class="btn btn-secondary" style="padding:0.35rem 0.75rem;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;" title="Schedule background scan for selected strategy">
+                            <span id="breakoutRefreshIcon">⏱️</span> Schedule Scan
                         </button>
 
                         <!-- Run All 5 in Parallel Master Button -->
-                        <button type="button" id="breakoutParallelScanBtn" onclick="app.triggerAllBreakoutStrategiesParallel()" class="btn btn-primary" style="padding:0.35rem 0.85rem;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);border-color:#818cf8;box-shadow:0 0 15px rgba(99,102,241,0.35);" title="Trigger parallel scan across all 5 strategies simultaneously">
-                            <span id="breakoutParallelIcon">🚀</span> Run All 5 in Parallel
+                        <button type="button" id="breakoutParallelScanBtn" onclick="app.triggerAllBreakoutStrategiesParallel()" class="btn btn-primary" style="padding:0.35rem 0.85rem;font-size:0.78rem;display:flex;align-items:center;gap:0.3rem;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);border-color:#818cf8;box-shadow:0 0 15px rgba(99,102,241,0.35);" title="Schedule background parallel sweep across all 5 strategies simultaneously">
+                            <span id="breakoutParallelIcon">⏱️</span> Schedule Parallel Sweep
                         </button>
                     </div>
                 </div>
@@ -995,7 +995,7 @@
                     </div>
                 </div>
                 <button type="button" id="bkModalParallelTriggerBtn" onclick="app.triggerAllBreakoutStrategiesParallel(true)" class="btn btn-primary" style="padding:0.45rem 1.1rem;font-size:0.82rem;font-weight:700;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);border-color:#818cf8;box-shadow:0 0 20px rgba(99,102,241,0.4);display:flex;align-items:center;gap:0.35rem;">
-                    <span id="bkModalParallelTriggerIcon">⚡</span> Run All 5 Now
+                    <span id="bkModalParallelTriggerIcon">⏱️</span> Schedule Parallel Sweep
                 </button>
             </div>
 

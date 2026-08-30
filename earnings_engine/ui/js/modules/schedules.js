@@ -241,20 +241,23 @@
             const btn = document.getElementById(`btnRun_${jobId}`);
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<span class="spinner" style="width:10px;height:10px;"></span> Running...';
+                btn.innerHTML = '<span class="spinner" style="width:10px;height:10px;"></span> Scheduled...';
             }
             try {
                 const res = await fetch(API_BASE + `/api/v1/breakout-radar/schedules/${encodeURIComponent(jobId)}/trigger`, { method: 'POST' });
                 if (res.ok) {
+                    const data = await res.json();
+                    console.log('[BREAKOUT-SCHEDULE] Triggered:', data);
+                    if (typeof app.startBreakoutPolling === 'function') {
+                        app.startBreakoutPolling();
+                    }
                     setTimeout(() => {
                         this.loadBreakoutSchedules();
-                        this.loadBreakoutRadar();
-                        this.loadBreakoutAuditLog();
                         if (btn) {
                             btn.disabled = false;
                             btn.innerHTML = '⚡ Run Now';
                         }
-                    }, 2000);
+                    }, 1200);
                 }
             } catch (e) {
                 console.error('Error triggering breakout schedule:', e);
@@ -276,13 +279,13 @@
 
             if (masterBtn) {
                 masterBtn.disabled = true;
-                if (masterIcon) masterIcon.textContent = '⏳';
+                if (masterIcon) masterIcon.textContent = '⏱️';
                 masterBtn.style.opacity = '0.7';
             }
             if (modalBtn) {
                 modalBtn.disabled = true;
-                if (modalIcon) modalIcon.textContent = '⏳';
-                modalBtn.innerHTML = '<span>⏳</span> Executing All 5 Strategies...';
+                if (modalIcon) modalIcon.textContent = '⏱️';
+                modalBtn.innerHTML = '<span>⏱️</span> Scan Scheduled in Background...';
             }
 
             try {
@@ -295,27 +298,29 @@
 
                 if (res.ok) {
                     const data = await res.json();
-                    console.log('[BREAKOUT-PARALLEL] Result:', data);
+                    console.log('[BREAKOUT-PARALLEL] Scheduled:', data);
 
-                    // Refresh both radar candidates and schedule states
-                    await this.loadBreakoutRadar();
-                    await this.loadBreakoutAuditLog();
-                    await this.loadBreakoutSchedules();
-                    await this.loadAutomationSchedules();
+                    // Initiate background polling loop to track database population
+                    if (typeof app.startBreakoutPolling === 'function') {
+                        app.startBreakoutPolling();
+                    }
+                    this.loadBreakoutSchedules();
                 }
             } catch (e) {
-                console.error('Error running parallel multi-strategy breakout scan:', e);
+                console.error('Error scheduling parallel multi-strategy breakout scan:', e);
             } finally {
-                this._isParallelScanRunning = false;
-                if (masterBtn) {
-                    masterBtn.disabled = false;
-                    if (masterIcon) masterIcon.textContent = '🚀';
-                    masterBtn.style.opacity = '1';
-                }
-                if (modalBtn) {
-                    modalBtn.disabled = false;
-                    modalBtn.innerHTML = '<span>⚡</span> Run All 5 Now';
-                }
+                setTimeout(() => {
+                    this._isParallelScanRunning = false;
+                    if (masterBtn) {
+                        masterBtn.disabled = false;
+                        if (masterIcon) masterIcon.textContent = '⏱️';
+                        masterBtn.style.opacity = '1';
+                    }
+                    if (modalBtn) {
+                        modalBtn.disabled = false;
+                        modalBtn.innerHTML = '<span>⚡</span> Schedule Parallel Sweep';
+                    }
+                }, 1500);
             }
         },
 

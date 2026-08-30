@@ -91,8 +91,27 @@ def test_breakout_schedule_configuration_endpoint(client):
     assert data["schedule"]["status"] == "active"
 
 
-def test_multi_strategy_parallel_scan_execution():
+def test_multi_strategy_parallel_scan_execution(monkeypatch):
     """Verify run_multi_strategy_parallel_scan runs across all 5 strategies concurrently."""
+    import earnings_engine.data.breakout_scanner as bks_mod
+
+    def _mock_score(ticker, settings, strategy="CLASSIC_TECHNICAL", use_live_quote=True):
+        return {
+            "ticker": ticker,
+            "strategy": strategy,
+            "composite_score": 75.0,
+            "breakout_trigger": 1000.0,
+            "signal_price": 980.0,
+            "target_price": 1100.0,
+            "stop_loss": 940.0,
+            "setup_archetype": "Parallel Sweep Setup",
+            "pct_from_high": -2.0,
+            "volume_ratio": 2.0,
+            "tier": "HOT",
+        }
+
+    monkeypatch.setattr(bks_mod, "_score_single_ticker", _mock_score)
+
     settings = Settings()
     test_tickers = ["TCS.NS", "INFY.NS", "RELIANCE.NS"]
     res = run_multi_strategy_parallel_scan(settings=settings, tickers=test_tickers, min_score=20.0)

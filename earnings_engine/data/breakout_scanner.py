@@ -185,28 +185,51 @@ _pool: dict[str, Any] = {
 _cache = _pool
 
 
+def _pool_key(ticker: str, strategy: str | None = None) -> str:
+    """Generate unique pool key attaching strategy to ticker."""
+    strat = (strategy or "CLASSIC_TECHNICAL").upper().strip()
+    return f"{ticker}::{strat}"
+
+
+
 def _rebuild_candidates() -> None:
-    """Merge hot + warm pools into a deduplicated, sorted candidates list."""
+    """Merge hot + warm pools into a deduplicated, sorted candidates list with strategy grouping."""
     merged: dict[str, dict] = {}
-    for ticker, entry in _pool["hot"].items():
-        merged[ticker] = entry["result"]
-    for ticker, entry in _pool["warm"].items():
-        if ticker not in merged:
-            merged[ticker] = entry["result"]
+    strat_pools: dict[str, Any] = {}
+
+    for key, entry in _pool["hot"].items():
+        r = entry.get("result", {})
+        if r:
+            merged[key] = r
+    for key, entry in _pool["warm"].items():
+        if key not in merged:
+            r = entry.get("result", {})
+            if r:
+                merged[key] = r
 
     candidates = [r for r in merged.values() if r.get("composite_score", 0) >= BREAKOUT_MIN_SCORE]
     candidates.sort(key=lambda x: x.get("composite_score", 0), reverse=True)
     _pool["candidates"] = candidates[:BREAKOUT_MAX_CANDIDATES]
+
+    # Group into per-strategy candidate pools
+    for strat_id in BREAKOUT_STRATEGIES.keys():
+        s_cands = [c for c in candidates if (c.get("strategy") or "CLASSIC_TECHNICAL").upper() == strat_id]
+        strat_pools[strat_id] = {
+            "candidates": s_cands,
+            "last_scan_at": _pool.get("last_scan_at"),
+        }
+    _pool["strategy_pools"] = strat_pools
     _pool["hot_count"] = len(_pool["hot"])
     _pool["warm_count"] = len(_pool["warm"])
 
 
 def _init_breakout_db(conn: Any) -> None:
-    """Ensure breakout_radar table and performance indices exist."""
+    """Ensure breakout_radar table and performance indices exist with strategy tracking."""
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS breakout_radar (
-            ticker TEXT PRIMARY KEY,
+            ticker TEXT NOT NULL,
+            strategy TEXT NOT NULL DEFAULT 'CLASSIC_TECHNICAL',
             tier TEXT NOT NULL DEFAULT 'WARM',
             company_name TEXT,
             industry TEXT,
@@ -240,7 +263,8 @@ def _init_breakout_db(conn: Any) -> None:
             scanned_at TEXT,
             data_json TEXT,
             created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now'))
+            updated_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY(ticker, strategy)
         )
         """
     )
@@ -248,6 +272,7 @@ def _init_breakout_db(conn: Any) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_tier ON breakout_radar(tier)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_score ON breakout_radar(composite_score DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_scanned_at ON breakout_radar(scanned_at DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_strategy ON breakout_radar(strategy)")
     except Exception:
         pass
 
@@ -263,24 +288,26 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
         seen: set[str] = set()
 
         # 1. Hot pool
-        for sym, entry in _pool.get("hot", {}).items():
+        for key, entry in _pool.get("hot", {}).items():
             r = entry.get("result", {})
-            if r and sym not in seen:
-                seen.add(sym)
+            if r and key not in seen:
+                seen.add(key)
                 records.append({**r, "tier": "HOT"})
 
         # 2. Warm pool
-        for sym, entry in _pool.get("warm", {}).items():
+        for key, entry in _pool.get("warm", {}).items():
             r = entry.get("result", {})
-            if r and sym not in seen:
-                seen.add(sym)
+            if r and key not in seen:
+                seen.add(key)
                 records.append({**r, "tier": "WARM"})
 
         # 3. Candidates
         for r in _pool.get("candidates", []):
             sym = r.get("ticker")
-            if sym and sym not in seen:
-                seen.add(sym)
+            strat = r.get("strategy") or "CLASSIC_TECHNICAL"
+            key = f"{sym}::{strat}"
+            if sym and key not in seen:
+                seen.add(key)
                 records.append({**r, "tier": r.get("tier", "WARM")})
 
         if not records:
@@ -292,9 +319,11 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             ticker = r.get("ticker")
             if not ticker:
                 continue
+            strat = (r.get("strategy") or "CLASSIC_TECHNICAL").upper().strip()
             sig_date = str(r.get("signal_date") or r.get("asof_date") or now_iso[:10]).strip()
             rows_to_insert.append((
                 ticker,
+                strat,
                 r.get("tier", "WARM"),
                 r.get("company_name") or ticker,
                 r.get("industry") or "—",
@@ -332,7 +361,7 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
 
         upsert_sql = """
         INSERT INTO breakout_radar (
-            ticker, tier, company_name, industry, composite_score,
+            ticker, strategy, tier, company_name, industry, composite_score,
             resistance_score, volume_score, compression_score, momentum_score, fundamental_score,
             signal_date, signal_price, predicted_value, breakout_trigger, target_price,
             stop_loss, risk_reward_ratio, current_price, current_date, realized_return_pct,
@@ -340,7 +369,7 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             days_elapsed, setup_archetype, volume_ratio, atr_pct, pct_from_high,
             avg_quality_score, scanned_at, data_json, updated_at
         ) VALUES (
-            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
@@ -348,7 +377,7 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?
         )
-        ON CONFLICT(ticker) DO UPDATE SET
+        ON CONFLICT(ticker, strategy) DO UPDATE SET
             tier = excluded.tier,
             company_name = excluded.company_name,
             industry = excluded.industry,
@@ -384,13 +413,19 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             updated_at = excluded.updated_at
         """
 
-        if hasattr(conn, "executemany"):
-            conn.executemany(upsert_sql, rows_to_insert)
+        try:
+            if hasattr(conn, "executemany"):
+                conn.executemany(upsert_sql, rows_to_insert)
+        except Exception:
+            # Fallback for single-column primary key
+            fallback_sql = upsert_sql.replace("ON CONFLICT(ticker, strategy)", "ON CONFLICT(ticker)")
+            if hasattr(conn, "executemany"):
+                conn.executemany(fallback_sql, rows_to_insert)
 
         # 2. Also persist / upsert to permanent historical archive: breakout_tracked_signals
         upsert_tracked_sql = """
         INSERT INTO breakout_tracked_signals (
-            ticker, tier, company_name, industry, composite_score,
+            ticker, strategy, tier, company_name, industry, composite_score,
             resistance_score, volume_score, compression_score, momentum_score, fundamental_score,
             signal_date, signal_price, predicted_value, breakout_trigger, target_price,
             stop_loss, risk_reward_ratio, current_price, current_date, realized_return_pct,
@@ -398,7 +433,7 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             days_elapsed, setup_archetype, volume_ratio, atr_pct, pct_from_high,
             avg_quality_score, scanned_at, data_json, created_at, updated_at
         ) VALUES (
-            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
@@ -406,7 +441,7 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?
         )
-        ON CONFLICT(ticker, signal_date) DO UPDATE SET
+        ON CONFLICT(ticker, strategy, signal_date) DO UPDATE SET
             tier = excluded.tier,
             company_name = excluded.company_name,
             industry = excluded.industry,
@@ -442,39 +477,36 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
         """
         rows_for_tracked = []
         for r_tuple in rows_to_insert:
-            # Tuple: ticker, tier, company_name, ..., updated_at (34 items)
-            # For tracked, we only archive setups that have actually breached/triggered
+            # Tuple: ticker, strategy, tier, company_name, ..., updated_at (35 items)
             t_list = list(r_tuple)
-            if not t_list[10]:
-                t_list[10] = t_list[31][:10] if t_list[31] else now_iso[:10]
+            if not t_list[11]:
+                t_list[11] = t_list[32][:10] if t_list[32] else now_iso[:10]
             
-            sig_px = t_list[11]
-            trig_px = t_list[13]
-            curr_px = t_list[17]
-            happened = t_list[21]
-            outc = str(t_list[22] or "").upper()
-
-            is_breached = (
-                bool(happened)
-                or (sig_px is not None and trig_px is not None and sig_px >= trig_px)
-                or (curr_px is not None and trig_px is not None and curr_px >= trig_px)
-                or (outc not in ("PENDING", "ACTIVE", ""))
-            )
+            sig_p = t_list[12]
+            trig_p = t_list[14]
+            cur_p = t_list[18]
+            outcome = t_list[23]
+            is_breached = bool(t_list[22]) or (sig_p and trig_p and sig_p >= trig_p) or (cur_p and trig_p and cur_p >= trig_p) or (outcome not in ("PENDING", "ACTIVE", ""))
+            
             if is_breached:
-                rows_for_tracked.append(tuple(t_list + [now_iso]))
+                t_list_tracked = list(t_list)
+                t_list_tracked.append(now_iso)  # created_at
+                rows_for_tracked.append(tuple(t_list_tracked))
 
-        if hasattr(conn, "executemany") and rows_for_tracked:
+        if rows_for_tracked:
             try:
-                conn.executemany(upsert_tracked_sql, rows_for_tracked)
-            except Exception as e_track:
-                logger.debug("[BREAKOUT-DB] Tracked signals archive upsert notice: %s", e_track)
+                if hasattr(conn, "executemany"):
+                    conn.executemany(upsert_tracked_sql, rows_for_tracked)
+            except Exception:
+                fallback_tracked = upsert_tracked_sql.replace("ON CONFLICT(ticker, strategy, signal_date)", "ON CONFLICT(ticker, signal_date)")
+                if hasattr(conn, "executemany"):
+                    conn.executemany(fallback_tracked, rows_for_tracked)
 
         if hasattr(conn, "commit"):
             conn.commit()
-
         logger.debug("[BREAKOUT-DB] Persisted %d candidates to breakout_radar and %d breached setups to breakout_tracked_signals.", len(rows_to_insert), len(rows_for_tracked))
     except Exception as e:
-        logger.warning("[BREAKOUT-DB] Failed to persist breakout pool to DB: %s", e)
+        logger.error("[BREAKOUT-DB] Failed persisting breakout setups to DB: %s", e)
 
 
 def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
@@ -489,44 +521,49 @@ def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
         if not rows:
             return False
 
+        col_names = [d[0] for d in cur.description] if cur.description else []
         hot_count = 0
         warm_count = 0
         for row in rows:
-            data = None
-            tier = "WARM"
-            ticker = ""
+            if hasattr(row, "keys"):
+                row_dict = dict(row)
+            elif col_names and isinstance(row, (tuple, list)):
+                row_dict = dict(zip(col_names, row))
+            elif hasattr(row, "get"):
+                row_dict = dict(row)
+            else:
+                row_dict = {}
 
-            if hasattr(row, "get"):
-                ticker = row.get("ticker", "")
-                tier = (row.get("tier") or "WARM").upper()
-                raw_json = row.get("data_json")
-                if raw_json:
-                    try:
-                        data = json.loads(raw_json)
-                    except Exception:
-                        pass
-                if not data:
-                    data = dict(row)
-            elif isinstance(row, (tuple, list)) and len(row) > 0:
-                ticker = str(row[0])
-                tier = str(row[1]).upper()
-                if len(row) >= 33 and row[32]:
-                    try:
-                        data = json.loads(row[32])
-                    except Exception:
-                        pass
-                if not data:
-                    data = {"ticker": ticker, "tier": tier}
+            ticker = str(row_dict.get("ticker") or "")
+            tier = str(row_dict.get("tier") or "WARM").upper()
+            strat = str(row_dict.get("strategy") or "CLASSIC_TECHNICAL").upper().strip()
+
+            raw_json = row_dict.get("data_json")
+            data = None
+            if raw_json:
+                try:
+                    data = json.loads(raw_json)
+                except Exception:
+                    data = None
+            if not data:
+                data = row_dict
 
             if not data or not ticker:
                 continue
 
+            clean_sym = ticker.upper().strip()
+            if "TEST" in clean_sym or "MOCK" in clean_sym or "DUMMY" in clean_sym:
+                continue
+
+            data["strategy"] = strat
             data["tier"] = tier
+            key = f"{ticker}::{strat}"
+
             if tier == "HOT":
-                _pool["hot"][ticker] = {"result": data, "consecutive_low": 0}
+                _pool["hot"][key] = {"result": data, "consecutive_low": 0}
                 hot_count += 1
             else:
-                _pool["warm"][ticker] = {"result": data, "consecutive_low": 0}
+                _pool["warm"][key] = {"result": data, "consecutive_low": 0}
                 warm_count += 1
 
         _rebuild_candidates()
@@ -647,6 +684,7 @@ def get_breakout_audit_log(
                        score_before, score_after, price, trigger_price,
                        reason, catalyst_impact, created_at
                 FROM breakout_audit_log
+                WHERE UPPER(ticker) NOT LIKE '%TEST%' AND UPPER(ticker) NOT LIKE '%MOCK%' AND UPPER(ticker) NOT LIKE '%DUMMY%'
                 ORDER BY id DESC LIMIT ?
                 """,
                 (limit,),
@@ -1215,21 +1253,27 @@ def get_tracked_breakouts(
 def _promote(ticker: str, result: dict, settings: Settings | None = None) -> None:
     """Place a ticker into the correct tier based on its score and audit the transition."""
     settings = settings or Settings()
+    strat = (result.get("strategy") or "CLASSIC_TECHNICAL").upper().strip()
+    result["strategy"] = strat
+    key = _pool_key(ticker, strat)
     new_score = result.get("composite_score", 0)
     cur_p = result.get("current_price") or result.get("signal_price")
     trig_p = result.get("breakout_trigger")
     vol_r = result.get("volume_ratio", 1.0)
     cat_headline = (result.get("catalyst_headlines") or [None])[0]
 
-    if _should_be_hot(result):
-        was_warm = ticker in _pool["warm"]
-        was_hot = ticker in _pool["hot"]
-        _pool["hot"][ticker] = {"result": result, "consecutive_low": 0}
-        _pool["warm"].pop(ticker, None)
+    tier = str(result.get("tier") or ("HOT" if _should_be_hot(result) else ("WARM" if new_score >= WARM_THRESHOLD else "WARM"))).upper()
+    result["tier"] = tier
+
+    if tier == "HOT":
+        was_warm = key in _pool["warm"]
+        was_hot = key in _pool["hot"]
+        _pool["hot"][key] = {"result": result, "consecutive_low": 0}
+        _pool["warm"].pop(key, None)
 
         if not was_hot:
             from_t = "WARM" if was_warm else "COLD"
-            reason_str = f"Promoted to HOT: Score {new_score:.1f} (>= {HOT_THRESHOLD}) with volume ratio {vol_r:.2f}x approaching resistance/trigger ₹{trig_p}"
+            reason_str = f"Promoted to HOT ({strat}): Score {new_score:.1f} (>= {HOT_THRESHOLD}) with volume ratio {vol_r:.2f}x approaching resistance/trigger ₹{trig_p}"
             if cat_headline:
                 reason_str += f" + News: {cat_headline}"
             record_breakout_transition(
@@ -1246,12 +1290,12 @@ def _promote(ticker: str, result: dict, settings: Settings | None = None) -> Non
                 settings=settings,
             )
 
-    elif new_score >= WARM_THRESHOLD:
-        if ticker not in _pool["hot"]:
-            was_warm = ticker in _pool["warm"]
-            _pool["warm"][ticker] = {"result": result, "consecutive_low": 0}
+    elif new_score >= WARM_THRESHOLD or tier == "WARM":
+        if key not in _pool["hot"]:
+            was_warm = key in _pool["warm"]
+            _pool["warm"][key] = {"result": result, "consecutive_low": 0}
             if not was_warm:
-                reason_str = f"Added to WARM: Coiling compression setup with score {new_score:.1f} (>= {WARM_THRESHOLD})"
+                reason_str = f"Added to WARM ({strat}): Coiling compression setup with score {new_score:.1f} (>= {WARM_THRESHOLD})"
                 record_breakout_transition(
                     ticker=ticker,
                     event_type="ADDED_WARM",
@@ -1270,7 +1314,14 @@ def _promote(ticker: str, result: dict, settings: Settings | None = None) -> Non
 def _demote_hot(ticker: str, settings: Settings | None = None) -> None:
     """Demote a Hot ticker: increment consecutive_low, remove after 2 strikes with audit log."""
     settings = settings or Settings()
-    entry = _pool["hot"].get(ticker)
+    key = ticker if "::" in ticker else _pool_key(ticker)
+    entry = _pool["hot"].get(key)
+    if not entry:
+        for k, v in _pool["hot"].items():
+            if k.startswith(f"{ticker}::"):
+                key = k
+                entry = v
+                break
     if not entry:
         return
     entry["consecutive_low"] += 1
@@ -1279,13 +1330,14 @@ def _demote_hot(ticker: str, settings: Settings | None = None) -> None:
         score = result.get("composite_score", 0)
         cur_p = result.get("current_price") or result.get("signal_price")
         trig_p = result.get("breakout_trigger")
-        del _pool["hot"][ticker]
+        t_clean = result.get("ticker", key.split("::")[0])
+        del _pool["hot"][key]
 
         # Maybe keep in warm if score still qualifies
         if score >= WARM_THRESHOLD:
-            _pool["warm"][ticker] = {"result": result, "consecutive_low": 0}
+            _pool["warm"][key] = {"result": result, "consecutive_low": 0}
             record_breakout_transition(
-                ticker=ticker,
+                ticker=t_clean,
                 event_type="DEMOTED_WARM",
                 from_tier="HOT",
                 to_tier="WARM",
@@ -1296,10 +1348,10 @@ def _demote_hot(ticker: str, settings: Settings | None = None) -> None:
                 reason=f"Demoted HOT ➔ WARM: Score dropped to {score:.1f} (< {HOT_DEMOTION_THRESHOLD}) for 2 consecutive scan cycles",
                 settings=settings,
             )
-            logger.debug("[BREAKOUT] %s demoted Hot → Warm (score %.1f)", ticker, score)
+            logger.debug("[BREAKOUT] %s demoted Hot → Warm (score %.1f)", key, score)
         else:
             record_breakout_transition(
-                ticker=ticker,
+                ticker=t_clean,
                 event_type="REMOVED_COLD",
                 from_tier="HOT",
                 to_tier="COLD",
@@ -1310,13 +1362,20 @@ def _demote_hot(ticker: str, settings: Settings | None = None) -> None:
                 reason=f"Removed from Breakout Radar: Score fell to {score:.1f} below minimum setup criteria",
                 settings=settings,
             )
-            logger.debug("[BREAKOUT] %s demoted Hot → Cold (score %.1f)", ticker, score)
+            logger.debug("[BREAKOUT] %s demoted Hot → Cold (score %.1f)", key, score)
 
 
 def _demote_warm(ticker: str, settings: Settings | None = None) -> None:
     """Demote a Warm ticker: increment consecutive_low, remove after 2 strikes with audit log."""
     settings = settings or Settings()
-    entry = _pool["warm"].get(ticker)
+    key = ticker if "::" in ticker else _pool_key(ticker)
+    entry = _pool["warm"].get(key)
+    if not entry:
+        for k, v in _pool["warm"].items():
+            if k.startswith(f"{ticker}::"):
+                key = k
+                entry = v
+                break
     if not entry:
         return
     entry["consecutive_low"] += 1
@@ -1325,8 +1384,9 @@ def _demote_warm(ticker: str, settings: Settings | None = None) -> None:
         score = result.get("composite_score", 0)
         cur_p = result.get("current_price") or result.get("signal_price")
         trig_p = result.get("breakout_trigger")
+        t_clean = result.get("ticker", key.split("::")[0])
         record_breakout_transition(
-            ticker=ticker,
+            ticker=t_clean,
             event_type="REMOVED_COLD",
             from_tier="WARM",
             to_tier="COLD",
@@ -1337,8 +1397,8 @@ def _demote_warm(ticker: str, settings: Settings | None = None) -> None:
             reason=f"Removed from Warm Pool: Score dropped to {score:.1f} (< {WARM_DEMOTION_THRESHOLD}) for 2 consecutive cycles",
             settings=settings,
         )
-        logger.debug("[BREAKOUT] %s demoted Warm → Cold (score %.1f)", ticker, score)
-        del _pool["warm"][ticker]
+        logger.debug("[BREAKOUT] %s demoted Warm → Cold (score %.1f)", key, score)
+        del _pool["warm"][key]
 
 
 def get_tracked_ticker_set(settings: Settings | None = None) -> set[str]:
@@ -1367,26 +1427,23 @@ def get_cached_scan_results(
     """Return breakout candidates, optionally filtered by universe, point-in-time as-of date, and strategy."""
     settings = settings or Settings()
     strategy_clean = (strategy or "CLASSIC_TECHNICAL").upper().strip()
-    if strategy_clean not in BREAKOUT_STRATEGIES:
-        strategy_clean = "CLASSIC_TECHNICAL"
+
+    if not _pool.get("candidates"):
+        load_breakout_pool_from_db(settings)
 
     if asof_date:
         candidates = run_breakout_scan(settings, universe=universe, asof_date=asof_date, strategy=strategy_clean)
     else:
-        if strategy_clean == "CLASSIC_TECHNICAL":
-            if not _pool.get("candidates"):
-                load_breakout_pool_from_db(settings)
-            candidates = list(_pool["candidates"])
+        if strategy_clean in ("ALL", "*"):
+            candidates = list(_pool.get("candidates", []))
         else:
             strat_pool = _pool.get("strategy_pools", {}).get(strategy_clean)
             if strat_pool and strat_pool.get("candidates"):
                 candidates = list(strat_pool["candidates"])
             else:
-                candidates = run_breakout_scan(settings, universe=universe, strategy=strategy_clean)
-                _pool.setdefault("strategy_pools", {})[strategy_clean] = {
-                    "candidates": candidates,
-                    "last_scan_at": datetime.now(timezone.utc).isoformat(),
-                }
+                candidates = [c for c in _pool.get("candidates", []) if (c.get("strategy") or "CLASSIC_TECHNICAL").upper() == strategy_clean]
+                if not candidates and strategy_clean == "CLASSIC_TECHNICAL":
+                    candidates = list(_pool.get("candidates", []))
 
     # Enrich candidates with real-tracked status badge
     tracked_set = get_tracked_ticker_set(settings)
@@ -1433,16 +1490,17 @@ def get_cached_scan_results(
 def get_scan_status(universe: str | None = None) -> dict[str, Any]:
     """Return a lightweight status dict for the API."""
     return {
-        "status": _pool["status"],
-        "last_scan_at": _pool["last_scan_at"],
-        "last_cold_scan_at": _pool["last_cold_scan_at"],
-        "last_warm_scan_at": _pool["last_warm_scan_at"],
-        "last_hot_scan_at": _pool["last_hot_scan_at"],
-        "last_scan_duration_s": _pool["last_scan_duration_s"],
-        "cold_tickers_scanned": _pool["cold_tickers_scanned"],
-        "hot_count": _pool["hot_count"],
-        "warm_count": _pool["warm_count"],
-        "candidates_found": len(_pool["candidates"]),
+        "status": _pool.get("status", "idle"),
+        "is_scanning": _pool.get("status") == "running",
+        "last_scan_at": _pool.get("last_scan_at"),
+        "last_cold_scan_at": _pool.get("last_cold_scan_at"),
+        "last_warm_scan_at": _pool.get("last_warm_scan_at"),
+        "last_hot_scan_at": _pool.get("last_hot_scan_at"),
+        "last_scan_duration_s": _pool.get("last_scan_duration_s", 0.0),
+        "cold_tickers_scanned": _pool.get("cold_tickers_scanned", 0),
+        "hot_count": _pool.get("hot_count", 0),
+        "warm_count": _pool.get("warm_count", 0),
+        "candidates_found": len(_pool.get("candidates", [])),
         "universe": universe or "ALL",
         "min_score": BREAKOUT_MIN_SCORE,
         "scan_intervals": {
@@ -1450,7 +1508,7 @@ def get_scan_status(universe: str | None = None) -> dict[str, Any]:
             "warm_min": WARM_INTERVAL_MIN,
             "hot_min": HOT_INTERVAL_MIN,
         },
-        "error": _pool["error"],
+        "error": _pool.get("error"),
     }
 
 
@@ -2916,9 +2974,9 @@ def run_cold_scan(
 
 
 def run_warm_rescore(settings: Settings) -> None:
-    """T1 Warm Rescore: rescore only warm-pool tickers."""
-    warm_tickers = list(_pool["warm"].keys())
-    if not warm_tickers:
+    """T1 Warm Rescore: rescore only warm-pool setups."""
+    warm_keys = list(_pool["warm"].keys())
+    if not warm_keys:
         return
 
     t0 = time.perf_counter()
@@ -2928,51 +2986,43 @@ def run_warm_rescore(settings: Settings) -> None:
     from earnings_engine.data.prices import fetch_batch_live_quotes
     from concurrent.futures import ThreadPoolExecutor
 
-    # 1. Batch fetch latest quotes in parallel for warm setups
+    # 1. Extract tickers for live quote batch fetch
+    tickers_to_fetch = list({k.split("::")[0] for k in warm_keys})
     try:
-        fetch_batch_live_quotes(warm_tickers, settings=settings, sync_db=True, max_workers=8)
+        fetch_batch_live_quotes(tickers_to_fetch, settings=settings, sync_db=True, max_workers=8)
     except Exception as e:
         logger.debug("[BREAKOUT-WARM] Batch live quote fetch warning: %s", e)
 
-    # 2. Rescore warm tickers
-    def _score(ticker: str) -> tuple[str, dict | None]:
-        return ticker, _score_single_ticker(ticker, settings, use_live_quote=False)
+    # 2. Rescore warm tickers per strategy
+    def _score(key: str) -> tuple[str, dict | None]:
+        parts = key.split("::")
+        ticker = parts[0]
+        strat = parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL"
+        return key, _score_single_ticker(ticker, settings, strategy=strat, use_live_quote=False)
 
     with ThreadPoolExecutor(max_workers=6) as executor:
-        scored = list(executor.map(_score, warm_tickers))
+        scored = list(executor.map(_score, warm_keys))
 
-    for ticker, result in scored:
+    for key, result in scored:
         if result is None:
-            _demote_warm(ticker, settings=settings)
+            _demote_warm(key, settings=settings)
             continue
+
+        parts = key.split("::")
+        ticker = parts[0]
+        strat = parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL"
+        result["strategy"] = strat
 
         new_score = result.get("composite_score", 0)
         if _should_be_hot(result):
-            # Promote to hot
-            _pool["warm"].pop(ticker, None)
-            _pool["hot"][ticker] = {"result": result, "consecutive_low": 0}
-            cur_p = result.get("current_price") or result.get("signal_price")
-            trig_p = result.get("breakout_trigger")
-            record_breakout_transition(
-                ticker=ticker,
-                event_type="PROMOTED_HOT",
-                from_tier="WARM",
-                to_tier="HOT",
-                score_before=None,
-                score_after=new_score,
-                price=cur_p,
-                trigger_price=trig_p,
-                reason=f"Warm setup upgraded to HOT: Score {new_score:.1f} crossed threshold",
-                settings=settings,
-            )
+            _promote(ticker, result, settings=settings)
         elif new_score >= WARM_THRESHOLD:
-            _pool["warm"][ticker] = {"result": result, "consecutive_low": 0}
+            _pool["warm"][key] = {"result": result, "consecutive_low": 0}
         elif new_score < WARM_DEMOTION_THRESHOLD:
-            _demote_warm(ticker, settings=settings)
+            _demote_warm(key, settings=settings)
         else:
-            # Between demotion threshold and warm threshold: keep but update
-            if ticker in _pool["warm"]:
-                _pool["warm"][ticker]["result"] = result
+            if key in _pool["warm"]:
+                _pool["warm"][key]["result"] = result
 
     _rebuild_candidates()
     save_breakout_pool_to_db(settings)
@@ -2982,7 +3032,7 @@ def run_warm_rescore(settings: Settings) -> None:
     _pool["last_warm_scan_at"] = now_iso
     _pool["last_scan_at"] = now_iso
 
-    summary_msg = f"Rescored {len(warm_tickers)} warm tickers (hot={len(_pool['hot'])}, warm={len(_pool['warm'])})"
+    summary_msg = f"Rescored {len(warm_keys)} warm setups (hot={len(_pool['hot'])}, warm={len(_pool['warm'])})"
     record_job_finish("breakout_warm_rescore", elapsed, summary_msg, settings=settings)
 
     logger.info(
@@ -2992,9 +3042,9 @@ def run_warm_rescore(settings: Settings) -> None:
 
 
 def run_hot_rescore(settings: Settings) -> None:
-    """T2 Hot Rescore: rescore only hot-pool tickers in parallel batches for maximum freshness."""
-    hot_tickers = list(_pool["hot"].keys())
-    if not hot_tickers:
+    """T2 Hot Rescore: rescore only hot-pool setups in parallel batches for maximum freshness."""
+    hot_keys = list(_pool["hot"].keys())
+    if not hot_keys:
         return
 
     t0 = time.perf_counter()
@@ -3005,36 +3055,43 @@ def run_hot_rescore(settings: Settings) -> None:
     from concurrent.futures import ThreadPoolExecutor
 
     # 1. Batch fetch latest live market quotes in parallel (single sub-second batch)
+    tickers_to_fetch = list({k.split("::")[0] for k in hot_keys})
     try:
-        fetch_batch_live_quotes(hot_tickers, settings=settings, sync_db=True, max_workers=8)
+        fetch_batch_live_quotes(tickers_to_fetch, settings=settings, sync_db=True, max_workers=8)
     except Exception as e:
         logger.debug("[BREAKOUT-HOT] Batch live quote fetch warning: %s", e)
 
     # 2. Rescore hot tickers with freshest prices
-    def _score(ticker: str) -> tuple[str, dict | None]:
-        return ticker, _score_single_ticker(ticker, settings, use_live_quote=False)
+    def _score(key: str) -> tuple[str, dict | None]:
+        parts = key.split("::")
+        ticker = parts[0]
+        strat = parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL"
+        return key, _score_single_ticker(ticker, settings, strategy=strat, use_live_quote=False)
 
     with ThreadPoolExecutor(max_workers=6) as executor:
-        scored = list(executor.map(_score, hot_tickers))
+        scored = list(executor.map(_score, hot_keys))
 
-    for ticker, result in scored:
+    for key, result in scored:
         if result is None:
-            _demote_hot(ticker, settings=settings)
+            _demote_hot(key, settings=settings)
             continue
+
+        parts = key.split("::")
+        ticker = parts[0]
+        strat = parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL"
+        result["strategy"] = strat
 
         new_score = result.get("composite_score", 0)
         if _should_be_hot(result):
-            _pool["hot"][ticker] = {"result": result, "consecutive_low": 0}
+            _pool["hot"][key] = {"result": result, "consecutive_low": 0}
         elif new_score < HOT_DEMOTION_THRESHOLD:
-            # Score dropped: track for two-strike demotion
-            if ticker in _pool["hot"]:
-                _pool["hot"][ticker]["result"] = result
-                _demote_hot(ticker, settings=settings)
+            if key in _pool["hot"]:
+                _pool["hot"][key]["result"] = result
+                _demote_hot(key, settings=settings)
         else:
-            # Between demotion threshold and hot threshold: keep but update
-            if ticker in _pool["hot"]:
-                _pool["hot"][ticker]["result"] = result
-                _pool["hot"][ticker]["consecutive_low"] = 0
+            if key in _pool["hot"]:
+                _pool["hot"][key]["result"] = result
+                _pool["hot"][key]["consecutive_low"] = 0
 
     _rebuild_candidates()
     save_breakout_pool_to_db(settings)

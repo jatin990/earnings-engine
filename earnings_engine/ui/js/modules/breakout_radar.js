@@ -683,6 +683,7 @@
                             <div style="font-size:0.67rem;color:#94a3b8;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.company_name || ctx.ticker}">${ctx.company}</div>
                             <div style="margin-top:0.1rem;display:flex;gap:0.25rem;flex-wrap:wrap;align-items:center;">
                                 <span style="font-size:0.60rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;">${ctx.archetype}</span>
+                                ${c.strategy ? `<span style="font-size:0.60rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-weight:700;" title="Strategy Model: ${c.strategy}">🎯 ${String(c.strategy).replace(/_/g, ' ')}</span>` : ''}
                                 <button type="button" onclick="app.openBreakoutHistoryModal('${ctx.ticker}', event)" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-size:0.60rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.2rem;" title="View Transition Lifecycle & Notes Timeline (Warm ➔ Hot ➔ Breakout)">
                                     📜 History
                                 </button>
@@ -1716,27 +1717,86 @@
             if (clearBtn) clearBtn.style.display = 'block';
         };
 
+        app.startBreakoutPolling = function(maxAttempts = 30, intervalMs = 3000) {
+            if (app._breakoutPollTimer) {
+                clearInterval(app._breakoutPollTimer);
+                app._breakoutPollTimer = null;
+            }
+            let attempts = 0;
+            const notice = document.getElementById('breakoutFilterNotice');
+            if (notice) {
+                notice.style.display = 'inline-flex';
+                notice.innerHTML = `⏱️ <strong>Scan is scheduled in background</strong> · Watching for database updates (${attempts}/${maxAttempts})... <button type="button" onclick="app.stopBreakoutPolling(); event.stopPropagation();" style="margin-left:0.45rem;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#cbd5e1;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">Dismiss</button>`;
+            }
+
+            app._breakoutPollTimer = setInterval(async () => {
+                attempts++;
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/breakout-radar/status');
+                    if (res.ok) {
+                        const status = await res.json();
+                        if (status.status === 'done' || (!status.is_scanning && attempts >= 2)) {
+                            clearInterval(app._breakoutPollTimer);
+                            app._breakoutPollTimer = null;
+                            await app.loadBreakoutRadar(false);
+                            if (typeof app.loadBreakoutAuditLog === 'function') await app.loadBreakoutAuditLog();
+                            if (typeof app.loadBreakoutSchedules === 'function') await app.loadBreakoutSchedules();
+                            if (notice) {
+                                notice.style.display = 'inline-flex';
+                                notice.innerHTML = `✅ <strong>Background scan finished</strong> · Database refreshed with latest setups! <button type="button" onclick="this.parentElement.style.display='none'; event.stopPropagation();" style="margin-left:0.45rem;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#cbd5e1;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕</button>`;
+                                setTimeout(() => { if (notice && !app._breakoutFilterBreakingOut && !app._breakoutRealTrackedOnly) notice.style.display = 'none'; }, 6000);
+                            }
+                            return;
+                        }
+                    }
+                    if (attempts % 2 === 0) {
+                        await app.loadBreakoutRadar(true);
+                    }
+                } catch (e) {
+                    console.debug('[BREAKOUT-POLL] Status error:', e);
+                }
+
+                if (attempts >= maxAttempts) {
+                    clearInterval(app._breakoutPollTimer);
+                    app._breakoutPollTimer = null;
+                    await app.loadBreakoutRadar(false);
+                    if (notice && !app._breakoutFilterBreakingOut && !app._breakoutRealTrackedOnly) {
+                        notice.style.display = 'none';
+                    }
+                }
+            }, intervalMs);
+        };
+
+        app.stopBreakoutPolling = function() {
+            if (app._breakoutPollTimer) {
+                clearInterval(app._breakoutPollTimer);
+                app._breakoutPollTimer = null;
+            }
+            const notice = document.getElementById('breakoutFilterNotice');
+            if (notice && !app._breakoutFilterBreakingOut && !app._breakoutRealTrackedOnly) {
+                notice.style.display = 'none';
+            }
+        };
+
         app.refreshBreakoutScan = async function() {
             const btn = document.getElementById('breakoutRefreshBtn');
             const icon = document.getElementById('breakoutRefreshIcon');
             const universe = document.getElementById('breakoutUniverseSelect')?.value || 'nifty_50';
             const strategy = document.getElementById('breakoutStrategySelect')?.value || app._breakoutStrategy || 'CLASSIC_TECHNICAL';
             if (btn) btn.disabled = true;
-            if (icon) icon.textContent = '\u23f3';
+            if (icon) icon.textContent = '⏱️';
             try {
                 const res = await fetch(API_BASE + '/api/v1/breakout-radar/refresh?universe=' + encodeURIComponent(universe) + '&strategy=' + encodeURIComponent(strategy), { method: 'POST' });
                 const data = await res.json();
-                if (data.success) {
-                    setTimeout(() => app.loadBreakoutRadar(), 3000);
-                    setTimeout(() => app.loadBreakoutRadar(), 10000);
-                }
+                console.log('[BREAKOUT] Schedule response:', data);
+                app.startBreakoutPolling();
             } catch (e) {
                 console.error('[BREAKOUT] Refresh error:', e);
             } finally {
                 setTimeout(() => {
                     if (btn) btn.disabled = false;
-                    if (icon) icon.textContent = '\u26a1';
-                }, 5000);
+                    if (icon) icon.textContent = '⏱️';
+                }, 3000);
             }
         };
 

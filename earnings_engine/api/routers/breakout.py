@@ -47,6 +47,9 @@ async def get_breakout_radar_endpoint(
             candidates = []
         status = await asyncio.to_thread(breakout_scanner_mod.get_scan_status, universe=universe)
 
+        # Reject any test or dummy tickers
+        candidates = [c for c in candidates if not any(x in str(c.get("ticker", "")).upper() for x in ("TEST", "MOCK", "DUMMY"))]
+
         # Apply min_score filter
         candidates = [c for c in candidates if (c.get("composite_score") or 0) >= min_score]
 
@@ -464,37 +467,62 @@ async def get_breakout_schedules_endpoint():
     return {"success": True, "count": len(breakout_schedules), "schedules": breakout_schedules}
 
 
+@router.get("/api/v1/breakout-radar/status")
+async def get_breakout_status_endpoint(universe: str | None = Query(None)):
+    """Check current background scan execution status and pool metrics."""
+    status = await asyncio.to_thread(breakout_scanner_mod.get_scan_status, universe=universe)
+    return {
+        "success": True,
+        "status": status.get("status", "idle"),
+        "is_scanning": status.get("status") == "running",
+        "last_scan_at": status.get("last_scan_at"),
+        "last_scan_duration_s": status.get("last_scan_duration_s", 0.0),
+        "hot_count": status.get("hot_count", 0),
+        "warm_count": status.get("warm_count", 0),
+        "candidates_count": status.get("candidates_count", 0),
+        "error": status.get("error"),
+    }
+
+
+@router.post("/api/v1/breakout-radar/refresh")
+async def refresh_breakout_radar_endpoint(
+    universe: str | None = Query(None),
+    strategy: str = Query("CLASSIC_TECHNICAL"),
+):
+    """Schedule breakout scan in background."""
+    from earnings_engine.data.scheduler_engine import get_scheduler_engine
+    engine = get_scheduler_engine()
+    job_id = "breakout_all_strategies_parallel" if strategy.upper() in ("ALL", "*") else f"breakout_{strategy.lower()}_scan"
+    if job_id not in engine.handlers:
+        job_id = "breakout_all_strategies_parallel"
+    dispatched = engine.dispatch_job(job_id, _settings)
+    return {
+        "success": True,
+        "status": "scheduled",
+        "job_id": job_id,
+        "dispatched": dispatched,
+        "message": "Breakout scan is scheduled in the background. Please check back in a few moments as data is populated.",
+    }
+
+
 @router.post("/api/v1/breakout-radar/schedules/parallel-scan")
 async def trigger_breakout_parallel_scan_endpoint(
     universe: str | None = Query(None, description="Universe to scan in parallel (e.g. NSE_ALL)"),
     min_score: float = Query(30.0, description="Minimum composite score threshold"),
-    background: bool = Query(False, description="Run in background thread without waiting"),
+    background: bool = Query(True, description="Run in background thread without waiting"),
 ):
-    """Trigger parallel multi-strategy breakout scan across all 5 quantitative models simultaneously."""
-    if background:
-        from earnings_engine.data.scheduler_engine import get_scheduler_engine
-        engine = get_scheduler_engine()
-        dispatched = engine.dispatch_job("breakout_all_strategies_parallel", _settings)
-        return {
-            "success": True,
-            "job_id": "breakout_all_strategies_parallel",
-            "dispatched": dispatched,
-            "message": "Dispatched parallel 5-strategy breakout scan in background thread.",
-        }
-
-    # Synchronous execution
-    try:
-        res = await asyncio.to_thread(
-            breakout_scanner_mod.run_multi_strategy_parallel_scan,
-            settings=_settings,
-            universe=universe,
-            min_score=min_score,
-            record_schedule_event=True,
-        )
-        return res
-    except Exception as e:
-        logger.exception("Error executing parallel multi-strategy breakout scan: %s", e)
-        raise HTTPException(status_code=500, detail=f"Parallel scan failed: {str(e)}")
+    """Trigger parallel multi-strategy breakout scan across all 5 quantitative models asynchronously."""
+    from earnings_engine.data.scheduler_engine import get_scheduler_engine
+    engine = get_scheduler_engine()
+    job_id = "breakout_all_strategies_parallel"
+    dispatched = engine.dispatch_job(job_id, _settings)
+    return {
+        "success": True,
+        "status": "scheduled",
+        "job_id": job_id,
+        "dispatched": dispatched,
+        "message": "Parallel 5-strategy breakout scan is scheduled in the background. Please check back in a few moments as data is populated.",
+    }
 
 
 @router.post("/api/v1/breakout-radar/schedules/configure")
@@ -524,14 +552,15 @@ async def configure_breakout_schedule_endpoint(
 
 @router.post("/api/v1/breakout-radar/schedules/{job_id}/trigger")
 async def trigger_breakout_single_schedule_endpoint(job_id: str):
-    """Trigger immediate execution of a specific breakout strategy schedule."""
+    """Trigger immediate execution of a specific breakout strategy schedule asynchronously in the background."""
     from earnings_engine.data.scheduler_engine import get_scheduler_engine
     engine = get_scheduler_engine()
     dispatched = engine.dispatch_job(job_id, _settings)
     return {
         "success": True,
+        "status": "scheduled",
         "job_id": job_id,
         "dispatched": dispatched,
-        "message": f"Triggered execution for '{job_id}' in background." if dispatched else f"Job '{job_id}' is already running.",
+        "message": f"Breakout scan for '{job_id}' is scheduled in the background. Please check back in a few moments as data is populated." if dispatched else f"Job '{job_id}' is already running.",
     }
 
