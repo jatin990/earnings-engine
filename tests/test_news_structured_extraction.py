@@ -206,3 +206,46 @@ def test_pipeline_ingestion_and_sqlite_persistence(test_settings):
     assert saved["temporal_originality"] in ("BREAKING", "NEW_PUBLICATION")
     assert saved["is_republication"] == 0
     assert "order_value_cr" in saved["financial_projections"]
+
+
+def test_news_ai_deduplication_and_db_caching(test_settings, monkeypatch):
+    """Verify that news items already analyzed and present in the DB are NOT re-queried via AI."""
+    import earnings_engine.data.ai_news_analyzer as analyzer_mod
+
+    call_count = 0
+    orig_analyze = analyzer_mod.analyze_news_catalyst_ai
+
+    def mock_analyze(ctx, settings=None):
+        nonlocal call_count
+        call_count += 1
+        return orig_analyze(ctx, settings=settings)
+
+    monkeypatch.setattr(analyzer_mod, "analyze_news_catalyst_ai", mock_analyze)
+
+    item = {
+        "ticker": "TATAMOTORS.NS",
+        "stock_name": "Tata Motors Ltd",
+        "title": "Tata Motors wins ₹5,000 Cr commercial vehicle fleet order with 16% margin",
+        "summary": "Tata Motors bags landmark order from state logistics corporation.",
+        "link": "https://example.com/tatamotors-fleet",
+        "publisher": "AutoNews",
+        "published_at": "2026-08-30 11:00:00",
+        "source": "rss_feed",
+    }
+
+    # 1. First run: should call analyze_news_catalyst_ai once
+    v1 = process_and_verify_news_items([item], settings=test_settings)
+    assert len(v1) == 1
+    assert call_count == 1
+    save_verified_news_records(v1, settings=test_settings)
+
+    # 2. Duplicate in subsequent fetch/harvest run: should NOT call analyze_news_catalyst_ai again
+    v2 = process_and_verify_news_items([item, item], settings=test_settings)
+    assert len(v2) == 1
+    assert call_count == 1  # Still 1! Reused from DB / in-memory cache
+
+    # 3. Explicit force_reanalyze: should call AI again
+    v3 = process_and_verify_news_items([item], settings=test_settings, force_reanalyze=True)
+    assert len(v3) == 1
+    assert call_count == 2  # Re-executed because force_reanalyze=True
+

@@ -72,8 +72,9 @@ def ensure_news_verification_schema(settings: Settings | None = None) -> None:
 def process_and_verify_news_items(
     raw_items: list[dict[str, Any]],
     settings: Settings | None = None,
+    force_reanalyze: bool = False,
 ) -> list[dict[str, Any]]:
-    """Pass raw news items through NewsVerifier, run OpenRouter free AI catalyst analysis, and return verified records."""
+    """Pass raw news items through NewsVerifier, run AI catalyst analysis ONLY ONCE per news item, and return verified records."""
     settings = settings or Settings()
     verifier = NewsVerifier(settings)
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -82,6 +83,7 @@ def process_and_verify_news_items(
 
     verified_records: list[dict[str, Any]] = []
     seen_hashes: set[str] = set()
+    seen_titles: set[tuple[str, str]] = set()
 
     for item in raw_items:
         v_res = verifier.verify_news_item(item)
@@ -90,15 +92,21 @@ def process_and_verify_news_items(
             continue
 
         c_hash = v_res.get("canonical_hash")
+        title = item.get("title", "").strip()
+        ticker = v_res["resolved_ticker"]
+        t_key = (ticker, title.lower())
+
         if c_hash and c_hash in seen_hashes:
             continue
+        if t_key in seen_titles:
+            continue
+
         if c_hash:
             seen_hashes.add(c_hash)
+        seen_titles.add(t_key)
 
-        title = item.get("title", "").strip()
         summary = item.get("summary", "").strip()
         scored = score_catalyst_headline(title, summary)
-        ticker = v_res["resolved_ticker"]
         pub_d = (v_res.get("published_at_utc") or "")[:10]
 
         # Calculate on last close's data; fetch price delta from market if not present or stale
@@ -152,6 +160,9 @@ def process_and_verify_news_items(
                                 sig_row = p_conn.execute(
                                     "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
                                     (ticker, pub_d),
+                                raid_fetch=True).fetchone() if hasattr(p_conn, 'raid_fetch') else p_conn.execute(
+                                    "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                                    (ticker, pub_d),
                                 ).fetchone()
                         except Exception as e:
                             logger.debug("[NEWS-PIPELINE] Auto-fetch price delta for %s failed: %s", ticker, e)
@@ -175,31 +186,75 @@ def process_and_verify_news_items(
                 logger.debug("[NEWS-PIPELINE] Price enrichment failed for %s: %s", ticker, e)
 
         # -------------------------------------------------------------------
-        # Execute Free AI Catalyst Analysis via OpenRouter
+        # Cache Check: Reuse Existing AI Analysis from Database (ONLY ONCE per news)
         # -------------------------------------------------------------------
-        ai_ctx = {
-            "ticker": ticker,
-            "stock_name": v_res["official_name"],
-            "title": title,
-            "summary": summary,
-            "signal_price": signal_price,
-            "current_price": current_price,
-            "published_at": v_res["published_at_utc"],
-            "verified_numbers": v_res.get("verified_numbers", {}),
-        }
-        ai_res = analyze_news_catalyst_ai(ai_ctx, settings=settings)
+        cached_row = None
+        if not force_reanalyze:
+            try:
+                with _connect(settings) as check_conn:
+                    check_conn.row_factory = sqlite3.Row
+                    if c_hash:
+                        cached_row = check_conn.execute(
+                            """
+                            SELECT * FROM news_catalysts
+                            WHERE (canonical_hash = ? AND canonical_hash != '') OR (ticker = ? AND title = ?)
+                            LIMIT 1
+                            """,
+                            (c_hash, ticker, title),
+                        ).fetchone()
+                    else:
+                        cached_row = check_conn.execute(
+                            "SELECT * FROM news_catalysts WHERE ticker = ? AND title = ? LIMIT 1",
+                            (ticker, title),
+                        ).fetchone()
+            except Exception as e:
+                logger.debug("[NEWS-PIPELINE] Error querying news AI cache for %s: %s", ticker, e)
 
-        ai_direction = ai_res.get("direction") or v_res["verified_direction"]
-        ai_sentiment = ai_res.get("sentiment") or ai_direction
-        ai_takeaway = ai_res.get("trading_takeaway") or scored["why_it_matters"]
-        ai_target = ai_res.get("target_price")
-        ai_stop = ai_res.get("stop_loss")
-        ai_proj = ai_res.get("financial_projections") or {}
-        ai_temp_orig = ai_res.get("temporal_originality") or "NEW_PUBLICATION"
-        ai_is_repub = 1 if ai_res.get("is_republication") else 0
-        ai_orig_rat = ai_res.get("originality_rationale") or ""
-        ai_model = ai_res.get("ai_model", "free-ai-engine")
-        ai_analyzed_at = ai_res.get("ai_analyzed_at", now_str)
+        if cached_row and (cached_row["ai_analysis"] or cached_row["ai_analyzed_at"]):
+            # Reuse existing AI analysis from the database without querying OmniRoute
+            try:
+                ai_res = json.loads(cached_row["ai_analysis"]) if isinstance(cached_row["ai_analysis"], str) else (cached_row["ai_analysis"] or {})
+            except Exception:
+                ai_res = {}
+            ai_direction = cached_row["ai_direction"] or ai_res.get("direction") or v_res["verified_direction"]
+            ai_sentiment = cached_row["sentiment"] or ai_res.get("sentiment") or ai_direction
+            ai_takeaway = cached_row["ai_takeaway"] or ai_res.get("trading_takeaway") or scored["why_it_matters"]
+            ai_target = cached_row["ai_target"] if cached_row["ai_target"] is not None else ai_res.get("target_price")
+            ai_stop = cached_row["ai_stop_loss"] if cached_row["ai_stop_loss"] is not None else ai_res.get("stop_loss")
+            ai_proj = cached_row["financial_projections"] or ai_res.get("financial_projections") or {}
+            ai_temp_orig = cached_row["temporal_originality"] or ai_res.get("temporal_originality") or "NEW_PUBLICATION"
+            ai_is_repub = cached_row["is_republication"] if cached_row["is_republication"] is not None else (1 if ai_res.get("is_republication") else 0)
+            ai_orig_rat = cached_row["originality_rationale"] or ai_res.get("originality_rationale") or ""
+            ai_model = cached_row["ai_model"] or ai_res.get("ai_model", "omniroute/cached")
+            ai_analyzed_at = cached_row["ai_analyzed_at"] or now_str
+            logger.info("[NEWS-PIPELINE] Reusing cached AI analysis from DB for %s: '%s'", ticker, title[:45])
+        else:
+            # -------------------------------------------------------------------
+            # Execute Free AI Catalyst Analysis via OmniRoute (Invoked ONLY ONCE)
+            # -------------------------------------------------------------------
+            ai_ctx = {
+                "ticker": ticker,
+                "stock_name": v_res["official_name"],
+                "title": title,
+                "summary": summary,
+                "signal_price": signal_price,
+                "current_price": current_price,
+                "published_at": v_res["published_at_utc"],
+                "verified_numbers": v_res.get("verified_numbers", {}),
+            }
+            ai_res = analyze_news_catalyst_ai(ai_ctx, settings=settings)
+
+            ai_direction = ai_res.get("direction") or v_res["verified_direction"]
+            ai_sentiment = ai_res.get("sentiment") or ai_direction
+            ai_takeaway = ai_res.get("trading_takeaway") or scored["why_it_matters"]
+            ai_target = ai_res.get("target_price")
+            ai_stop = ai_res.get("stop_loss")
+            ai_proj = ai_res.get("financial_projections") or {}
+            ai_temp_orig = ai_res.get("temporal_originality") or "NEW_PUBLICATION"
+            ai_is_repub = 1 if ai_res.get("is_republication") else 0
+            ai_orig_rat = ai_res.get("originality_rationale") or ""
+            ai_model = ai_res.get("ai_model", "free-ai-engine")
+            ai_analyzed_at = ai_res.get("ai_analyzed_at", now_str)
 
         # Merge AI impact score if more granular
         if ai_res.get("impact_score") and ai_res["impact_score"] > 0:
@@ -234,7 +289,7 @@ def process_and_verify_news_items(
             "signal_date": signal_date,
             "current_price": current_price,
             "price_change_pct": price_change_pct,
-            "ai_analysis": json.dumps(ai_res),
+            "ai_analysis": json.dumps(ai_res) if isinstance(ai_res, dict) else str(ai_res),
             "ai_takeaway": ai_takeaway,
             "ai_direction": ai_direction,
             "ai_target": ai_target,

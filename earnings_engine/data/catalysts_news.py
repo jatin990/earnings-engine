@@ -569,7 +569,7 @@ def fetch_ticker_catalysts(
         if "ticker" not in it:
             it["ticker"] = ticker
 
-    articles = process_and_verify_news_items(raw_items, settings=settings)
+    articles = process_and_verify_news_items(raw_items, settings=settings, force_reanalyze=force)
     if articles:
         save_verified_news_records(articles, settings=settings)
 
