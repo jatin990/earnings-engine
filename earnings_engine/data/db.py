@@ -49,15 +49,16 @@ def _get_thread_session() -> requests.Session:
 
 def _cache_path(settings: Settings) -> Path:
     """Return local SQLite database path with auto-migration from legacy prices.sqlite3."""
-    custom_path = os.getenv("EARNINGS_ENGINE_DB_PATH")
-    if custom_path:
-        return Path(custom_path)
+    is_test_env = bool(os.getenv("PYTEST_CURRENT_TEST"))
+    if not is_test_env:
+        custom_path = os.getenv("EARNINGS_ENGINE_DB_PATH")
+        if custom_path:
+            return Path(custom_path)
     db_filename = os.getenv("EARNINGS_ENGINE_DB_NAME", "money_club.sqlite3")
     target_path = settings.data_dirs["prices"] / db_filename
     if not target_path.exists():
         # Do not copy 527MB legacy database for tests or temporary test suites
-        is_test_env = db_filename.startswith("test_") or bool(os.getenv("PYTEST_CURRENT_TEST"))
-        if not is_test_env:
+        if not is_test_env and not db_filename.startswith("test_"):
             legacy_path = settings.data_dirs["prices"] / "prices.sqlite3"
             if legacy_path.exists() and legacy_path.stat().st_size > 0:
                 try:
