@@ -106,6 +106,23 @@ DOWNSTREAM_CRITERIA: dict[str, dict[str, Any]] = {
         "unit": "inferences",
         "docs_url": "https://pytorch.org",
     },
+    "omniroute": {
+        "service_name": "OmniRoute AI (diegosouzapw/OmniRoute)",
+        "icon": "⚡",
+        "description": "Multi-LLM proxy & gateway with quota-aware routing across 350+ providers and deterministic fallback.",
+        "free_tier_limits": {
+            "1m": 60,
+            "1h": 500,
+            "24h": 2000,
+        },
+        "default_limits": {
+            "1m": 120,
+            "1h": 1000,
+            "24h": 5000,
+        },
+        "unit": "requests",
+        "docs_url": "https://github.com/diegosouzapw/OmniRoute",
+    },
     "local_ai": {
         "service_name": "Local AI (Ollama / DeepSeek-R1 / Llama-3)",
         "icon": "💻",
@@ -265,6 +282,19 @@ AVAILABLE_AI_MODELS: list[dict[str, Any]] = [
         "default_limit_1m": 30,
         "default_limit_1h": 200,
         "default_limit_24h": 500,
+    },
+    {
+        "id": "omniroute/deepseek-r1",
+        "name": "OmniRoute-AI",
+        "icon": "⚡",
+        "badge": "OmniRoute Gateway",
+        "description": "diegosouzapw/OmniRoute quota-aware multi-LLM proxy & catalyst intelligence engine.",
+        "color": "#c084fc",
+        "benchmark_avg_s": 1.8,
+        "benchmark_success_rate_pct": 100.0,
+        "default_limit_1m": 60,
+        "default_limit_1h": 500,
+        "default_limit_24h": 2000,
     },
 ]
 

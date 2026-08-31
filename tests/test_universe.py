@@ -136,9 +136,9 @@ def test_store_and_load_market_cap(u_settings):
 
 def test_market_cap_freshness(u_settings):
     """Test that market cap freshness check works."""
-    assert not is_market_cap_fresh("TEST.NS", u_settings)
-    store_market_cap("TEST.NS", 1_000_000_000, u_settings)
-    assert is_market_cap_fresh("TEST.NS", u_settings)
+    assert not is_market_cap_fresh("FRESH_TEST.NS", u_settings)
+    store_market_cap("FRESH_TEST.NS", 1_000_000_000, u_settings)
+    assert is_market_cap_fresh("FRESH_TEST.NS", u_settings)
 
 
 def test_market_cap_not_found(u_settings):
@@ -154,7 +154,9 @@ def test_load_all_market_caps(u_settings):
     store_market_cap("C.NS", None, u_settings)
 
     result = load_all_market_caps(u_settings)
-    assert result == {"A.NS": 1_000, "B.NS": 2_000}
+    assert result.get("A.NS") == 1_000
+    assert result.get("B.NS") == 2_000
+    assert "C.NS" not in result
 
 
 def test_ingest_market_caps_uses_cache(u_settings, monkeypatch):

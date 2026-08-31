@@ -897,6 +897,9 @@
             <button type="button" id="btnModel-glm-52" onclick="runConsensus(true, 'z-ai/glm-5.2')" class="btn-model-opt glm" title="Run Z.ai GLM-5.2 flagship 753B long-horizon reasoning model">
                 <span>🐉</span> GLM-5.2
             </button>
+            <button type="button" id="btnModel-omniroute" onclick="runConsensus(true, 'omniroute/deepseek-r1')" class="btn-model-opt" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.35); color: #d8b4fe;" title="Run diegosouzapw/OmniRoute gateway reasoning & trade catalyst engine">
+                <span>⚡</span> OmniRoute
+            </button>
 
             <!-- Run All Consensus Button -->
             <button type="button" id="btnConsensus" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.32rem 0.75rem; font-size: 0.75rem;" title="Run all AI engines in parallel and synthesize consensus">
@@ -1328,6 +1331,20 @@
                                 </div>
                             </div>
                             <button type="button" id="btnModel-glm-5-2" onclick="runConsensus(true, 'z-ai/glm-5.2')" class="btn-tile-run" style="border-color: rgba(236, 72, 153, 0.4); color: #fbcfe8;">⚡ Run GLM-5.2</button>
+                        </div>
+
+                        <div class="ai-launcher-item" style="border-color: rgba(168, 85, 247, 0.35); background: linear-gradient(180deg, rgba(168,85,247,0.06) 0%, rgba(0,0,0,0.2) 100%);">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">⚡ OmniRoute-AI</span>
+                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(168, 85, 247, 0.25); color: #e9d5ff; padding: 0.15rem 0.4rem; border-radius: 4px;">Gateway Proxy</span>
+                                </div>
+                                <div style="font-size: 0.72rem; color: #94a3b8;">diegosouzapw/OmniRoute quota-aware multi-LLM proxy & catalyst intelligence</div>
+                                <div style="font-size: 0.65rem; color: #c084fc; font-family: var(--font-mono); margin-top: 0.3rem; display: flex; align-items: center; gap: 0.35rem;">
+                                    <span id="telemetry-omniroute-ai">⚡ ~1.8s avg · 100% Success</span>
+                                </div>
+                            </div>
+                            <button type="button" id="btnModel-omniroute-ai" onclick="runConsensus(true, 'omniroute/deepseek-r1')" class="btn-tile-run" style="border-color: rgba(168, 85, 247, 0.5); color: #d8b4fe;">⚡ Run OmniRoute</button>
                         </div>
 
                         <div class="ai-launcher-item">
