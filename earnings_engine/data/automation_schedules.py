@@ -174,6 +174,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "interval_seconds": 600,
         "run_after_hours": 0,
         "market_session": "market_hours_only",
+        "is_enabled": 0,
         "params_json": '{"merge_tolerance_pct": 0.5, "lookback": 120, "pred_len": 14}',
         "description": "Background Kronos AI sequence prediction for Hot pool stocks with ±0.5% audit merging.",
     },
@@ -194,6 +195,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "interval_seconds": 86400,
         "run_after_hours": 0,
         "market_session": "market_hours_only",
+        "is_enabled": 0,
         "params_json": '{"watchlist": "my_watchlist", "device": "cuda:0"}',
         "description": "Pre-computes and caches Kronos AI 14-day sequence price predictions.",
     },
@@ -214,6 +216,7 @@ def init_automation_schedules(settings: Settings | None = None) -> None:
             next_iso = (now_dt + timedelta(seconds=s["interval_seconds"])).isoformat()
             run_after = int(s.get("run_after_hours", 0))
             session = s.get("market_session", "market_hours_only")
+            is_en = int(s.get("is_enabled", 1))
             conn.execute(
                 """
                 INSERT OR IGNORE INTO automation_schedules (
@@ -230,13 +233,13 @@ def init_automation_schedules(settings: Settings | None = None) -> None:
                     s["interval_seconds"],
                     None,
                     next_iso,
-                    "active",
+                    "active" if is_en else "paused",
                     0.0,
                     0,
                     f"Initialized. Ready for scheduled run ({s['interval_seconds']}s interval).",
                     None,
                     now_iso,
-                    1,
+                    is_en,
                     s.get("params_json"),
                     run_after,
                     session,

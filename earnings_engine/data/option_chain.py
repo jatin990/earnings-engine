@@ -18,7 +18,9 @@ import pandas as pd
 from earnings_engine.config import Settings
 from earnings_engine.data.providers.provider_manager import get_data_manager
 
-logger = logging.getLogger("earnings_engine.data.option_chain")
+_NON_FNO_SYMBOLS: set[str] = set()
+_OPTION_CHAIN_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_CACHE_TTL_SECONDS = 900.0  # 15 minutes
 
 
 def analyze_option_chain(
@@ -41,23 +43,41 @@ def analyze_option_chain(
       - highest_put_oi_strike: Major support strike
     """
     clean_symbol = symbol.upper().replace(".NS", "")
-    logger.info("[OPTION-CHAIN] Analyzing Option Chain derivatives data for symbol=%s (spot=%s)...", clean_symbol, spot_price)
+
+    # Fast return from TTL cache
+    now = pd.Timestamp.now().timestamp()
+    if clean_symbol in _OPTION_CHAIN_CACHE:
+        cached_time, cached_res = _OPTION_CHAIN_CACHE[clean_symbol]
+        if (now - cached_time) < _CACHE_TTL_SECONDS:
+            return cached_res
+
+    # If known non-F&O equity, return fast baseline without hammering network
+    if clean_symbol in _NON_FNO_SYMBOLS:
+        if spot_price is None:
+            spot_price = 100.0
+        res = _compute_baseline_option_metrics(clean_symbol, spot_price)
+        _OPTION_CHAIN_CACHE[clean_symbol] = (now, res)
+        return res
+
+    logger.debug("[OPTION-CHAIN] Analyzing Option Chain derivatives data for symbol=%s (spot=%s)...", clean_symbol, spot_price)
     mgr = get_data_manager(settings)
     raw_chain = mgr.fetch_option_chain(clean_symbol)
 
     records = raw_chain.get("data", [])
     if not records:
-        logger.info("[OPTION-CHAIN] Real-time Option Chain records empty for %s; computing baseline derivatives metrics", clean_symbol)
+        _NON_FNO_SYMBOLS.add(clean_symbol)
+        logger.debug("[OPTION-CHAIN] Real-time Option Chain records empty for %s; computing baseline derivatives metrics", clean_symbol)
         # Generate synthetic calculation if spot price is provided (or fetch quote)
         if spot_price is None:
             q = mgr.fetch_quote(clean_symbol)
             spot_price = q.get("price") or 100.0
 
         res = _compute_baseline_option_metrics(clean_symbol, spot_price)
-        logger.info("[OPTION-CHAIN] [Baseline] %s -> Sentiment: %s, PCR: %s, Max Pain: %s", clean_symbol, res.get("sentiment"), res.get("pcr_oi"), res.get("max_pain_strike"))
+        _OPTION_CHAIN_CACHE[clean_symbol] = (now, res)
         return res
 
     res = _calculate_option_metrics_from_records(clean_symbol, records, spot_price)
+    _OPTION_CHAIN_CACHE[clean_symbol] = (now, res)
     logger.info("[OPTION-CHAIN] [NSE-Live] %s (%d strikes) -> Sentiment: %s, PCR(OI): %s, Max Pain: ₹%s", clean_symbol, len(records), res.get("sentiment"), res.get("pcr_oi"), res.get("max_pain_strike"))
     return res
 
