@@ -96,7 +96,7 @@ class Settings:
         default_factory=lambda: _env_int("OMNIROUTE_TIMEOUT", 15)
     )
     omniroute_fallback_url: str = field(
-        default_factory=lambda: os.getenv("OMNIROUTE_FALLBACK_URL") or os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1"
+        default_factory=lambda: os.getenv("OMNIROUTE_FALLBACK_URL") or "http://localhost:20128/v1"
     )
 
     def resolve_device(self, preferred: str | None = None) -> str:

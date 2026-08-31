@@ -344,11 +344,10 @@
                     <button type="button" id="modalBtn-mistral" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['mistralai/mistral-large'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.35);color:#fde68a;" title="Run Mistral-Large only">⚡ Mistral</button>
                     <button type="button" id="modalBtn-gemma" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['google/gemma-4-31b-it:free'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.35);color:#a5f3fc;" title="Run Gemma-4-31B Free only">💎 Gemma-31B</button>
                     <button type="button" id="modalBtn-glm" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['z-ai/glm-5.2'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(236,72,153,0.15);border:1px solid rgba(236,72,153,0.35);color:#fbcfe8;" title="Run Z.ai GLM-5.2 only">🐉 GLM-5.2</button>
-                    <button type="button" id="modalBtn-omniroute" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['omniroute/deepseek-r1'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.35);color:#d8b4fe;" title="Run OmniRoute Gateway only">⚡ OmniRoute</button>
                     <button type="button" id="modalBtn-all" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, null, true)" class="btn btn-primary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.6rem;" title="Run all AI consensus engines in parallel">🧠 All AI Suite</button>
                 </div>
-                <div id="modalRatelimitStatus" style="font-size:0.68rem;font-family:var(--font-mono);color:#34d399;background:rgba(16,185,129,0.1);padding:0.2rem 0.5rem;border-radius:4px;border:1px solid rgba(16,185,129,0.3);" title="Real-time OpenRouter & model rate limits tracking">
-                    🟢 AI Quota: 20/20 RPM
+                <div id="modalRatelimitStatus" style="font-size:0.68rem;font-family:var(--font-mono);color:#34d399;background:rgba(16,185,129,0.1);padding:0.2rem 0.5rem;border-radius:4px;border:1px solid rgba(16,185,129,0.3);" title="Real-time OmniRoute AI Gateway & model rate limits tracking">
+                    🟢 OmniRoute: Ready
                 </div>
             </div>
 
@@ -399,56 +398,6 @@
                     <div style="font-size:0.68rem;color:#a5b4fc;text-transform:uppercase;font-weight:700;margin-bottom:0.2rem;">⚡ AI Agreement</div>
                     <div id="catConsensusStrength" style="font-size:1.35rem;font-weight:800;color:#e0e7ff;font-family:var(--font-mono);">0%</div>
                     <div id="catConsensusModelCount" style="font-size:0.7rem;color:#a1a1aa;margin-top:0.2rem;">4 Models Polled</div>
-                </div>
-            </div>
-
-            <!-- Dedicated OmniRoute AI News Catalyst Intelligence Section (diegosouzapw/OmniRoute) -->
-            <div id="catModalOmniRouterSection" style="display:none;background:linear-gradient(180deg, #0e0a1f 0%, #06050e 100%);border:1px solid rgba(168,85,247,0.35);border-radius:10px;padding:0.85rem 1.1rem;margin-bottom:1rem;box-shadow:0 4px 20px rgba(0,0,0,0.4);">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.4rem;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0.45rem;">
-                    <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
-                        <span style="font-size:1.15rem;">📰</span>
-                        <strong style="color:#ffffff;font-size:0.88rem;">OmniRoute AI News Catalyst Intelligence</strong>
-                        <span id="catModalNewsModelBadge" class="signal-badge" style="background:rgba(168,85,247,0.2);color:#c084fc;font-size:0.68rem;font-family:var(--font-mono);">🤖 omnirouter/deepseek-r1</span>
-                        <span id="catModalNewsLatencyBadge" class="signal-badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:0.65rem;font-family:var(--font-mono);">⏱️ 1.25s</span>
-                        <span id="catModalNewsTokensBadge" class="signal-badge" style="background:rgba(148,163,184,0.12);color:#94a3b8;font-size:0.65rem;font-family:var(--font-mono);">🔢 450 tok</span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:0.4rem;">
-                        <span id="catModalNewsImpactBadge" class="signal-badge" style="background:rgba(239,68,68,0.2);color:#f87171;font-size:0.68rem;">🔥 HIGH (85%)</span>
-                        <button type="button" id="catModalBtnNewsRaw" onclick="app.showModalNewsRawOutput()" class="btn btn-sm" style="font-size:0.68rem;padding:0.18rem 0.5rem;background:rgba(168,85,247,0.2);border:1px solid rgba(168,85,247,0.4);color:#d8b4fe;" title="Inspect raw diegosouzapw/OmniRoute structured JSON output">📄 Raw Output</button>
-                    </div>
-                </div>
-
-                <div style="margin-bottom:0.45rem;">
-                    <a id="catModalNewsTitleLink" href="#" target="_blank" rel="noopener noreferrer" style="font-weight:700;font-size:0.88rem;color:#f8fafc;text-decoration:none;line-height:1.35;" onmouseover="this.style.color='#c084fc'" onmouseout="this.style.color='#f8fafc'">Headline Loading... ↗</a>
-                </div>
-
-                <!-- Quantitative Price Baseline Ribbon -->
-                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.45rem;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.45rem 0.65rem;font-size:0.72rem;margin-bottom:0.5rem;">
-                    <div>
-                        <span style="color:#94a3b8;display:block;">Signal Price:</span>
-                        <strong id="catModalNewsSignalPrice" style="color:#f8fafc;font-family:var(--font-mono);">₹—</strong>
-                    </div>
-                    <div>
-                        <span style="color:#94a3b8;display:block;">Live Price:</span>
-                        <strong id="catModalNewsCurrentPrice" style="color:#38bdf8;font-family:var(--font-mono);">₹—</strong>
-                    </div>
-                    <div>
-                        <span style="color:#94a3b8;display:block;">Price Delta:</span>
-                        <strong id="catModalNewsPriceDelta" style="font-family:var(--font-mono);">—</strong>
-                    </div>
-                    <div>
-                        <span style="color:#94a3b8;display:block;">AI Target:</span>
-                        <strong id="catModalNewsTarget" style="color:#34d399;font-family:var(--font-mono);">₹—</strong>
-                    </div>
-                    <div>
-                        <span style="color:#94a3b8;display:block;">Invalidation SL:</span>
-                        <strong id="catModalNewsStopLoss" style="color:#f87171;font-family:var(--font-mono);">₹—</strong>
-                    </div>
-                </div>
-
-                <div style="font-size:0.76rem;color:#38bdf8;line-height:1.4;background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.15);border-radius:6px;padding:0.4rem 0.6rem;">
-                    <strong style="color:#c084fc;">💡 Actionable Catalyst Thesis: </strong>
-                    <span id="catModalNewsTakeaway" style="color:#e2e8f0;">—</span>
                 </div>
             </div>
 
@@ -599,87 +548,6 @@
 
             <div style="display:flex;justify-content:flex-end;gap:0.5rem;padding-top:0.5rem;border-top:1px solid rgba(255,255,255,0.08);">
                 <button type="button" onclick="app.closeDashboardRawModal()" class="btn btn-secondary btn-sm" style="font-size:0.8rem;padding:0.4rem 0.9rem;">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: OMNIROUTER AI NEWS CATALYST RAW TELEMETRY & INFERENCE INSPECTOR -->
-    <div id="modalNewsRawOutput" onclick="if(event.target === this) app.closeNewsRawModal();" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:1.25rem;">
-        <div style="background:#090d16;border:1px solid rgba(168,85,247,0.3);width:100%;max-width:860px;max-height:92vh;border-radius:14px;padding:1.5rem;box-shadow:0 30px 90px rgba(0,0,0,0.95);display:flex;flex-direction:column;gap:1rem;overflow:hidden;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.75rem;gap:0.75rem;">
-                <div style="display:flex;align-items:center;gap:0.6rem;">
-                    <span style="font-size:1.4rem;">📰</span>
-                    <div>
-                        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                            <span id="newsRawModalTicker" style="font-weight:800;font-size:1.15rem;color:#ffffff;font-family:var(--font-mono);">--</span>
-                            <span id="newsRawModalStockName" style="color:#cbd5e1;font-size:0.9rem;font-weight:600;">Loading Stock...</span>
-                            <span id="newsRawModalModelBadge" class="signal-badge" style="background:rgba(168,85,247,0.2);color:#c084fc;font-size:0.72rem;font-family:var(--font-mono);">🤖 omnirouter/deepseek-r1</span>
-                        </div>
-                        <div id="newsRawModalHeadline" style="font-size:0.8rem;color:#94a3b8;margin-top:0.25rem;line-height:1.4;">Headline Loading...</div>
-                    </div>
-                </div>
-                <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
-                    <span id="newsRawModalImpactBadge" class="signal-badge" style="font-size:0.72rem;font-weight:700;padding:0.2rem 0.5rem;background:rgba(239,68,68,0.2);color:#f87171;">🔥 HIGH (85%)</span>
-                    <button type="button" onclick="app.closeNewsRawModal()" style="background:none;border:none;color:#94a3b8;font-size:1.3rem;cursor:pointer;padding:0.2rem 0.5rem;">✕</button>
-                </div>
-            </div>
-
-            <!-- Quantitative Setup Ribbon -->
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.5rem;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.6rem 0.8rem;font-size:0.72rem;">
-                <div>
-                    <span style="color:#94a3b8;display:block;">Signal Ref Close:</span>
-                    <strong id="newsRawModalSignalPrice" style="color:#f8fafc;font-family:var(--font-mono);font-size:0.82rem;">₹—</strong>
-                </div>
-                <div>
-                    <span style="color:#94a3b8;display:block;">Current Price:</span>
-                    <strong id="newsRawModalCurrentPrice" style="color:#38bdf8;font-family:var(--font-mono);font-size:0.82rem;">₹—</strong>
-                </div>
-                <div>
-                    <span style="color:#94a3b8;display:block;">Price Delta:</span>
-                    <strong id="newsRawModalPriceDelta" style="font-family:var(--font-mono);font-size:0.82rem;">—</strong>
-                </div>
-                <div>
-                    <span style="color:#94a3b8;display:block;">AI Target Price:</span>
-                    <strong id="newsRawModalTargetPrice" style="color:#34d399;font-family:var(--font-mono);font-size:0.82rem;">₹—</strong>
-                </div>
-                <div>
-                    <span style="color:#94a3b8;display:block;">Invalidation Stop:</span>
-                    <strong id="newsRawModalStopLoss" style="color:#f87171;font-family:var(--font-mono);font-size:0.82rem;">₹—</strong>
-                </div>
-                <div>
-                    <span style="color:#94a3b8;display:block;">Latency / Time:</span>
-                    <strong id="newsRawModalLatency" style="color:#fbbf24;font-family:var(--font-mono);font-size:0.82rem;">—</strong>
-                </div>
-                <div>
-                    <span style="color:#94a3b8;display:block;">Tokens Used:</span>
-                    <strong id="newsRawModalTokens" style="color:#cbd5e1;font-family:var(--font-mono);font-size:0.82rem;">—</strong>
-                </div>
-            </div>
-
-            <!-- Structured Rationale & Risk -->
-            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.75rem 0.9rem;font-size:0.78rem;display:flex;flex-direction:column;gap:0.4rem;">
-                <div><strong style="color:#c084fc;">💡 Actionable Thesis: </strong><span id="newsRawModalTakeaway" style="color:#e2e8f0;">—</span></div>
-                <div style="display:flex;gap:1.5rem;flex-wrap:wrap;color:#94a3b8;font-size:0.72rem;margin-top:0.2rem;">
-                    <div><span>Expected Horizon: </span><strong id="newsRawModalHorizon" style="color:#f8fafc;">—</strong></div>
-                    <div><span>Move Estimate: </span><strong id="newsRawModalVolatility" style="color:#fbbf24;">—</strong></div>
-                    <div><span>Primary Risk: </span><strong id="newsRawModalRisk" style="color:#fca5a5;">—</strong></div>
-                </div>
-            </div>
-
-            <!-- Raw Structured Output Block -->
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:0.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Raw Inference Payload (JSON)</span>
-                <button type="button" onclick="app.copyNewsRawOutput()" id="btnNewsCopyRaw" class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.6rem;">📋 Copy JSON</button>
-            </div>
-            <div style="flex:1;overflow-y:auto;">
-                <pre id="newsRawModalContent" style="background:#030509;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:1rem;color:#e2e8f0;font-family:var(--font-mono);font-size:0.78rem;line-height:1.55;overflow-x:auto;max-height:360px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin:0;">Loading structured analysis payload...</pre>
-            </div>
-
-            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:0.5rem;border-top:1px solid rgba(255,255,255,0.08);">
-                <div style="font-size:0.7rem;color:#64748b;font-family:var(--font-mono);">
-                    Analyzed At: <span id="newsRawModalTimestamp">—</span>
-                </div>
-                <button type="button" onclick="app.closeNewsRawModal()" class="btn btn-secondary btn-sm" style="font-size:0.8rem;padding:0.4rem 0.9rem;">Close</button>
             </div>
         </div>
     </div>

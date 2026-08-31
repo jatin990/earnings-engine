@@ -18,13 +18,13 @@
                 if (!res.ok) return;
                 const data = await res.json();
                 const rlStatusEl = document.getElementById('modalRatelimitStatus');
-                if (rlStatusEl && data.rate_limits?.downstreams?.openrouter) {
-                    const or = data.rate_limits.downstreams.openrouter;
+                const or = data.rate_limits?.downstreams?.omniroute || data.rate_limits?.downstreams?.openrouter;
+                if (rlStatusEl && or) {
                     const tf1m = or.timeframes?.['1m'] || {};
                     const tf24h = or.timeframes?.['24h'] || {};
-                    const rem1m = tf1m.remaining != null ? tf1m.remaining : 20;
-                    const rem24h = tf24h.remaining != null ? tf24h.remaining : 200;
-                    rlStatusEl.textContent = `🟢 AI Quota: ${rem1m}/${tf1m.allowed || 20} RPM | ${rem24h}/${tf24h.allowed || 200} RPD`;
+                    const rem1m = tf1m.remaining != null ? tf1m.remaining : (tf1m.allowed || 60);
+                    const rem24h = tf24h.remaining != null ? tf24h.remaining : (tf24h.allowed || 2000);
+                    rlStatusEl.textContent = `🟢 OmniRoute: ${rem1m}/${tf1m.allowed || 60} RPM | ${rem24h}/${tf24h.allowed || 2000} RPD`;
                     if (rem1m <= 3 || rem24h <= 15) {
                         rlStatusEl.style.color = '#fbbf24';
                         rlStatusEl.style.borderColor = 'rgba(245,158,11,0.3)';

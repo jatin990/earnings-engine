@@ -59,7 +59,8 @@ def test_omniroute_probe_health_offline():
         health = omni.probe_health(timeout=0.1)
         assert health["status"] == "offline"
         assert health["models_count"] == 0
-        assert "not detected on port 20128" in health["message"]
+        assert "not detected on" in health["message"]
+        assert "20128" in health["message"]
 
 
 def test_omniroute_format_prompt():

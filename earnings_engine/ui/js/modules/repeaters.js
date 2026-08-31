@@ -313,7 +313,7 @@
                     <div style="background:#0f172a;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:0.75rem;margin-bottom:1rem;">
                         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
                             <div style="font-size:0.78rem;font-weight:700;color:#60a5fa;display:flex;align-items:center;gap:0.35rem;">
-                                <span>🤖 Multi-Model AI Engine (Local Ollama &amp; Online OpenRouter)</span>
+                                <span>🤖 Multi-Model AI Engine (Local Ollama &amp; OmniRoute Gateway)</span>
                             </div>
                             <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                                 <select id="repeaterModelSelect" onchange="app.updateRepeaterModelTelemetry(this.value)" style="background:#090d16;border:1px solid rgba(255,255,255,0.15);color:#e2e8f0;font-size:0.72rem;padding:0.25rem 0.5rem;border-radius:5px;outline:none;">
@@ -322,13 +322,14 @@
                                         <option value="deepseek-r1:8b">deepseek-r1:8b (⚡ ~2.4s · 100% Success)</option>
                                         <option value="qwen2.5-coder:latest">qwen2.5-coder (⚡ ~1.5s · 100% Success)</option>
                                     </optgroup>
-                                    <optgroup label="☁️ Online Models (OpenRouter)">
-                                        <option value="deepseek/deepseek-r1:free">DeepSeek-R1 (⚡ ~3.4s · 99.2% Success)</option>
-                                        <option value="google/gemma-4-31b-it:free">Gemma-4-31B (⚡ ~1.6s · 100% Success)</option>
-                                        <option value="z-ai/glm-5.2">GLM-5.2 (⚡ ~3.8s · 99.1% Success)</option>
+                                    <optgroup label="⚡ OmniRoute Model Presets">
+                                        <option value="deepseek/deepseek-r1">DeepSeek-R1 (⚡ ~1.8s · 100% Success)</option>
+                                        <option value="google/gemini-2.5-pro">Gemini 2.5 Pro (⚡ ~1.6s · 100% Success)</option>
+                                        <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (⚡ ~2.0s · 100% Success)</option>
                                         <option value="meta-llama/llama-3.3-70b-instruct">Llama-3.3 70B (⚡ ~2.1s · 99.8% Success)</option>
+                                        <option value="qwen/qwen-2.5-72b-instruct">Qwen 2.5 72B (⚡ ~2.2s · 99.7% Success)</option>
                                         <option value="mistralai/mistral-large">Mistral Large (⚡ ~1.9s · 99.7% Success)</option>
-                                        <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash (⚡ ~1.4s · 99.9% Success)</option>
+                                        <option value="z-ai/glm-5.2">GLM-5.2 (⚡ ~3.8s · 99.1% Success)</option>
                                     </optgroup>
                                 </select>
                                 <span id="repeaterModelTelemetryBadge" style="font-size:0.68rem;color:#38bdf8;font-family:var(--font-mono);background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);padding:0.2rem 0.45rem;border-radius:4px;">

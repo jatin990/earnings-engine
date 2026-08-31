@@ -175,7 +175,7 @@
             'consensus': {
                 title: 'Multi-Model AI Consensus Engine',
                 icon: '🤖',
-                dataSource: 'OpenRouter parallel LLM inference across DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large, plus local Ollama host.',
+                dataSource: 'OmniRoute Gateway parallel LLM inference across DeepSeek-R1, Gemini 2.5 Pro, Claude 3.5 Sonnet, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large, plus local Ollama host.',
                 what: 'Ensemble reasoning across DeepSeek-R1 (logical chain-of-thought), Llama-3.3-70B (macro/quant), Qwen-2.5-72B (patterns), and Mistral/Gemini (news catalysts), generating unified verdicts and target ranges.',
                 thought: 'Single LLM models suffer from idiosyncratic hallucinations and blind spots. Orchestrating distinct specialized open-weight models in parallel—each evaluating from different analytical perspectives—produces robust ensemble signals superior to any single model.',
                 calculations: [

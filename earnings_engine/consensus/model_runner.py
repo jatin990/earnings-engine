@@ -141,13 +141,12 @@ MODEL_DISPLAY_NAMES: dict[str, str] = {
 }
 
 
-def _get_api_key(required: bool = True) -> str:
-    """Retrieve OpenRouter API key from environment."""
-    key = os.getenv("OPENROUTER_API_KEY", "").strip()
+def _get_api_key(required: bool = False) -> str:
+    """Retrieve OmniRoute API key from environment."""
+    key = (os.getenv("OMNIROUTE_API_KEY") or os.getenv("OMNI_API_KEY") or "").strip()
     if not key and required:
         raise ValueError(
-            "OPENROUTER_API_KEY not set. Add it to your .env file. "
-            "Get one at https://openrouter.ai/keys"
+            "OMNIROUTE_API_KEY not set. Add it to your .env file or run OmniRoute locally on http://localhost:20128/."
         )
     return key
 
@@ -601,7 +600,7 @@ def _query_local_model(
 def _query_single_model(
     model_id: str,
     prompt: str,
-    api_key: str,
+    api_key: str | None = None,
     timeout: int = 60,
     max_retries: int = 2,
     local_url: str | None = None,
@@ -611,7 +610,7 @@ def _query_single_model(
     temperature: float = 0.3,
     system_prompt: str | None = None,
 ) -> dict[str, Any]:
-    """Send a prediction request to a single model (local, omniroute, or OpenRouter) with full raw trace capture.
+    """Send a prediction request to a single model (local Ollama or OmniRoute gateway) with full raw trace capture.
 
     Returns a dict with model_name, the parsed prediction fields, raw prompt,
     system prompt, raw response, reasoning tokens, and execution telemetry.
@@ -628,16 +627,13 @@ def _query_single_model(
             temperature=temperature, system_prompt=system_prompt,
         )
 
-    if (
-        model_id.startswith("omniroute/")
-        or model_id.startswith("omnirouter/")
-        or model_id in ("omniroute", "omnirouter")
-    ):
-        return _query_omniroute_model(
-            model_id, prompt, timeout=timeout, timeframe_days=timeframe_days,
-            _ticker=_ticker, custom_directives=custom_directives,
-            temperature=temperature, system_prompt=system_prompt,
-        )
+    # Route all other preset models via OmniRoute Gateway
+    return _query_omniroute_model(
+        model_id, prompt, timeout=timeout, timeframe_days=timeframe_days,
+        _ticker=_ticker, custom_directives=custom_directives,
+        temperature=temperature, system_prompt=system_prompt,
+    )
+
 
     display_name = MODEL_DISPLAY_NAMES.get(model_id, model_id.split("/")[-1])
     current_model = model_id

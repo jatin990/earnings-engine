@@ -918,11 +918,12 @@ class RateLimitTracker:
         if count_24h >= allowed_24h:
             return f"24h quota exhausted ({count_24h}/{allowed_24h} requests today)"
 
-        # Also honour live OpenRouter remaining header if available
-        with self._lock:
-            or_remaining = self._openrouter_headers.get("remaining")
-        if or_remaining is not None and or_remaining <= 0:
-            return "OpenRouter global quota exhausted (x-ratelimit-remaining=0)"
+        # Only honour live OpenRouter remaining header if openrouter is explicitly queried
+        if "openrouter" in m_key:
+            with self._lock:
+                or_remaining = self._openrouter_headers.get("remaining")
+            if or_remaining is not None and or_remaining <= 0:
+                return "OpenRouter global quota exhausted (x-ratelimit-remaining=0)"
 
         return None
 

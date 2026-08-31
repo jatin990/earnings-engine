@@ -35,7 +35,14 @@ from earnings_engine.trading_agents.storage import save_trading_agents_report
 
 logger = get_logger("earnings_engine.trading_agents.workflow")
 
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+def get_omniroute_api_url() -> str:
+    url = os.getenv("OMNIROUTE_BASE_URL", "").rstrip("/")
+    if not url:
+        url = "http://localhost:20128/v1"
+    if not url.endswith("/chat/completions"):
+        url = f"{url}/chat/completions"
+    return url
 
 
 # ---------------------------------------------------------------------------

@@ -1090,9 +1090,9 @@
             </div>
 
             <!-- Rate Limit Monitor Pill -->
-            <div id="ratelimitPill" class="rate-limit-pill" title="Real-time OpenRouter & downstream rate limit tracking">
+            <div id="ratelimitPill" class="rate-limit-pill" title="Real-time OmniRoute AI Gateway & downstream rate limit tracking">
                 <span class="pulse-dot" style="background:#10b981;"></span>
-                <span id="txtRatelimit">AI Quota: 20/20 RPM</span>
+                <span id="txtRatelimit">OmniRoute: Ready</span>
             </div>
 
             <!-- Local Models Group -->
@@ -3324,16 +3324,16 @@
                 if (!pill || !txt) return;
 
                 const downstreams = data.rate_limits?.downstreams || {};
-                const openrouter = downstreams.openrouter || {};
-                const tf1m = openrouter.timeframes?.['1m'] || {};
-                const tf24h = openrouter.timeframes?.['24h'] || {};
-                const rem1m = tf1m.remaining != null ? tf1m.remaining : 20;
-                const rem24h = tf24h.remaining != null ? tf24h.remaining : 200;
-                const status = openrouter.status || 'normal';
+                const omniroute = downstreams.omniroute || downstreams.openrouter || {};
+                const tf1m = omniroute.timeframes?.['1m'] || {};
+                const tf24h = omniroute.timeframes?.['24h'] || {};
+                const rem1m = tf1m.remaining != null ? tf1m.remaining : (tf1m.allowed || 60);
+                const rem24h = tf24h.remaining != null ? tf24h.remaining : (tf24h.allowed || 2000);
+                const status = omniroute.status || 'normal';
 
-                txt.textContent = `AI Quota: ${rem1m}/${tf1m.allowed || 20} RPM · ${rem24h}/${tf24h.allowed || 200} RPD`;
+                txt.textContent = `OmniRoute: ${rem1m}/${tf1m.allowed || 60} RPM · ${rem24h}/${tf24h.allowed || 2000} RPD`;
                 pill.className = `rate-limit-pill ${status}`;
-                pill.title = `OpenRouter AI Quota: ${rem1m} requests remaining this minute, ${rem24h} today. Status: ${openrouter.status_badge || '🟢 Ready'}`;
+                pill.title = `OmniRoute AI Gateway: ${rem1m} requests remaining this minute, ${rem24h} today. Status: ${omniroute.status_badge || '🟢 Ready'}`;
 
                 // Update individual model button tooltips, telemetry badges and states
                 const models = data.models || [];
@@ -4085,8 +4085,8 @@
             const latMs = targetItem.latency_ms || tel.latency_ms;
             document.getElementById('traceTelLatency').textContent = latMs ? `${latMs} ms (${(latMs / 1000).toFixed(2)}s)` : '—';
             document.getElementById('traceTelTokens').textContent = targetItem.tokens_used || tel.total_tokens || tel.tokens || '—';
-            document.getElementById('traceTelEndpoint').textContent = tel.endpoint || (targetItem.is_local ? 'http://localhost:11434' : (targetItem.gateway || 'https://openrouter.ai/api/v1'));
-            document.getElementById('traceTelGateway').textContent = targetItem.gateway || (targetItem.is_local ? 'Ollama Local' : 'OpenRouter / OmniRoute');
+            document.getElementById('traceTelEndpoint').textContent = tel.endpoint || (targetItem.is_local ? 'http://localhost:11434' : (targetItem.gateway || 'http://localhost:20128/v1'));
+            document.getElementById('traceTelGateway').textContent = targetItem.gateway || (targetItem.is_local ? 'Ollama Local' : 'OmniRoute Gateway');
             document.getElementById('traceTelRawJson').textContent = JSON.stringify({
                 model_id: mid,
                 model_name: mName,

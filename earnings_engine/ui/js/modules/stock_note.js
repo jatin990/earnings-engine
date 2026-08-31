@@ -168,7 +168,7 @@
                 <!-- 2. Interactive Multi-Model Selector Bar -->
                 <div style="background:#0c101c;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.65rem 0.85rem;margin-bottom:0.85rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
                     <div style="font-size:0.76rem;font-weight:700;color:#60a5fa;display:flex;align-items:center;gap:0.35rem;">
-                        <span>🤖 Model Reasoning Engine (Local Ollama &amp; Online OpenRouter)</span>
+                        <span>🤖 Model Reasoning Engine (Local Ollama &amp; OmniRoute Gateway)</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                         <select id="stockNoteModelSelect" style="background:#05070d;border:1px solid rgba(255,255,255,0.18);color:#f1f5f9;font-size:0.72rem;padding:0.25rem 0.5rem;border-radius:5px;outline:none;">
@@ -177,13 +177,14 @@
                                 <option value="deepseek-r1:8b">deepseek-r1:8b (Deep Reasoning)</option>
                                 <option value="qwen2.5-coder:latest">qwen2.5-coder (Algorithmic)</option>
                             </optgroup>
-                            <optgroup label="☁️ Online Models (OpenRouter)">
-                                <option value="deepseek/deepseek-r1:free">DeepSeek-R1 (Free Cloud)</option>
-                                <option value="google/gemma-4-31b-it:free">Gemma-4-31B (Free Multimodal)</option>
-                                <option value="z-ai/glm-5.2">GLM-5.2 (Z.ai Flagship 753B)</option>
+                            <optgroup label="⚡ OmniRoute Model Presets">
+                                <option value="deepseek/deepseek-r1">DeepSeek-R1 (Deep Reasoning)</option>
+                                <option value="google/gemini-2.5-pro">Gemini 2.5 Pro (Multimodal)</option>
+                                <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
                                 <option value="meta-llama/llama-3.3-70b-instruct">Llama-3.3 70B Instruct</option>
+                                <option value="qwen/qwen-2.5-72b-instruct">Qwen 2.5 72B</option>
                                 <option value="mistralai/mistral-large">Mistral Large</option>
-                                <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
+                                <option value="z-ai/glm-5.2">GLM-5.2 (Z.ai Flagship)</option>
                             </optgroup>
                         </select>
                         <button type="button" onclick="event.preventDefault(); const sel = document.getElementById('stockNoteModelSelect').value; app.runStockNoteAi('${sym}', this, sel);" class="btn btn-sm" style="background:#2563eb;color:#fff;font-size:0.72rem;padding:0.25rem 0.65rem;border-radius:5px;cursor:pointer;">

@@ -243,15 +243,15 @@
             if (!statusEl) return;
 
             const downstreams = data.rate_limits?.downstreams || {};
-            const openrouter = downstreams.openrouter || {};
-            const tf1m = openrouter.timeframes?.['1m'] || {};
-            const tf24h = openrouter.timeframes?.['24h'] || {};
-            const rem1m = tf1m.remaining != null ? tf1m.remaining : 20;
-            const rem24h = tf24h.remaining != null ? tf24h.remaining : 200;
-            const status = openrouter.status || 'normal';
+            const omniroute = downstreams.omniroute || downstreams.openrouter || {};
+            const tf1m = omniroute.timeframes?.['1m'] || {};
+            const tf24h = omniroute.timeframes?.['24h'] || {};
+            const rem1m = tf1m.remaining != null ? tf1m.remaining : (tf1m.allowed || 60);
+            const rem24h = tf24h.remaining != null ? tf24h.remaining : (tf24h.allowed || 2000);
+            const status = omniroute.status || 'normal';
 
-            statusEl.textContent = `🟢 AI Quota: ${rem1m}/${tf1m.allowed || 20} RPM · ${rem24h}/${tf24h.allowed || 200} RPD`;
-            statusEl.title = `OpenRouter Quota: ${rem1m} requests left this minute, ${rem24h} today. Status: ${openrouter.status_badge || 'Ready'}`;
+            statusEl.textContent = `🟢 OmniRoute: ${rem1m}/${tf1m.allowed || 60} RPM · ${rem24h}/${tf24h.allowed || 2000} RPD`;
+            statusEl.title = `OmniRoute AI Gateway: ${rem1m} requests left this minute, ${rem24h} today. Status: ${omniroute.status_badge || 'Ready'}`;
             if (status === 'throttled') {
                 statusEl.style.borderColor = 'rgba(239,68,68,0.5)';
                 statusEl.style.color = '#f87171';

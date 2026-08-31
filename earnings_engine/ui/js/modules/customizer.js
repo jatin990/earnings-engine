@@ -218,25 +218,25 @@
                 const res = await fetch('/api/v1/config/ratelimits');
                 const data = await res.json();
                 const downstreams = data.downstreams || {};
-                const opCounter = data.openrouter_counter || {};
+                const opCounter = data.omniroute_counter || data.openrouter_counter || {};
 
                 // Update Top Header Pill
                 app.updateTopRateLimitPill(opCounter);
 
-                // Update Control Center OpenRouter Banner
+                // Update Control Center OmniRoute / AI Gateway Banner
                 const bannerCount = document.getElementById('ccOpenRouter24hCount');
                 const bannerRem = document.getElementById('ccOpenRouter24hRem');
                 const tierBadge = document.getElementById('ccOpenRouterTierBadge');
 
-                if (bannerCount) bannerCount.textContent = `${opCounter.current_24h || 0} / ${opCounter.allowed_24h || 200}`;
+                if (bannerCount) bannerCount.textContent = `${opCounter.current_24h || 0} / ${opCounter.allowed_24h || 2000}`;
                 if (bannerRem) {
                     bannerRem.textContent = `${opCounter.remaining_24h || 0} reqs`;
                     bannerRem.style.color = (opCounter.remaining_24h <= 20) ? '#f87171' : ((opCounter.remaining_24h <= 60) ? '#fbbf24' : '#34d399');
                 }
                 if (tierBadge) {
-                    tierBadge.textContent = opCounter.is_free_tier ? 'Free Tier Active' : 'Paid / Standard Tier';
-                    tierBadge.style.background = opCounter.is_free_tier ? 'rgba(16,185,129,0.2)' : 'rgba(59,130,246,0.2)';
-                    tierBadge.style.color = opCounter.is_free_tier ? '#34d399' : '#60a5fa';
+                    tierBadge.textContent = 'OmniRoute Gateway Active';
+                    tierBadge.style.background = 'rgba(16,185,129,0.2)';
+                    tierBadge.style.color = '#34d399';
                 }
 
                 if (!grid) return;
@@ -339,11 +339,11 @@
             }
 
             const cur = counter.current_24h || 0;
-            const allowed = counter.allowed_24h || 200;
+            const allowed = counter.allowed_24h || 2000;
             const rem = counter.remaining_24h != null ? counter.remaining_24h : (allowed - cur);
             const util = counter.utilization_pct || 0;
 
-            quotaEl.textContent = `OpenRouter: ${cur}/${allowed} reqs`;
+            quotaEl.textContent = `OmniRoute: ${cur}/${allowed} reqs`;
 
             if (util >= 90 || rem <= 20) {
                 statusEl.textContent = `🔴 ${rem} left · High`;
