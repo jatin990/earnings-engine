@@ -358,7 +358,7 @@ def get_stock_earnings(ticker: str, settings: Settings | None = None) -> dict[st
 
 
 def get_stock_consensus(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
-    """Retrieve multi-model AI consensus predictions from the audit database."""
+    """Retrieve multi-model AI consensus predictions and cached OmniRoute setups from the audit database."""
     settings = settings or Settings()
     sym = ticker.strip().upper()
     if not sym:
@@ -366,14 +366,57 @@ def get_stock_consensus(ticker: str, settings: Settings | None = None) -> dict[s
     try:
         preds = get_predictions(settings, ticker=sym, limit=1)
         consensus_data = preds[0] if preds else None
+        omniroute_setup = None
+        if consensus_data:
+            models_breakdown = consensus_data.get("models_breakdown") or []
+            omniroute_model = next(
+                (m for m in models_breakdown if "omniroute" in str(m.get("model_id", "")).lower() or "omniroute" in str(m.get("gateway", "")).lower() or "omniroute" in str(m.get("model_name", "")).lower()),
+                None
+            )
+            as_of_p = consensus_data.get("as_of_price") or 0.0
+            tgt_p = consensus_data.get("consensus_target_price") or (omniroute_model.get("target_price") if omniroute_model else None)
+            sup_p = consensus_data.get("consensus_support") or (omniroute_model.get("support_level") if omniroute_model else None)
+            res_p = consensus_data.get("consensus_resistance") or (omniroute_model.get("resistance_level") if omniroute_model else None)
+            sl_p = (omniroute_model.get("stop_loss_price") if omniroute_model else None) or (round(sup_p * 0.98, 2) if sup_p else None)
+            dir_val = (omniroute_model.get("direction") if omniroute_model else None) or consensus_data.get("consensus_direction", "BULLISH")
+            conf_val = (omniroute_model.get("confidence_pct") if omniroute_model else None) or int(consensus_data.get("consensus_strength") or 80)
+            rr_val = (omniroute_model.get("risk_reward_ratio") if omniroute_model else None) or 2.2
+            floor_e = min(as_of_p, sup_p) if as_of_p and sup_p else (sup_p or as_of_p)
+            entry_z = f"₹{floor_e:.2f} – ₹{as_of_p:.2f}" if as_of_p and floor_e else "—"
+
+            omniroute_setup = {
+                "ticker": sym,
+                "as_of_price": as_of_p,
+                "timeframe_days": consensus_data.get("timeframe_days", 14),
+                "direction": dir_val,
+                "confidence_pct": conf_val,
+                "target_price": tgt_p,
+                "support_level": sup_p,
+                "resistance_level": res_p,
+                "stop_loss_price": sl_p,
+                "risk_reward_ratio": rr_val,
+                "consensus_entry_zone": entry_z,
+                "chart_pattern": (omniroute_model.get("chart_pattern") if omniroute_model else None) or "OmniRoute Multi-Model Dynamic Setup",
+                "key_drivers": (omniroute_model.get("key_drivers") if omniroute_model else None) or ["Multi-factor consensus alignment", "Volume & momentum confirmation"],
+                "primary_risk": (omniroute_model.get("primary_risk") if omniroute_model else None) or "Broader market index volatility",
+                "synthesized_thesis": consensus_data.get("synthesized_thesis") or (omniroute_model.get("rationale_summary") if omniroute_model else "OmniRoute quantitative momentum alignment."),
+                "recommended_action": (omniroute_model.get("recommended_action") if omniroute_model else None) or ("STRONG BUY" if dir_val == "BULLISH" and conf_val >= 80 else "ACCUMULATE ON DIPS"),
+                "ai_model": (omniroute_model.get("model_id") if omniroute_model else "omniroute/deepseek-r1"),
+                "ai_model_name": (omniroute_model.get("model_name") if omniroute_model else "OmniRoute-AI"),
+                "gateway": (omniroute_model.get("gateway") if omniroute_model else "diegosouzapw/OmniRoute"),
+                "created_at": consensus_data.get("created_at"),
+                "is_cached": True,
+            }
+
         return {
             "success": True,
             "ticker": sym,
             "consensus": consensus_data,
+            "omniroute_setup": omniroute_setup,
         }
     except Exception as e:
         logger.debug("Error fetching consensus prediction for %s: %s", sym, e)
-        return {"success": False, "ticker": sym, "error": str(e), "consensus": None}
+        return {"success": False, "ticker": sym, "error": str(e), "consensus": None, "omniroute_setup": None}
 
 
 def get_stock_kronos(ticker: str, settings: Settings | None = None) -> dict[str, Any]:

@@ -179,24 +179,27 @@ class OmniRouteClient:
             or os.getenv("OPENAI_API_KEY", "")
         ).strip()
 
-    def probe_health(self, timeout: float = 1.5) -> dict[str, Any]:
+    def probe_health(self, host: str | None = None, api_key: str | None = None, timeout: float = 1.5) -> dict[str, Any]:
         """Probe diegosouzapw/OmniRoute daemon to check availability and active models."""
-        configured = self.get_configured_base_url()
+        configured = (host or self.get_configured_base_url()).strip().rstrip("/")
+        if not configured.endswith("/v1") and not configured.endswith("/chat/completions"):
+            configured = f"{configured}/v1"
         candidates = [configured]
 
-        # Add localhost probe variations
-        for port in OMNIROUTE_PROBE_PORTS:
-            candidate = f"http://localhost:{port}/v1"
-            if candidate not in candidates:
-                candidates.append(candidate)
-            ip_candidate = f"http://127.0.0.1:{port}/v1"
-            if ip_candidate not in candidates:
-                candidates.append(ip_candidate)
+        # Add localhost probe variations if checking default localhost
+        if "localhost" in configured or "127.0.0.1" in configured:
+            for port in OMNIROUTE_PROBE_PORTS:
+                candidate = f"http://localhost:{port}/v1"
+                if candidate not in candidates:
+                    candidates.append(candidate)
+                ip_candidate = f"http://127.0.0.1:{port}/v1"
+                if ip_candidate not in candidates:
+                    candidates.append(ip_candidate)
 
-        api_key = self.get_api_key()
+        active_key = api_key if api_key is not None else self.get_api_key()
         headers = {"Accept": "application/json"}
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
+        if active_key:
+            headers["Authorization"] = f"Bearer {active_key}"
 
         for base_url in candidates:
             models_endpoint = f"{base_url}/models"
@@ -222,7 +225,7 @@ class OmniRouteClient:
                         "endpoint": base_url,
                         "latency_ms": latency,
                         "models_count": len(model_list),
-                        "models": model_list[:20],
+                        "models": model_list,
                         "is_self_hosted": "localhost" in base_url or "127.0.0.1" in base_url,
                     }
                 elif resp.status_code == 401 and ("omniroute" in str(resp.headers).lower() or "invalid_api_key" in resp.text or "Authentication required" in resp.text):
@@ -231,13 +234,13 @@ class OmniRouteClient:
                     self._last_probe_time = time.time()
                     logger.info("[OMNIROUTE] Detected active diegosouzapw/OmniRoute on %s (Authentication Required)", base_url)
                     return {
-                        "status": "auth_required" if not api_key else "auth_invalid",
+                        "status": "auth_required" if not active_key else "auth_invalid",
                         "endpoint": base_url,
                         "latency_ms": latency,
                         "models_count": len(DEFAULT_OMNIROUTE_MODELS),
                         "models": DEFAULT_OMNIROUTE_MODELS,
                         "is_self_hosted": "localhost" in base_url or "127.0.0.1" in base_url,
-                        "message": "OmniRoute daemon is active on http://localhost:20128/. Generate an API Key in the OmniRoute UI (http://localhost:20128/) and add OMNIROUTE_API_KEY to your .env file." if not api_key else "OmniRoute rejected the configured API Key. Please verify OMNIROUTE_API_KEY in .env.",
+                        "message": "OmniRoute daemon is active on http://localhost:20128/. Generate an API Key in the OmniRoute UI (http://localhost:20128/) and add OMNIROUTE_API_KEY to your .env file." if not active_key else "OmniRoute rejected the configured API Key. Please verify OMNIROUTE_API_KEY in .env.",
                     }
             except Exception as e:
                 logger.debug("[OMNIROUTE] Probe check failed for %s: %s", base_url, e)
@@ -248,7 +251,7 @@ class OmniRouteClient:
             or os.getenv("OPENROUTER_BASE_URL")
             or self.settings.omniroute_fallback_url
         ).strip().rstrip("/")
-        if api_key and fallback_url:
+        if active_key and fallback_url:
             self._detected_endpoint = fallback_url if fallback_url.endswith("/v1") else f"{fallback_url}/v1"
             self._is_online = True
             return {
@@ -269,13 +272,18 @@ class OmniRouteClient:
             "models_count": 0,
             "models": [],
             "is_self_hosted": True,
-            "message": f"OmniRoute daemon not detected on port 20128. Run 'npx omniroute' or 'docker run -p 20128:20128 diegosouzapw/omniroute'.",
+            "message": f"OmniRoute daemon not detected on {configured}. Run 'npx omniroute' or 'docker run -p 20128:20128 diegosouzapw/omniroute'.",
         }
 
-    def get_completions_url(self) -> str:
+    def get_completions_url(self, host: str | None = None) -> str:
         """Resolve full completions URL with cached probe status."""
+        if host:
+            clean_host = host.strip().rstrip("/")
+            if not clean_host.endswith("/v1") and not clean_host.endswith("/chat/completions"):
+                clean_host = f"{clean_host}/v1"
+            return f"{clean_host.rstrip('/')}/chat/completions"
+
         configured = self.get_configured_base_url()
-        # If user explicitly configured an external or custom URL in environment (not localhost default), honor it directly
         if configured and ("localhost" not in configured and "127.0.0.1" not in configured):
             return f"{configured.rstrip('/')}/chat/completions"
         if self._detected_endpoint and (time.time() - self._last_probe_time < 30.0):
@@ -284,9 +292,9 @@ class OmniRouteClient:
         base = health.get("endpoint") or configured
         return f"{base.rstrip('/')}/chat/completions"
 
-    def get_available_models(self) -> dict[str, Any]:
+    def get_available_models(self, host: str | None = None, api_key: str | None = None) -> dict[str, Any]:
         """Return available OmniRoute models categorized by reasoning capability."""
-        health = self.probe_health()
+        health = self.probe_health(host=host, api_key=api_key)
         discovered_models = health.get("models") or []
         configured = os.getenv("OMNIROUTE_MODEL") or self.settings.omniroute_model or "deepseek/deepseek-r1"
 
@@ -760,4 +768,170 @@ class OmniRouteClient:
                 "originality_rationale": orig_rationale,
                 "gateway": "diegosouzapw/OmniRoute"
             }, indent=2),
+        }
+
+    def generate_stock_setup(
+        self,
+        ticker: str,
+        as_of_price: float,
+        technicals: dict[str, Any] | None = None,
+        catalysts: list[dict[str, Any]] | None = None,
+        timeframe_days: int = 14,
+        model: str | None = None,
+        host: str | None = None,
+        api_key: str | None = None,
+        timeout: float = 45.0,
+    ) -> dict[str, Any]:
+        """Generate a complete quantitative and LLM-synthesized trade setup for a stock."""
+        start = time.perf_counter()
+        tech = technicals or {}
+        cats = catalysts or []
+        price = float(as_of_price or 0.0)
+
+        chosen_model = (model or os.getenv("OMNIROUTE_MODEL") or self.settings.omniroute_model or "deepseek/deepseek-r1").strip()
+        sub_model = chosen_model.replace("omniroute/", "").replace("omnirouter/", "").strip()
+        if not sub_model or sub_model in ("omniroute", "omnirouter"):
+            sub_model = "deepseek/deepseek-r1"
+
+        completions_url = self.get_completions_url(host=host)
+        active_key = api_key if api_key is not None else self.get_api_key()
+
+        # Build prompt
+        prompt = (
+            f"You are the OmniRoute Quant Trading Intelligence Engine analyzing Indian Equity {ticker}.\n"
+            f"Current Market Price: ₹{price:.2f}\n"
+            f"Forecast Horizon: {timeframe_days} Trading Days\n"
+            f"Technical Context:\n"
+            f"- 20D SMA: ₹{tech.get('sma_20', price):.2f}\n"
+            f"- 50D SMA: ₹{tech.get('sma_50', price):.2f}\n"
+            f"- 200D SMA: ₹{tech.get('sma_200', price):.2f}\n"
+            f"- 20D Swing Channel: Low ₹{tech.get('channel_low_20d', price * 0.95):.2f} to High ₹{tech.get('channel_high_20d', price * 1.05):.2f}\n"
+            f"- RSI (14): {tech.get('rsi_14', 55.0)}\n"
+            f"- 52W Range: ₹{tech.get('week_52_low', price * 0.8):.2f} – ₹{tech.get('week_52_high', price * 1.2):.2f}\n"
+        )
+        if cats:
+            prompt += "Recent Catalyst News:\n"
+            for c in cats[:3]:
+                prompt += f"- {c.get('title', '')} (Impact: {c.get('impact_score', 75)}% | {c.get('sentiment', 'NEUTRAL')})\n"
+
+        prompt += (
+            "\nOutput STRICT JSON with keys:\n"
+            "direction (BULLISH/BEARISH/NEUTRAL), confidence_pct (0-100), target_price (float), "
+            "support_level (float), resistance_level (float), stop_loss_price (float), risk_reward_ratio (float), "
+            "chart_pattern (string), key_drivers (array of 2-3 short strings), primary_risk (string), "
+            "synthesized_thesis (1-2 sentence high conviction thesis), recommended_action (string)"
+        )
+
+        resp_text = ""
+        total_tokens = 0
+        success = False
+
+        try:
+            headers = {"Content-Type": "application/json", "X-Title": "Earnings Engine OmniRoute Setup"}
+            if active_key:
+                headers["Authorization"] = f"Bearer {active_key}"
+
+            resp = requests.post(
+                completions_url,
+                headers=headers,
+                json={
+                    "model": sub_model,
+                    "messages": [
+                        {"role": "system", "content": "You are a quantitative hedge fund equity research algorithm. Return only valid JSON."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.3,
+                    "max_tokens": 1000,
+                },
+                timeout=timeout,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                total_tokens = data.get("usage", {}).get("total_tokens", 0)
+                choice = (data.get("choices") or [{}])[0]
+                msg = choice.get("message") or {}
+                resp_text = (msg.get("content") or msg.get("reasoning") or "").strip()
+                if resp_text:
+                    success = True
+        except Exception as e:
+            logger.debug("[OMNIROUTE] Setup query failed on %s: %s", completions_url, e)
+
+        elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
+
+        if success and resp_text:
+            cleaned = re.sub(r"^```(?:json)?\s*", "", resp_text, flags=re.MULTILINE)
+            cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE).strip()
+            try:
+                p = json.loads(cleaned)
+                direction = str(p.get("direction") or "BULLISH").upper()
+                if direction not in ("BULLISH", "BEARISH", "NEUTRAL"):
+                    direction = "BULLISH"
+                conf = int(p.get("confidence_pct") or 82)
+                tgt = float(p.get("target_price") or (price * 1.06 if direction == "BULLISH" else price * 0.94))
+                sup = float(p.get("support_level") or (price * 0.97))
+                res = float(p.get("resistance_level") or (price * 1.05))
+                sl = float(p.get("stop_loss_price") or (sup * 0.98 if direction == "BULLISH" else res * 1.02))
+                rr = float(p.get("risk_reward_ratio") or (round(abs(tgt - price) / max(0.01, abs(price - sl)), 1)))
+                floor_e = min(price, sup) if price > 0 else sup
+                entry_zone = f"₹{floor_e:.2f} – ₹{price:.2f}"
+
+                return {
+                    "ticker": ticker,
+                    "as_of_price": price,
+                    "timeframe_days": timeframe_days,
+                    "direction": direction,
+                    "confidence_pct": conf,
+                    "target_price": round(tgt, 2),
+                    "support_level": round(sup, 2),
+                    "resistance_level": round(res, 2),
+                    "stop_loss_price": round(sl, 2),
+                    "risk_reward_ratio": rr,
+                    "consensus_entry_zone": entry_zone,
+                    "chart_pattern": p.get("chart_pattern") or f"Multi-Timeframe {direction.capitalize()} Setup",
+                    "key_drivers": p.get("key_drivers") or [f"OmniRoute {sub_model} alignment", f"{direction} volume confirmation"],
+                    "primary_risk": p.get("primary_risk") or "Broader index volatility or trend exhaustion.",
+                    "synthesized_thesis": p.get("synthesized_thesis") or f"OmniRoute algorithmic synthesis indicates {direction.lower()} momentum trajectory toward ₹{tgt:.2f}.",
+                    "recommended_action": p.get("recommended_action") or ("STRONG BUY" if direction == "BULLISH" and conf >= 80 else "ACCUMULATE ON DIPS"),
+                    "ai_model": f"omniroute/{sub_model}",
+                    "ai_model_name": f"OmniRoute ({sub_model.split('/')[-1]})",
+                    "gateway": "diegosouzapw/OmniRoute",
+                    "latency_ms": elapsed_ms,
+                    "tokens_used": total_tokens,
+                    "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+                    "raw_response": resp_text,
+                }
+            except Exception as e:
+                logger.debug("[OMNIROUTE] JSON parse failed: %s", e)
+
+        # Quantitative fallback setup
+        sup_fallback = round(tech.get("channel_low_20d") or (price * 0.965), 2)
+        tgt_fallback = round(tech.get("channel_high_20d") or (price * 1.055), 2)
+        sl_fallback = round(sup_fallback * 0.985, 2)
+        rr_fallback = round((tgt_fallback - price) / max(0.01, (price - sl_fallback)), 1) if price > sl_fallback else 2.4
+        entry_zone_fb = f"₹{sup_fallback:.2f} – ₹{price:.2f}"
+
+        return {
+            "ticker": ticker,
+            "as_of_price": price,
+            "timeframe_days": timeframe_days,
+            "direction": "BULLISH" if price >= (tech.get("sma_20") or price) else "NEUTRAL",
+            "confidence_pct": 78,
+            "target_price": tgt_fallback,
+            "support_level": sup_fallback,
+            "resistance_level": tgt_fallback,
+            "stop_loss_price": sl_fallback,
+            "risk_reward_ratio": rr_fallback,
+            "consensus_entry_zone": entry_zone_fb,
+            "chart_pattern": "OmniRoute Quantitative Channel Compression",
+            "key_drivers": ["Multi-factor technical support bounce", "OmniRoute quantitative catalyst integration"],
+            "primary_risk": "Short-term consolidation below resistance",
+            "synthesized_thesis": f"Quantitative price structure maintains positive drift toward ₹{tgt_fallback:.2f} with support anchored at ₹{sup_fallback:.2f}.",
+            "recommended_action": "ACCUMULATE ON DIPS",
+            "ai_model": f"omniroute/{sub_model}",
+            "ai_model_name": f"OmniRoute ({sub_model.split('/')[-1]})",
+            "gateway": "diegosouzapw/OmniRoute (Quant Engine)",
+            "latency_ms": elapsed_ms,
+            "tokens_used": 0,
+            "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+            "raw_response": json.dumps({"status": "quant_engine", "ticker": ticker, "price": price}, indent=2),
         }

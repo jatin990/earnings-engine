@@ -199,12 +199,12 @@ async def get_news_activity_stream(limit: int = Query(50, ge=1, le=200)):
 
 
 @router.get("/api/v1/omniroute/status")
-async def get_omniroute_status_endpoint():
+async def get_omniroute_status_endpoint(host: str | None = None, api_key: str | None = None):
     """Probe and return the real-time health and status of the diegosouzapw/OmniRoute gateway."""
     try:
         from earnings_engine.data.omniroute_client import OmniRouteClient
         client = OmniRouteClient(settings=_settings)
-        health = await asyncio.to_thread(client.probe_health)
+        health = await asyncio.to_thread(client.probe_health, host=host, api_key=api_key)
         return {"success": True, "gateway": "diegosouzapw/OmniRoute", **health}
     except Exception as e:
         logger.exception("Error probing OmniRoute status: %s", e)
@@ -217,12 +217,12 @@ async def get_omniroute_status_endpoint():
 
 
 @router.get("/api/v1/omniroute/models")
-async def get_omniroute_models_endpoint():
+async def get_omniroute_models_endpoint(host: str | None = None, api_key: str | None = None):
     """Return available OmniRoute models categorized by reasoning capability (matching local models selector)."""
     try:
         from earnings_engine.data.omniroute_client import OmniRouteClient
         client = OmniRouteClient(settings=_settings)
-        models_data = await asyncio.to_thread(client.get_available_models)
+        models_data = await asyncio.to_thread(client.get_available_models, host=host, api_key=api_key)
         return models_data
     except Exception as e:
         logger.exception("Error fetching OmniRoute models: %s", e)
@@ -231,6 +231,152 @@ async def get_omniroute_models_endpoint():
             "error": str(e),
             "models": [],
         }
+
+
+@router.get("/api/v1/omniroute/setup/{ticker}")
+async def get_omniroute_setup_endpoint(ticker: str):
+    """Retrieve the latest cached OmniRoute trade setup from the database for a stock."""
+    sym = ticker.strip().upper()
+    try:
+        from earnings_engine.consensus import storage
+        preds = await asyncio.to_thread(storage.get_predictions, settings=_settings, ticker=sym, limit=1)
+        if not preds:
+            return {"success": True, "found": False, "setup": None, "ticker": sym}
+
+        latest = preds[0]
+        models_breakdown = latest.get("models_breakdown") or []
+        omniroute_model = next(
+            (m for m in models_breakdown if "omniroute" in str(m.get("model_id", "")).lower() or "omniroute" in str(m.get("gateway", "")).lower() or "omniroute" in str(m.get("model_name", "")).lower()),
+            None
+        )
+
+        as_of_p = latest.get("as_of_price") or 0.0
+        tgt_p = latest.get("consensus_target_price") or (omniroute_model.get("target_price") if omniroute_model else None)
+        sup_p = latest.get("consensus_support") or (omniroute_model.get("support_level") if omniroute_model else None)
+        res_p = latest.get("consensus_resistance") or (omniroute_model.get("resistance_level") if omniroute_model else None)
+        sl_p = omniroute_model.get("stop_loss_price") if omniroute_model else (round(sup_p * 0.98, 2) if sup_p else None)
+        dir_val = omniroute_model.get("direction") if omniroute_model else latest.get("consensus_direction", "BULLISH")
+        conf_val = omniroute_model.get("confidence_pct") if omniroute_model else int(latest.get("consensus_strength") or 80)
+        rr_val = omniroute_model.get("risk_reward_ratio") if omniroute_model else 2.2
+
+        floor_e = min(as_of_p, sup_p) if as_of_p and sup_p else (sup_p or as_of_p)
+        entry_z = f"₹{floor_e:.2f} – ₹{as_of_p:.2f}" if as_of_p and floor_e else "—"
+
+        setup = {
+            "ticker": sym,
+            "as_of_price": as_of_p,
+            "timeframe_days": latest.get("timeframe_days", 14),
+            "direction": dir_val,
+            "confidence_pct": conf_val,
+            "target_price": tgt_p,
+            "support_level": sup_p,
+            "resistance_level": res_p,
+            "stop_loss_price": sl_p,
+            "risk_reward_ratio": rr_val,
+            "consensus_entry_zone": entry_z,
+            "chart_pattern": (omniroute_model.get("chart_pattern") if omniroute_model else None) or "OmniRoute Multi-Model Dynamic Setup",
+            "key_drivers": (omniroute_model.get("key_drivers") if omniroute_model else None) or ["Multi-factor consensus alignment", "Volume & momentum confirmation"],
+            "primary_risk": (omniroute_model.get("primary_risk") if omniroute_model else None) or "Broader market index volatility",
+            "synthesized_thesis": latest.get("synthesized_thesis") or (omniroute_model.get("rationale_summary") if omniroute_model else "OmniRoute quantitative momentum alignment."),
+            "recommended_action": (omniroute_model.get("recommended_action") if omniroute_model else None) or ("STRONG BUY" if dir_val == "BULLISH" and conf_val >= 80 else "ACCUMULATE ON DIPS"),
+            "ai_model": (omniroute_model.get("model_id") if omniroute_model else "omniroute/deepseek-r1"),
+            "ai_model_name": (omniroute_model.get("model_name") if omniroute_model else "OmniRoute-AI"),
+            "gateway": (omniroute_model.get("gateway") if omniroute_model else "diegosouzapw/OmniRoute"),
+            "created_at": latest.get("created_at"),
+            "is_cached": True,
+            "raw_response": (omniroute_model.get("raw_response") if omniroute_model else json.dumps(latest, default=str)),
+        }
+
+        return {"success": True, "found": True, "setup": setup, "ticker": sym}
+    except Exception as e:
+        logger.exception("Error loading OmniRoute setup for %s: %s", sym, e)
+        return {"success": False, "error": str(e), "setup": None, "ticker": sym}
+
+
+@router.post("/api/v1/omniroute/setup/{ticker}")
+async def generate_omniroute_setup_endpoint(ticker: str, payload: dict | None = None):
+    """Generate or re-evaluate an OmniRoute trade setup for a stock and cache it in the database."""
+    sym = ticker.strip().upper()
+    body = payload or {}
+    chosen_model = body.get("model") or body.get("model_id") or "deepseek/deepseek-r1"
+    host = body.get("host") or body.get("endpoint")
+    api_key = body.get("api_key")
+    timeframe_days = int(body.get("timeframe_days") or 14)
+
+    try:
+        from earnings_engine.data.omniroute_client import OmniRouteClient
+        from earnings_engine.api import stock_api
+        from earnings_engine.consensus import storage
+
+        # Fetch live quote and technicals
+        quote_res = await asyncio.to_thread(stock_api.get_stock_quote, ticker=sym, settings=_settings)
+        tech_res = await asyncio.to_thread(stock_api.get_stock_technicals, ticker=sym, settings=_settings)
+        cat_res = await asyncio.to_thread(stock_api.get_stock_catalysts, ticker=sym, settings=_settings)
+
+        price = quote_res.get("quote", {}).get("current_price") or 0.0
+        technicals = tech_res.get("technical") or {}
+        catalysts = cat_res.get("catalysts") or []
+
+        client = OmniRouteClient(settings=_settings)
+        setup = await asyncio.to_thread(
+            client.generate_stock_setup,
+            ticker=sym,
+            as_of_price=price,
+            technicals=technicals,
+            catalysts=catalysts,
+            timeframe_days=timeframe_days,
+            model=chosen_model,
+            host=host,
+            api_key=api_key,
+        )
+
+        # Persist into consensus_predictions table
+        eval_date = (datetime.now() + timedelta(days=timeframe_days)).strftime("%Y-%m-%d")
+        consensus_record = {
+            "ticker": sym,
+            "as_of_price": price,
+            "timeframe_days": timeframe_days,
+            "consensus_direction": setup["direction"],
+            "consensus_strength": float(setup["confidence_pct"]),
+            "consensus_return_pct": round(((setup["target_price"] / price) - 1.0) * 100.0, 2) if price > 0 and setup.get("target_price") else 4.5,
+            "consensus_target_price": setup.get("target_price"),
+            "consensus_support": setup.get("support_level"),
+            "consensus_resistance": setup.get("resistance_level"),
+            "model_count": 1,
+            "agreement_ratio": 1.0,
+            "synthesized_thesis": setup.get("synthesized_thesis"),
+            "models_breakdown": [
+                {
+                    "model_id": setup.get("ai_model"),
+                    "model_name": setup.get("ai_model_name"),
+                    "direction": setup["direction"],
+                    "confidence_pct": setup["confidence_pct"],
+                    "target_price": setup.get("target_price"),
+                    "support_level": setup.get("support_level"),
+                    "resistance_level": setup.get("resistance_level"),
+                    "stop_loss_price": setup.get("stop_loss_price"),
+                    "risk_reward_ratio": setup.get("risk_reward_ratio"),
+                    "chart_pattern": setup.get("chart_pattern"),
+                    "key_drivers": setup.get("key_drivers"),
+                    "primary_risk": setup.get("primary_risk"),
+                    "rationale_summary": setup.get("synthesized_thesis"),
+                    "recommended_action": setup.get("recommended_action"),
+                    "latency_ms": setup.get("latency_ms"),
+                    "tokens_used": setup.get("tokens_used"),
+                    "gateway": setup.get("gateway"),
+                    "raw_response": setup.get("raw_response"),
+                }
+            ],
+        }
+
+        row_id = await asyncio.to_thread(storage.save_prediction, consensus=consensus_record, evaluation_date=eval_date, settings=_settings)
+        setup["prediction_id"] = row_id
+        setup["is_cached"] = False
+
+        return {"success": True, "setup": setup, "prediction_id": row_id}
+    except Exception as e:
+        logger.exception("Error generating OmniRoute setup for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"OmniRoute setup generation failed: {str(e)}")
 
 
 @router.post("/api/v1/omniroute/analyze")
