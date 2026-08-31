@@ -520,16 +520,30 @@ def get_historical_premarket_outcomes(
                 if sq not in title.lower() and sq not in summary.lower() and sq not in ticker.lower() and sq not in stock_name.lower():
                     continue
 
-            pub_date = pub_at[:10]
-            if not pub_date or not ticker:
+            ist_dt, _ = parse_to_ist(pub_at)
+            if not ist_dt or not ticker:
                 continue
 
-            # Query the trade day T candle on or after pub_date
+            pub_date = ist_dt.strftime("%Y-%m-%d")
+            time_float = ist_dt.hour + (ist_dt.minute / 60.0)
+
+            # Determine temporal target trading session:
+            # - If published post-close (>= 15:15 IST), trade session is strictly the NEXT market day (date > pub_date)
+            # - If published pre-market (<= 09:15 IST), trade session is on or after pub_date (date >= pub_date)
+            # - Intraday news during 09:15-15:15 IST is not an overnight pre-market setup
+            if time_float >= 15.25:
+                date_filter = "date > ?"
+            elif time_float <= 9.25:
+                date_filter = "date >= ?"
+            else:
+                continue
+
+            # Query the target trade day T candle on or after target session date
             candle_rows = conn.execute(
-                """
+                f"""
                 SELECT date, open, high, low, close, volume 
                 FROM price_history 
-                WHERE ticker = ? AND date >= ? 
+                WHERE ticker = ? AND {date_filter} 
                 ORDER BY date ASC LIMIT 2
                 """,
                 (ticker, pub_date),
@@ -656,13 +670,24 @@ def get_historical_premarket_outcomes(
                     outcome_color = "#f43f5e"
                 else:
                     outcome_code = "GAP_FADED"
-                    outcome_badge = f"⚠️ Faded ({day_return_pct}%)"
+                    outcome_badge = f"⚠️ Gap Faded ({day_return_pct}%)"
                     outcome_color = "#fbbf24"
             else:
-                is_win = abs(day_return_pct) <= 2.0
-                outcome_code = "NEUTRAL"
-                outcome_badge = f"⚖️ Neutral ({day_return_pct}%)"
-                outcome_color = "#94a3b8"
+                if abs(day_return_pct) <= 2.0:
+                    is_win = True
+                    outcome_code = "RANGE_BOUND"
+                    outcome_badge = f"⚖️ Range-Bound ({day_return_pct:+0.2f}%)"
+                    outcome_color = "#38bdf8"
+                elif day_return_pct > 2.0:
+                    is_win = False
+                    outcome_code = "DRIFT_UP"
+                    outcome_badge = f"🟢 Drifted Up (+{day_return_pct:.2f}%)"
+                    outcome_color = "#34d399"
+                else:
+                    is_win = False
+                    outcome_code = "DRIFT_DOWN"
+                    outcome_badge = f"🔴 Drifted Down ({day_return_pct:.2f}%)"
+                    outcome_color = "#f43f5e"
 
             verified_items.append({
                 "id": c.get("id"),
