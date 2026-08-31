@@ -120,33 +120,11 @@ def store_prediction(
     predicted_at: str | None = None,
     merge_tolerance_pct: float = 0.5,
 ) -> int:
-    """Store a single Kronos prediction result as an audit row, merging ±0.5% close updates.
-
-    Parameters
-    ----------
-    ticker:
-        The stock ticker the prediction is for.
-    settings:
-        Runtime :class:`Settings` (controls the cache DB path).
-    payload:
-        The full forecast dict produced by ``predict_single_stock`` (e.g.
-        ``symbol``, ``name``, ``current_price``, ``support``, ``resistance``,
-        ``return_pct``, ``trend``, ``results_date``, ``explanation``).
-    run_at:
-        Optional ISO timestamp for this prediction *run*. Defaults to now.
-    predicted_at:
-        Optional ISO timestamp of the price-date the forecast was based on.
-        Defaults to ``run_at``.
-    merge_tolerance_pct:
-        If the predicted return_pct is within ±merge_tolerance_pct of the latest
-        existing prediction for the same ticker, merge and update the existing row
-        instead of creating a noisy duplicate row. Set to 0 to disable merging.
-
-    Returns
-    -------
-    int
-        The inserted or updated row id.
-    """
+    """Store a single Kronos prediction result as an audit row, merging ±0.5% close updates."""
+    clean_ticker = str(ticker or "").split("::")[0].strip().upper()
+    if not clean_ticker:
+        return -1
+    ticker = clean_ticker
     now = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
     run_at = run_at or now
     predicted_at = predicted_at or run_at

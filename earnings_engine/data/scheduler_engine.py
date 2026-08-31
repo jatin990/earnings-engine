@@ -215,51 +215,55 @@ class SchedulerEngine:
         lookback = int(params.get("lookback", 120))
         pred_len = int(params.get("pred_len", 14))
 
-        hot_tickers: set[str] = set()
+        hot_keys: set[str] = set()
         try:
             from earnings_engine.data.swing_scanner import _pool as swing_pool
-            hot_tickers.update(swing_pool.get("hot", {}).keys())
+            hot_keys.update(swing_pool.get("hot", {}).keys())
         except Exception:
             pass
 
         try:
             from earnings_engine.data.breakout_scanner import _pool as breakout_pool
-            hot_tickers.update(breakout_pool.get("hot", {}).keys())
+            hot_keys.update(breakout_pool.get("hot", {}).keys())
         except Exception:
             pass
 
-        if not hot_tickers:
+        # Deduplicate to distinct base tickers (avoiding redundant GPU runs across strategies)
+        distinct_tickers = sorted({k.split("::")[0].strip().upper() for k in hot_keys if k})
+        if not distinct_tickers:
             return "No active Hot pool candidates currently require Kronos sequence forecast."
 
         updated_count = 0
-        for ticker in hot_tickers:
+        for clean_sym in distinct_tickers:
             try:
-                res = predict_single_stock(ticker, lookback=lookback, pred_len=pred_len, settings=settings)
+                res = predict_single_stock(clean_sym, lookback=lookback, pred_len=pred_len, settings=settings)
                 if res and isinstance(res, dict):
-                    # Store with merge tolerance
-                    store_prediction(ticker, settings, res, merge_tolerance_pct=merge_tol)
+                    # Store with clean ticker and merge tolerance
+                    store_prediction(clean_sym, settings, res, merge_tolerance_pct=merge_tol)
 
-                    # Update swing pool in memory
+                    # Update swing pool in memory for all keys matching this ticker
                     try:
                         from earnings_engine.data.swing_scanner import _pool as s_pool
-                        if ticker in s_pool.get("hot", {}):
-                            s_pool["hot"][ticker]["result"]["kronos_prediction"] = res
+                        for k, v in s_pool.get("hot", {}).items():
+                            if k == clean_sym or k.startswith(f"{clean_sym}::"):
+                                v["result"]["kronos_prediction"] = res
                     except Exception:
                         pass
 
-                    # Update breakout pool in memory
+                    # Update breakout pool in memory for all keys matching this ticker
                     try:
                         from earnings_engine.data.breakout_scanner import _pool as b_pool
-                        if ticker in b_pool.get("hot", {}):
-                            b_pool["hot"][ticker]["result"]["kronos_prediction"] = res
+                        for k, v in b_pool.get("hot", {}).items():
+                            if k == clean_sym or k.startswith(f"{clean_sym}::"):
+                                v["result"]["kronos_prediction"] = res
                     except Exception:
                         pass
 
                     updated_count += 1
             except Exception as e:
-                logger.debug("[SCHEDULER-KRONOS] Error predicting for %s: %s", ticker, e)
+                logger.debug("[SCHEDULER-KRONOS] Error predicting for %s: %s", clean_sym, e)
 
-        return f"Kronos deep sequence re-scored {updated_count}/{len(hot_tickers)} Hot setups (±{merge_tol}% audit merge enabled)."
+        return f"Kronos 14-day forecasts generated and attached for {updated_count} distinct Hot pool stocks."
 
     def _handle_kronos_warmup(self, settings: Settings, params: dict[str, Any]) -> str:
         watchlist = params.get("watchlist", "my_watchlist")
