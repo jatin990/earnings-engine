@@ -10,11 +10,11 @@ from earnings_engine.data.catalysts_news import _connect
 
 
 def test_news_injection_calculates_on_last_close(tmp_path, monkeypatch):
-    test_db = str(tmp_path / "test_news_price.sqlite3")
     settings = Settings()
-    settings.db_path = test_db
+    settings.data_dirs = {"prices": tmp_path / "prices", "earnings": tmp_path / "earnings"}
+    settings.ensure_dirs()
 
-    # Initialize tables and seed price history for RELIANCE.NS
+    # Initialize tables and seed price history for RELIANCE.NS in isolated test tmp_path
     with _connect(settings) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS price_history (
