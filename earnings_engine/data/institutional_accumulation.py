@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,6 +17,28 @@ from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
 
 logger = logging.getLogger(__name__)
+
+# In-memory TTL Cache (3-minute TTL for high-throughput responses)
+_INST_CACHE: dict[str, tuple[float, Any]] = {}
+
+
+def _get_inst_cache(key: str) -> Any | None:
+    now = time.time()
+    if key in _INST_CACHE:
+        exp, val = _INST_CACHE[key]
+        if now < exp:
+            return val
+        del _INST_CACHE[key]
+    return None
+
+
+def _set_inst_cache(key: str, val: Any, ttl_seconds: float = 180.0) -> None:
+    _INST_CACHE[key] = (time.time() + ttl_seconds, val)
+
+
+def clear_institutional_cache() -> None:
+    """Flush the institutional in-memory response cache."""
+    _INST_CACHE.clear()
 
 # Core benchmark equities dynamically populated with live corporate ownership
 CORE_BENCHMARK_UNIVERSE: list[str] = [
@@ -84,24 +107,40 @@ def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]
     }
 
 
+_TICKER_RETURNS_MEMO: dict[str, tuple[float, tuple[float | None, float | None, float | None]]] = {}
+
+
 def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None, float | None]:
-    """Compute 7-day, 30-day, and 1-year percentage returns directly from price_history."""
+    """Compute 7-day, 30-day, and 1-year percentage returns directly from price_history with fast memoization."""
     if not sym:
         return None, None, None
-    try:
-        clean_sym = sym.strip().upper()
-        clean_sym_ns = clean_sym if clean_sym.endswith(".NS") else f"{clean_sym}.NS"
-        clean_sym_plain = clean_sym.replace(".NS", "")
 
+    clean_sym = sym.strip().upper()
+    target_sym = clean_sym if (clean_sym.endswith(".NS") or clean_sym.endswith(".BO") or "." in clean_sym) else f"{clean_sym}.NS"
+    now = time.time()
+    if target_sym in _TICKER_RETURNS_MEMO:
+        exp, val = _TICKER_RETURNS_MEMO[target_sym]
+        if now < exp:
+            return val
+
+    try:
         rows = conn.execute(
-            "SELECT date, close FROM price_history WHERE ticker IN (?, ?, ?) ORDER BY date DESC LIMIT 260",
-            (clean_sym, clean_sym_ns, clean_sym_plain),
+            "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
+            (target_sym,),
         ).fetchall()
+        if not rows and target_sym.endswith(".NS"):
+            rows = conn.execute(
+                "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
+                (target_sym.replace(".NS", ""),),
+            ).fetchall()
+
         if not rows or len(rows) < 2:
+            _TICKER_RETURNS_MEMO[target_sym] = (now + 600.0, (None, None, None))
             return None, None, None
 
         latest_close = float(rows[0][1] or 0.0)
         if latest_close <= 0:
+            _TICKER_RETURNS_MEMO[target_sym] = (now + 600.0, (None, None, None))
             return None, None, None
 
         idx_7d = min(5, len(rows) - 1)
@@ -116,7 +155,9 @@ def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None
         prior_1y = float(rows[idx_1y][1] or 0.0)
         ret_1y = round(((latest_close - prior_1y) / prior_1y) * 100.0, 2) if prior_1y > 0 else None
 
-        return ret_7d, ret_30d, ret_1y
+        res = (ret_7d, ret_30d, ret_1y)
+        _TICKER_RETURNS_MEMO[target_sym] = (now + 600.0, res)
+        return res
     except Exception:
         return None, None, None
 
@@ -236,20 +277,8 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             (sym,),
         ).fetchall()
 
-        # Check if modern 2026 quarter patterns exist for this ticker or missing recent_txn_date
-        p_check = conn.execute(
-            "SELECT COUNT(*) FROM shareholding_patterns WHERE ticker = ? AND (quarter LIKE '%FY27%' OR quarter LIKE '%FY26%')",
-            (sym,),
-        ).fetchone()[0]
-
-        invalid_pat_sum = conn.execute(
-            "SELECT COUNT(*) FROM shareholding_patterns WHERE ticker = ? AND ABS((promoter_pct + fii_pct + dii_mf_pct + public_retail_pct + other_pct) - 100.0) > 0.5",
-            (sym,),
-        ).fetchone()[0]
-
-        missing_txn = sum(1 for r in h_rows if not r[15] and r[9] != "HOLD") if h_rows else 1
-
-        if not h_rows or p_check == 0 or missing_txn > 0 or invalid_pat_sum > 0:
+        # If completely empty and is a core benchmark ticker, seed initial data
+        if not h_rows and sym in CORE_BENCHMARK_UNIVERSE:
             _ensure_institutional_data_for_ticker(sym, conn)
             h_rows = conn.execute(
                 """
@@ -590,26 +619,13 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             verdict = "🔴 Institutional Distribution / Trimming"
             verdict_badge = "rose"
 
-        # Company name lookup — resolve real name, never return raw ticker
+        # Company name lookup — resolve real name from local database, never return raw ticker
         from earnings_engine.data.names import get_name
         raw_name = get_name(sym)
-        # If get_name returned the ticker itself (fallback), strip suffix for display
         if raw_name and raw_name != sym and not raw_name.endswith(".NS") and not raw_name.endswith(".BO"):
             company_name = raw_name
         else:
-            # Try yfinance shortName as last resort
-            try:
-                import yfinance as yf
-                yf_info = yf.Ticker(sym).info or {}
-                yf_name = yf_info.get("shortName") or yf_info.get("longName")
-                if yf_name:
-                    company_name = yf_name
-                    from earnings_engine.data.names import store_name
-                    store_name(sym, yf_name, source="yfinance")
-                else:
-                    company_name = sym.replace(".NS", "").replace(".BO", "")
-            except Exception:
-                company_name = sym.replace(".NS", "").replace(".BO", "")
+            company_name = sym.replace(".NS", "").replace(".BO", "")
 
         # Calculate 3 Distinct Financial Metrics at the stock level
         mcap_cr = None
@@ -702,14 +718,50 @@ def get_top_accumulated_stocks(
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     """Retrieve high-conviction equities experiencing active institutional fund accumulation."""
+    cache_key = f"top_accum_{universe}_{min_score}_{limit}"
+    cached = _get_inst_cache(cache_key)
+    if cached is not None:
+        return cached
+
     settings = settings or Settings()
     init_institutional_db(settings)
 
     try:
         conn = get_db_connection(settings)
-        # Find distinct tickers in holdings
-        t_rows = conn.execute("SELECT DISTINCT ticker FROM institutional_holdings").fetchall()
-        tickers = [r[0] for r in t_rows if r[0]]
+        candidate_limit = max(limit * 3, 60)
+
+        # Select top candidates that actually have accumulation actions
+        if universe:
+            cand_rows = conn.execute(
+                """
+                SELECT h.ticker, COUNT(*) as buy_count, SUM(h.holding_value_cr) as gross_inflow
+                FROM institutional_holdings h
+                JOIN universes u ON (h.ticker = u.ticker OR h.ticker || '.NS' = u.ticker OR REPLACE(h.ticker, '.NS', '') = u.ticker)
+                WHERE (LOWER(u.universe_name) = LOWER(?) OR u.universe_name = ?)
+                  AND h.action IN ('NEW BUY', 'ACCUMULATED')
+                GROUP BY h.ticker
+                ORDER BY buy_count DESC, gross_inflow DESC
+                LIMIT ?
+                """,
+                (universe, universe, candidate_limit),
+            ).fetchall()
+        else:
+            cand_rows = conn.execute(
+                """
+                SELECT ticker, COUNT(*) as buy_count, SUM(holding_value_cr) as gross_inflow
+                FROM institutional_holdings
+                WHERE action IN ('NEW BUY', 'ACCUMULATED')
+                GROUP BY ticker
+                ORDER BY buy_count DESC, gross_inflow DESC
+                LIMIT ?
+                """,
+                (candidate_limit,),
+            ).fetchall()
+
+        tickers = [r[0] for r in cand_rows if r[0]]
+        if not tickers:
+            t_rows = conn.execute("SELECT DISTINCT ticker FROM institutional_holdings LIMIT 30").fetchall()
+            tickers = [r[0] for r in t_rows if r[0]]
 
         results: list[dict[str, Any]] = []
         for t in tickers:
@@ -748,8 +800,10 @@ def get_top_accumulated_stocks(
                     ],
                 })
 
-        results.sort(key=lambda x: x["accumulation_score"], reverse=True)
-        return results[:limit]
+        results.sort(key=lambda x: (x["accumulation_score"], x.get("net_flow_cr", 0.0)), reverse=True)
+        final_res = results[:limit]
+        _set_inst_cache(cache_key, final_res, ttl_seconds=180.0)
+        return final_res
     except Exception as e:
         logger.warning("[INSTITUTIONAL] Top accumulated error: %s", e)
         return []
@@ -760,14 +814,30 @@ def get_top_distributed_stocks(
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     """Retrieve equities where institutional funds are actively trimming or liquidating positions."""
+    cache_key = f"top_dist_{limit}"
+    cached = _get_inst_cache(cache_key)
+    if cached is not None:
+        return cached
+
     settings = settings or Settings()
     init_institutional_db(settings)
 
     try:
         conn = get_db_connection(settings)
-        t_rows = conn.execute("SELECT DISTINCT ticker FROM institutional_holdings").fetchall()
-        tickers = [r[0] for r in t_rows if r[0]]
+        candidate_limit = max(limit * 3, 50)
+        cand_rows = conn.execute(
+            """
+            SELECT ticker, COUNT(*) as sell_count, SUM(holding_value_cr) as gross_outflow
+            FROM institutional_holdings
+            WHERE action IN ('TRIMMED', 'SOLD OUT')
+            GROUP BY ticker
+            ORDER BY sell_count DESC, gross_outflow DESC
+            LIMIT ?
+            """,
+            (candidate_limit,),
+        ).fetchall()
 
+        tickers = [r[0] for r in cand_rows if r[0]]
         results: list[dict[str, Any]] = []
         for t in tickers:
             act = get_stock_institutional_activity(t, settings=settings)
@@ -804,8 +874,10 @@ def get_top_distributed_stocks(
                     ],
                 })
 
-        results.sort(key=lambda x: x["funds_selling_count"], reverse=True)
-        return results[:limit]
+        results.sort(key=lambda x: (x["funds_selling_count"], x.get("gross_outflow_cr", 0.0)), reverse=True)
+        final_res = results[:limit]
+        _set_inst_cache(cache_key, final_res, ttl_seconds=180.0)
+        return final_res
     except Exception as e:
         logger.warning("[INSTITUTIONAL] Top distributed error: %s", e)
         return []
@@ -813,6 +885,11 @@ def get_top_distributed_stocks(
 
 def get_all_funds_activity(limit: int = 50, settings: Settings | None = None) -> list[dict[str, Any]]:
     """Retrieve distinct list of active institutional funds with their latest actions and 30D / 1Y returns."""
+    cache_key = f"all_funds_{limit}"
+    cached = _get_inst_cache(cache_key)
+    if cached is not None:
+        return cached
+
     settings = settings or Settings()
     init_institutional_db(settings)
 
@@ -875,6 +952,8 @@ def get_all_funds_activity(limit: int = 50, settings: Settings | None = None) ->
                 "return_30d_pct": fund_30d,
                 "return_1y_pct": fund_1y,
             })
+
+        _set_inst_cache(cache_key, funds, ttl_seconds=180.0)
         return funds
     except Exception as e:
         logger.warning("[INSTITUTIONAL] Funds list error: %s", e)
@@ -883,6 +962,11 @@ def get_all_funds_activity(limit: int = 50, settings: Settings | None = None) ->
 
 def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None) -> list[dict[str, Any]]:
     """Reverse lookup: retrieve all equities held, 30D/1Y returns, and recent actions for a specific fund."""
+    cache_key = f"fund_portfolio_{fund_name.lower().strip()}"
+    cached = _get_inst_cache(cache_key)
+    if cached is not None:
+        return cached
+
     settings = settings or Settings()
     init_institutional_db(settings)
 
@@ -966,6 +1050,8 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
                 "return_1y_pct": r1y,
                 "reported_date": r[12],
             })
+
+        _set_inst_cache(cache_key, holdings, ttl_seconds=180.0)
         return holdings
     except Exception as e:
         logger.warning("[INSTITUTIONAL] Fund portfolio error for %s: %s", fund_name, e)
@@ -978,6 +1064,11 @@ def get_top_stake_additions(
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Retrieve top stocks with >= min_delta% institutional addition in latest quarter and historical mega surges."""
+    cache_key = f"top_additions_{min_delta}_{limit}"
+    cached = _get_inst_cache(cache_key)
+    if cached is not None:
+        return cached
+
     settings = settings or Settings()
     init_institutional_db(settings)
 
@@ -985,28 +1076,30 @@ def get_top_stake_additions(
 
     try:
         conn = get_db_connection(settings)
-        tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM shareholding_patterns").fetchall() if r[0]]
+        all_pats = conn.execute(
+            """
+            SELECT ticker, quarter, promoter_pct, fii_pct, dii_mf_pct, public_retail_pct, other_pct
+            FROM shareholding_patterns
+            ORDER BY ticker, rowid ASC
+            """
+        ).fetchall()
+
+        by_ticker: dict[str, list[Any]] = {}
+        for r in all_pats:
+            t = r[0]
+            if t not in by_ticker:
+                by_ticker[t] = []
+            by_ticker[t].append(r)
 
         latest_additions: list[dict[str, Any]] = []
         historical_additions: list[dict[str, Any]] = []
 
-        for t in tickers:
-            pats = conn.execute(
-                """
-                SELECT quarter, promoter_pct, fii_pct, dii_mf_pct, public_retail_pct, other_pct, updated_at
-                FROM shareholding_patterns
-                WHERE ticker = ?
-                """,
-                (t,),
-            ).fetchall()
+        from earnings_engine.data.names import get_name
 
-            pats = sorted(pats, key=lambda x: quarter_order.get(x[0], 0), reverse=True)
+        for t, pats_raw in by_ticker.items():
+            pats = sorted(pats_raw, key=lambda x: quarter_order.get(x[1], 0), reverse=True)
             if len(pats) < 2:
                 continue
-
-            act = get_stock_institutional_activity(t, settings=settings)
-            company_name = act.get("company_name") or t.replace(".NS", "")
-            mcap_cr = act.get("market_cap_cr")
 
             # 1. Latest Quarter Comparison (pats[0] vs pats[1])
             lat_q, prev_q = pats[0][0], pats[1][0]
@@ -1019,87 +1112,96 @@ def get_top_stake_additions(
             fii_delta = round(lat_fii - prev_fii, 2)
             dii_delta = round(lat_dii - prev_dii, 2)
 
+            is_latest_qualify = (inst_delta >= min_delta or fii_delta >= min_delta or dii_delta >= min_delta)
+
+            # Check historical pairs
+            qualifying_historical_indices = []
+            for i in range(1, len(pats) - 1):
+                hfii_curr, hdii_curr = pats[i][2] or 0.0, pats[i][3] or 0.0
+                hfii_prev, hdii_prev = pats[i+1][2] or 0.0, pats[i+1][3] or 0.0
+                h_delta = round((hfii_curr + hdii_curr) - (hfii_prev + hdii_prev), 2)
+                hf_delta = round(hfii_curr - hfii_prev, 2)
+                hd_delta = round(hdii_curr - hdii_prev, 2)
+                if h_delta >= min_delta or hf_delta >= min_delta or hd_delta >= min_delta:
+                    qualifying_historical_indices.append((i, h_delta, hf_delta, hd_delta))
+
+            if not is_latest_qualify and not qualifying_historical_indices:
+                continue
+
+            # Only enrich fully if stock qualifies
+            act = get_stock_institutional_activity(t, settings=settings)
+            company_name = act.get("company_name") or get_name(t) or t.replace(".NS", "")
+            mcap_cr = act.get("market_cap_cr")
+
             # 3 Distinct Financial Metrics
             tot_amt_cr = round((lat_inst / 100.0) * mcap_cr, 1) if mcap_cr else act.get("total_amount_cr", 0.0)
             inc_amt_cr = round((inst_delta / 100.0) * mcap_cr, 1) if (mcap_cr and inst_delta != 0) else act.get("net_flow_cr", 0.0)
 
-            item_data = {
-                "ticker": t,
-                "company_name": company_name,
-                "latest_quarter": lat_q,
-                "previous_quarter": prev_q,
-                "market_cap_cr": mcap_cr,
-                # 3 Distinct Financial Metrics:
-                "inst_addition_pct": inst_delta,
-                "increase_pct": inst_delta,
-                "increase_amount_cr": inc_amt_cr,
-                "total_amount_cr": tot_amt_cr,
-                "total_institutional_amount_cr": tot_amt_cr,
-                "fii_delta_pct": fii_delta,
-                "dii_delta_pct": dii_delta,
-                "total_institutional_stake_pct": lat_inst,
-                "fii_stake_pct": lat_fii,
-                "dii_stake_pct": lat_dii,
-                "accumulation_score": act.get("accumulation_score", 50.0),
-                "verdict": act.get("verdict", "Stable"),
-                "verdict_badge": act.get("verdict_badge", "amber"),
-                "net_flow_cr": act.get("net_flow_cr", 0.0),
-                "gross_inflow_cr": act.get("gross_inflow_cr", 0.0),
-                "gross_outflow_cr": act.get("gross_outflow_cr", 0.0),
-                "funds_accumulating_count": act.get("funds_accumulating_count", 0),
-                "funds_selling_count": act.get("funds_selling_count", 0),
-                "is_new_fii_entry": act.get("is_new_fii_entry", False),
-                "is_new_dii_entry": act.get("is_new_dii_entry", False),
-                "fii_interest_summary": act.get("fii_interest_summary", ""),
-                "return_7d_pct": act.get("return_7d_pct"),
-                "return_30d_pct": act.get("return_30d_pct"),
-                "return_1y_pct": act.get("return_1y_pct"),
-            }
+            if is_latest_qualify:
+                latest_additions.append({
+                    "ticker": t,
+                    "company_name": company_name,
+                    "latest_quarter": lat_q,
+                    "previous_quarter": prev_q,
+                    "market_cap_cr": mcap_cr,
+                    "inst_addition_pct": inst_delta,
+                    "increase_pct": inst_delta,
+                    "increase_amount_cr": inc_amt_cr,
+                    "total_amount_cr": tot_amt_cr,
+                    "total_institutional_amount_cr": tot_amt_cr,
+                    "fii_delta_pct": fii_delta,
+                    "dii_delta_pct": dii_delta,
+                    "total_institutional_stake_pct": lat_inst,
+                    "fii_stake_pct": lat_fii,
+                    "dii_stake_pct": lat_dii,
+                    "accumulation_score": act.get("accumulation_score", 50.0),
+                    "verdict": act.get("verdict", "Stable"),
+                    "verdict_badge": act.get("verdict_badge", "amber"),
+                    "net_flow_cr": act.get("net_flow_cr", 0.0),
+                    "gross_inflow_cr": act.get("gross_inflow_cr", 0.0),
+                    "gross_outflow_cr": act.get("gross_outflow_cr", 0.0),
+                    "funds_accumulating_count": act.get("funds_accumulating_count", 0),
+                    "funds_selling_count": act.get("funds_selling_count", 0),
+                    "is_new_fii_entry": act.get("is_new_fii_entry", False),
+                    "is_new_dii_entry": act.get("is_new_dii_entry", False),
+                    "fii_interest_summary": act.get("fii_interest_summary", ""),
+                    "return_7d_pct": act.get("return_7d_pct"),
+                    "return_30d_pct": act.get("return_30d_pct"),
+                    "return_1y_pct": act.get("return_1y_pct"),
+                })
 
-            if inst_delta >= min_delta or fii_delta >= min_delta or dii_delta >= min_delta:
-                latest_additions.append(item_data)
-
-            # 2. Check historical sequential pairs for massive moves
-            for i in range(1, len(pats) - 1):
-                hq_curr, hq_prev = pats[i][0], pats[i+1][0]
-                hfii_curr, hdii_curr = pats[i][2] or 0.0, pats[i][3] or 0.0
-                hfii_prev, hdii_prev = pats[i+1][2] or 0.0, pats[i+1][3] or 0.0
+            for idx_h, h_delta, hf_delta, hd_delta in qualifying_historical_indices:
+                hq_curr, hq_prev = pats[idx_h][0], pats[idx_h+1][0]
+                hfii_curr, hdii_curr = pats[idx_h][2] or 0.0, pats[idx_h][3] or 0.0
                 hinst_curr = round(hfii_curr + hdii_curr, 2)
-                hinst_prev = round(hfii_prev + hdii_prev, 2)
-                h_delta = round(hinst_curr - hinst_prev, 2)
-                hf_delta = round(hfii_curr - hfii_prev, 2)
-                hd_delta = round(hdii_curr - hdii_prev, 2)
-
                 h_tot_amt = round((hinst_curr / 100.0) * mcap_cr, 1) if mcap_cr else round(hinst_curr * 150.0, 1)
                 h_inc_amt = round((h_delta / 100.0) * mcap_cr, 1) if (mcap_cr and h_delta != 0) else round(h_delta * 120.0, 1)
 
-                if h_delta >= min_delta or hf_delta >= min_delta or hd_delta >= min_delta:
-                    historical_additions.append({
-                        "ticker": t,
-                        "company_name": company_name,
-                        "quarter_comparison": f"{hq_curr} vs {hq_prev}",
-                        "target_quarter": hq_curr,
-                        "baseline_quarter": hq_prev,
-                        "market_cap_cr": mcap_cr,
-                        # 3 Distinct Financial Metrics:
-                        "inst_addition_pct": h_delta,
-                        "increase_pct": h_delta,
-                        "increase_amount_cr": h_inc_amt,
-                        "total_amount_cr": h_tot_amt,
-                        "total_institutional_amount_cr": h_tot_amt,
-                        "fii_delta_pct": hf_delta,
-                        "dii_delta_pct": hd_delta,
-                        "historical_stake_pct": hinst_curr,
-                        "current_total_stake_pct": lat_inst,
-                        "accumulation_score": act.get("accumulation_score", 50.0),
-                        "funds_accumulating_count": act.get("funds_accumulating_count", 0),
-                        "return_30d_pct": act.get("return_30d_pct"),
-                    })
+                historical_additions.append({
+                    "ticker": t,
+                    "company_name": company_name,
+                    "quarter_comparison": f"{hq_curr} vs {hq_prev}",
+                    "target_quarter": hq_curr,
+                    "baseline_quarter": hq_prev,
+                    "market_cap_cr": mcap_cr,
+                    "inst_addition_pct": h_delta,
+                    "increase_pct": h_delta,
+                    "increase_amount_cr": h_inc_amt,
+                    "total_amount_cr": h_tot_amt,
+                    "total_institutional_amount_cr": h_tot_amt,
+                    "fii_delta_pct": hf_delta,
+                    "dii_delta_pct": hd_delta,
+                    "historical_stake_pct": hinst_curr,
+                    "current_total_stake_pct": lat_inst,
+                    "accumulation_score": act.get("accumulation_score", 50.0),
+                    "funds_accumulating_count": act.get("funds_accumulating_count", 0),
+                    "return_30d_pct": act.get("return_30d_pct"),
+                })
 
         latest_additions.sort(key=lambda x: x["inst_addition_pct"], reverse=True)
         historical_additions.sort(key=lambda x: x["inst_addition_pct"], reverse=True)
 
-        return {
+        res_payload = {
             "success": True,
             "min_delta": min_delta,
             "latest_count": len(latest_additions),
@@ -1107,6 +1209,8 @@ def get_top_stake_additions(
             "latest_additions": latest_additions[:limit],
             "historical_additions": historical_additions[:limit],
         }
+        _set_inst_cache(cache_key, res_payload, ttl_seconds=180.0)
+        return res_payload
     except Exception as e:
         logger.warning("[INSTITUTIONAL] Top additions error: %s", e)
         return {
