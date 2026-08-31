@@ -395,7 +395,14 @@ def get_db_connection(settings: Settings | None = None, force_remote: bool = Fal
     default_dir = Settings().data_dirs.get("prices")
     if settings is not None and str(s.data_dirs.get("prices")) != str(default_dir):
         s.ensure_dirs()
-        return sqlite3.connect(str(_cache_path(s)))
+        conn = sqlite3.connect(str(_cache_path(s)), timeout=30.0)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("PRAGMA busy_timeout=10000;")
+        except Exception:
+            pass
+        return conn
 
     url = os.getenv("TURSO_DATABASE_URL", "").strip()
     token = os.getenv("TURSO_AUTH_TOKEN", "").strip()
