@@ -493,17 +493,6 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
     delta_inserts: list[tuple] = []
     now_iso = now_utc.isoformat()
 
-    # Predefined baseline variations for realistic institutional dynamics
-    flow_variations = [
-        (9420.5, 11840.2, 12650.0, 9420.0),   # FII -2419.7, DII +3230.0 -> Net +810.3 (Bullish)
-        (8750.0, 9210.0, 11400.0, 8900.0),    # FII -460.0,  DII +2500.0 -> Net +2040.0 (Bullish)
-        (10200.0, 12450.0, 13100.0, 10150.0), # FII -2250.0, DII +2950.0 -> Net +700.0 (Bullish)
-        (11500.0, 10800.0, 9800.0, 10400.0),  # FII +700.0,  DII -600.0  -> Net +100.0 (Balanced)
-        (8900.0, 10900.0, 11800.0, 9100.0),   # FII -2000.0, DII +2700.0 -> Net +700.0 (Bullish)
-        (7600.0, 9400.0, 10500.0, 8200.0),    # FII -1800.0, DII +2300.0 -> Net +500.0 (Bullish)
-        (12100.0, 11400.0, 10200.0, 9600.0),  # FII +700.0,  DII +600.0  -> Net +1300.0 (Bullish)
-    ]
-
     for idx, dt_str in enumerate(trading_dates_raw[:30]):
         if dt_str in cached_flows_map and (cached_flows_map[dt_str].get("fii_buy_cr") or cached_flows_map[dt_str].get("dii_buy_cr")):
             history_full.append(cached_flows_map[dt_str])
@@ -558,11 +547,10 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
                 base_dii_buy = round(base_inst_turnover * 0.55, 1)
                 base_dii_sell = round(base_inst_turnover * 0.45, 1)
             else:
-                var_pat = flow_variations[idx % len(flow_variations)]
-                base_fii_buy = var_pat[0]
-                base_fii_sell = var_pat[1]
-                base_dii_buy = var_pat[2]
-                base_dii_sell = var_pat[3]
+                base_fii_buy = 0.0
+                base_fii_sell = 0.0
+                base_dii_buy = 0.0
+                base_dii_sell = 0.0
 
         fii_day_net = round(base_fii_buy - base_fii_sell, 1)
         dii_day_net = round(base_dii_buy - base_dii_sell, 1)

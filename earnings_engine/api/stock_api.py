@@ -630,6 +630,11 @@ def calculate_or_fetch_eps(
     """
     from earnings_engine.api.recalculate_api import recalculate_ticker_metrics
 
+    if not isinstance(earnings_date, str):
+        if isinstance(earnings_date, Settings) and settings is None:
+            settings = earnings_date
+        earnings_date = None
+
     settings = settings or Settings()
     sym = ticker.strip().upper()
     if not sym.endswith(".NS") and not "." in sym:
@@ -796,8 +801,8 @@ def calculate_or_fetch_eps(
 
         if existing_auth and existing_auth[0] in ("yfinance", "nse") and not is_manual_override:
             logger.info("[CALC-EPS] Preserving authentic %s record for %s (%s)", existing_auth[0], sym, target_ed)
-        elif eps_rep is not None or eps_est is not None:
-            save_source = "manual_override" if is_manual_override else (method or "calculated")
+        elif eps_rep is not None or eps_est is not None or target_ed:
+            save_source = "manual_override" if is_manual_override else (method or "corporate_announcement")
             try:
                 with conn:
                     conn.execute("""
