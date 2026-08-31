@@ -323,6 +323,122 @@
             border-color: var(--border-hover);
         }
 
+        /* Per-Section Action Toolbars */
+        .section-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+        .btn-section-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.25rem 0.62rem;
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            font-family: var(--font-sans);
+        }
+        .btn-section-action:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+        .btn-section-action:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .btn-section-action.primary-subtle {
+            background: rgba(99, 102, 241, 0.12);
+            border-color: rgba(99, 102, 241, 0.35);
+            color: #c7d2fe;
+        }
+        .btn-section-action.primary-subtle:hover:not(:disabled) {
+            background: rgba(99, 102, 241, 0.22);
+            border-color: rgba(99, 102, 241, 0.55);
+            color: #ffffff;
+        }
+        .btn-section-action.cyan-subtle {
+            background: rgba(56, 189, 248, 0.12);
+            border-color: rgba(56, 189, 248, 0.35);
+            color: #38bdf8;
+        }
+        .btn-section-action.cyan-subtle:hover:not(:disabled) {
+            background: rgba(56, 189, 248, 0.22);
+            border-color: rgba(56, 189, 248, 0.55);
+            color: #ffffff;
+        }
+        .btn-section-action.emerald-subtle {
+            background: rgba(16, 185, 129, 0.12);
+            border-color: rgba(16, 185, 129, 0.35);
+            color: #34d399;
+        }
+        .btn-section-action.emerald-subtle:hover:not(:disabled) {
+            background: rgba(16, 185, 129, 0.22);
+            border-color: rgba(16, 185, 129, 0.55);
+            color: #ffffff;
+        }
+
+        /* Floating Toast Engine */
+        .stock-toast-container {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            pointer-events: none;
+        }
+        .stock-toast {
+            pointer-events: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.65rem 1rem;
+            border-radius: 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.1);
+            animation: toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: all 0.25s ease;
+            max-width: 420px;
+        }
+        .stock-toast.toast-success {
+            background: rgba(6, 44, 27, 0.95);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: #6ee7b7;
+        }
+        .stock-toast.toast-info {
+            background: rgba(12, 35, 64, 0.95);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #bae6fd;
+        }
+        .stock-toast.toast-warning {
+            background: rgba(45, 29, 6, 0.95);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            color: #fde68a;
+        }
+        .stock-toast.toast-error {
+            background: rgba(50, 14, 22, 0.95);
+            border: 1px solid rgba(244, 63, 94, 0.4);
+            color: #fecdd3;
+        }
+        @keyframes toastSlideIn {
+            from { opacity: 0; transform: translateY(12px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
         .hero-right {
             display: flex;
             flex-direction: column;
@@ -1038,9 +1154,17 @@
                     <span id="lblPriceAsOf" style="font-size: 0.75rem; color: #94a3b8; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.18rem 0.55rem; border-radius: 4px;">
                         🕒 As of: —
                     </span>
-                    <button type="button" onclick="fetchStockDetails(true)" class="btn-live-refresh" id="btnRefreshQuote" title="Fetch latest live market price">
-                        ⚡ Refresh Live
-                    </button>
+                    <div class="section-actions">
+                        <button type="button" onclick="fetchStockQuoteOnly(true)" class="btn-section-action emerald-subtle" id="btnRefreshQuote" title="Quick fetch of latest live quote">
+                            ⚡ Refresh Live
+                        </button>
+                        <button type="button" onclick="refreshStockPricesFromSource()" class="btn-section-action cyan-subtle" id="btnFetchPricesSource" title="Download latest OHLCV daily price bars and market cap from NSE / yfinance">
+                            🔄 Fetch Price from Source
+                        </button>
+                        <button type="button" onclick="recalculateStockMetrics()" class="btn-section-action primary-subtle" id="btnRecalcMetrics" title="Recalculate technical, moving average, and price quality metrics">
+                            ⚡ Recalculate Quote
+                        </button>
+                    </div>
                     <span class="prev-close-text" id="lblPrevClose">Prev Close: ₹—</span>
                 </div>
             </div>
@@ -1117,8 +1241,18 @@
                     <span>Standardized Multi-Factor Evaluation Matrix</span>
                     <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 500; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.12rem 0.45rem; border-radius: 4px;">6 Pillars · 100% Weight Model</span>
                 </div>
-                <div id="factorCompositePill" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.76rem; font-weight: 800; padding: 0.28rem 0.85rem; border-radius: var(--radius-sm); font-family: var(--font-mono); background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
-                    COMPOSITE: -- / 100
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                    <div id="factorCompositePill" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.76rem; font-weight: 800; padding: 0.28rem 0.85rem; border-radius: var(--radius-sm); font-family: var(--font-mono); background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
+                        COMPOSITE: -- / 100
+                    </div>
+                    <div class="section-actions">
+                        <button type="button" id="btnRefreshFactorScores" onclick="refreshFactorEvaluation()" class="btn-section-action cyan-subtle" title="Recalculate fundamental & technical factor ratings">
+                            🔄 Update All Scores
+                        </button>
+                        <button type="button" id="btnRecalcFactorPillars" onclick="fetchStockFactorEvaluationOnly(true)" class="btn-section-action primary-subtle" title="Recompute 6-pillar factor evaluation weights and grades">
+                            ⚡ Recalculate Factors
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1135,7 +1269,17 @@
                     <span style="color:#818cf8;">🏦</span>
                     <span>Institutional Accumulation &amp; Smart Money</span>
                 </div>
-                <div id="instVerdictPill" style="font-size:0.73rem;font-weight:800;padding:0.25rem 0.8rem;border-radius:var(--radius-sm);font-family:var(--font-mono);background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">Loading...</div>
+                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                    <div id="instVerdictPill" style="font-size:0.73rem;font-weight:800;padding:0.25rem 0.8rem;border-radius:var(--radius-sm);font-family:var(--font-mono);background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">Loading...</div>
+                    <div class="section-actions">
+                        <button type="button" id="btnRefreshInstSource" onclick="refreshInstitutionalFromSource()" class="btn-section-action cyan-subtle" title="Force re-fetch institutional shareholding, fund filings, and block deals from authentic exchange sources">
+                            🔄 Fetch from Source
+                        </button>
+                        <button type="button" id="btnRecalcInstFlows" onclick="fetchStockInstitutionalOnly(true)" class="btn-section-action primary-subtle" title="Recalculate institutional accumulation score, gross inflow/outflow, and FII/DII stake breakdown">
+                            ⚡ Recalculate Flows
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- KPI Row -->
@@ -1219,7 +1363,17 @@
                     <span style="color:#34d399;">📈</span>
                     <span>Technical &amp; Swing Structure</span>
                 </div>
-                <div id="techBreakoutPill" style="font-size:0.73rem;font-weight:800;padding:0.25rem 0.8rem;border-radius:var(--radius-sm);background:rgba(255,255,255,0.05);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);">Loading...</div>
+                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                    <div id="techBreakoutPill" style="font-size:0.73rem;font-weight:800;padding:0.25rem 0.8rem;border-radius:var(--radius-sm);background:rgba(255,255,255,0.05);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);">Loading...</div>
+                    <div class="section-actions">
+                        <button type="button" id="btnRefreshTechPrices" onclick="refreshStockPricesFromSource()" class="btn-section-action cyan-subtle" title="Fetch fresh OHLCV price bars and re-calculate technical indicators">
+                            🔄 Fetch Price History
+                        </button>
+                        <button type="button" id="btnRecalcTechnicals" onclick="recalculateTechnicalsFromSource()" class="btn-section-action primary-subtle" title="Recalculate 20D & 3M swing channels, cycle counts, 20/50/200-DMAs, and structure alignment">
+                            ⚡ Recalculate Technicals
+                        </button>
+                    </div>
+                </div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.65rem;">
                 <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.75rem;">
@@ -1264,11 +1418,11 @@
             <section class="card">
                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                     <div class="card-title">📅 Quarterly Earnings Track Record</div>
-                    <div style="display: flex; gap: 0.4rem; align-items: center;">
-                        <button type="button" id="btnRefreshSourceEps" onclick="refreshEarningsFromSource()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" title="Fetch authoritative corporate calendar and reported EPS directly from official source (NSE / yfinance)">
-                            🔄 Refresh from Source
+                    <div class="section-actions">
+                        <button type="button" id="btnRefreshSourceEps" onclick="refreshEarningsFromSource()" class="btn-section-action cyan-subtle" title="Fetch authoritative corporate calendar and reported EPS directly from official source (NSE / yfinance)">
+                            🔄 Fetch from Source
                         </button>
-                        <button type="button" id="btnCalcAllEps" onclick="calculateEpsAll()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.6rem; border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;" title="Recalculate and fill missing EPS for past earnings">
+                        <button type="button" id="btnCalcAllEps" onclick="calculateEpsAll()" class="btn-section-action primary-subtle" title="Recalculate and fill missing EPS for past earnings">
                             ⚡ Calculate Missing EPS
                         </button>
                     </div>
@@ -1295,11 +1449,16 @@
             <section class="card">
                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                     <div class="card-title">🔥 Short-Term News Catalysts</div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                         <span style="font-size: 0.75rem; color: var(--text-tertiary);" id="lblCatalystCount">0 headlines</span>
-                        <button type="button" id="btnFetchNewsDelta" onclick="fetchNewsDelta()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.22rem 0.6rem; border-color: rgba(56, 189, 248, 0.35); color: #38bdf8; font-weight: 600;" title="Fetch latest news delta and fresh headlines">
-                            ⚡ Fetch News Delta
-                        </button>
+                        <div class="section-actions">
+                            <button type="button" id="btnFetchNewsDelta" onclick="fetchNewsDelta()" class="btn-section-action cyan-subtle" title="Fetch fresh news headlines, press releases, and corporate exchange announcements">
+                                🔄 Fetch from Sources
+                            </button>
+                            <button type="button" id="btnRecalcNewsSentiment" onclick="fetchStockCatalystsOnly(true)" class="btn-section-action primary-subtle" title="Re-evaluate news sentiment, impact scoring (0-100%), and catalyst rankings">
+                                ⚡ Refresh Sentiment
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div id="listCatalysts" style="display: flex; flex-direction: column; max-height: 420px; overflow-y: auto;">
@@ -1334,6 +1493,12 @@
                         <button type="button" class="tf-pill-btn" onclick="setHorizonTimeframe(45)" id="aiTfBtn-45">📈 45D Positional</button>
                         <button type="button" class="tf-pill-btn" onclick="setHorizonTimeframe(90)" id="aiTfBtn-90">🏛️ 90D Quarterly</button>
                     </div>
+                    <button type="button" id="btnRunKronosHeader" onclick="runKronosForecast()" class="btn btn-secondary" style="font-size: 0.76rem; padding: 0.38rem 0.75rem; border-color: rgba(16, 185, 129, 0.35); color: #34d399;" title="Run Kronos AI 14-day sequence trajectory forecast">
+                        📈 Run Kronos 14D
+                    </button>
+                    <button type="button" id="btnRefreshAiContext" onclick="fetchStockConsensusOnly(true)" class="btn btn-secondary" style="font-size: 0.76rem; padding: 0.38rem 0.75rem;" title="Refresh consensus predictions and load latest point-in-time context">
+                        🔄 Refresh AI Context
+                    </button>
                     <button type="button" id="btnToggleConfig" onclick="toggleConsensusConfig()" class="btn btn-secondary" style="font-size: 0.76rem; padding: 0.38rem 0.75rem; border-color: rgba(99, 102, 241, 0.35); color: #c7d2fe;" title="Customize AI models, custom directives prompt, and OmniRoute target model">
                         ⚙️ Configure Directives
                     </button>
@@ -1684,6 +1849,27 @@
         const ACTIVE_SYM = "{{ ticker }}";
         let stockState = {};
 
+        function showStockToast(message, type = 'info', duration = 3500) {
+            const container = document.getElementById('stockToastContainer');
+            if (!container) return;
+            const toast = document.createElement('div');
+            const iconMap = {
+                success: '✅',
+                info: 'ℹ️',
+                warning: '⚠️',
+                error: '❌'
+            };
+            const icon = iconMap[type] || 'ℹ️';
+            toast.className = `stock-toast toast-${type}`;
+            toast.innerHTML = `<span style="font-size: 1rem;">${icon}</span> <span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px) scale(0.95)';
+                setTimeout(() => toast.remove(), 250);
+            }, duration);
+        }
+
         async function fetchStockQuoteOnly(isManualRefresh = false) {
             const refreshBtn = document.getElementById('btnRefreshQuote');
             if (isManualRefresh && refreshBtn) {
@@ -1697,9 +1883,13 @@
                     stockState.profile = data.profile || {};
                     stockState.quote = data.quote || {};
                     renderQuoteHeader(data.profile, data.quote, stockState.is_in_watchlist);
+                    if (isManualRefresh) {
+                        showStockToast(`Live quote updated for ${ACTIVE_SYM}: ₹${data.quote?.current_price || '—'}`, 'success');
+                    }
                 }
             } catch (e) {
                 console.error('Quote fetch error:', e);
+                if (isManualRefresh) showStockToast('Failed to refresh quote: ' + e.message, 'error');
             } finally {
                 if (isManualRefresh && refreshBtn) {
                     refreshBtn.disabled = false;
@@ -1708,7 +1898,77 @@
             }
         }
 
-        async function fetchStockTechnicalsOnly() {
+        async function refreshStockPricesFromSource() {
+            const btnHeader = document.getElementById('btnFetchPricesSource');
+            const btnTech = document.getElementById('btnRefreshTechPrices');
+            const setBtn = (el, loading) => {
+                if (!el) return;
+                el.disabled = loading;
+                el.innerHTML = loading ? '<span class="spinner" style="width: 10px; height: 10px;"></span> Ingesting...' : (el.id === 'btnRefreshTechPrices' ? '🔄 Fetch Price History' : '🔄 Fetch Price from Source');
+            };
+            setBtn(btnHeader, true);
+            setBtn(btnTech, true);
+
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/refresh-prices`, {
+                    method: 'POST'
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || data.error || 'Failed to fetch prices from source');
+
+                if (data.overview) {
+                    stockState.profile = data.overview.profile || stockState.profile;
+                    stockState.quote = data.overview.quote || stockState.quote;
+                    renderQuoteHeader(stockState.profile, stockState.quote, stockState.is_in_watchlist);
+                }
+                if (data.technicals) {
+                    stockState.technical = data.technicals.technical || data.technicals;
+                    const curr = stockState.quote?.current_price || 0;
+                    renderTechnicalSection(stockState.technical, curr, stockState.profile, stockState.quote);
+                    renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, curr, stockState.profile, stockState.quote);
+                }
+                showStockToast(data.message || `Successfully fetched fresh price bars from source for ${ACTIVE_SYM}`, 'success');
+            } catch (err) {
+                showStockToast('Price fetch error: ' + err.message, 'error');
+            } finally {
+                setBtn(btnHeader, false);
+                setBtn(btnTech, false);
+            }
+        }
+
+        async function recalculateStockMetrics() {
+            const btn = document.getElementById('btnRecalcMetrics');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Recalculating...';
+            }
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/recalculate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source: 'user_profile_recalculate' })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || data.error || 'Recalculation error');
+
+                await fetchStockDetails();
+                showStockToast(`✅ Metrics recalculated for ${ACTIVE_SYM}${data.has_changes ? ` (${data.changes_count || 'several'} fields updated)` : ''}`, 'success');
+            } catch (err) {
+                showStockToast('Recalculation error: ' + err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ Recalculate Quote';
+                }
+            }
+        }
+
+        async function fetchStockTechnicalsOnly(isManual = false) {
+            const btn = document.getElementById('btnRecalcTechnicals');
+            if (isManual && btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Recalculating...';
+            }
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/technicals`);
                 if (res.ok) {
@@ -1717,35 +1977,86 @@
                     const curr = stockState.quote?.current_price || 0;
                     renderTechnicalSection(stockState.technical, curr, stockState.profile, stockState.quote);
                     renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, curr, stockState.profile, stockState.quote);
+                    if (isManual) showStockToast('Technical structure and swing ranges updated', 'success');
                 }
             } catch (e) {
                 console.error('Technicals fetch error:', e);
+                if (isManual) showStockToast('Failed to fetch technicals: ' + e.message, 'error');
+            } finally {
+                if (isManual && btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ Recalculate Technicals';
+                }
             }
         }
 
-        async function fetchStockEarningsOnly() {
+        async function recalculateTechnicalsFromSource() {
+            const btn = document.getElementById('btnRecalcTechnicals');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Recalculating...';
+            }
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/recalculate-technicals`, {
+                    method: 'POST'
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || data.error || 'Failed to recalculate technicals');
+
+                if (data.technicals) {
+                    stockState.technical = data.technicals.technical || data.technicals;
+                    const curr = stockState.quote?.current_price || 0;
+                    renderTechnicalSection(stockState.technical, curr, stockState.profile, stockState.quote);
+                    renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, curr, stockState.profile, stockState.quote);
+                }
+                showStockToast(data.message || 'Technical indicators and swing ranges recalculated', 'success');
+            } catch (err) {
+                showStockToast('Technicals error: ' + err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ Recalculate Technicals';
+                }
+            }
+        }
+
+        async function fetchStockEarningsOnly(isManual = false) {
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/earnings`);
                 if (res.ok) {
                     const data = await res.json();
                     stockState.earnings_history = data.earnings_history || [];
                     renderEarnings(stockState.earnings_history);
+                    if (isManual) showStockToast('Earnings track record updated', 'success');
                 }
             } catch (e) {
                 console.error('Earnings fetch error:', e);
+                if (isManual) showStockToast('Earnings fetch error: ' + e.message, 'error');
             }
         }
 
-        async function fetchStockConsensusOnly() {
+        async function fetchStockConsensusOnly(isManual = false) {
+            const btn = document.getElementById('btnRefreshAiContext');
+            if (isManual && btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Loading AI...';
+            }
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/consensus`);
                 if (res.ok) {
                     const data = await res.json();
                     stockState.consensus = data.consensus || {};
                     renderConsensus(stockState.consensus, stockState.quote?.current_price || 0);
+                    if (isManual) showStockToast('Point-in-time AI context and latest consensus loaded', 'success');
                 }
             } catch (e) {
                 console.error('Consensus fetch error:', e);
+                if (isManual) showStockToast('Consensus error: ' + e.message, 'error');
+            } finally {
+                if (isManual && btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '🔄 Refresh AI Context';
+                }
             }
         }
 
@@ -1764,7 +2075,40 @@
             }
         }
 
-        async function fetchStockInstitutionalOnly() {
+        async function runKronosForecast() {
+            const btn = document.getElementById('btnRunKronosHeader');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Generating Path...';
+            }
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/run-kronos`, {
+                    method: 'POST'
+                });
+                const data = await res.json();
+                if (data.kronos) {
+                    stockState.kronos = data.kronos;
+                    if (typeof renderKronosTrajectory === 'function') {
+                        renderKronosTrajectory(data.kronos);
+                    }
+                }
+                showStockToast(data.message || `Kronos 14-day trajectory forecast generated for ${ACTIVE_SYM}`, 'success');
+            } catch (err) {
+                showStockToast('Kronos error: ' + err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '📈 Run Kronos 14D';
+                }
+            }
+        }
+
+        async function fetchStockInstitutionalOnly(isManual = false) {
+            const btn = document.getElementById('btnRecalcInstFlows');
+            if (isManual && btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Recalculating...';
+            }
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/institutional`);
                 if (res.ok) {
@@ -1772,26 +2116,79 @@
                     stockState.institutional = data.institutional || {};
                     renderInstitutional(stockState.institutional);
                     renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, stockState.quote?.current_price || 0, stockState.profile, stockState.quote);
+                    if (isManual) showStockToast('Institutional accumulation flows recalculated', 'success');
                 }
             } catch (e) {
                 console.error('Institutional fetch error:', e);
+                if (isManual) showStockToast('Institutional fetch error: ' + e.message, 'error');
+            } finally {
+                if (isManual && btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ Recalculate Flows';
+                }
             }
         }
 
-        async function fetchStockCatalystsOnly() {
+        async function refreshInstitutionalFromSource() {
+            const btn = document.getElementById('btnRefreshInstSource');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Fetching Source...';
+            }
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/refresh-institutional`, {
+                    method: 'POST'
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || data.error || 'Failed to refresh institutional data');
+
+                if (data.data) {
+                    stockState.institutional = data.data;
+                    renderInstitutional(stockState.institutional);
+                    renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, stockState.quote?.current_price || 0, stockState.profile, stockState.quote);
+                }
+                showStockToast(data.message || 'Institutional filings & block deals refreshed from source', 'success');
+            } catch (err) {
+                showStockToast('Institutional refresh error: ' + err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '🔄 Fetch from Source';
+                }
+            }
+        }
+
+        async function fetchStockCatalystsOnly(isManual = false) {
+            const btn = document.getElementById('btnRecalcNewsSentiment');
+            if (isManual && btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Scoring...';
+            }
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/catalysts`);
                 if (res.ok) {
                     const data = await res.json();
                     stockState.catalysts = data.catalysts || [];
                     renderCatalysts(stockState.catalysts);
+                    if (isManual) showStockToast(`News sentiment & ${stockState.catalysts.length} catalysts evaluated`, 'success');
                 }
             } catch (e) {
                 console.error('Catalysts fetch error:', e);
+                if (isManual) showStockToast('News fetch error: ' + e.message, 'error');
+            } finally {
+                if (isManual && btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ Refresh Sentiment';
+                }
             }
         }
 
-        async function fetchStockFactorEvaluationOnly() {
+        async function fetchStockFactorEvaluationOnly(isManual = false) {
+            const btn = document.getElementById('btnRecalcFactorPillars');
+            if (isManual && btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Scoring...';
+            }
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/factor-evaluation`);
                 if (res.ok) {
@@ -1799,9 +2196,37 @@
                     stockState.factor_evaluation = data.factor_evaluation || data || {};
                     renderFactorEvaluation(stockState.factor_evaluation);
                     renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, stockState.quote?.current_price || 0, stockState.profile, stockState.quote);
+                    if (isManual) showStockToast(`Multi-factor pillars evaluated (Composite: ${stockState.factor_evaluation.composite_score || '—'}/100)`, 'success');
                 }
             } catch (e) {
                 console.error('Factors fetch error:', e);
+                if (isManual) showStockToast('Factor evaluation error: ' + e.message, 'error');
+            } finally {
+                if (isManual && btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ Recalculate Factors';
+                }
+            }
+        }
+
+        async function refreshFactorEvaluation() {
+            const btn = document.getElementById('btnRefreshFactorScores');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Updating...';
+            }
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/rating`);
+                const data = await res.json();
+                await fetchStockFactorEvaluationOnly();
+                showStockToast('Fundamental & technical factor ratings updated', 'success');
+            } catch (err) {
+                showStockToast('Rating update error: ' + err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '🔄 Update All Scores';
+                }
             }
         }
 
@@ -1824,7 +2249,7 @@
                 return fetchStockQuoteOnly(true);
             }
 
-            // Fallback overview call to ensure complete compatibility & instant parallel sub-fetches
+            // Parallel sub-fetches for instant hydration
             fetchStockQuoteOnly();
             fetchStockTechnicalsOnly();
             fetchStockConsensusOnly();
@@ -2656,11 +3081,12 @@
 
                 // Refresh stock details
                 await fetchStockDetails();
+                showStockToast(`✅ EPS calculated & audited for ${earningsDate}`, 'success');
                 if (data.has_changes && data.changes_summary && data.changes_summary.length) {
                     console.info('[AUDIT] Recalculated metrics diff:', data.changes_summary);
                 }
             } catch (err) {
-                alert('Error calculating EPS: ' + err.message);
+                showStockToast('Error calculating EPS: ' + err.message, 'error');
                 if (row) row.style.opacity = '1';
             }
         }
@@ -2669,7 +3095,7 @@
             const btn = document.getElementById('btnCalcAllEps');
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<span class="spinner"></span> Calculating & Auditing...';
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Calculating...';
             }
 
             try {
@@ -2681,11 +3107,9 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || 'Failed to calculate EPS');
                 await fetchStockDetails();
-                if (data.has_changes && data.changes_summary && data.changes_summary.length) {
-                    alert(`✅ EPS Recalculated & Audited:\n• ${data.changes_summary.slice(0, 5).join('\n• ')}`);
-                }
+                showStockToast(`✅ EPS recalculated & audited for ${ACTIVE_SYM}`, 'success');
             } catch (err) {
-                alert('Error: ' + err.message);
+                showStockToast('Error calculating EPS: ' + err.message, 'error');
             } finally {
                 if (btn) {
                     btn.disabled = false;
@@ -2698,7 +3122,7 @@
             const btn = document.getElementById('btnRefreshSourceEps');
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<span class="spinner"></span> Fetching Source...';
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Fetching...';
             }
 
             try {
@@ -2708,9 +3132,9 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || data.error || 'Failed to refresh from source');
                 await fetchStockDetails();
-                alert(`✅ ${data.message || 'Authoritative earnings refreshed from source!'}`);
+                showStockToast(`✅ ${data.message || 'Authoritative earnings refreshed from source!'}`, 'success');
             } catch (err) {
-                alert('Error refreshing earnings from source: ' + err.message);
+                showStockToast('Error refreshing earnings: ' + err.message, 'error');
             } finally {
                 if (btn) {
                     btn.disabled = false;
@@ -2757,8 +3181,9 @@
                 if (!res.ok) throw new Error(data.detail || 'Failed to save EPS');
                 closeEpsModal();
                 await fetchStockDetails();
+                showStockToast(`✅ EPS saved and metrics recalculated for ${dateStr}`, 'success');
             } catch (err) {
-                alert('Error: ' + err.message);
+                showStockToast('Error saving EPS: ' + err.message, 'error');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = '⚡ Calculate & Save';
@@ -2796,7 +3221,7 @@
             const btn = document.getElementById('btnFetchNewsDelta');
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<span class="spinner"></span> Fetching Delta...';
+                btn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Fetching Sources...';
             }
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/fetch-news`, {
@@ -2810,13 +3235,13 @@
                     renderCatalysts(data.catalysts);
                 }
                 const count = data.catalysts ? data.catalysts.length : 0;
-                console.info(`[NEWS] Synced ${count} catalysts for ${ACTIVE_SYM}`);
+                showStockToast(`🔥 Synced ${count} fresh catalysts from financial news sources`, 'success');
             } catch (err) {
-                alert('Error fetching news delta: ' + err.message);
+                showStockToast('Error fetching news delta: ' + err.message, 'error');
             } finally {
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '⚡ Fetch News Delta';
+                    btn.innerHTML = '🔄 Fetch from Sources';
                 }
             }
         }
@@ -4252,5 +4677,8 @@
             </div>
         </div>
     </div>
+
+    <!-- FLOATING TOAST NOTIFICATION CONTAINER -->
+    <div id="stockToastContainer" class="stock-toast-container"></div>
 </body>
 </html>

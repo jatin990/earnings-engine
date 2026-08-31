@@ -15,7 +15,7 @@ Whenever you work on this repository, you must maintain zero-error hygiene using
 2. **Post-Task Verification**: Verify that changes introduced no unhandled exceptions or regressions:
    ```bash
    python scripts/error_ledger.py scan
-   python scripts/smart_test.py
+   pytest
    ```
 3. **Resolution Logging**: When you fix an existing issue, resolve it in the ledger:
    ```bash
@@ -59,7 +59,8 @@ earnings-engine/
 ├── pyproject.toml                    # Dependencies & entrypoint (`earnings-engine`)
 ├── scripts/
 │   ├── error_ledger.py               # Centralized exception logging and tracking
-│   └── smart_test.py                 # Change-aware selective test runner
+│   ├── verify_and_sync_all_data.py   # Full-system data audit and live-sync runner
+│   └── migrate_sqlite_to_turso.py    # Remote Turso migration utility
 ├── earnings_engine/
 │   ├── config.py                     # App settings & environment loading
 │   ├── logging_utils.py              # Centralized logging setup
@@ -380,9 +381,6 @@ python run_api.py
 
 ### Verification & Testing
 ```bash
-# Run change-aware test runner
-python scripts/smart_test.py
-
 # Run full pytest suite
 pytest
 ```

@@ -286,6 +286,89 @@ async def get_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Que
         raise HTTPException(status_code=500, detail=f"Failed to calculate live week high/low: {str(e)}")
 
 
+@router.post("/api/v1/stock/{ticker}/refresh-prices")
+async def refresh_stock_prices_endpoint(ticker: str):
+    """Force download latest OHLCV price bars, market cap, and return updated quote & technicals."""
+    sym = ticker.upper().strip()
+    try:
+        from earnings_engine.data.prices import ingest_prices
+        from earnings_engine.data.universe import ingest_market_caps
+        await asyncio.to_thread(ingest_prices, [sym], _settings, force=True)
+        await asyncio.to_thread(ingest_market_caps, [sym], _settings)
+        overview = await asyncio.to_thread(stock_api.get_stock_overview, ticker=sym, settings=_settings)
+        technicals = await asyncio.to_thread(stock_api.get_stock_technicals, ticker=sym, settings=_settings)
+        return {
+            "success": True,
+            "ticker": sym,
+            "message": f"Successfully fetched latest price bars and refreshed quote for {sym}",
+            "overview": overview,
+            "technicals": technicals,
+        }
+    except Exception as e:
+        logger.exception("Error in refresh_stock_prices for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Failed to refresh prices: {str(e)}")
+
+
+@router.post("/api/v1/stock/{ticker}/refresh-institutional")
+async def refresh_stock_institutional_endpoint(ticker: str):
+    """Force re-derive and calculate institutional activity, fund actions, and amount-based score."""
+    sym = ticker.upper().strip()
+    try:
+        from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
+        data = await asyncio.to_thread(get_stock_institutional_activity, ticker=sym, settings=_settings, force=True)
+        return {
+            "success": True,
+            "ticker": sym,
+            "message": f"Successfully recalculated institutional activity for {sym}",
+            "data": data,
+        }
+    except Exception as e:
+        logger.exception("Error in refresh_stock_institutional for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Failed to refresh institutional data: {str(e)}")
+
+
+@router.post("/api/v1/stock/{ticker}/recalculate-technicals")
+async def recalculate_stock_technicals_endpoint(ticker: str):
+    """Recalculate swing ranges, moving averages, and technical indicators for stock."""
+    sym = ticker.upper().strip()
+    try:
+        technicals = await asyncio.to_thread(stock_api.get_stock_technicals, ticker=sym, settings=_settings)
+        return {
+            "success": True,
+            "ticker": sym,
+            "message": f"Successfully recalculated technical structure for {sym}",
+            "technicals": technicals,
+        }
+    except Exception as e:
+        logger.exception("Error in recalculate_stock_technicals for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Failed to recalculate technicals: {str(e)}")
+
+
+@router.post("/api/v1/stock/{ticker}/run-kronos")
+async def run_stock_kronos_endpoint(ticker: str):
+    """Run on-demand Kronos AI 14-day sequence trajectory forecast."""
+    sym = ticker.upper().strip()
+    try:
+        from earnings_engine.kronos_predictor import predict_single_stock
+        forecast = await asyncio.to_thread(predict_single_stock, sym, _settings)
+        return {
+            "success": True,
+            "ticker": sym,
+            "message": f"Successfully generated Kronos 14-day AI forecast for {sym}",
+            "kronos": forecast,
+        }
+    except Exception as e:
+        logger.exception("Error running Kronos for %s: %s", sym, e)
+        # Fallback to existing latest prediction if model generation encounters GPU/CUDA mismatch
+        latest = await asyncio.to_thread(stock_api.get_stock_kronos, ticker=sym, settings=_settings)
+        return {
+            "success": latest.get("success", False),
+            "ticker": sym,
+            "warning": f"Live inference notice: {str(e)}. Returned latest cached forecast.",
+            "kronos": latest.get("kronos"),
+        }
+
+
 @router.get("/api/v1/ticker/audit-log")
 async def get_ticker_audit_log_endpoint(
     ticker: str | None = Query(None),

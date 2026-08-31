@@ -1033,30 +1033,14 @@ def dashboard(host: str, port: int) -> None:
     dashboard_url = f"http://{host}:{port}/dashboard"
     health_url = f"http://{host}:{port}/health"
 
-    # Check if a server instance is ALREADY running on this host:port
-    is_already_running = False
-    try:
-        with urllib.request.urlopen(health_url, timeout=1.0) as resp:
-            if resp.status == 200:
-                is_already_running = True
-    except Exception:
-        is_already_running = False
-
-    if is_already_running:
-        click.echo(f"ℹ️ Earnings Engine dashboard server is already running on http://{host}:{port}")
-        click.echo(f"✅ Dashboard available at: {dashboard_url}")
-        click.echo("🌐 Opening in browser...")
-        webbrowser.open(dashboard_url)
-        click.echo("Press Ctrl+C to exit.")
-        logger.info("dashboard already running, opened url=%s", dashboard_url)
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            return
+    # Ensure port is clean and free; kill conflicting previous instances if port is occupied
+    from earnings_engine.port_utils import ensure_port_available
+    killed_pids = ensure_port_available(port=port, host=host, logger=logger)
+    if killed_pids:
+        click.echo(f"⚠️ Port {port} was occupied by PID(s) {killed_pids}. Terminated conflicting process(es).")
 
     click.echo(f"🌐 Starting API server on http://{host}:{port} ...")
-    logger.info("dashboard command started host=%s port=%s", host, port)
+    logger.info("dashboard command started host=%s port=%s (killed_prev=%s)", host, port, killed_pids)
 
     # Start the API server in a background thread
     server_thread = threading.Thread(
