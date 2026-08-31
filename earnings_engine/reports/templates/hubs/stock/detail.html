@@ -1846,7 +1846,7 @@
     </main>
 
     <script>
-        const ACTIVE_SYM = "{{ ticker }}";
+        const ACTIVE_SYM = {{ ticker | tojson }};
         let stockState = {};
 
         function showStockToast(message, type = 'info', duration = 3500) {

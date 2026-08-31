@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import time
 from typing import Any
+import urllib.parse
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -374,7 +375,8 @@ async def enforce_auth_middleware(request: Request, call_next):
 
         if not is_route_authorized(path, session):
             if path in ("/dashboard", "/credit-card", "/trips", "/net-worth", "/zepto", "/dashboard.html") or not path.startswith("/api/"):
-                return RedirectResponse(url=f"/portal?unauthorized=true&redirect={path}", status_code=302)
+                enc_path = urllib.parse.quote(path)
+                return RedirectResponse(url=f"/portal?unauthorized=true&redirect={enc_path}", status_code=302)
             return JSONResponse(
                 status_code=403,
                 content={"detail": f"Access forbidden: Your active passcode/tier does not grant permission for '{path}'."},
@@ -401,7 +403,8 @@ async def enforce_auth_middleware(request: Request, call_next):
         return response
 
     if not path.startswith("/api/"):
-        return RedirectResponse(url=f"/portal?redirect={path}", status_code=302)
+        enc_path = urllib.parse.quote(path)
+        return RedirectResponse(url=f"/portal?redirect={enc_path}", status_code=302)
 
     return JSONResponse(
         status_code=401,

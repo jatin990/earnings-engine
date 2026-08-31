@@ -245,7 +245,7 @@
                         <!-- 1. Stock / Ticker -->
                         <td style="padding:0.5rem 0.6rem;white-space:nowrap;">
                             <div style="display:flex;align-items:center;gap:0.4rem;">
-                                <a href="/stock/${ticker}" target="_blank" style="font-weight:800;color:#f8fafc;font-family:var(--font-mono);font-size:0.78rem;text-decoration:none;" title="Open stock intelligence">
+                                <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="font-weight:800;color:#f8fafc;font-family:var(--font-mono);font-size:0.78rem;text-decoration:none;" title="Open stock intelligence">
                                     ${cleanTicker}
                                 </a>
                                 <span style="font-size:0.60rem;color:#64748b;font-family:var(--font-mono);">.NS</span>
@@ -317,7 +317,7 @@
                                 <button type="button" onclick="app.openConsensusModal('${ticker}')" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:4px;" title="Run AI Consensus">
                                     🧠 AI
                                 </button>
-                                <a href="/stock/${ticker}" target="_blank" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(255,255,255,0.06);color:#ededed;border:1px solid rgba(255,255,255,0.15);border-radius:4px;text-decoration:none;" title="Stock Intelligence Details">
+                                <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(255,255,255,0.06);color:#ededed;border:1px solid rgba(255,255,255,0.15);border-radius:4px;text-decoration:none;" title="Stock Intelligence Details">
                                     📊 Intel
                                 </a>
                             </div>
@@ -492,7 +492,7 @@
                         <!-- 1. Stock / Ticker -->
                         <td style="padding:0.5rem 0.6rem;white-space:nowrap;">
                             <div style="display:flex;align-items:center;gap:0.4rem;">
-                                <a href="/stock/${ticker}" target="_blank" style="font-weight:800;color:#f8fafc;font-family:var(--font-mono);font-size:0.78rem;text-decoration:none;">
+                                <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="font-weight:800;color:#f8fafc;font-family:var(--font-mono);font-size:0.78rem;text-decoration:none;">
                                     ${cleanTicker}
                                 </a>
                                 <span style="font-size:0.60rem;color:#64748b;font-family:var(--font-mono);">.NS</span>
@@ -569,7 +569,7 @@
                                 <button type="button" onclick="app.openConsensusModal('${ticker}')" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:4px;" title="Run AI Consensus">
                                     🧠 AI
                                 </button>
-                                <a href="/stock/${ticker}" target="_blank" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(255,255,255,0.06);color:#ededed;border:1px solid rgba(255,255,255,0.15);border-radius:4px;text-decoration:none;" title="Stock Intelligence Details">
+                                <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" class="btn-micro" style="padding:0.2rem 0.4rem;font-size:0.68rem;background:rgba(255,255,255,0.06);color:#ededed;border:1px solid rgba(255,255,255,0.15);border-radius:4px;text-decoration:none;" title="Stock Intelligence Details">
                                     📊 Intel
                                 </a>
                             </div>
