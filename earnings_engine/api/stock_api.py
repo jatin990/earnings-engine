@@ -23,8 +23,8 @@ from earnings_engine.data.earnings import refresh_earnings_from_source
 logger = logging.getLogger(__name__)
 
 
-def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
-    """Compile a full stock intelligence overview for a single ticker."""
+def get_stock_quote(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve fast live quote and profile metadata for a single ticker."""
     settings = settings or Settings()
     sym = ticker.strip().upper()
     if not sym:
@@ -83,7 +83,7 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
     except Exception as e:
         logger.debug("Error in fetch_live_quote for %s: %s", sym, e)
 
-    # Load price history (now containing today's live bar if market was open)
+    # Load price history if needed
     prices_df = pd.DataFrame()
     try:
         prices_df = load_prices(sym, settings)
@@ -108,8 +108,6 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
             if quote.get("week_52_low") is None and len(closes) >= 20:
                 quote["week_52_low"] = round(float(closes.tail(252).min()), 2)
 
-    # Compute 52W % distances, listing date and timestamps
-    if not prices_df.empty:
         try:
             last_dt = prices_df.index[-1]
             first_dt = prices_df.index[0]
@@ -133,7 +131,21 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
     if quote.get("current_price") and quote.get("week_52_low") and quote["week_52_low"] > 0:
         quote["pct_from_52w_low"] = round((quote["current_price"] / quote["week_52_low"] - 1.0) * 100.0, 2)
 
-    # 3. Technical Swing Structure & Momentum
+    return {
+        "success": True,
+        "ticker": sym,
+        "profile": profile,
+        "quote": quote,
+    }
+
+
+def get_stock_technicals(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
+    """Calculate technical swing structure, moving averages, and momentum metrics."""
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if not sym:
+        return {"success": False, "error": "Ticker symbol is required"}
+
     technical: dict[str, Any] = {
         "swing_range_20d": None,
         "swing_range_3m": None,
@@ -150,6 +162,14 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
         "dma_200": None,
         "volume_ratio_5d_20d": None,
     }
+
+    prices_df = pd.DataFrame()
+    try:
+        prices_df = load_prices(sym, settings)
+        if prices_df.empty:
+            prices_df = fetch_prices(sym, settings, force=False)
+    except Exception as e:
+        logger.debug("Error fetching price history for %s technicals: %s", sym, e)
 
     if not prices_df.empty and "close" in prices_df.columns:
         closes = pd.to_numeric(prices_df["close"], errors="coerce").dropna()
@@ -204,7 +224,7 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
             if len(closes) >= 200:
                 technical["dma_200"] = round(float(closes.tail(200).mean()), 2)
 
-            # Volume surge ratio 5d vs 20d (with fallback for recent listings)
+            # Volume surge ratio 5d vs 20d
             if "volume" in prices_df.columns:
                 vols = pd.to_numeric(prices_df["volume"], errors="coerce").dropna()
                 if len(vols) >= 20:
@@ -225,8 +245,27 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
         if stored_sr.get("lower_bound"): technical["support_level"] = stored_sr["lower_bound"]
         if stored_sr.get("upper_bound"): technical["resistance_level"] = stored_sr["upper_bound"]
 
-    # 4. Quarterly Earnings Track Record
+    return {
+        "success": True,
+        "ticker": sym,
+        "technical": technical,
+    }
+
+
+def get_stock_earnings(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve 12-quarter earnings history, surprises, and post-earnings week moves."""
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if not sym:
+        return {"success": False, "error": "Ticker symbol is required"}
+
     earnings_history: list[dict[str, Any]] = []
+    prices_df = pd.DataFrame()
+    try:
+        prices_df = load_prices(sym, settings)
+    except Exception:
+        pass
+
     try:
         conn = get_db_connection(settings)
         e_rows = conn.execute(
@@ -234,7 +273,6 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
             (sym,),
         ).fetchall()
 
-        # If earnings history is empty or missing reported EPS for past dates, attempt authentic fetch from source first
         if not e_rows or all(r[2] is None for r in e_rows):
             try:
                 from earnings_engine.data.earnings import fetch_earnings
@@ -244,9 +282,8 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
                     (sym,),
                 ).fetchall()
             except Exception as src_err:
-                logger.debug("Source earnings fetch in get_stock_overview for %s: %s", sym, src_err)
+                logger.debug("Source earnings fetch in get_stock_earnings for %s: %s", sym, src_err)
 
-        # Fallback to calculation ONLY if still missing reported EPS from official source
         if not e_rows or all(r[2] is None for r in e_rows):
             try:
                 calculate_or_fetch_eps(sym, settings=settings)
@@ -255,7 +292,20 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
                     (sym,),
                 ).fetchall()
             except Exception as auto_eps_err:
-                logger.debug("Auto EPS hydration in get_stock_overview for %s: %s", sym, auto_eps_err)
+                logger.debug("Auto EPS hydration in get_stock_earnings for %s: %s", sym, auto_eps_err)
+
+        # Get current live price / high / low for week HL calculations
+        curr_price = None
+        d_high = None
+        d_low = None
+        if not prices_df.empty and "close" in prices_df.columns:
+            closes = pd.to_numeric(prices_df["close"], errors="coerce").dropna()
+            if not closes.empty:
+                curr_price = float(closes.iloc[-1])
+            if "high" in prices_df.columns:
+                d_high = float(pd.to_numeric(prices_df["high"], errors="coerce").dropna().iloc[-1])
+            if "low" in prices_df.columns:
+                d_low = float(pd.to_numeric(prices_df["low"], errors="coerce").dropna().iloc[-1])
 
         for r in e_rows:
             ed_str = r[0]
@@ -264,15 +314,14 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
             surp = float(r[3]) if r[3] is not None else None
             source = str(r[4]) if len(r) > 4 and r[4] else "yfinance"
 
-            # Calculate post-earnings week high/low move
             week_hl = None
             if not prices_df.empty:
                 week_hl = _week_high_low_around(
                     prices_df,
                     ed_str,
-                    current_price=quote.get("current_price"),
-                    day_high=quote.get("day_high"),
-                    day_low=quote.get("day_low"),
+                    current_price=curr_price,
+                    day_high=d_high,
+                    day_low=d_low,
                 )
 
             earnings_history.append({
@@ -291,35 +340,74 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
     except Exception as e:
         logger.debug("Error fetching earnings history for %s: %s", sym, e)
 
-    # 5. Multi-Model AI Consensus Prediction & Trade Setup
-    preds = get_predictions(settings, ticker=sym, limit=1)
-    consensus_data = preds[0] if preds else None
+    # Compute beat streak
+    streak = 0
+    for e in earnings_history:
+        if e.get("surprise_pct") is not None:
+            if e["surprise_pct"] > 0:
+                streak += 1
+            else:
+                break
 
-    # 6. Live Short-Term News Catalysts (cached lookup)
-    catalysts_data = get_short_term_catalysts(watchlist_or_universe="ALL", search_query=sym, limit=15, settings=settings)
-    if not catalysts_data:
-        try:
-            import threading
-            from earnings_engine.data.catalysts_news import fetch_ticker_catalysts
-            threading.Thread(target=fetch_ticker_catalysts, args=(sym, 15, False, settings), daemon=True).start()
-        except Exception as e:
-            logger.debug("Async catalysts fetch spawn error for %s: %s", sym, e)
+    return {
+        "success": True,
+        "ticker": sym,
+        "earnings_history": earnings_history,
+        "streak": streak,
+    }
 
-    # 7. Standardized 6-Pillar Factor Evaluation Matrix
-    factor_eval = {}
+
+def get_stock_consensus(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve multi-model AI consensus predictions from the audit database."""
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if not sym:
+        return {"success": False, "error": "Ticker symbol is required"}
     try:
-        from earnings_engine.consensus.standard_inputs import evaluate_stock_standard_pillars
-        factor_eval = evaluate_stock_standard_pillars(sym, settings=settings)
+        preds = get_predictions(settings, ticker=sym, limit=1)
+        consensus_data = preds[0] if preds else None
+        return {
+            "success": True,
+            "ticker": sym,
+            "consensus": consensus_data,
+        }
     except Exception as e:
-        logger.debug("Error computing standard factor evaluation for %s: %s", sym, e)
+        logger.debug("Error fetching consensus prediction for %s: %s", sym, e)
+        return {"success": False, "ticker": sym, "error": str(e), "consensus": None}
 
-    # 7b. Institutional Accumulation (lightweight embed for stock detail page)
+
+def get_stock_kronos(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve latest Kronos AI 14-day sequence price prediction."""
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if not sym:
+        return {"success": False, "error": "Ticker symbol is required"}
+    try:
+        from earnings_engine.data.predictions import load_latest_predictions
+        preds = load_latest_predictions(tickers=[sym], settings=settings)
+        latest_kronos = preds[0] if preds else None
+        return {
+            "success": True,
+            "ticker": sym,
+            "kronos": latest_kronos,
+        }
+    except Exception as e:
+        logger.debug("Error fetching Kronos prediction for %s: %s", sym, e)
+        return {"success": False, "ticker": sym, "error": str(e), "kronos": None}
+
+
+def get_stock_institutional(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve institutional accumulation flows, top fund holdings, and block deals."""
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if not sym:
+        return {"success": False, "error": "Ticker symbol is required"}
+
     institutional_data: dict[str, Any] = {}
     try:
         from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
         inst = get_stock_institutional_activity(sym, settings)
         if inst.get("success"):
-            # Include only the summary fields + first 4 patterns + top 8 holdings
             institutional_data = {
                 "accumulation_score": inst.get("accumulation_score"),
                 "verdict": inst.get("verdict"),
@@ -344,7 +432,57 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
     except Exception as e:
         logger.debug("Error fetching institutional data for %s: %s", sym, e)
 
-    # 8. Check Watchlist status
+    return {
+        "success": True,
+        "ticker": sym,
+        "institutional": institutional_data,
+    }
+
+
+def get_stock_catalysts(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve news catalysts and sentiment impact scores."""
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if not sym:
+        return {"success": False, "error": "Ticker symbol is required"}
+
+    catalysts_data = get_short_term_catalysts(watchlist_or_universe="ALL", search_query=sym, limit=15, settings=settings)
+    if not catalysts_data:
+        try:
+            import threading
+            from earnings_engine.data.catalysts_news import fetch_ticker_catalysts
+            threading.Thread(target=fetch_ticker_catalysts, args=(sym, 15, False, settings), daemon=True).start()
+        except Exception as e:
+            logger.debug("Async catalysts fetch spawn error for %s: %s", sym, e)
+
+    return {
+        "success": True,
+        "ticker": sym,
+        "catalysts": catalysts_data,
+    }
+
+
+def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
+    """Compile a full stock intelligence overview (composed from individual modules)."""
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+    if not sym:
+        return {"success": False, "error": "Ticker symbol is required"}
+
+    quote_res = get_stock_quote(sym, settings)
+    tech_res = get_stock_technicals(sym, settings)
+    earn_res = get_stock_earnings(sym, settings)
+    cons_res = get_stock_consensus(sym, settings)
+    cat_res = get_stock_catalysts(sym, settings)
+    inst_res = get_stock_institutional(sym, settings)
+
+    factor_eval = {}
+    try:
+        from earnings_engine.consensus.standard_inputs import evaluate_stock_standard_pillars
+        factor_eval = evaluate_stock_standard_pillars(sym, settings=settings)
+    except Exception as e:
+        logger.debug("Error computing standard factor evaluation for %s: %s", sym, e)
+
     is_in_watchlist = False
     try:
         from earnings_engine.data.watchlists import get_watchlist
@@ -356,14 +494,14 @@ def get_stock_overview(ticker: str, settings: Settings | None = None) -> dict[st
     return {
         "success": True,
         "ticker": sym,
-        "profile": profile,
-        "quote": quote,
-        "technical": technical,
-        "earnings_history": earnings_history,
-        "consensus": consensus_data,
-        "catalysts": catalysts_data,
+        "profile": quote_res.get("profile", {}),
+        "quote": quote_res.get("quote", {}),
+        "technical": tech_res.get("technical", {}),
+        "earnings_history": earn_res.get("earnings_history", []),
+        "consensus": cons_res.get("consensus"),
+        "catalysts": cat_res.get("catalysts", []),
         "factor_evaluation": factor_eval,
-        "institutional": institutional_data,
+        "institutional": inst_res.get("institutional", {}),
         "is_in_watchlist": is_in_watchlist,
     }
 

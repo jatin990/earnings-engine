@@ -1542,39 +1542,27 @@
         const ACTIVE_SYM = "{{ ticker }}";
         let stockState = null;
 
-        async function fetchStockDetails(isManualRefresh = false, retryCount = 0) {
+        let stockState = {};
+
+        async function fetchStockQuoteOnly(isManualRefresh = false) {
             const refreshBtn = document.getElementById('btnRefreshQuote');
             if (isManualRefresh && refreshBtn) {
                 refreshBtn.disabled = true;
                 refreshBtn.innerHTML = '<span class="spinner" style="width: 10px; height: 10px;"></span> Syncing...';
             }
             try {
-                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/overview`, {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/quote`, {
                     credentials: 'same-origin',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
+                    headers: { 'Accept': 'application/json' }
                 });
-                if (!res.ok) {
-                    if (res.status === 401) {
-                        window.location.href = `/portal?redirect=${encodeURIComponent(window.location.pathname)}`;
-                        return;
-                    }
-                    throw new Error(`Server returned HTTP ${res.status}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    stockState.profile = data.profile || {};
+                    stockState.quote = data.quote || {};
+                    renderQuoteHeader(data.profile, data.quote, stockState.is_in_watchlist);
                 }
-                const data = await res.json();
-                stockState = data;
-                renderUI(data);
-            } catch (err) {
-                console.warn('[StockDetail] Overview fetch error:', err);
-                if (retryCount < 2 && !isManualRefresh) {
-                    setTimeout(() => fetchStockDetails(false, retryCount + 1), 1200);
-                    return;
-                }
-                const lbl = document.getElementById('lblCompanyName');
-                if (lbl && (lbl.textContent.includes('Loading') || lbl.textContent === ACTIVE_SYM)) {
-                    lbl.innerHTML = `<span style="color:#f87171;">⚠️ Network connection issue</span> <button type="button" onclick="fetchStockDetails(true)" class="btn-micro" style="margin-left:0.5rem;padding:0.2rem 0.5rem;background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);border-radius:4px;cursor:pointer;">🔄 Retry</button>`;
-                }
+            } catch (e) {
+                console.error('Quote fetch error:', e);
             } finally {
                 if (isManualRefresh && refreshBtn) {
                     refreshBtn.disabled = false;
@@ -1583,12 +1571,137 @@
             }
         }
 
-        function renderUI(data) {
-            if (!data) return;
-            const p = data.profile || {};
-            const q = data.quote || {};
-            const t = data.technical || {};
-            const c = data.consensus || {};
+        async function fetchStockTechnicalsOnly() {
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/technicals`);
+                if (res.ok) {
+                    const data = await res.json();
+                    stockState.technical = data.technical || {};
+                    const curr = stockState.quote?.current_price || 0;
+                    renderTechnicalSection(stockState.technical, curr, stockState.profile, stockState.quote);
+                    renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, curr, stockState.profile, stockState.quote);
+                }
+            } catch (e) {
+                console.error('Technicals fetch error:', e);
+            }
+        }
+
+        async function fetchStockEarningsOnly() {
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/earnings`);
+                if (res.ok) {
+                    const data = await res.json();
+                    stockState.earnings_history = data.earnings_history || [];
+                    renderEarnings(stockState.earnings_history);
+                }
+            } catch (e) {
+                console.error('Earnings fetch error:', e);
+            }
+        }
+
+        async function fetchStockConsensusOnly() {
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/consensus`);
+                if (res.ok) {
+                    const data = await res.json();
+                    stockState.consensus = data.consensus || {};
+                    renderConsensus(stockState.consensus, stockState.quote?.current_price || 0);
+                }
+            } catch (e) {
+                console.error('Consensus fetch error:', e);
+            }
+        }
+
+        async function fetchStockKronosOnly() {
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/kronos`);
+                if (res.ok) {
+                    const data = await res.json();
+                    stockState.kronos = data.kronos;
+                    if (typeof renderKronosTrajectory === 'function' && data.kronos) {
+                        renderKronosTrajectory(data.kronos);
+                    }
+                }
+            } catch (e) {
+                console.error('Kronos fetch error:', e);
+            }
+        }
+
+        async function fetchStockInstitutionalOnly() {
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/institutional`);
+                if (res.ok) {
+                    const data = await res.json();
+                    stockState.institutional = data.institutional || {};
+                    renderInstitutional(stockState.institutional);
+                    renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, stockState.quote?.current_price || 0, stockState.profile, stockState.quote);
+                }
+            } catch (e) {
+                console.error('Institutional fetch error:', e);
+            }
+        }
+
+        async function fetchStockCatalystsOnly() {
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/catalysts`);
+                if (res.ok) {
+                    const data = await res.json();
+                    stockState.catalysts = data.catalysts || [];
+                    renderCatalysts(stockState.catalysts);
+                }
+            } catch (e) {
+                console.error('Catalysts fetch error:', e);
+            }
+        }
+
+        async function fetchStockFactorEvaluationOnly() {
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/factor-evaluation`);
+                if (res.ok) {
+                    const data = await res.json();
+                    stockState.factor_evaluation = data.factor_evaluation || data || {};
+                    renderFactorEvaluation(stockState.factor_evaluation);
+                    renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, stockState.quote?.current_price || 0, stockState.profile, stockState.quote);
+                }
+            } catch (e) {
+                console.error('Factors fetch error:', e);
+            }
+        }
+
+        async function fetchStockNotesOnly() {
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/notes`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && typeof renderStockNoteCard === 'function') {
+                        renderStockNoteCard(data);
+                    }
+                }
+            } catch (e) {
+                console.debug('Notes fetch error:', e);
+            }
+        }
+
+        async function fetchStockDetails(isManualRefresh = false) {
+            if (isManualRefresh) {
+                return fetchStockQuoteOnly(true);
+            }
+
+            // Launch all modular endpoints concurrently in parallel
+            fetchStockQuoteOnly();
+            fetchStockTechnicalsOnly();
+            fetchStockConsensusOnly();
+            fetchStockKronosOnly();
+            fetchStockEarningsOnly();
+            fetchStockInstitutionalOnly();
+            fetchStockCatalystsOnly();
+            fetchStockFactorEvaluationOnly();
+            fetchStockNotesOnly();
+        }
+
+        function renderQuoteHeader(p, q, isInWatchlist) {
+            p = p || {};
+            q = q || {};
             const currSym = p.currency || (ACTIVE_SYM.endsWith('.NS') ? '₹' : '$');
 
             // Header profile
@@ -1650,6 +1763,52 @@
             if (vMC) vMC.textContent = p.market_cap ? `${currSym}${(p.market_cap / 10000000).toLocaleString(undefined, {maximumFractionDigits: 0})} Cr` : '—';
             const vDR = document.getElementById('valDayRange');
             if (vDR) vDR.textContent = (q.day_low && q.day_high) ? `${currSym}${q.day_low} – ${currSym}${q.day_high}` : '—';
+
+            // Listing date and discovery tag
+            const listEl = document.getElementById('valListingDate');
+            if (listEl) {
+                if (p.listing_date) {
+                    listEl.textContent = p.is_new_listing ? `${p.listing_date} (${p.trading_days_count || '?'}D New Listing)` : p.listing_date;
+                    listEl.style.color = p.is_new_listing ? '#38bdf8' : '#e2e8f0';
+                } else {
+                    listEl.textContent = '—';
+                }
+            }
+
+            const fill52 = document.getElementById('fill52Range');
+            if (fill52 && q.week_52_low && q.week_52_high && curr) {
+                const ratio = Math.max(0, Math.min(100, ((curr - q.week_52_low) / (q.week_52_high - q.week_52_low)) * 100));
+                fill52.style.width = ratio + '%';
+            }
+
+            // Watchlist button
+            if (isInWatchlist !== undefined) {
+                const btnW = document.getElementById('btnWatchlist');
+                if (btnW) {
+                    if (isInWatchlist) {
+                        btnW.innerHTML = '⭐ In Watchlist';
+                        btnW.style.background = 'rgba(245, 158, 11, 0.15)';
+                        btnW.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+                        btnW.style.color = '#fbbf24';
+                    } else {
+                        btnW.innerHTML = '☆ Add to Watchlist';
+                        btnW.style.background = 'rgba(255, 255, 255, 0.05)';
+                        btnW.style.borderColor = 'var(--border)';
+                        btnW.style.color = 'var(--text-secondary)';
+                    }
+                }
+            }
+        }
+
+        function renderUI(data) {
+            if (!data) return;
+            const p = data.profile || {};
+            const q = data.quote || {};
+            const t = data.technical || {};
+            const c = data.consensus || {};
+            const curr = q.current_price || 0;
+
+            renderQuoteHeader(p, q, data.is_in_watchlist);
 
             // Listing date and discovery tag
             const listEl = document.getElementById('valListingDate');

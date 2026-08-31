@@ -46,6 +46,76 @@ async def get_stock_overview_endpoint(ticker: str):
         raise HTTPException(status_code=500, detail=f"Error fetching stock overview: {str(e)}")
 
 
+@router.get("/api/v1/stock/{ticker}/quote")
+async def get_stock_quote_endpoint(ticker: str):
+    """Fast endpoint returning live market quote, 52W levels, and profile metadata."""
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_quote, ticker=ticker.upper(), settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_quote for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching stock quote: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/technicals")
+async def get_stock_technicals_endpoint(ticker: str):
+    """Fast endpoint returning swing range channels, support/resistance, and moving averages."""
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_technicals, ticker=ticker.upper(), settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_technicals for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching technicals: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/earnings")
+async def get_stock_earnings_endpoint(ticker: str):
+    """Fast endpoint returning 12-quarter earnings history, EPS surprises, and week moves."""
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_earnings, ticker=ticker.upper(), settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_earnings for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching earnings: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/consensus")
+async def get_stock_consensus_endpoint(ticker: str):
+    """Fast endpoint returning multi-model AI consensus predictions."""
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_consensus, ticker=ticker.upper(), settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_consensus for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching consensus: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/kronos")
+async def get_stock_kronos_endpoint(ticker: str):
+    """Fast endpoint returning Kronos AI 14-day sequence trajectory forecast."""
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_kronos, ticker=ticker.upper(), settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_kronos for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching Kronos prediction: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/institutional")
+async def get_stock_institutional_endpoint(ticker: str):
+    """Fast endpoint returning institutional flows, shareholding trend, and top holdings."""
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_institutional, ticker=ticker.upper(), settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_institutional for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching institutional flows: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/catalysts")
+async def get_stock_catalysts_endpoint(ticker: str):
+    """Fast endpoint returning short-term news catalysts, impact scores, and sentiment."""
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_catalysts, ticker=ticker.upper(), settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_catalysts for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching news catalysts: {str(e)}")
+
+
 @router.get("/api/v1/stock/{ticker}/factor-evaluation")
 async def get_stock_factor_evaluation_endpoint(ticker: str):
     """Return factor evaluation score breakdown for a stock."""
