@@ -9,7 +9,7 @@ from earnings_engine.data.migrations import apply_migrations
 
 from pathlib import Path
 
-STATIC_TEST_DB = Path("data/cache/prices/test_static.sqlite3").resolve()
+STATIC_TEST_DB = Path("data/cache/prices/test.sqlite3").resolve()
 
 # Point environment to static test DB immediately at import time
 os.environ["TURSO_DATABASE_URL"] = ""
@@ -17,7 +17,7 @@ os.environ["TURSO_AUTH_TOKEN"] = ""
 os.environ["EARNINGS_ENGINE_DB_PATH"] = str(STATIC_TEST_DB)
 os.environ["EARNINGS_ENGINE_DB_NAME"] = STATIC_TEST_DB.name
 
-# One-time static setup: only runs if test_static.sqlite3 does NOT exist on disk
+# One-time static setup: only runs if test.sqlite3 does NOT exist on disk
 if not STATIC_TEST_DB.exists():
     STATIC_TEST_DB.parent.mkdir(parents=True, exist_ok=True)
     _conn = sqlite3.connect(str(STATIC_TEST_DB))
@@ -60,11 +60,17 @@ def mock_external_network_in_tests(monkeypatch):
     dummy_ticker.news = []
     monkeypatch.setattr(yf, "Ticker", lambda *args, **kwargs: dummy_ticker)
 
-    # Default dummy download if not overridden by test
     def dummy_download(*args, **kwargs):
         return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
 
     monkeypatch.setattr(yf, "download", dummy_download)
+
+    try:
+        from earnings_engine.data import news as news_mod
+        monkeypatch.setattr(news_mod, "scan_watchlist_catalysts", lambda *args, **kwargs: [])
+        monkeypatch.setattr(news_mod, "fetch_catalyst_news", lambda *args, **kwargs: [])
+    except Exception:
+        pass
 
 
 from earnings_engine.config import Settings

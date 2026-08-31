@@ -64,7 +64,7 @@ async def get_breakout_radar_endpoint(
             
             def _fetch_live(c: dict[str, Any]) -> None:
                 t = c.get("ticker")
-                if not t:
+                if not t or "TEST" in t.upper() or "MOCK" in t.upper() or "DUMMY" in t.upper():
                     return
                 try:
                     df = fetch_prices(t, _settings, force=True)

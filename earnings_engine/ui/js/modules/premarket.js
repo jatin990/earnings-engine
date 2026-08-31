@@ -140,7 +140,7 @@
                     }
                 }
             } catch (err) {
-                if (err.name === 'AbortError') return;
+                if (err && (err.name === 'AbortError' || String(err).includes('Tab switched') || String(err).includes('AbortError') || String(err.message || '').includes('aborted'))) return;
                 console.error('[PREMARKET] Failed to load setups:', err);
                 if (tbody) {
                     tbody.innerHTML = `
@@ -390,7 +390,7 @@
                 this.renderPremarketAccuracyMatrix(data.accuracy_by_category || []);
                 this.renderPremarketOutcomesTable(this.premarketOutcomesData);
             } catch (err) {
-                if (err.name === 'AbortError') return;
+                if (err && (err.name === 'AbortError' || String(err).includes('Tab switched') || String(err).includes('AbortError') || String(err.message || '').includes('aborted'))) return;
                 console.error('[PREMARKET] Failed loading outcomes:', err);
                 if (tbody) {
                     tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:2rem;color:#f87171;">⚠️ Failed loading previous setups: ${err.message}</td></tr>`;

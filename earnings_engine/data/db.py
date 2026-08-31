@@ -50,15 +50,26 @@ def _get_thread_session() -> requests.Session:
 def _cache_path(settings: Settings) -> Path:
     """Return local SQLite database path with auto-migration from legacy prices.sqlite3."""
     is_test_env = bool(os.getenv("PYTEST_CURRENT_TEST"))
-    if not is_test_env:
-        custom_path = os.getenv("EARNINGS_ENGINE_DB_PATH")
-        if custom_path:
-            return Path(custom_path)
-    db_filename = os.getenv("EARNINGS_ENGINE_DB_NAME", "money_club.sqlite3")
+    default_prices_dir = Settings().data_dirs.get("prices")
+
+    # If the caller provided a custom data_dirs (e.g. from tmp_path in a test fixture), respect that directory
+    if settings.data_dirs.get("prices") != default_prices_dir:
+        db_filename = os.getenv("EARNINGS_ENGINE_DB_NAME", "test.sqlite3" if is_test_env else "money_club.sqlite3")
+        return settings.data_dirs["prices"] / db_filename
+
+    custom_path = os.getenv("EARNINGS_ENGINE_DB_PATH")
+    if custom_path:
+        return Path(custom_path)
+
+    if is_test_env:
+        db_filename = os.getenv("EARNINGS_ENGINE_DB_NAME", "test.sqlite3")
+    else:
+        db_filename = os.getenv("EARNINGS_ENGINE_DB_NAME", "money_club.sqlite3")
+
     target_path = settings.data_dirs["prices"] / db_filename
     if not target_path.exists():
-        # Do not copy 527MB legacy database for tests or temporary test suites
-        if not is_test_env and not db_filename.startswith("test_"):
+        # Do not copy legacy database for tests or test databases
+        if not is_test_env and not db_filename.startswith("test"):
             legacy_path = settings.data_dirs["prices"] / "prices.sqlite3"
             if legacy_path.exists() and legacy_path.stat().st_size > 0:
                 try:

@@ -34,6 +34,22 @@ from earnings_engine.data.gainers_patterns import (
 
 logger = logging.getLogger(__name__)
 
+_TELEM_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+
+def _get_cached_stock_telemetry(ticker: str, settings: Settings) -> dict[str, Any] | None:
+    """Retrieve telemetry with in-memory TTL caching to avoid repeated SQLite disk reads."""
+    now = time.time()
+    cached = _TELEM_CACHE.get(ticker)
+    if cached and (now - cached[0]) < 120.0:
+        return cached[1]
+    df = load_prices(ticker, settings=settings)
+    if df.empty or len(df) < 15:
+        return None
+    telem = compute_stock_daily_telemetry(ticker, df)
+    if telem:
+        _TELEM_CACHE[ticker] = (now, telem)
+    return telem
+
 # Standard Category Definitions
 SCANNER_CATEGORIES: dict[str, dict[str, Any]] = {
     "order_wins": {
@@ -370,10 +386,7 @@ def _compute_category_candidates_live(
     else:
         for t in tickers:
             try:
-                df = load_prices(t, settings=settings)
-                if df.empty or len(df) < 15:
-                    continue
-                telem = compute_stock_daily_telemetry(t, df)
+                telem = _get_cached_stock_telemetry(t, settings=settings)
                 if not telem:
                     continue
 
@@ -543,6 +556,7 @@ def _compute_category_candidates_live(
 
 def compute_and_save_scanner_universe(
     universe_or_watchlist: str = "NSE_TOP",
+    limit_per_category: int = 35,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Background Worker Task: Runs full universe scanner and persists results to SQLite DB."""
@@ -560,7 +574,7 @@ def compute_and_save_scanner_universe(
     all_candidates: list[dict[str, Any]] = []
     for cat_id in SCANNER_CATEGORIES:
         try:
-            cand = _compute_category_candidates_live(cat_id, universe_or_watchlist=universe_or_watchlist, limit=35, settings=settings)
+            cand = _compute_category_candidates_live(cat_id, universe_or_watchlist=universe_or_watchlist, limit=limit_per_category, settings=settings)
             all_candidates.extend(cand)
         except Exception as e:
             logger.warning("[SCANNER-WORKER] Error sweeping category %s: %s", cat_id, e)
@@ -693,7 +707,7 @@ def scheduled_category_scanner_job(
                     now_iso,
                     next_iso,
                     duration,
-                    f"Swept {total_candidates} setups across {len(universes)} universes based on news severity & technical targets.",
+                    f"Swept {total_candidates} setups across {len(target_universes)} universes based on news severity & technical targets.",
                     now_iso,
                 ),
             )

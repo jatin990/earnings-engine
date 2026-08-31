@@ -108,21 +108,17 @@ def _hydrate_badge_counters_from_db(settings: Settings) -> None:
             if pm_count == 0:
                 pm_count = min(news_count, 4)
 
-            # 3. Active Breakout Count (Avoid historical cumulative 99+)
-            max_bo_date_row = conn.execute("SELECT MAX(signal_date) FROM breakout_radar").fetchone()
-            max_bo_date = max_bo_date_row[0] if max_bo_date_row and max_bo_date_row[0] else None
-            
-            bo_count = 0
-            if max_bo_date:
-                row_bo_active = conn.execute(
-                    "SELECT COUNT(*) FROM breakout_radar WHERE signal_date = ? AND (tier = 'HOT' OR composite_score >= 40.0)",
-                    (max_bo_date,)
-                ).fetchone()
-                bo_count = int(row_bo_active[0]) if row_bo_active and row_bo_active[0] is not None else 0
-
+            # 3. Active Breakout Count (High conviction HOT setups, distinct tickers)
+            row_bo_active = conn.execute(
+                "SELECT COUNT(DISTINCT ticker) FROM breakout_radar WHERE tier = 'HOT' AND composite_score >= 70.0"
+            ).fetchone()
+            bo_count = int(row_bo_active[0]) if row_bo_active and row_bo_active[0] is not None else 0
             if bo_count == 0:
-                row_tracked = conn.execute("SELECT COUNT(*) FROM breakout_tracked_signals WHERE outcome IN ('ACTIVE', 'PENDING')").fetchone()
+                row_tracked = conn.execute("SELECT COUNT(DISTINCT ticker) FROM breakout_tracked_signals WHERE outcome IN ('ACTIVE', 'PENDING')").fetchone()
                 bo_count = int(row_tracked[0]) if row_tracked and row_tracked[0] is not None else 0
+            if bo_count == 0:
+                row_hot = conn.execute("SELECT COUNT(DISTINCT ticker) FROM breakout_radar WHERE tier = 'HOT'").fetchone()
+                bo_count = min(int(row_hot[0]) if row_hot and row_hot[0] is not None else 0, 30)
 
             # 4. Top Gainers
             try:
@@ -130,8 +126,6 @@ def _hydrate_badge_counters_from_db(settings: Settings) -> None:
                 gainers_count = int(row_gainers[0]) if row_gainers and row_gainers[0] is not None else 0
             except Exception:
                 gainers_count = 0
-            if gainers_count == 0:
-                gainers_count = max(1, bo_count)
 
             _BADGES_STATE["breaking_out_stocks"] = bo_count
             _BADGES_STATE["high_impact_news_70"] = news_count

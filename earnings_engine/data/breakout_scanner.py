@@ -209,7 +209,7 @@ def _rebuild_candidates() -> None:
 
     candidates = [r for r in merged.values() if r.get("composite_score", 0) >= BREAKOUT_MIN_SCORE]
     candidates.sort(key=lambda x: x.get("composite_score", 0), reverse=True)
-    _pool["candidates"] = candidates[:BREAKOUT_MAX_CANDIDATES]
+    _pool["candidates"] = candidates
 
     # Group into per-strategy candidate pools from all qualifying setups
     for strat_id in BREAKOUT_STRATEGIES.keys():
@@ -515,8 +515,8 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
         logger.debug("[BREAKOUT-DB] Persisted %d candidates to breakout_radar and %d breached setups to breakout_tracked_signals.", len(rows_to_insert), len(rows_for_tracked))
         try:
             from earnings_engine.api.routers.system import set_badge_counter
-            hot_breaking = sum(1 for r in rows_to_insert if len(r) > 2 and (str(r[2]).upper() == "HOT" or (len(r) > 17 and (r[17] or 0) >= 35.0)))
-            set_badge_counter("breaking_out_stocks", hot_breaking, settings)
+            hot_breaking = len({r[0] for r in rows_to_insert if len(r) > 5 and (str(r[2]).upper() == "HOT" or (float(r[5] or 0) >= 70.0))})
+            set_badge_counter("breaking_out_stocks", min(hot_breaking, len(_pool.get("hot", {})) or hot_breaking), settings)
         except Exception:
             pass
     except Exception as e:
@@ -593,7 +593,8 @@ def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
         logger.info("[BREAKOUT-DB] Loaded %d hot and %d warm candidates from database.", hot_count, warm_count)
         try:
             from earnings_engine.api.routers.system import set_badge_counter
-            set_badge_counter("breaking_out_stocks", hot_count, settings)
+            unique_hot_tickers = len({k.split("::")[0] for k in _pool.get("hot", {}).keys()})
+            set_badge_counter("breaking_out_stocks", unique_hot_tickers, settings)
         except Exception:
             pass
         return True
@@ -752,7 +753,7 @@ def get_breakout_audit_log(
         from earnings_engine.data.migrations import apply_migrations
         apply_migrations(settings)
         conn = get_db_connection(settings)
-        wheres = ["UPPER(ticker) NOT LIKE '%TEST%' AND UPPER(ticker) NOT LIKE '%MOCK%' AND UPPER(ticker) NOT LIKE '%DUMMY%'"]
+        wheres: list[str] = []
         params: list[Any] = []
         if ticker:
             sym = ticker.strip().upper()
@@ -760,6 +761,8 @@ def get_breakout_audit_log(
                 sym = f"{sym}.NS"
             wheres.append("ticker = ?")
             params.append(sym)
+        else:
+            wheres.append("UPPER(ticker) NOT LIKE '%TEST%' AND UPPER(ticker) NOT LIKE '%MOCK%' AND UPPER(ticker) NOT LIKE '%DUMMY%'")
         if strategy and strategy.upper() not in ("ALL", "*"):
             wheres.append("(UPPER(strategy) = ? OR UPPER(strategy) = ?)")
             params.extend([strategy.upper(), strategy.replace("_", " ").upper()])
@@ -1194,7 +1197,7 @@ def get_tracked_breakouts(
                 stop_p = item_d.get("stop_loss")
                 sig_date = item_d.get("signal_date")
 
-                if not t:
+                if not t or "TEST" in t.upper() or "MOCK" in t.upper() or "DUMMY" in t.upper():
                     return
                 try:
                     df = fetch_prices(t, settings, force=live)

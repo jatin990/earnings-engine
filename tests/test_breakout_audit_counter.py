@@ -23,7 +23,7 @@ def test_breakout_audit_counter_increment_and_deduplication(tmp_path, monkeypatc
     earnings_dir.mkdir(parents=True, exist_ok=True)
     settings = Settings(data_dirs={"prices": prices_dir, "earnings": earnings_dir})
 
-    test_db = prices_dir / "prices.sqlite3"
+    test_db = prices_dir / "test.sqlite3"
     db_conn_fn = lambda s=None: sqlite3.connect(str(test_db))
     monkeypatch.setattr("earnings_engine.data.db.get_db_connection", db_conn_fn)
     monkeypatch.setattr("earnings_engine.data.breakout_scanner.get_db_connection", db_conn_fn)
@@ -138,7 +138,7 @@ def test_migration_024_backpopulates_legacy_audit_records(tmp_path, monkeypatch)
     earnings_dir.mkdir(parents=True, exist_ok=True)
     settings = Settings(data_dirs={"prices": prices_dir, "earnings": earnings_dir})
 
-    test_db = prices_dir / "prices.sqlite3"
+    test_db = prices_dir / "test.sqlite3"
     db_conn_fn = lambda s=None: sqlite3.connect(str(test_db))
     monkeypatch.setattr("earnings_engine.data.db.get_db_connection", db_conn_fn)
     monkeypatch.setattr("earnings_engine.data.breakout_scanner.get_db_connection", db_conn_fn)
