@@ -401,6 +401,37 @@ def load_prices_batch(tickers: list[str], settings: Settings) -> dict[str, pd.Da
     return result
 
 
+def ensure_prices_batch(
+    tickers: list[str],
+    settings: Settings,
+    max_workers: int = 10,
+    force: bool = False,
+) -> dict[str, pd.DataFrame]:
+    """Ensure price data exists and is up to date for all tickers, downloading missing in parallel.
+
+    Returns the loaded dictionary of price DataFrames for all requested tickers.
+    """
+    if not tickers:
+        return {}
+
+    cleaned = [canonical_symbol(t) for t in tickers if t and t.strip()]
+    unique_tickers = list(dict.fromkeys(cleaned))
+
+    # Identify tickers that need fetching
+    to_fetch: list[str] = []
+    for t in unique_tickers:
+        if force or not _is_fresh(t, settings) or not prices_recent_enough(t, settings):
+            to_fetch.append(t)
+
+    if to_fetch:
+        from concurrent.futures import ThreadPoolExecutor
+        logger.info("[PRICES-BATCH] Batch fetching latest prices for %d missing/stale tickers", len(to_fetch))
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(to_fetch))) as executor:
+            list(executor.map(lambda sym: fetch_prices(sym, settings, force=True), to_fetch))
+
+    return load_prices_batch(unique_tickers, settings)
+
+
 def load_prices(ticker: str, settings: Settings) -> pd.DataFrame:
     """Load prices from in-memory cache or SQLite if present."""
     if not ticker:

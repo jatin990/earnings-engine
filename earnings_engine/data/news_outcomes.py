@@ -108,11 +108,8 @@ def evaluate_all_catalyst_outcomes(
                 "elapsed_seconds": 0.0,
             }
 
-        # Gather unique tickers
-        tickers = list({c["ticker"] for c in catalysts if c.get("ticker")})
-
-        # Batch load price histories using optimized price loader
-        price_map = prices_mod.load_prices_batch(tickers, settings)
+        # Batch load/fetch price histories using parallel price loader
+        price_map = prices_mod.ensure_prices_batch(tickers, settings, max_workers=10)
 
         now_str = datetime.now(timezone.utc).isoformat()
         evaluated_count = 0
@@ -203,8 +200,9 @@ def evaluate_all_catalyst_outcomes(
             max_gain_pct = round(((max_high - entry_price) / entry_price) * 100.0, 2)
             max_drawdown_pct = round(((min_low - entry_price) / entry_price) * 100.0, 2)
 
-            # Exit / net return
-            exit_price = price_5d if price_5d is not None else (price_3d if price_3d is not None else (price_1d if price_1d is not None else entry_price))
+            # Exit / net return (always anchored to latest market price if still active)
+            latest_close = float(df_sorted.iloc[-1]["close"]) if not df_sorted.empty and "close" in df_sorted.columns else entry_price
+            exit_price = price_5d if price_5d is not None else latest_close
             net_return_pct = round(((exit_price - entry_price) / entry_price) * 100.0, 2)
 
             # Outcome verification logic

@@ -437,6 +437,15 @@ def audit_predictions(
     skipped = 0
     pending = 0
 
+    # Ensure prices for all prediction tickers are fetched in batch
+    pred_tickers = list({p["ticker"] for p in preds if p.get("ticker")})
+    if pred_tickers:
+        try:
+            from earnings_engine.data.prices import ensure_prices_batch
+            ensure_prices_batch(pred_tickers, settings)
+        except Exception as e:
+            logger.debug("[STRATEGY-AUDIT] Batch price fetch warning: %s", e)
+
     for pred in preds:
         ticker = pred["ticker"]
         target_date = pred["target_date"]
@@ -496,7 +505,7 @@ def _get_price_on_date(
     settings: Settings,
     conn: sqlite3.Connection | None = None,
 ) -> float | None:
-    """Get the closing price for a ticker on (or nearest after) a date."""
+    """Get the closing price for a ticker on target_date, nearest window, or latest price."""
     target_dt = str(date_str)[:10]
 
     # Fast path: query price_history table directly via SQLite
@@ -509,6 +518,14 @@ def _get_price_on_date(
             ).fetchone()
             if row and row[0] is not None:
                 return float(row[0])
+
+            # If no price after target_dt, return the latest available price on record
+            latest_row = conn.execute(
+                "SELECT close FROM price_history WHERE ticker = ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                (ticker.upper(),),
+            ).fetchone()
+            if latest_row and latest_row[0] is not None:
+                return float(latest_row[0])
         except Exception:
             pass
 
@@ -539,6 +556,11 @@ def _get_price_on_date(
                 val = pd.to_numeric(match["close"], errors="coerce").dropna()
                 if not val.empty:
                     return float(val.iloc[-1])
+
+        # Fallback to latest available close price
+        closes = pd.to_numeric(pdf["close"], errors="coerce").dropna()
+        if not closes.empty:
+            return float(closes.iloc[-1])
 
         return None
     except Exception:
