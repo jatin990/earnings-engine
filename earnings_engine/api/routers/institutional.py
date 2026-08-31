@@ -116,6 +116,28 @@ async def get_stock_institutional_details(ticker: str):
         raise HTTPException(status_code=500, detail=f"Error fetching stock institutional data: {str(e)}")
 
 
+@router.get("/api/v1/institutional/freshness")
+async def get_institutional_data_freshness():
+    """Inspect and return last refresh timestamps, cadences, and counts across institutional data types."""
+    try:
+        data = await asyncio.to_thread(inst_mod.check_institutional_data_freshness, settings=_settings)
+        return data
+    except Exception as e:
+        logger.exception("Error in get_institutional_data_freshness: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error checking freshness: {str(e)}")
+
+
+@router.post("/api/v1/institutional/recalculate")
+async def trigger_institutional_recalculation(force: bool = Query(False)):
+    """Trigger complete batch recalculation and cache population for all stocks in the database."""
+    try:
+        res = await asyncio.to_thread(inst_mod.recalculate_all_institutional_metrics, settings=_settings, force=force)
+        return res
+    except Exception as e:
+        logger.exception("Error in trigger_institutional_recalculation: %s", e)
+        raise HTTPException(status_code=500, detail=f"Recalculation failed: {str(e)}")
+
+
 @router.post("/api/v1/institutional/scan")
 async def run_institutional_scan(request: dict | None = None):
     """Trigger background computation of institutional flows via live corporate ownership fetch."""
@@ -124,8 +146,9 @@ async def run_institutional_scan(request: dict | None = None):
         if ticker:
             res = await asyncio.to_thread(inst_mod.fetch_live_corporate_ownership, ticker=ticker, settings=_settings)
         else:
-            res = {"message": "Provide a ticker for targeted institutional ownership fetch"}
+            res = await asyncio.to_thread(inst_mod.recalculate_all_institutional_metrics, settings=_settings, force=True)
         return {"success": True, "result": res}
     except Exception as e:
         logger.exception("Error in run_institutional_scan: %s", e)
         raise HTTPException(status_code=500, detail=f"Institutional scan failed: {str(e)}")
+

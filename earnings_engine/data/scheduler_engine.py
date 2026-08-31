@@ -201,11 +201,13 @@ class SchedulerEngine:
         return f"Quarter repeater seasonality matrices verified for {universe}."
 
     def _handle_institutional_sync(self, settings: Settings, params: dict[str, Any]) -> str:
-        from earnings_engine.data.institutional_accumulation import scan_watchlist_institutional
+        from earnings_engine.data.institutional_accumulation import recalculate_all_institutional_metrics, scan_watchlist_institutional
         watchlist = params.get("watchlist") or params.get("universe") or "my_watchlist"
-        res = scan_watchlist_institutional(watchlist, settings)
-        count = len(res) if isinstance(res, list) else 0
-        return f"Institutional ownership synced for {count} stocks in '{watchlist}'."
+        scan_watchlist_institutional(watchlist, settings)
+        res = recalculate_all_institutional_metrics(settings)
+        count = res.get("tickers_processed", 0)
+        dur = res.get("duration_seconds", 0.0)
+        return f"Institutional accumulation batch precomputation refreshed for {count} stocks in {dur}s."
 
     def _handle_kronos_hot_rescore(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data.predictions import store_prediction

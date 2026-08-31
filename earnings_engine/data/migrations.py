@@ -1220,6 +1220,58 @@ def _migration_025_option_chain_history(conn: Any) -> None:
         pass
 
 
+def _migration_026_institutional_accumulation_cache(conn: Any) -> None:
+    """Precomputed summary cache table and composite indexes for ultra fast institutional intelligence queries."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS institutional_accumulation_cache (
+            ticker TEXT PRIMARY KEY,
+            company_name TEXT NOT NULL,
+            market_cap_cr REAL,
+            accumulation_score REAL NOT NULL DEFAULT 50.0,
+            verdict TEXT NOT NULL,
+            verdict_badge TEXT NOT NULL,
+            funds_accumulating_count INTEGER NOT NULL DEFAULT 0,
+            funds_selling_count INTEGER NOT NULL DEFAULT 0,
+            new_funds_bought_count INTEGER NOT NULL DEFAULT 0,
+            gross_inflow_cr REAL NOT NULL DEFAULT 0.0,
+            gross_outflow_cr REAL NOT NULL DEFAULT 0.0,
+            net_flow_cr REAL NOT NULL DEFAULT 0.0,
+            inst_addition_pct REAL NOT NULL DEFAULT 0.0,
+            increase_amount_cr REAL NOT NULL DEFAULT 0.0,
+            total_amount_cr REAL NOT NULL DEFAULT 0.0,
+            total_institutional_amount_cr REAL NOT NULL DEFAULT 0.0,
+            total_institutional_stake_pct REAL NOT NULL DEFAULT 0.0,
+            fii_stake_pct REAL NOT NULL DEFAULT 0.0,
+            dii_stake_pct REAL NOT NULL DEFAULT 0.0,
+            is_new_fii_entry INTEGER NOT NULL DEFAULT 0,
+            is_new_dii_entry INTEGER NOT NULL DEFAULT 0,
+            fii_always_held INTEGER NOT NULL DEFAULT 1,
+            fii_interest_summary TEXT,
+            return_7d_pct REAL,
+            return_30d_pct REAL,
+            return_1y_pct REAL,
+            holdings_json TEXT,
+            block_deals_json TEXT,
+            shareholding_patterns_json TEXT,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_cache_score ON institutional_accumulation_cache (accumulation_score DESC, net_flow_cr DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_cache_selling ON institutional_accumulation_cache (funds_selling_count DESC, gross_outflow_cr DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_cache_addition ON institutional_accumulation_cache (inst_addition_pct DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_cache_net_flow ON institutional_accumulation_cache (net_flow_cr DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_cache_updated ON institutional_accumulation_cache (updated_at DESC)")
+        
+        # Raw tables composite indexes
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_holdings_action_ticker ON institutional_holdings (action, ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_holdings_ticker_stake ON institutional_holdings (ticker, stake_pct DESC, holding_value_cr DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_shareholding_ticker_quarter ON shareholding_patterns (ticker, quarter)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_block_deals_ticker_date ON institutional_block_deals (ticker, deal_date DESC)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1247,6 +1299,7 @@ MIGRATIONS: list[Migration] = [
     Migration(23, "023_news_structured_extraction", _migration_023_news_structured_extraction),
     Migration(24, "024_breakout_audit_counter_and_strategy", _migration_024_breakout_audit_counter_and_strategy),
     Migration(25, "025_option_chain_history", _migration_025_option_chain_history),
+    Migration(26, "026_institutional_accumulation_cache", _migration_026_institutional_accumulation_cache),
 ]
 
 

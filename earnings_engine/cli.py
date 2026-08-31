@@ -1541,6 +1541,31 @@ def scan_cmd(universe: str) -> None:
     click.echo()
 
 
+@cli.command("sync-institutional")
+@click.option("--force", is_flag=True, help="Force recalculation and bypass in-memory caches.")
+def sync_institutional_cmd(force: bool) -> None:
+    """Precompute and persist complete institutional accumulation metrics, scores, and fund flows into cache table."""
+    from earnings_engine.data.institutional_accumulation import recalculate_all_institutional_metrics, check_institutional_data_freshness
+    settings = Settings()
+    click.echo("\n[INSTITUTIONAL] Precomputing institutional intelligence, scores & fund flows...")
+    res = recalculate_all_institutional_metrics(settings, force=force)
+    if res.get("success"):
+        click.secho(
+            f"[SUCCESS] Precomputed & cached metrics for {res.get('tickers_processed', 0)} tickers in {res.get('duration_seconds', 0.0)}s!",
+            fg="green",
+            bold=True,
+        )
+    else:
+        click.secho(f"[ERROR] Batch precomputation failed: {res.get('error')}", fg="red")
+
+    freshness = check_institutional_data_freshness(settings)
+    if freshness.get("success"):
+        click.echo("\n  Data Freshness Audit:")
+        for dt, info in freshness.get("data_types", {}).items():
+            click.echo(f"    - {dt:<34}: {info.get('status')} ({info.get('cadence')})")
+    click.echo()
+
+
 if __name__ == "__main__":
     cli()
 
