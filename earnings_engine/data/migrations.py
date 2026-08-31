@@ -1166,6 +1166,33 @@ def _migration_023_news_structured_extraction(conn: sqlite3.Connection | TursoCo
             pass
 
 
+def _migration_024_breakout_audit_counter_and_strategy(conn: sqlite3.Connection | TursoConnection) -> None:
+    """Add strategy, counter and updated_at to breakout_audit_log and backpopulate historical records."""
+    cols = [
+        ("strategy", "TEXT NOT NULL DEFAULT 'Classic Technical'"),
+        ("counter", "INTEGER NOT NULL DEFAULT 1"),
+        ("updated_at", "TEXT"),
+    ]
+    for c_name, c_type in cols:
+        try:
+            conn.execute(f"ALTER TABLE breakout_audit_log ADD COLUMN {c_name} {c_type}")
+        except Exception:
+            pass
+
+    try:
+        conn.execute("UPDATE breakout_audit_log SET strategy = 'Classic Technical' WHERE strategy IS NULL OR strategy = '' OR strategy = 'CLASSIC_TECHNICAL'")
+        conn.execute("UPDATE breakout_audit_log SET counter = 1 WHERE counter IS NULL OR counter < 1")
+        conn.execute("UPDATE breakout_audit_log SET updated_at = created_at WHERE updated_at IS NULL")
+    except Exception as e:
+        logger.debug("[MIGRATION-024] Backpopulate notice: %s", e)
+
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_audit_strat ON breakout_audit_log (strategy)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_breakout_audit_ticker_time ON breakout_audit_log (ticker, created_at DESC)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1191,6 +1218,7 @@ MIGRATIONS: list[Migration] = [
     Migration(21, "021_sidebar_badge_counters", _migration_021_sidebar_badge_counters),
     Migration(22, "022_institutional_amount_metrics", _migration_022_institutional_amount_metrics),
     Migration(23, "023_news_structured_extraction", _migration_023_news_structured_extraction),
+    Migration(24, "024_breakout_audit_counter_and_strategy", _migration_024_breakout_audit_counter_and_strategy),
 ]
 
 

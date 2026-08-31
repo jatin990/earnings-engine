@@ -211,11 +211,16 @@ def _rebuild_candidates() -> None:
     candidates.sort(key=lambda x: x.get("composite_score", 0), reverse=True)
     _pool["candidates"] = candidates[:BREAKOUT_MAX_CANDIDATES]
 
-    # Group into per-strategy candidate pools
+    # Group into per-strategy candidate pools from all qualifying setups
     for strat_id in BREAKOUT_STRATEGIES.keys():
-        s_cands = [c for c in candidates if (c.get("strategy") or "CLASSIC_TECHNICAL").upper() == strat_id]
+        s_cands = [
+            c for c in merged.values()
+            if (c.get("strategy") or "CLASSIC_TECHNICAL").upper() == strat_id
+            and (c.get("composite_score") or 0) >= BREAKOUT_MIN_SCORE
+        ]
+        s_cands.sort(key=lambda x: x.get("composite_score", 0), reverse=True)
         strat_pools[strat_id] = {
-            "candidates": s_cands,
+            "candidates": s_cands[:BREAKOUT_MAX_CANDIDATES],
             "last_scan_at": _pool.get("last_scan_at"),
         }
     _pool["strategy_pools"] = strat_pools
@@ -628,9 +633,14 @@ def record_breakout_transition(
     reason: str = "",
     catalyst_impact: str | None = None,
     company_name: str | None = None,
+    strategy: str | None = "Classic Technical",
     settings: Settings | None = None,
 ) -> None:
-    """Record an audit trail event explaining why a stock moved in, out, or between breakout tiers."""
+    """Record an audit trail event explaining why a stock moved in, out, or between breakout tiers.
+
+    If the incoming event matches the immediately preceding transition for this ticker and strategy,
+    it increments an occurrence counter instead of inserting redundant duplicate rows.
+    """
     settings = settings or Settings()
     try:
         from earnings_engine.data.migrations import apply_migrations
@@ -641,29 +651,88 @@ def record_breakout_transition(
             from earnings_engine.data.names import get_name
             company_name = get_name(ticker) or ticker.replace(".NS", "")
 
-        conn.execute(
+        strat_name = (strategy or "Classic Technical").strip()
+        if strat_name.upper() in ("CLASSIC_TECHNICAL", "CLASSIC TECHNICAL"):
+            strat_name = "Classic Technical"
+        elif strat_name.upper() in ("NSE_DELIVERY_ABSORPTION", "NSE DELIVERY"):
+            strat_name = "NSE Delivery"
+        elif strat_name.upper() in ("NSE_FO_CALL_WALL", "NSE CALL OI WALL"):
+            strat_name = "NSE Call OI Wall"
+        elif strat_name.upper() in ("VOLUME_PROFILE_VAH", "VOLUME PROFILE VAH"):
+            strat_name = "Volume Profile VAH"
+        elif strat_name.upper() in ("DONCHIAN_TTM_SQUEEZE", "DONCHIAN SQUEEZE"):
+            strat_name = "Donchian Squeeze"
+
+        # Check last recorded transition for this ticker
+        cur = conn.execute(
             """
-            INSERT INTO breakout_audit_log (
-                ticker, company_name, event_type, from_tier, to_tier,
-                score_before, score_after, price, trigger_price,
-                reason, catalyst_impact, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            SELECT id, event_type, from_tier, to_tier, strategy, counter
+            FROM breakout_audit_log
+            WHERE ticker = ?
+            ORDER BY id DESC LIMIT 1
             """,
-            (
-                ticker,
-                company_name,
-                event_type,
-                from_tier.upper(),
-                to_tier.upper(),
-                round(float(score_before), 1) if score_before is not None else None,
-                round(float(score_after), 1) if score_after is not None else None,
-                round(float(price), 2) if price is not None else None,
-                round(float(trigger_price), 2) if trigger_price is not None else None,
-                reason,
-                catalyst_impact,
-                now_iso,
-            ),
+            (ticker,),
         )
+        last_row = cur.fetchone()
+
+        if (
+            last_row
+            and str(last_row[1] or "").upper() == event_type.upper()
+            and str(last_row[2] or "").upper() == from_tier.upper()
+            and str(last_row[3] or "").upper() == to_tier.upper()
+            and str(last_row[4] or "").strip().lower() == strat_name.strip().lower()
+        ):
+            last_id = last_row[0]
+            curr_count = (int(last_row[5]) if last_row[5] is not None else 1) + 1
+            conn.execute(
+                """
+                UPDATE breakout_audit_log
+                SET counter = ?,
+                    score_after = COALESCE(?, score_after),
+                    price = COALESCE(?, price),
+                    trigger_price = COALESCE(?, trigger_price),
+                    reason = COALESCE(?, reason),
+                    catalyst_impact = COALESCE(?, catalyst_impact),
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    curr_count,
+                    round(float(score_after), 1) if score_after is not None else None,
+                    round(float(price), 2) if price is not None else None,
+                    round(float(trigger_price), 2) if trigger_price is not None else None,
+                    reason if reason else None,
+                    catalyst_impact if catalyst_impact else None,
+                    now_iso,
+                    last_id,
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO breakout_audit_log (
+                    ticker, company_name, event_type, from_tier, to_tier,
+                    score_before, score_after, price, trigger_price,
+                    reason, catalyst_impact, strategy, counter, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                """,
+                (
+                    ticker,
+                    company_name,
+                    event_type,
+                    from_tier.upper(),
+                    to_tier.upper(),
+                    round(float(score_before), 1) if score_before is not None else None,
+                    round(float(score_after), 1) if score_after is not None else None,
+                    round(float(price), 2) if price is not None else None,
+                    round(float(trigger_price), 2) if trigger_price is not None else None,
+                    reason,
+                    catalyst_impact,
+                    strat_name,
+                    now_iso,
+                    now_iso,
+                ),
+            )
         if hasattr(conn, "commit"):
             conn.commit()
     except Exception as e:
@@ -673,6 +742,7 @@ def record_breakout_transition(
 def get_breakout_audit_log(
     ticker: str | None = None,
     limit: int = 50,
+    strategy: str | None = None,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     """Query recent breakout movement audit log entries with formatted explanations."""
@@ -682,33 +752,28 @@ def get_breakout_audit_log(
         from earnings_engine.data.migrations import apply_migrations
         apply_migrations(settings)
         conn = get_db_connection(settings)
+        wheres = ["UPPER(ticker) NOT LIKE '%TEST%' AND UPPER(ticker) NOT LIKE '%MOCK%' AND UPPER(ticker) NOT LIKE '%DUMMY%'"]
+        params: list[Any] = []
         if ticker:
             sym = ticker.strip().upper()
             if not (sym.endswith(".NS") or sym.endswith(".BO") or "." in sym):
                 sym = f"{sym}.NS"
-            rows = conn.execute(
-                """
-                SELECT id, ticker, company_name, event_type, from_tier, to_tier,
-                       score_before, score_after, price, trigger_price,
-                       reason, catalyst_impact, created_at
-                FROM breakout_audit_log
-                WHERE ticker = ?
-                ORDER BY id DESC LIMIT ?
-                """,
-                (sym, limit),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                """
-                SELECT id, ticker, company_name, event_type, from_tier, to_tier,
-                       score_before, score_after, price, trigger_price,
-                       reason, catalyst_impact, created_at
-                FROM breakout_audit_log
-                WHERE UPPER(ticker) NOT LIKE '%TEST%' AND UPPER(ticker) NOT LIKE '%MOCK%' AND UPPER(ticker) NOT LIKE '%DUMMY%'
-                ORDER BY id DESC LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
+            wheres.append("ticker = ?")
+            params.append(sym)
+        if strategy and strategy.upper() not in ("ALL", "*"):
+            wheres.append("(UPPER(strategy) = ? OR UPPER(strategy) = ?)")
+            params.extend([strategy.upper(), strategy.replace("_", " ").upper()])
+
+        query = f"""
+            SELECT id, ticker, company_name, event_type, from_tier, to_tier,
+                   score_before, score_after, price, trigger_price,
+                   reason, catalyst_impact, created_at, strategy, counter, updated_at
+            FROM breakout_audit_log
+            WHERE {' AND '.join(wheres)}
+            ORDER BY id DESC LIMIT ?
+        """
+        params.append(limit)
+        rows = conn.execute(query, params).fetchall()
 
         for r in rows:
             logs.append({
@@ -725,6 +790,9 @@ def get_breakout_audit_log(
                 "reason": r[10] or "Automated multi-factor evaluation",
                 "catalyst_impact": r[11],
                 "created_at": r[12],
+                "strategy": r[13] or "Classic Technical",
+                "counter": r[14] or 1,
+                "updated_at": r[15] or r[12],
             })
     except Exception as e:
         logger.warning("[BREAKOUT-AUDIT] Failed querying audit log: %s", e)
@@ -828,6 +896,11 @@ def get_stock_breakout_timeline(
             badge = "COLD"
             badge_color = "#64748b"
 
+        ev_counter = l.get("counter", 1) or 1
+        ev_strat = l.get("strategy") or "Classic Technical"
+        if ev_counter > 1:
+            title = f"{title} (🔁 {ev_counter}x scan confirmations)"
+
         events.append({
             "timestamp": time_display,
             "raw_time": created,
@@ -837,6 +910,8 @@ def get_stock_breakout_timeline(
             "badge_color": badge_color,
             "price": price_val,
             "score": score_val,
+            "strategy": ev_strat,
+            "counter": ev_counter,
             "reason": l.get("reason") or "Scored and re-evaluated by multi-factor scanner.",
             "catalyst_impact": l.get("catalyst_impact"),
         })
@@ -1307,6 +1382,7 @@ def _promote(ticker: str, result: dict, settings: Settings | None = None) -> Non
                 trigger_price=trig_p,
                 reason=reason_str,
                 catalyst_impact=cat_headline,
+                strategy=strat,
                 settings=settings,
             )
 
@@ -1327,6 +1403,7 @@ def _promote(ticker: str, result: dict, settings: Settings | None = None) -> Non
                     trigger_price=trig_p,
                     reason=reason_str,
                     catalyst_impact=cat_headline,
+                    strategy=strat,
                     settings=settings,
                 )
 
@@ -1350,7 +1427,9 @@ def _demote_hot(ticker: str, settings: Settings | None = None) -> None:
         score = result.get("composite_score", 0)
         cur_p = result.get("current_price") or result.get("signal_price")
         trig_p = result.get("breakout_trigger")
-        t_clean = result.get("ticker", key.split("::")[0])
+        parts = key.split("::")
+        t_clean = result.get("ticker", parts[0])
+        strat = result.get("strategy") or (parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL")
         del _pool["hot"][key]
 
         # Maybe keep in warm if score still qualifies
@@ -1366,6 +1445,7 @@ def _demote_hot(ticker: str, settings: Settings | None = None) -> None:
                 price=cur_p,
                 trigger_price=trig_p,
                 reason=f"Demoted HOT ➔ WARM: Score dropped to {score:.1f} (< {HOT_DEMOTION_THRESHOLD}) for 2 consecutive scan cycles",
+                strategy=strat,
                 settings=settings,
             )
             logger.debug("[BREAKOUT] %s demoted Hot → Warm (score %.1f)", key, score)
@@ -1380,6 +1460,7 @@ def _demote_hot(ticker: str, settings: Settings | None = None) -> None:
                 price=cur_p,
                 trigger_price=trig_p,
                 reason=f"Removed from Breakout Radar: Score fell to {score:.1f} below minimum setup criteria",
+                strategy=strat,
                 settings=settings,
             )
             logger.debug("[BREAKOUT] %s demoted Hot → Cold (score %.1f)", key, score)
@@ -1404,7 +1485,9 @@ def _demote_warm(ticker: str, settings: Settings | None = None) -> None:
         score = result.get("composite_score", 0)
         cur_p = result.get("current_price") or result.get("signal_price")
         trig_p = result.get("breakout_trigger")
-        t_clean = result.get("ticker", key.split("::")[0])
+        parts = key.split("::")
+        t_clean = result.get("ticker", parts[0])
+        strat = result.get("strategy") or (parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL")
         record_breakout_transition(
             ticker=t_clean,
             event_type="REMOVED_COLD",
@@ -1415,6 +1498,7 @@ def _demote_warm(ticker: str, settings: Settings | None = None) -> None:
             price=cur_p,
             trigger_price=trig_p,
             reason=f"Removed from Warm Pool: Score dropped to {score:.1f} (< {WARM_DEMOTION_THRESHOLD}) for 2 consecutive cycles",
+            strategy=strat,
             settings=settings,
         )
         logger.debug("[BREAKOUT] %s demoted Warm → Cold (score %.1f)", key, score)
@@ -1469,8 +1553,39 @@ def get_cached_scan_results(
                 candidates = list(strat_pool["candidates"])
             else:
                 candidates = [c for c in _pool.get("candidates", []) if (c.get("strategy") or "CLASSIC_TECHNICAL").upper() == strategy_clean]
-                if not candidates and strategy_clean == "CLASSIC_TECHNICAL":
-                    candidates = list(_pool.get("candidates", []))
+
+            # Direct SQLite fallback if in-memory pool doesn't have this strategy yet
+            if not candidates and strategy_clean not in ("ALL", "*"):
+                try:
+                    conn = get_db_connection(settings)
+                    cur = conn.execute(
+                        "SELECT data_json, ticker, composite_score FROM breakout_radar WHERE UPPER(strategy) = ? ORDER BY composite_score DESC LIMIT ?",
+                        (strategy_clean, BREAKOUT_MAX_CANDIDATES),
+                    )
+                    db_cands = []
+                    for row in cur.fetchall():
+                        if row[0]:
+                            try:
+                                d = json.loads(row[0])
+                                if d and d.get("ticker"):
+                                    d["strategy"] = strategy_clean
+                                    db_cands.append(d)
+                            except Exception:
+                                pass
+                    if db_cands:
+                        candidates = db_cands
+                except Exception as e:
+                    logger.debug("[BREAKOUT] DB direct fallback notice for %s: %s", strategy_clean, e)
+
+            # If still empty and strategy is valid, compute dynamically on the fly
+            if not candidates and strategy_clean in BREAKOUT_STRATEGIES:
+                try:
+                    candidates = run_breakout_scan(settings, universe=universe, strategy=strategy_clean)
+                except Exception as e:
+                    logger.debug("[BREAKOUT] Dynamic scan fallback notice for %s: %s", strategy_clean, e)
+
+            if not candidates and strategy_clean == "CLASSIC_TECHNICAL":
+                candidates = list(_pool.get("candidates", []))
 
     # Enrich candidates with real-tracked status badge
     tracked_set = get_tracked_ticker_set(settings)

@@ -298,6 +298,7 @@ async def get_breakout_scan_status(
 @router.get("/api/v1/breakout-radar/audit-log")
 async def get_breakout_audit_log_endpoint(
     ticker: str | None = Query(None, description="Filter by ticker"),
+    strategy: str | None = Query(None, description="Filter by strategy (e.g. CLASSIC_TECHNICAL, NSE_DELIVERY_ABSORPTION, etc.)"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """Retrieve historical audit logs of tracked breakout signals."""
@@ -306,6 +307,7 @@ async def get_breakout_audit_log_endpoint(
             breakout_scanner_mod.get_breakout_audit_log,
             ticker=ticker,
             limit=limit,
+            strategy=strategy,
             settings=_settings,
         )
         return {"success": True, "count": len(logs), "logs": logs}

@@ -59,6 +59,8 @@ Object.assign(app, {
                             const timeStr = l.created_at ? l.created_at.replace('T', ' ').substring(0, 16) : '';
                             const priceStr = l.price ? `₹${l.price.toFixed(2)}` : '';
                             const scoreStr = l.score_after !== null && l.score_after !== undefined ? `Score: ${l.score_after}` : '';
+                            const stratName = l.strategy || 'Classic Technical';
+                            const counterBadge = (l.counter && l.counter > 1) ? `<span style="font-size:0.62rem;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.15);padding:0.1rem 0.35rem;border-radius:4px;border:1px solid rgba(56,189,248,0.4);" title="Repeated confirmation count across continuous scans">🔁 ${l.counter}x</span>` : '';
 
                             return `
                                 <div style="background:${bg};border:1px solid ${border};border-radius:6px;padding:0.45rem 0.65rem;display:flex;flex-direction:column;gap:0.2rem;">
@@ -67,6 +69,8 @@ Object.assign(app, {
                                             <span style="font-size:0.65rem;font-weight:800;color:${color};background:#000000;padding:0.1rem 0.35rem;border-radius:4px;border:1px solid ${border};">${icon}</span>
                                             <strong style="font-size:0.78rem;color:#f8fafc;font-family:var(--font-mono);cursor:pointer;" onclick="app.inspectBreakoutStock('${l.ticker}')">${l.ticker}</strong>
                                             <span style="font-size:0.7rem;color:#94a3b8;">${l.company_name}</span>
+                                            <span style="font-size:0.62rem;color:#a78bfa;background:rgba(167,139,250,0.12);padding:0.08rem 0.3rem;border-radius:3px;border:1px solid rgba(167,139,250,0.25);">${stratName}</span>
+                                            ${counterBadge}
                                             <span style="font-size:0.65rem;color:#64748b;">(${l.from_tier} ➔ ${l.to_tier})</span>
                                         </div>
                                         <div style="font-size:0.65rem;color:#64748b;font-family:var(--font-mono);">
