@@ -1193,6 +1193,33 @@ def _migration_024_breakout_audit_counter_and_strategy(conn: sqlite3.Connection 
         pass
 
 
+def _migration_025_option_chain_history(conn: Any) -> None:
+    """Create option_chain_history table for persisting daily/intraday derivatives snapshots."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS option_chain_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol TEXT NOT NULL,
+            as_of_date TEXT NOT NULL,
+            spot_price REAL,
+            pcr_oi REAL,
+            pcr_volume REAL,
+            max_pain_strike REAL,
+            sentiment TEXT,
+            call_oi_total INTEGER,
+            put_oi_total INTEGER,
+            resistance_strike REAL,
+            support_strike REAL,
+            created_at TEXT NOT NULL,
+            UNIQUE(symbol, as_of_date)
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_option_chain_sym_date ON option_chain_history (symbol, as_of_date DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_option_chain_date ON option_chain_history (as_of_date DESC)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1219,6 +1246,7 @@ MIGRATIONS: list[Migration] = [
     Migration(22, "022_institutional_amount_metrics", _migration_022_institutional_amount_metrics),
     Migration(23, "023_news_structured_extraction", _migration_023_news_structured_extraction),
     Migration(24, "024_breakout_audit_counter_and_strategy", _migration_024_breakout_audit_counter_and_strategy),
+    Migration(25, "025_option_chain_history", _migration_025_option_chain_history),
 ]
 
 

@@ -10,6 +10,7 @@ Calculates key derivatives metrics for catalyst and earnings prediction:
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 import numpy as np
@@ -18,9 +19,127 @@ import pandas as pd
 from earnings_engine.config import Settings
 from earnings_engine.data.providers.provider_manager import get_data_manager
 
+logger = logging.getLogger("earnings_engine.data.option_chain")
+
 _NON_FNO_SYMBOLS: set[str] = set()
 _OPTION_CHAIN_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _CACHE_TTL_SECONDS = 900.0  # 15 minutes
+
+
+def _resolve_spot_price(clean_symbol: str, spot_price: float | None, settings: Settings | None = None) -> float:
+    """Resolve spot price from local price_history database first before hitting network quote."""
+    if spot_price is not None and spot_price > 0:
+        return float(spot_price)
+
+    # 1. Try local price_history cache
+    try:
+        from earnings_engine.data.prices import load_prices
+        settings = settings or Settings()
+        pdf = load_prices(clean_symbol, settings)
+        if pdf is not None and not pdf.empty and "close" in pdf.columns:
+            last_close = float(pdf["close"].dropna().iloc[-1])
+            if last_close > 0:
+                return last_close
+    except Exception:
+        pass
+
+    # 2. Fallback to live quote
+    try:
+        mgr = get_data_manager(settings)
+        q = mgr.fetch_quote(clean_symbol)
+        p = float(q.get("price") or 0)
+        if p > 0:
+            return p
+    except Exception:
+        pass
+
+    return 100.0
+
+
+def store_option_chain_snapshot(data: dict[str, Any], settings: Settings | None = None) -> bool:
+    """Persist an Option Chain snapshot record into SQLite option_chain_history."""
+    if not data or not data.get("symbol"):
+        return False
+
+    settings = settings or Settings()
+    from earnings_engine.data.db import get_db_connection
+    from earnings_engine.data.migrations import apply_migrations
+
+    try:
+        apply_migrations(settings)
+        conn = get_db_connection(settings)
+        now_dt = datetime.now()
+        as_of_date = data.get("as_of_date") or now_dt.strftime("%Y-%m-%d")
+        created_at = now_dt.isoformat()
+        sym = str(data.get("symbol")).upper().replace(".NS", "")
+
+        conn.execute(
+            """
+            INSERT INTO option_chain_history (
+                symbol, as_of_date, spot_price, pcr_oi, pcr_volume,
+                max_pain_strike, sentiment, call_oi_total, put_oi_total,
+                resistance_strike, support_strike, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(symbol, as_of_date) DO UPDATE SET
+                spot_price = excluded.spot_price,
+                pcr_oi = excluded.pcr_oi,
+                pcr_volume = excluded.pcr_volume,
+                max_pain_strike = excluded.max_pain_strike,
+                sentiment = excluded.sentiment,
+                call_oi_total = excluded.call_oi_total,
+                put_oi_total = excluded.put_oi_total,
+                resistance_strike = excluded.resistance_strike,
+                support_strike = excluded.support_strike,
+                created_at = excluded.created_at
+            """,
+            (
+                sym,
+                as_of_date,
+                data.get("spot_price"),
+                data.get("pcr_oi"),
+                data.get("pcr_volume"),
+                data.get("max_pain_strike"),
+                data.get("sentiment"),
+                data.get("call_oi_total"),
+                data.get("put_oi_total"),
+                data.get("resistance_strike"),
+                data.get("support_strike"),
+                created_at,
+            ),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.debug("[OPTION-CHAIN-DB] Could not persist snapshot for %s: %s", data.get("symbol"), e)
+        return False
+
+
+def get_option_chain_history(symbol: str, limit: int = 30, settings: Settings | None = None) -> list[dict[str, Any]]:
+    """Retrieve historical Option Chain snapshots for a symbol."""
+    clean_symbol = symbol.upper().replace(".NS", "")
+    settings = settings or Settings()
+    from earnings_engine.data.db import get_db_connection
+
+    try:
+        conn = get_db_connection(settings)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT as_of_date, spot_price, pcr_oi, pcr_volume, max_pain_strike,
+                   sentiment, call_oi_total, put_oi_total, resistance_strike, support_strike, created_at
+            FROM option_chain_history
+            WHERE symbol = ?
+            ORDER BY as_of_date DESC
+            LIMIT ?
+            """,
+            (clean_symbol, limit),
+        )
+        rows = cursor.fetchall()
+        cols = [c[0] for c in cursor.description]
+        return [dict(zip(cols, r)) for r in rows]
+    except Exception as e:
+        logger.debug("[OPTION-CHAIN-DB] Could not load history for %s: %s", clean_symbol, e)
+        return []
 
 
 def analyze_option_chain(
@@ -43,6 +162,7 @@ def analyze_option_chain(
       - highest_put_oi_strike: Major support strike
     """
     clean_symbol = symbol.upper().replace(".NS", "")
+    spot_price = _resolve_spot_price(clean_symbol, spot_price, settings)
 
     # Fast return from TTL cache
     now = pd.Timestamp.now().timestamp()
@@ -53,8 +173,6 @@ def analyze_option_chain(
 
     # If known non-F&O equity, return fast baseline without hammering network
     if clean_symbol in _NON_FNO_SYMBOLS:
-        if spot_price is None:
-            spot_price = 100.0
         res = _compute_baseline_option_metrics(clean_symbol, spot_price)
         _OPTION_CHAIN_CACHE[clean_symbol] = (now, res)
         return res
@@ -67,17 +185,14 @@ def analyze_option_chain(
     if not records:
         _NON_FNO_SYMBOLS.add(clean_symbol)
         logger.debug("[OPTION-CHAIN] Real-time Option Chain records empty for %s; computing baseline derivatives metrics", clean_symbol)
-        # Generate synthetic calculation if spot price is provided (or fetch quote)
-        if spot_price is None:
-            q = mgr.fetch_quote(clean_symbol)
-            spot_price = q.get("price") or 100.0
-
         res = _compute_baseline_option_metrics(clean_symbol, spot_price)
         _OPTION_CHAIN_CACHE[clean_symbol] = (now, res)
         return res
 
     res = _calculate_option_metrics_from_records(clean_symbol, records, spot_price)
+    res["spot_price"] = spot_price
     _OPTION_CHAIN_CACHE[clean_symbol] = (now, res)
+    store_option_chain_snapshot(res, settings)
     logger.info("[OPTION-CHAIN] [NSE-Live] %s (%d strikes) -> Sentiment: %s, PCR(OI): %s, Max Pain: ₹%s", clean_symbol, len(records), res.get("sentiment"), res.get("pcr_oi"), res.get("max_pain_strike"))
     return res
 
