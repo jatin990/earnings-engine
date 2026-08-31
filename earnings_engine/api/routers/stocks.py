@@ -325,8 +325,8 @@ async def refresh_stock_prices_endpoint(ticker: str):
     try:
         from earnings_engine.data.prices import ingest_prices
         from earnings_engine.data.universe import ingest_market_caps
-        await asyncio.to_thread(ingest_prices, [sym], _settings, force=True)
-        await asyncio.to_thread(ingest_market_caps, [sym], _settings)
+        await asyncio.to_thread(ingest_prices, [sym], settings=_settings, force=True)
+        await asyncio.to_thread(ingest_market_caps, [sym], force=True, settings=_settings)
         overview = await asyncio.to_thread(stock_api.get_stock_overview, ticker=sym, settings=_settings)
         technicals = await asyncio.to_thread(stock_api.get_stock_technicals, ticker=sym, settings=_settings)
         return {
@@ -347,7 +347,7 @@ async def refresh_stock_institutional_endpoint(ticker: str):
     sym = clean_ticker_param(ticker)
     try:
         from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
-        data = await asyncio.to_thread(get_stock_institutional_activity, ticker=sym, settings=_settings, force=True)
+        data = await asyncio.to_thread(get_stock_institutional_activity, ticker=sym, settings=_settings, force_refresh=True)
         return {
             "success": True,
             "ticker": sym,
@@ -382,7 +382,7 @@ async def run_stock_kronos_endpoint(ticker: str):
     sym = clean_ticker_param(ticker)
     try:
         from earnings_engine.kronos_predictor import predict_single_stock
-        forecast = await asyncio.to_thread(predict_single_stock, sym, _settings)
+        forecast = await asyncio.to_thread(predict_single_stock, symbol=sym, settings=_settings)
         return {
             "success": True,
             "ticker": sym,

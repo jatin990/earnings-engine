@@ -31,3 +31,12 @@ def test_stock_detail_html_route_with_ampersand():
     res_escaped = client.get("/stock/M&amp;M.NS")
     assert res_escaped.status_code == 200
     assert 'const ACTIVE_SYM = "M\\u0026M.NS";' in res_escaped.text or 'const ACTIVE_SYM = "M&M.NS";' in res_escaped.text
+
+
+def test_refresh_stock_institutional_endpoint():
+    res = client.post("/api/v1/stock/LEAPIND.NS/refresh-institutional")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["ticker"] == "LEAPIND.NS"
+

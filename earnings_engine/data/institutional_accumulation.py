@@ -581,8 +581,14 @@ def recalculate_all_institutional_metrics(settings: Settings | None = None, forc
         return {"success": False, "error": str(e)}
 
 
-def get_stock_institutional_activity(ticker: str, settings: Settings | None = None, force_refresh: bool = False) -> dict[str, Any]:
+def get_stock_institutional_activity(
+    ticker: str,
+    settings: Settings | None = None,
+    force_refresh: bool = False,
+    force: bool = False,
+) -> dict[str, Any]:
     """Retrieve complete institutional accumulation breakdown for a specific equity."""
+    force_refresh = force_refresh or force
     settings = settings or Settings()
     init_institutional_db(settings)
 
