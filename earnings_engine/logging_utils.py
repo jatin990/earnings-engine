@@ -110,7 +110,16 @@ def setup_logger(name: str = "earnings_engine", base_dir: Path | None = None) ->
     except Exception:
         pass
 
-    stream_handler = logging.StreamHandler(sys.stdout)
+    class SafeStreamHandler(logging.StreamHandler):
+        def emit(self, record: logging.LogRecord) -> None:
+            try:
+                if self.stream is None or getattr(self.stream, "closed", False):
+                    return
+                super().emit(record)
+            except (ValueError, OSError):
+                pass
+
+    stream_handler = SafeStreamHandler(sys.stdout)
     stream_handler.setFormatter(formatter)
     root_logger.addHandler(stream_handler)
 
