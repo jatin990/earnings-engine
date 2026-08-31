@@ -216,16 +216,34 @@ async def get_omniroute_status_endpoint():
         }
 
 
-@router.post("/api/v1/omniroute/analyze")
-async def analyze_with_omniroute_endpoint(payload: dict):
-    """Directly execute AI news analysis for any corporate headline using diegosouzapw/OmniRoute."""
+@router.get("/api/v1/omniroute/models")
+async def get_omniroute_models_endpoint():
+    """Return available OmniRoute models categorized by reasoning capability (matching local models selector)."""
     try:
         from earnings_engine.data.omniroute_client import OmniRouteClient
         client = OmniRouteClient(settings=_settings)
+        models_data = await asyncio.to_thread(client.get_available_models)
+        return models_data
+    except Exception as e:
+        logger.exception("Error fetching OmniRoute models: %s", e)
+        return {
+            "success": False,
+            "error": str(e),
+            "models": [],
+        }
+
+
+@router.post("/api/v1/omniroute/analyze")
+async def analyze_with_omniroute_endpoint(payload: dict, model: str | None = None):
+    """Directly execute AI news analysis for any corporate headline using diegosouzapw/OmniRoute with configurable model."""
+    try:
+        from earnings_engine.data.omniroute_client import OmniRouteClient
+        client = OmniRouteClient(settings=_settings)
+        chosen_model = model or payload.get("model") or payload.get("preferred_model")
         result = await asyncio.to_thread(
             client.analyze_catalyst,
             item=payload,
-            preferred_model=payload.get("model"),
+            preferred_model=chosen_model,
         )
         return {"success": True, "analysis": result, **result}
     except Exception as e:
@@ -233,16 +251,35 @@ async def analyze_with_omniroute_endpoint(payload: dict):
         raise HTTPException(status_code=500, detail=f"OmniRoute analysis error: {str(e)}")
 
 
+@router.post("/api/v1/news/ai-analyze")
+async def analyze_news_ai_endpoint(payload: dict, model: str | None = None):
+    """Analyze corporate news headline with configurable AI model and rich market context."""
+    try:
+        from earnings_engine.data.ai_news_analyzer import analyze_news_catalyst_ai
+        chosen_model = model or payload.get("model") or payload.get("preferred_model")
+        result = await asyncio.to_thread(
+            analyze_news_catalyst_ai,
+            item=payload,
+            settings=_settings,
+            preferred_model=chosen_model,
+        )
+        return {"success": True, "analysis": result, **result}
+    except Exception as e:
+        logger.exception("Error executing news AI analysis: %s", e)
+        raise HTTPException(status_code=500, detail=f"News AI analysis error: {str(e)}")
+
+
 @router.post("/api/v1/news/extract-structured")
-async def extract_structured_news_endpoint(payload: dict):
-    """Execute structured, type-safe news extraction returning NewsExtractedData schema."""
+async def extract_structured_news_endpoint(payload: dict, model: str | None = None):
+    """Execute structured, type-safe news extraction returning NewsExtractedData schema with configurable model."""
     try:
         from earnings_engine.data.ai_news_analyzer import extract_structured_news_data
+        chosen_model = model or payload.get("model") or payload.get("preferred_model")
         result = await asyncio.to_thread(
             extract_structured_news_data,
             item=payload,
             settings=_settings,
-            preferred_model=payload.get("model"),
+            preferred_model=chosen_model,
         )
         return {
             "success": True,

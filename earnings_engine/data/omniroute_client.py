@@ -26,60 +26,122 @@ logger = logging.getLogger("earnings_engine.data.omniroute_client")
 OMNIROUTE_PROBE_PORTS = [20128, 20129, 8080, 3000]
 
 DEFAULT_OMNIROUTE_MODELS = [
-    "antigravity/gemini-3.7-flash-medium",
-    "antigravity/gemini-3.7-flash-high",
+    "deepseek/deepseek-r1",
+    "qwen/qwen-2.5-72b-instruct",
+    "meta-llama/llama-3.3-70b-instruct",
+    "google/gemini-2.5-pro",
+    "anthropic/claude-3.5-sonnet",
+    "openai/gpt-4o",
+    "google/gemini-2.0-flash",
     "auto/best-reasoning",
     "auto/best-fast",
-    "auto/fast",
-    "auto/cheap",
     "auto/best-free",
-    "deepseek/deepseek-r1",
-    "meta-llama/llama-3.3-70b-instruct",
-    "google/gemini-2.0-flash",
-    "qwen/qwen-2.5-72b-instruct",
     "gpt-4o-mini",
 ]
 DEFAULT_OMNIROUTER_MODELS = DEFAULT_OMNIROUTE_MODELS
 
-OMNIROUTE_SYSTEM_PROMPT = """You are an institutional trading analyst and financial quantitative engine.
-Analyze the provided corporate news headline and context for an Indian or global equity.
-Perform structured information extraction identifying the primary instrument, financial projections, sentiment polarity, and temporal originality.
+# Catalog of reasoning and production models with categorization for UI & API selection
+OMNIROUTE_MODEL_CATALOG: list[dict[str, Any]] = [
+    {
+        "id": "deepseek/deepseek-r1",
+        "name": "🧠 DeepSeek-R1 (Deep Chain-of-Thought)",
+        "tier": "REASONING",
+        "provider": "DeepSeek",
+        "recommended": True,
+        "description": "Deep mathematical reasoning and step-by-step chain-of-thought analysis for complex financial filings and order accretion.",
+    },
+    {
+        "id": "qwen/qwen-2.5-72b-instruct",
+        "name": "⚡ Qwen 2.5 72B (Quantitative Reasoning)",
+        "tier": "REASONING",
+        "provider": "Alibaba Cloud / Qwen",
+        "recommended": True,
+        "description": "Superior quantitative comprehension, derivative structure evaluation, and volume ratio pattern matching.",
+    },
+    {
+        "id": "meta-llama/llama-3.3-70b-instruct",
+        "name": "🏛️ Llama 3.3 70B (Institutional & Macro)",
+        "tier": "INSTITUTIONAL",
+        "provider": "Meta AI",
+        "description": "Broad macroeconomic synthesis, industry competitive positioning, and fund flow conviction analysis.",
+    },
+    {
+        "id": "google/gemini-2.5-pro",
+        "name": "✨ Gemini 2.5 Pro (Advanced Reasoning)",
+        "tier": "REASONING",
+        "provider": "Google DeepMind",
+        "description": "State-of-the-art multimodal reasoning, high-precision numeric extraction, and forward guidance reconciliation.",
+    },
+    {
+        "id": "anthropic/claude-3.5-sonnet",
+        "name": "🎯 Claude 3.5 Sonnet (Institutional Thesis)",
+        "tier": "INSTITUTIONAL",
+        "provider": "Anthropic",
+        "description": "High-conviction qualitative thesis generation, corporate governance risk auditing, and clean trade setups.",
+    },
+    {
+        "id": "google/gemini-2.0-flash",
+        "name": "🚀 Gemini 2.0 Flash (Ultra Fast)",
+        "tier": "FAST",
+        "provider": "Google",
+        "description": "Sub-second low-latency catalyst screening and fast structured extraction.",
+    },
+    {
+        "id": "auto/best-reasoning",
+        "name": "🔮 Auto Best Reasoning (Gateway Dynamic)",
+        "tier": "AUTO",
+        "provider": "OmniRoute Router",
+        "description": "Dynamically selects the highest-scoring available reasoning model across active providers.",
+    },
+    {
+        "id": "auto/best-fast",
+        "name": "⚡ Auto Best Fast (Gateway Dynamic)",
+        "tier": "AUTO",
+        "provider": "OmniRoute Router",
+        "description": "Dynamically routes to the fastest response provider with available quota.",
+    },
+]
 
-Return your response strictly as a JSON object with the following schema:
+OMNIROUTE_SYSTEM_PROMPT = """You are an institutional quantitative equity analyst and advanced reasoning engine specializing in Indian (NSE/BSE) and global equities.
+Evaluate the provided corporate news announcement alongside point-in-time technical price action, institutional flows, moving average structures, and fundamental guidance.
+
+Provide a crisp, mathematically consistent, and actionable trading evaluation.
+
+Return ONLY a raw, valid JSON object strictly matching this schema:
 {
-  "ticker": "<primary financial instrument's ticker symbol, e.g. 'TCS.NS', 'RELIANCE.NS'>",
+  "ticker": "<ticker symbol, e.g. 'TCS.NS', 'RELIANCE.NS'>",
   "sentiment": "BULLISH" | "BEARISH" | "NEUTRAL",
   "direction": "BULLISH" | "BEARISH" | "NEUTRAL",
-  "target_price": <float or null, projected short-term price target based on signal_price>,
-  "stop_loss": <float or null, defensive technical invalidation price based on signal_price>,
+  "target_price": <float, projected short-term price target based on signal_price & resistance levels>,
+  "stop_loss": <float, technical invalidation price based on signal_price & support levels>,
   "financial_projections": {
     "target_price": <float or null>,
     "stop_loss": <float or null>,
-    "order_value_cr": <float or null, explicit order/contract value in Crore>,
-    "revenue_projection_cr": <float or null, projected revenue in Crore>,
-    "ebitda_margin_pct": <float or null, projected margin %>,
-    "growth_rate_pct": <float or null, projected growth rate %>,
-    "raw_projections": ["<extracted forward projection or numeric quote>"]
+    "order_value_cr": <float or null, explicit order/deal value in INR Crore if mentioned>,
+    "revenue_projection_cr": <float or null, projected revenue impact in INR Crore>,
+    "ebitda_margin_pct": <float or null, expected margin change or %>,
+    "growth_rate_pct": <float or null, expected YoY/QoQ growth %>,
+    "raw_projections": ["<exact forward guidance or numeric projection extracted from text>"]
   },
   "temporal_originality": "NEW_PUBLICATION" | "BREAKING" | "DEVELOPING" | "REPUBLICATION",
-  "is_republication": <boolean, true if article is a re-hash/republication of older news, false if fresh/new>,
-  "originality_rationale": "<1 sentence explaining why this is a new publication or republication>",
-  "impact_score": <integer from 25 to 99 representing catalyst magnitude>,
+  "is_republication": <boolean, true if this is an old recycled story/re-hash, false if genuine fresh news>,
+  "originality_rationale": "<1 sentence on news freshness vs past announcements>",
+  "impact_score": <integer 25 to 99, catalyst price magnitude score>,
   "impact_level": "HIGH" | "MEDIUM" | "LOW",
   "expected_horizon": "📅 1-3 Days" | "📅 1-2 Weeks" | "📅 Positional",
   "volatility_est": "±1% to ±3%" | "±2% to ±6%" | "±5% to ±12%",
-  "trading_takeaway": "<1-2 sentences concise institutional trade rationale / setup explanation>",
+  "trading_takeaway": "<2-3 sentence institutional synthesis integrating news catalyst, price action momentum, and institutional accumulation flow>",
   "confidence_pct": <integer 0-100>,
-  "key_catalyst_triggers": ["<short trigger 1>", "<short trigger 2>"],
-  "primary_risk": "<single biggest risk to this thesis>"
+  "key_catalyst_triggers": ["<bullet 1>", "<bullet 2>"],
+  "primary_risk": "<single biggest technical or fundamental risk factor>"
 }
 
-Directives:
-- Respond with ONLY the raw JSON object. No markdown code blocks, no backticks, no commentary.
-- target_price must be above signal_price for BULLISH, below signal_price for BEARISH.
-- If signal_price is provided, calculate realistic price targets (typically 2% to 8% move).
-- Explicitly assess temporal originality: detect if content is fresh primary news or a republication of past events.
-- Focus on material revenue accretion, margin expansion/contraction, and institutional order book impact."""
+Key Quantitative Directives:
+1. Grounding: Set target_price > signal_price for BULLISH (typically 2% to 7% above current levels or at resistance R1), and target_price < signal_price for BEARISH.
+2. Invalidation: Set defensive stop_loss below key support S1 / recent base for BULLISH, and above swing resistance for BEARISH.
+3. Temporal Originality: Distinguish between brand-new regulatory/exchange disclosures vs regurgitated past events.
+4. Institutional Context: Synthesize delivery absorption, volume ratios, and moving average structure with news impact.
+5. Format: Return ONLY the raw JSON object without markdown code blocks, backticks, or preamble commentary."""
 
 
 class OmniRouteClient:
@@ -222,15 +284,47 @@ class OmniRouteClient:
         base = health.get("endpoint") or configured
         return f"{base.rstrip('/')}/chat/completions"
 
+    def get_available_models(self) -> dict[str, Any]:
+        """Return available OmniRoute models categorized by reasoning capability."""
+        health = self.probe_health()
+        discovered_models = health.get("models") or []
+        configured = os.getenv("OMNIROUTE_MODEL") or self.settings.omniroute_model or "deepseek/deepseek-r1"
+
+        catalog = [dict(m) for m in OMNIROUTE_MODEL_CATALOG]
+        # Attach discovered custom models if running locally
+        catalog_ids = {m["id"] for m in catalog}
+        for dm in discovered_models:
+            if dm not in catalog_ids:
+                catalog.append({
+                    "id": dm,
+                    "name": dm,
+                    "tier": "CUSTOM",
+                    "provider": "OmniRoute Gateway",
+                    "description": f"Discovered endpoint model {dm}",
+                })
+
+        return {
+            "success": True,
+            "status": health.get("status", "offline"),
+            "endpoint": health.get("endpoint"),
+            "is_self_hosted": health.get("is_self_hosted", False),
+            "configured_model": configured,
+            "default_model": "deepseek/deepseek-r1",
+            "models": catalog,
+            "models_count": len(catalog),
+        }
+
     def format_prompt(self, item: dict[str, Any]) -> str:
-        """Format structured quantitative context for the OmniRoute analysis."""
-        ticker = item.get("ticker", "UNKNOWN")
-        stock_name = item.get("stock_name") or ticker
-        title = item.get("title", "").strip()
-        summary = item.get("summary", "").strip()
+        """Format crisp, high-density structured context for OmniRoute quantitative reasoning."""
+        raw_ticker = str(item.get("ticker") or "UNKNOWN").strip().upper()
+        clean_sym = raw_ticker.split("::")[0].strip()
+        stock_name = item.get("stock_name") or clean_sym
+        title = (item.get("title") or item.get("headline") or "").strip()
+        summary = (item.get("summary") or item.get("description") or "").strip()
+        publisher = (item.get("publisher") or item.get("source") or "").strip()
+        published_at = item.get("published_at") or item.get("published_date") or ""
         signal_price = item.get("signal_price")
         current_price = item.get("current_price") or signal_price
-        published_at = item.get("published_at", "")
         verified_nums = item.get("verified_numbers") or {}
         if isinstance(verified_nums, str):
             try:
@@ -238,31 +332,166 @@ class OmniRouteClient:
             except Exception:
                 verified_nums = {}
 
-        lines = [
-            f"Ticker: {ticker} ({stock_name})",
-            f"Headline: {title}",
-            f"Summary / Excerpt: {summary}",
-            f"Published At: {published_at}",
-        ]
-        if signal_price and signal_price > 0:
-            lines.append(f"Pre-News Reference Close (Signal Price): INR {signal_price:.2f}")
-        if current_price and current_price > 0:
-            lines.append(f"Latest Market Price: INR {current_price:.2f}")
-            if signal_price and signal_price > 0:
-                delta_pct = ((current_price - signal_price) / signal_price) * 100
-                lines.append(f"Price Delta Since Signal: {delta_pct:+.2f}%")
-        if verified_nums:
-            nums_desc = ", ".join(f"{k}: {v}" for k, v in verified_nums.items() if v is not None)
-            if nums_desc:
-                lines.append(f"Verified Financial Figures: {nums_desc}")
+        # Enrich with local database price history, institutional flows, and fundamentals if missing
+        tech_ctx = dict(item.get("price_action") or item.get("technical_context") or {})
+        flow_ctx = dict(item.get("institutional_flow") or item.get("flow_context") or {})
 
-        return "\n".join(lines)
+        # Quick local DB enrichment if ticker is valid and tech_ctx is empty
+        if clean_sym and clean_sym not in ("UNKNOWN", "NONE", "") and not tech_ctx:
+            try:
+                from earnings_engine.data.prices import load_prices
+                from earnings_engine.data.market_context import detect_swing_range
+                from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
+                import pandas as pd
+
+                pdf = load_prices(clean_sym, self.settings)
+                if pdf is not None and not pdf.empty and "close" in pdf.columns:
+                    closes = pd.to_numeric(pdf["close"], errors="coerce").dropna()
+                    vols = pd.to_numeric(pdf["volume"], errors="coerce").dropna() if "volume" in pdf.columns else None
+                    if not closes.empty:
+                        cur_p = float(closes.iloc[-1])
+                        if not current_price or current_price <= 0:
+                            current_price = cur_p
+                        if not signal_price or signal_price <= 0:
+                            signal_price = cur_p
+
+                        high_52w = float(closes.tail(252).max()) if len(closes) >= 10 else cur_p
+                        low_52w = float(closes.tail(252).min()) if len(closes) >= 10 else cur_p
+                        pct_52w_high = ((cur_p - high_52w) / high_52w) * 100 if high_52w > 0 else 0.0
+
+                        ret_7d = round(((cur_p / float(closes.iloc[-min(5, len(closes))])) - 1) * 100, 2) if len(closes) >= 5 else 0.0
+                        ret_30d = round(((cur_p / float(closes.iloc[-min(21, len(closes))])) - 1) * 100, 2) if len(closes) >= 21 else 0.0
+                        ret_90d = round(((cur_p / float(closes.iloc[-min(63, len(closes))])) - 1) * 100, 2) if len(closes) >= 63 else 0.0
+
+                        sma_20 = round(float(closes.tail(20).mean()), 2) if len(closes) >= 20 else None
+                        sma_50 = round(float(closes.tail(50).mean()), 2) if len(closes) >= 50 else None
+                        sma_200 = round(float(closes.tail(200).mean()), 2) if len(closes) >= 200 else None
+
+                        vol_surge = None
+                        if vols is not None and len(vols) >= 63:
+                            v5 = float(vols.tail(5).mean())
+                            v63 = float(vols.tail(63).mean())
+                            if v63 > 0:
+                                vol_surge = round(v5 / v63, 2)
+
+                        tech_ctx = {
+                            "current_price": round(cur_p, 2),
+                            "high_52w": round(high_52w, 2),
+                            "low_52w": round(low_52w, 2),
+                            "pct_from_52w_high": round(pct_52w_high, 2),
+                            "ret_7d": ret_7d,
+                            "ret_30d": ret_30d,
+                            "ret_90d": ret_90d,
+                            "sma_20": sma_20,
+                            "sma_50": sma_50,
+                            "sma_200": sma_200,
+                            "volume_surge": vol_surge,
+                        }
+
+                        sr = detect_swing_range(clean_sym, self.settings)
+                        if sr:
+                            tech_ctx["swing_support"] = sr.get("support")
+                            tech_ctx["swing_resistance"] = sr.get("resistance")
+                            tech_ctx["channel_position"] = sr.get("channel_pos_pct")
+
+                inst = get_stock_institutional_activity(clean_sym, self.settings)
+                if inst:
+                    flow_ctx = {
+                        "fund_count": inst.get("fund_count"),
+                        "funds_in": inst.get("funds_in_count"),
+                        "funds_out": inst.get("funds_out_count"),
+                        "shares_held": inst.get("total_shares_held"),
+                        "shares_delta_pct": inst.get("total_shares_delta_pct"),
+                        "total_invested_cr": inst.get("total_invested_cr"),
+                        "holding_period": inst.get("holding_period"),
+                    }
+            except Exception as e:
+                logger.debug("[OMNIROUTE-PROMPT] Context enrichment error for %s: %s", clean_sym, e)
+
+        sections = []
+
+        # 1. Company Profile
+        prof = f"=== INSTRUMENT: {clean_sym}"
+        if stock_name and stock_name != clean_sym:
+            prof += f" ({stock_name})"
+        industry = item.get("industry") or item.get("sector")
+        if industry:
+            prof += f" | Sector: {industry}"
+        sections.append(prof)
+
+        # 2. Latest News Catalyst
+        news_lines = ["=== LATEST CATALYST EVENT"]
+        news_lines.append(f"Headline: {title}")
+        if summary and summary != title:
+            news_lines.append(f"Summary / Excerpt: {summary}")
+        if publisher:
+            news_lines.append(f"Source / Publisher: {publisher}")
+        if published_at:
+            news_lines.append(f"Published: {published_at}")
+        if verified_nums:
+            nums_str = ", ".join(f"{k}: {v}" for k, v in verified_nums.items() if v is not None)
+            if nums_str:
+                news_lines.append(f"Verified Extracted Metrics: {nums_str}")
+        sections.append("\n".join(news_lines))
+
+        # 3. Price Action & Technical Structure
+        pa_lines = ["=== PRICE ACTION & TECHNICAL STRUCTURE"]
+        if current_price and current_price > 0:
+            pa_lines.append(f"Latest Market Price: INR {current_price:.2f}")
+        if signal_price and signal_price > 0:
+            pa_lines.append(f"Pre-News Reference Close (Signal Price): INR {signal_price:.2f}")
+            if current_price and current_price > 0 and signal_price > 0:
+                delta_pct = ((current_price - signal_price) / signal_price) * 100
+                pa_lines.append(f"Price Delta Since Signal: {delta_pct:+.2f}%")
+
+        if tech_ctx:
+            if tech_ctx.get("high_52w") and tech_ctx.get("low_52w"):
+                pa_lines.append(f"52-Week Range: INR {tech_ctx['low_52w']:.2f} to INR {tech_ctx['high_52w']:.2f} ({tech_ctx.get('pct_from_52w_high', 0):+.2f}% from 52W High)")
+            ret_str = f"Momentum Returns: 7D: {tech_ctx.get('ret_7d', 'N/A')}% | 30D: {tech_ctx.get('ret_30d', 'N/A')}% | 90D: {tech_ctx.get('ret_90d', 'N/A')}%"
+            pa_lines.append(ret_str)
+            if tech_ctx.get("sma_20") or tech_ctx.get("sma_50") or tech_ctx.get("sma_200"):
+                pa_lines.append(f"Moving Averages: 20 SMA: {tech_ctx.get('sma_20')} | 50 SMA: {tech_ctx.get('sma_50')} | 200 SMA: {tech_ctx.get('sma_200')}")
+            if tech_ctx.get("swing_resistance") or tech_ctx.get("swing_support"):
+                pa_lines.append(f"Swing Levels: Resistance Trigger R1: INR {tech_ctx.get('swing_resistance')} | Support S1: INR {tech_ctx.get('swing_support')}")
+            if tech_ctx.get("volume_surge"):
+                pa_lines.append(f"Volume Surge Ratio: {tech_ctx['volume_surge']}x (5D avg vs 63D baseline)")
+        sections.append("\n".join(pa_lines))
+
+        # 4. Institutional & Order Flow
+        if flow_ctx or item.get("delivery_pct") or item.get("volume_ratio"):
+            flow_lines = ["=== INSTITUTIONAL & ORDER FLOW ACCUMULATION"]
+            if flow_ctx.get("fund_count"):
+                flow_lines.append(f"Mutual Funds Holding: {flow_ctx['fund_count']} (In: +{flow_ctx.get('funds_in', 0)} / Out: -{flow_ctx.get('funds_out', 0)}) [{flow_ctx.get('holding_period', 'QoQ')}]")
+            if flow_ctx.get("shares_delta_pct"):
+                flow_lines.append(f"Institutional Stake Delta: {flow_ctx['shares_delta_pct']:+.2f}% QoQ")
+            if item.get("delivery_pct"):
+                flow_lines.append(f"Bhavcopy Deliverable Volume: {item['delivery_pct']:.1f}%")
+            if item.get("volume_ratio"):
+                flow_lines.append(f"Bhavcopy Volume Spike: {item['volume_ratio']:.2f}x")
+            sections.append("\n".join(flow_lines))
+
+        # 5. Derivatives / Option Chain (if provided or present)
+        opt_ctx = item.get("option_chain") or {}
+        if opt_ctx:
+            opt_lines = ["=== DERIVATIVES & OPTION CHAIN STRUCTURE"]
+            if opt_ctx.get("sentiment"):
+                opt_lines.append(f"Option Chain Sentiment: {opt_ctx['sentiment']}")
+            if opt_ctx.get("pcr_oi"):
+                opt_lines.append(f"Put-Call Ratio (PCR OI): {opt_ctx['pcr_oi']:.2f}")
+            if opt_ctx.get("call_wall_strike"):
+                opt_lines.append(f"Highest Call OI Wall: INR {opt_ctx['call_wall_strike']}")
+            if opt_ctx.get("max_pain_strike"):
+                opt_lines.append(f"Max Pain Strike: INR {opt_ctx['max_pain_strike']}")
+            sections.append("\n".join(opt_lines))
+
+        return "\n\n".join(sections)
 
     def analyze_catalyst(
         self,
         item: dict[str, Any],
         preferred_model: str | None = None,
         timeout: int | None = None,
+        model: str | None = None,
     ) -> dict[str, Any]:
         """Send catalyst context to diegosouzapw/OmniRoute with automatic model cascading and heuristic fallback."""
         timeout = timeout or self.settings.omniroute_timeout
@@ -274,7 +503,8 @@ class OmniRouteClient:
             logger.info("[OMNIROUTE] Gateway offline; using deterministic analysis for %s", item.get("ticker"))
             return self.fallback_heuristic_analysis(item)
 
-        configured_model = preferred_model or os.getenv("OMNIROUTE_MODEL") or self.settings.omniroute_model
+        chosen_model = model or preferred_model or item.get("model") or item.get("preferred_model")
+        configured_model = chosen_model or os.getenv("OMNIROUTE_MODEL") or self.settings.omniroute_model
         models_to_try = [configured_model] if configured_model else DEFAULT_OMNIROUTER_MODELS
         for m in DEFAULT_OMNIROUTER_MODELS:
             if m not in models_to_try:

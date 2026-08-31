@@ -159,29 +159,35 @@ def get_cuda_status() -> dict[str, Any]:
 
 def get_asset_name(symbol: str) -> str:
     """Resolve the display name for a ticker symbol from DB or yfinance."""
+    clean_sym = str(symbol or "").split("::")[0].strip().upper()
+    if not clean_sym:
+        return ""
     try:
         from earnings_engine.config import Settings as _Settings
         from earnings_engine.data.db import get_db_connection
         conn = get_db_connection(_Settings())
-        row = conn.execute("SELECT name FROM universes WHERE ticker = ? LIMIT 1", (symbol,)).fetchone()
+        row = conn.execute("SELECT name FROM universes WHERE ticker = ? LIMIT 1", (clean_sym,)).fetchone()
         if row and row[0]:
             conn.close()
             return str(row[0])
-        row2 = conn.execute("SELECT name FROM ticker_market_cap WHERE ticker = ? LIMIT 1", (symbol,)).fetchone()
+        row2 = conn.execute("SELECT name FROM ticker_market_cap WHERE ticker = ? LIMIT 1", (clean_sym,)).fetchone()
         conn.close()
         if row2 and row2[0]:
             return str(row2[0])
     except Exception:
         pass
-    return symbol
+    return clean_sym
 
 
 def has_results_coming_up(symbol: str, days: int = 7) -> bool:
     """Check if the stock has earnings results in the next N days."""
+    clean_sym = str(symbol or "").split("::")[0].strip().upper()
+    if not clean_sym:
+        return False
     try:
         from earnings_engine.config import Settings as _Settings
         from earnings_engine.data.earnings import upcoming_earnings
-        df = upcoming_earnings([symbol], _Settings(), days=days)
+        df = upcoming_earnings([clean_sym], _Settings(), days=days)
         return not df.empty
     except Exception:
         return False
@@ -189,10 +195,13 @@ def has_results_coming_up(symbol: str, days: int = 7) -> bool:
 
 def get_upcoming_earnings_date(symbol: str, days: int = 7) -> str | None:
     """Get the next earnings date within the next N days."""
+    clean_sym = str(symbol or "").split("::")[0].strip().upper()
+    if not clean_sym:
+        return None
     try:
         from earnings_engine.config import Settings as _Settings
         from earnings_engine.data.earnings import upcoming_earnings
-        df = upcoming_earnings([symbol], _Settings(), days=days)
+        df = upcoming_earnings([clean_sym], _Settings(), days=days)
         if not df.empty and "earnings_date" in df.columns:
             return str(df["earnings_date"].iloc[0])
     except Exception:
@@ -202,10 +211,13 @@ def get_upcoming_earnings_date(symbol: str, days: int = 7) -> str | None:
 
 def get_last_week_change(symbol: str) -> float | None:
     """Calculate the percentage change over the last 5 trading days."""
+    clean_sym = str(symbol or "").split("::")[0].strip().upper()
+    if not clean_sym:
+        return None
     try:
         from earnings_engine.config import Settings as _Settings
         from earnings_engine.data.prices import load_prices
-        df = load_prices(symbol, _Settings())
+        df = load_prices(clean_sym, _Settings())
         if df.empty or len(df) < 5:
             return None
         close = df["close"].dropna()
@@ -222,9 +234,10 @@ def get_last_week_change(symbol: str) -> float | None:
 
 def get_results_metadata(symbol: str) -> dict[str, Any]:
     """Get earnings-related metadata for a stock."""
-    results_date = get_upcoming_earnings_date(symbol)
-    weekly_change = get_last_week_change(symbol)
-    logger.info("[EVENT] %s -> results_date=%s, 1W_change=%s", symbol, results_date, weekly_change)
+    clean_sym = str(symbol or "").split("::")[0].strip().upper()
+    results_date = get_upcoming_earnings_date(clean_sym)
+    weekly_change = get_last_week_change(clean_sym)
+    logger.info("[EVENT] %s -> results_date=%s, 1W_change=%s", clean_sym, results_date, weekly_change)
     return {
         "results_date": results_date,
         "last_week_change_pct": weekly_change
@@ -274,35 +287,38 @@ def fetch_historical_data(symbol: str, settings: Settings | None = None) -> pd.D
     Prioritizes the authoritative local SQLite price_history database (grounded & fast),
     then falls back to Yahoo Finance live endpoints if cache is cold.
     """
-    logger.info("[DATA] Fetching 1Y history for %s...", symbol)
+    clean_sym = str(symbol or "").split("::")[0].strip().upper()
+    if not clean_sym:
+        return None
+    logger.info("[DATA] Fetching 1Y history for %s...", clean_sym)
 
     # --- Attempt 0: Authoritative SQLite database price history (Instant & grounded) ---
     try:
         from earnings_engine.data.prices import load_prices
-        db_df = load_prices(symbol, settings or Settings())
+        db_df = load_prices(clean_sym, settings or Settings())
         cleaned = _history_to_clean_df(db_df)
         if cleaned is not None and len(cleaned) >= 60:
-            logger.info("[DATA] Loaded %d rows for %s from local SQLite price_history", len(cleaned), symbol)
+            logger.info("[DATA] Loaded %d rows for %s from local SQLite price_history", len(cleaned), clean_sym)
             return cleaned
     except Exception as exc:
-        logger.warning("[DATA] Local SQLite load failed for %s: %s", symbol, exc)
+        logger.warning("[DATA] Local SQLite load failed for %s: %s", clean_sym, exc)
 
     # --- Attempt 1: Ticker.history(period=...) ---
     try:
-        ticker = yf.Ticker(symbol)
+        ticker = yf.Ticker(clean_sym)
         df = ticker.history(period="1y", interval="1d")
         cleaned = _history_to_clean_df(df)
         if cleaned is not None and len(cleaned) >= 60:
-            logger.info("[DATA] Loaded %d rows for %s from Yahoo Finance", len(cleaned), symbol)
+            logger.info("[DATA] Loaded %d rows for %s from Yahoo Finance", len(cleaned), clean_sym)
             return cleaned
     except Exception as exc:
-        logger.warning("[DATA] Yahoo Finance history failed for %s: %s", symbol, exc)
+        logger.warning("[DATA] Yahoo Finance history failed for %s: %s", clean_sym, exc)
 
     # --- Attempt 2: explicit start/end + auto_adjust=False (avoids timezone lookup) ---
     try:
         end = pd.Timestamp.now()
         start = end - pd.Timedelta(days=400)
-        df = yf.Ticker(symbol).history(
+        df = yf.Ticker(clean_sym).history(
             start=start.strftime("%Y-%m-%d"),
             end=end.strftime("%Y-%m-%d"),
             interval="1d",
@@ -310,22 +326,22 @@ def fetch_historical_data(symbol: str, settings: Settings | None = None) -> pd.D
         )
         cleaned = _history_to_clean_df(df)
         if cleaned is not None and len(cleaned) >= 60:
-            logger.info("[DATA] Loaded %d rows for %s via explicit-range retry", len(cleaned), symbol)
+            logger.info("[DATA] Loaded %d rows for %s via explicit-range retry", len(cleaned), clean_sym)
             return cleaned
     except Exception as exc:
-        logger.warning("[DATA] Yahoo Finance explicit-range retry failed for %s: %s", symbol, exc)
+        logger.warning("[DATA] Yahoo Finance explicit-range retry failed for %s: %s", clean_sym, exc)
 
     # --- Attempt 3: yf.download fallback ---
     try:
-        df = yf.download(symbol, period="1y", interval="1d", progress=False, auto_adjust=False)
+        df = yf.download(clean_sym, period="1y", interval="1d", progress=False, auto_adjust=False)
         cleaned = _history_to_clean_df(df)
         if cleaned is not None and len(cleaned) >= 60:
-            logger.info("[DATA] Loaded %d rows for %s via yf.download fallback", len(cleaned), symbol)
+            logger.info("[DATA] Loaded %d rows for %s via yf.download fallback", len(cleaned), clean_sym)
             return cleaned
     except Exception as exc:
-        logger.warning("[DATA] yf.download fallback failed for %s: %s", symbol, exc)
+        logger.warning("[DATA] yf.download fallback failed for %s: %s", clean_sym, exc)
 
-    logger.warning("[DATA] All live data paths failed for %s", symbol)
+    logger.warning("[DATA] All live data paths failed for %s", clean_sym)
     return None
 
 
@@ -438,6 +454,10 @@ def predict_single_stock(
     settings: Settings | None = None,
 ) -> dict[str, Any] | None:
     """Generate 14-day price prediction for a single stock."""
+    clean_sym = str(symbol or "").split("::")[0].strip().upper()
+    if not clean_sym:
+        return None
+    symbol = clean_sym
     norm_device = _normalize_device(device)
     predictor = _get_kronos_predictor(norm_device)
     if predictor is None:
@@ -614,6 +634,16 @@ def predict_portfolio(
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from earnings_engine.config import Settings as _Settings
 
+    # Clean and deduplicate symbols (stripping strategy keys like TICKER::STRATEGY)
+    cleaned_symbols: list[str] = []
+    seen: set[str] = set()
+    for s in (symbols or []):
+        cs = str(s or "").split("::")[0].strip().upper()
+        if cs and cs not in seen:
+            seen.add(cs)
+            cleaned_symbols.append(cs)
+    symbols = cleaned_symbols
+
     settings = _Settings()
     norm_device = _normalize_device(device or getattr(settings, "kronos_device", None))
     logger.info("[INFO] Initializing Kronos predictor on %s for %d stocks", norm_device, len(symbols))
@@ -693,16 +723,25 @@ def predict_portfolio(
                         df=x_df, x_timestamp=x_ts_i, y_timestamp=y_ts_i,
                         pred_len=pred_len, T=0.8, top_p=0.9, sample_count=1, verbose=False,
                     )
-                    forecasts.append(_build_forecast(sym, x_df, pred_df, pred_len))
+                    fc = _build_forecast(sym, x_df, pred_df, pred_len)
+                    forecasts.append(fc)
+                    if on_forecast:
+                        try:
+                            on_forecast(fc)
+                        except Exception as e:
+                            logger.warning("[CALLBACK] on_forecast failed for %s: %s", sym, e)
                 except Exception as e2:
                     logger.error("[ERROR] Single prediction failed for %s: %s", sym, e2)
             continue
 
         for sym, x_df, pred_df in zip(batch_syms, x_dfs, pred_dfs):
-            try:
-                forecasts.append(_build_forecast(sym, x_df, pred_df, pred_len))
-            except Exception as e:
-                logger.error("[ERROR] Building forecast failed for %s: %s", sym, e)
+            fc = _build_forecast(sym, x_df, pred_df, pred_len)
+            forecasts.append(fc)
+            if on_forecast:
+                try:
+                    on_forecast(fc)
+                except Exception as e:
+                    logger.warning("[CALLBACK] on_forecast failed for %s: %s", sym, e)
 
     # Free transient GPU allocations after inference loop
     if norm_device.startswith("cuda") and torch.cuda.is_available():
@@ -795,6 +834,16 @@ def run_kronos_with_cache(
     re-running all tickers).
     """
     from earnings_engine.prediction_cache import load_prediction_cache_partial, save_prediction_cache
+
+    # Sanitize and deduplicate tickers
+    cleaned_tickers: list[str] = []
+    seen: set[str] = set()
+    for t in (tickers or []):
+        ct = str(t or "").split("::")[0].strip().upper()
+        if ct and ct not in seen:
+            seen.add(ct)
+            cleaned_tickers.append(ct)
+    tickers = cleaned_tickers
 
     reused: dict[str, dict[str, Any]] = {}
 
