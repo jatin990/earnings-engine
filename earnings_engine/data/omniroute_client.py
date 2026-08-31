@@ -275,6 +275,32 @@ class OmniRouteClient:
             "message": f"OmniRoute daemon not detected on {configured}. Run 'npx omniroute' or 'docker run -p 20128:20128 diegosouzapw/omniroute'.",
         }
 
+    def get_available_models_catalog(self, host: str | None = None, api_key: str | None = None) -> dict[str, Any]:
+        """Return merged list of probed online models and curated model catalog with metadata."""
+        health = self.probe_health(host=host, api_key=api_key)
+        probed_models = health.get("models") or []
+        catalog = list(OMNIROUTE_MODEL_CATALOG)
+        catalog_ids = {m["id"] for m in catalog}
+
+        for pm in probed_models:
+            if pm not in catalog_ids:
+                catalog.append({
+                    "id": pm,
+                    "name": pm.split("/")[-1].replace("-instruct", "").title(),
+                    "tier": "CUSTOM / PROBED",
+                    "provider": pm.split("/")[0].title() if "/" in pm else "OmniRoute",
+                    "description": f"Model detected on active OmniRoute gateway: {pm}",
+                    "recommended": False,
+                })
+
+        return {
+            "status": health.get("status", "offline"),
+            "endpoint": health.get("endpoint", self.get_configured_base_url()),
+            "catalog": catalog,
+            "probed_models": probed_models,
+            "default_model": os.getenv("OMNIROUTE_DEFAULT_MODEL", "deepseek/deepseek-r1"),
+        }
+
     def get_completions_url(self, host: str | None = None) -> str:
         """Resolve full completions URL with cached probe status."""
         if host:

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 from datetime import datetime
 from typing import Any
 
@@ -43,6 +44,9 @@ def _ensure_table(conn: Any) -> None:
             agreement_ratio REAL NOT NULL,
             models_breakdown_json TEXT NOT NULL,
             synthesized_thesis TEXT,
+            system_prompt TEXT,
+            raw_context_prompt TEXT,
+            custom_directives TEXT,
             settlement_status TEXT DEFAULT 'PENDING',
             settled_at TEXT,
             actual_exit_price REAL,
@@ -53,12 +57,18 @@ def _ensure_table(conn: Any) -> None:
             failure_post_mortem TEXT
         )
     """)
-    # Migration: add timeframe_days if table was created in an older version
-    try:
-        conn.execute("ALTER TABLE consensus_predictions ADD COLUMN timeframe_days INTEGER DEFAULT 14")
-        conn.commit()
-    except Exception:
-        pass
+    # Migrations for existing database instances
+    for col_def in (
+        "timeframe_days INTEGER DEFAULT 14",
+        "system_prompt TEXT",
+        "raw_context_prompt TEXT",
+        "custom_directives TEXT",
+    ):
+        try:
+            conn.execute(f"ALTER TABLE consensus_predictions ADD COLUMN {col_def}")
+            conn.commit()
+        except Exception:
+            pass
 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_consensus_ticker ON consensus_predictions(ticker)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_consensus_ticker_timeframe ON consensus_predictions(ticker, timeframe_days)")
@@ -77,12 +87,14 @@ def _connect(settings: Settings) -> Any:
             conn.execute("PRAGMA busy_timeout = 10000;")
         except Exception:
             pass
+        if hasattr(conn, "row_factory"):
+            conn.row_factory = sqlite3.Row
     _ensure_table(conn)
     return conn
 
 
 def save_prediction(consensus: dict[str, Any], evaluation_date: str, settings: Settings | None = None) -> int:
-    """Insert a consensus prediction into the database.
+    """Insert a consensus prediction into the database with full raw trace payload.
 
     Args:
         consensus: The consensus result dict from aggregator.aggregate_predictions().
@@ -106,8 +118,9 @@ def save_prediction(consensus: dict[str, Any], evaluation_date: str, settings: S
             consensus_direction, consensus_strength, consensus_return_pct,
             consensus_target_price, consensus_support, consensus_resistance,
             model_count, agreement_ratio, models_breakdown_json, synthesized_thesis,
+            system_prompt, raw_context_prompt, custom_directives,
             settlement_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
         """,
         (
             consensus["ticker"],
@@ -125,6 +138,9 @@ def save_prediction(consensus: dict[str, Any], evaluation_date: str, settings: S
             consensus["agreement_ratio"],
             models_json,
             consensus.get("synthesized_thesis"),
+            consensus.get("system_prompt"),
+            consensus.get("raw_context_prompt"),
+            consensus.get("custom_directives"),
         ),
     )
     conn.commit()
@@ -199,7 +215,7 @@ def get_pending_predictions(settings: Settings | None = None, before_date: str |
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT * FROM consensus_predictions WHERE settlement_status = 'PENDING' ORDER BY evaluation_date",
+            "SELECT * FROM consensus_predictions WHERE settlement_status = 'PENDING' ORDER BY evaluation_date"
         ).fetchall()
 
     conn.close()
@@ -210,15 +226,15 @@ def update_settlement(
     prediction_id: int,
     settlement_data: dict[str, Any],
     settings: Settings | None = None,
-) -> None:
-    """Update a prediction with settlement outcome."""
+) -> bool:
+    """Update a prediction row with settlement results."""
     settings = settings or Settings()
     conn = _connect(settings)
 
-    conn.execute(
+    cursor = conn.execute(
         """
-        UPDATE consensus_predictions SET
-            settlement_status = ?,
+        UPDATE consensus_predictions
+        SET settlement_status = ?,
             settled_at = ?,
             actual_exit_price = ?,
             actual_return_pct = ?,
@@ -229,8 +245,8 @@ def update_settlement(
         WHERE id = ?
         """,
         (
-            settlement_data["settlement_status"],
-            settlement_data.get("settled_at", datetime.now().isoformat()),
+            settlement_data.get("settlement_status", "SUCCESS"),
+            settlement_data.get("settled_at"),
             settlement_data.get("actual_exit_price"),
             settlement_data.get("actual_return_pct"),
             settlement_data.get("is_direction_correct"),
@@ -241,82 +257,72 @@ def update_settlement(
         ),
     )
     conn.commit()
+    updated = cursor.rowcount > 0
     conn.close()
 
-    logger.info("[CONSENSUS-DB] Updated settlement for id=%d -> %s", prediction_id, settlement_data["settlement_status"])
+    logger.info("[CONSENSUS-DB] Updated settlement for prediction #%d (status=%s, correct=%s)",
+                prediction_id, settlement_data.get("settlement_status"), settlement_data.get("is_direction_correct"))
+    return updated
 
 
 def get_accuracy_stats(settings: Settings | None = None) -> dict[str, Any]:
-    """Compute aggregate accuracy statistics across all settled predictions."""
+    """Calculate historical accuracy statistics from settled predictions."""
     settings = settings or Settings()
     conn = _connect(settings)
 
-    total = conn.execute("SELECT COUNT(*) FROM consensus_predictions").fetchone()[0]
-    pending = conn.execute("SELECT COUNT(*) FROM consensus_predictions WHERE settlement_status = 'PENDING'").fetchone()[0]
-    settled = conn.execute("SELECT COUNT(*) FROM consensus_predictions WHERE settlement_status != 'PENDING'").fetchone()[0]
-    success = conn.execute("SELECT COUNT(*) FROM consensus_predictions WHERE settlement_status = 'SUCCESS'").fetchone()[0]
-    partial = conn.execute("SELECT COUNT(*) FROM consensus_predictions WHERE settlement_status = 'PARTIAL'").fetchone()[0]
-    failure = conn.execute("SELECT COUNT(*) FROM consensus_predictions WHERE settlement_status = 'FAILURE'").fetchone()[0]
+    total_settled = conn.execute(
+        "SELECT COUNT(*) FROM consensus_predictions WHERE settlement_status != 'PENDING'"
+    ).fetchone()[0]
 
-    # Win rate
-    win_rate = (success / settled * 100) if settled > 0 else 0.0
-
-    # Direction accuracy
-    direction_correct = conn.execute(
+    correct_count = conn.execute(
         "SELECT COUNT(*) FROM consensus_predictions WHERE is_direction_correct = 1"
     ).fetchone()[0]
-    direction_accuracy = (direction_correct / settled * 100) if settled > 0 else 0.0
 
-    # Average consensus strength for wins vs losses
-    avg_strength_win = conn.execute(
-        "SELECT AVG(consensus_strength) FROM consensus_predictions WHERE settlement_status = 'SUCCESS'"
-    ).fetchone()[0]
-    avg_strength_loss = conn.execute(
-        "SELECT AVG(consensus_strength) FROM consensus_predictions WHERE settlement_status = 'FAILURE'"
-    ).fetchone()[0]
-
-    # Top failure categories
-    failure_cats = conn.execute(
-        "SELECT failure_category, COUNT(*) as cnt FROM consensus_predictions "
-        "WHERE failure_category IS NOT NULL GROUP BY failure_category ORDER BY cnt DESC LIMIT 5"
+    by_category_rows = conn.execute(
+        """
+        SELECT failure_category, COUNT(*) FROM consensus_predictions
+        WHERE failure_category IS NOT NULL AND failure_category != ''
+        GROUP BY failure_category ORDER BY COUNT(*) DESC
+        """
     ).fetchall()
-
-    # Per-model accuracy (parse models_breakdown_json)
-    # This is computed from settled predictions
-    model_stats = _compute_model_stats(conn)
 
     conn.close()
 
+    accuracy_pct = (correct_count / total_settled * 100) if total_settled > 0 else 0.0
+
     return {
-        "total_predictions": total,
-        "pending": pending,
-        "settled": settled,
-        "success_count": success,
-        "partial_count": partial,
-        "failure_count": failure,
-        "win_rate": round(win_rate, 1),
-        "direction_accuracy": round(direction_accuracy, 1),
-        "avg_strength_wins": round(avg_strength_win, 1) if avg_strength_win else None,
-        "avg_strength_losses": round(avg_strength_loss, 1) if avg_strength_loss else None,
-        "top_failure_categories": [{"category": r[0], "count": r[1]} for r in failure_cats],
-        "model_stats": model_stats,
+        "total_settled": total_settled,
+        "total_predictions": total_settled,
+        "correct_predictions": correct_count,
+        "success_count": correct_count,
+        "overall_accuracy_pct": round(accuracy_pct, 1),
+        "win_rate": round(accuracy_pct / 100.0, 3) if total_settled > 0 else 0.0,
+        "failure_breakdown": {row[0]: row[1] for row in by_category_rows},
+        "model_stats": get_model_leaderboard(settings),
     }
 
 
-def _compute_model_stats(conn: Any) -> list[dict[str, Any]]:
-    """Compute per-model directional accuracy from settled predictions."""
-    rows = conn.execute(
-        "SELECT models_breakdown_json, consensus_direction, is_direction_correct, settlement_status "
-        "FROM consensus_predictions WHERE settlement_status IN ('SUCCESS', 'PARTIAL', 'FAILURE')"
-    ).fetchall()
+def get_model_leaderboard(settings: Settings | None = None) -> list[dict[str, Any]]:
+    """Compute accuracy per individual model from models_breakdown_json of settled predictions."""
+    settings = settings or Settings()
+    conn = _connect(settings)
 
-    model_correct: dict[str, int] = {}
+    rows = conn.execute(
+        """
+        SELECT models_breakdown_json, consensus_direction, is_direction_correct
+        FROM consensus_predictions
+        WHERE settlement_status != 'PENDING' AND is_direction_correct IS NOT NULL
+        """
+    ).fetchall()
+    conn.close()
+
     model_total: dict[str, int] = {}
+    model_correct: dict[str, int] = {}
 
     for r in rows:
         try:
-            breakdown = json.loads(r[0])
-            actual_correct = r[2]  # is_direction_correct for the overall consensus
+            breakdown = json.loads(r[0]) if r[0] else []
+            actual_correct = bool(r[2])
 
             for model_pred in breakdown:
                 name = model_pred.get("model_name", "Unknown")
@@ -324,16 +330,12 @@ def _compute_model_stats(conn: Any) -> list[dict[str, Any]]:
                     continue
 
                 model_dir = model_pred.get("direction", "NEUTRAL").upper()
-                # A model is "correct" if its direction matched what actually happened
-                # We use the consensus direction correctness as a proxy
                 model_total[name] = model_total.get(name, 0) + 1
                 if actual_correct:
-                    # The consensus was correct — models aligned with consensus are correct
                     consensus_dir = r[1]
                     if model_dir == consensus_dir:
                         model_correct[name] = model_correct.get(name, 0) + 1
                 else:
-                    # Consensus was wrong — dissenters were correct
                     consensus_dir = r[1]
                     if model_dir != consensus_dir:
                         model_correct[name] = model_correct.get(name, 0) + 1
@@ -359,26 +361,28 @@ def _row_to_dict(row: Any) -> dict[str, Any]:
     if row is None:
         return {}
 
-    # Column names for consensus_predictions table
-    columns = [
-        "id", "ticker", "created_at", "evaluation_date", "timeframe_days", "as_of_price",
-        "consensus_direction", "consensus_strength", "consensus_return_pct",
-        "consensus_target_price", "consensus_support", "consensus_resistance",
-        "model_count", "agreement_ratio", "models_breakdown_json", "synthesized_thesis",
-        "settlement_status", "settled_at", "actual_exit_price", "actual_return_pct",
-        "is_direction_correct", "failure_category", "failure_reason_summary", "failure_post_mortem",
-    ]
-
-    # Support both dict-like rows (TursoRow) and tuple rows
-    try:
-        d = dict(row)
-    except (TypeError, ValueError):
-        d = {}
-        for i, col in enumerate(columns):
-            try:
-                d[col] = row[i]
-            except (IndexError, TypeError):
-                d[col] = None
+    # Check if row is already dict-like or sqlite3.Row with keys()
+    if hasattr(row, "keys"):
+        d = {k: row[k] for k in row.keys()}
+    else:
+        try:
+            d = dict(row)
+        except (TypeError, ValueError):
+            columns = [
+                "id", "ticker", "created_at", "evaluation_date", "timeframe_days", "as_of_price",
+                "consensus_direction", "consensus_strength", "consensus_return_pct",
+                "consensus_target_price", "consensus_support", "consensus_resistance",
+                "model_count", "agreement_ratio", "models_breakdown_json", "synthesized_thesis",
+                "settlement_status", "settled_at", "actual_exit_price", "actual_return_pct",
+                "is_direction_correct", "failure_category", "failure_reason_summary", "failure_post_mortem",
+                "system_prompt", "raw_context_prompt", "custom_directives",
+            ]
+            d = {}
+            for i, col in enumerate(columns):
+                try:
+                    d[col] = row[i]
+                except (IndexError, TypeError):
+                    d[col] = None
 
     if d.get("timeframe_days") is None:
         d["timeframe_days"] = 14
@@ -391,3 +395,66 @@ def _row_to_dict(row: Any) -> dict[str, Any]:
             d["models_breakdown"] = []
 
     return d
+
+
+def get_prediction_trace(prediction_id: int, settings: Settings | None = None) -> dict[str, Any] | None:
+    """Retrieve full inspection trace of a consensus prediction including all raw model inputs & outputs."""
+    pred = get_prediction_by_id(prediction_id, settings=settings)
+    if not pred:
+        return None
+
+    models = pred.get("models_breakdown", [])
+    model_traces = []
+    for m in models:
+        model_traces.append({
+            "model_name": m.get("model_name"),
+            "model_id": m.get("model_id"),
+            "sub_model": m.get("sub_model"),
+            "direction": m.get("direction"),
+            "confidence_pct": m.get("confidence_pct"),
+            "target_price": m.get("target_price"),
+            "target_return_pct": m.get("target_return_pct"),
+            "support_level": m.get("support_level"),
+            "resistance_level": m.get("resistance_level"),
+            "stop_loss_price": m.get("stop_loss_price"),
+            "risk_reward_ratio": m.get("risk_reward_ratio"),
+            "recommended_action": m.get("recommended_action"),
+            "chart_pattern": m.get("chart_pattern"),
+            "volume_profile_insight": m.get("volume_profile_insight"),
+            "key_drivers": m.get("key_drivers", []),
+            "primary_risk": m.get("primary_risk"),
+            "latency_ms": m.get("latency_ms"),
+            "tokens_used": m.get("tokens_used"),
+            "system_prompt": m.get("system_prompt") or pred.get("system_prompt"),
+            "raw_prompt": m.get("raw_prompt") or pred.get("raw_context_prompt"),
+            "raw_response": m.get("raw_response"),
+            "reasoning_content": m.get("reasoning_content"),
+            "parsed_json": m.get("parsed_json"),
+            "telemetry": m.get("telemetry"),
+            "error": m.get("error"),
+            "is_local": m.get("is_local", False),
+            "gateway": m.get("gateway"),
+        })
+
+    return {
+        "id": pred["id"],
+        "ticker": pred["ticker"],
+        "created_at": pred["created_at"],
+        "evaluation_date": pred["evaluation_date"],
+        "timeframe_days": pred["timeframe_days"],
+        "as_of_price": pred["as_of_price"],
+        "consensus_direction": pred["consensus_direction"],
+        "consensus_strength": pred["consensus_strength"],
+        "consensus_return_pct": pred["consensus_return_pct"],
+        "consensus_target_price": pred["consensus_target_price"],
+        "consensus_support": pred.get("consensus_support"),
+        "consensus_resistance": pred.get("consensus_resistance"),
+        "agreement_ratio": pred["agreement_ratio"],
+        "model_count": pred["model_count"],
+        "synthesized_thesis": pred.get("synthesized_thesis"),
+        "system_prompt": pred.get("system_prompt"),
+        "raw_context_prompt": pred.get("raw_context_prompt"),
+        "custom_directives": pred.get("custom_directives"),
+        "settlement_status": pred.get("settlement_status"),
+        "models": model_traces,
+    }

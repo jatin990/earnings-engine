@@ -655,6 +655,108 @@
             color: #ffffff;
             border-color: rgba(255, 255, 255, 0.25);
         }
+        /* Consensus Customizer & Directives Drawer */
+        .consensus-config-drawer {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            border-radius: var(--radius-md);
+            padding: 1.15rem;
+            margin-bottom: 1.15rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+        }
+        .config-section-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #93c5fd;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-bottom: 0.35rem;
+        }
+        .model-chip-select {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #cbd5e1;
+            font-size: 0.74rem;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.15s ease;
+        }
+        .model-chip-select:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        .model-chip-select input[type="checkbox"] {
+            accent-color: #6366f1;
+            cursor: pointer;
+        }
+        .model-chip-select.selected {
+            background: rgba(99, 102, 241, 0.18);
+            border-color: rgba(99, 102, 241, 0.5);
+            color: #ffffff;
+        }
+        /* Trace Modal Tabs */
+        .trace-tab-btn {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-tertiary);
+            font-size: 0.78rem;
+            font-weight: 700;
+            padding: 0.5rem 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .trace-tab-btn:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .trace-tab-btn.active {
+            color: #38bdf8;
+            border-bottom-color: #38bdf8;
+            background: rgba(56, 189, 248, 0.08);
+        }
+        .trace-box {
+            background: #05070d;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 0.85rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.76rem;
+            color: #e2e8f0;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 480px;
+            overflow-y: auto;
+        }
+        .think-block {
+            background: rgba(99, 102, 241, 0.08);
+            border-left: 3px solid #818cf8;
+            border-radius: 0 6px 6px 0;
+            padding: 0.75rem 0.9rem;
+            font-size: 0.75rem;
+            color: #c7d2fe;
+            margin-bottom: 0.85rem;
+            font-family: var(--font-mono);
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
         .clean-table {
             width: 100%;
             border-collapse: collapse;
@@ -1207,20 +1309,20 @@
 
         </div>
 
-        <!-- ━━━ MULTI-MODEL AI CONSENSUS COMMAND CENTER (ON-DEMAND) ━━━ -->
+        <!-- ━━━ MULTI-MODEL AI CONSENSUS COMMAND CENTER (CUSTOMIZABLE & TRACEABLE) ━━━ -->
         <section class="ai-command-card" id="cardAICommandCenter">
             
             <!-- Command Center Header & Toolbar -->
             <div style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.85rem; margin-bottom: 1.15rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
                 <div>
-                    <div style="display: flex; align-items: center; gap: 0.55rem;">
+                    <div style="display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;">
                         <span style="font-size: 1.25rem;">🧠</span>
                         <h2 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: #ffffff; letter-spacing: -0.01em;">Multi-Model AI Consensus Engine</h2>
                         <span id="lblConsensusHorizon" style="font-size: 0.68rem; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.15rem 0.45rem; border-radius: 4px;">14D HORIZON</span>
                         <span id="lblConsensusAsOf" style="font-size: 0.7rem; color: #94a3b8; font-family: var(--font-mono); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 0.12rem 0.45rem; border-radius: 4px; display: none;"></span>
                     </div>
                     <div style="font-size: 0.74rem; color: var(--text-tertiary); margin-top: 0.2rem;">
-                        Multi-agent quantitative reasoning across 6 Frontier LLMs + Zero-Quota Offline Local Models
+                        Customizable multi-agent quantitative reasoning · Full raw input & output trace capture
                     </div>
                 </div>
 
@@ -1232,8 +1334,108 @@
                         <button type="button" class="tf-pill-btn" onclick="setHorizonTimeframe(45)" id="aiTfBtn-45">📈 45D Positional</button>
                         <button type="button" class="tf-pill-btn" onclick="setHorizonTimeframe(90)" id="aiTfBtn-90">🏛️ 90D Quarterly</button>
                     </div>
+                    <button type="button" id="btnToggleConfig" onclick="toggleConsensusConfig()" class="btn btn-secondary" style="font-size: 0.76rem; padding: 0.38rem 0.75rem; border-color: rgba(99, 102, 241, 0.35); color: #c7d2fe;" title="Customize AI models, custom directives prompt, and OmniRoute target model">
+                        ⚙️ Configure Directives
+                    </button>
+                    <button type="button" id="btnHeaderTrace" onclick="openConsensusTraceModal('consensus', null)" class="btn btn-secondary" style="font-size: 0.76rem; padding: 0.38rem 0.75rem; border-color: rgba(56, 189, 248, 0.35); color: #38bdf8; display: none;" title="Inspect raw prompts, raw LLM outputs, reasoning tokens, and execution telemetry">
+                        🔍 View Raw Trace
+                    </button>
                     <button type="button" id="btnConsensusMain" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.38rem 0.95rem; font-size: 0.78rem; font-weight: 800; background: linear-gradient(135deg, #2563eb, #6366f1); border: none; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);" title="Run all AI engines in parallel on-demand for selected horizon">
                         ⚡ Run All Consensus
+                    </button>
+                </div>
+            </div>
+
+            <!-- COLLAPSIBLE CUSTOM CONFIGURATION & DIRECTIVES DRAWER -->
+            <div id="consensusConfigDrawer" class="consensus-config-drawer" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.6rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 1.1rem;">⚙️</span>
+                        <strong style="color: #ffffff; font-size: 0.88rem;">Consensus Directives & OmniRoute Model Configuration</strong>
+                    </div>
+                    <button type="button" onclick="toggleConsensusConfig()" style="background: transparent; border: none; color: var(--text-tertiary); font-size: 1.1rem; cursor: pointer;">✕</button>
+                </div>
+
+                <!-- Row 1: OmniRoute Gateway Model Selection & Temperature -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 200px; gap: 0.85rem; align-items: flex-start;">
+                    <div>
+                        <label class="config-section-title">⚡ OmniRoute Target Model</label>
+                        <select id="selectOmniRouteModel" onchange="onOmniRouteSelectChange()" style="width: 100%; padding: 0.45rem 0.65rem; background: #000000; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; color: #ffffff; font-size: 0.8rem; outline: none; font-family: var(--font-sans);">
+                            <option value="deepseek/deepseek-r1">🧠 DeepSeek-R1 (Deep Chain-of-Thought Reasoning)</option>
+                            <option value="qwen/qwen-2.5-72b-instruct">⚡ Qwen 2.5 72B (Quantitative Reasoning & Flow)</option>
+                            <option value="meta-llama/llama-3.3-70b-instruct">🏛️ Llama 3.3 70B (Institutional & Macro Structure)</option>
+                            <option value="google/gemini-2.5-pro">✨ Gemini 2.5 Pro (Multimodal & Precision Math)</option>
+                            <option value="anthropic/claude-3.5-sonnet">🎯 Claude 3.5 Sonnet (Institutional Thesis)</option>
+                            <option value="openai/gpt-4o">🌐 GPT-4o (Cross-Asset Macro)</option>
+                            <option value="google/gemini-2.0-flash">🚀 Gemini 2.0 Flash (Fast Catalyst Extraction)</option>
+                            <option value="auto/best-reasoning">🔮 Auto Best Reasoning (Gateway Dynamic)</option>
+                            <option value="auto/best-fast">⚡ Auto Best Fast (Gateway Low-Latency)</option>
+                            <option value="__custom__">✏️ Custom Model Identifier...</option>
+                        </select>
+                        <div id="omnirouteStatusBadge" style="font-size: 0.68rem; color: #38bdf8; font-family: var(--font-mono); margin-top: 0.3rem;">
+                            Gateway: Checking diegosouzapw/OmniRoute (http://localhost:20128/v1)...
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="config-section-title">✏️ Custom Model ID / Override</label>
+                        <input type="text" id="inputCustomOmniRouteModel" placeholder="e.g. anthropic/claude-3.5-sonnet or z-ai/glm-5.2" style="width: 100%; padding: 0.45rem 0.65rem; background: #000000; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; color: #ffffff; font-size: 0.8rem; font-family: var(--font-mono); outline: none;">
+                        <div style="font-size: 0.68rem; color: var(--text-tertiary); margin-top: 0.3rem;">
+                            Direct model string passed to OmniRoute completions proxy.
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label class="config-section-title">🌡️ Temperature</label>
+                            <span id="lblTemperatureVal" style="font-size: 0.74rem; font-family: var(--font-mono); color: #38bdf8; font-weight: 700;">0.30</span>
+                        </div>
+                        <input type="range" id="sliderTemperature" min="0.0" max="1.0" step="0.05" value="0.30" oninput="document.getElementById('lblTemperatureVal').textContent = parseFloat(this.value).toFixed(2);" style="width: 100%; margin-top: 0.4rem; accent-color: #6366f1; cursor: pointer;">
+                        <div style="font-size: 0.66rem; color: var(--text-tertiary); margin-top: 0.2rem; display: flex; justify-content: space-between;">
+                            <span>0.0 (Strict Quant)</span>
+                            <span>1.0 (Creative)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Ensemble Models Multi-Select -->
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem;">
+                        <label class="config-section-title" style="margin-bottom: 0;">🤖 Active Ensemble Models</label>
+                        <div style="display: flex; gap: 0.45rem; font-size: 0.7rem;">
+                            <button type="button" onclick="toggleAllConfigModelChips(true)" style="background: transparent; border: none; color: #38bdf8; cursor: pointer;">Select All</button>
+                            <span style="color: rgba(255,255,255,0.15);">|</span>
+                            <button type="button" onclick="selectPresetModelChips('frontier')" style="background: transparent; border: none; color: #c7d2fe; cursor: pointer;">Frontier Core</button>
+                            <span style="color: rgba(255,255,255,0.15);">|</span>
+                            <button type="button" onclick="toggleAllConfigModelChips(false)" style="background: transparent; border: none; color: var(--text-tertiary); cursor: pointer;">Clear</button>
+                        </div>
+                    </div>
+                    <div id="configModelChipsContainer" style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
+                        <label class="model-chip-select selected"><input type="checkbox" value="deepseek/deepseek-r1" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 🤖 DeepSeek-R1 (671B)</label>
+                        <label class="model-chip-select selected"><input type="checkbox" value="meta-llama/llama-3.3-70b-instruct" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 🦙 Llama-3.3-70B</label>
+                        <label class="model-chip-select selected"><input type="checkbox" value="qwen/qwen-2.5-72b-instruct" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 🌐 Qwen-2.5-72B</label>
+                        <label class="model-chip-select selected"><input type="checkbox" value="mistralai/mistral-large" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> ⚡ Mistral-Large</label>
+                        <label class="model-chip-select selected"><input type="checkbox" value="google/gemma-4-31b-it:free" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 💎 Gemma-4-31B</label>
+                        <label class="model-chip-select selected"><input type="checkbox" value="z-ai/glm-5.2" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 🐉 GLM-5.2 (753B)</label>
+                        <label class="model-chip-select selected"><input type="checkbox" value="omniroute" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> ⚡ OmniRoute-AI</label>
+                        <label class="model-chip-select"><input type="checkbox" value="local" onchange="this.parentElement.classList.toggle('selected', this.checked)"> 💻 Local Offline AI</label>
+                    </div>
+                </div>
+
+                <!-- Row 3: Custom Analysis Directives Prompt -->
+                <div>
+                    <label class="config-section-title">📝 Custom Focus Directives Prompt (Optional)</label>
+                    <textarea id="txtCustomDirectives" rows="2" placeholder="e.g. Focus on quarterly margin defense against input inflation, order accretion runway in the defense sector, delivery volume surge vs 63D baseline, and derivative option pain level..." style="width: 100%; padding: 0.55rem 0.75rem; background: #000000; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; color: #ffffff; font-size: 0.8rem; font-family: var(--font-sans); outline: none; line-height: 1.45;"></textarea>
+                    <div style="font-size: 0.68rem; color: var(--text-tertiary); margin-top: 0.25rem;">
+                        Directives are injected into the system prompt and sent to all selected reasoning models.
+                    </div>
+                </div>
+
+                <!-- Drawer Action Bar -->
+                <div style="display: flex; justify-content: flex-end; gap: 0.6rem; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.75rem;">
+                    <button type="button" onclick="toggleConsensusConfig()" class="btn btn-secondary" style="font-size: 0.78rem;">Close</button>
+                    <button type="button" onclick="runCustomConsensus()" class="btn btn-primary" style="font-size: 0.82rem; font-weight: 800; background: linear-gradient(135deg, #2563eb, #7c3aed); border: none; box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);">
+                        ▶ Synthesize Custom Consensus
                     </button>
                 </div>
             </div>
@@ -1404,7 +1606,10 @@
                             <span id="lblVerdictSub" style="font-size: 0.72rem; color: #94a3b8;">High-conviction consensus across quantitative engines</span>
                         </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <button type="button" onclick="openConsensusTraceModal('consensus', null)" class="btn btn-secondary" style="font-size: 0.74rem; padding: 0.3rem 0.7rem; border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;" title="Inspect raw prompts, raw LLM outputs, reasoning tokens, and execution telemetry">
+                            🔍 View Raw Trace
+                        </button>
                         <button type="button" onclick="runConsensus(true, null)" class="btn btn-secondary" style="font-size: 0.74rem; padding: 0.3rem 0.7rem;" title="Re-synthesize consensus prediction">
                             🔄 Re-synthesize
                         </button>
@@ -2120,12 +2325,16 @@
                 if (emptyLauncher) emptyLauncher.style.display = 'block';
                 if (resultsState) resultsState.style.display = 'none';
                 if (cAsOfEl) cAsOfEl.style.display = 'none';
+                const headerTraceBtn = document.getElementById('btnHeaderTrace');
+                if (headerTraceBtn) headerTraceBtn.style.display = 'none';
                 renderModelsMatrix(c && c.predictions ? c.predictions : []);
                 return;
             }
 
             if (emptyLauncher) emptyLauncher.style.display = 'none';
             if (resultsState) resultsState.style.display = 'block';
+            const headerTraceBtn = document.getElementById('btnHeaderTrace');
+            if (headerTraceBtn) headerTraceBtn.style.display = 'inline-block';
 
             if (horizonEl) {
                 horizonEl.textContent = `${currentSelectedTimeframe || 14}D HORIZON`;
@@ -2371,8 +2580,8 @@
                             <button type="button" id="tileBtn-${safeMid}" onclick="runConsensus(true, '${mid || mName}')" class="btn-tile-run" style="flex: 1;" title="Run and refresh prediction specifically for ${mName}">
                                 ⚡ Run ${mName}
                             </button>
-                            <button type="button" onclick="openRawModal('${safeMid}', ${idx})" class="btn-tile-raw" title="View full raw reasoning, chain-of-thought, generation speed stats, and JSON output from ${mName}">
-                                📄 Raw
+                            <button type="button" onclick="openConsensusTraceModal(${idx}, '${safeMid}')" class="btn-tile-raw" title="Inspect raw prompts, chain-of-thought (<think>), speed stats, and JSON output from ${mName}">
+                                🔍 Trace & I/O
                             </button>
                         </div>
                     </div>
@@ -3085,104 +3294,383 @@
             }
         }
 
-        function openRawModal(safeMid, idx) {
-            const models = window.currentModelsBreakdown || (stockState && stockState.consensus && (stockState.consensus.models_breakdown || stockState.consensus.predictions)) || [];
-            let m = null;
-            if (typeof idx === 'number' && models[idx]) {
-                m = models[idx];
-            } else if (safeMid) {
-                m = models.find(x => (x.model_id || '').replace(/[^a-zA-Z0-9]/g, '_') === safeMid || (x.model_name || '').replace(/[^a-zA-Z0-9]/g, '_') === safeMid);
-            }
-            if (!m && models.length > 0) {
-                m = models[0];
-            }
-            if (!m) return;
+        // =========================================================================
+        // ⚙️ Customizable Consensus & Directives Configuration Handlers
+        // =========================================================================
+        let currentOmniRouteModels = [];
 
-            const mid = m.model_id || '';
-            const mName = m.model_name || mid.split('/').pop() || 'AI Model';
-            
-            let icon = '🤖';
-            if (mid.includes('llama') || mName.includes('Llama')) icon = '🦙';
+        function toggleConsensusConfig() {
+            const drawer = document.getElementById('consensusConfigDrawer');
+            if (!drawer) return;
+            const isOpen = drawer.style.display !== 'none';
+            drawer.style.display = isOpen ? 'none' : 'flex';
+            if (!isOpen && (!currentOmniRouteModels || !currentOmniRouteModels.length)) {
+                loadOmniRouteModels();
+            }
+        }
+
+        async function loadOmniRouteModels() {
+            const selectEl = document.getElementById('selectOmniRouteModel');
+            const statusBadge = document.getElementById('omnirouteStatusBadge');
+            try {
+                const res = await fetch('/api/v1/consensus/omniroute-models');
+                if (res.ok) {
+                    const data = await res.json();
+                    currentOmniRouteModels = data.catalog || [];
+                    const status = data.status || 'online';
+                    const endpoint = data.endpoint || 'http://localhost:20128/v1';
+
+                    if (statusBadge) {
+                        statusBadge.innerHTML = status === 'online' || status === 'fallback_online'
+                            ? `🟢 Gateway: Active on <span style="color:#ffffff;">${endpoint}</span> (${currentOmniRouteModels.length} models)`
+                            : `⚠️ Gateway: Offline / Auth Needed (<span style="color:#94a3b8;">${endpoint}</span>)`;
+                        statusBadge.style.color = status === 'online' ? '#34d399' : '#fbbf24';
+                    }
+
+                    if (selectEl && currentOmniRouteModels.length > 0) {
+                        const currentVal = selectEl.value;
+                        selectEl.innerHTML = currentOmniRouteModels.map(m => `
+                            <option value="${m.id}" ${m.id === currentVal ? 'selected' : ''}>
+                                ${m.name} ${m.tier ? `[${m.tier}]` : ''}
+                            </option>
+                        `).join('') + '<option value="__custom__">✏️ Custom Model Identifier...</option>';
+                    }
+                }
+            } catch (e) {
+                console.debug('OmniRoute models fetch notice:', e);
+            }
+        }
+
+        function onOmniRouteSelectChange() {
+            const selectEl = document.getElementById('selectOmniRouteModel');
+            const customInput = document.getElementById('inputCustomOmniRouteModel');
+            if (!selectEl || !customInput) return;
+            if (selectEl.value === '__custom__') {
+                customInput.focus();
+            } else {
+                customInput.value = selectEl.value;
+            }
+        }
+
+        function toggleAllConfigModelChips(selectAll) {
+            document.querySelectorAll('#configModelChipsContainer input[type="checkbox"]').forEach(cb => {
+                cb.checked = selectAll;
+                cb.parentElement.classList.toggle('selected', selectAll);
+            });
+        }
+
+        function selectPresetModelChips(preset) {
+            const frontierIds = ['deepseek/deepseek-r1', 'meta-llama/llama-3.3-70b-instruct', 'qwen/qwen-2.5-72b-instruct', 'mistralai/mistral-large', 'omniroute'];
+            document.querySelectorAll('#configModelChipsContainer input[type="checkbox"]').forEach(cb => {
+                const isSelected = preset === 'frontier' ? frontierIds.includes(cb.value) : true;
+                cb.checked = isSelected;
+                cb.parentElement.classList.toggle('selected', isSelected);
+            });
+        }
+
+        async function runCustomConsensus() {
+            const selectedModels = Array.from(document.querySelectorAll('#configModelChipsContainer input[type="checkbox"]:checked')).map(cb => cb.value);
+            const selectOmni = document.getElementById('selectOmniRouteModel');
+            const customOmni = document.getElementById('inputCustomOmniRouteModel');
+            const omnirouteModel = (customOmni && customOmni.value.trim()) || (selectOmni && selectOmni.value !== '__custom__' ? selectOmni.value : 'deepseek/deepseek-r1');
+            const txtDirectives = document.getElementById('txtCustomDirectives');
+            const customDirectives = txtDirectives ? txtDirectives.value.trim() : '';
+            const sliderTemp = document.getElementById('sliderTemperature');
+            const temperature = sliderTemp ? parseFloat(sliderTemp.value) : 0.3;
+
+            // Collapse config drawer
+            const drawer = document.getElementById('consensusConfigDrawer');
+            if (drawer) drawer.style.display = 'none';
+
+            await runConsensus(true, null, {
+                models: selectedModels.length > 0 ? selectedModels : null,
+                omniroute_model: omnirouteModel,
+                custom_directives: customDirectives,
+                temperature: temperature,
+            });
+        }
+
+        async function runConsensus(force = true, modelId = null, customOpts = {}) {
+            const allBtn = document.getElementById('btnConsensus') || document.getElementById('btnConsensusMain');
+            let targetBtn = allBtn;
+            let prevHtml = '';
+
+            // If a specific model was chosen, locate its button
+            if (modelId) {
+                const mKey = modelId.toLowerCase();
+                const safeMid = modelId.replace(/[^a-zA-Z0-9]/g, '_');
+                targetBtn = document.getElementById(`tileBtn-${safeMid}`) ||
+                            document.getElementById(`btnModel-${safeMid}`) ||
+                            document.getElementById(
+                                mKey.includes('deepseek') ? 'btnModel-deepseek-r1' :
+                                mKey.includes('llama') ? 'btnModel-llama-3-3-70b-instruct' :
+                                mKey.includes('qwen') ? 'btnModel-qwen-2-5-72b-instruct' :
+                                mKey.includes('mistral') ? 'btnModel-mistral-large' :
+                                mKey.includes('gemma') ? 'btnModel-gemma-4-31b-it-free' :
+                                mKey.includes('glm') ? 'btnModel-glm-5-2' :
+                                mKey.includes('local') ? 'btnModel-local' : ''
+                            ) ||
+                            allBtn;
+            }
+
+            if (targetBtn) {
+                prevHtml = targetBtn.innerHTML;
+                targetBtn.disabled = true;
+                targetBtn.innerHTML = `<span class="spinner"></span> ${modelId ? 'Running ' + (modelId.split('/').pop()) + '...' : 'Running All Engines...'}`;
+            }
+
+            // Show active loading state in AI Command Center
+            const loadingState = document.getElementById('aiLoadingState');
+            const emptyLauncher = document.getElementById('aiEmptyLauncher');
+            const resultsState = document.getElementById('aiConsensusResults');
+            const progressTitle = document.getElementById('lblAiProgressTitle');
+            const progressSub = document.getElementById('lblAiProgressSub');
+
+            if (loadingState) loadingState.style.display = 'block';
+            if (emptyLauncher) emptyLauncher.style.display = 'none';
+            if (resultsState) resultsState.style.opacity = '0.4';
+
+            if (progressTitle) {
+                progressTitle.textContent = modelId ? `Running ${modelId.split('/').pop()} on ${ACTIVE_SYM}...` : `Querying Multi-Model AI Ensemble in Parallel on ${ACTIVE_SYM}...`;
+            }
+            if (progressSub) {
+                progressSub.textContent = `Analyzing ${currentSelectedTimeframe || 14}-day price paths, volume surges, and 3Q surprise quality...`;
+            }
+
+            try {
+                const reqBody = {
+                    ticker: ACTIVE_SYM,
+                    timeframe_days: currentSelectedTimeframe || 14,
+                    local_model_url: currentLocalHost,
+                    force: force,
+                    include_raw_trace: true,
+                };
+                if (modelId) {
+                    reqBody.models = [modelId];
+                }
+                if (customOpts.models) reqBody.models = customOpts.models;
+                if (customOpts.omniroute_model) reqBody.omniroute_model = customOpts.omniroute_model;
+                if (customOpts.custom_directives) reqBody.custom_directives = customOpts.custom_directives;
+                if (customOpts.temperature != null) reqBody.temperature = customOpts.temperature;
+
+                const res = await fetch('/api/v1/consensus/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reqBody)
+                });
+                
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.detail || 'Prediction request failed with HTTP ' + res.status);
+                }
+
+                const resData = await res.json();
+                const pred = resData.prediction || resData.consensus || resData;
+                if (stockState) {
+                    stockState.consensus = pred;
+                }
+                const currPrice = (stockState && stockState.quote && stockState.quote.current_price) || 0;
+                renderConsensus(pred, currPrice);
+                await fetchRateLimits();
+            } catch (e) {
+                alert('Error computing AI consensus: ' + e.message);
+                if (loadingState) loadingState.style.display = 'none';
+                if (resultsState) resultsState.style.opacity = '1';
+            } finally {
+                if (targetBtn) {
+                    targetBtn.disabled = false;
+                    targetBtn.innerHTML = prevHtml;
+                }
+                if (resultsState) resultsState.style.opacity = '1';
+            }
+        }
+
+        // =========================================================================
+        // 🔍 Multi-Tab Raw Trace & Input/Output Inspector
+        // =========================================================================
+        let currentTraceObject = null;
+        let activeTraceTabName = 'prompt';
+
+        function openConsensusTraceModal(modelIdxOrType = 'consensus', modelKey = null) {
+            const consensus = stockState && stockState.consensus ? stockState.consensus : {};
+            const models = window.currentModelsBreakdown || consensus.models_breakdown || consensus.predictions || [];
+
+            let targetItem = null;
+            let isConsensusOverall = false;
+
+            if (modelIdxOrType === 'consensus') {
+                isConsensusOverall = true;
+                targetItem = consensus;
+            } else if (typeof modelIdxOrType === 'number' && models[modelIdxOrType]) {
+                targetItem = models[modelIdxOrType];
+            } else if (typeof modelIdxOrType === 'string') {
+                targetItem = models.find(x => (x.model_id || '').replace(/[^a-zA-Z0-9]/g, '_') === modelIdxOrType || (x.model_name || '').replace(/[^a-zA-Z0-9]/g, '_') === modelIdxOrType);
+            }
+
+            if (!targetItem) {
+                if (models.length > 0) targetItem = models[0];
+                else targetItem = consensus;
+            }
+
+            currentTraceObject = targetItem;
+            const mid = targetItem.model_id || (isConsensusOverall ? 'ensemble/consensus' : '');
+            const mName = targetItem.model_name || (isConsensusOverall ? 'Unified Multi-Model Consensus' : (mid.split('/').pop() || 'AI Model'));
+
+            let icon = '🔍';
+            if (isConsensusOverall) icon = '🧠';
+            else if (mid.includes('llama') || mName.includes('Llama')) icon = '🦙';
             else if (mid.includes('qwen') || mName.includes('Qwen')) icon = '🌐';
             else if (mid.includes('mistral') || mName.includes('Mistral')) icon = '⚡';
             else if (mid.includes('gemini') || mName.includes('Gemini')) icon = '✨';
             else if (mid.includes('gemma') || mName.includes('Gemma')) icon = '💎';
             else if (mid.includes('glm') || mName.includes('GLM')) icon = '🐉';
             else if (mid.includes('deepseek') || mName.includes('DeepSeek')) icon = '🤖';
+            else if (mid.includes('local') || targetItem.is_local) icon = '💻';
 
-            const rawIcon = document.getElementById('rawModalIcon');
-            if (rawIcon) rawIcon.textContent = icon;
-            const rawTitle = document.getElementById('rawModalTitle');
-            if (rawTitle) rawTitle.textContent = `${mName} — Raw Model Output`;
-            const rawSub = document.getElementById('rawModalSubtitle');
-            if (rawSub) rawSub.textContent = mid;
-            
-            const isBull = (m.direction || 'NEUTRAL').toUpperCase() === 'BULLISH';
-            const isBear = (m.direction || '').toUpperCase() === 'BEARISH';
-            const bEl = document.getElementById('rawModalBadge');
+            document.getElementById('traceModalIcon').textContent = icon;
+            document.getElementById('traceModalTitle').textContent = isConsensusOverall ? `${ACTIVE_SYM} · AI Consensus Trace` : `${mName} · Execution Trace`;
+            document.getElementById('traceModalModelId').textContent = mid || (isConsensusOverall ? `${consensus.model_count || 6} Models` : '');
+
+            const dir = (targetItem.direction || targetItem.consensus_direction || 'NEUTRAL').toUpperCase();
+            const conf = targetItem.confidence_pct != null ? targetItem.confidence_pct : (targetItem.consensus_strength != null ? targetItem.consensus_strength : 80);
+            const isBull = dir === 'BULLISH';
+            const isBear = dir === 'BEARISH';
+            const bEl = document.getElementById('traceModalBadge');
             if (bEl) {
-                bEl.textContent = `${m.direction || 'NEUTRAL'} (${m.confidence_pct || 75}%)`;
+                bEl.textContent = `${dir} (${Number(conf).toFixed(0)}%)`;
                 bEl.style.background = isBull ? 'var(--emerald-subtle)' : (isBear ? 'var(--rose-subtle)' : 'rgba(245,158,11,0.15)');
                 bEl.style.color = isBull ? 'var(--emerald)' : (isBear ? 'var(--rose)' : '#fbbf24');
                 bEl.style.border = isBull ? '1px solid var(--emerald-border)' : (isBear ? '1px solid var(--rose-border)' : '1px solid rgba(245,158,11,0.3)');
             }
 
-            const rawLat = document.getElementById('rawModalLatency');
-            if (rawLat) rawLat.textContent = m.latency_ms ? `${m.latency_ms} ms` : '—';
-            const rawTok = document.getElementById('rawModalTokens');
-            if (rawTok) rawTok.textContent = m.tokens_used ? `${m.tokens_used} tokens` : (m.tokens ? `${m.tokens}` : '—');
+            // Tab 1: System Prompt & User Context Prompt
+            const sysPrompt = targetItem.system_prompt || consensus.system_prompt || 'Default Quantitative Reasoning System Prompt';
+            const ctxPrompt = targetItem.raw_prompt || consensus.raw_context_prompt || 'Point-in-Time Technical and Fundamental Context Data';
+            const customDirectives = targetItem.custom_directives || consensus.custom_directives || '';
 
-            const stats = (window._aiModelsStats || []).find(x => x.id === mid || x.name === mName || (x.name || '').toLowerCase() === (mName || '').toLowerCase()) || {};
-            const gStats = stats.generation_stats || {};
-            const lat1h = gStats['1h']?.avg_s ? `${gStats['1h'].avg_s}s` : (stats.avg_latency_1h_s ? `${stats.avg_latency_1h_s}s` : '—');
-            const lat24h = gStats['24h']?.avg_s ? `${gStats['24h'].avg_s}s` : (stats.avg_latency_24h_s ? `${stats.avg_latency_24h_s}s` : '—');
-            const latAll = gStats['all_time']?.avg_s ? `${gStats['all_time'].avg_s}s` : (stats.avg_latency_all_s ? `${stats.avg_latency_all_s}s` : '—');
-            const totalRuns = stats.total_generations != null ? stats.total_generations : (m.latency_ms ? 1 : '—');
-            const successRate = stats.success_rate_pct != null ? `${stats.success_rate_pct}%` : (stats.benchmark_success_rate_pct ? `${stats.benchmark_success_rate_pct}%` : '100%');
-
-            const el1h = document.getElementById('rawModalAvg1h');
-            const el24h = document.getElementById('rawModalAvg24h');
-            const elAll = document.getElementById('rawModalAvgAll');
-            const elRuns = document.getElementById('rawModalTotalRuns');
-            const elSucc = document.getElementById('rawModalSuccessRate');
-            if (el1h) el1h.textContent = lat1h;
-            if (el24h) el24h.textContent = lat24h;
-            if (elAll) elAll.textContent = latAll;
-            if (elRuns) elRuns.textContent = totalRuns;
-            if (elSucc) elSucc.textContent = successRate;
-
-            let rawText = m.raw_response || '';
-            if (!rawText) {
-                const formatted = { ...m };
-                delete formatted.raw_response;
-                rawText = JSON.stringify(formatted, null, 2);
+            document.getElementById('traceSystemPromptText').textContent = sysPrompt;
+            document.getElementById('traceContextPromptText').textContent = ctxPrompt;
+            const dirContainer = document.getElementById('traceDirectivesContainer');
+            if (dirContainer) {
+                if (customDirectives) {
+                    dirContainer.style.display = 'block';
+                    document.getElementById('traceDirectivesText').textContent = customDirectives;
+                } else {
+                    dirContainer.style.display = 'none';
+                }
             }
 
-            const rawContent = document.getElementById('rawModalContent');
-            if (rawContent) rawContent.textContent = rawText;
-            const modalEl = document.getElementById('modalRawOutput');
+            // Tab 2: Extracted CoT (<think>) and Verbatim Raw Response
+            const cotText = targetItem.reasoning_content || '';
+            const cotContainer = document.getElementById('traceCoTContainer');
+            if (cotContainer) {
+                if (cotText) {
+                    cotContainer.style.display = 'block';
+                    document.getElementById('traceCoTText').textContent = cotText;
+                } else {
+                    cotContainer.style.display = 'none';
+                }
+            }
+            let rawResp = targetItem.raw_response || '';
+            if (!rawResp) {
+                if (isConsensusOverall) {
+                    rawResp = targetItem.synthesized_thesis || JSON.stringify(targetItem, null, 2);
+                } else {
+                    const formatted = { ...targetItem };
+                    rawResp = JSON.stringify(formatted, null, 2);
+                }
+            }
+            document.getElementById('traceRawResponseText').textContent = rawResp;
+
+            // Tab 3: Parsed Structured JSON
+            let parsedJson = targetItem.parsed_json;
+            if (!parsedJson) {
+                parsedJson = { ...targetItem };
+                delete parsedJson.raw_prompt;
+                delete parsedJson.raw_response;
+                delete parsedJson.system_prompt;
+            }
+            document.getElementById('traceParsedJsonText').textContent = JSON.stringify(parsedJson, null, 2);
+
+            // Tab 4: Execution Telemetry
+            const tel = targetItem.telemetry || {};
+            const latMs = targetItem.latency_ms || tel.latency_ms;
+            document.getElementById('traceTelLatency').textContent = latMs ? `${latMs} ms (${(latMs / 1000).toFixed(2)}s)` : '—';
+            document.getElementById('traceTelTokens').textContent = targetItem.tokens_used || tel.total_tokens || tel.tokens || '—';
+            document.getElementById('traceTelEndpoint').textContent = tel.endpoint || (targetItem.is_local ? 'http://localhost:11434' : (targetItem.gateway || 'https://openrouter.ai/api/v1'));
+            document.getElementById('traceTelGateway').textContent = targetItem.gateway || (targetItem.is_local ? 'Ollama Local' : 'OpenRouter / OmniRoute');
+            document.getElementById('traceTelRawJson').textContent = JSON.stringify({
+                model_id: mid,
+                model_name: mName,
+                sub_model: targetItem.sub_model,
+                gateway: targetItem.gateway,
+                is_local: targetItem.is_local,
+                timeframe_days: targetItem.timeframe_days || consensus.timeframe_days || currentSelectedTimeframe,
+                latency_ms: latMs,
+                tokens_used: targetItem.tokens_used,
+                telemetry: tel,
+            }, null, 2);
+
+            switchTraceTab('prompt');
+            const modalEl = document.getElementById('modalConsensusTrace');
             if (modalEl) modalEl.style.display = 'flex';
         }
 
-        function closeRawModal() {
-            const modalEl = document.getElementById('modalRawOutput');
+        function closeConsensusTraceModal() {
+            const modalEl = document.getElementById('modalConsensusTrace');
             if (modalEl) modalEl.style.display = 'none';
         }
 
-        function copyRawOutput() {
-            const rawContent = document.getElementById('rawModalContent');
-            const text = rawContent ? rawContent.textContent : '';
-            if (!text) return;
-            navigator.clipboard.writeText(text).then(() => {
-                const btn = document.getElementById('btnCopyRaw');
+        function switchTraceTab(tabName) {
+            activeTraceTabName = tabName;
+            ['prompt', 'reasoning', 'json', 'telemetry'].forEach(t => {
+                const btn = document.getElementById(`btnTraceTab-${t}`);
+                const pane = document.getElementById(`paneTraceTab-${t}`);
+                if (btn) btn.classList.toggle('active', t === tabName);
+                if (pane) pane.style.display = t === tabName ? 'flex' : 'none';
+            });
+        }
+
+        function copyActiveTraceTab() {
+            let copyText = '';
+            if (activeTraceTabName === 'prompt') {
+                copyText = `=== SYSTEM PROMPT ===\n${document.getElementById('traceSystemPromptText').textContent}\n\n=== USER CONTEXT PROMPT ===\n${document.getElementById('traceContextPromptText').textContent}`;
+            } else if (activeTraceTabName === 'reasoning') {
+                const cot = document.getElementById('traceCoTText').textContent;
+                const raw = document.getElementById('traceRawResponseText').textContent;
+                copyText = cot ? `=== CHAIN-OF-THOUGHT (<think>) ===\n${cot}\n\n=== RAW RESPONSE ===\n${raw}` : raw;
+            } else if (activeTraceTabName === 'json') {
+                copyText = document.getElementById('traceParsedJsonText').textContent;
+            } else if (activeTraceTabName === 'telemetry') {
+                copyText = document.getElementById('traceTelRawJson').textContent;
+            }
+            if (!copyText) return;
+            navigator.clipboard.writeText(copyText).then(() => {
+                const btn = document.getElementById('btnCopyTraceTab');
                 if (btn) {
                     const old = btn.textContent;
-                    btn.textContent = '✅ Copied!';
+                    btn.textContent = '✅ Copied Tab!';
                     setTimeout(() => { btn.textContent = old; }, 2000);
                 }
             }).catch(err => {
-                alert('Failed to copy to clipboard: ' + err);
+                alert('Failed to copy: ' + err);
             });
+        }
+
+        function copySnippet(elementId) {
+            const el = document.getElementById(elementId);
+            if (!el || !el.textContent) return;
+            navigator.clipboard.writeText(el.textContent).then(() => {
+                alert('Copied to clipboard!');
+            }).catch(err => alert('Failed to copy: ' + err));
+        }
+
+        // Backward compatibility shim
+        function openRawModal(safeMid, idx) {
+            openConsensusTraceModal(idx, safeMid);
+        }
+        function closeRawModal() {
+            closeConsensusTraceModal();
         }
 
         // =========================================================================
@@ -3399,49 +3887,118 @@
 
             updateLocalModelBadge();
             detectLocalModels();
+            loadOmniRouteModels();
             fetchStockDetails();
             fetchRateLimits();
         });
     </script>
 
-    <!-- MODAL: VIEW RAW MODEL OUTPUT & REASONING -->
-    <div id="modalRawOutput" onclick="if(event.target === this) closeRawModal();" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, 0.84); backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 1.25rem;">
-        <div style="background: var(--bg-surface); border: 1px solid var(--border); width: 100%; max-width: 840px; max-height: 90vh; border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); display: flex; flex-direction: column; gap: 1rem; overflow: hidden;">
+    <!-- MODAL: MULTI-TAB RAW TRACE & INPUT/OUTPUT INSPECTOR -->
+    <div id="modalConsensusTrace" onclick="if(event.target === this) closeConsensusTraceModal();" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); align-items: center; justify-content: center; padding: 1.25rem;">
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); width: 100%; max-width: 920px; height: 88vh; border-radius: var(--radius-lg); padding: 1.25rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; gap: 0.75rem; overflow: hidden;">
+            
+            <!-- Modal Header -->
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
                 <div style="display: flex; align-items: center; gap: 0.6rem;">
-                    <span id="rawModalIcon" style="font-size: 1.3rem;">🤖</span>
+                    <span id="traceModalIcon" style="font-size: 1.4rem;">🔍</span>
                     <div>
-                        <div id="rawModalTitle" style="font-weight: 700; font-size: 1.05rem; color: #ffffff;">Model Name</div>
-                        <div id="rawModalSubtitle" style="font-size: 0.72rem; color: var(--text-tertiary); font-family: var(--font-mono);">model_id</div>
+                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                            <h3 id="traceModalTitle" style="margin: 0; font-weight: 800; font-size: 1.05rem; color: #ffffff;">Model Name</h3>
+                            <span id="traceModalModelId" style="font-size: 0.68rem; color: var(--text-tertiary); font-family: var(--font-mono); background: rgba(255,255,255,0.04); padding: 0.1rem 0.35rem; border-radius: 4px;">model_id</span>
+                        </div>
+                        <div id="traceModalSubtitle" style="font-size: 0.72rem; color: #94a3b8;">Raw execution trace, chain-of-thought, and prompt input/output payload</div>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span id="rawModalBadge" style="font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px;">BULLISH (85%)</span>
-                    <button type="button" onclick="closeRawModal()" style="background: none; border: none; color: var(--text-tertiary); font-size: 1.3rem; cursor: pointer; padding: 0.2rem 0.5rem;">✕</button>
+                    <span id="traceModalBadge" style="font-size: 0.74rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 4px; font-family: var(--font-mono);">BULLISH (85%)</span>
+                    <button type="button" onclick="closeConsensusTraceModal()" style="background: none; border: none; color: var(--text-tertiary); font-size: 1.3rem; cursor: pointer; padding: 0.2rem 0.5rem;">✕</button>
                 </div>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.74rem; color: var(--text-secondary); background: rgba(255,255,255,0.02); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem;">
-                <div style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap;">
-                    <span>⏱️ Latest: <strong id="rawModalLatency" style="color: #ffffff;">—</strong></span>
-                    <span>📊 1h Avg: <strong id="rawModalAvg1h" style="color: #93c5fd;">—</strong></span>
-                    <span>📊 24h Avg: <strong id="rawModalAvg24h" style="color: #60a5fa;">—</strong></span>
-                    <span>📊 All-Time: <strong id="rawModalAvgAll" style="color: #38bdf8;">—</strong></span>
-                    <span>🎯 Success: <strong id="rawModalSuccessRate" style="color: #34d399;">—</strong></span>
-                    <span>🔢 Runs: <strong id="rawModalTotalRuns" style="color: #a7f3d0;">—</strong></span>
-                    <span>🔢 Tokens: <strong id="rawModalTokens" style="color: #ffffff;">—</strong></span>
+            <!-- Tab Navigation Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.2rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: flex; gap: 0.25rem;">
+                    <button type="button" class="trace-tab-btn active" id="btnTraceTab-prompt" onclick="switchTraceTab('prompt')">📝 Prompt & Input</button>
+                    <button type="button" class="trace-tab-btn" id="btnTraceTab-reasoning" onclick="switchTraceTab('reasoning')">💭 Reasoning & Output</button>
+                    <button type="button" class="trace-tab-btn" id="btnTraceTab-json" onclick="switchTraceTab('json')">🧩 Parsed JSON</button>
+                    <button type="button" class="trace-tab-btn" id="btnTraceTab-telemetry" onclick="switchTraceTab('telemetry')">⚡ Telemetry & Speed</button>
+                </div>
+                <button type="button" onclick="copyActiveTraceTab()" id="btnCopyTraceTab" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.65rem;">📋 Copy Tab Content</button>
+            </div>
+
+            <!-- Tab 1: Prompts & Input -->
+            <div id="paneTraceTab-prompt" class="trace-tab-pane" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                        <span style="font-size: 0.72rem; font-weight: 700; color: #93c5fd; text-transform: uppercase;">System Prompt</span>
+                        <button type="button" onclick="copySnippet('traceSystemPromptText')" style="background: transparent; border: none; color: #38bdf8; font-size: 0.68rem; cursor: pointer;">📋 Copy</button>
+                    </div>
+                    <pre id="traceSystemPromptText" class="trace-box" style="max-height: 140px;"></pre>
+                </div>
+                <div id="traceDirectivesContainer" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                        <span style="font-size: 0.72rem; font-weight: 700; color: #fde68a; text-transform: uppercase;">Custom Focus Directives</span>
+                    </div>
+                    <div id="traceDirectivesText" class="trace-box" style="max-height: 80px; color: #fef08a; background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.25);"></div>
                 </div>
                 <div>
-                    <button type="button" onclick="copyRawOutput()" id="btnCopyRaw" class="btn btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.65rem;">📋 Copy Raw Output</button>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                        <span style="font-size: 0.72rem; font-weight: 700; color: #34d399; text-transform: uppercase;">Point-in-Time Quantitative Context Prompt (User Payload)</span>
+                        <button type="button" onclick="copySnippet('traceContextPromptText')" style="background: transparent; border: none; color: #38bdf8; font-size: 0.68rem; cursor: pointer;">📋 Copy</button>
+                    </div>
+                    <pre id="traceContextPromptText" class="trace-box" style="max-height: 320px;"></pre>
                 </div>
             </div>
 
-            <div style="flex: 1; overflow-y: auto;">
-                <pre id="rawModalContent" class="code-box">Loading raw model response...</pre>
+            <!-- Tab 2: Chain of Thought & Raw Response -->
+            <div id="paneTraceTab-reasoning" class="trace-tab-pane" style="flex: 1; overflow-y: auto; display: none; flex-direction: column; gap: 0.75rem;">
+                <div id="traceCoTContainer" style="display: none;">
+                    <div style="font-size: 0.72rem; font-weight: 700; color: #c084fc; text-transform: uppercase; margin-bottom: 0.3rem;">💭 Extracted Chain-of-Thought Reasoning (&lt;think&gt;)</div>
+                    <div id="traceCoTText" class="think-block"></div>
+                </div>
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                        <span style="font-size: 0.72rem; font-weight: 700; color: #e2e8f0; text-transform: uppercase;">Complete Verbatim LLM Raw Response</span>
+                        <button type="button" onclick="copySnippet('traceRawResponseText')" style="background: transparent; border: none; color: #38bdf8; font-size: 0.68rem; cursor: pointer;">📋 Copy</button>
+                    </div>
+                    <pre id="traceRawResponseText" class="trace-box" style="max-height: 440px;"></pre>
+                </div>
             </div>
 
-            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border);">
-                <button type="button" onclick="closeRawModal()" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.9rem;">Close</button>
+            <!-- Tab 3: Parsed Structured JSON -->
+            <div id="paneTraceTab-json" class="trace-tab-pane" style="flex: 1; overflow-y: auto; display: none;">
+                <pre id="traceParsedJsonText" class="trace-box" style="max-height: 480px;"></pre>
+            </div>
+
+            <!-- Tab 4: Telemetry & Latency -->
+            <div id="paneTraceTab-telemetry" class="trace-tab-pane" style="flex: 1; overflow-y: auto; display: none; flex-direction: column; gap: 0.75rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.85rem;">
+                        <div style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase;">Execution Latency</div>
+                        <div id="traceTelLatency" style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; font-family: var(--font-mono); margin-top: 0.2rem;">—</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.85rem;">
+                        <div style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase;">Tokens Used</div>
+                        <div id="traceTelTokens" style="font-size: 1.15rem; font-weight: 800; color: #a7f3d0; font-family: var(--font-mono); margin-top: 0.2rem;">—</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.85rem;">
+                        <div style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase;">Target Endpoint</div>
+                        <div id="traceTelEndpoint" style="font-size: 0.82rem; font-weight: 600; color: #ffffff; font-family: var(--font-mono); margin-top: 0.2rem; word-break: break-all;">—</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.85rem;">
+                        <div style="font-size: 0.68rem; color: #94a3b8; text-transform: uppercase;">Execution Gateway</div>
+                        <div id="traceTelGateway" style="font-size: 0.82rem; font-weight: 600; color: #c084fc; margin-top: 0.2rem;">—</div>
+                    </div>
+                </div>
+                <div id="traceTelRawContainer">
+                    <span style="font-size: 0.72rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.3rem; display: block;">Full Telemetry Payload</span>
+                    <pre id="traceTelRawJson" class="trace-box" style="max-height: 240px;"></pre>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.5rem;">
+                <button type="button" onclick="closeConsensusTraceModal()" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.9rem;">Close</button>
             </div>
         </div>
     </div>

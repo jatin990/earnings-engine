@@ -189,6 +189,10 @@ class ConsensusPredictRequest(BaseModel):
     force_refresh: bool = False
     models: list[str] | None = None
     local_model_url: str | None = None
+    omniroute_model: str | None = None
+    custom_directives: str | None = None
+    temperature: float = 0.3
+    include_raw_trace: bool = True
 
 
 class ConsensusSettleRequest(BaseModel):

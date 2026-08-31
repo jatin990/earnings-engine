@@ -46,8 +46,8 @@ MODEL_FALLBACKS: dict[str, str] = {
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
-def get_horizon_system_prompt(timeframe_days: int = 14) -> str:
-    """Generate specialized system prompt calibrated for the specified trading horizon."""
+def get_horizon_system_prompt(timeframe_days: int = 14, custom_directives: str | None = None) -> str:
+    """Generate specialized system prompt calibrated for the specified trading horizon and optional custom directives."""
     if timeframe_days <= 5:
         horizon_name = "SHORT-TERM SWING / CATALYST SCALP (1–5 Trading Days)"
         horizon_guidance = """- Horizon Focus: Immediate news catalyst reaction, deliverable volume surge, 1-3 day price expansion, and tight invalidation stop-loss.
@@ -69,6 +69,8 @@ def get_horizon_system_prompt(timeframe_days: int = 14) -> str:
 - Expected Target Return Scale: Typically 15.0% to 40.0% for multi-quarter holding horizons.
 - Invalidation / Stop Loss: Positional invalidation below the 200-day EMA or multi-month cyclical floor."""
 
+    directives_block = f"\nCustom User Focus Directives:\n{custom_directives.strip()}\n" if custom_directives else ""
+
     return f"""You are a quantitative stock analyst and swing trader specializing in {horizon_name}. Given the stock analysis context below, provide your prediction as a STRICT JSON object with exactly these fields:
 
 {{
@@ -88,7 +90,7 @@ def get_horizon_system_prompt(timeframe_days: int = 14) -> str:
 }}
 
 Horizon Directives ({horizon_name}):
-{horizon_guidance}
+{horizon_guidance}{directives_block}
 
 Rules:
 - Respond with ONLY the JSON object. No markdown, no explanation, no commentary.
@@ -124,7 +126,15 @@ MODEL_DISPLAY_NAMES: dict[str, str] = {
     "local/qwen2.5:7b": "Local (Qwen-2.5 7B)",
     "local/mistral:7b": "Local (Mistral 7B)",
     "local": "Local AI Model",
-    "omniroute/deepseek-r1": "OmniRoute-AI",
+    "omniroute/deepseek-r1": "OmniRoute (DeepSeek-R1)",
+    "omniroute/deepseek/deepseek-r1": "OmniRoute (DeepSeek-R1)",
+    "omniroute/anthropic/claude-3.5-sonnet": "OmniRoute (Claude 3.5 Sonnet)",
+    "omniroute/openai/gpt-4o": "OmniRoute (GPT-4o)",
+    "omniroute/google/gemini-2.5-pro": "OmniRoute (Gemini 2.5 Pro)",
+    "omniroute/qwen/qwen-2.5-72b-instruct": "OmniRoute (Qwen 2.5 72B)",
+    "omniroute/meta-llama/llama-3.3-70b-instruct": "OmniRoute (Llama 3.3 70B)",
+    "omniroute/auto/best-reasoning": "OmniRoute (Auto Best Reasoning)",
+    "omniroute/auto/best-fast": "OmniRoute (Auto Best Fast)",
     "omniroute/ai-news-engine": "OmniRoute-AI",
     "omniroute": "OmniRoute-AI",
     "omnirouter": "OmniRoute-AI",
@@ -148,22 +158,27 @@ def _query_omniroute_model(
     timeout: int = 45,
     timeframe_days: int = 14,
     _ticker: str = "UNKNOWN",
+    custom_directives: str | None = None,
+    temperature: float = 0.3,
+    system_prompt: str | None = None,
 ) -> dict[str, Any]:
-    """Execute prediction via diegosouzapw/OmniRoute gateway with fallback to heuristic quant forecast."""
+    """Execute prediction via diegosouzapw/OmniRoute gateway with full raw input/output capture and fallback."""
     from earnings_engine.data.omniroute_client import OmniRouteClient
 
     start = time.perf_counter()
-    display_name = "OmniRoute-AI"
-    system_prompt = get_horizon_system_prompt(timeframe_days)
+    system_prompt = system_prompt or get_horizon_system_prompt(timeframe_days, custom_directives=custom_directives)
 
     client = OmniRouteClient()
     completions_url = client.get_completions_url()
     api_key = client.get_api_key()
 
-    # Strip prefix e.g. "omniroute/deepseek-r1" -> "deepseek/deepseek-r1"
+    # Strip prefix e.g. "omniroute/anthropic/claude-3.5-sonnet" -> "anthropic/claude-3.5-sonnet"
     sub_model = model_id.replace("omniroute/", "").replace("omnirouter/", "").strip()
     if not sub_model or sub_model in ("omniroute", "omnirouter"):
         sub_model = "deepseek/deepseek-r1"
+
+    sub_display = MODEL_DISPLAY_NAMES.get(sub_model, sub_model.split("/")[-1].replace("-instruct", "").replace(":free", "").title())
+    display_name = f"OmniRoute ({sub_display})" if "OmniRoute" not in sub_display else sub_display
 
     logger.info("[CONSENSUS-OMNIROUTE] Querying %s via %s (model=%s, timeframe=%dd)...", display_name, completions_url, sub_model, timeframe_days)
 
@@ -176,6 +191,7 @@ def _query_omniroute_model(
         pass
 
     resp_text = ""
+    reasoning_text = ""
     total_tokens = 0
     success = False
 
@@ -197,8 +213,8 @@ def _query_omniroute_model(
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
-                "temperature": 0.3,
-                "max_tokens": 1200,
+                "temperature": temperature,
+                "max_tokens": 1400,
             },
             timeout=timeout,
         )
@@ -207,7 +223,12 @@ def _query_omniroute_model(
             total_tokens = data.get("usage", {}).get("total_tokens", 0)
             choice = (data.get("choices") or [{}])[0]
             msg = choice.get("message") or {}
-            resp_text = (msg.get("content") or msg.get("reasoning") or "").strip()
+            content_str = msg.get("content") or ""
+            reasoning_text = msg.get("reasoning") or ""
+            if reasoning_text and reasoning_text not in content_str:
+                resp_text = f"<think>\n{reasoning_text}\n</think>\n\n{content_str}".strip()
+            else:
+                resp_text = (content_str or reasoning_text or "").strip()
             if resp_text:
                 success = True
     except Exception as e:
@@ -243,6 +264,7 @@ def _query_omniroute_model(
             return {
                 "model_name": display_name,
                 "model_id": model_id,
+                "sub_model": sub_model,
                 "direction": direction,
                 "confidence_pct": conf_pct,
                 "target_return_pct": float(prediction.get("target_return_pct", 0.0)) if prediction.get("target_return_pct") is not None else None,
@@ -251,15 +273,26 @@ def _query_omniroute_model(
                 "resistance_level": resist_p,
                 "stop_loss_price": sl_p,
                 "risk_reward_ratio": rr,
-                "chart_pattern": prediction.get("chart_pattern") or "OmniRoute Multi-Model Dynamic Channel",
+                "chart_pattern": prediction.get("chart_pattern") or f"OmniRoute {sub_display} Dynamic Channel",
                 "volume_profile_insight": prediction.get("volume_profile_insight") or "Institutional volume liquidity surge detected across multi-provider consensus.",
                 "recommended_action": rec_action,
                 "key_drivers": prediction.get("key_drivers", ["OmniRoute quantitative catalyst integration", f"{direction} momentum alignment"]),
                 "primary_risk": prediction.get("primary_risk") or "Broader market volatility or immediate profit booking at open.",
                 "latency_ms": round(elapsed_ms, 1),
                 "tokens_used": total_tokens,
+                "system_prompt": system_prompt,
+                "raw_prompt": prompt,
                 "raw_response": resp_text,
-                "gateway": "diegosouzapw/OmniRoute",
+                "reasoning_content": reasoning_text,
+                "parsed_json": prediction,
+                "telemetry": {
+                    "latency_ms": round(elapsed_ms, 1),
+                    "tokens": total_tokens,
+                    "gateway": completions_url,
+                    "sub_model": sub_model,
+                    "provider": "OmniRoute Gateway",
+                },
+                "gateway": f"diegosouzapw/OmniRoute ({sub_model})",
             }
 
     # Fallback to deterministic heuristic quant extraction using OmniRoute client
@@ -276,9 +309,11 @@ def _query_omniroute_model(
     except Exception:
         pass
 
+    raw_fallback = json.dumps(heur, indent=2)
     return {
         "model_name": display_name,
         "model_id": model_id,
+        "sub_model": sub_model,
         "direction": dir_heur,
         "confidence_pct": int(heur.get("confidence_pct", 75)),
         "target_return_pct": round(4.5 if dir_heur == "BULLISH" else (-4.5 if dir_heur == "BEARISH" else 0.0), 1),
@@ -287,15 +322,26 @@ def _query_omniroute_model(
         "resistance_level": tar_heur,
         "stop_loss_price": sl_heur,
         "risk_reward_ratio": rr_heur,
-        "chart_pattern": "OmniRoute Quantitative Channel Compression",
+        "chart_pattern": f"OmniRoute {sub_display} Quantitative Channel Compression",
         "volume_profile_insight": "Deterministic multi-factor volume and earnings momentum validation.",
         "recommended_action": "ACCUMULATE ON DIPS" if dir_heur == "BULLISH" else ("AVOID / CAUTION" if dir_heur == "BEARISH" else "HOLD / WAIT"),
         "key_drivers": [heur.get("trading_takeaway") or "OmniRoute quantitative catalyst trigger", "Multi-factor alignment"],
         "primary_risk": heur.get("primary_risk") or "Broader market volatility",
         "latency_ms": round(elapsed_ms, 1),
         "tokens_used": 0,
-        "raw_response": json.dumps(heur, indent=2),
-        "gateway": "diegosouzapw/OmniRoute (Heuristic Fallback)",
+        "system_prompt": system_prompt,
+        "raw_prompt": prompt,
+        "raw_response": raw_fallback,
+        "reasoning_content": "Heuristic fallback derivation based on momentum & support/resistance pillars.",
+        "parsed_json": heur,
+        "telemetry": {
+            "latency_ms": round(elapsed_ms, 1),
+            "tokens": 0,
+            "gateway": completions_url,
+            "sub_model": sub_model,
+            "provider": "OmniRoute (Heuristic Fallback)",
+        },
+        "gateway": f"diegosouzapw/OmniRoute ({sub_model} - Heuristic Fallback)",
     }
 
 
@@ -305,8 +351,11 @@ def _query_local_model(
     timeout: int = 60,
     local_url: str | None = None,
     timeframe_days: int = 14,
+    custom_directives: str | None = None,
+    temperature: float = 0.3,
+    system_prompt: str | None = None,
 ) -> dict[str, Any]:
-    """Execute a local LLM prompt via Ollama (http://localhost:11434) or LM Studio (http://localhost:1234)."""
+    """Execute a local LLM prompt via Ollama (http://localhost:11434) or LM Studio (http://localhost:1234) with raw trace capture."""
     start = time.perf_counter()
     
     # Extract clean model tag, e.g. "local/deepseek-r1:8b" -> "deepseek-r1:8b"
@@ -319,9 +368,10 @@ def _query_local_model(
     logger.info("[CONSENSUS-LOCAL] Querying local model %s (timeframe=%dd) at %s...", local_model, timeframe_days, base_host)
     
     v1_url = f"{base_host}/v1/chat/completions" if not base_host.endswith("/v1") else f"{base_host}/chat/completions"
-    system_prompt = get_horizon_system_prompt(timeframe_days)
+    system_prompt = system_prompt or get_horizon_system_prompt(timeframe_days, custom_directives=custom_directives)
     
     resp_text = ""
+    reasoning_text = ""
     total_tokens = 0
     success = False
     
@@ -341,7 +391,7 @@ def _query_local_model(
                 "stream": False,
                 "options": {
                     "num_ctx": 4096,
-                    "temperature": 0.3,
+                    "temperature": temperature,
                 },
             },
             timeout=timeout,
@@ -350,6 +400,7 @@ def _query_local_model(
             data = resp.json()
             msg = data.get("message") or {}
             resp_text = (msg.get("content") or "").strip()
+            reasoning_text = msg.get("thinking") or ""
             total_tokens = data.get("eval_count", 0)
             if resp_text:
                 success = True
@@ -357,6 +408,7 @@ def _query_local_model(
                 choice = (data.get("choices") or [{}])[0]
                 msg = choice.get("message") or {}
                 resp_text = (msg.get("content") or msg.get("reasoning") or "").strip()
+                reasoning_text = msg.get("reasoning") or ""
                 total_tokens = data.get("usage", {}).get("total_tokens", 0)
                 if resp_text:
                     success = True
@@ -375,8 +427,8 @@ def _query_local_model(
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt},
                     ],
-                    "temperature": 0.3,
-                    "max_tokens": 1200,
+                    "temperature": temperature,
+                    "max_tokens": 1400,
                 },
                 timeout=timeout,
             )
@@ -386,8 +438,11 @@ def _query_local_model(
                 choice = (data.get("choices") or [{}])[0]
                 msg = choice.get("message") or {}
                 content = msg.get("content") or ""
-                reasoning = msg.get("reasoning") or ""
-                resp_text = (content or reasoning or "").strip()
+                reasoning_text = msg.get("reasoning") or ""
+                if reasoning_text and reasoning_text not in content:
+                    resp_text = f"<think>\n{reasoning_text}\n</think>\n\n{content}".strip()
+                else:
+                    resp_text = (content or reasoning_text or "").strip()
                 success = True
         except Exception as e2:
             logger.debug("[CONSENSUS-LOCAL] /v1/chat/completions attempt failed: %s. Trying /api/generate...", e2)
@@ -407,7 +462,7 @@ def _query_local_model(
                     "stream": False,
                     "options": {
                         "num_ctx": 2048,
-                        "temperature": 0.3,
+                        "temperature": temperature,
                     },
                 },
                 timeout=timeout,
@@ -434,7 +489,17 @@ def _query_local_model(
                 "stop_loss_price": None,
                 "risk_reward_ratio": None,
                 "recommended_action": "LOCAL OFFLINE",
+                "system_prompt": system_prompt,
+                "raw_prompt": prompt,
                 "raw_response": f"Connection failed to local endpoint {base_host}. Ensure Ollama or LM Studio is running.",
+                "reasoning_content": None,
+                "telemetry": {
+                    "latency_ms": round(elapsed_ms, 1),
+                    "tokens": 0,
+                    "endpoint": base_host,
+                    "model": local_model,
+                    "status": "Offline / Unreachable",
+                },
                 "latency_ms": round(elapsed_ms, 1),
                 "is_local": True,
             }
@@ -464,7 +529,18 @@ def _query_local_model(
             "stop_loss_price": None,
             "risk_reward_ratio": None,
             "recommended_action": "HOLD / WAIT",
+            "system_prompt": system_prompt,
+            "raw_prompt": prompt,
             "raw_response": resp_text,
+            "reasoning_content": reasoning_text,
+            "parsed_json": None,
+            "telemetry": {
+                "latency_ms": round(elapsed_ms, 1),
+                "tokens": total_tokens,
+                "endpoint": base_host,
+                "model": local_model,
+                "status": "Unparseable Output",
+            },
             "latency_ms": round(elapsed_ms, 1),
             "tokens_used": total_tokens,
             "is_local": True,
@@ -506,7 +582,18 @@ def _query_local_model(
         "primary_risk": prediction.get("primary_risk"),
         "latency_ms": round(elapsed_ms, 1),
         "tokens_used": total_tokens,
+        "system_prompt": system_prompt,
+        "raw_prompt": prompt,
         "raw_response": resp_text,
+        "reasoning_content": reasoning_text,
+        "parsed_json": prediction,
+        "telemetry": {
+            "latency_ms": round(elapsed_ms, 1),
+            "tokens": total_tokens,
+            "endpoint": base_host,
+            "model": local_model,
+            "status": "HTTP 200 Success",
+        },
         "is_local": True,
     }
 
@@ -520,11 +607,14 @@ def _query_single_model(
     local_url: str | None = None,
     _ticker: str = "UNKNOWN",
     timeframe_days: int = 14,
+    custom_directives: str | None = None,
+    temperature: float = 0.3,
+    system_prompt: str | None = None,
 ) -> dict[str, Any]:
-    """Send a prediction request to a single model (local or via OpenRouter) with rate limit retry & fallback.
+    """Send a prediction request to a single model (local, omniroute, or OpenRouter) with full raw trace capture.
 
-    Returns a dict with model_name, the parsed prediction fields,
-    or an error entry if the call fails.
+    Returns a dict with model_name, the parsed prediction fields, raw prompt,
+    system prompt, raw response, reasoning tokens, and execution telemetry.
     """
     if (
         model_id.startswith("local/")
@@ -532,19 +622,27 @@ def _query_single_model(
         or model_id.startswith("lmstudio/")
         or model_id == "local"
     ):
-        return _query_local_model(model_id, prompt, timeout=timeout, local_url=local_url, timeframe_days=timeframe_days)
+        return _query_local_model(
+            model_id, prompt, timeout=timeout, local_url=local_url,
+            timeframe_days=timeframe_days, custom_directives=custom_directives,
+            temperature=temperature, system_prompt=system_prompt,
+        )
 
     if (
         model_id.startswith("omniroute/")
         or model_id.startswith("omnirouter/")
         or model_id in ("omniroute", "omnirouter")
     ):
-        return _query_omniroute_model(model_id, prompt, timeout=timeout, timeframe_days=timeframe_days, _ticker=_ticker)
+        return _query_omniroute_model(
+            model_id, prompt, timeout=timeout, timeframe_days=timeframe_days,
+            _ticker=_ticker, custom_directives=custom_directives,
+            temperature=temperature, system_prompt=system_prompt,
+        )
 
     display_name = MODEL_DISPLAY_NAMES.get(model_id, model_id.split("/")[-1])
     current_model = model_id
-    current_max_tokens = int(os.getenv("OPENROUTER_MAX_TOKENS", "1000"))
-    system_prompt = get_horizon_system_prompt(timeframe_days)
+    current_max_tokens = int(os.getenv("OPENROUTER_MAX_TOKENS", "1200"))
+    system_prompt = system_prompt or get_horizon_system_prompt(timeframe_days, custom_directives=custom_directives)
 
     # --- Pre-flight rate-limit check (only blocks on genuine quota exhaustion) ---
     try:
@@ -564,7 +662,16 @@ def _query_single_model(
                 "stop_loss_price": None,
                 "risk_reward_ratio": None,
                 "recommended_action": "HOLD / WAIT",
+                "system_prompt": system_prompt,
+                "raw_prompt": prompt,
                 "raw_response": f"Skipped: {rl_reason}",
+                "reasoning_content": None,
+                "telemetry": {
+                    "latency_ms": 0,
+                    "tokens": 0,
+                    "status": f"Rate-limited: {rl_reason}",
+                    "model_id": model_id,
+                },
                 "latency_ms": 0,
             }
     except Exception:
@@ -574,8 +681,6 @@ def _query_single_model(
         start = time.perf_counter()
         logger.info("[CONSENSUS] Querying %s (%s, timeframe=%dd, attempt %d/%d, max_tokens=%d)...", display_name, current_model, timeframe_days, attempt + 1, max_retries + 1, current_max_tokens)
         try:
-            # Record request BEFORE the HTTP call so the sliding window is updated
-            # even if the request errors or times out.
             try:
                 from earnings_engine.rate_limits import record_request as _rr
                 _rr("openrouter")
@@ -598,7 +703,7 @@ def _query_single_model(
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt},
                     ],
-                    "temperature": 0.3,
+                    "temperature": temperature,
                     "max_tokens": current_max_tokens,
                 },
                 timeout=timeout,
@@ -623,7 +728,6 @@ def _query_single_model(
                 afford_match = re.search(r"can only afford (\d+)", err_text)
                 if afford_match and attempt < max_retries:
                     afford_tokens = int(afford_match.group(1))
-                    # Adjust max_tokens to safe affordable limit
                     current_max_tokens = max(250, min(afford_tokens - 20, 800))
                     logger.info("[CONSENSUS] Retrying %s with lowered max_tokens=%d (affordable: %d)...", display_name, current_max_tokens, afford_tokens)
                     time.sleep(0.4)
@@ -672,7 +776,17 @@ def _query_single_model(
                     "stop_loss_price": None,
                     "risk_reward_ratio": None,
                     "recommended_action": "HOLD / WAIT",
+                    "system_prompt": system_prompt,
+                    "raw_prompt": prompt,
                     "raw_response": resp.text,
+                    "reasoning_content": None,
+                    "telemetry": {
+                        "latency_ms": round(elapsed_ms, 1),
+                        "status": f"HTTP {resp.status_code}",
+                        "endpoint": OPENROUTER_API_URL,
+                        "model_id": current_model,
+                    },
+                    "latency_ms": round(elapsed_ms, 1),
                 }
 
             data = resp.json()
@@ -694,7 +808,6 @@ def _query_single_model(
             if not full_raw_text and data:
                 full_raw_text = json.dumps(data, indent=2)
 
-            # For reasoning models where content might be in reasoning tag
             parse_target = content if content else reasoning
 
             # Parse the JSON response
@@ -713,10 +826,20 @@ def _query_single_model(
                     "stop_loss_price": None,
                     "risk_reward_ratio": None,
                     "recommended_action": "HOLD / WAIT",
+                    "system_prompt": system_prompt,
+                    "raw_prompt": prompt,
                     "raw_response": full_raw_text,
+                    "reasoning_content": reasoning,
+                    "telemetry": {
+                        "latency_ms": round(elapsed_ms, 1),
+                        "tokens": total_tokens,
+                        "status": "Unparseable JSON Schema",
+                        "endpoint": OPENROUTER_API_URL,
+                        "model_id": current_model,
+                    },
+                    "latency_ms": round(elapsed_ms, 1),
                 }
 
-            # Field normalization
             direction = str(prediction.get("direction", "NEUTRAL")).upper()
             if direction not in ("BULLISH", "BEARISH", "NEUTRAL"):
                 direction = "NEUTRAL"
@@ -728,7 +851,6 @@ def _query_single_model(
             sl_p = float(prediction.get("stop_loss_price", 0.0)) if prediction.get("stop_loss_price") else None
             rr = float(prediction.get("risk_reward_ratio", 0.0)) if prediction.get("risk_reward_ratio") else None
 
-            # Fallback calculations if SL or RR missing
             if target_p and support_p and not sl_p and direction == "BULLISH":
                 sl_p = round(support_p * 0.98, 2)
             if not rr and target_p and sl_p and support_p and (target_p - support_p) > 0 and (support_p - sl_p) > 0:
@@ -765,7 +887,18 @@ def _query_single_model(
                 "primary_risk": str(prediction.get("primary_risk") or "General market volatility"),
                 "latency_ms": round(elapsed_ms),
                 "tokens_used": total_tokens,
+                "system_prompt": system_prompt,
+                "raw_prompt": prompt,
                 "raw_response": full_raw_text,
+                "reasoning_content": reasoning,
+                "parsed_json": prediction,
+                "telemetry": {
+                    "latency_ms": round(elapsed_ms),
+                    "tokens": total_tokens,
+                    "status": "HTTP 200 Success",
+                    "endpoint": OPENROUTER_API_URL,
+                    "model_id": current_model,
+                },
             }
 
         except requests.Timeout:
@@ -791,7 +924,15 @@ def _query_single_model(
                 "stop_loss_price": None,
                 "risk_reward_ratio": None,
                 "recommended_action": "HOLD / WAIT",
+                "system_prompt": system_prompt,
+                "raw_prompt": prompt,
                 "raw_response": f"Request to {current_model} timed out after {timeout}s",
+                "reasoning_content": None,
+                "telemetry": {
+                    "latency_ms": timeout * 1000,
+                    "status": "Timeout",
+                    "model_id": current_model,
+                },
             }
         except Exception as e:
             if attempt < max_retries:
@@ -816,7 +957,14 @@ def _query_single_model(
                 "stop_loss_price": None,
                 "risk_reward_ratio": None,
                 "recommended_action": "HOLD / WAIT",
+                "system_prompt": system_prompt,
+                "raw_prompt": prompt,
                 "raw_response": f"Exception connecting to {current_model}: {str(e)}",
+                "reasoning_content": None,
+                "telemetry": {
+                    "status": f"Error: {str(e)}",
+                    "model_id": current_model,
+                },
             }
 
     return {
@@ -831,7 +979,14 @@ def _query_single_model(
         "stop_loss_price": None,
         "risk_reward_ratio": None,
         "recommended_action": "HOLD / WAIT",
+        "system_prompt": system_prompt,
+        "raw_prompt": prompt,
         "raw_response": f"Max retries ({max_retries}) exceeded for {current_model}",
+        "reasoning_content": None,
+        "telemetry": {
+            "status": "Max retries exceeded",
+            "model_id": current_model,
+        },
     }
 
 
@@ -844,7 +999,6 @@ def _parse_model_json(content: Any) -> dict[str, Any] | None:
     # Strip thinking tags (DeepSeek-R1 uses <think>...</think> or unclosed <think>...)
     content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
     content = re.sub(r"^<think>.*$", "", content, flags=re.DOTALL).strip()
-
 
     # Try direct parse first
     try:
@@ -966,19 +1120,42 @@ def run_consensus_models(
     models: list[str] | None = None,
     timeout: int = 60,
     local_url: str | None = None,
+    omniroute_model: str | None = None,
+    custom_directives: str | None = None,
+    temperature: float = 0.3,
 ) -> list[dict[str, Any]]:
-    """Run prediction prompts across multiple LLMs (cloud and/or local) in parallel.
+    """Run prediction prompts across multiple LLMs (cloud, omniroute, and/or local) in parallel with trace capture.
 
     Args:
         context: The assembled context dict from context_builder.build_context().
-        models: List of model IDs (e.g. OpenRouter or local/* or 'local_all'). Defaults to DEFAULT_MODELS.
+        models: List of model IDs. Defaults to DEFAULT_MODELS.
         timeout: Per-model timeout in seconds.
         local_url: Optional override URL for local model (e.g. http://localhost:11434).
+        omniroute_model: Optional specific sub-model to route through OmniRoute gateway.
+        custom_directives: Optional custom trader instructions / focus directives.
+        temperature: Sampling temperature (default 0.3).
 
     Returns:
-        List of prediction dicts, one per model (including errored ones).
+        List of prediction dicts, one per model (including errored ones with raw traces).
     """
-    models = models or DEFAULT_MODELS
+    models = list(models) if models else list(DEFAULT_MODELS)
+
+    # Normalize OmniRoute model choice if specified
+    if omniroute_model:
+        clean_omni = omniroute_model.replace("omniroute/", "").replace("omnirouter/", "").strip()
+        omni_target_id = f"omniroute/{clean_omni}"
+        # If user included generic "omniroute", replace it with specific omniroute target
+        new_models = []
+        has_omni = False
+        for m in models:
+            if m.startswith("omniroute") or m.startswith("omnirouter"):
+                new_models.append(omni_target_id)
+                has_omni = True
+            else:
+                new_models.append(m)
+        if not has_omni and omniroute_model:
+            new_models.append(omni_target_id)
+        models = new_models
 
     # Expand "local_all", "all_local", or "local:all" into all installed local models
     if any(m in ("local_all", "all_local", "local:all") for m in models):
@@ -1009,17 +1186,32 @@ def run_consensus_models(
     timeframe = context.get("timeframe_days", 14)
 
     # Add the prediction ask to the prompt
-    full_prompt = f"{prompt}\n\n---\n**Task:** Predict the price direction of {ticker} over the next {timeframe} trading days. Respond with ONLY a JSON object."
+    directives_text = f"\n\n**Custom Focus & Evaluation Directives:**\n{custom_directives.strip()}" if custom_directives else ""
+    full_prompt = f"{prompt}{directives_text}\n\n---\n**Task:** Predict the price direction of {ticker} over the next {timeframe} trading days. Respond with ONLY a JSON object."
+    system_prompt = get_horizon_system_prompt(timeframe, custom_directives=custom_directives)
 
     t_start = time.perf_counter()
     model_names_str = ", ".join(MODEL_DISPLAY_NAMES.get(m, m.split('/')[-1]) for m in models)
-    logger.info("[CONSENSUS] Dispatching %s to %d models (%s, timeframe=%dd)...", ticker, len(models), model_names_str, timeframe)
+    logger.info("[CONSENSUS] Dispatching %s to %d models (%s, timeframe=%dd, temp=%.2f)...", ticker, len(models), model_names_str, timeframe, temperature)
 
     results: list[dict[str, Any]] = []
 
     with ThreadPoolExecutor(max_workers=len(models)) as executor:
         futures = {
-            executor.submit(_query_single_model, model_id, full_prompt, api_key, timeout, 2, local_url, ticker, timeframe): model_id
+            executor.submit(
+                _query_single_model,
+                model_id,
+                full_prompt,
+                api_key,
+                timeout,
+                2,
+                local_url,
+                ticker,
+                timeframe,
+                custom_directives,
+                temperature,
+                system_prompt,
+            ): model_id
             for model_id in models
         }
         for future in as_completed(futures):
@@ -1034,10 +1226,18 @@ def run_consensus_models(
                             len(results), len(models), result["model_name"], dir_or_err, result.get("latency_ms", 0) / 1000.0)
             except Exception as e:
                 logger.error("[CONSENSUS] %s future error: %s", display_name, e)
-                results.append({"model_name": display_name, "model_id": model_id, "error": str(e)})
+                results.append({
+                    "model_name": display_name,
+                    "model_id": model_id,
+                    "error": str(e),
+                    "system_prompt": system_prompt,
+                    "raw_prompt": full_prompt,
+                    "raw_response": f"Future exception: {str(e)}",
+                })
 
     total_elapsed = time.perf_counter() - t_start
     successful = sum(1 for r in results if "error" not in r)
     logger.info("[CONSENSUS] %s: %d/%d models responded successfully in %.2fs. Proceeding to aggregation.", ticker, successful, len(models), total_elapsed)
 
     return results
+
