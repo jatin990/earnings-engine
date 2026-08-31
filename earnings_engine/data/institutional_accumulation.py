@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -20,6 +21,65 @@ logger = logging.getLogger(__name__)
 
 # In-memory TTL Cache (3-minute TTL for high-throughput responses)
 _INST_CACHE: dict[str, tuple[float, Any]] = {}
+
+
+def calculate_institutional_score(
+    accumulating_count: int,
+    selling_count: int,
+    new_buys_count: int,
+    net_flow_cr: float,
+    gross_inflow_cr: float,
+    gross_outflow_cr: float,
+    inst_addition_pct: float,
+    increase_amount_cr: float,
+    total_inst_amount_cr: float,
+) -> tuple[float, str, str]:
+    """Calculate institutional conviction score (0-100), verdict, and badge based on both Rupee amount flows and percentage stake shifts."""
+    score = 50.0
+
+    # 1. Absolute Rupee Amount Flow Component (up to +/- 25 points)
+    if net_flow_cr > 0:
+        amt_boost = math.log10(max(1.0, net_flow_cr)) * 6.0
+        if increase_amount_cr > 0:
+            inc_boost = math.log10(max(1.0, increase_amount_cr)) * 3.0
+            amt_boost = (amt_boost * 0.7) + (inc_boost * 0.3)
+        score += min(25.0, amt_boost)
+    elif net_flow_cr < 0:
+        amt_drag = math.log10(max(1.0, abs(net_flow_cr))) * 6.0
+        score -= min(25.0, amt_drag)
+
+    # 2. Percentage Stake Shift Component (QoQ % Delta, up to +/- 15 points)
+    if inst_addition_pct > 0:
+        score += min(15.0, inst_addition_pct * 4.0)
+    elif inst_addition_pct < 0:
+        score -= min(15.0, abs(inst_addition_pct) * 4.0)
+
+    # 3. Fund Breadth & Actions Component (up to +/- 20 points)
+    if accumulating_count > selling_count:
+        score += min(20.0, (accumulating_count - selling_count) * 4.0 + new_buys_count * 2.5)
+    elif selling_count > accumulating_count:
+        score -= min(20.0, (selling_count - accumulating_count) * 4.0)
+
+    # 4. Institutional Scale & Depth Component (Total Holding Value, up to +5 points)
+    if total_inst_amount_cr and total_inst_amount_cr > 500.0:
+        score += min(5.0, math.log10(total_inst_amount_cr / 500.0) * 2.5)
+
+    score = max(5.0, min(98.0, round(score, 1)))
+
+    if score >= 75.0:
+        verdict = "🔥 Aggressive Institutional Accumulation"
+        verdict_badge = "emerald"
+    elif score >= 58.0:
+        verdict = "🟢 Moderate Institutional Accumulation"
+        verdict_badge = "green"
+    elif score >= 42.0:
+        verdict = "⚖️ Stable Institutional Allocation"
+        verdict_badge = "amber"
+    else:
+        verdict = "🔴 Institutional Distribution / Trimming"
+        verdict_badge = "rose"
+
+    return score, verdict, verdict_badge
 
 
 def _get_inst_cache(key: str) -> Any | None:
@@ -442,33 +502,7 @@ def recalculate_all_institutional_metrics(settings: Settings | None = None, forc
                     "exchange": b[9],
                 })
 
-            # Score calculation
-            score = 50.0
-            if accumulating_count > selling_count:
-                score += min(35.0, (accumulating_count - selling_count) * 12.0 + new_buys_count * 5.0)
-            elif selling_count > accumulating_count:
-                score -= min(35.0, (selling_count - accumulating_count) * 12.0)
-
-            if len(patterns) >= 2:
-                fii_delta = patterns[0]["fii_pct"] - patterns[1]["fii_pct"]
-                dii_delta = patterns[0]["dii_mf_pct"] - patterns[1]["dii_mf_pct"]
-                score += min(15.0, max(-15.0, (fii_delta + dii_delta) * 5.0))
-
-            score = max(5.0, min(98.0, round(score, 1)))
-
-            if score >= 75.0:
-                verdict = "🔥 Aggressive Institutional Accumulation"
-                verdict_badge = "emerald"
-            elif score >= 58.0:
-                verdict = "🟢 Moderate Institutional Accumulation"
-                verdict_badge = "green"
-            elif score >= 42.0:
-                verdict = "⚖️ Stable Institutional Allocation"
-                verdict_badge = "amber"
-            else:
-                verdict = "🔴 Institutional Distribution / Trimming"
-                verdict_badge = "rose"
-
+            # Market cap and names
             raw_info = names_map.get(sym) or (None, None)
             cname = raw_info[0] or get_name(sym) or sym.replace(".NS", "").replace(".BO", "")
             mcap_val = raw_info[1]
@@ -485,6 +519,19 @@ def recalculate_all_institutional_metrics(settings: Settings | None = None, forc
                 inst_addition_pct = round(tot_inst_stake - prev_inst, 2)
 
             inc_amt_cr = round((inst_addition_pct / 100.0) * mcap_cr, 1) if (mcap_cr and inst_addition_pct != 0) else net_flow_cr
+
+            # Amount-based and percentage-based institutional conviction score
+            score, verdict, verdict_badge = calculate_institutional_score(
+                accumulating_count=accumulating_count,
+                selling_count=selling_count,
+                new_buys_count=new_buys_count,
+                net_flow_cr=net_flow_cr,
+                gross_inflow_cr=gross_inflow_cr,
+                gross_outflow_cr=gross_outflow_cr,
+                inst_addition_pct=inst_addition_pct,
+                increase_amount_cr=inc_amt_cr,
+                total_inst_amount_cr=tot_inst_amt,
+            )
 
             is_new_fii = False
             if patterns and any(p.get("fii_pct", 0) == 0 for p in patterns):
@@ -912,34 +959,6 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
         # 5. Returns (7d, 30d, 1y)
         ret_7d, ret_30d, ret_1y = _get_ticker_returns(sym, conn)
 
-        # Derive institutional accumulation conviction score (0-100)
-        score = 50.0
-        if accumulating_count > selling_count:
-            score += min(35.0, (accumulating_count - selling_count) * 12.0 + new_buys_count * 5.0)
-        elif selling_count > accumulating_count:
-            score -= min(35.0, (selling_count - accumulating_count) * 12.0)
-
-        # Delta from shareholding pattern
-        if len(patterns) >= 2:
-            fii_delta = patterns[0]["fii_pct"] - patterns[1]["fii_pct"]
-            dii_delta = patterns[0]["dii_mf_pct"] - patterns[1]["dii_mf_pct"]
-            score += min(15.0, max(-15.0, (fii_delta + dii_delta) * 5.0))
-
-        score = max(5.0, min(98.0, round(score, 1)))
-
-        if score >= 75.0:
-            verdict = "🔥 Aggressive Institutional Accumulation"
-            verdict_badge = "emerald"
-        elif score >= 58.0:
-            verdict = "🟢 Moderate Institutional Accumulation"
-            verdict_badge = "green"
-        elif score >= 42.0:
-            verdict = "⚖️ Stable Institutional Allocation"
-            verdict_badge = "amber"
-        else:
-            verdict = "🔴 Institutional Distribution / Trimming"
-            verdict_badge = "rose"
-
         # Company name lookup — resolve real name from local database, never return raw ticker
         from earnings_engine.data.names import get_name
         raw_name = get_name(sym)
@@ -979,6 +998,19 @@ def get_stock_institutional_activity(ticker: str, settings: Settings | None = No
             inst_addition_pct = round(lat_inst - prev_inst, 2)
 
         stock_increase_amount_cr = round((inst_addition_pct / 100.0) * mcap_cr, 1) if (mcap_cr and inst_addition_pct != 0) else net_flow_cr
+
+        # Derive institutional accumulation conviction score (0-100) using both amount & percentage
+        score, verdict, verdict_badge = calculate_institutional_score(
+            accumulating_count=accumulating_count,
+            selling_count=selling_count,
+            new_buys_count=new_buys_count,
+            net_flow_cr=net_flow_cr,
+            gross_inflow_cr=gross_inflow_cr,
+            gross_outflow_cr=gross_outflow_cr,
+            inst_addition_pct=inst_addition_pct,
+            increase_amount_cr=stock_increase_amount_cr,
+            total_inst_amount_cr=total_inst_amount_cr,
+        )
 
         return {
             "success": True,
