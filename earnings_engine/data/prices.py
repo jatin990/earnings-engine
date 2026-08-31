@@ -256,7 +256,13 @@ def canonical_symbol(ticker: str) -> str:
     return KNOWN_TICKER_ALIASES.get(sym, sym)
 
 
-def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.DataFrame:
+def fetch_prices(
+    ticker: str,
+    settings: Settings,
+    force: bool = False,
+    start_date: str | None = None,
+    hard_refresh: bool = False,
+) -> pd.DataFrame:
     """Fetch prices from yfinance or load from SQLite.
 
     A 10-minute fetch cache (see ``prices_recent_enough``) prevents redundant
@@ -265,7 +271,7 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
     """
     sym = canonical_symbol(ticker)
     fetch_symbol = sym
-    if not force:
+    if not force and not hard_refresh:
         cached_df = load_prices(sym, settings)
         if not cached_df.empty and prices_recent_enough(sym, settings):
             logger.debug("[DATA-CACHE] [prices] Reusing cached price history for ticker=%s (within TTL)", sym)
@@ -273,20 +279,24 @@ def fetch_prices(ticker: str, settings: Settings, force: bool = False) -> pd.Dat
 
     clear_price_df_cache(sym)
 
-    # Delta fetch: only download the dates we're missing. A 5-day overlap
-    # buffer means a prior day's interrupted/partial write is corrected by the
-    # fresh yfinance data (yfinance returns enough rows for the overlap).
-    start = settings.history_start
-    last_cached = _last_cached_date(sym, settings)
-    if last_cached is not None:
-        overlap = pd.Timedelta(days=5)
-        start = (last_cached - overlap).strftime("%Y-%m-%d")
-        logger.info(
-            "[DATA-FETCH] [yfinance] Downloading price delta for ticker=%s (%s) from=%s (last cached: %s)",
-            sym, fetch_symbol, start, last_cached.date(),
-        )
+    # Delta fetch: only download the dates we're missing.
+    # If hard_refresh=True, we explicitly bypass delta fetch and pull from 2015-01-01 (or custom start_date).
+    if hard_refresh:
+        start = start_date or "2015-01-01"
+        last_cached = None
+        logger.info("[DATA-FETCH] [yfinance] Hard-refreshing full historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
     else:
-        logger.info("[DATA-FETCH] [yfinance] Downloading full historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
+        start = start_date or settings.history_start
+        last_cached = _last_cached_date(sym, settings)
+        if last_cached is not None:
+            overlap = pd.Timedelta(days=5)
+            start = (last_cached - overlap).strftime("%Y-%m-%d")
+            logger.info(
+                "[DATA-FETCH] [yfinance] Downloading price delta for ticker=%s (%s) from=%s (last cached: %s)",
+                sym, fetch_symbol, start, last_cached.date(),
+            )
+        else:
+            logger.info("[DATA-FETCH] [yfinance] Downloading full historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
 
     from earnings_engine.data.providers.provider_manager import get_data_manager
 
@@ -511,22 +521,28 @@ def load_price_metrics(ticker: str, settings: Settings, as_of_date: str | None =
     return json.loads(row[0]) if isinstance(row[0], str) else row[0]
 
 
-def _fetch_prices_for_ticker(args: tuple[str, Settings, bool]) -> tuple[str, int]:
+def _fetch_prices_for_ticker(args: tuple[str, Settings, bool, bool, str | None]) -> tuple[str, int]:
     """Fetch prices for a single ticker. Returns (ticker, row_count)."""
-    ticker, settings, force = args
+    ticker, settings, force, hard_refresh, start_date = args
     try:
-        df = fetch_prices(ticker, settings, force=force)
+        df = fetch_prices(ticker, settings, force=force, hard_refresh=hard_refresh, start_date=start_date)
         return (ticker, int(len(df)))
     except Exception:
         return (ticker, 0)
 
 
-def ingest_prices(tickers: list[str], settings: Settings, force: bool = False) -> dict[str, int]:
+def ingest_prices(
+    tickers: list[str],
+    settings: Settings,
+    force: bool = False,
+    hard_refresh: bool = False,
+    start_date: str | None = None,
+) -> dict[str, int]:
     """Download or refresh cached price data for the requested tickers.
 
     Uses ThreadPoolExecutor with 10 workers, batched in groups of 50 with
     2-second delays between batches to avoid yfinance rate limits.
-    Skips tickers with fresh cache unless force=True.
+    Skips tickers with fresh cache unless force=True or hard_refresh=True.
     """
     import time
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -536,11 +552,11 @@ def ingest_prices(tickers: list[str], settings: Settings, force: bool = False) -
     batch_size = 50
     processed = 0
 
-    # Filter out tickers with fresh cache (when not forcing)
+    # Filter out tickers with fresh cache (when not forcing / hard refreshing)
     tickers_to_fetch: list[str] = []
     cached_hits = 0
     for ticker in tickers:
-        if not force and _is_fresh(ticker, settings):
+        if not force and not hard_refresh and _is_fresh(ticker, settings):
             # Load from cache to get row count
             df = load_prices(ticker, settings)
             results[ticker] = int(len(df))
@@ -553,8 +569,8 @@ def ingest_prices(tickers: list[str], settings: Settings, force: bool = False) -
         logger.info("prices cache hit for all %s tickers, skipping fetch", total)
         return results
 
-    logger.info("ingesting prices for %s tickers (%s cached, %s to fetch)",
-                total, cached_hits, len(tickers_to_fetch))
+    logger.info("ingesting prices for %s tickers (%s cached, %s to fetch, hard_refresh=%s)",
+                total, cached_hits, len(tickers_to_fetch), hard_refresh)
 
     fetch_total = len(tickers_to_fetch)
     max_workers = max(1, getattr(settings, "price_fetch_workers", 10))
@@ -565,7 +581,7 @@ def ingest_prices(tickers: list[str], settings: Settings, force: bool = False) -
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_ticker = {
-                executor.submit(_fetch_prices_for_ticker, (ticker, settings, force)): ticker
+                executor.submit(_fetch_prices_for_ticker, (ticker, settings, force or hard_refresh, hard_refresh, start_date)): ticker
                 for ticker in batch
             }
             for future in as_completed(future_to_ticker):

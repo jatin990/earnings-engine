@@ -40,3 +40,16 @@ def test_refresh_stock_institutional_endpoint():
     assert data["success"] is True
     assert data["ticker"] == "LEAPIND.NS"
 
+
+def test_hard_refresh_prices_endpoint():
+    # Test hard refresh route with from_year query parameter
+    res = client.post("/api/v1/stock/TCS.NS/hard-refresh-prices?from_year=2015")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["hard_refresh"] is True
+    assert data["ticker"] == "TCS.NS"
+    assert "total_bars" in data
+    assert "start_date" in data
+
+

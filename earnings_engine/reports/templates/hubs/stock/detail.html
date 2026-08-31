@@ -386,6 +386,16 @@
             border-color: rgba(16, 185, 129, 0.55);
             color: #ffffff;
         }
+        .btn-section-action.warning-subtle {
+            background: rgba(245, 158, 11, 0.12);
+            border-color: rgba(245, 158, 11, 0.35);
+            color: #fbbf24;
+        }
+        .btn-section-action.warning-subtle:hover:not(:disabled) {
+            background: rgba(245, 158, 11, 0.22);
+            border-color: rgba(245, 158, 11, 0.55);
+            color: #ffffff;
+        }
 
         /* Floating Toast Engine */
         .stock-toast-container {
@@ -1161,6 +1171,9 @@
                         <button type="button" onclick="refreshStockPricesFromSource()" class="btn-section-action cyan-subtle" id="btnFetchPricesSource" title="Download latest OHLCV daily price bars and market cap from NSE / yfinance">
                             🔄 Fetch Price from Source
                         </button>
+                        <button type="button" onclick="hardRefreshStockPricesFromSource()" class="btn-section-action warning-subtle" id="btnHardRefreshPrices" title="Force re-download FULL historical OHLCV from Jan 2015 (or listing date) and rebuild the cached price series">
+                            ⚡ Hard Refresh (2015+)
+                        </button>
                         <button type="button" onclick="recalculateStockMetrics()" class="btn-section-action primary-subtle" id="btnRecalcMetrics" title="Recalculate technical, moving average, and price quality metrics">
                             ⚡ Recalculate Quote
                         </button>
@@ -1368,6 +1381,9 @@
                     <div class="section-actions">
                         <button type="button" id="btnRefreshTechPrices" onclick="refreshStockPricesFromSource()" class="btn-section-action cyan-subtle" title="Fetch fresh OHLCV price bars and re-calculate technical indicators">
                             🔄 Fetch Price History
+                        </button>
+                        <button type="button" id="btnHardRefreshTechPrices" onclick="hardRefreshStockPricesFromSource()" class="btn-section-action warning-subtle" title="Force re-download FULL historical OHLCV from Jan 2015 (or listing date) and rebuild the cached price series">
+                            ⚡ Hard Refresh (2015+)
                         </button>
                         <button type="button" id="btnRecalcTechnicals" onclick="recalculateTechnicalsFromSource()" class="btn-section-action primary-subtle" title="Recalculate 20D & 3M swing channels, cycle counts, 20/50/200-DMAs, and structure alignment">
                             ⚡ Recalculate Technicals
@@ -1933,6 +1949,53 @@
             } finally {
                 setBtn(btnHeader, false);
                 setBtn(btnTech, false);
+            }
+        }
+
+        async function hardRefreshStockPricesFromSource() {
+            if (!confirm(`⚠️ This will fully re-download ${ACTIVE_SYM}'s entire price history from Jan 2015 (or listing date) and rebuild the cached OHLCV series. Continue?`)) return;
+            const btnHeader = document.getElementById('btnFetchPricesSource');
+            const btnTech = document.getElementById('btnRefreshTechPrices');
+            const btn = document.getElementById('btnHardRefreshPrices');
+            const btnHardTech = document.getElementById('btnHardRefreshTechPrices');
+            const setBtn = (el, loading) => {
+                if (!el) return;
+                el.disabled = loading;
+                if (loading) {
+                    el.innerHTML = '<span class="spinner" style="width:10px;height:10px;"></span> Hard refreshing...';
+                } else {
+                    if (el.id === 'btnHardRefreshPrices' || el.id === 'btnHardRefreshTechPrices') {
+                        el.innerHTML = '⚡ Hard Refresh (2015+)';
+                    } else if (el.id === 'btnRefreshTechPrices') {
+                        el.innerHTML = '🔄 Fetch Price History';
+                    } else {
+                        el.innerHTML = '🔄 Fetch Price from Source';
+                    }
+                }
+            };
+            setBtn(btn, true); setBtn(btnHardTech, true); setBtn(btnHeader, true); setBtn(btnTech, true);
+            try {
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/hard-refresh-prices?from_year=2015`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || data.error || 'Hard refresh failed');
+                if (data.overview) {
+                    stockState.profile = data.overview.profile || stockState.profile;
+                    stockState.quote = data.overview.quote || stockState.quote;
+                    renderQuoteHeader(stockState.profile, stockState.quote, stockState.is_in_watchlist);
+                }
+                if (data.technicals) {
+                    stockState.technical = data.technicals.technical || data.technicals;
+                    const curr = stockState.quote?.current_price || 0;
+                    renderTechnicalSection(stockState.technical, curr, stockState.profile, stockState.quote);
+                    renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, curr, stockState.profile, stockState.quote);
+                }
+                await fetchStockDetails();
+                const range = (data.total_bars && data.total_bars > 0) ? `${data.total_bars} bars · ${data.start_date} → ${data.end_date}` : 'no price bars returned';
+                showStockToast(data.message || `Hard refresh complete for ${ACTIVE_SYM} (${range})`, 'success');
+            } catch (err) {
+                showStockToast('Hard refresh error: ' + err.message, 'error');
+            } finally {
+                setBtn(btn, false); setBtn(btnHardTech, false); setBtn(btnHeader, false); setBtn(btnTech, false);
             }
         }
 

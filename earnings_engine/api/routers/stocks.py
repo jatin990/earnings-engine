@@ -319,20 +319,52 @@ async def get_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Que
 
 
 @router.post("/api/v1/stock/{ticker}/refresh-prices")
-async def refresh_stock_prices_endpoint(ticker: str):
-    """Force download latest OHLCV price bars, market cap, and return updated quote & technicals."""
+@router.post("/api/v1/stock/{ticker}/hard-refresh-prices")
+async def refresh_stock_prices_endpoint(
+    ticker: str,
+    hard: bool = Query(False, description="Whether to hard-refresh full history from 2015"),
+    from_year: int | None = Query(None, description="Starting year for historical prices (e.g. 2015)"),
+):
+    """Force download latest OHLCV price bars, market cap, and return updated quote & technicals.
+    
+    If hard=True or from_year is specified, fetches full historical prices from 2015 (or listing date).
+    """
     sym = clean_ticker_param(ticker)
+    is_hard = hard or (from_year is not None)
+    start_dt = f"{from_year}-01-01" if from_year else ("2015-01-01" if is_hard else None)
     try:
-        from earnings_engine.data.prices import ingest_prices
+        from earnings_engine.data.prices import ingest_prices, load_prices
         from earnings_engine.data.universe import ingest_market_caps
-        await asyncio.to_thread(ingest_prices, [sym], settings=_settings, force=True)
+        await asyncio.to_thread(
+            ingest_prices,
+            [sym],
+            settings=_settings,
+            force=True,
+            hard_refresh=is_hard,
+            start_date=start_dt,
+        )
         await asyncio.to_thread(ingest_market_caps, [sym], force=True, settings=_settings)
         overview = await asyncio.to_thread(stock_api.get_stock_overview, ticker=sym, settings=_settings)
         technicals = await asyncio.to_thread(stock_api.get_stock_technicals, ticker=sym, settings=_settings)
+
+        df = await asyncio.to_thread(load_prices, sym, _settings)
+        bar_count = len(df) if df is not None and not df.empty else 0
+        min_date = df.index.min().strftime("%Y-%m-%d") if bar_count > 0 else "—"
+        max_date = df.index.max().strftime("%Y-%m-%d") if bar_count > 0 else "—"
+
+        msg = (
+            f"Successfully hard-refreshed {bar_count} price bars from {min_date} to {max_date} for {sym}"
+            if is_hard
+            else f"Successfully fetched latest price bars and refreshed quote for {sym}"
+        )
         return {
             "success": True,
             "ticker": sym,
-            "message": f"Successfully fetched latest price bars and refreshed quote for {sym}",
+            "message": msg,
+            "hard_refresh": is_hard,
+            "start_date": min_date,
+            "end_date": max_date,
+            "total_bars": bar_count,
             "overview": overview,
             "technicals": technicals,
         }
