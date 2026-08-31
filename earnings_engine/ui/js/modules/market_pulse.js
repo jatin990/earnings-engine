@@ -354,12 +354,14 @@
         },
 
         renderParticipantOI(oiData) {
+            this._lastOiData = oiData;
             const tableBody = document.getElementById('pulseParticipantOiTableBody');
+            const historyBody = document.getElementById('pulseParticipantOiHistoryTableBody');
             const badgeEl = document.getElementById('pulseOiRegimeBadge');
             const sessionSub = document.getElementById('pulseOiSessionSub');
             const commentaryEl = document.getElementById('pulseOiCommentary');
 
-            if (!oiData || !oiData.participants || !oiData.participants.length) {
+            if (!oiData || (!oiData.participants && !oiData.history_7d)) {
                 if (tableBody) {
                     tableBody.innerHTML = `
                         <tr>
@@ -397,7 +399,8 @@
                 commentaryEl.textContent = oiData.commentary;
             }
 
-            if (tableBody) {
+            // Render 1D Snapshot Table
+            if (tableBody && oiData.participants && oiData.participants.length) {
                 tableBody.innerHTML = oiData.participants.map(p => {
                     const netVal = p.net_contracts || 0;
                     const netCol = netVal > 0 ? '#34d399' : (netVal < 0 ? '#f87171' : '#94a3b8');
@@ -455,6 +458,83 @@
                         </tr>
                     `;
                 }).join('');
+            }
+
+            // Render 7-Day History Matrix Table
+            if (historyBody && oiData.history_7d && oiData.history_7d.length) {
+                historyBody.innerHTML = oiData.history_7d.map((row, idx) => {
+                    const isToday = idx === 0;
+                    const rowBg = isToday ? 'rgba(56,189,248,0.06)' : 'transparent';
+                    
+                    const fNet = row.fii_net_contracts || 0;
+                    const fSign = fNet >= 0 ? '+' : '';
+                    const fCol = fNet >= 0 ? '#34d399' : '#f87171';
+                    const fRatio = row.fii_long_short_ratio || 1.0;
+
+                    const dNet = row.dii_net_contracts || 0;
+                    const dSign = dNet >= 0 ? '+' : '';
+                    const dCol = dNet >= 0 ? '#34d399' : '#f87171';
+                    const dRatio = row.dii_long_short_ratio || 1.0;
+
+                    const pNet = row.pro_net_contracts || 0;
+                    const pSign = pNet >= 0 ? '+' : '';
+                    const pCol = pNet >= 0 ? '#34d399' : '#f87171';
+                    const pRatio = row.pro_long_short_ratio || 1.0;
+
+                    const cNet = row.client_net_contracts || 0;
+                    const cSign = cNet >= 0 ? '+' : '';
+                    const cCol = cNet >= 0 ? '#34d399' : '#f87171';
+                    const cRatio = row.client_long_short_ratio || 1.0;
+
+                    const isFiiLong = fNet >= 0;
+                    const biasText = isFiiLong ? '🟢 FII Long Bias' : '🔴 FII Short Hedge';
+                    const biasBg = isFiiLong ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)';
+                    const biasCol = isFiiLong ? '#34d399' : '#f87171';
+
+                    return `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);background:${rowBg};">
+                            <td style="padding:0.45rem 0.6rem;font-family:var(--font-mono);font-weight:${isToday ? '700' : '500'};color:${isToday ? '#f8fafc' : '#cbd5e1'};">
+                                ${row.session_label || row.date}
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${fCol};font-weight:600;">
+                                ${fSign}${fNet.toLocaleString()} <span style="font-size:0.62rem;color:#94a3b8;">(${fRatio.toFixed(2)}x)</span>
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${dCol};font-weight:600;">
+                                ${dSign}${dNet.toLocaleString()} <span style="font-size:0.62rem;color:#94a3b8;">(${dRatio.toFixed(2)}x)</span>
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${pCol};font-weight:600;">
+                                ${pSign}${pNet.toLocaleString()} <span style="font-size:0.62rem;color:#94a3b8;">(${pRatio.toFixed(2)}x)</span>
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${cCol};font-weight:600;">
+                                ${cSign}${cNet.toLocaleString()} <span style="font-size:0.62rem;color:#94a3b8;">(${cRatio.toFixed(2)}x)</span>
+                            </td>
+                            <td style="padding:0.45rem 0.6rem;text-align:center;">
+                                <span style="font-size:0.62rem;padding:0.12rem 0.4rem;border-radius:3px;background:${biasBg};color:${biasCol};font-weight:700;font-family:var(--font-mono);">
+                                    ${biasText}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        },
+
+        toggleParticipantOiView() {
+            this._isOiHistoryView = !this._isOiHistoryView;
+            const snapContainer = document.getElementById('pulseOiSnapshotContainer');
+            const histContainer = document.getElementById('pulseOiHistoryContainer');
+            const btn = document.getElementById('btnToggleOiView');
+
+            if (snapContainer && histContainer) {
+                if (this._isOiHistoryView) {
+                    snapContainer.style.display = 'none';
+                    histContainer.style.display = 'block';
+                    if (btn) btn.innerHTML = '📊 1D Snapshot View';
+                } else {
+                    snapContainer.style.display = 'block';
+                    histContainer.style.display = 'none';
+                    if (btn) btn.innerHTML = '📅 Past 7 Days Matrix';
+                }
             }
         },
 
@@ -704,5 +784,6 @@
     };
 
     window.marketPulseModule = marketPulseModule;
+    window.app.marketPulse = marketPulseModule;
     Object.assign(window.app, marketPulseModule);
 })();

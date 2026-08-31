@@ -268,12 +268,18 @@
                     <div id="pulseOiSessionSub" style="font-size:0.65rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.1rem;">Institutional FII / DII vs Pro Algo Desks vs Retail Positioning Breakdown</div>
                 </div>
             </div>
-            <span id="pulseOiRegimeBadge" style="font-size:0.68rem;padding:0.18rem 0.55rem;border-radius:4px;background:rgba(249,115,22,0.15);color:#fb923c;font-family:var(--font-mono);font-weight:700;border:1px solid rgba(249,115,22,0.3);">
-                ⏳ Calculating Derivatives Sentiment...
-            </span>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <button type="button" id="btnToggleOiView" class="btn-micro" style="padding:0.25rem 0.6rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.marketPulse.toggleParticipantOiView()">
+                    📅 Past 7 Days Matrix
+                </button>
+                <span id="pulseOiRegimeBadge" style="font-size:0.68rem;padding:0.18rem 0.55rem;border-radius:4px;background:rgba(249,115,22,0.15);color:#fb923c;font-family:var(--font-mono);font-weight:700;border:1px solid rgba(249,115,22,0.3);">
+                    ⏳ Calculating Derivatives Sentiment...
+                </span>
+            </div>
         </div>
 
-        <div style="overflow-x:auto;border-radius:6px;border:1px solid rgba(255,255,255,0.06);margin-bottom:0.75rem;">
+        <!-- Latest Snapshot Table -->
+        <div id="pulseOiSnapshotContainer" style="overflow-x:auto;border-radius:6px;border:1px solid rgba(255,255,255,0.06);margin-bottom:0.75rem;">
             <table class="results-table" style="width:100%;font-size:0.72rem;border-collapse:collapse;margin:0;">
                 <thead>
                     <tr style="background:#060a16;">
@@ -287,6 +293,25 @@
                     </tr>
                 </thead>
                 <tbody id="pulseParticipantOiTableBody">
+                    <!-- Populated dynamically via market_pulse.js -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 7-Day Matrix Table (Toggled) -->
+        <div id="pulseOiHistoryContainer" style="display:none;overflow-x:auto;border-radius:6px;border:1px solid rgba(255,255,255,0.06);margin-bottom:0.75rem;">
+            <table class="results-table" style="width:100%;font-size:0.72rem;border-collapse:collapse;margin:0;">
+                <thead>
+                    <tr style="background:#060a16;">
+                        <th style="padding:0.45rem 0.6rem;text-align:left;">Trading Session</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">🏛️ FII Net (L/S Ratio)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">🏢 DII Net (L/S Ratio)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">⚡ PRO Net (L/S Ratio)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">👤 Retail Net (L/S Ratio)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:center;">Institutional Flow Bias</th>
+                    </tr>
+                </thead>
+                <tbody id="pulseParticipantOiHistoryTableBody">
                     <!-- Populated dynamically via market_pulse.js -->
                 </tbody>
             </table>

@@ -77,6 +77,35 @@ def test_market_pulse_data_structure():
     sectors = data["sectors"]
     assert len(sectors) >= 5
 
+    # Check Participant Derivatives Open Interest (OI) & 7-Day Matrix
+    oi = data["participant_oi"]
+    assert "participants" in oi
+    assert len(oi["participants"]) >= 4
+    for p in oi["participants"]:
+        assert "participant" in p
+        assert "category_label" in p
+        assert "futures_long" in p
+        assert "futures_short" in p
+        assert "calls_long" in p
+        assert "puts_long" in p
+        assert "net_contracts" in p
+        assert "long_short_ratio" in p
+        assert "stance" in p
+
+    assert "history_7d" in oi
+    assert len(oi["history_7d"]) >= 5
+    for h in oi["history_7d"]:
+        assert "date" in h
+        assert "session_label" in h
+        assert "fii_net_contracts" in h
+        assert "dii_net_contracts" in h
+        assert "pro_net_contracts" in h
+        assert "client_net_contracts" in h
+        assert "fii_long_short_ratio" in h
+
+    assert "regime_verdict" in oi
+    assert "commentary" in oi
+
 
 def test_market_pulse_api_endpoint(client):
     res = client.get("/api/v1/market/pulse")
@@ -88,7 +117,35 @@ def test_market_pulse_api_endpoint(client):
     assert len(inst["history_7d"]) >= 5
     assert "history_extended" in inst
     assert len(inst["history_extended"]) >= 5
-    json_data = res.json()
-    assert json_data["success"] is True
-    assert "fear_and_greed" in json_data
-    assert "prediction" in json_data
+    assert "participant_oi" in payload
+    assert len(payload["participant_oi"]["history_7d"]) >= 5
+    assert "fear_and_greed" in payload
+    assert "prediction" in payload
+
+
+def test_participant_oi_dedicated_endpoint(client):
+    res = client.get("/api/v1/market-pulse/participant-oi")
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["success"] is True
+    assert "participant_oi" in payload
+    oi = payload["participant_oi"]
+    assert "participants" in oi
+    assert len(oi["participants"]) >= 4
+    assert "history_7d" in oi
+    assert len(oi["history_7d"]) >= 5
+    assert "regime_verdict" in oi
+
+
+def test_institutional_flows_dedicated_endpoint(client):
+    res = client.get("/api/v1/market-pulse/institutional-flows")
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["success"] is True
+    assert "liquidity" in payload
+    liq = payload["liquidity"]
+    assert "history_7d" in liq
+    assert len(liq["history_7d"]) >= 5
+    assert "fii_net_cr" in liq
+    assert "dii_net_cr" in liq
+

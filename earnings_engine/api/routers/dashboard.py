@@ -405,6 +405,7 @@ async def api_get_sector_heatmap(
 
 
 @router.get("/api/v1/market-pulse/liquidity")
+@router.get("/api/v1/market-pulse/institutional-flows")
 @router.get("/api/v1/liquidity/overview")
 async def api_get_net_cash_liquidity(
     force_refresh: bool = Query(False, description="Force refresh cache"),
