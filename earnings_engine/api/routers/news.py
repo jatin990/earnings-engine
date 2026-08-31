@@ -233,6 +233,27 @@ async def analyze_with_omniroute_endpoint(payload: dict):
         raise HTTPException(status_code=500, detail=f"OmniRoute analysis error: {str(e)}")
 
 
+@router.post("/api/v1/news/extract-structured")
+async def extract_structured_news_endpoint(payload: dict):
+    """Execute structured, type-safe news extraction returning NewsExtractedData schema."""
+    try:
+        from earnings_engine.data.ai_news_analyzer import extract_structured_news_data
+        result = await asyncio.to_thread(
+            extract_structured_news_data,
+            item=payload,
+            settings=_settings,
+            preferred_model=payload.get("model"),
+        )
+        return {
+            "success": True,
+            "extracted": result.model_dump() if hasattr(result, "model_dump") else result,
+            **result.to_db_dict(),
+        }
+    except Exception as e:
+        logger.exception("Error executing structured news extraction: %s", e)
+        raise HTTPException(status_code=500, detail=f"Structured extraction error: {str(e)}")
+
+
 @router.post("/api/v1/news/analyze-ondemand")
 async def analyze_news_ondemand_endpoint(payload: dict):
     """Execute on-demand AI analysis for a single news item and persist structured output atomically."""

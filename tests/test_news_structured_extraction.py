@@ -219,10 +219,10 @@ def test_news_ai_deduplication_and_ondemand_pipeline(test_settings, monkeypatch)
     call_count = 0
     orig_analyze = analyzer_mod.analyze_news_catalyst_ai
 
-    def mock_analyze(ctx, settings=None, model=None):
+    def mock_analyze(ctx, settings=None, model=None, preferred_model=None, **kwargs):
         nonlocal call_count
         call_count += 1
-        return orig_analyze(ctx, settings=settings, model=model)
+        return orig_analyze(ctx, settings=settings, model=model, preferred_model=preferred_model, **kwargs)
 
     monkeypatch.setattr(analyzer_mod, "analyze_news_catalyst_ai", mock_analyze)
 

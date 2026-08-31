@@ -239,20 +239,22 @@ def process_and_verify_news_items(
             ai_analyzed_at = cached_row["ai_analyzed_at"] or now_str
         elif run_ai:
             # -------------------------------------------------------------------
-            # Explicit On-Demand AI Catalyst Analysis via OmniRoute
+            # Explicit On-Demand AI Catalyst Analysis via OmniRoute & Structured Extraction
             # -------------------------------------------------------------------
-            ai_res = analyze_news_catalyst_ai(ai_ctx, settings=settings)
-            ai_model = ai_res.get("ai_model", "free-ai-engine")
-            ai_direction = ai_res.get("direction") or v_res["verified_direction"]
-            ai_sentiment = ai_res.get("sentiment") or ai_direction
-            ai_takeaway = ai_res.get("trading_takeaway") or scored["why_it_matters"]
-            ai_target = ai_res.get("target_price")
-            ai_stop = ai_res.get("stop_loss")
-            ai_proj = ai_res.get("financial_projections") or {}
-            ai_temp_orig = ai_res.get("temporal_originality") or "NEW_PUBLICATION"
-            ai_is_repub = 1 if ai_res.get("is_republication") else 0
-            ai_orig_rat = ai_res.get("original_rationale") or ai_res.get("originality_rationale") or ""
-            ai_analyzed_at = ai_res.get("ai_analyzed_at", now_str)
+            from earnings_engine.data.ai_news_analyzer import extract_structured_news_data
+            extracted = extract_structured_news_data(ai_ctx, settings=settings)
+            ai_model = extracted.ai_model or "free-ai-engine"
+            ai_direction = extracted.direction or v_res["verified_direction"]
+            ai_sentiment = extracted.sentiment.value if hasattr(extracted.sentiment, "value") else str(extracted.sentiment)
+            ai_takeaway = extracted.trading_takeaway or scored["why_it_matters"]
+            ai_target = extracted.target_price
+            ai_stop = extracted.stop_loss
+            ai_proj = extracted.financial_projections.model_dump() if hasattr(extracted.financial_projections, "model_dump") else (extracted.financial_projections.to_dict() if hasattr(extracted.financial_projections, "to_dict") else {})
+            ai_temp_orig = extracted.temporal_originality.value if hasattr(extracted.temporal_originality, "value") else str(extracted.temporal_originality)
+            ai_is_repub = 1 if extracted.is_republication else 0
+            ai_orig_rat = extracted.originality_rationale or ""
+            ai_analyzed_at = extracted.ai_analyzed_at or now_str
+            ai_res = extracted.to_db_dict()
         else:
             # -------------------------------------------------------------------
             # Zero-Token Deterministic Heuristic Extraction (Default Ingestion)
@@ -375,27 +377,25 @@ def analyze_news_item_ondemand(
         "verified_numbers": verified_nums,
     }
 
-    from earnings_engine.data.ai_news_analyzer import analyze_news_catalyst_ai
-    ai_res = analyze_news_catalyst_ai(ai_ctx, settings=settings, model=model)
+    from earnings_engine.data.ai_news_analyzer import extract_structured_news_data
+    extracted = extract_structured_news_data(ai_ctx, settings=settings, preferred_model=model)
 
-    # Extract structured fields
-    ai_direction = ai_res.get("direction") or row_dict.get("direction", "NEUTRAL")
-    ai_sentiment = ai_res.get("sentiment") or ai_direction
-    ai_takeaway = ai_res.get("trading_takeaway") or row_dict.get("why_it_matters", "")
-    ai_target = ai_res.get("target_price")
-    ai_stop = ai_res.get("stop_loss")
-    ai_proj = ai_res.get("financial_projections") or {}
-    ai_temp_orig = ai_res.get("temporal_originality") or "NEW_PUBLICATION"
-    ai_is_repub = 1 if ai_res.get("is_republication") else 0
-    ai_orig_rat = ai_res.get("originality_rationale") or ""
-    ai_model_name = ai_res.get("ai_model", model or "omniroute/ai-news-engine")
-    ai_analyzed_at = ai_res.get("ai_analyzed_at", now_str)
+    # Extract structured fields from type-safe NewsExtractedData model
+    ai_direction = extracted.direction or row_dict.get("direction", "NEUTRAL")
+    ai_sentiment = extracted.sentiment.value if hasattr(extracted.sentiment, "value") else str(extracted.sentiment)
+    ai_takeaway = extracted.trading_takeaway or row_dict.get("why_it_matters", "")
+    ai_target = extracted.target_price
+    ai_stop = extracted.stop_loss
+    ai_proj = extracted.financial_projections.model_dump() if hasattr(extracted.financial_projections, "model_dump") else (extracted.financial_projections.to_dict() if hasattr(extracted.financial_projections, "to_dict") else {})
+    ai_temp_orig = extracted.temporal_originality.value if hasattr(extracted.temporal_originality, "value") else str(extracted.temporal_originality)
+    ai_is_repub = 1 if extracted.is_republication else 0
+    ai_orig_rat = extracted.originality_rationale or ""
+    ai_model_name = extracted.ai_model or (model or "omniroute/ai-news-engine")
+    ai_analyzed_at = extracted.ai_analyzed_at or now_str
+    ai_res = extracted.to_db_dict()
 
-    impact_score = row_dict.get("impact_score", 50)
-    impact_level = row_dict.get("impact_level", "MEDIUM")
-    if ai_res.get("impact_score") and ai_res["impact_score"] > 0:
-        impact_score = int(ai_res["impact_score"])
-        impact_level = ai_res.get("impact_level", impact_level)
+    impact_score = extracted.impact_score if extracted.impact_score > 0 else row_dict.get("impact_score", 50)
+    impact_level = extracted.impact_level or row_dict.get("impact_level", "MEDIUM")
 
     # Upsert atomically to news_catalysts
     rec_to_save = {
@@ -412,8 +412,8 @@ def analyze_news_item_ondemand(
         "category": row_dict.get("category", "General Corporate News"),
         "direction": ai_direction,
         "sentiment": ai_sentiment,
-        "expected_horizon": ai_res.get("expected_horizon") or row_dict.get("expected_horizon", "📅 1-3 Days"),
-        "volatility_est": ai_res.get("volatility_est") or row_dict.get("volatility_est", "±1% to ±4%"),
+        "expected_horizon": extracted.expected_horizon or row_dict.get("expected_horizon", "📅 1-3 Days"),
+        "volatility_est": extracted.volatility_est or row_dict.get("volatility_est", "±1% to ±4%"),
         "why_it_matters": ai_takeaway,
         "source": row_dict.get("source", "ondemand_pipeline"),
         "created_at": row_dict.get("created_at", now_str),
