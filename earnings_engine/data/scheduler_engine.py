@@ -355,8 +355,9 @@ class SchedulerEngine:
         from earnings_engine.data.market_pulse import is_market_open
         market_open = is_market_open(now_ts)
 
-        # Global weekend & off-market hours guard: immediately skip recurring evaluations
-        if not market_open:
+        # Global concurrency guard: prevent background jobs from overloading the CPU/database
+        MAX_CONCURRENT_BACKGROUND_JOBS = 2
+        if len(self._running_jobs) >= MAX_CONCURRENT_BACKGROUND_JOBS:
             return
 
         for sched in schedules:
@@ -369,6 +370,8 @@ class SchedulerEngine:
                 continue
             if job_id in self._running_jobs:
                 continue
+            if len(self._running_jobs) >= MAX_CONCURRENT_BACKGROUND_JOBS:
+                break
 
             # Market session & after-hours execution filter
             run_after_hours = sched.get("run_after_hours")

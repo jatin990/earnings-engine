@@ -34,6 +34,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "interval_seconds": 3600,
         "run_after_hours": 0,
         "market_session": "market_hours_only",
+        "is_enabled": 0,
         "params_json": '{"universe": "NSE_ALL", "strategy": "NSE_DELIVERY_ABSORPTION", "min_score": 30}',
         "description": "Automated scan identifying institutional block delivery accumulation spikes exceeding 60% and delivery resistance ceilings.",
     },
@@ -44,6 +45,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "interval_seconds": 1800,
         "run_after_hours": 0,
         "market_session": "market_hours_only",
+        "is_enabled": 0,
         "params_json": '{"universe": "NSE_ALL", "strategy": "NSE_FO_CALL_WALL", "min_score": 30}',
         "description": "Derivatives option chain scanner evaluating call open interest walls, short-covering velocity, and PCR momentum.",
     },
@@ -54,6 +56,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "interval_seconds": 3600,
         "run_after_hours": 0,
         "market_session": "market_hours_only",
+        "is_enabled": 0,
         "params_json": '{"universe": "NSE_ALL", "strategy": "VOLUME_PROFILE_VAH", "min_score": 30}',
         "description": "63-day volume profile analysis detecting Value Area High (VAH) breakouts and low volume node liquidity vacuums.",
     },
@@ -64,6 +67,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "interval_seconds": 1800,
         "run_after_hours": 0,
         "market_session": "market_hours_only",
+        "is_enabled": 0,
         "params_json": '{"universe": "NSE_ALL", "strategy": "DONCHIAN_TTM_SQUEEZE", "min_score": 30}',
         "description": "John Carter TTM Squeeze (Bollinger inside Keltner) and 55-Day Donchian channel trend breakout scanner.",
     },
@@ -94,6 +98,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "interval_seconds": 3600,
         "run_after_hours": 0,
         "market_session": "market_hours_only",
+        "is_enabled": 0,
         "params_json": '{"universe": "NSE_ALL", "strategy": "CLASSIC_TECHNICAL", "min_score": 35}',
         "description": "Full universe multi-factor scan discovering fresh compression and momentum setups using Classic 20D/52W model.",
     },
@@ -202,8 +207,14 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
 ]
 
 
-def init_automation_schedules(settings: Settings | None = None) -> None:
+_SCHEDULES_SEEDED = False
+
+
+def init_automation_schedules(settings: Settings | None = None, force: bool = False) -> None:
     """Ensure all default background schedules are seeded in the database."""
+    global _SCHEDULES_SEEDED
+    if _SCHEDULES_SEEDED and not force:
+        return
     settings = settings or Settings()
     try:
         from earnings_engine.data.migrations import apply_migrations
@@ -264,8 +275,43 @@ def init_automation_schedules(settings: Settings | None = None) -> None:
                 """,
                 (run_after, session, s["job_id"]),
             )
+            # If job is disabled in code defaults (e.g. redundant individual sweeps or kronos), ensure is_enabled is synced
+            if is_en == 0:
+                conn.execute(
+                    """
+                    UPDATE automation_schedules
+                    SET is_enabled = 0,
+                        status = 'paused'
+                    WHERE job_id = ?
+                    """,
+                    (s["job_id"],),
+                )
+
+        # 1. Reset any stuck 'running' status back to 'active' on server startup
+        conn.execute("UPDATE automation_schedules SET status = 'active' WHERE status = 'running'")
+
+        # 2. Reset overdue next_run_at timestamps so jobs don't storm-fire concurrently on startup
+        overdue_rows = conn.execute("SELECT job_id, interval_seconds, next_run_at FROM automation_schedules WHERE is_enabled = 1").fetchall()
+        stagger_offset = 60
+        for r_job, r_int, r_next in overdue_rows:
+            is_overdue = False
+            if not r_next:
+                is_overdue = True
+            else:
+                try:
+                    dt = datetime.fromisoformat(r_next.replace("Z", "+00:00"))
+                    if dt < now_dt:
+                        is_overdue = True
+                except Exception:
+                    is_overdue = True
+            if is_overdue:
+                fut_iso = (now_dt + timedelta(seconds=max(int(r_int or 600), stagger_offset))).isoformat()
+                conn.execute("UPDATE automation_schedules SET next_run_at = ?, updated_at = ? WHERE job_id = ?", (fut_iso, now_iso, r_job))
+                stagger_offset += 60
+
         if hasattr(conn, "commit"):
             conn.commit()
+        _SCHEDULES_SEEDED = True
     except Exception as e:
         logger.debug("[SCHEDULES] Init schedules error: %s", e)
 
