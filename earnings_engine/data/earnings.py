@@ -153,12 +153,12 @@ def _is_fresh(ticker: str, settings: Settings) -> bool:
 
         fetched_at_str = row[0] if row and row[0] else None
 
-        # If fetched within the last 12 hours, treat as fresh to avoid hammering APIs within the same session
+        # If fetched within the last 24 hours, treat as fresh to avoid hammering APIs within the same session (especially for newly listed IPOs with no earnings calendar yet)
         if fetched_at_str:
             try:
                 fetched_at = pd.Timestamp(fetched_at_str)
                 age_hours = (pd.Timestamp.now() - fetched_at).total_seconds() / 3600.0
-                if age_hours < 12.0:
+                if age_hours < 24.0:
                     return True
             except Exception:
                 pass
@@ -172,8 +172,15 @@ def _is_fresh(ticker: str, settings: Settings) -> bool:
 
         next_earnings_date_str = next_row[0] if next_row and next_row[0] else None
 
-    # Condition 1: Next earnings date is NOT present -> needs refresh
+    # Condition 1: Next earnings date is NOT present and hasn't been fetched in last 24h -> needs refresh
     if not next_earnings_date_str:
+        if fetched_at_str:
+            try:
+                age_hours = (pd.Timestamp.now() - pd.Timestamp(fetched_at_str)).total_seconds() / 3600.0
+                if age_hours < 24.0:
+                    return True
+            except Exception:
+                pass
         return False
 
     try:

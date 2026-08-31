@@ -63,6 +63,10 @@ class ErrorLedgerLoggingHandler(logging.Handler):
             msg = record.getMessage()
             err_type = f"{record.name}.{record.levelname}"
 
+            # Filter out expected third-party noise (e.g. yfinance newly listed IPOs with no earnings calendar yet)
+            if "No earnings dates found, symbol may be delisted" in msg:
+                return
+
             # 1. Append to active error stream for instant zero-scan consumption
             append_to_error_stream({
                 "timestamp": now_iso,
