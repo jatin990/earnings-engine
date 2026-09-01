@@ -2294,13 +2294,28 @@
         }
 
         async function fetchStockNotesOnly() {
+            // Fast core note first (AI thesis gated server-side via include_ai=false),
+            // then lazy-load the AI thesis in the background so the page isn't blocked.
             try {
                 const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/notes`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && typeof renderStockNoteCard === 'function') {
-                        renderStockNoteCard(data);
-                    }
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                stockState.notes = data;
+                if (data && typeof renderStockNoteCard === 'function') {
+                    renderStockNoteCard(data);
+                }
+                // Lazy-load the AI thesis if the fast note didn't include it.
+                if (data && data.ai_loaded === false) {
+                    fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/notes?include_ai=true`)
+                        .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+                        .then(full => {
+                            if (!full) return;
+                            stockState.notes = full;
+                            if (typeof renderStockNoteCard === 'function') {
+                                renderStockNoteCard(full);
+                            }
+                        })
+                        .catch(e => console.debug('AI thesis lazy-load error:', e));
                 }
             } catch (e) {
                 console.debug('Notes fetch error:', e);

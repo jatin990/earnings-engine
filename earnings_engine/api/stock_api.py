@@ -958,6 +958,7 @@ def get_stock_intelligence_note(
     model_name: str | None = None,
     provider: str = "auto",
     settings: Settings | None = None,
+    include_ai: bool = True,
 ) -> dict[str, Any]:
     """Aggregate a comprehensive, transparent intelligence note for any stock.
     
@@ -1007,11 +1008,15 @@ def get_stock_intelligence_note(
     pct_to_ress = round(((ress - cmp) / cmp) * 100.0, 2) if (cmp and ress and cmp > 0) else None
 
     # 4. Forward AI Thesis & Multi-Model Execution
+    # Lazy-loaded: expensive LLM inference exercises by default so the core note
+    # renders fast. Callers opt-in via include_ai=True (the /notes?include_ai=true
+    # and /intelligence-note paths) to pull the full AI thesis in the background.
     ai_forecast = {}
-    try:
-        ai_forecast = generate_ai_repeater_forecast(sym, settings=settings, model_name=model_name, provider=provider)
-    except Exception as ex:
-        logger.warning("[NOTE-API] Error generating AI forecast for %s: %s", sym, ex)
+    if include_ai:
+        try:
+            ai_forecast = generate_ai_repeater_forecast(sym, settings=settings, model_name=model_name, provider=provider)
+        except Exception as ex:
+            logger.warning("[NOTE-API] Error generating AI forecast for %s: %s", sym, ex)
 
     # Reaction explanation
     price_action_explanation = ai_forecast.get("price_action_assessment")
@@ -1066,6 +1071,7 @@ def get_stock_intelligence_note(
         "beat_history": ai_forecast.get("streak_history") or [],
         "beat_streak": ai_forecast.get("beat_streak") or len(e_hist),
         "news_catalysts": ai_forecast.get("news_articles") or [],
+        "ai_loaded": bool(ai_forecast),
     }
 
 

@@ -103,7 +103,9 @@ OMNIROUTE_MODEL_CATALOG: list[dict[str, Any]] = [
 ]
 
 OMNIROUTE_SYSTEM_PROMPT = """You are an institutional quantitative equity analyst and advanced reasoning engine specializing in Indian (NSE/BSE) and global equities.
-Evaluate the provided corporate news announcement alongside point-in-time technical price action, institutional flows, moving average structures, and fundamental guidance.
+Analyze the provided corporate news announcement together with the point-in-time technical price action, institutional flows, moving average structure, and fundamental guidance.
+
+Ask yourself the full analysis yourself before producing the output: assess the impact on revenue, margins, institutional order flow, technical levels, and market sentiment, then reconcile these factors into a single consistent view. Ground every number and projection in the data supplied - never invent signal prices, targets, or stop levels that are not supported by the provided context.
 
 Provide a crisp, mathematically consistent, and actionable trading evaluation.
 
@@ -128,8 +130,8 @@ Return ONLY a raw, valid JSON object strictly matching this schema:
   "originality_rationale": "<1 sentence on news freshness vs past announcements>",
   "impact_score": <integer 25 to 99, catalyst price magnitude score>,
   "impact_level": "HIGH" | "MEDIUM" | "LOW",
-  "expected_horizon": "📅 1-3 Days" | "📅 1-2 Weeks" | "📅 Positional",
-  "volatility_est": "±1% to ±3%" | "±2% to ±6%" | "±5% to ±12%",
+  "expected_horizon": "1-3 Days" | "1-2 Weeks" | "Positional",
+  "volatility_est": "+/-1% to +/-3%" | "+/-2% to +/-6%" | "+/-5% to +/-12%",
   "trading_takeaway": "<2-3 sentence institutional synthesis integrating news catalyst, price action momentum, and institutional accumulation flow>",
   "confidence_pct": <integer 0-100>,
   "key_catalyst_triggers": ["<bullet 1>", "<bullet 2>"],
@@ -141,7 +143,9 @@ Key Quantitative Directives:
 2. Invalidation: Set defensive stop_loss below key support S1 / recent base for BULLISH, and above swing resistance for BEARISH.
 3. Temporal Originality: Distinguish between brand-new regulatory/exchange disclosures vs regurgitated past events.
 4. Institutional Context: Synthesize delivery absorption, volume ratios, and moving average structure with news impact.
-5. Format: Return ONLY the raw JSON object without markdown code blocks, backticks, or preamble commentary."""
+5. Self-Analysis: Work through the reasoning internally first, then output only the final, internally-consistent JSON.
+6. Format: Return ONLY the raw JSON object without markdown code blocks, backticks, or preamble commentary.
+7. Style: Use plain professional language. Do NOT use emojis, symbols, or decorative gunk in any string value."""
 
 
 class OmniRouteClient:
@@ -674,8 +678,8 @@ class OmniRouteClient:
         sentiment = direction
         impact_score = scored.get("impact_score", 50)
         impact_level = scored.get("impact_level", "MEDIUM")
-        horizon = scored.get("expected_horizon", "📅 1-3 Days")
-        volatility = scored.get("volatility_est", "±1% to ±4%")
+        horizon = scored.get("expected_horizon", "1-3 Days")
+        volatility = scored.get("volatility_est", "+/-1% to +/-4%")
         why_it_matters = scored.get("why_it_matters", "")
 
         target_price = None

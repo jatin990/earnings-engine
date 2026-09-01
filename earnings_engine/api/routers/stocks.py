@@ -148,11 +148,11 @@ async def get_stock_factor_evaluation_endpoint(ticker: str):
 
 
 @router.get("/api/v1/stock/{ticker}/notes")
-async def get_stock_notes_endpoint(ticker: str):
+async def get_stock_notes_endpoint(ticker: str, include_ai: bool = Query(False, description="Include the AI forward thesis (slow LLM inference). Defaults to false for a fast core note that the UI lazy-loads the AI thesis into.")):
     """Return consolidated AI intelligence notes for a stock."""
     sym = clean_ticker_param(ticker)
     try:
-        return await asyncio.to_thread(stock_api.get_stock_intelligence_note, ticker=sym, settings=_settings)
+        return await asyncio.to_thread(stock_api.get_stock_intelligence_note, ticker=sym, settings=_settings, include_ai=include_ai)
     except Exception as e:
         logger.exception("Error in get_stock_notes for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Error fetching notes: {str(e)}")

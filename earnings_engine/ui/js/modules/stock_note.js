@@ -307,6 +307,10 @@
             `;
         };
 
+        // Global alias so fetchStockNotesOnly() can preload the modal content
+        // in the background without opening the modal.
+        window.renderStockNoteCard = app.renderStockIntelligenceNote;
+
         app.runStockNoteAi = async function(ticker, btnEl, modelName = null) {
             if (btnEl) btnEl.innerHTML = `<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span>`;
             try {

@@ -50,7 +50,7 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
         ],
         "base_impact": 82,
         "default_direction": "BULLISH",
-        "horizon": "⚡ 1-2 Days (Immediate)",
+        "horizon": "1-2 Days (Immediate)",
         "volatility_est": "±4% to ±9%",
     },
     "Earnings & Guidance Surprise": {
@@ -66,7 +66,7 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
         ],
         "base_impact": 88,
         "default_direction": "BULLISH",
-        "horizon": "⚡ 1-2 Days (Immediate)",
+        "horizon": "1-2 Days (Immediate)",
         "volatility_est": "±5% to ±12%",
     },
     "Regulatory, Approvals & Policy": {
@@ -82,7 +82,7 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
         ],
         "base_impact": 80,
         "default_direction": "BULLISH",
-        "horizon": "📅 2-4 Days (Swing)",
+        "horizon": "2-4 Days (Swing)",
         "volatility_est": "±3% to ±8%",
     },
     "M&A, Stake & Expansion": {
@@ -98,7 +98,7 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
         ],
         "base_impact": 78,
         "default_direction": "BULLISH",
-        "horizon": "📅 3-5 Days (Swing Momentum)",
+        "horizon": "3-5 Days (Swing Momentum)",
         "volatility_est": "±4% to ±10%",
     },
     "Analyst Ratings & Targets": {
