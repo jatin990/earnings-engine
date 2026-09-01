@@ -25,6 +25,9 @@ logger = logging.getLogger("earnings_engine.data.omniroute_client")
 # Standard ports where diegosouzapw/OmniRoute may be hosted
 OMNIROUTE_PROBE_PORTS = [20128, 20129, 8080, 3000]
 
+# Global cache to prevent hammering unreachable or unauthenticated local daemon
+_OMNIROUTE_AUTH_FAILURE_CACHE: dict[str, float] = {}
+
 DEFAULT_OMNIROUTE_MODELS = [
     "google/gemini-2.0-flash",
     "auto/best-fast",
@@ -527,6 +530,11 @@ class OmniRouteClient:
         api_key = self.get_api_key()
         completions_url = self.get_completions_url()
 
+        # If gateway previously failed authentication within 5 minutes, fail fast immediately
+        auth_fail_time = _OMNIROUTE_AUTH_FAILURE_CACHE.get(completions_url, 0.0)
+        if time.time() - auth_fail_time < 300.0 and not api_key:
+            return self.fallback_heuristic_analysis(item)
+
         # If offline and no API key available, execute instant deterministic heuristic
         if not self._is_online and not api_key:
             logger.info("[OMNIROUTE] Gateway offline; using deterministic analysis for %s", item.get("ticker"))
@@ -575,6 +583,7 @@ class OmniRouteClient:
 
                 # If unauthorized/invalid credentials or gateway not configured, fail fast immediately
                 if resp.status_code in (401, 403):
+                    _OMNIROUTE_AUTH_FAILURE_CACHE[completions_url] = time.time()
                     logger.warning("[OMNIROUTE] Gateway auth error (%d) for model %s: %s. Failing fast to deterministic heuristics.", resp.status_code, model_name, resp.text[:150])
                     break
 

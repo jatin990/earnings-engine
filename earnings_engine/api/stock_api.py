@@ -489,19 +489,27 @@ def get_stock_catalysts(ticker: str, settings: Settings | None = None) -> dict[s
     if not sym:
         return {"success": False, "error": "Ticker symbol is required"}
 
-    catalysts_data = get_short_term_catalysts(watchlist_or_universe="ALL", search_query=sym, limit=15, settings=settings)
-    if not catalysts_data:
-        try:
-            import threading
-            from earnings_engine.data.catalysts_news import fetch_ticker_catalysts
-            threading.Thread(target=fetch_ticker_catalysts, args=(sym, 15, False, settings), daemon=True).start()
-        except Exception as e:
-            logger.debug("Async catalysts fetch spawn error for %s: %s", sym, e)
+    # 1. Check SQLite DB cache first
+    cached_catalysts = get_short_term_catalysts(watchlist_or_universe="ALL", search_query=sym, limit=15, settings=settings)
+    if cached_catalysts:
+        return {
+            "success": True,
+            "ticker": sym,
+            "catalysts": cached_catalysts,
+        }
+
+    # 2. If completely empty, perform instant heuristic background fetch (run_ai=False to keep modal fast and on-demand)
+    try:
+        import threading
+        from earnings_engine.data.catalysts_news import fetch_ticker_catalysts
+        threading.Thread(target=fetch_ticker_catalysts, args=(sym, 15, False, False, settings), daemon=True).start()
+    except Exception as e:
+        logger.debug("Async catalysts fetch spawn error for %s: %s", sym, e)
 
     return {
         "success": True,
         "ticker": sym,
-        "catalysts": catalysts_data,
+        "catalysts": [],
     }
 
 

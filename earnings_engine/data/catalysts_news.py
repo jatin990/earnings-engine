@@ -538,6 +538,7 @@ def fetch_ticker_catalysts(
     ticker: str,
     limit: int = 8,
     force: bool = False,
+    run_ai: bool = False,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch and score short-term news catalysts for a single ticker with fast TTL caching."""
@@ -618,7 +619,7 @@ def fetch_ticker_catalysts(
         if "ticker" not in it:
             it["ticker"] = ticker
 
-    articles = process_and_verify_news_items(raw_items, settings=settings, force_reanalyze=force)
+    articles = process_and_verify_news_items(raw_items, settings=settings, force_reanalyze=force, run_ai=run_ai)
     if articles:
         save_verified_news_records(articles, settings=settings)
 

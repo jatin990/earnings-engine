@@ -450,18 +450,20 @@ def build_standardized_model_context(
 
     # 7. Pillar 4: Corporate Catalysts, News & Order Wins
     try:
-        # Actively fetch verified news articles for this ticker
-        raw_cats = fetch_ticker_catalysts(sym, limit=8, force=fetch_live, settings=settings)
-        if not raw_cats:
-            # Fallback to direct DB query specifically for this ticker
-            conn = get_db_connection(settings)
-            rows = conn.execute(
-                "SELECT * FROM news_catalysts WHERE ticker = ? ORDER BY published_at DESC, impact_score DESC LIMIT 8",
-                (sym,),
-            ).fetchall()
-            col_names = [d[0] for d in conn.execute("SELECT * FROM news_catalysts LIMIT 0").description] if rows else []
-            db_cats = [dict(zip(col_names, r)) for r in rows]
-            raw_cats = [c for c in db_cats if is_headline_current(c.get("title", ""), c.get("summary") or "", c.get("published_at", ""))]
+        # Check SQLite DB first for instant resolution without triggering live scraping/LLM during modal load
+        conn = get_db_connection(settings)
+        rows = conn.execute(
+            "SELECT * FROM news_catalysts WHERE ticker = ? ORDER BY published_at DESC, impact_score DESC LIMIT 8",
+            (sym,),
+        ).fetchall()
+        col_names = [d[0] for d in conn.execute("SELECT * FROM news_catalysts LIMIT 0").description] if rows else []
+        db_cats = [dict(zip(col_names, r)) for r in rows]
+        raw_cats = [c for c in db_cats if is_headline_current(c.get("title", ""), c.get("summary") or "", c.get("published_at", ""))]
+
+        # If completely empty and fetch_live is enabled, fetch without heavy AI parsing (run_ai=False)
+        if not raw_cats and fetch_live:
+            raw_cats = fetch_ticker_catalysts(sym, limit=8, force=False, run_ai=False, settings=settings)
+
         ctx["corporate_catalysts"] = raw_cats[:6] if raw_cats else []
     except Exception as e:
         logger.debug("[STD-CTX] Catalysts error for %s: %s", sym, e)

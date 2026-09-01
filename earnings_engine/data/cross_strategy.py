@@ -24,8 +24,20 @@ logger = logging.getLogger(__name__)
 def get_market_macro_summary(settings: Settings | None = None) -> dict[str, Any]:
     """Retrieve high-level market sentiment and volatility regime summary."""
     try:
-        from earnings_engine.data.market_pulse import get_market_pulse_data
-        pulse = get_market_pulse_data(settings=settings, force_refresh=False)
+        from earnings_engine.data.market_pulse import _PULSE_CACHE, _PULSE_CACHE_TTL
+        now_ts = time.time()
+        if "data" in _PULSE_CACHE and (now_ts - _PULSE_CACHE.get("ts", 0)) < _PULSE_CACHE_TTL:
+            pulse = _PULSE_CACHE["data"]
+        else:
+            from earnings_engine.data.market_pulse import compute_market_sentiment_matrix
+            sentiment_data = compute_market_sentiment_matrix(settings=settings)
+            pulse = {
+                "fear_greed_score": sentiment_data.get("fear_greed_score", 50.0),
+                "fear_greed_label": sentiment_data.get("fear_greed_label", "Neutral"),
+                "vix_level": sentiment_data.get("vix_level", 14.0),
+                "vix_regime": sentiment_data.get("vix_regime", "Calm"),
+                "institutional_stance": "NEUTRAL",
+            }
         fg_score = pulse.get("fear_greed_score", 50.0)
         fg_label = pulse.get("fear_greed_label", "Neutral")
         vix = pulse.get("vix_level", 14.0)
