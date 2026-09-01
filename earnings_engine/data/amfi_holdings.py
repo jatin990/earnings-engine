@@ -26,6 +26,12 @@ logger = logging.getLogger("earnings_engine.data.amfi_holdings")
 # Standard headers for AMFI / AMC network requests
 _AMFI_HEADERS = {
     "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/plain, */*",
+}
+
 # Flagship mutual fund schemes across major AMCs for dynamic tracking
 AMC_FLAGSHIP_SCHEMES: list[dict[str, Any]] = [
     {"fund_house": "Nippon India Mutual Fund", "scheme_name": "Nippon India Small Cap Fund", "fund_type": "Mutual Fund (DII)", "category": "Small Cap"},
@@ -182,9 +188,3 @@ def save_discovered_fund_holdings(
     logger.info("[AMFI] Persisted %d institutional fund holding records.", inserted)
     return inserted
 
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-    ),
-    "Accept": "application/json, text/plain, text/csv, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-}

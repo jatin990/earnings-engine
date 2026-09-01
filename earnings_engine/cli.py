@@ -289,7 +289,9 @@ def ingest(market, ticker, force, prices, earnings_flag, universe_file, nse_cale
               help="Number of top equities to process for institutional holdings & shareholding patterns.")
 @click.option("--rate-limit", "-r", type=float, default=1.5,
               help="Delay in seconds between requests to avoid rate limits.")
-def ingest_institutional(limit: int, rate_limit: float) -> None:
+@click.option("--force", "-f", is_flag=True, default=False,
+              help="Bypass freshness checks and re-ingest all shareholding patterns.")
+def ingest_institutional(limit: int, rate_limit: float, force: bool) -> None:
     """Ingest AMFI mutual fund disclosures and NSE corporate shareholding patterns.
 
     Extracts all discovered institutional entities (Mutual Funds, FIIs, Insurance,
@@ -298,13 +300,14 @@ def ingest_institutional(limit: int, rate_limit: float) -> None:
     Examples:
         earnings-engine ingest-institutional --limit 100
         earnings-engine ingest-institutional --limit 500 --rate-limit 2.0
+        earnings-engine ingest-institutional --limit 50 --force
     """
     from earnings_engine.data.institutional_accumulation import ingest_amfi_and_nse_institutional_holdings
 
     settings = Settings()
-    click.echo(f"Ingesting institutional patterns & AMFI funds for top {limit} equities (rate limit={rate_limit}s)...")
-    res = ingest_amfi_and_nse_institutional_holdings(limit=limit, rate_limit_delay=rate_limit, settings=settings)
-    click.echo(f"Institutional ingestion complete: {res['equities_processed']}/{res['total_requested']} equities processed, {res['schemes_discovered']} AMFI schemes discovered.")
+    click.echo(f"Ingesting institutional patterns & AMFI funds for top {limit} equities (rate limit={rate_limit}s, force={force})...")
+    res = ingest_amfi_and_nse_institutional_holdings(limit=limit, rate_limit_delay=rate_limit, force=force, settings=settings)
+    click.echo(f"Institutional ingestion complete: {res['equities_processed']}/{res['total_requested']} equities processed ({res.get('nse_fetched_count', 0)} live NSE, {res.get('fallback_count', 0)} fallbacks, {res.get('total_entities_extracted', 0)} entities extracted), {res['schemes_discovered']} AMFI schemes discovered.")
 
 
 

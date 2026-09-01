@@ -1272,6 +1272,22 @@ def _migration_026_institutional_accumulation_cache(conn: Any) -> None:
         pass
 
 
+def _migration_027_nse_shareholding_freshness(conn: Any) -> None:
+    """Create nse_shareholding_freshness table for tracking last fetch timestamp and dynamic discovery of institutional holdings."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS nse_shareholding_freshness (
+            ticker TEXT PRIMARY KEY,
+            fetched_at TEXT NOT NULL,
+            source TEXT DEFAULT 'nse_api',
+            entities_count INTEGER DEFAULT 0
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_nse_shp_fresh_fetched ON nse_shareholding_freshness (fetched_at DESC)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1300,6 +1316,7 @@ MIGRATIONS: list[Migration] = [
     Migration(24, "024_breakout_audit_counter_and_strategy", _migration_024_breakout_audit_counter_and_strategy),
     Migration(25, "025_option_chain_history", _migration_025_option_chain_history),
     Migration(26, "026_institutional_accumulation_cache", _migration_026_institutional_accumulation_cache),
+    Migration(27, "027_nse_shareholding_freshness", _migration_027_nse_shareholding_freshness),
 ]
 
 

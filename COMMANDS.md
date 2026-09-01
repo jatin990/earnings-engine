@@ -47,6 +47,15 @@ earnings-engine ingest --universe-file my_stocks.txt
 earnings-engine ingest --market NSE_ALL --incremental
 ```
 
+### Ingest institutional shareholding & AMFI fund portfolios
+```bash
+# Ingest corporate shareholding patterns & discovered institutional entities for top 500 equities
+earnings-engine ingest-institutional --limit 500
+
+# Force re-ingest and bypass cache freshness
+earnings-engine ingest-institutional --limit 500 --force --rate-limit 2.0
+```
+
 ### View data coverage (dashboard tab)
 Open the dashboard (`earnings-engine dashboard`) → **📊 Data Coverage** tab for per-ticker price/earnings coverage; use **⚡ Fetch Missing Earnings** to fetch only missing earnings. API: `GET /api/v1/dashboard/data-coverage?market=` and `POST /api/v1/dashboard/earnings/incremental`.
 
