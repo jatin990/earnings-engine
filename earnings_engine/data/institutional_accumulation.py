@@ -10,7 +10,9 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 import time
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
@@ -482,9 +484,38 @@ def recalculate_all_institutional_metrics(settings: Settings | None = None, forc
             # Patterns processing
             patterns = []
             p_rows_sorted = sorted(p_rows, key=lambda x: quarter_order.get(x[1], 0), reverse=True)
-            for p in p_rows_sorted:
+            latest_close_p = price_series[0][1] if price_series else None
+            latest_close_d = price_series[0][0] if price_series else None
+
+            for idx, p in enumerate(p_rows_sorted):
+                q_name = p[1]
+                q_sdate = "2026-01-01"
+                m = re.search(r'Q([1-4])\s*FY(\d{2,4})', q_name, re.IGNORECASE)
+                if m:
+                    qn, fyn = int(m.group(1)), int(m.group(2))
+                    if fyn < 100: fyn += 2000
+                    if qn == 1: q_sdate = f"{fyn - 1}-04-01"
+                    elif qn == 2: q_sdate = f"{fyn - 1}-07-01"
+                    elif qn == 3: q_sdate = f"{fyn - 1}-10-01"
+                    elif qn == 4: q_sdate = f"{fyn}-01-01"
+
+                # Find quarter start price from chronological price series
+                q_sprice = None
+                q_act_date = None
+                for d_val, c_val in reversed(price_series):
+                    if d_val >= q_sdate:
+                        q_sprice = c_val
+                        q_act_date = d_val
+                        break
+                if q_sprice is None and price_series:
+                    q_sprice = price_series[-1][1]
+                    q_act_date = price_series[-1][0]
+
+                is_present_q = (idx == 0)
+                stock_price_display = latest_close_p if (is_present_q and latest_close_p is not None) else q_sprice
+
                 patterns.append({
-                    "quarter": p[1],
+                    "quarter": q_name,
                     "promoter_pct": round(float(p[2] or 0.0), 2),
                     "fii_pct": round(float(p[3] or 0.0), 2),
                     "dii_mf_pct": round(float(p[4] or 0.0), 2),
@@ -492,6 +523,13 @@ def recalculate_all_institutional_metrics(settings: Settings | None = None, forc
                     "public_retail_pct": round(float(p[5] or 0.0), 2),
                     "public_pct": round(float(p[5] or 0.0), 2),
                     "other_pct": round(float(p[6] or 0.0), 2),
+                    "quarter_start_date": q_sdate,
+                    "quarter_start_price": q_sprice,
+                    "quarter_price_date": q_act_date,
+                    "current_price": latest_close_p,
+                    "latest_price_date": latest_close_d,
+                    "stock_price": stock_price_display,
+                    "is_current_quarter": is_present_q,
                 })
 
             # Block deals processing
@@ -623,6 +661,53 @@ def get_stock_institutional_activity(
                 (sym,),
             ).fetchone()
             if row:
+                pats = json.loads(row[28] or "[]")
+                # Enrich with price if missing
+                if pats and (pats[0].get("current_price") is None or pats[0].get("quarter_start_price") is None):
+                    p_series = conn.execute(
+                        "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC",
+                        (sym,),
+                    ).fetchall()
+                    if not p_series and sym.endswith(".NS"):
+                        p_series = conn.execute(
+                            "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC",
+                            (sym.replace(".NS", ""),),
+                        ).fetchall()
+                    lat_cp = round(float(p_series[0][1]), 2) if p_series and p_series[0][1] else None
+                    lat_cd = str(p_series[0][0]) if p_series and p_series[0][0] else None
+
+                    for idx, pat in enumerate(pats):
+                        q_name = pat.get("quarter", "")
+                        q_sdate = "2026-01-01"
+                        m = re.search(r'Q([1-4])\s*FY(\d{2,4})', q_name, re.IGNORECASE)
+                        if m:
+                            qn, fyn = int(m.group(1)), int(m.group(2))
+                            if fyn < 100: fyn += 2000
+                            if qn == 1: q_sdate = f"{fyn - 1}-04-01"
+                            elif qn == 2: q_sdate = f"{fyn - 1}-07-01"
+                            elif qn == 3: q_sdate = f"{fyn - 1}-10-01"
+                            elif qn == 4: q_sdate = f"{fyn}-01-01"
+
+                        q_sprice = None
+                        q_act_date = None
+                        for d_val, c_val in reversed(p_series):
+                            if d_val >= q_sdate:
+                                q_sprice = round(float(c_val), 2)
+                                q_act_date = str(d_val)
+                                break
+                        if q_sprice is None and p_series:
+                            q_sprice = round(float(p_series[-1][1]), 2)
+                            q_act_date = str(p_series[-1][0])
+
+                        is_present_q = (idx == 0)
+                        pat["quarter_start_date"] = q_sdate
+                        pat["quarter_start_price"] = q_sprice
+                        pat["quarter_price_date"] = q_act_date
+                        pat["current_price"] = lat_cp
+                        pat["latest_price_date"] = lat_cd
+                        pat["stock_price"] = lat_cp if (is_present_q and lat_cp is not None) else q_sprice
+                        pat["is_current_quarter"] = is_present_q
+
                 return {
                     "success": True,
                     "ticker": row[0],
@@ -655,7 +740,7 @@ def get_stock_institutional_activity(
                     "return_1y_pct": row[25],
                     "holdings": json.loads(row[26] or "[]"),
                     "block_deals": json.loads(row[27] or "[]"),
-                    "shareholding_patterns": json.loads(row[28] or "[]"),
+                    "shareholding_patterns": pats,
                     "updated_at": row[29],
                 }
 
