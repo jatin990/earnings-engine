@@ -70,6 +70,34 @@
             app.activeCatConsensusTicker = ticker.trim().toUpperCase();
             app.activeConsensusResult = null;
 
+            // Resolve models to run: explicit targetModels > stored user choice > fast default core
+            let modelsToRun = targetModels;
+            if (!modelsToRun) {
+                try {
+                    const saved = localStorage.getItem('nexus_consensus_models');
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            modelsToRun = parsed;
+                        }
+                    }
+                } catch(_) {}
+            }
+            if (!modelsToRun || !modelsToRun.length) {
+                modelsToRun = [
+                    'google/gemini-2.0-flash-001',
+                    'meta-llama/llama-3.3-70b-instruct',
+                    'deepseek/deepseek-r1',
+                    'google/gemma-4-31b-it:free'
+                ];
+            }
+
+            if (targetModels && Array.isArray(targetModels)) {
+                try {
+                    localStorage.setItem('nexus_consensus_models', JSON.stringify(targetModels));
+                } catch(_) {}
+            }
+
             const modal = document.getElementById('catalystConsensusModal');
             const tickerEl = document.getElementById('catConsensusTicker');
             const priceEl = document.getElementById('catConsensusPrice');
@@ -95,7 +123,7 @@
             if (tickerEl) tickerEl.textContent = app.activeCatConsensusTicker;
             if (priceEl) priceEl.textContent = 'Polling live price...';
             
-            const modelCountDesc = targetModels && targetModels.length === 1 ? targetModels[0].split('/').pop() : '4 AI Engines';
+            const modelCountDesc = modelsToRun.length === 1 ? modelsToRun[0].split('/').pop() : `${modelsToRun.length} AI Engines`;
             if (dirBadge) {
                 dirBadge.textContent = `POLLING ${modelCountDesc.toUpperCase()}...`;
                 dirBadge.style.background = 'rgba(99,102,241,0.2)';
@@ -114,13 +142,13 @@
             if (buyZoneEl) buyZoneEl.innerHTML = '<span style="font-size:0.9rem;color:#a1a1aa;">Calculating...</span>';
             if (resEl) resEl.innerHTML = '<span style="font-size:0.9rem;color:#a1a1aa;">Calculating...</span>';
             if (strEl) strEl.textContent = '...';
-            if (modelCountEl) modelCountEl.textContent = `${targetModels && targetModels.length === 1 ? '1 Model Polled' : '4 Models Polled'}`;
+            if (modelCountEl) modelCountEl.textContent = `${modelsToRun.length} Model${modelsToRun.length > 1 ? 's' : ''} Polled`;
             if (patternEl) patternEl.textContent = 'Scanning technical chart...';
             if (volumeEl) volumeEl.textContent = 'Analyzing delivery volume...';
             if (riskEl) riskEl.textContent = 'Evaluating downside risks...';
             if (thesisEl) thesisEl.innerHTML = `<div style="display:flex;align-items:center;gap:0.4rem;color:#a1a1aa;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Polling ${modelCountDesc} for full trade setup (SL, Target, R:R, Entry Zone)...</div>`;
             if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--muted);">Engaging ${modelCountDesc}...</td></tr>`;
-            if (statusEl) statusEl.textContent = 'Ensemble reasoning & rate limit throttling underway';
+            if (statusEl) statusEl.textContent = `Ensemble reasoning underway (${modelsToRun.join(', ')})`;
 
             modal.style.display = 'block';
             app.fetchModalRateLimits();
@@ -130,11 +158,9 @@
                     tickers: [app.activeCatConsensusTicker],
                     ticker: app.activeCatConsensusTicker,
                     timeframe_days: 14,
+                    models: modelsToRun,
                     force: force
                 };
-                if (targetModels && targetModels.length) {
-                    reqBody.models = targetModels;
-                }
 
                 const res = await fetch(API_BASE + '/api/v1/consensus/predict', {
                     method: 'POST',

@@ -170,12 +170,31 @@ Object.assign(app, {
                     btnEl.disabled = true;
                     btnEl.innerHTML = '<span class="loading-spinner" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#60a5fa;animation:spin 0.8s linear infinite;"></span>';
                 }
+
+                let modelsToRun = null;
+                try {
+                    const saved = localStorage.getItem('nexus_consensus_models');
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            modelsToRun = parsed;
+                        }
+                    }
+                } catch(_) {}
+                if (!modelsToRun || !modelsToRun.length) {
+                    modelsToRun = [
+                        'google/gemini-2.0-flash-001',
+                        'meta-llama/llama-3.3-70b-instruct',
+                        'deepseek/deepseek-r1',
+                        'google/gemma-4-31b-it:free'
+                    ];
+                }
                 
                 try {
                     const res = await fetch(API_BASE + '/api/v1/consensus/predict', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ticker: sym, timeframe_days: 14, force: false })
+                        body: JSON.stringify({ ticker: sym, timeframe_days: 14, models: modelsToRun, force: false })
                     });
                     const data = await res.json();
                     const preds = (data && (data.predictions || data.results)) ? (data.predictions || data.results) : [];

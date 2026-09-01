@@ -19,28 +19,22 @@ from earnings_engine.consensus.context_builder import context_to_prompt
 
 logger = logging.getLogger("earnings_engine.consensus.model_runner")
 
-# Default model suite via OpenRouter
+# Default curated model suite (Antigravity & Free + General Best)
 DEFAULT_MODELS = [
-    "deepseek/deepseek-r1",
+    "google/gemini-2.0-flash-001",
     "meta-llama/llama-3.3-70b-instruct",
-    "qwen/qwen-2.5-72b-instruct",
-    "mistralai/mistral-large",
+    "deepseek/deepseek-r1",
     "google/gemma-4-31b-it:free",
-    "z-ai/glm-5.2",
-    "omniroute/deepseek-r1",
 ]
 
 # Fallback models when primary model encounters 429 rate limit or 404 endpoint deprecation
 MODEL_FALLBACKS: dict[str, str] = {
     "mistralai/mistral-large": "google/gemini-2.0-flash-001",
-    "mistralai/mistral-large-2411": "mistralai/mistral-large",
-    "mistralai/mistral-large-2407": "mistralai/mistral-large",
     "qwen/qwen-2.5-72b-instruct": "meta-llama/llama-3.3-70b-instruct",
-    "deepseek/deepseek-r1": "deepseek/deepseek-chat",
-    "google/gemma-4-31b-it:free": "google/gemma-4-31b-it",
+    "deepseek/deepseek-r1": "google/gemini-2.0-flash-001",
+    "google/gemma-4-31b-it:free": "google/gemini-2.0-flash-001",
     "google/gemma-4-31b-it": "google/gemini-2.0-flash-001",
-    "z-ai/glm-5.2": "z-ai/glm-5.3-flash",
-    "z-ai/glm-5.3-flash": "thudm/glm-4-9b-chat",
+    "z-ai/glm-5.2": "google/gemini-2.0-flash-001",
 }
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -154,7 +148,7 @@ def _get_api_key(required: bool = False) -> str:
 def _query_omniroute_model(
     model_id: str,
     prompt: str,
-    timeout: int = 45,
+    timeout: int = 15,
     timeframe_days: int = 14,
     _ticker: str = "UNKNOWN",
     custom_directives: str | None = None,
@@ -601,8 +595,8 @@ def _query_single_model(
     model_id: str,
     prompt: str,
     api_key: str | None = None,
-    timeout: int = 60,
-    max_retries: int = 2,
+    timeout: int = 15,
+    max_retries: int = 1,
     local_url: str | None = None,
     _ticker: str = "UNKNOWN",
     timeframe_days: int = 14,
@@ -1114,7 +1108,7 @@ def get_installed_local_models(local_url: str | None = None) -> list[str]:
 def run_consensus_models(
     context: dict[str, Any],
     models: list[str] | None = None,
-    timeout: int = 60,
+    timeout: int = 15,
     local_url: str | None = None,
     omniroute_model: str | None = None,
     custom_directives: str | None = None,

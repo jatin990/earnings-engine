@@ -270,7 +270,8 @@ def test_consensus_models_endpoint_and_rate_limits():
     assert "deepseek/deepseek-r1" in model_ids
     assert "meta-llama/llama-3.3-70b-instruct" in model_ids
     assert "qwen/qwen-2.5-72b-instruct" in model_ids
-    assert "mistralai/mistral-large" in model_ids
+    assert "google/gemini-2.0-flash-001" in model_ids
+    assert "google/gemma-4-31b-it:free" in model_ids
 
     client = TestClient(app)
     res = client.get("/api/v1/consensus/models")

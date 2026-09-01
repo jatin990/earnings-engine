@@ -1584,22 +1584,23 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem;">
                         <label class="config-section-title" style="margin-bottom: 0;">🤖 Active Ensemble Models</label>
                         <div style="display: flex; gap: 0.45rem; font-size: 0.7rem;">
-                            <button type="button" onclick="toggleAllConfigModelChips(true)" style="background: transparent; border: none; color: #38bdf8; cursor: pointer;">Select All</button>
+                            <button type="button" onclick="selectPresetModelChips('free_antigravity')" style="background: transparent; border: none; color: #34d399; font-weight: 700; cursor: pointer;">⚡ Free & Antigravity</button>
                             <span style="color: rgba(255,255,255,0.15);">|</span>
-                            <button type="button" onclick="selectPresetModelChips('frontier')" style="background: transparent; border: none; color: #c7d2fe; cursor: pointer;">Frontier Core</button>
+                            <button type="button" onclick="selectPresetModelChips('general_best')" style="background: transparent; border: none; color: #38bdf8; font-weight: 700; cursor: pointer;">🏆 General Best</button>
+                            <span style="color: rgba(255,255,255,0.15);">|</span>
+                            <button type="button" onclick="selectPresetModelChips('core')" style="background: transparent; border: none; color: #c7d2fe; font-weight: 700; cursor: pointer;">🧠 Core Fast (Default)</button>
                             <span style="color: rgba(255,255,255,0.15);">|</span>
                             <button type="button" onclick="toggleAllConfigModelChips(false)" style="background: transparent; border: none; color: var(--text-tertiary); cursor: pointer;">Clear</button>
                         </div>
                     </div>
                     <div id="configModelChipsContainer" style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
-                        <label class="model-chip-select selected"><input type="checkbox" value="deepseek/deepseek-r1" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 🤖 DeepSeek-R1 (671B)</label>
-                        <label class="model-chip-select selected"><input type="checkbox" value="meta-llama/llama-3.3-70b-instruct" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 🦙 Llama-3.3-70B</label>
-                        <label class="model-chip-select selected"><input type="checkbox" value="qwen/qwen-2.5-72b-instruct" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 🌐 Qwen-2.5-72B</label>
-                        <label class="model-chip-select selected"><input type="checkbox" value="mistralai/mistral-large" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> ⚡ Mistral-Large</label>
-                        <label class="model-chip-select selected"><input type="checkbox" value="google/gemma-4-31b-it:free" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 💎 Gemma-4-31B</label>
-                        <label class="model-chip-select selected"><input type="checkbox" value="z-ai/glm-5.2" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 🐉 GLM-5.2 (753B)</label>
-                        <label class="model-chip-select selected"><input type="checkbox" value="omniroute" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> ⚡ OmniRoute-AI</label>
-                        <label class="model-chip-select"><input type="checkbox" value="local" onchange="this.parentElement.classList.toggle('selected', this.checked)"> 💻 Local Offline AI</label>
+                        <label class="model-chip-select selected"><input type="checkbox" value="google/gemini-2.0-flash-001" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> ⚡ Gemini Flash (Antigravity)</label>
+                        <label class="model-chip-select selected"><input type="checkbox" value="google/gemma-4-31b-it:free" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 💎 Gemma-4-31B (Free)</label>
+                        <label class="model-chip-select selected"><input type="checkbox" value="deepseek/deepseek-r1" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 🤖 DeepSeek-R1 (Best Reasoning)</label>
+                        <label class="model-chip-select selected"><input type="checkbox" value="meta-llama/llama-3.3-70b-instruct" checked onchange="this.parentElement.classList.toggle('selected', this.checked)"> 🦙 Llama-3.3-70B (Best Institutional)</label>
+                        <label class="model-chip-select"><input type="checkbox" value="qwen/qwen-2.5-72b-instruct" onchange="this.parentElement.classList.toggle('selected', this.checked)"> 🌐 Qwen-2.5-72B (Best Algorithmic)</label>
+                        <label class="model-chip-select"><input type="checkbox" value="local" onchange="this.parentElement.classList.toggle('selected', this.checked)"> 💻 Local Offline AI (Free)</label>
+                        <label class="model-chip-select"><input type="checkbox" value="omniroute" onchange="this.parentElement.classList.toggle('selected', this.checked)"> ⚡ OmniRoute Proxy</label>
                     </div>
                 </div>
 
@@ -1989,7 +1990,6 @@
                     renderTechnicalSection(stockState.technical, curr, stockState.profile, stockState.quote);
                     renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, curr, stockState.profile, stockState.quote);
                 }
-                await fetchStockDetails();
                 const range = (data.total_bars && data.total_bars > 0) ? `${data.total_bars} bars · ${data.start_date} → ${data.end_date}` : 'no price bars returned';
                 showStockToast(data.message || `Hard refresh complete for ${ACTIVE_SYM} (${range})`, 'success');
             } catch (err) {
@@ -2014,7 +2014,6 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || data.error || 'Recalculation error');
 
-                await fetchStockDetails();
                 showStockToast(`✅ Metrics recalculated for ${ACTIVE_SYM}${data.has_changes ? ` (${data.changes_count || 'several'} fields updated)` : ''}`, 'success');
             } catch (err) {
                 showStockToast('Recalculation error: ' + err.message, 'error');
@@ -2461,6 +2460,7 @@
         }
 
         function renderInstantStats(t, inst, fe, curr, p, q) {
+            t = t || {};
             const fmt = (v, suffix='%') => v != null ? `${v >= 0 ? '+' : ''}${Number(v).toFixed(1)}${suffix}` : '—';
             const col = (v) => v == null ? '#94a3b8' : (v >= 0 ? '#34d399' : '#f87171');
 
@@ -3863,9 +3863,16 @@
         }
 
         function selectPresetModelChips(preset) {
-            const frontierIds = ['deepseek/deepseek-r1', 'meta-llama/llama-3.3-70b-instruct', 'qwen/qwen-2.5-72b-instruct', 'mistralai/mistral-large', 'omniroute'];
+            let targetIds = [];
+            if (preset === 'free_antigravity') {
+                targetIds = ['google/gemini-2.0-flash-001', 'google/gemma-4-31b-it:free', 'local'];
+            } else if (preset === 'general_best') {
+                targetIds = ['deepseek/deepseek-r1', 'meta-llama/llama-3.3-70b-instruct', 'qwen/qwen-2.5-72b-instruct'];
+            } else { // 'core'
+                targetIds = ['google/gemini-2.0-flash-001', 'google/gemma-4-31b-it:free', 'deepseek/deepseek-r1', 'meta-llama/llama-3.3-70b-instruct'];
+            }
             document.querySelectorAll('#configModelChipsContainer input[type="checkbox"]').forEach(cb => {
-                const isSelected = preset === 'frontier' ? frontierIds.includes(cb.value) : true;
+                const isSelected = targetIds.includes(cb.value);
                 cb.checked = isSelected;
                 cb.parentElement.classList.toggle('selected', isSelected);
             });
