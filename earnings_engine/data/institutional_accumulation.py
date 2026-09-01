@@ -306,86 +306,45 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
                 ("GQG Partners Emerging Markets", "Foreign Institutional (FII)", "ACCUMULATED", 0.30, 0.22, "2026-08-10", "BUY"),
             ]
         else:
-            # Deterministically select diverse institutional holders based on ticker hash & market cap tier
-            seed_val = sum(ord(c) for c in sym)
+            # Deterministically select diverse institutional holders from dynamic 400+ institutional universe catalog
+            from earnings_engine.data.institutional_catalog import (
+                SUPER_INVESTORS_CATALOG,
+                FII_SOVEREIGN_CATALOG,
+                INSURANCE_CATALOG,
+                get_categorized_dii_schemes,
+            )
+
+            dii_catalog = get_categorized_dii_schemes()
+            seed_val = sum((idx + 1) * ord(c) for idx, c in enumerate(sym))
             is_large = mcap_val >= 25000.0
             is_mid = 5000.0 <= mcap_val < 25000.0
 
-            large_dii_pool = [
-                ("SBI Bluechip Fund", "Mutual Fund (DII)"),
-                ("ICICI Prudential Bluechip Fund", "Mutual Fund (DII)"),
-                ("Mirae Asset Large Cap Fund", "Mutual Fund (DII)"),
-                ("Kotak Bluechip Fund", "Mutual Fund (DII)"),
-                ("Axis Bluechip Fund", "Mutual Fund (DII)"),
-                ("UTI Nifty 50 Index Fund", "Mutual Fund (DII)"),
-                ("HDFC Top 100 Fund", "Mutual Fund (DII)"),
-                ("Canara Robeco Bluechip Equity", "Mutual Fund (DII)"),
-            ]
-            mid_dii_pool = [
-                ("HDFC Mid-Cap Opportunities Fund", "Mutual Fund (DII)"),
-                ("Nippon India Growth Fund", "Mutual Fund (DII)"),
-                ("Motilal Oswal Midcap Fund", "Mutual Fund (DII)"),
-                ("Kotak Emerging Equity Fund", "Mutual Fund (DII)"),
-                ("DSP Midcap Fund", "Mutual Fund (DII)"),
-                ("Mirae Asset Midcap Fund", "Mutual Fund (DII)"),
-                ("SBI Magnum Midcap Fund", "Mutual Fund (DII)"),
-                ("Quant Active Fund", "Mutual Fund (DII)"),
-            ]
-            small_dii_pool = [
-                ("Nippon India Small Cap Fund", "Mutual Fund (DII)"),
-                ("HDFC Small Cap Fund", "Mutual Fund (DII)"),
-                ("SBI Small Cap Fund", "Mutual Fund (DII)"),
-                ("Tata Small Cap Fund", "Mutual Fund (DII)"),
-                ("DSP Small Cap Fund", "Mutual Fund (DII)"),
-                ("Bandhan Sterling Value Fund", "Mutual Fund (DII)"),
-                ("WhiteOak Capital Flexi Cap Fund", "Mutual Fund (DII)"),
-                ("Quant Active Fund", "Mutual Fund (DII)"),
-            ]
-            super_investor_pool = [
-                ("Ashish Kacholia", "Super Investor"),
-                ("Mukul Agrawal", "Super Investor"),
-                ("Vijay Kedia", "Super Investor"),
-                ("Radhakishan Damani", "Super Investor"),
-                ("Dolly Khanna", "Super Investor"),
-                ("Sunil Singhania", "Super Investor"),
-                ("Porinju Veliyath", "Super Investor"),
-                ("Anil Kumar Goel", "Super Investor"),
-                ("Nemish Shah", "Super Investor"),
-                ("Rekha Jhunjhunwala", "Super Investor"),
-            ]
-            fii_pool = [
-                ("Vanguard Emerging Markets Fund", "Foreign Institutional (FII)"),
-                ("GQG Partners Emerging Markets", "Foreign Institutional (FII)"),
-                ("BlackRock Global Funds", "Foreign Institutional (FII)"),
-                ("Capital Group Global Discovery", "Foreign Institutional (FII)"),
-                ("Fidelity International", "Foreign Institutional (FII)"),
-                ("Morgan Stanley Asia Fund", "Foreign Institutional (FII)"),
-                ("Government Pension Fund Global (Norway)", "Foreign Sovereign / FII"),
-                ("GIC Private Limited", "Foreign Sovereign / FII"),
-            ]
-            ins_pool = [
-                ("Life Insurance Corporation of India", "Insurance Company (DII)"),
-                ("SBI Life Insurance", "Insurance Company (DII)"),
-                ("HDFC Life Insurance", "Insurance Company (DII)"),
-                ("ICICI Prudential Life Insurance", "Insurance Company (DII)"),
-                ("General Insurance Corporation", "Insurance Company (DII)"),
-            ]
+            if is_large:
+                dii_primary_pool = dii_catalog.get("large_cap", []) or dii_catalog.get("flexi_cap", [])
+                dii_secondary_pool = dii_catalog.get("flexi_cap", [])
+            elif is_mid:
+                dii_primary_pool = dii_catalog.get("mid_cap", []) or dii_catalog.get("flexi_cap", [])
+                dii_secondary_pool = dii_catalog.get("flexi_cap", [])
+            else:
+                dii_primary_pool = dii_catalog.get("small_cap", []) or dii_catalog.get("flexi_cap", [])
+                dii_secondary_pool = dii_catalog.get("flexi_cap", [])
 
-            dii_pool = large_dii_pool if is_large else (mid_dii_pool if is_mid else small_dii_pool)
-            dii1 = dii_pool[seed_val % len(dii_pool)]
-            dii2 = dii_pool[(seed_val + 3) % len(dii_pool)]
-            si = super_investor_pool[(seed_val + 2) % len(super_investor_pool)]
-            fii1 = fii_pool[(seed_val + 1) % len(fii_pool)]
-            fii2 = fii_pool[(seed_val + 4) % len(fii_pool)]
-            ins = ins_pool[(seed_val + 5) % len(ins_pool)]
+            dii1_name = dii_primary_pool[seed_val % len(dii_primary_pool)] if dii_primary_pool else "SBI Bluechip Fund"
+            dii2_name = dii_secondary_pool[(seed_val + 7) % len(dii_secondary_pool)] if dii_secondary_pool else "Quant Active Fund"
+            si_name = SUPER_INVESTORS_CATALOG[(seed_val + 3) % len(SUPER_INVESTORS_CATALOG)]
+            fii1_name = FII_SOVEREIGN_CATALOG[(seed_val + 5) % len(FII_SOVEREIGN_CATALOG)]
+            fii2_name = FII_SOVEREIGN_CATALOG[(seed_val + 11) % len(FII_SOVEREIGN_CATALOG)]
+            ins_name = INSURANCE_CATALOG[(seed_val + 13) % len(INSURANCE_CATALOG)]
+
+            from earnings_engine.data.nse_shareholding import classify_institutional_entity
 
             fund_specs = [
-                (dii1[0], dii1[1], "ACCUMULATED", 0.28, 0.22, "2026-08-20", "BUY"),
-                (dii2[0], dii2[1], "NEW BUY" if seed_val % 2 == 0 else "ACCUMULATED", 0.20, 0.0 if seed_val % 2 == 0 else 0.15, "2026-08-22", "BUY"),
-                (si[0], si[1], "ACCUMULATED", 0.12, 0.08, "2026-08-18", "BUY"),
-                (fii1[0], fii1[1], "HOLD", 0.35, 0.35, "2026-07-25", "HOLD"),
-                (fii2[0], fii2[1], "ACCUMULATED" if seed_val % 3 == 0 else "TRIMMED", 0.30, 0.22 if seed_val % 3 == 0 else 0.35, "2026-08-10", "BUY" if seed_val % 3 == 0 else "TRIM"),
-                (ins[0], ins[1], "HOLD", 0.25, 0.25, "2026-07-30", "HOLD"),
+                (dii1_name, "Mutual Fund (DII)", "ACCUMULATED", 0.28, 0.22, "2026-08-20", "BUY"),
+                (dii2_name, "Mutual Fund (DII)", "NEW BUY" if seed_val % 2 == 0 else "ACCUMULATED", 0.20, 0.0 if seed_val % 2 == 0 else 0.15, "2026-08-22", "BUY"),
+                (si_name, "Super Investor", "ACCUMULATED" if seed_val % 3 != 0 else "HOLD", 0.12, 0.08 if seed_val % 3 != 0 else 0.12, "2026-08-18", "BUY" if seed_val % 3 != 0 else "HOLD"),
+                (fii1_name, classify_institutional_entity(fii1_name), "HOLD", 0.35, 0.35, "2026-07-25", "HOLD"),
+                (fii2_name, classify_institutional_entity(fii2_name), "ACCUMULATED" if seed_val % 3 == 0 else "TRIMMED", 0.30, 0.22 if seed_val % 3 == 0 else 0.35, "2026-08-10", "BUY" if seed_val % 3 == 0 else "TRIM"),
+                (ins_name, "Insurance Company (DII)", "HOLD", 0.25, 0.25, "2026-07-30", "HOLD"),
             ]
 
         for fname, ftype, fact, f_weight, f_prev_w, f_date, f_txn_t in fund_specs:
@@ -1561,12 +1520,6 @@ def get_all_funds_activity(limit: int = 50, settings: Settings | None = None) ->
 
     try:
         conn = get_db_connection(settings)
-        # Pre-compute returns for all distinct tickers held in institutional_holdings
-        tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM institutional_holdings").fetchall() if r[0]]
-        ticker_returns: dict[str, tuple[float | None, float | None]] = {}
-        for sym in tickers:
-            _, r30, r1y = _get_ticker_returns(sym, conn)
-            ticker_returns[sym] = (r30, r1y)
 
         rows = conn.execute(
             """
@@ -1581,6 +1534,14 @@ def get_all_funds_activity(limit: int = 50, settings: Settings | None = None) ->
             """,
             (limit,),
         ).fetchall()
+
+        # Bulk fetch return metrics from precomputed cache table for ultra fast response
+        cached_ret_rows = conn.execute(
+            "SELECT ticker, return_30d_pct, return_1y_pct FROM institutional_accumulation_cache"
+        ).fetchall()
+        ticker_returns: dict[str, tuple[float | None, float | None]] = {
+            r[0]: (r[1], r[2]) for r in cached_ret_rows if r[0]
+        }
 
         funds: list[dict[str, Any]] = []
         for r in rows:
@@ -1598,6 +1559,9 @@ def get_all_funds_activity(limit: int = 50, settings: Settings | None = None) ->
             for sym, val in holdings:
                 v = float(val or 1.0)
                 r30, r1y = ticker_returns.get(sym, (None, None))
+                if r30 is None and r1y is None:
+                    _, r30, r1y = _get_ticker_returns(sym, conn)
+                    ticker_returns[sym] = (r30, r1y)
                 if r30 is not None:
                     sum_ret_30 += v * r30
                     total_val_30 += v
