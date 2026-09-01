@@ -89,11 +89,19 @@ def _get_table_columns(conn: Any, table_name: str) -> list[str]:
 
 WATERMARK_CANDIDATE_COLUMNS = [
     "updated_at",
+    "last_updated",
     "scanned_at",
     "created_at",
     "published_at",
     "detected_at",
     "fetched_at",
+    "audited_at",
+    "run_at",
+    "predicted_at",
+    "added_at",
+    "cycle_start",
+    "cycle_end",
+    "trade_date",
     "signal_date",
     "date",
 ]
@@ -270,6 +278,25 @@ def sync_local_to_upstream(settings: Settings | None = None, force_full: bool = 
             # Determine watermark column and previous sync timestamp for delta filtering
             watermark_col = _get_watermark_column(common_cols)
             last_synced_at = None if force_full else _get_last_sync_timestamp(local_conn, table)
+
+            # Skip unwatermarked tables on incremental sync if already synced and row counts match
+            if not watermark_col and last_synced_at and not force_full:
+                try:
+                    loc_cnt = local_conn.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0] if table in local_tables else 0
+                    rem_cnt = remote_conn.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0] if table in remote_tables else 0
+                    if loc_cnt == rem_cnt and loc_cnt > 0:
+                        _save_last_sync_timestamp(local_conn, remote_conn, table, sync_now_iso, 0, 0)
+                        stats[table] = {
+                            "pushed": 0,
+                            "pulled": 0,
+                            "delta_watermark": None,
+                            "since": last_synced_at,
+                            "skipped": True,
+                            "reason": f"Row counts match ({loc_cnt})",
+                        }
+                        continue
+                except Exception as e:
+                    logger.debug("[TURSO-SYNC] Row count check error on %s: %s", table, e)
 
             # 1. Fetch Local Delta Rows (only records updated after last_synced_at)
             local_rows = []
