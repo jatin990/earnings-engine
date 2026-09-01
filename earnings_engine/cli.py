@@ -284,6 +284,30 @@ def ingest(market, ticker, force, prices, earnings_flag, universe_file, nse_cale
     mc_ok = sum(1 for v in mc_results.values() if v > 0)
     click.echo(f"Market cap: {mc_ok}/{len(tickers)} tickers with data.")
 
+@cli.command("ingest-institutional")
+@click.option("--limit", "-l", type=int, default=500,
+              help="Number of top equities to process for institutional holdings & shareholding patterns.")
+@click.option("--rate-limit", "-r", type=float, default=1.5,
+              help="Delay in seconds between requests to avoid rate limits.")
+def ingest_institutional(limit: int, rate_limit: float) -> None:
+    """Ingest AMFI mutual fund disclosures and NSE corporate shareholding patterns.
+
+    Extracts all discovered institutional entities (Mutual Funds, FIIs, Insurance,
+    Sovereign funds, and Super Investors) into institutional_holdings.
+
+    Examples:
+        earnings-engine ingest-institutional --limit 100
+        earnings-engine ingest-institutional --limit 500 --rate-limit 2.0
+    """
+    from earnings_engine.data.institutional_accumulation import ingest_amfi_and_nse_institutional_holdings
+
+    settings = Settings()
+    click.echo(f"Ingesting institutional patterns & AMFI funds for top {limit} equities (rate limit={rate_limit}s)...")
+    res = ingest_amfi_and_nse_institutional_holdings(limit=limit, rate_limit_delay=rate_limit, settings=settings)
+    click.echo(f"Institutional ingestion complete: {res['equities_processed']}/{res['total_requested']} equities processed, {res['schemes_discovered']} AMFI schemes discovered.")
+
+
+
 
 @cli.command("ingest-industries")
 @click.option("--market", type=click.Choice(["IN", "US", "NSE_ALL", "NSE_LARGE_CAP"], case_sensitive=False), default=None,
