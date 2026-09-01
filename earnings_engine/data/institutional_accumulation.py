@@ -651,6 +651,19 @@ def get_stock_institutional_activity(
                     "updated_at": row[29],
                 }
 
+        h_rows = conn.execute(
+            """
+            SELECT id, ticker, fund_name, fund_type, quarter, shares_held, stake_pct,
+                   holding_value_cr, prev_stake_pct, action, change_shares, change_pct,
+                   avg_price, recent_buy_price, recent_txn_price, recent_txn_date, recent_txn_type,
+                   reported_date
+            FROM institutional_holdings
+            WHERE ticker = ?
+            ORDER BY stake_pct DESC, holding_value_cr DESC
+            """,
+            (sym,),
+        ).fetchall()
+
         # If completely empty and is a core benchmark ticker, seed initial data
         if not h_rows and sym in CORE_BENCHMARK_UNIVERSE:
             _ensure_institutional_data_for_ticker(sym, conn)
@@ -1551,6 +1564,7 @@ def get_top_stake_additions(
             "historical_count": len(historical_additions),
             "latest_additions": latest_additions[:limit],
             "historical_additions": historical_additions[:limit],
+            "historical_surges": historical_additions[:limit],
             "top_additions": latest_additions[:limit],
             "as_of": datetime.now(timezone.utc).isoformat(),
         }

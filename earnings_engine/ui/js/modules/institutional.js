@@ -477,8 +477,9 @@
                     const kpiCount = document.getElementById('kpiTopAdditionsCount');
                     const kpiLeader = document.getElementById('kpiTopAdditionLeader');
                     const kpiLeaderSub = document.getElementById('kpiTopAdditionLeaderSub');
-                    const kpiInflow = document.getElementById('kpiTopAdditionInflow');
-                    const kpiMegaCount = document.getElementById('kpiHistoricalMegaCount');
+                    const kpiInflow = document.getElementById('kpiTopAdditionInflowLeader') || document.getElementById('kpiTopAdditionInflow');
+                    const kpiInflowSub = document.getElementById('kpiTopAdditionInflowLeaderSub');
+                    const kpiMegaCount = document.getElementById('kpiHistoricalSurgesCount') || document.getElementById('kpiHistoricalMegaCount');
 
                     if (kpiCount) {
                         kpiCount.innerText = `${data.latest_count || (data.latest_additions ? data.latest_additions.length : 0)} Setups`;
@@ -487,18 +488,24 @@
                         const top = data.latest_additions[0];
                         kpiLeader.innerText = `+${top.increase_pct}% (${top.ticker.replace('.NS', '')})`;
                         if (kpiLeaderSub) {
-                            kpiLeaderSub.innerText = `FII +${top.fii_delta_pct}% · DII +${top.dii_delta_pct}% · +₹${top.increase_amount_cr} Cr`;
+                            kpiLeaderSub.innerText = `FII +${top.fii_delta_pct || 0}% · DII +${top.dii_delta_pct || 0}% · +₹${top.increase_amount_cr || 0} Cr`;
                         }
                     }
-                    if (kpiInflow && data.total_inflow_cr) {
-                        kpiInflow.innerText = `+₹${Number(data.total_inflow_cr).toLocaleString()} Cr`;
+                    if (kpiInflow) {
+                        const totalInflow = data.total_inflow_cr || (data.latest_additions ? data.latest_additions.reduce((acc, x) => acc + (x.increase_amount_cr || 0), 0) : 0);
+                        kpiInflow.innerText = `+₹${Number(Number(totalInflow).toFixed(0)).toLocaleString()} Cr`;
+                        if (kpiInflowSub && data.latest_additions && data.latest_additions.length > 0) {
+                            const topStock = data.latest_additions[0];
+                            kpiInflowSub.innerText = `Led by ${topStock.ticker.replace('.NS', '')}`;
+                        }
                     }
-                    if (kpiMegaCount && data.historical_surges) {
-                        kpiMegaCount.innerText = `${data.historical_surges.length} Surges`;
+                    if (kpiMegaCount) {
+                        const count = data.historical_count || (data.historical_surges ? data.historical_surges.length : (data.historical_additions ? data.historical_additions.length : 0));
+                        kpiMegaCount.innerText = `${count} Surges`;
                     }
 
                     this.renderTopAdditionsTable(data.latest_additions || []);
-                    this.renderHistoricalAdditionsTable(data.historical_surges || []);
+                    this.renderHistoricalAdditionsTable(data.historical_surges || data.historical_additions || []);
                 }
             } catch (e) {
                 console.error('[INSTITUTIONAL] Failed loading top additions:', e);
@@ -510,12 +517,12 @@
             if (!tbody) return;
 
             if (!items || !items.length) {
-                tbody.innerHTML = '<tr><td colspan="10" style="padding:2rem;text-align:center;color:#64748b;">No high-conviction stake additions exceeding threshold.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#71717a;">No high-conviction stake additions exceeding threshold.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = items.map(it => {
-                const fundsInStr = `<span style="color:#34d399;font-weight:700;">+${it.funds_accumulating_count || 0} in</span> / <span style="color:#f87171;">-${it.funds_selling_count || 0} out</span>`;
+                const fundsInStr = `<span style="color:#ffffff;font-weight:700;">+${it.funds_accumulating_count || 0}</span> / <span style="color:#71717a;">-${it.funds_selling_count || 0}</span>`;
                 const ret7d = it.return_7d_pct != null ? it.return_7d_pct : 0;
                 const ret30d = it.return_30d_pct != null ? it.return_30d_pct : 0;
                 const ret7dCol = ret7d >= 0 ? '#34d399' : '#f87171';
@@ -523,38 +530,34 @@
 
                 const increaseAmount = it.increase_amount_cr != null ? it.increase_amount_cr : (it.net_flow_cr || 0);
                 const totalAmount = it.total_amount_cr != null ? it.total_amount_cr : (it.total_institutional_amount_cr || 0);
+                const incPct = it.increase_pct != null ? it.increase_pct : (it.inst_addition_pct != null ? it.inst_addition_pct : 0);
 
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-                        <td style="padding:0.65rem 0.75rem;font-family:var(--font-mono);font-weight:700;cursor:pointer;" onclick="app.searchInstitutionalStock('${it.ticker}')">
-                            <span style="color:#38bdf8;font-size:0.82rem;">${it.ticker.replace('.NS', '')}</span>
-                            <div style="font-size:0.68rem;color:#94a3b8;font-weight:400;">${it.company_name || ''}</div>
+                        <td style="padding:0.55rem 0.65rem;font-family:var(--font-mono);font-weight:700;cursor:pointer;" onclick="app.searchInstitutionalStock('${it.ticker}', false)">
+                            <span style="color:#ffffff;font-size:0.82rem;">${it.ticker.replace('.NS', '')}</span>
+                            <div style="font-size:0.68rem;color:#71717a;font-weight:400;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.company_name || ''}</div>
                         </td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);font-weight:800;color:#34d399;font-size:0.84rem;">
-                            +${it.increase_pct}%
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-weight:800;color:#ffffff;font-size:0.82rem;">
+                            +${incPct}%
                         </td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);font-weight:800;color:#34d399;">
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">
                             +₹${Number(increaseAmount).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr
                         </td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);font-weight:800;color:#38bdf8;">
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#a1a1aa;">
                             ₹${Number(totalAmount).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr
                         </td>
-                        <td style="padding:0.65rem 0.6rem;font-size:0.68rem;color:#cbd5e1;font-family:var(--font-mono);line-height:1.35;">
-                            <div>FII: <span style="color:#38bdf8;font-weight:700;">${it.fii_stake_pct}%</span> (+${it.fii_delta_pct}%)</div>
-                            <div>DII: <span style="color:#34d399;font-weight:700;">${it.dii_stake_pct}%</span> (+${it.dii_delta_pct}%)</div>
+                        <td style="padding:0.55rem 0.5rem;font-size:0.68rem;color:#a1a1aa;font-family:var(--font-mono);line-height:1.35;">
+                            <div>FII: <span style="color:#ffffff;font-weight:700;">${it.fii_stake_pct || 0}%</span> (+${it.fii_delta_pct || 0}%)</div>
+                            <div>DII: <span style="color:#ffffff;font-weight:700;">${it.dii_stake_pct || 0}%</span> (+${it.dii_delta_pct || 0}%)</div>
                         </td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${it.total_institutional_stake_pct}%</td>
-                        <td style="padding:0.65rem 0.6rem;">
-                            <div style="font-family:var(--font-mono);font-weight:800;color:#38bdf8;font-size:0.75rem;">${it.accumulation_score} / 100</div>
-                            <span class="signal-badge" style="background:${it.verdict_badge === 'emerald' ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)'};color:${it.verdict_badge === 'emerald' ? '#34d399' : '#60a5fa'};font-size:0.64rem;padding:0.1rem 0.35rem;margin-top:0.2rem;display:inline-block;">${it.verdict}</span>
-                        </td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);font-size:0.7rem;">${fundsInStr}</td>
-                        <td style="padding:0.65rem 0.4rem;font-family:var(--font-mono);font-size:0.68rem;">
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;">${fundsInStr}</td>
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;">
                             <div style="color:${ret7dCol};">7D: ${ret7d >= 0 ? '+' : ''}${ret7d}%</div>
                             <div style="color:${ret30dCol};">30D: ${ret30d >= 0 ? '+' : ''}${ret30d}%</div>
                         </td>
-                        <td style="padding:0.65rem 0.5rem;text-align:center;">
-                            <button type="button" onclick="app.searchInstitutionalStock('${it.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.25rem 0.55rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);">Inspect</button>
+                        <td style="padding:0.55rem 0.4rem;text-align:center;">
+                            <button type="button" onclick="app.searchInstitutionalStock('${it.ticker}', false)" class="btn btn-sm" style="font-size:0.65rem;padding:0.2rem 0.5rem;background:#18181b;color:#ffffff;border:1px solid rgba(255,255,255,0.25);border-radius:4px;cursor:pointer;">Inspect</button>
                         </td>
                     </tr>
                 `;
@@ -566,52 +569,102 @@
             if (!tbody) return;
 
             if (!items || !items.length) {
-                tbody.innerHTML = '<tr><td colspan="10" style="padding:2rem;text-align:center;color:#64748b;">No historical surges on record.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="padding:2rem;text-align:center;color:#71717a;">No historical surges on record.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = items.map(it => {
-                const ret30 = it.return_30d_pct != null ? it.return_30d_pct : 0;
-                const ret30Col = ret30 >= 0 ? '#34d399' : '#f87171';
                 const increaseAmount = it.increase_amount_cr != null ? it.increase_amount_cr : (it.net_flow_cr || 0);
                 const totalAmount = it.total_amount_cr != null ? it.total_amount_cr : (it.total_institutional_amount_cr || 0);
+                const comparisonStr = it.quarter_comparison || ((it.target_quarter && it.baseline_quarter) ? `${it.target_quarter} vs ${it.baseline_quarter}` : (it.quarter && it.prev_quarter ? `${it.quarter} vs ${it.prev_quarter}` : 'Prior Filings'));
+                const incPct = it.increase_pct != null ? it.increase_pct : (it.inst_addition_pct != null ? it.inst_addition_pct : 0);
+                const fiiDelta = it.fii_delta_pct != null ? it.fii_delta_pct : (it.fii_surge_pct != null ? it.fii_surge_pct : 0);
+                const diiDelta = it.dii_delta_pct != null ? it.dii_delta_pct : (it.dii_surge_pct != null ? it.dii_surge_pct : 0);
+                const histStake = it.historical_stake_pct != null ? `${it.historical_stake_pct}%` : '—';
+                const currStake = (it.current_total_stake_pct != null ? it.current_total_stake_pct : (it.current_stake_pct != null ? it.current_stake_pct : null));
+                const stakeFlowStr = currStake != null ? `<span style="color:#71717a;">${histStake}</span> &rarr; <span style="color:#ffffff;font-weight:700;">${currStake}%</span>` : `<span style="color:#ffffff;font-weight:700;">${histStake}</span>`;
 
                 return `
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-                        <td style="padding:0.65rem 0.75rem;font-family:var(--font-mono);font-weight:700;cursor:pointer;" onclick="app.searchInstitutionalStock('${it.ticker}')">
-                            <span style="color:#fbbf24;font-size:0.82rem;">${it.ticker.replace('.NS', '')}</span>
-                            <div style="font-size:0.68rem;color:#94a3b8;font-weight:400;">${it.company_name || ''}</div>
+                        <td style="padding:0.55rem 0.65rem;font-family:var(--font-mono);font-weight:700;cursor:pointer;" onclick="app.searchInstitutionalStock('${it.ticker}', false)">
+                            <span style="color:#ffffff;font-size:0.82rem;">${it.ticker.replace('.NS', '')}</span>
+                            <div style="font-size:0.68rem;color:#71717a;font-weight:400;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.company_name || ''}</div>
                         </td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);font-size:0.72rem;color:#cbd5e1;">${it.quarter} vs ${it.prev_quarter}</td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);font-weight:800;color:#fbbf24;font-size:0.84rem;">
-                            +${it.increase_pct || it.inst_addition_pct}%
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;color:#a1a1aa;">${comparisonStr}</td>
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-weight:800;color:#ffffff;font-size:0.82rem;">
+                            +${incPct}%
                         </td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);font-weight:800;color:#fbbf24;">
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">
                             +₹${Number(increaseAmount).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr
                         </td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);font-weight:800;color:#38bdf8;">
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#a1a1aa;">
                             ₹${Number(totalAmount).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr
                         </td>
-                        <td style="padding:0.65rem 0.6rem;font-size:0.68rem;color:#cbd5e1;font-family:var(--font-mono);line-height:1.35;">
-                            <div>FII: <span style="color:#38bdf8;font-weight:700;">+${it.fii_surge_pct}%</span></div>
-                            <div>DII: <span style="color:#34d399;font-weight:700;">+${it.dii_surge_pct}%</span></div>
+                        <td style="padding:0.55rem 0.5rem;font-size:0.68rem;color:#a1a1aa;font-family:var(--font-mono);line-height:1.35;">
+                            <div>FII: <span style="color:#ffffff;font-weight:700;">+${fiiDelta}%</span></div>
+                            <div>DII: <span style="color:#ffffff;font-weight:700;">+${diiDelta}%</span></div>
                         </td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);color:#cbd5e1;font-size:0.72rem;">
-                            <span style="color:#94a3b8;">${it.historical_stake_pct}%</span> → <span style="color:#38bdf8;font-weight:700;">${it.current_stake_pct}%</span>
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;">
+                            ${stakeFlowStr}
                         </td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);font-weight:800;color:#fbbf24;">${it.accumulation_score} / 100</td>
-                        <td style="padding:0.65rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:${ret30Col};">${ret30 >= 0 ? '+' : ''}${ret30}%</td>
-                        <td style="padding:0.65rem 0.5rem;text-align:center;">
-                            <button type="button" onclick="app.searchInstitutionalStock('${it.ticker}')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.25rem 0.55rem;background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.35);">Inspect</button>
+                        <td style="padding:0.55rem 0.4rem;text-align:center;">
+                            <button type="button" onclick="app.searchInstitutionalStock('${it.ticker}', false)" class="btn btn-sm" style="font-size:0.65rem;padding:0.2rem 0.5rem;background:#18181b;color:#ffffff;border:1px solid rgba(255,255,255,0.25);border-radius:4px;cursor:pointer;">Inspect</button>
                         </td>
                     </tr>
                 `;
             }).join('');
         },
 
+        toggleSurgeSort(type) {
+            const btnPct = document.getElementById('btnSurgeSort-pct');
+            const btnAmt = document.getElementById('btnSurgeSort-amt');
+            const topAdditions = this.institutionalData.topAdditions;
+            const surges = topAdditions ? (topAdditions.historical_surges || topAdditions.historical_additions || []) : [];
+
+            if (type === 'pct') {
+                if (btnPct) {
+                    btnPct.style.background = '#ffffff';
+                    btnPct.style.color = '#09090b';
+                    btnPct.style.borderColor = '#ffffff';
+                    btnPct.style.fontWeight = '700';
+                }
+                if (btnAmt) {
+                    btnAmt.style.background = 'transparent';
+                    btnAmt.style.color = '#a1a1aa';
+                    btnAmt.style.borderColor = 'transparent';
+                    btnAmt.style.fontWeight = '500';
+                }
+                const sorted = [...surges].sort((a, b) => {
+                    const pctB = b.increase_pct != null ? b.increase_pct : (b.inst_addition_pct || 0);
+                    const pctA = a.increase_pct != null ? a.increase_pct : (a.inst_addition_pct || 0);
+                    return pctB - pctA;
+                });
+                this.renderHistoricalAdditionsTable(sorted);
+            } else {
+                if (btnAmt) {
+                    btnAmt.style.background = '#ffffff';
+                    btnAmt.style.color = '#09090b';
+                    btnAmt.style.borderColor = '#ffffff';
+                    btnAmt.style.fontWeight = '700';
+                }
+                if (btnPct) {
+                    btnPct.style.background = 'transparent';
+                    btnPct.style.color = '#a1a1aa';
+                    btnPct.style.borderColor = 'transparent';
+                    btnPct.style.fontWeight = '500';
+                }
+                const sorted = [...surges].sort((a, b) => {
+                    const amtB = b.increase_amount_cr != null ? b.increase_amount_cr : (b.net_flow_cr || 0);
+                    const amtA = a.increase_amount_cr != null ? a.increase_amount_cr : (a.net_flow_cr || 0);
+                    return amtB - amtA;
+                });
+                this.renderHistoricalAdditionsTable(sorted);
+            }
+        },
+
         async searchInstitutionalStock(ticker, autoSwitch = true) {
             if (!ticker) return;
-            const cleanTicker = ticker.trim().toUpperCase();
+            const cleanTicker = ticker.trim().toUpperCase().endsWith('.NS') ? ticker.trim().toUpperCase() : ticker.trim().toUpperCase() + '.NS';
             this._selectedTicker = cleanTicker;
             try {
                 const res = await fetch(API_BASE + `/api/v1/institutional/stock/${encodeURIComponent(cleanTicker)}`);
@@ -619,7 +672,7 @@
                     const data = await res.json();
                     this.institutionalData.currentStock = data;
                     this.renderStockInstitutionalDetails(data);
-                    if (autoSwitch && this.institutionalSubPage !== 'equities') {
+                    if (autoSwitch && this.institutionalSubPage === 'investors') {
                         this.switchInstitutionalPage('equities');
                     }
                 } else {
@@ -633,164 +686,195 @@
         renderStockInstitutionalDetails(data) {
             if (!data) return;
 
+            // Page 1 Elements
             const tickerEl = document.getElementById('instSelectedTicker');
             const nameEl = document.getElementById('instSelectedCompanyName');
             const badgeEl = document.getElementById('instSelectedVerdictBadge');
             const scoreTextEl = document.getElementById('instSelectedScoreText');
+            const linkEl = document.getElementById('instSelectedStockLink');
 
+            // Page 3 Elements
+            const topTickerEl = document.getElementById('instTopSelectedTicker');
+            const topNameEl = document.getElementById('instTopSelectedCompanyName') || document.getElementById('instTopSelectedCompany');
+            const topBadgeEl = document.getElementById('instTopSelectedVerdictBadge');
+            const topSubtitleEl = document.getElementById('instTopSelectedStockSubtitle');
+            const topScoreTextEl = document.getElementById('instTopSelectedScoreText');
+            const topLinkEl = document.getElementById('instTopSelectedStockLink') || document.getElementById('instTopSelectedStockDeepLink');
+
+            // Populate Page 1 Header
             if (tickerEl) tickerEl.textContent = data.ticker;
             if (nameEl) nameEl.textContent = data.company_name || '';
             if (badgeEl) {
-                badgeEl.textContent = data.verdict;
+                badgeEl.textContent = data.verdict || 'Institutional Activity';
                 badgeEl.style.background = data.verdict_badge === 'emerald' ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)';
                 badgeEl.style.color = data.verdict_badge === 'emerald' ? '#34d399' : '#60a5fa';
             }
             if (scoreTextEl) {
-                const incPctStr = data.increase_pct != null ? `${data.increase_pct >= 0 ? '+' : ''}${data.increase_pct}%` : '0.0%';
-                const incAmtStr = data.increase_amount_cr != null ? `${data.increase_amount_cr >= 0 ? '+' : ''}₹${Number(data.increase_amount_cr).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr` : `+₹${data.net_flow_cr || 0} Cr`;
-                const totAmtStr = data.total_amount_cr != null ? `₹${Number(data.total_amount_cr).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr` : '—';
-
-                scoreTextEl.innerHTML = `Accumulation Score: <strong style="color:#38bdf8;">${data.accumulation_score} / 100</strong> | Net Increase: <strong style="color:#34d399;">${incAmtStr} (${incPctStr})</strong> | Total Inst Value: <strong style="color:#38bdf8;">${totAmtStr}</strong> | Funds In/Out (QoQ): <strong style="color:#34d399;">+${data.funds_accumulating_count}</strong> / <strong style="color:#f87171;">-${data.funds_selling_count}</strong>`;
+                scoreTextEl.innerHTML = `Accumulation Score: <strong style="color:#ffffff;">${data.accumulation_score} / 100</strong> · Inflow: <strong style="color:#ffffff;">+₹${Number(data.gross_inflow_cr || 0).toLocaleString()} Cr</strong> · Outflow: <strong style="color:#f87171;">-₹${Number(data.gross_outflow_cr || 0).toLocaleString()} Cr</strong> · Net: <strong style="color:#ffffff;">+₹${Number(data.net_flow_cr || 0).toLocaleString()} Cr</strong>`;
             }
+            if (linkEl) linkEl.href = `/stock/${data.ticker}`;
 
-            // 1. Shareholding pattern history
-            const patContainer = document.getElementById('instShareholdingPatternContainer');
-            if (patContainer) {
-                const pats = data.shareholding_patterns || [];
-                if (!pats.length) {
-                    patContainer.innerHTML = '<div style="color:#64748b;font-size:0.72rem;padding:0.5rem;">No historical shareholding filings found.</div>';
-                } else {
-                    patContainer.innerHTML = `
-                        <table style="width:100%;font-size:0.72rem;text-align:left;border-collapse:collapse;">
-                            <thead>
-                                <tr style="color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.06);font-family:var(--font-mono);">
-                                    <th style="padding:0.35rem 0.5rem;">QUARTER</th>
-                                    <th style="padding:0.35rem 0.5rem;text-align:right;">STOCK PRICE</th>
-                                    <th style="padding:0.35rem 0.5rem;text-align:right;">PROMOTER</th>
-                                    <th style="padding:0.35rem 0.5rem;text-align:right;">FII / FPI</th>
-                                    <th style="padding:0.35rem 0.5rem;text-align:right;">DII / MUTUAL FUNDS</th>
-                                    <th style="padding:0.35rem 0.5rem;text-align:right;">RETAIL / PUBLIC</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${pats.map((p, idx) => {
-                                    const prevP = pats[idx + 1];
-                                    const fiiDelta = prevP ? (p.fii_pct - prevP.fii_pct) : 0;
-                                    const diiDelta = prevP ? (p.dii_mf_pct - prevP.dii_mf_pct) : 0;
-                                    const fiiDeltaStr = prevP ? (fiiDelta >= 0 ? `<span style="color:#34d399;font-size:0.62rem;">(+${fiiDelta.toFixed(2)}%)</span>` : `<span style="color:#f87171;font-size:0.62rem;">(${fiiDelta.toFixed(2)}%)</span>`) : '';
-                                    const diiDeltaStr = prevP ? (diiDelta >= 0 ? `<span style="color:#34d399;font-size:0.62rem;">(+${diiDelta.toFixed(2)}%)</span>` : `<span style="color:#f87171;font-size:0.62rem;">(${diiDelta.toFixed(2)}%)</span>`) : '';
+            // Populate Page 3 Header (Crisp Monochrome)
+            if (topTickerEl) topTickerEl.textContent = data.ticker;
+            if (topNameEl) topNameEl.textContent = data.company_name || '';
+            if (topBadgeEl) {
+                topBadgeEl.textContent = data.verdict || 'Top Institutional Addition';
+                topBadgeEl.style.background = '#18181b';
+                topBadgeEl.style.color = '#f4f4f5';
+                topBadgeEl.style.border = '1px solid rgba(255,255,255,0.25)';
+            }
+            const incPctStr = data.increase_pct != null ? `${data.increase_pct >= 0 ? '+' : ''}${data.increase_pct}%` : `${data.total_institutional_stake_pct || 0}%`;
+            const incAmtStr = data.increase_amount_cr != null ? `+₹${Number(data.increase_amount_cr).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr` : `+₹${data.net_flow_cr || 0} Cr`;
+            const totAmtStr = data.total_amount_cr != null ? `₹${Number(data.total_amount_cr).toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})} Cr` : '—';
 
-                                    const isCurrentQ = p.is_current_quarter || idx === 0;
-                                    let priceHtml = '—';
-                                    if (isCurrentQ) {
-                                        const curP = p.current_price != null ? p.current_price : p.stock_price;
-                                        const startP = p.quarter_start_price;
-                                        const retQ = (curP && startP) ? (((curP - startP) / startP) * 100) : null;
-                                        const retStr = retQ != null ? `<span style="color:${retQ >= 0 ? '#34d399' : '#f87171'};font-size:0.60rem;font-weight:700;">(${retQ >= 0 ? '+' : ''}${retQ.toFixed(1)}%)</span>` : '';
-                                        priceHtml = `
-                                            <div style="font-weight:800;color:#f8fafc;">₹${curP != null ? Number(curP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'} <span style="font-size:0.58rem;color:#38bdf8;background:rgba(56,189,248,0.15);padding:0.02rem 0.25rem;border-radius:3px;font-weight:700;">Live</span></div>
-                                            ${startP ? `<div style="font-size:0.60rem;color:#64748b;">Start: ₹${Number(startP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})} ${retStr}</div>` : ''}
-                                        `;
-                                    } else {
-                                        const startP = p.quarter_start_price != null ? p.quarter_start_price : p.stock_price;
-                                        priceHtml = `
-                                            <div style="font-weight:700;color:#93c5fd;">₹${startP != null ? Number(startP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}</div>
-                                            <div style="font-size:0.60rem;color:#64748b;">Quarter Start</div>
-                                        `;
-                                    }
+            const subtitleHtml = `Inflow: <b style="color:#ffffff;">${incAmtStr}</b> · Current Stake: <b style="color:#ffffff;">${data.total_institutional_stake_pct || '—'}%</b> · FII Surge: <b style="color:#ffffff;">+${data.fii_delta_pct || 0}%</b>`;
+            if (topSubtitleEl) topSubtitleEl.innerHTML = subtitleHtml;
+            if (topScoreTextEl) topScoreTextEl.innerHTML = `Inflow: <strong style="color:#ffffff;">${incAmtStr}</strong> · Stake: <strong style="color:#ffffff;">${incPctStr}</strong> · Total: <strong style="color:#ffffff;">${totAmtStr}</strong>`;
+            if (topLinkEl) topLinkEl.href = `/stock/${data.ticker}`;
 
-                                    return `
-                                        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
-                                            <td style="padding:0.4rem 0.5rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);">${p.quarter}</td>
-                                            <td style="padding:0.4rem 0.5rem;text-align:right;font-family:var(--font-mono);">${priceHtml}</td>
-                                            <td style="padding:0.4rem 0.5rem;text-align:right;color:#cbd5e1;font-family:var(--font-mono);">${p.promoter_pct}%</td>
-                                            <td style="padding:0.4rem 0.5rem;text-align:right;color:#38bdf8;font-weight:700;font-family:var(--font-mono);">${p.fii_pct}% ${fiiDeltaStr}</td>
-                                            <td style="padding:0.4rem 0.5rem;text-align:right;color:#34d399;font-weight:700;font-family:var(--font-mono);">${p.dii_mf_pct}% ${diiDeltaStr}</td>
-                                            <td style="padding:0.4rem 0.5rem;text-align:right;color:#94a3b8;font-family:var(--font-mono);">${p.public_retail_pct}%</td>
-                                        </tr>
+            // 1. Shareholding Pattern History (Rendered to both Page 1 and Page 3)
+            const pats = data.shareholding_patterns || [];
+            let patTableHtml = '';
+            if (!pats.length) {
+                patTableHtml = '<div style="color:#71717a;font-size:0.72rem;padding:0.75rem;text-align:center;">No historical shareholding filings found.</div>';
+            } else {
+                patTableHtml = `
+                    <table style="width:100%;font-size:0.72rem;text-align:left;border-collapse:collapse;">
+                        <thead>
+                            <tr style="color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.12);font-family:var(--font-mono);font-size:0.68rem;">
+                                <th style="padding:0.35rem 0.5rem;">QUARTER</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:right;">STOCK PRICE</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:right;">PROMOTER</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:right;">FII / FPI</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:right;">DII / MUTUAL FUNDS</th>
+                                <th style="padding:0.35rem 0.5rem;text-align:right;">PUBLIC / RETAIL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${pats.map((p, idx) => {
+                                const fiiDelta = p.fii_delta_pct != null ? p.fii_delta_pct : (idx < pats.length - 1 ? (p.fii_pct - pats[idx+1].fii_pct) : 0);
+                                const diiDelta = p.dii_delta_pct != null ? p.dii_delta_pct : (idx < pats.length - 1 ? (p.dii_mf_pct - pats[idx+1].dii_mf_pct) : 0);
+                                const fiiDeltaStr = fiiDelta !== 0 ? `<span style="color:${fiiDelta > 0 ? '#34d399' : '#f87171'};font-size:0.62rem;">(${fiiDelta > 0 ? '+' : ''}${fiiDelta.toFixed(2)}%)</span>` : '';
+                                const diiDeltaStr = diiDelta !== 0 ? `<span style="color:${diiDelta > 0 ? '#34d399' : '#f87171'};font-size:0.62rem;">(${diiDelta > 0 ? '+' : ''}${diiDelta.toFixed(2)}%)</span>` : '';
+
+                                const isCurrentQ = p.is_current_quarter || idx === 0;
+                                let priceHtml = '—';
+                                if (isCurrentQ) {
+                                    const curP = p.current_price != null ? p.current_price : p.stock_price;
+                                    const startP = p.quarter_start_price;
+                                    const retQ = (curP && startP) ? (((curP - startP) / startP) * 100) : null;
+                                    const retStr = retQ != null ? `<span style="color:${retQ >= 0 ? '#34d399' : '#f87171'};font-size:0.60rem;font-weight:700;">(${retQ >= 0 ? '+' : ''}${retQ.toFixed(1)}%)</span>` : '';
+                                    priceHtml = `
+                                        <div style="font-weight:800;color:#f8fafc;">₹${curP != null ? Number(curP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'} <span style="font-size:0.58rem;color:#ffffff;background:#27272a;padding:0.02rem 0.25rem;border-radius:3px;font-weight:700;">Live</span></div>
+                                        ${startP ? `<div style="font-size:0.60rem;color:#71717a;">Start: ₹${Number(startP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})} ${retStr}</div>` : ''}
                                     `;
-                                }).join('')}
-                            </tbody>
-                        </table>
-                    `;
-                }
-            }
+                                } else {
+                                    const startP = p.quarter_start_price != null ? p.quarter_start_price : p.stock_price;
+                                    priceHtml = `
+                                        <div style="font-weight:700;color:#ffffff;">₹${startP != null ? Number(startP).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}</div>
+                                    `;
+                                }
 
-            // 2. Block deals
-            const dealsContainer = document.getElementById('instBlockDealsContainer');
-            if (dealsContainer) {
-                const deals = data.block_deals || [];
-                if (!deals.length) {
-                    dealsContainer.innerHTML = '<div style="color:#64748b;font-size:0.72rem;padding:0.5rem;">No recent bulk or block deals recorded for this ticker.</div>';
-                } else {
-                    dealsContainer.innerHTML = deals.map(d => {
-                        const isBuy = d.deal_type === 'BUY';
-                        const bg = isBuy ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
-                        const col = isBuy ? '#34d399' : '#f87171';
-                        return `
-                            <div style="background:${bg};border:1px solid ${isBuy ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'};border-radius:4px;padding:0.35rem 0.55rem;margin-bottom:0.35rem;display:flex;justify-content:space-between;align-items:center;font-size:0.72rem;">
-                                <div>
-                                    <span style="font-weight:700;color:${col};font-family:var(--font-mono);margin-right:0.35rem;">[${d.deal_type}]</span>
-                                    <strong style="color:#f8fafc;">${d.client_name}</strong>
-                                </div>
-                                <div style="font-family:var(--font-mono);color:#cbd5e1;text-align:right;">
-                                    ${d.quantity.toLocaleString()} shares @ ₹${d.price} (₹${d.value_cr} Cr) | <span style="color:#94a3b8;">${d.deal_date}</span>
-                                </div>
+                                return `
+                                    <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                                        <td style="padding:0.4rem 0.5rem;font-weight:700;color:#ffffff;font-family:var(--font-mono);">${p.quarter}</td>
+                                        <td style="padding:0.4rem 0.5rem;text-align:right;font-family:var(--font-mono);">${priceHtml}</td>
+                                        <td style="padding:0.4rem 0.5rem;text-align:right;color:#a1a1aa;font-family:var(--font-mono);">${p.promoter_pct}%</td>
+                                        <td style="padding:0.4rem 0.5rem;text-align:right;color:#ffffff;font-weight:700;font-family:var(--font-mono);">${p.fii_pct}% ${fiiDeltaStr}</td>
+                                        <td style="padding:0.4rem 0.5rem;text-align:right;color:#ffffff;font-weight:700;font-family:var(--font-mono);">${p.dii_mf_pct}% ${diiDeltaStr}</td>
+                                        <td style="padding:0.4rem 0.5rem;text-align:right;color:#71717a;font-family:var(--font-mono);">${p.public_retail_pct}%</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            const patContainer = document.getElementById('instShareholdingPatternContainer');
+            if (patContainer) patContainer.innerHTML = patTableHtml;
+            const patContainerTop = document.getElementById('instTopStockQuarterlyTrendContainer');
+            if (patContainerTop) patContainerTop.innerHTML = patTableHtml;
+
+            // 2. Block Deals (Rendered to both Page 1 and Page 3)
+            const deals = data.block_deals || [];
+            let dealsHtml = '';
+            if (!deals.length) {
+                dealsHtml = '<div style="color:#71717a;font-size:0.72rem;padding:0.75rem;text-align:center;">No recent block/bulk deals recorded.</div>';
+            } else {
+                dealsHtml = deals.map(d => {
+                    const isBuy = d.deal_type === 'BUY';
+                    const bg = isBuy ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+                    const col = isBuy ? '#34d399' : '#f87171';
+                    return `
+                        <div style="background:${bg};border:1px solid ${isBuy ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'};border-radius:4px;padding:0.35rem 0.55rem;margin-bottom:0.35rem;display:flex;justify-content:space-between;align-items:center;font-size:0.72rem;">
+                            <div>
+                                <span style="font-weight:700;color:${col};font-family:var(--font-mono);margin-right:0.35rem;">[${d.deal_type}]</span>
+                                <strong style="color:#ffffff;">${d.client_name}</strong>
                             </div>
-                        `;
-                    }).join('');
-                }
+                            <div style="font-family:var(--font-mono);color:#a1a1aa;text-align:right;">
+                                ${d.quantity.toLocaleString()} shares @ ₹${d.price} (₹${d.value_cr} Cr) | <span style="color:#71717a;">${d.deal_date}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
             }
+            const dealsContainer = document.getElementById('instBlockDealsContainer');
+            if (dealsContainer) dealsContainer.innerHTML = dealsHtml;
+            const dealsContainerTop = document.getElementById('instTopBlockDealsContainer') || document.getElementById('instTopStockBlockDealsBody');
+            if (dealsContainerTop) dealsContainerTop.innerHTML = dealsHtml;
 
-            // 3. Fund-by-Fund Table (Render 3 Distinct Financial Metrics)
+            // 3. Fund-by-Fund Table (Rendered to both Page 1 and Page 3)
+            const holdings = data.holdings || [];
+            const fundBadge = document.getElementById('instStockFundCountBadge');
+            if (fundBadge) fundBadge.textContent = `${holdings.length} Funds Tracked`;
+            const fundBadgeTop = document.getElementById('instTopStockFundCountBadge');
+            if (fundBadgeTop) fundBadgeTop.textContent = `${holdings.length} Funds Tracked`;
+
             const tbody = document.getElementById('instStockHoldingsTableBody');
-            if (tbody) {
-                const holdings = data.holdings || [];
-                if (!holdings.length) {
-                    tbody.innerHTML = '<tr><td colspan="10" style="padding:2rem;text-align:center;color:#64748b;">No fund positions recorded for this ticker yet.</td></tr>';
-                    return;
-                }
+            const tbodyTop = document.getElementById('instTopStockHoldingsTableBody');
 
-                tbody.innerHTML = holdings.map(h => {
+            let holdingsRowsHtml = '';
+            if (!holdings.length) {
+                holdingsRowsHtml = '<tr><td colspan="10" style="padding:1.5rem;text-align:center;color:#71717a;">No fund positions recorded for this ticker yet.</td></tr>';
+            } else {
+                holdingsRowsHtml = holdings.map(h => {
                     const act = h.action;
                     const isBuy = act === 'NEW BUY';
                     const isAcc = act === 'ACCUMULATED';
                     const isTrim = act === 'TRIMMED';
-                    const isSold = act === 'SOLD OUT';
-
-                    const actBg = isBuy ? 'rgba(56,189,248,0.15)' : isAcc ? 'rgba(16,185,129,0.15)' : isTrim ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)';
+                    const actBg = '#18181b';
                     const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : '#f87171';
-                    
-                    // Metric 1: Increase by Percentage
+
                     const changePct = h.change_pct != null ? h.change_pct : 0;
                     const changeStr = changePct > 0 ? `+${changePct}%` : `${changePct}%`;
 
-                    // Metric 2: Increase by Amount (₹ Cr)
                     const incAmountCr = h.increase_amount_cr != null ? h.increase_amount_cr : 0;
                     const incAmountCol = incAmountCr >= 0 ? '#34d399' : '#f87171';
                     const incAmountStr = `${incAmountCr >= 0 ? '+' : ''}₹${Number(incAmountCr).toFixed(2)} Cr`;
-
-                    // Metric 3: Total Amount (₹ Cr)
                     const totAmountCr = h.total_amount_cr != null ? h.total_amount_cr : (h.holding_value_cr || 0);
 
                     return `
                         <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-                            <td style="padding:0.6rem 0.8rem;font-weight:700;color:#f8fafc;">${h.fund_name}</td>
-                            <td style="padding:0.6rem 0.8rem;color:#94a3b8;font-size:0.72rem;">${h.fund_type}</td>
-                            <td style="padding:0.6rem 0.8rem;">
-                                <span class="signal-badge" style="background:${actBg};color:${actCol};font-size:0.68rem;padding:0.12rem 0.4rem;">${h.action}</span>
+                            <td style="padding:0.5rem 0.6rem;font-weight:700;color:#ffffff;cursor:pointer;" onclick="app.inspectFundPortfolio('${h.fund_name}')">
+                                <span style="color:#ffffff;">${h.fund_name}</span>
                             </td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${h.stake_pct}%</td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#38bdf8;font-weight:600;">₹${h.avg_price != null ? Number(h.avg_price).toFixed(2) : '—'}</td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#a7f3d0;font-weight:600;">₹${h.recent_buy_price != null ? Number(h.recent_buy_price).toFixed(2) : '—'}</td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:${actCol};">${changeStr}</td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:${incAmountCol};">${incAmountStr}</td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#38bdf8;">₹${Number(totAmountCr).toFixed(2)} Cr</td>
-                            <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#64748b;font-size:0.7rem;">${h.reported_date || '—'}</td>
+                            <td style="padding:0.5rem 0.5rem;color:#a1a1aa;font-size:0.68rem;">${h.fund_type}</td>
+                            <td style="padding:0.5rem 0.5rem;">
+                                <span class="signal-badge" style="background:${actBg};color:${actCol};border:1px solid rgba(255,255,255,0.15);font-size:0.65rem;padding:0.1rem 0.35rem;">${h.action}</span>
+                            </td>
+                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">${h.stake_pct}%</td>
+                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#a1a1aa;font-size:0.68rem;">₹${h.avg_price != null ? Number(h.avg_price).toFixed(2) : '—'}</td>
+                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#71717a;font-size:0.65rem;">${h.recent_buy_price ? `₹${Number(h.recent_buy_price).toFixed(2)}` : '—'}</td>
+                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:${actCol};">${changeStr}</td>
+                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:${incAmountCol};">${incAmountStr}</td>
+                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">₹${Number(totAmountCr).toFixed(2)} Cr</td>
+                            <td style="padding:0.5rem 0.5rem;font-family:var(--font-mono);color:#71717a;font-size:0.68rem;">${h.reported_date || '—'}</td>
                         </tr>
                     `;
                 }).join('');
             }
+            if (tbody) tbody.innerHTML = holdingsRowsHtml;
+            if (tbodyTop) tbodyTop.innerHTML = holdingsRowsHtml;
         },
 
         async inspectFundPortfolio(fundName) {
@@ -807,7 +891,7 @@
                     const tbody = document.getElementById('instFundModalTableBody');
 
                     if (titleEl) {
-                        titleEl.innerHTML = `<span>💼</span> ${data.fund_name || fundName}`;
+                        titleEl.innerText = data.fund_name || fundName;
                     }
                     if (subEl) {
                         subEl.innerText = `${data.fund_type || 'Fund'} Portfolio · ${holdings.length} Positions Tracked · Total Tracked Value: ₹${Number(data.total_aum_tracked_cr || 0).toLocaleString()} Cr`;
@@ -815,14 +899,14 @@
 
                     if (tbody) {
                         if (!holdings.length) {
-                            tbody.innerHTML = '<tr><td colspan="13" style="padding:2rem;text-align:center;color:#64748b;">No portfolio positions recorded for this fund.</td></tr>';
+                            tbody.innerHTML = '<tr><td colspan="10" style="padding:2rem;text-align:center;color:#71717a;">No portfolio positions recorded for this fund.</td></tr>';
                         } else {
                             tbody.innerHTML = holdings.map(h => {
                                 const act = h.action;
                                 const isBuy = act === 'NEW BUY';
                                 const isAcc = act === 'ACCUMULATED';
                                 const isTrim = act === 'TRIMMED';
-                                const actBg = isBuy ? 'rgba(56,189,248,0.15)' : isAcc ? 'rgba(16,185,129,0.15)' : isTrim ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)';
+                                const actBg = '#18181b';
                                 const actCol = isBuy ? '#38bdf8' : isAcc ? '#34d399' : isTrim ? '#fbbf24' : '#f87171';
 
                                 const ret30 = h.return_30d_pct != null ? h.return_30d_pct : 0;
@@ -830,7 +914,6 @@
                                 const ret30Col = ret30 >= 0 ? '#34d399' : '#f87171';
                                 const ret1yCol = ret1y >= 0 ? '#34d399' : '#f87171';
 
-                                // 3 Distinct Metrics
                                 const changePct = h.change_pct != null ? h.change_pct : 0;
                                 const changeStr = changePct > 0 ? `+${changePct}%` : `${changePct}%`;
                                 const incAmountCr = h.increase_amount_cr != null ? h.increase_amount_cr : 0;
@@ -840,26 +923,20 @@
 
                                 return `
                                     <tr style="border-bottom:1px solid rgba(255,255,255,0.06);transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;cursor:pointer;" onclick="app.closeFundModal(); app.searchInstitutionalStock('${h.ticker}');">
-                                            <span style="color:#38bdf8;">${h.ticker.replace('.NS', '')}</span>
-                                            <div style="font-size:0.66rem;color:#94a3b8;font-weight:400;">${h.company_name || ''}</div>
+                                        <td style="padding:0.5rem 0.65rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;cursor:pointer;" onclick="app.closeFundModal(); app.searchInstitutionalStock('${h.ticker}', false);">
+                                            ${h.ticker.replace('.NS', '')}
                                         </td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#cbd5e1;font-size:0.72rem;">${h.quarter || 'Q1 FY27'}</td>
-                                        <td style="padding:0.6rem 0.8rem;">
-                                            <span class="signal-badge" style="background:${actBg};color:${actCol};font-size:0.68rem;padding:0.12rem 0.4rem;">${h.action}</span>
+                                        <td style="padding:0.5rem 0.6rem;color:#a1a1aa;font-size:0.72rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h.company_name || ''}</td>
+                                        <td style="padding:0.5rem 0.6rem;color:#71717a;font-size:0.68rem;">${h.sector || '—'}</td>
+                                        <td style="padding:0.5rem 0.6rem;">
+                                            <span class="signal-badge" style="background:${actBg};color:${actCol};border:1px solid rgba(255,255,255,0.15);font-size:0.65rem;padding:0.1rem 0.35rem;">${h.action}</span>
                                         </td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#f8fafc;">${h.stake_pct}%</td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:${actCol};">${changeStr}</td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:${incAmountCol};">${incAmountStr}</td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:#38bdf8;">₹${Number(totAmountCr).toFixed(2)} Cr</td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:${ret30Col};">${ret30 >= 0 ? '+' : ''}${ret30}%</td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);font-weight:700;color:${ret1yCol};">${ret1y >= 0 ? '+' : ''}${ret1y}%</td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#38bdf8;">₹${h.avg_price != null ? Number(h.avg_price).toFixed(2) : '—'}</td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#a7f3d0;">₹${h.recent_buy_price != null ? Number(h.recent_buy_price).toFixed(2) : '—'}</td>
-                                        <td style="padding:0.6rem 0.8rem;font-family:var(--font-mono);color:#64748b;font-size:0.7rem;">${h.reported_date || '—'}</td>
-                                        <td style="padding:0.6rem 0.8rem;text-align:center;">
-                                            <button type="button" onclick="app.closeFundModal(); app.searchInstitutionalStock('${h.ticker}');" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;">Inspect</button>
-                                        </td>
+                                        <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">₹${Number(totAmountCr).toFixed(2)} Cr</td>
+                                        <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);color:#a1a1aa;font-size:0.7rem;">${Number(h.shares || 0).toLocaleString()}</td>
+                                        <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">${h.stake_pct}%</td>
+                                        <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:${ret30Col};">${ret30 >= 0 ? '+' : ''}${ret30}%</td>
+                                        <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:${ret1yCol};">${ret1y >= 0 ? '+' : ''}${ret1y}%</td>
+                                        <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);color:#71717a;font-size:0.68rem;">${h.reported_date || '—'}</td>
                                     </tr>
                                 `;
                             }).join('');
