@@ -91,3 +91,55 @@ def test_evaluate_stock_breakout_api_endpoint(sample_stock_db):
     assert e_data["ticker"] == "RELIANCE.NS"
     assert e_data["breakout_trigger"] > 0
     assert e_data["target_price"] > 0
+
+
+def test_reevaluate_preserves_original_signal_and_position(sample_stock_db):
+    """Test that re-evaluating an existing stock NEVER overrides original signal_price/signal_date."""
+    settings = sample_stock_db
+    conn = get_db_connection(settings)
+
+    # 1. Manually insert an initial detected position at 2500.0 on 2026-08-15
+    with conn:
+        conn.execute("DELETE FROM breakout_radar WHERE ticker = 'RELIANCE.NS'")
+        conn.execute(
+            """
+            INSERT INTO breakout_radar (
+                ticker, strategy, tier, company_name, composite_score,
+                signal_date, signal_price, predicted_value, breakout_trigger, target_price,
+                stop_loss, current_price, current_date, realized_return_pct, max_gain_pct,
+                outcome, scanned_at, created_at, updated_at
+            ) VALUES (
+                'RELIANCE.NS', 'CLASSIC_TECHNICAL', 'HOT', 'Reliance Industries Ltd', 85.0,
+                '2026-08-15', 2500.0, 2500.0, 2550.0, 2750.0,
+                2400.0, 2500.0, '2026-08-15', 0.0, 0.0,
+                'ACTIVE', '2026-08-15T10:00:00Z', '2026-08-15T10:00:00Z', '2026-08-15T10:00:00Z'
+            )
+            """
+        )
+        conn.commit()
+
+    # 2. Call evaluate_stock_breakout (which runs against latest price history ~2750.0)
+    reeval_res = evaluate_stock_breakout("RELIANCE.NS", strategy="CLASSIC_TECHNICAL", settings=settings)
+
+    assert reeval_res["success"] is True
+    # Anchor attributes MUST be preserved
+    assert reeval_res["signal_date"] == "2026-08-15"
+    assert reeval_res["signal_price"] == 2500.0
+    assert reeval_res["breakout_trigger"] == 2550.0
+    assert reeval_res["target_price"] == 2750.0
+    assert reeval_res["stop_loss"] == 2400.0
+
+    # Current market price and P&L MUST be updated relative to the original position (2500.0)
+    assert reeval_res["current_price"] == 2750.0
+    assert reeval_res["realized_return_pct"] == round(((2750.0 - 2500.0) / 2500.0) * 100, 2)  # +10.0%
+    assert reeval_res["outcome"] == "TARGET_HIT"  # 2750 >= target 2750
+
+    # 3. Verify in database that breakout_radar still preserves the original signal_price
+    db_row = conn.execute("SELECT signal_date, signal_price, current_price, realized_return_pct, outcome FROM breakout_radar WHERE ticker = 'RELIANCE.NS'").fetchone()
+    assert db_row is not None
+    assert db_row[0] == "2026-08-15"
+    assert db_row[1] == 2500.0
+    assert db_row[2] == 2750.0
+    assert db_row[3] == 10.0
+    assert db_row[4] == "TARGET_HIT"
+

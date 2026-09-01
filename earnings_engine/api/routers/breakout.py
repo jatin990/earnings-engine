@@ -251,14 +251,22 @@ async def evaluate_breakout_candidates_endpoint(request: dict | None = None):
 @router.post("/api/v1/breakout-radar/refresh")
 async def refresh_breakout_radar(
     universe: str | None = Query(None, description="Universe or watchlist to refresh scan for"),
-    strategy: str = Query("CLASSIC_TECHNICAL", description="Breakout strategy model (CLASSIC_TECHNICAL, NSE_DELIVERY_ABSORPTION, NSE_FO_CALL_WALL, VOLUME_PROFILE_VAH, DONCHIAN_TTM_SQUEEZE)"),
+    strategy: str = Query("ALL", description="Breakout strategy model (ALL, CLASSIC_TECHNICAL, NSE_DELIVERY_ABSORPTION, NSE_FO_CALL_WALL, VOLUME_PROFILE_VAH, DONCHIAN_TTM_SQUEEZE)"),
 ):
     """Trigger an immediate re-scan of tickers (runs in a background thread)."""
     import threading
 
     def _run():
         try:
-            breakout_scanner_mod.run_breakout_scan(_settings, universe=universe, strategy=strategy)
+            strat_clean = (strategy or "ALL").upper().strip()
+            if strat_clean in ("ALL", "*"):
+                for s_key in breakout_scanner_mod.BREAKOUT_STRATEGIES.keys():
+                    try:
+                        breakout_scanner_mod.run_breakout_scan(_settings, universe=universe, strategy=s_key)
+                    except Exception as s_err:
+                        logger.debug("[BREAKOUT] Multi-strategy refresh error for %s: %s", s_key, s_err)
+            else:
+                breakout_scanner_mod.run_breakout_scan(_settings, universe=universe, strategy=strat_clean)
         except Exception as e:
             logger.error("[BREAKOUT] Manual refresh error: %s", e)
 

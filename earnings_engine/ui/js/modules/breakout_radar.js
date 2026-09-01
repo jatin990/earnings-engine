@@ -1547,8 +1547,9 @@
                 btn.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span>';
             }
             try {
-                let url = `/api/v1/breakout-radar/evaluate/${encodeURIComponent(ticker)}`;
-                if (forceTier) url += `?force_tier=${encodeURIComponent(forceTier)}`;
+                const strat = document.getElementById('breakoutStrategySelect')?.value || app._breakoutStrategy || 'CLASSIC_TECHNICAL';
+                let url = `/api/v1/breakout-radar/evaluate/${encodeURIComponent(ticker)}?strategy=${encodeURIComponent(strat)}`;
+                if (forceTier) url += `&force_tier=${encodeURIComponent(forceTier)}`;
                 const res = await fetch(url);
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({}));
@@ -1558,7 +1559,7 @@
                 
                 // Update in-memory data
                 if (app._breakoutData) {
-                    const idx = app._breakoutData.findIndex(x => x.ticker === ticker || x.ticker === data.ticker);
+                    const idx = app._breakoutData.findIndex(x => (x.ticker === ticker || x.ticker === data.ticker) && (!data.strategy || !x.strategy || x.strategy === data.strategy));
                     if (idx > -1) {
                         app._breakoutData[idx] = data;
                     } else {
@@ -1806,6 +1807,16 @@
                     if (icon) icon.textContent = '⏱️';
                 }, 3000);
             }
+        };
+
+        app.onBreakoutStrategyChange = async function(val) {
+            app._breakoutStrategy = val || 'ALL';
+            await app.loadBreakoutRadar(false);
+        };
+
+        app.onBreakoutUniverseChange = async function(val) {
+            app._breakoutUniverse = val || 'all';
+            await app.loadBreakoutRadar(false);
         };
 
         app.toggleBreakoutExplainer = function() {

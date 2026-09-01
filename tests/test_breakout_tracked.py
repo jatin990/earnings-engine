@@ -1,6 +1,7 @@
 """Unit and integration tests for Breakout Radar Tracked Signals Archive and Sub-Tab API."""
 
 import pytest
+from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
@@ -92,14 +93,15 @@ def test_tracked_breakout_persistence():
     settings = Settings()
     apply_migrations(settings)
 
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     test_pool = [
         {
             "ticker": "TEST_TRACKED_STOCK.NS",
             "company_name": "Test Tracked Corp",
             "industry": "Software",
             "tier": "HOT",
-            "asof_date": "2026-08-28",
-            "signal_date": "2026-08-28",
+            "asof_date": today_str,
+            "signal_date": today_str,
             "signal_price": 500.0,
             "current_price": 500.0,
             "breakout_trigger": 520.0,

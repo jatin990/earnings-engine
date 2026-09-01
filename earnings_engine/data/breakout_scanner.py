@@ -395,12 +395,12 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             compression_score = excluded.compression_score,
             momentum_score = excluded.momentum_score,
             fundamental_score = excluded.fundamental_score,
-            signal_date = excluded.signal_date,
-            signal_price = excluded.signal_price,
-            predicted_value = excluded.predicted_value,
-            breakout_trigger = excluded.breakout_trigger,
-            target_price = excluded.target_price,
-            stop_loss = excluded.stop_loss,
+            signal_date = CASE WHEN breakout_radar.signal_date IS NOT NULL AND breakout_radar.signal_date != '' THEN breakout_radar.signal_date ELSE excluded.signal_date END,
+            signal_price = CASE WHEN breakout_radar.signal_price IS NOT NULL AND breakout_radar.signal_price > 0 THEN breakout_radar.signal_price ELSE excluded.signal_price END,
+            predicted_value = CASE WHEN breakout_radar.predicted_value IS NOT NULL AND breakout_radar.predicted_value > 0 THEN breakout_radar.predicted_value ELSE excluded.predicted_value END,
+            breakout_trigger = CASE WHEN breakout_radar.breakout_trigger IS NOT NULL AND breakout_radar.breakout_trigger > 0 THEN breakout_radar.breakout_trigger ELSE excluded.breakout_trigger END,
+            target_price = CASE WHEN breakout_radar.target_price IS NOT NULL AND breakout_radar.target_price > 0 THEN breakout_radar.target_price ELSE excluded.target_price END,
+            stop_loss = CASE WHEN breakout_radar.stop_loss IS NOT NULL AND breakout_radar.stop_loss > 0 THEN breakout_radar.stop_loss ELSE excluded.stop_loss END,
             risk_reward_ratio = excluded.risk_reward_ratio,
             current_price = excluded.current_price,
             current_date = excluded.current_date,
@@ -426,7 +426,7 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
                 conn.executemany(upsert_sql, rows_to_insert)
         except Exception:
             # Fallback for single-column primary key
-            fallback_sql = upsert_sql.replace("ON CONFLICT(ticker, strategy)", "ON CONFLICT(ticker)")
+            fallback_sql = upsert_sql.replace("ON CONFLICT(ticker, strategy)", "ON CONFLICT(ticker)").replace("breakout_radar.", "")
             if hasattr(conn, "executemany"):
                 conn.executemany(fallback_sql, rows_to_insert)
 
@@ -1550,6 +1550,28 @@ def get_cached_scan_results(
     else:
         if strategy_clean in ("ALL", "*"):
             candidates = list(_pool.get("candidates", []))
+            if not candidates:
+                try:
+                    conn = get_db_connection(settings)
+                    cur = conn.execute(
+                        "SELECT data_json, ticker, strategy, composite_score FROM breakout_radar ORDER BY composite_score DESC LIMIT ?",
+                        (BREAKOUT_MAX_CANDIDATES,),
+                    )
+                    db_cands = []
+                    for row in cur.fetchall():
+                        if row[0]:
+                            try:
+                                d = json.loads(row[0])
+                                if d and d.get("ticker"):
+                                    if row[2]:
+                                        d["strategy"] = str(row[2])
+                                    db_cands.append(d)
+                            except Exception:
+                                pass
+                    if db_cands:
+                        candidates = db_cands
+                except Exception as e:
+                    logger.debug("[BREAKOUT] DB direct fallback notice for ALL: %s", e)
         else:
             strat_pool = _pool.get("strategy_pools", {}).get(strategy_clean)
             if strat_pool and strat_pool.get("candidates"):
@@ -3471,6 +3493,98 @@ def evaluate_stock_breakout(
     scored["industry"] = industry
     scored["success"] = True
 
+    # Check for existing position in database to guarantee signal_price & signal_date immutability
+    strat_clean = (strategy or "CLASSIC_TECHNICAL").upper().strip()
+    if strat_clean in ("ALL", "*"):
+        strat_clean = "CLASSIC_TECHNICAL"
+
+    scored["strategy"] = strat_clean
+    current_price = scored.get("current_price") or scored.get("signal_price")
+    current_date = scored.get("current_date") or scored.get("signal_date")
+
+    existing_row = None
+    try:
+        conn = get_db_connection(settings)
+        cur = conn.execute(
+            "SELECT signal_date, signal_price, predicted_value, breakout_trigger, target_price, stop_loss, outcome, max_gain_pct, created_at FROM breakout_radar WHERE ticker = ? AND UPPER(strategy) = ?",
+            (sym, strat_clean),
+        )
+        existing_row = cur.fetchone()
+    except Exception as e:
+        logger.debug("[BREAKOUT-EVAL] Existing position check error: %s", e)
+
+    if existing_row:
+        orig_sig_date = str(existing_row[0] or "")
+        orig_sig_price = float(existing_row[1]) if existing_row[1] is not None else None
+        orig_pred_val = float(existing_row[2]) if existing_row[2] is not None else None
+        orig_trigger = float(existing_row[3]) if existing_row[3] is not None else None
+        orig_target = float(existing_row[4]) if existing_row[4] is not None else None
+        orig_stop = float(existing_row[5]) if existing_row[5] is not None else None
+        prev_outcome = str(existing_row[6] or "ACTIVE").upper()
+        prev_max_gain = float(existing_row[7] or 0.0)
+
+        # Check if previous position reached terminal state (TARGET_HIT/STOP_HIT) AND current price has formed a new setup at distinct level (>= 5% diff)
+        is_distinct_new_position = (
+            prev_outcome in ("TARGET_HIT", "STOP_HIT")
+            and orig_sig_price is not None
+            and orig_sig_price > 0
+            and current_price is not None
+            and abs(current_price - orig_sig_price) / orig_sig_price >= 0.05
+        )
+
+        if not is_distinct_new_position and orig_sig_price is not None and orig_sig_price > 0:
+            # PRESERVE ORIGINAL POSITION ANCHOR
+            scored["signal_date"] = orig_sig_date
+            scored["signal_price"] = orig_sig_price
+            scored["predicted_value"] = orig_pred_val or orig_sig_price
+            if orig_trigger:
+                scored["breakout_trigger"] = orig_trigger
+            if orig_target:
+                scored["target_price"] = orig_target
+            if orig_stop:
+                scored["stop_loss"] = orig_stop
+
+            # UPDATE LIVE POSITION METRICS RELATIVE TO ORIGINAL ANCHOR
+            if current_price and orig_sig_price > 0:
+                rel_ret = round(((current_price - orig_sig_price) / orig_sig_price) * 100, 2)
+                scored["realized_return_pct"] = rel_ret
+                scored["max_gain_pct"] = max(prev_max_gain, rel_ret)
+
+                # Update trading days elapsed since original inception
+                try:
+                    import pandas as pd
+                    d_cur = pd.to_datetime(current_date)
+                    d_orig = pd.to_datetime(orig_sig_date)
+                    scored["days_elapsed"] = max(0, int((d_cur - d_orig).days))
+                except Exception:
+                    scored["days_elapsed"] = 0
+
+                # Recompute outcome against original triggers
+                trig = scored.get("breakout_trigger")
+                targ = scored.get("target_price")
+                stop = scored.get("stop_loss")
+
+                if targ and current_price >= targ:
+                    scored["outcome"] = "TARGET_HIT"
+                    scored["outcome_label"] = "🎯 Target Reached"
+                    scored["outcome_badge"] = "emerald"
+                    scored["breakout_happened"] = 1
+                elif stop and current_price <= stop:
+                    scored["outcome"] = "STOP_HIT"
+                    scored["outcome_label"] = "🛑 Invalidation Triggered"
+                    scored["outcome_badge"] = "rose"
+                    scored["breakout_happened"] = 0
+                elif trig and current_price >= trig * 1.0015:
+                    scored["outcome"] = "TRIGGERED"
+                    scored["outcome_label"] = "🚀 Breakout Active"
+                    scored["outcome_badge"] = "blue"
+                    scored["breakout_happened"] = 1
+                else:
+                    scored["outcome"] = "ACTIVE"
+                    scored["outcome_label"] = "⏳ Approaching Trigger"
+                    scored["outcome_badge"] = "amber"
+                    scored["breakout_happened"] = 0
+
     # Setup Conviction Tier
     comp_score = scored.get("composite_score", 0)
     if comp_score >= HOT_THRESHOLD:
@@ -3490,24 +3604,26 @@ def evaluate_stock_breakout(
     scored["tier_label"] = tier_label
     scored["tier_badge"] = tier_badge
 
-    # Update active scan pools with freshest calculation
+    # Update active scan pools with freshest calculation using multi-strategy key
+    key = f"{sym}::{strat_clean}"
     if force_tier and force_tier.lower() == "hot":
-        _pool["hot"][sym] = {"result": scored, "consecutive_low": 0}
-        _pool["warm"].pop(sym, None)
-        _rebuild_candidates()
+        _pool["hot"][key] = {"result": scored, "consecutive_low": 0}
+        _pool["warm"].pop(key, None)
     elif force_tier and force_tier.lower() == "warm":
-        _pool["warm"][sym] = {"result": scored, "consecutive_low": 0}
-        _pool["hot"].pop(sym, None)
-        _rebuild_candidates()
-    elif sym in _pool["hot"]:
-        _pool["hot"][sym]["result"] = scored
-        _pool["hot"][sym]["consecutive_low"] = 0
-        _rebuild_candidates()
-    elif sym in _pool["warm"]:
-        _pool["warm"][sym]["result"] = scored
-        _pool["warm"][sym]["consecutive_low"] = 0
-        _rebuild_candidates()
+        _pool["warm"][key] = {"result": scored, "consecutive_low": 0}
+        _pool["hot"].pop(key, None)
+    elif key in _pool["hot"]:
+        _pool["hot"][key]["result"] = scored
+        _pool["hot"][key]["consecutive_low"] = 0
+    elif key in _pool["warm"]:
+        _pool["warm"][key]["result"] = scored
+        _pool["warm"][key]["consecutive_low"] = 0
+    elif comp_score >= HOT_THRESHOLD:
+        _pool["hot"][key] = {"result": scored, "consecutive_low": 0}
+    else:
+        _pool["warm"][key] = {"result": scored, "consecutive_low": 0}
 
+    _rebuild_candidates()
     save_breakout_pool_to_db(settings)
     return scored
 
