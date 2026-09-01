@@ -77,48 +77,190 @@ COMMON_EQUITY_ALIASES: dict[str, list[str]] = {
     "ITC": ["itc limited", "itc ltd", "itc"],
     "MARUTI": ["maruti suzuki", "maruti"],
     "SUNPHARMA": ["sun pharma", "sun pharmaceutical"],
+    "HEROMOTOCO": ["hero motocorp", "hero moto", "hero honda"],
+    "BAJAJ-AUTO": ["bajaj auto", "bajaj auto ltd"],
+    "TVSMOTOR": ["tvs motor", "tvs motors", "tvs"],
+    "OLAELEC": ["ola electric", "ola elec"],
+    "ZOMATO": ["zomato", "blinkit"],
+    "SWIGGY": ["swiggy", "instamart"],
+    "PAYTM": ["paytm", "one97 communications", "one97"],
+    "HAL": ["hindustan aeronautics", "hal"],
+    "BEL": ["bharat electronics", "bel"],
+    "BHEL": ["bharat heavy electricals", "bhel"],
+    "COALINDIA": ["coal india", "cil"],
+    "NTPC": ["ntpc limited", "ntpc"],
+    "ONGC": ["oil and natural gas", "ongc"],
+    "IOC": ["indian oil", "iocl"],
+    "BPCL": ["bharat petroleum", "bpcl"],
+    "HPCL": ["hindustan petroleum", "hpcl"],
+    "GAIL": ["gail india", "gail"],
+    "TATASTEEL": ["tata steel"],
+    "JSWSTEEL": ["jsw steel", "jsw"],
+    "SAIL": ["steel authority of india", "sail"],
+    "JINDALSTEL": ["jindal steel & power", "jindal steel", "jspl"],
+    "VEDL": ["vedanta limited", "vedanta"],
+    "HINDALCO": ["hindalco industries", "hindalco", "novelis"],
+    "ULTRACEMCO": ["ultratech cement", "ultratech"],
+    "AMBUJACEM": ["ambuja cements", "ambuja cement", "ambuja"],
+    "ACC": ["acc limited", "acc cement", "acc"],
+    "SUZLON": ["suzlon energy", "suzlon"],
+    "INOXWIND": ["inox wind"],
+    "KPIGREEN": ["kpi green energy", "kpi green"],
+    "WAAREEENER": ["waaree energies", "waaree"],
+    "PREMIERENE": ["premier energies", "premier energy"],
+    "DIXON": ["dixon technologies", "dixon"],
+    "KAYNES": ["kaynes technology", "kaynes"],
+    "SYRMA": ["syrma sgs technology", "syrma"],
+    "INDIGO": ["interglobe aviation", "indigo airlines", "indigo"],
+    "JIOFIN": ["jio financial services", "jio financial", "jio finance", "jfs"],
+    "DLF": ["dlf limited", "dlf"],
+    "GODREJPROP": ["godrej properties", "godrej property"],
+    "OBEROIRLTY": ["oberoi realty"],
+    "PRESTIGE": ["prestige estates", "prestige"],
+    "ZENTEC": ["zen technologies", "zen tech"],
+    "MAZDOCK": ["mazagon dock shipbuilders", "mazagon dock", "mazdock"],
+    "BDL": ["bharat dynamics", "bdl"],
+    "COCHINSHIP": ["cochin shipyard"],
 }
 
-# Curated Conglomerate Entity Mappings
+# Conglomerate entity disambiguation map (disambiguates generic ticker names like APOLLO vs APOLLOTYRE)
 CONGLOMERATE_MAP: dict[str, list[tuple[str, str]]] = {
     "APOLLO": [
-        (r"\b(apollo\s+tyres?|tyres?)\b", "APOLLOTYRE.NS"),
-        (r"\b(apollo\s+hospitals?|hospital|healthcare|pharmacy)\b", "APOLLOHOSP.NS"),
-        (r"\b(apollo\s+pipes?|pipes?)\b", "APOLLOPIPE.NS"),
-        (r"\b(apollo\s+micro|micro\s+systems?|defence\s+avionics)\b", "APOLLO.NS"),
-    ],
-    "TATA": [
-        (r"\b(tata\s+motors?|jlr|ev\s+curvv|harrier|safari|commercial\s+vehicles)\b", "TATAMOTORS.NS"),
-        (r"\b(tata\s+steel|steel\s+plant|kalinganagar)\b", "TATASTEEL.NS"),
-        (r"\b(tata\s+power|solar\s+roof|ev\s+charging|renewable)\b", "TATAPOWER.NS"),
-        (r"\b(tata\s+consumer|tata\s+tea|sampann|tetley|starbucks)\b", "TATACONSUM.NS"),
-        (r"\b(tata\s+elxsi|design\s+tech|embedded\s+ai)\b", "TATAELXSI.NS"),
-        (r"\b(tata\s+comm|tata\s+communications?|data\s+center)\b", "TATACOMM.NS"),
-        (r"\b(tata\s+chem|tata\s+chemicals?|soda\s+ash)\b", "TATACHEM.NS"),
-        (r"\b(tcs|tata\s+consultancy)\b", "TCS.NS"),
-        (r"\b(trent|zudio|westside)\b", "TRENT.NS"),
-    ],
-    "BAJAJ": [
-        (r"\b(bajaj\s+finance|bajfinance|consumer\s+lending)\b", "BAJFINANCE.NS"),
-        (r"\b(bajaj\s+finserv|finserv|insurance\s+arm)\b", "BAJAJFINSV.NS"),
-        (r"\b(bajaj\s+auto|pulsar|chetak|two-wheeler|three-wheeler)\b", "BAJAJ-AUTO.NS"),
-        (r"\b(bajaj\s+housing|bhfl)\b", "BAJAJHLDNG.NS"),
+        (r"\b(apollo\s+hospital\w*|apollo\s+hosp\w*|hospital\w*|pharmacy)\b", "APOLLOHOSP.NS"),
+        (r"\b(apollo\s+tyre\w*|tyres?|rubber)\b", "APOLLOTYRE.NS"),
+        (r"\b(apollo\s+pipe\w*|pipes?|tubes?)\b", "APOLLO.NS"),
     ],
     "ADANI": [
-        (r"\b(adani\s+enterprises|ael)\b", "ADANIENT.NS"),
-        (r"\b(adani\s+ports|apsez|mundra\s+port)\b", "ADANIPORTS.NS"),
+        (r"\b(adani\s+port|ports|sez)\b", "ADANIPORTS.NS"),
         (r"\b(adani\s+power)\b", "ADANIPOWER.NS"),
         (r"\b(adani\s+green|renewable)\b", "ADANIGREEN.NS"),
         (r"\b(adani\s+energy|transmission)\b", "ADANIENSOL.NS"),
-        (r"\b(adani\s+total\s+gas|atgl)\b", "ATGL.NS"),
-        (r"\b(adani\s+wilmar|fortune\s+oil)\b", "AWL.NS"),
+        (r"\b(adani\s+total|gas)\b", "ATGL.NS"),
+        (r"\b(adani\s+wilmar)\b", "AWL.NS"),
+        (r"\b(adani\s+ent|enterprises)\b", "ADANIENT.NS"),
+    ],
+    "TATA": [
+        (r"\b(tata\s+motors|jlr)\b", "TATAMOTORS.NS"),
+        (r"\b(tata\s+consultancy|tcs)\b", "TCS.NS"),
+        (r"\b(tata\s+steel)\b", "TATASTEEL.NS"),
+        (r"\b(tata\s+power)\b", "TATAPOWER.NS"),
+        (r"\b(tata\s+consumer|tata\s+tea)\b", "TATACONSUM.NS"),
+        (r"\b(tata\s+chem|chemicals)\b", "TATACHEM.NS"),
+        (r"\b(tata\s+comm|communications)\b", "TATACOMM.NS"),
+        (r"\b(tata\s+tech|technologies)\b", "TATATECH.NS"),
+        (r"\b(tata\s+elxsi)\b", "TATAELXSI.NS"),
+        (r"\b(trent)\b", "TRENT.NS"),
+        (r"\b(voltas)\b", "VOLTAS.NS"),
+        (r"\b(titan)\b", "TITAN.NS"),
     ],
     "RELIANCE": [
-        (r"\b(reliance\s+industries|ril|jio|reliance\s+retail|oil\s+to\s+chemicals|o2c)\b", "RELIANCE.NS"),
-        (r"\b(reliance\s+power|rpower)\b", "RPOWER.NS"),
-        (r"\b(reliance\s+infra|rinfra)\b", "RINFRA.NS"),
+        (r"\b(reliance\s+ind|reliance\s+industries|ril|jio\s+platforms|jio\s+telecom|reliance\s+retail)\b", "RELIANCE.NS"),
+        (r"\b(reliance\s+power)\b", "RPOWER.NS"),
+        (r"\b(reliance\s+infra|infrastructure)\b", "RINFRA.NS"),
+        (r"\b(jio\s+financial|jfs)\b", "JIOFIN.NS"),
+    ],
+    "BAJAJ": [
+        (r"\b(bajaj\s+auto)\b", "BAJAJ-AUTO.NS"),
+        (r"\b(bajaj\s+finance)\b", "BAJFINANCE.NS"),
+        (r"\b(bajaj\s+finserv)\b", "BAJAJFINSV.NS"),
+        (r"\b(bajaj\s+holdings)\b", "BAJAJHLDNG.NS"),
+    ],
+    "GODREJ": [
+        (r"\b(godrej\s+prop|properties)\b", "GODREJPROP.NS"),
+        (r"\b(godrej\s+consumer|gcpl)\b", "GODREJCP.NS"),
+        (r"\b(godrej\s+ind|industries)\b", "GODREJIND.NS"),
+        (r"\b(godrej\s+agrovet)\b", "GODREJAGRO.NS"),
+    ],
+    "MAHINDRA": [
+        (r"\b(mahindra\s+&\s+mahindra|m&m|mahindra\s+auto)\b", "M&M.NS"),
+        (r"\b(tech\s+mahindra)\b", "TECHM.NS"),
+        (r"\b(mahindra\s+finance|mmfs)\b", "M&MFIN.NS"),
+        (r"\b(mahindra\s+lifespace)\b", "MAHLIFE.NS"),
+        (r"\b(mahindra\s+logistics)\b", "MAHLOG.NS"),
+    ],
+    "BIRLA": [
+        (r"\b(ultratech\s+cement)\b", "ULTRACEMCO.NS"),
+        (r"\b(grasim)\b", "GRASIM.NS"),
+        (r"\b(hindalco)\b", "HINDALCO.NS"),
+        (r"\b(aditya\s+birla\s+capital|ab\s+capital)\b", "ABCAPITAL.NS"),
+        (r"\b(aditya\s+birla\s+fashion|abfrl)\b", "ABFRL.NS"),
+    ],
+    "JSW": [
+        (r"\b(jsw\s+steel)\b", "JSWSTEEL.NS"),
+        (r"\b(jsw\s+energy)\b", "JSWENERGY.NS"),
+        (r"\b(jsw\s+infra|infrastructure)\b", "JSWINFRA.NS"),
     ],
 }
+
+# Unlisted startups, subsidiaries & ecosystem brands mapped to listed parents/competitors
+UNLISTED_AND_ECOSYSTEM_MAP: dict[str, list[tuple[str, str]]] = {
+    r"\b(ather\s+energy|ather\s+scooter|ather\s+rizta|ather\s+450x|ather\s+ev)\b": [
+        ("HEROMOTOCO.NS", "STAKEHOLDER"),
+        ("OLAELEC.NS", "SECTOR_PEER"),
+        ("TVSMOTOR.NS", "SECTOR_PEER"),
+        ("BAJAJ-AUTO.NS", "SECTOR_PEER"),
+    ],
+    r"\b(zepto|quick\s+commerce\s+war)\b": [
+        ("ZOMATO.NS", "SECTOR_PEER"),
+        ("SWIGGY.NS", "SECTOR_PEER"),
+    ],
+    r"\b(blinkit)\b": [
+        ("ZOMATO.NS", "PRIMARY"),
+        ("SWIGGY.NS", "SECTOR_PEER"),
+    ],
+    r"\b(instamart)\b": [
+        ("SWIGGY.NS", "PRIMARY"),
+        ("ZOMATO.NS", "SECTOR_PEER"),
+    ],
+    r"\b(jiocinema|jio\s+cinema|viacom18|disney\+?\s*hotstar|star\s+india)\b": [
+        ("RELIANCE.NS", "PRIMARY"),
+        ("NETWORK18.NS", "GROUP_ENTITY"),
+    ],
+    r"\b(air\s+india|air\s+india\s+express|vistara)\b": [
+        ("TATAMOTORS.NS", "GROUP_ENTITY"),
+        ("INDIGO.NS", "SECTOR_PEER"),
+        ("SPICEJET.NS", "SECTOR_PEER"),
+    ],
+}
+
+# Broad Sector & Policy Triggers impacting entire peer groups
+SECTOR_PEER_MAP: list[dict[str, Any]] = [
+    {
+        "keywords": [r"\b(two-wheeler|2-wheeler|electric scooter|ev scooter|two wheeler sales|electric 2w|ev subsidy|fame iii|fame 3|pm e-drive)\b"],
+        "peers": ["HEROMOTOCO.NS", "BAJAJ-AUTO.NS", "TVSMOTOR.NS", "OLAELEC.NS", "EICHERMOT.NS"],
+        "name": "Auto & 2-Wheeler EV",
+    },
+    {
+        "keywords": [r"\b(steel import duty|anti-dumping duty on steel|steel prices|coking coal duty|steel ministry|steel export|iron ore cess)\b"],
+        "peers": ["TATASTEEL.NS", "JSWSTEEL.NS", "SAIL.NS", "JINDALSTEL.NS", "NMDC.NS"],
+        "name": "Steel & Metals",
+    },
+    {
+        "keywords": [r"\b(defence ministry nod|dac clearance|defence acquisition council|defence export order|make in india defence|warship tender|fighter jet tender)\b"],
+        "peers": ["HAL.NS", "BEL.NS", "MAZDOCK.NS", "BDL.NS", "COCHINSHIP.NS", "PARAS.NS", "DATAPATTNS.NS", "ZENTEC.NS"],
+        "name": "Defence & Aerospace",
+    },
+    {
+        "keywords": [r"\b(telecom tariff hike|agr relief|spectrum auction|trai tariff norm|telecom relief package)\b"],
+        "peers": ["BHARTIARTL.NS", "IDEA.NS", "INDUSTOWER.NS"],
+        "name": "Telecom",
+    },
+    {
+        "keywords": [r"\b(solar pli scheme|almm mandate|solar module import duty|renewable energy tender|green hydrogen subsidy|pm surya ghar)\b"],
+        "peers": ["ADANIGREEN.NS", "TATAPOWER.NS", "SUZLON.NS", "INOXWIND.NS", "KPIGREEN.NS", "WAAREEENER.NS", "PREMIERENE.NS"],
+        "name": "Renewables & Solar",
+    },
+    {
+        "keywords": [r"\b(us tech spending|it hiring surge|h1b visa fee|discretionary tech spend|bfsi tech revival)\b"],
+        "peers": ["TCS.NS", "INFY.NS", "HCLTECH.NS", "WIPRO.NS", "TECHM.NS", "LTIM.NS"],
+        "name": "IT Services",
+    },
+    {
+        "keywords": [r"\b(cement price hike|cement demand|infrastructure capex push|clinker capacity)\b"],
+        "peers": ["ULTRACEMCO.NS", "AMBUJACEM.NS", "ACC.NS", "SHREECEM.NS", "DALBHARAT.NS"],
+        "name": "Cement",
+    },
+]
 
 # Multinational Subsidiaries where Global Parent News (e.g. Pfizer US Q2 2026) Collides with Indian Entity
 MULTINATIONAL_SUBSIDIARY_TICKERS: dict[str, tuple[str, list[str]]] = {
@@ -274,6 +416,87 @@ def parse_and_verify_date(
     }
 
 
+def extract_all_affected_tickers(
+    title: str,
+    summary: str = "",
+    primary_ticker: str | None = None,
+    settings: Settings | None = None,
+) -> list[tuple[str, str]]:
+    """Identify ALL affected NSE/BSE tickers from a headline & summary.
+
+    Returns a list of (ticker, impact_type) tuples, where impact_type is one of:
+    - 'PRIMARY': Direct subject of the news
+    - 'SECONDARY': Mentioned secondary company / joint venture partner
+    - 'GROUP_ENTITY': Sister company in same conglomerate / group
+    - 'SECTOR_PEER': Direct competitor or sector peer impacted by industry-wide catalyst
+    - 'STAKEHOLDER': Parent company or major equity stakeholder (e.g. Hero MotoCorp for Ather)
+    """
+    settings = settings or Settings()
+    full_text = f"{title} {summary}".lower()
+    affected: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    def _add(t: str, impact: str):
+        t_clean = t.strip().upper()
+        if not t_clean.endswith(".NS") and not t_clean.endswith(".BO"):
+            t_clean += ".NS"
+        if t_clean not in seen:
+            seen.add(t_clean)
+            affected.append((t_clean, impact))
+
+    # 1. Start with provided primary ticker if valid
+    if primary_ticker and primary_ticker.strip():
+        _add(primary_ticker, "PRIMARY")
+
+    # 2. Check Unlisted Ecosystem & Startup mappings (e.g. Ather -> Hero MotoCorp)
+    for pattern, target_list in UNLISTED_AND_ECOSYSTEM_MAP.items():
+        if re.search(pattern, full_text):
+            for target_t, imp_type in target_list:
+                _add(target_t, imp_type)
+
+    # 3. Check Conglomerate Entities (Tata, Adani, Bajaj, Reliance, Apollo, etc.)
+    for prefix, mappings in CONGLOMERATE_MAP.items():
+        # Check if group prefix or specific conglomerate is in text
+        if re.search(rf"\b{prefix.lower()}\b", full_text):
+            matched_subsidiary = False
+            for pattern, target_ticker in mappings:
+                if re.search(pattern, full_text):
+                    _add(target_ticker, "PRIMARY" if not affected else "GROUP_ENTITY")
+                    matched_subsidiary = True
+            # If broad group mentioned (e.g. "Adani Group", "Tata Sons") without subsidiary, add flagship + group entities
+            if not matched_subsidiary:
+                if prefix == "ADANI":
+                    _add("ADANIENT.NS", "PRIMARY" if not affected else "GROUP_ENTITY")
+                    _add("ADANIPORTS.NS", "GROUP_ENTITY")
+                    _add("ADANIPOWER.NS", "GROUP_ENTITY")
+                    _add("ADANIGREEN.NS", "GROUP_ENTITY")
+                    _add("ADANIENSOL.NS", "GROUP_ENTITY")
+                elif prefix == "TATA":
+                    _add("TATAMOTORS.NS", "PRIMARY" if not affected else "GROUP_ENTITY")
+                    _add("TCS.NS", "GROUP_ENTITY")
+                    _add("TATASTEEL.NS", "GROUP_ENTITY")
+                    _add("TATAPOWER.NS", "GROUP_ENTITY")
+                elif prefix == "RELIANCE":
+                    _add("RELIANCE.NS", "PRIMARY" if not affected else "GROUP_ENTITY")
+                    _add("JIOFIN.NS", "GROUP_ENTITY")
+                elif prefix == "BAJAJ":
+                    _add("BAJFINANCE.NS", "PRIMARY" if not affected else "GROUP_ENTITY")
+                    _add("BAJAJ-AUTO.NS", "GROUP_ENTITY")
+
+    # 4. Check Common Equity Aliases
+    for sym, aliases in COMMON_EQUITY_ALIASES.items():
+        if any(re.search(rf"\b{re.escape(a)}\b", full_text) for a in aliases):
+            _add(f"{sym}.NS", "PRIMARY" if not affected else "SECONDARY")
+
+    # 5. Check Sector Peer Triggers
+    for sec in SECTOR_PEER_MAP:
+        if any(re.search(pat, full_text) for pat in sec["keywords"]):
+            for peer in sec["peers"]:
+                _add(peer, "SECTOR_PEER")
+
+    return affected
+
+
 def verify_company_entity(
     ticker: str,
     title: str,
@@ -284,14 +507,32 @@ def verify_company_entity(
 
     Validates ticker legitimacy, matches corporate entity names and known trading aliases,
     protects against single-word dictionary collisions (e.g. CREST, SUN), and disambiguates conglomerate families.
+    If ticker is empty/None (broadband ingestion), automatically resolves from headline text.
     """
     settings = settings or Settings()
-    raw_sym = str(ticker).strip().upper()
-    clean_sym = raw_sym.replace(".NS", "").replace(".BO", "").strip()
-    official_name = get_name(raw_sym, settings) or clean_sym
+    raw_sym = str(ticker or "").strip().upper()
 
     full_text = f"{title} {summary}".lower()
     flags: list[str] = []
+
+    # Broadband Auto-Discovery if no ticker was supplied
+    if not raw_sym:
+        all_aff = extract_all_affected_tickers(title, summary, settings=settings)
+        if all_aff:
+            raw_sym = all_aff[0][0]
+            flags.append(f"BROADBAND_AUTO_RESOLVED_TICKER_{raw_sym}")
+        else:
+            return {
+                "is_verified": False,
+                "confidence_score": 0.0,
+                "resolved_ticker": "",
+                "official_name": "",
+                "rejection_reason": "No identifiable Indian listed equity or corporate ecosystem entity in headline.",
+                "flags": ["BROADBAND_NO_TICKER_MATCH"],
+            }
+
+    clean_sym = raw_sym.replace(".NS", "").replace(".BO", "").strip()
+    official_name = get_name(raw_sym, settings) or clean_sym
     resolved_ticker = raw_sym
     confidence_score = 0.50
 
@@ -664,11 +905,17 @@ class NewsVerifier:
         confidence = round((entity_res["confidence_score"] * 0.7) + (0.3 if num_res["has_numbers"] else 0.2), 2)
         confidence = min(0.99, max(0.50, confidence))
 
+        # Extract all affected tickers (multi-stock fanout)
+        all_aff = extract_all_affected_tickers(title, summary, primary_ticker=entity_res["resolved_ticker"], settings=self.settings)
+        affected_tickers = [t for t, _ in all_aff] if all_aff else [entity_res["resolved_ticker"]]
+
         return {
             "verification_status": "VERIFIED",
             "confidence_score": confidence,
             "resolved_ticker": entity_res["resolved_ticker"],
             "official_name": entity_res["official_name"],
+            "affected_tickers": affected_tickers,
+            "affected_details": all_aff,
             "published_at_utc": date_res["published_at_utc"],
             "published_at_ist": date_res["published_at_ist"],
             "reporting_quarter": date_res["reporting_quarter"],

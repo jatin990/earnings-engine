@@ -112,6 +112,18 @@
                     <!-- Operations Filter Toolbar -->
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.45rem;">
                         <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                            <button type="button" id="catAnalyzeBatchBtn" onclick="app.analyzeSelectedCatalysts()" class="btn btn-sm" style="display:none;background:linear-gradient(135deg, rgba(168,85,247,0.3), rgba(59,130,246,0.3));color:#e9d5ff;border:1px solid rgba(168,85,247,0.5);font-weight:700;padding:0.25rem 0.65rem;font-size:0.75rem;" title="Run on-demand AI analysis on selected news items">
+                                <span id="catBatchBtnIcon">⚡</span> Analyze Selected (<span id="catSelectedCount">0</span>)
+                            </button>
+                            <select id="catModelSelect" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:#c084fc;border:1px solid rgba(168,85,247,0.4);border-radius:0.35rem;outline:none;font-weight:600;" title="Select AI Model for News Ingestion and On-Demand Re-evaluation">
+                                <option value="google/gemini-2.5-flash" selected>⚡ Gemini Flash (Fast / Ingestion)</option>
+                                <option value="google/gemini-3.7-flash">✨ Gemini 3.7 Flash</option>
+                                <option value="deepseek/deepseek-r1">🧠 DeepSeek-R1 (Reasoning)</option>
+                                <option value="meta-llama/llama-3.3-70b-instruct">🏛️ Llama 3.3 70B (Institutional)</option>
+                                <option value="qwen/qwen-2.5-72b-instruct">🌐 Qwen 2.5 72B (Quantitative)</option>
+                                <option value="anthropic/claude-3.5-sonnet">🎯 Claude 3.5 Sonnet</option>
+                                <option value="openai/gpt-4o">🤖 GPT-4o</option>
+                            </select>
                             <input type="text" id="catSearchInput" oninput="app.filterCatalysts()" placeholder="🔍 Search stock, order, FDA..." style="padding:0.25rem 0.55rem;font-size:0.75rem;background:#030305;color:var(--light);border:1px solid rgba(255,255,255,0.15);border-radius:0.35rem;min-width:180px;font-family:var(--font-mono);outline:none;">
                             <select id="catDaysFilter" onchange="app.onCatDaysFilterChange(this.value)" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#030305;color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.35rem;outline:none;font-weight:600;" title="Filter by publication recency timeframe">
                                 <option value="1">⏱️ Last 24 Hours</option>

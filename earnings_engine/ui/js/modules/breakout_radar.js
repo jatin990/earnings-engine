@@ -2200,7 +2200,9 @@
         };
 
         app.openAiConsensusForStock = function(ticker) {
-            if (typeof app.switchTab === 'function') {
+            if (typeof app.runConsensusForStock === 'function') {
+                app.runConsensusForStock(ticker);
+            } else if (typeof app.switchTab === 'function') {
                 app.switchTab('consensus');
                 setTimeout(() => {
                     const input = document.getElementById('consensusTickerInput');

@@ -58,7 +58,9 @@
     app.openConsensusModal = function (ticker) {
         if (!ticker) return;
         const sym = String(ticker).trim().toUpperCase();
-        if (typeof app.openStockModal === 'function') {
+        if (typeof app.runConsensusForStock === 'function') {
+            app.runConsensusForStock(sym);
+        } else if (typeof app.openStockModal === 'function') {
             app.openStockModal(sym, '#consensus');
         } else {
             window.open('/stock/' + encodeURIComponent(sym) + '#consensus', '_blank');

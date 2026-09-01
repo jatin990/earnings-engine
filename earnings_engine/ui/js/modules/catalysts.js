@@ -681,6 +681,19 @@ Object.assign(app, {
                         </div>
                     ` : '';
 
+                    let affTickers = [];
+                    if (c.affected_tickers) {
+                        try {
+                            affTickers = typeof c.affected_tickers === 'string' ? JSON.parse(c.affected_tickers) : c.affected_tickers;
+                        } catch(_) {
+                            affTickers = [];
+                        }
+                    }
+                    const otherPeers = Array.isArray(affTickers) ? affTickers.filter(t => String(t).toUpperCase() !== String(c.ticker).toUpperCase()) : [];
+                    const multiStockBadge = otherPeers.length > 0
+                        ? `<span class="signal-badge" style="background:rgba(236,72,153,0.15);color:#f472b6;border:1px solid rgba(236,72,153,0.35);font-size:0.7rem;padding:0.12rem 0.45rem;border-radius:0.3rem;" title="Multi-stock impact: ${otherPeers.join(', ')}">⚡ Also Impacts: ${otherPeers.slice(0, 3).map(t => `<a href="/stock/${encodeURIComponent(t)}" target="_blank" style="color:#f472b6;text-decoration:none;font-weight:700;">${String(t).replace('.NS','')}</a>`).join(', ')}${otherPeers.length > 3 ? ` +${otherPeers.length - 3}` : ''}</span>`
+                        : '';
+
                     const isSel = (this.selectedCatalysts && this.selectedCatalysts.has(c.ticker + '|||' + c.title)) ? 'checked' : '';
 
                     return '<div class="card" style="margin:0;padding:1rem;background:rgba(255,255,255,0.03);' + cardBorder + 'transition:transform 0.15s ease;">' +
@@ -690,6 +703,7 @@ Object.assign(app, {
                                 ((c.stock_name && c.stock_name.trim().toUpperCase() !== c.ticker.trim().toUpperCase())
                                     ? '<strong style="font-size:1.05rem;color:#f8fafc;">' + c.stock_name + '</strong><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" class="signal-badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;font-size:0.72rem;text-decoration:none;" title="Open stock intelligence">' + c.ticker + ' ↗</a>'
                                     : '<a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="font-size:1.05rem;font-weight:700;color:#60a5fa;text-decoration:none;">' + c.ticker + ' ↗</a>') +
+                                multiStockBadge +
                                 priceBadge +
                                 aiTargetBadge +
                                 projBadge +
@@ -703,7 +717,7 @@ Object.assign(app, {
                             '</div>' +
                             '<div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">' +
                                 '<span class="timestamp" style="font-size:0.72rem;background:rgba(255,255,255,0.05);padding:0.15rem 0.45rem;border-radius:0.25rem;">' + (c.publisher || 'News') + ' &middot; ⏱️ ' + dateDisplay + '</span>' +
-                                `<button type="button" onclick="app.analyzeSingleCatalyst('${encodeURIComponent(c.ticker)}', '${encodeURIComponent(c.title)}', this)" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(168,85,247,0.2);color:#c084fc;border:1px solid rgba(168,85,247,0.45);border-radius:0.3rem;font-weight:700;" title="Run on-demand OmniRoute AI structured analysis">⚡ Analyze AI</button>` +
+                                `<button type="button" onclick="app.analyzeSingleCatalyst('${encodeURIComponent(c.ticker)}', '${encodeURIComponent(c.title)}', this)" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(168,85,247,0.2);color:#c084fc;border:1px solid rgba(168,85,247,0.45);border-radius:0.3rem;font-weight:700;" title="Run on-demand AI re-evaluation using selected model">⚡ Re-evaluate</button>` +
                                 `<button type="button" onclick="app.showNewsRawOutput(${filtered.indexOf(c)})" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:0.3rem;" title="Inspect raw OmniRouter AI JSON telemetry">📄 Raw AI</button>` +
                                 `<button type="button" onclick="app.runConsensusForStock('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.45);border-radius:0.3rem;font-weight:700;" title="Run AI Multi-Model Consensus for Target, Resistance, Support & Buy Zone">🧠 Consensus</button>` +
                                 `<button type="button" onclick="app.openAddToWatchlistModal('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐ Watchlist</button>` +
@@ -777,9 +791,10 @@ Object.assign(app, {
                 }
             },
 
-            async analyzeSingleCatalyst(encodedTicker, encodedTitle, btnEl) {
+            async analyzeSingleCatalyst(encodedTicker, encodedTitle, btnEl, specificModel = null) {
                 const ticker = decodeURIComponent(encodedTicker);
                 const title = decodeURIComponent(encodedTitle);
+                const model = specificModel || document.getElementById('catModelSelect')?.value || 'google/gemini-2.5-flash';
                 const origHtml = btnEl ? btnEl.innerHTML : '';
                 if (btnEl) {
                     btnEl.disabled = true;
@@ -789,7 +804,7 @@ Object.assign(app, {
                     const res = await fetch(API_BASE + '/api/v1/news/analyze-ondemand', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ticker, title})
+                        body: JSON.stringify({ticker, title, model})
                     });
                     const data = await res.json();
                     if (data.success && (data.catalyst || data.id)) {
@@ -800,7 +815,7 @@ Object.assign(app, {
                         }
                         this.renderCatalysts();
                         if (typeof this.showToast === 'function') {
-                            this.showToast(`Analyzed news for ${ticker}`, 'success');
+                            this.showToast(`Re-evaluated ${ticker} using ${model.split('/').pop()}`, 'success');
                         }
                     } else {
                         if (typeof this.showToast === 'function') {
@@ -815,7 +830,7 @@ Object.assign(app, {
                 } finally {
                     if (btnEl) {
                         btnEl.disabled = false;
-                        btnEl.innerHTML = origHtml || '⚡ Analyze AI';
+                        btnEl.innerHTML = origHtml || '⚡ Re-evaluate';
                     }
                 }
             },
@@ -831,6 +846,7 @@ Object.assign(app, {
                 });
                 if (!items.length) return;
 
+                const model = document.getElementById('catModelSelect')?.value || 'google/gemini-2.5-flash';
                 const batchBtn = document.getElementById('catAnalyzeBatchBtn');
                 const iconSpan = document.getElementById('catBatchBtnIcon');
                 if (batchBtn) batchBtn.disabled = true;
@@ -840,7 +856,7 @@ Object.assign(app, {
                     const res = await fetch(API_BASE + '/api/v1/news/analyze-batch', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({items})
+                        body: JSON.stringify({items, model})
                     });
                     const data = await res.json();
                     if (data.success && data.catalysts) {
@@ -854,7 +870,7 @@ Object.assign(app, {
                         this.renderCatalysts();
                         this.updateCatalystSelectionState();
                         if (typeof this.showToast === 'function') {
-                            this.showToast(`Successfully analyzed ${data.count} selected news items!`, 'success');
+                            this.showToast(`Successfully analyzed ${data.count} items with ${model.split('/').pop()}!`, 'success');
                         }
                     } else {
                         if (typeof this.showToast === 'function') {

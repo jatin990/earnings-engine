@@ -418,16 +418,16 @@ def get_premarket_setups(
 
     deduped_setups: list[dict[str, Any]] = []
     for t, group in grouped_by_ticker.items():
-        # Sort group by impact_score DESC, published_at DESC
-        group.sort(key=lambda x: (x["impact_score"], x.get("published_at_raw") or x["published_at"]), reverse=True)
+        # Sort group by published_at_raw (submission time) DESC, then impact_score DESC
+        group.sort(key=lambda x: (x.get("published_at_raw") or x.get("published_at") or "", x.get("impact_score", 0)), reverse=True)
         primary = dict(group[0])
         primary["headlines_count"] = len(group)
         primary["all_headlines"] = group
         primary["other_headlines"] = group[1:] if len(group) > 1 else []
         deduped_setups.append(primary)
 
-    # Sort deduped setups by impact_score DESC, published_at DESC
-    deduped_setups.sort(key=lambda x: (x["impact_score"], x.get("published_at_raw") or x["published_at"]), reverse=True)
+    # Sort deduped setups by published_at_raw (submission time) DESC, then impact_score DESC
+    deduped_setups.sort(key=lambda x: (x.get("published_at_raw") or x.get("published_at") or "", x.get("impact_score", 0)), reverse=True)
     items = deduped_setups[:limit]
 
     # Compute KPI Summary Cards

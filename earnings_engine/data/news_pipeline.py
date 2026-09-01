@@ -50,6 +50,7 @@ def ensure_news_verification_schema(settings: Settings | None = None) -> None:
             ("temporal_originality", "TEXT DEFAULT 'NEW_PUBLICATION'"),
             ("is_republication", "INTEGER DEFAULT 0"),
             ("originality_rationale", "TEXT DEFAULT ''"),
+            ("affected_tickers", "TEXT DEFAULT '[]'"),
         ]
 
         for col_name, col_type in new_columns:
@@ -66,6 +67,25 @@ def ensure_news_verification_schema(settings: Settings | None = None) -> None:
         except Exception:
             pass
 
+        # Create multi-ticker association table
+        try:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS news_catalysts_tickers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    catalyst_id INTEGER NOT NULL,
+                    ticker TEXT NOT NULL,
+                    impact_type TEXT DEFAULT 'PRIMARY',
+                    created_at TEXT,
+                    UNIQUE(catalyst_id, ticker)
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_nct_ticker ON news_catalysts_tickers (ticker)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_nct_catalyst_id ON news_catalysts_tickers (catalyst_id)")
+        except Exception:
+            pass
+
         conn.commit()
 
 
@@ -73,9 +93,10 @@ def process_and_verify_news_items(
     raw_items: list[dict[str, Any]],
     settings: Settings | None = None,
     force_reanalyze: bool = False,
-    run_ai: bool = False,
+    run_ai: bool = True,
+    ai_model: str = "google/gemini-2.5-flash",
 ) -> list[dict[str, Any]]:
-    """Pass raw news items through NewsVerifier, use deterministic heuristics by default, and return verified records."""
+    """Pass raw news items through NewsVerifier, run AI triage on newly discovered items, and return verified records."""
     settings = settings or Settings()
     verifier = NewsVerifier(settings)
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -239,22 +260,39 @@ def process_and_verify_news_items(
             ai_analyzed_at = cached_row["ai_analyzed_at"] or now_str
         elif run_ai:
             # -------------------------------------------------------------------
-            # Explicit On-Demand AI Catalyst Analysis via OmniRoute & Structured Extraction
+            # Explicit On-Demand / New Ingestion AI Catalyst Analysis via OmniRoute & Structured Extraction
             # -------------------------------------------------------------------
             from earnings_engine.data.ai_news_analyzer import extract_structured_news_data
-            extracted = extract_structured_news_data(ai_ctx, settings=settings)
-            ai_model = extracted.ai_model or "free-ai-engine"
-            ai_direction = extracted.direction or v_res["verified_direction"]
-            ai_sentiment = extracted.sentiment.value if hasattr(extracted.sentiment, "value") else str(extracted.sentiment)
-            ai_takeaway = extracted.trading_takeaway or scored["why_it_matters"]
-            ai_target = extracted.target_price
-            ai_stop = extracted.stop_loss
-            ai_proj = extracted.financial_projections.model_dump() if hasattr(extracted.financial_projections, "model_dump") else (extracted.financial_projections.to_dict() if hasattr(extracted.financial_projections, "to_dict") else {})
-            ai_temp_orig = extracted.temporal_originality.value if hasattr(extracted.temporal_originality, "value") else str(extracted.temporal_originality)
-            ai_is_repub = 1 if extracted.is_republication else 0
-            ai_orig_rat = extracted.originality_rationale or ""
-            ai_analyzed_at = extracted.ai_analyzed_at or now_str
-            ai_res = extracted.to_db_dict()
+            try:
+                extracted = extract_structured_news_data(ai_ctx, settings=settings, preferred_model=ai_model)
+                ai_model_name = extracted.ai_model or ai_model or "omniroute/gemini-flash"
+                ai_direction = extracted.direction or v_res["verified_direction"]
+                ai_sentiment = extracted.sentiment.value if hasattr(extracted.sentiment, "value") else str(extracted.sentiment)
+                ai_takeaway = extracted.trading_takeaway or scored["why_it_matters"]
+                ai_target = extracted.target_price
+                ai_stop = extracted.stop_loss
+                ai_proj = extracted.financial_projections.model_dump() if hasattr(extracted.financial_projections, "model_dump") else (extracted.financial_projections.to_dict() if hasattr(extracted.financial_projections, "to_dict") else {})
+                ai_temp_orig = extracted.temporal_originality.value if hasattr(extracted.temporal_originality, "value") else str(extracted.temporal_originality)
+                ai_is_repub = 1 if extracted.is_republication else 0
+                ai_orig_rat = extracted.originality_rationale or ""
+                ai_analyzed_at = extracted.ai_analyzed_at or now_str
+                ai_res = extracted.to_db_dict()
+                ai_model = ai_model_name
+            except Exception as e:
+                logger.debug("[NEWS-PIPELINE] AI triage failed for '%s', falling back to heuristics: %s", title[:30], e)
+                client = OmniRouteClient(settings=settings)
+                ai_res = client.fallback_heuristic_analysis(ai_ctx)
+                ai_model = "heuristic/deterministic"
+                ai_direction = ai_res.get("direction") or v_res["verified_direction"]
+                ai_sentiment = ai_res.get("sentiment") or ai_direction
+                ai_takeaway = ai_res.get("trading_takeaway") or scored["why_it_matters"]
+                ai_target = ai_res.get("target_price")
+                ai_stop = ai_res.get("stop_loss")
+                ai_proj = ai_res.get("financial_projections") or {}
+                ai_temp_orig = ai_res.get("temporal_originality") or "NEW_PUBLICATION"
+                ai_is_repub = 1 if ai_res.get("is_republication") else 0
+                ai_orig_rat = ai_res.get("originality_rationale") or ""
+                ai_analyzed_at = now_str
         else:
             # -------------------------------------------------------------------
             # Zero-Token Deterministic Heuristic Extraction (Default Ingestion)
@@ -317,6 +355,8 @@ def process_and_verify_news_items(
             "originality_rationale": ai_orig_rat,
             "ai_model": ai_model,
             "ai_analyzed_at": ai_analyzed_at,
+            "affected_tickers": json.dumps(v_res.get("affected_tickers", [ticker])),
+            "affected_details": v_res.get("affected_details", [(ticker, "PRIMARY")]),
         }
         verified_records.append(record)
 
@@ -482,7 +522,7 @@ def save_verified_news_records(
     records: list[dict[str, Any]],
     settings: Settings | None = None,
 ) -> int:
-    """Save verified news records into the database with atomic upsert and AI analysis fields."""
+    """Save verified news records into the database with atomic upsert, multi-ticker relations, and AI analysis fields."""
     settings = settings or Settings()
     ensure_news_verification_schema(settings)
 
@@ -490,9 +530,15 @@ def save_verified_news_records(
         return 0
 
     inserted_count = 0
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
     with _connect(settings) as conn:
         for r in records:
             try:
+                aff_tickers_json = r.get("affected_tickers") or json.dumps([r["ticker"]])
+                if isinstance(aff_tickers_json, list):
+                    aff_tickers_json = json.dumps(aff_tickers_json)
+
                 conn.execute(
                     """
                     INSERT INTO news_catalysts (
@@ -503,8 +549,8 @@ def save_verified_news_records(
                         entity_confidence, canonical_hash, signal_price, signal_date,
                         current_price, price_change_pct, ai_analysis, ai_takeaway,
                         ai_direction, ai_target, ai_stop_loss, ai_model, ai_analyzed_at,
-                        financial_projections, sentiment, temporal_originality, is_republication, originality_rationale
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        financial_projections, sentiment, temporal_originality, is_republication, originality_rationale, affected_tickers
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(ticker, title) DO UPDATE SET
                         stock_name = excluded.stock_name,
                         publisher = excluded.publisher,
@@ -538,14 +584,15 @@ def save_verified_news_records(
                         sentiment = COALESCE(excluded.sentiment, news_catalysts.sentiment),
                         temporal_originality = COALESCE(excluded.temporal_originality, news_catalysts.temporal_originality),
                         is_republication = COALESCE(excluded.is_republication, news_catalysts.is_republication),
-                        originality_rationale = COALESCE(excluded.originality_rationale, news_catalysts.originality_rationale)
+                        originality_rationale = COALESCE(excluded.originality_rationale, news_catalysts.originality_rationale),
+                        affected_tickers = COALESCE(excluded.affected_tickers, news_catalysts.affected_tickers)
                     """,
                     (
                         r["ticker"], r["stock_name"], r["title"], r["publisher"],
                         r["link"], r["published_at"], r["summary"], r["impact_score"],
                         r["impact_level"], r["category"], r["direction"],
                         r["expected_horizon"], r["volatility_est"], r["why_it_matters"],
-                        r["source"], r["created_at"], r["verification_status"],
+                        r["source"], r.get("created_at", now_str), r["verification_status"],
                         r["verification_flags"], r["verified_numbers"],
                         r["entity_confidence"], r["canonical_hash"],
                         r.get("signal_price"), r.get("signal_date"),
@@ -559,9 +606,41 @@ def save_verified_news_records(
                         r.get("temporal_originality", "NEW_PUBLICATION"),
                         r.get("is_republication", 0),
                         r.get("originality_rationale", ""),
+                        aff_tickers_json,
                     ),
                 )
                 inserted_count += 1
+
+                # Populate relational news_catalysts_tickers table
+                try:
+                    cat_id_row = conn.execute(
+                        "SELECT id FROM news_catalysts WHERE ticker = ? AND title = ? LIMIT 1",
+                        (r["ticker"], r["title"]),
+                    ).fetchone()
+                    if cat_id_row:
+                        cat_id = cat_id_row[0]
+                        aff_details = r.get("affected_details")
+                        if not aff_details and r.get("affected_tickers"):
+                            try:
+                                t_list = json.loads(r["affected_tickers"]) if isinstance(r["affected_tickers"], str) else r["affected_tickers"]
+                                aff_details = [(t, "PRIMARY" if t == r["ticker"] else "SECONDARY") for t in t_list]
+                            except Exception:
+                                aff_details = [(r["ticker"], "PRIMARY")]
+                        if not aff_details:
+                            aff_details = [(r["ticker"], "PRIMARY")]
+
+                        for aff_t, imp_type in aff_details:
+                            conn.execute(
+                                """
+                                INSERT INTO news_catalysts_tickers (catalyst_id, ticker, impact_type, created_at)
+                                VALUES (?, ?, ?, ?)
+                                ON CONFLICT(catalyst_id, ticker) DO UPDATE SET impact_type = excluded.impact_type
+                                """,
+                                (cat_id, aff_t, imp_type, r.get("created_at", now_str)),
+                            )
+                except Exception as inner_e:
+                    logger.debug("Failed saving news_catalysts_tickers for %s: %s", r.get("title"), inner_e)
+
             except Exception as e:
                 logger.debug("Failed inserting verified record %s: %s", r.get("title"), e)
 

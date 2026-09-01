@@ -231,6 +231,7 @@ def _connect(settings: Settings) -> Any:
             temporal_originality TEXT DEFAULT 'NEW_PUBLICATION',
             is_republication INTEGER DEFAULT 0,
             originality_rationale TEXT DEFAULT '',
+            affected_tickers TEXT DEFAULT '[]',
             UNIQUE(ticker, title)
         )
         """
@@ -241,6 +242,21 @@ def _connect(settings: Settings) -> Any:
         ON news_catalysts (ticker, impact_score DESC, published_at DESC)
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS news_catalysts_tickers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            catalyst_id INTEGER NOT NULL,
+            ticker TEXT NOT NULL,
+            impact_type TEXT DEFAULT 'PRIMARY',
+            created_at TEXT,
+            UNIQUE(catalyst_id, ticker)
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_nct_ticker ON news_catalysts_tickers (ticker)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_nct_catalyst_id ON news_catalysts_tickers (catalyst_id)")
+
     try:
         existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(news_catalysts)").fetchall()}
         for col_name, col_type in [
@@ -265,6 +281,7 @@ def _connect(settings: Settings) -> Any:
             ("temporal_originality", "TEXT DEFAULT 'NEW_PUBLICATION'"),
             ("is_republication", "INTEGER DEFAULT 0"),
             ("originality_rationale", "TEXT DEFAULT ''"),
+            ("affected_tickers", "TEXT DEFAULT '[]'"),
         ]:
             if col_name not in existing_cols:
                 conn.execute(f"ALTER TABLE news_catalysts ADD COLUMN {col_name} {col_type}")
@@ -641,7 +658,8 @@ def get_short_term_catalysts(
             tickers = get_watchlist(watchlist_or_universe, settings) or get_universe(watchlist_or_universe, settings)
             if tickers:
                 placeholders = ",".join("?" for _ in tickers)
-                query += f" AND ticker IN ({placeholders})"
+                query += f" AND (ticker IN ({placeholders}) OR id IN (SELECT catalyst_id FROM news_catalysts_tickers WHERE ticker IN ({placeholders})))"
+                params.extend(tickers)
                 params.extend(tickers)
 
         if impact_filter and impact_filter.upper() != "ALL":
@@ -877,13 +895,36 @@ def get_recent_news_activity(
         return results
 
 
+def harvest_broadband_news(settings: Settings | None = None, run_ai: bool = True) -> dict[str, Any]:
+    """Harvest market-wide broadband news feeds (MoneyControl, ET, Mint, NDTV, Google, BSE/NSE)."""
+    settings = settings or Settings()
+    t0 = time.perf_counter()
+    from earnings_engine.data.news_sources import fetch_all_broadband_news
+    from earnings_engine.data.news_pipeline import process_and_verify_news_items, save_verified_news_records
+
+    raw_items = fetch_all_broadband_news(timeout=6.5)
+    saved_cnt = 0
+    if raw_items:
+        articles = process_and_verify_news_items(raw_items, settings=settings, run_ai=run_ai)
+        if articles:
+            saved_cnt = save_verified_news_records(articles, settings=settings)
+
+    elapsed = round(time.perf_counter() - t0, 2)
+    logger.info("[NEWS-HARVESTER] Broadband harvest completed in %.2fs: %d raw fetched, %d verified & saved", elapsed, len(raw_items), saved_cnt)
+    return {
+        "raw_fetched": len(raw_items),
+        "saved_count": saved_cnt,
+        "elapsed_seconds": elapsed,
+    }
+
+
 async def news_catalyst_harvest_loop(settings: Settings | None = None) -> None:
-    """Async background task: periodically harvests news across active stocks and updates schedules."""
+    """Async background task: periodically harvests broadband news and watchlist catalysts (interval=300s / 5 min)."""
     import asyncio
     settings = settings or Settings()
-    interval_s = 600  # 10 minutes
+    interval_s = 300  # 5 minutes
 
-    logger.info("[NEWS-HARVESTER] Started background news catalyst harvester loop (interval=%ds)", interval_s)
+    logger.info("[NEWS-HARVESTER] Started broadband news catalyst harvester loop (interval=%ds / 5m)", interval_s)
     loop = asyncio.get_event_loop()
 
     while True:
@@ -892,10 +933,13 @@ async def news_catalyst_harvest_loop(settings: Settings | None = None) -> None:
             record_job_start("news_catalyst_harvest", settings)
             t0 = time.perf_counter()
 
-            # Harvest for key watchlist and top breakout tickers
+            # 1. Harvest broadband market-wide feeds & exchange announcements
+            bb_res = await loop.run_in_executor(None, harvest_broadband_news, settings, True)
+
+            # 2. Harvest for key watchlist tickers
             res = await loop.run_in_executor(None, scan_watchlist_catalysts, "my_watchlist", 3, False, settings)
             elapsed = round(time.perf_counter() - t0, 2)
-            summary_msg = f"Harvested {res.get('catalysts_fetched', 0)} headlines ({res.get('high_impact_found', 0)} high impact) across {res.get('scanned_tickers', 0)} stocks"
+            summary_msg = f"Harvested {bb_res.get('saved_count', 0)} broadband + {res.get('catalysts_fetched', 0)} watchlist headlines ({res.get('high_impact_found', 0)} high impact)"
             record_job_finish("news_catalyst_harvest", elapsed, summary_msg, settings=settings)
 
         except asyncio.CancelledError:
