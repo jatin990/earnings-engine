@@ -565,7 +565,7 @@
         },
 
         renderHistoricalAdditionsTable(items) {
-            const tbody = document.getElementById('instHistoricalAdditionsTableBody');
+            const tbody = document.getElementById('instHistoricalSurgesTableBody') || document.getElementById('instHistoricalAdditionsTableBody');
             if (!tbody) return;
 
             if (!items || !items.length) {
