@@ -26,17 +26,8 @@ logger = logging.getLogger("earnings_engine.data.omniroute_client")
 OMNIROUTE_PROBE_PORTS = [20128, 20129, 8080, 3000]
 
 DEFAULT_OMNIROUTE_MODELS = [
-    "deepseek/deepseek-r1",
-    "qwen/qwen-2.5-72b-instruct",
-    "meta-llama/llama-3.3-70b-instruct",
-    "google/gemini-2.5-pro",
-    "anthropic/claude-3.5-sonnet",
-    "openai/gpt-4o",
     "google/gemini-2.0-flash",
-    "auto/best-reasoning",
     "auto/best-fast",
-    "auto/best-free",
-    "gpt-4o-mini",
 ]
 DEFAULT_OMNIROUTER_MODELS = DEFAULT_OMNIROUTE_MODELS
 
@@ -541,12 +532,15 @@ class OmniRouteClient:
             logger.info("[OMNIROUTE] Gateway offline; using deterministic analysis for %s", item.get("ticker"))
             return self.fallback_heuristic_analysis(item)
 
+        effective_timeout = min(timeout or 3.5, 4.0)
         chosen_model = model or preferred_model or item.get("model") or item.get("preferred_model")
-        configured_model = chosen_model or os.getenv("OMNIROUTE_MODEL") or self.settings.omniroute_model
-        models_to_try = [configured_model] if configured_model else DEFAULT_OMNIROUTER_MODELS
+        configured_model = chosen_model or os.getenv("OMNIROUTE_MODEL") or self.settings.omniroute_model or "google/gemini-2.0-flash"
+        
+        models_to_try = [configured_model]
         for m in DEFAULT_OMNIROUTER_MODELS:
             if m not in models_to_try:
                 models_to_try.append(m)
+        models_to_try = models_to_try[:2]  # Cap at max 2 models to prevent cascading timeout storms
 
         prompt = self.format_prompt(item)
         headers = {
@@ -575,9 +569,14 @@ class OmniRouteClient:
                         "temperature": 0.2,
                         "max_tokens": 350,
                     },
-                    timeout=timeout,
+                    timeout=effective_timeout,
                 )
                 latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+
+                # If unauthorized/invalid credentials or gateway not configured, fail fast immediately
+                if resp.status_code in (401, 403):
+                    logger.warning("[OMNIROUTE] Gateway auth error (%d) for model %s: %s. Failing fast to deterministic heuristics.", resp.status_code, model_name, resp.text[:150])
+                    break
 
                 if resp.status_code == 200:
                     data = resp.json()
@@ -586,6 +585,10 @@ class OmniRouteClient:
                     raw_content = (msg.get("content") or msg.get("reasoning") or "").strip()
                     usage = data.get("usage") or {}
                     total_toks = usage.get("total_tokens") or (usage.get("prompt_tokens", 0) + usage.get("completion_tokens", 0))
+
+                    if not raw_content:
+                        logger.warning("[OMNIROUTE] Model %s returned empty content from %s; failing fast to heuristics.", model_name, completions_url)
+                        break
 
                     clean_json = re.sub(r"^```(?:json)?", "", raw_content, flags=re.MULTILINE).strip()
                     clean_json = re.sub(r"```$", "", clean_json, flags=re.MULTILINE).strip()
@@ -648,7 +651,7 @@ class OmniRouteClient:
                         return parsed
                     except json.JSONDecodeError as jde:
                         logger.warning("[OMNIROUTE] JSON decode error from %s: %s (Raw: %s)", model_name, jde, raw_content[:200])
-                        continue
+                        break
                 else:
                     logger.warning("[OMNIROUTE] Model %s failed with HTTP %d: %s", model_name, resp.status_code, resp.text[:200])
                     continue
