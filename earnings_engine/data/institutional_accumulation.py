@@ -1642,7 +1642,8 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
             """
             SELECT ticker, quarter, shares_held, stake_pct, holding_value_cr,
                    action, change_pct, avg_price, recent_buy_price,
-                   recent_txn_price, recent_txn_date, recent_txn_type, reported_date
+                   recent_txn_price, recent_txn_date, recent_txn_type, reported_date,
+                   fund_type
             FROM institutional_holdings
             WHERE LOWER(fund_name) = LOWER(?)
             ORDER BY stake_pct DESC
@@ -1715,6 +1716,7 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
                 "return_30d_pct": r30,
                 "return_1y_pct": r1y,
                 "reported_date": r[12],
+                "fund_type": r[13] if len(r) > 13 and r[13] else "Mutual Fund (DII)",
             })
 
         _set_inst_cache(cache_key, holdings, ttl_seconds=180.0)

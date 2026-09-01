@@ -99,7 +99,16 @@ async def get_fund_portfolio(fund_name: str):
     """Reverse lookup: retrieve all equities held and recent actions for a specific mutual fund or super investor."""
     try:
         items = await asyncio.to_thread(inst_mod.get_fund_portfolio_activity, fund_name=fund_name, settings=_settings)
-        return {"success": True, "fund_name": fund_name, "count": len(items), "holdings": items}
+        total_aum = round(sum(float(h.get("holding_value_cr") or 0.0) for h in items), 1)
+        fund_type = items[0].get("fund_type") if items and items[0].get("fund_type") else "Mutual Fund (DII)"
+        return {
+            "success": True,
+            "fund_name": fund_name,
+            "fund_type": fund_type,
+            "count": len(items),
+            "total_aum_tracked_cr": total_aum,
+            "holdings": items,
+        }
     except Exception as e:
         logger.exception("Error in get_fund_portfolio for %s: %s", fund_name, e)
         raise HTTPException(status_code=500, detail=f"Error fetching fund portfolio: {str(e)}")
