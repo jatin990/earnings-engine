@@ -7,16 +7,25 @@ Location: `data/cache/prices/prices.sqlite3`
 
 **Tables:**
 - `price_history`: ticker, date, open/high/low/close, volume — PK `(ticker, date)`
-- `ticker_metrics`: ticker, as_of_date, metrics (JSON) — PK `(ticker, as_of_date)`. **Used for once-per-day caching of price-derived report fields** (`week_change`, `pct_from_52w_high/low`, `thirty_day_return_pct`, `week_high/low`, `earnings_week_move_pct`) — `enrich_upcoming_results()` reads today's row if present, otherwise recomputes and stores.
+- `ticker_metrics`: ticker, as_of_date, metrics (JSON) — PK `(ticker, as_of_date)`. Used for once-per-day caching of price-derived report fields.
 - `earnings_history`: ticker, earnings_date, eps_estimate, eps_reported, surprise_pct — PK `(ticker, earnings_date)`
 - `earnings_freshness`: ticker, fetched_at — PK `(ticker)`
-- `event_dataset`: ID columns (ticker, market, earnings_date, asof_date, reaction_date) + FEATURE_COLUMNS + LABEL_COLUMNS — PK `(ticker, earnings_date)`
+- `event_dataset`: ID columns + FEATURE_COLUMNS + LABEL_COLUMNS — PK `(ticker, earnings_date)`
 - `ticker_market_cap`: ticker, market_cap, fetched_at — PK `(ticker)`, freshness 1 day
 - `kronos_predictions`: id, ticker, run_at, predicted_at, lookback, pred_len, prediction_json, current_price, support, resistance, return_pct, trend, explanation — index `idx_kronos_pred_ticker_run (ticker, run_at DESC)`
-- `watchlists`: name, ticker, added_at — PK `(name, ticker)`. SQLite-backed watchlist storage (see `data/watchlists.py`)
-- `universes`: universe_name, ticker, updated_at — PK `(universe_name, ticker)`. 100% SQLite-backed universe storage for IN, US, NSE_ALL, NSE_LARGE_CAP, and custom universes.
+- `consensus_predictions`: id, ticker, event_date, consensus_json, model_breakdown, targets, stop_loss, outcome — multi-model AI consensus persistence
+- `institutional_accumulation_cache`: ticker, accumulation_score, increase_pct, increase_amt_cr, total_holding_cr, net_flow_cr, top_buyers, updated_at — precomputed institutional metrics cache
+- `tri_confluence_metrics`: ticker, clean_ticker, company_name, sector, industry, market, market_cap, market_cap_cr, current_price, synergy_score, grade, rating_label, rating_badge, status_desc, hit_rate_pct, confluent_quarters, total_quarters, corr_inst_return, corr_surprise_return, corr_inst_surprise, latest_quarter, latest_inst_pct, latest_inst_delta, latest_surprise_pct, latest_return_pct, latest_confluence_aligned, quarters_json, top_holders_json, insights_json, calculated_at, updated_at — persistent table for Tri-Factor institutional-earnings-returns cross-correlation and confluence scoring (Migration 28)
+- `breakout_radar` / `breakout_tracked_signals`: id, ticker, strategy_name, trigger_price, stop_loss, target_price, detected_at, status, outcome_return — tracked breakout setups
+- `breakout_audit_log`: id, signal_id, evaluated_at, exit_price, exit_return, win_loss, deduplication_hash
+- `option_chain_history`: symbol, strike_price, expiry_date, call_oi, put_oi, spot_price, pcr, fetched_at — NSE derivatives option chain persistence
+- `participant_oi_history`: date, client_oi, dii_oi, fii_oi, pro_oi, net_ratio — 7-day participant derivatives OI breakdown
+- `sidebar_badges`: tab_name, badge_count, metadata_json, updated_at — sub-millisecond sidebar badge counters
+- `automation_schedules`: schedule_id, task_name, cron_expr, next_run_at, status, last_error — master scheduler persistence
+- `watchlists`: name, ticker, added_at — PK `(name, ticker)`
+- `universes`: universe_name, ticker, updated_at — PK `(universe_name, ticker)`
 - `universe_freshness`: universe_name, fetched_at — PK `(universe_name)`
-- `swing_ranges`: watchlist, ticker, lower_bound, upper_bound, source, cycles, avg_cycle_days, last_updated — PK `(watchlist, ticker)`. Keyed per watchlist so users can maintain independent range hypotheses.
+- `swing_ranges`: watchlist, ticker, lower_bound, upper_bound, source, cycles, avg_cycle_days, last_updated — PK `(watchlist, ticker)`
 - `swing_cycle_history`: watchlist, ticker, cycle_idx, cycle_start, cycle_end, duration_days, lower_bound, upper_bound — PK `(watchlist, ticker, cycle_idx)`
 
 ## `data/earnings.py`
@@ -98,3 +107,24 @@ SQLite-backed universe storage (`universes` & `universe_freshness` tables).
 - `store_prediction(ticker, settings, payload, run_at=None, predicted_at=None) -> int`
 - `load_prediction_history(tickers=None, limit=None, settings=None) -> list[dict]` — ORDER BY run_at DESC, id DESC
 - `load_latest_predictions(tickers=None, settings=None) -> list[dict]` — first per ticker from history
+
+## `data/institutional_accumulation.py` & `institutional_catalog.py`
+**Purpose:** Multi-tier institutional shareholding & AMFI fund tracking across 410+ entities.
+- Calculates 3 key metrics: Increase %, Increase Amount (₹ Cr), and Total Holding Amount (₹ Cr).
+- Caches pre-computed metrics into `institutional_accumulation_cache` for sub-10ms query performance.
+
+## `data/tri_confluence.py`
+**Purpose:** Tri-Factor Alpha Synergy and Cross-Correlation engine.
+- Reconstructs quarterly historical vectors aligning $\Delta \text{Inst}$ (FII + DII), EPS Surprise %, and Returns.
+- Computes Pearson correlation coefficients ($r_{\text{inst, ret}}$, $r_{\text{surp, ret}}$, $r_{\text{inst, surp}}$), Triple Confluence Hit Rate %, and composite Synergy Score (0–100) with letter grades (A+ Triple Alpha, A High Synergy, B Moderate, C/D Divergent).
+- In-memory TTL caching for fast scanner and macro summary responses.
+
+## `data/breakout_scanner.py`
+**Purpose:** 5-strategy breakout scanner (Compression, 52W High Momentum, Volume Expansion, S/R Breach, Composite ALL).
+- Tracks candidate pools, records signals in `breakout_tracked_signals`, and audits realized outcomes in `breakout_audit_log` with deduplication hashing.
+
+## `data/market_pulse.py` & `option_chain.py`
+**Purpose:** Market-wide pulse, 7-day Participant OI matrix (FII, DII, Client, Pro), sector heatmaps, and NSE option chain persistence in `option_chain_history`.
+
+## `data/omniroute_client.py` & `consensus/`
+**Purpose:** Universal AI proxy to OmniRoute gateway supporting Antigravity, local/cloud models, DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large with sliding-window rate limiting.

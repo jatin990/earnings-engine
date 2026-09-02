@@ -37,6 +37,7 @@ from earnings_engine.api.routers import (
     swing,
     system,
     trading_agents,
+    tri_confluence,
     trips,
     watchlists,
     wealth,
@@ -457,6 +458,7 @@ app.include_router(premarket.router)
 app.include_router(scanner.router)
 app.include_router(repeaters.router)
 app.include_router(institutional.router)
+app.include_router(tri_confluence.router)
 app.include_router(swing.router)
 app.include_router(trading_agents.router)
 app.include_router(audit.router)

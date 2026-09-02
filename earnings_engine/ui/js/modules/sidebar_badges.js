@@ -60,6 +60,12 @@ app.updateSidebarBadges = async function() {
                             gainerBadge.style.display = 'none';
                         }
                     }
+
+                    // 5. Tri-Factor Synergy Grade A+ Alpha Badge
+                    const confBadge = document.getElementById('sidebarConfluenceBadge');
+                    if (confBadge && data.confluence_a_plus_count != null) {
+                        confBadge.textContent = data.confluence_a_plus_count > 0 ? `${data.confluence_a_plus_count} ALPHA` : 'ALPHA';
+                    }
                 }
             } catch (e) {
                 console.debug('[SIDEBAR-BADGES] Error updating sidebar count badges:', e);

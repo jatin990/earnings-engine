@@ -238,15 +238,18 @@ def compute_sector_heatmap(settings: Settings | None = None, force_refresh: bool
     conn = get_db_connection(settings)
 
     # 1. Determine active weekday market sessions (Monday to Friday)
-    active_dates_rows = conn.execute("""
-        SELECT date, COUNT(*) as cnt, SUM(volume) as tot_vol 
-        FROM price_history 
-        WHERE date <= date('now')
-        GROUP BY date 
-        HAVING cnt >= 30 AND tot_vol > 1000000
-        ORDER BY date DESC 
-        LIMIT 40
-    """).fetchall()
+    try:
+        active_dates_rows = conn.execute("""
+            SELECT date, COUNT(*) as cnt, SUM(volume) as tot_vol
+            FROM price_history
+            WHERE date <= date('now')
+            GROUP BY date
+            HAVING cnt >= 30 AND tot_vol > 1000000
+            ORDER BY date DESC
+            LIMIT 40
+        """).fetchall()
+    except Exception:
+        active_dates_rows = []
 
     weekday_dates: list[str] = []
     for r in active_dates_rows:

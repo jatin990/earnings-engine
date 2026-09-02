@@ -14,6 +14,30 @@
                 "-Command",
                 "& '${workspaceFolder}/.venv/Scripts/Activate.ps1'"
             ]
+        },
+        "Claude Code": {
+            "source": "PowerShell",
+            "args": [
+                "-ExecutionPolicy",
+                "Bypass",
+                "-NoExit",
+                "-Command",
+                "& '${workspaceFolder}/.venv/Scripts/Activate.ps1'; claude"
+            ],
+            "icon": "sparkle",
+            "overrideName": true
+        },
+        "Claude Code Router (CCR)": {
+            "source": "PowerShell",
+            "args": [
+                "-ExecutionPolicy",
+                "Bypass",
+                "-NoExit",
+                "-Command",
+                "& '${workspaceFolder}/.venv/Scripts/Activate.ps1'; ccr ui"
+            ],
+            "icon": "hubot",
+            "overrideName": true
         }
     }
 }

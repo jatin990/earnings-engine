@@ -12,6 +12,10 @@
 - What data schemas are involved
 - How modules interact
 - What the existing patterns are
+- READ BEFORE WRITE: You MUST execute `read_file` on target files before making edits. NEVER write to a file based on assumptions.
+-  VERIFY PATHS: Always run `list_files` or inspect directory trees before creating new directories or target paths.
+-  SURGICAL EDITS ONLY: Modify only the necessary lines/functions using `replace_in_file`. DO NOT rewrite entire files unless creating a new file from scratch.
+-  THINK BEFORE ACTING: Write out your tool execution plan in 2 sentences before firing any tool call.
 
 **Rule:** After completing any change that affects behavior, update `KNOWLEDGE_BASE.md`:
 - Add to the **Recent Changes Log** (Section 10)

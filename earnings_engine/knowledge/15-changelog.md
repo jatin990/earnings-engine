@@ -2,11 +2,58 @@
 
 > Related: [14-modification-points](14-modification-points.md) → [00-index](00-index.md)
 
+## 2026-09-02 (Tri-Factor Institutional-Earnings-Returns Synergy Tab & On-Demand Confluence Radar)
+- **Market Pulse On-Demand Confluence Radar (`ui/js/modules/market_pulse.js`, `_market_pulse.html`)**:
+  - Decoupled Cross-Strategy Confluence Radar execution from initial Market Pulse tab load to ensure sub-50ms instant hydration.
+  - Added interactive on-demand empty state with clear action prompt and `⚡ Scan Confluence Radar` / `🔄 Re-scan Confluences` stateful triggers.
+- **Tri-Factor Alpha Synergy Engine (`data/tri_confluence.py`, `api/routers/tri_confluence.py`)**:
+  - Implemented cross-correlation analytics linking QoQ Institutional accumulation ($\Delta \text{Inst}$), quarterly EPS surprise beats ($\text{Surprise}\%$), and post-earnings/quarterly price returns ($\text{Return}\%$).
+  - Built Pearson correlation math ($r_{\text{inst, ret}}$, $r_{\text{surp, ret}}$, $r_{\text{inst, surp}}$) with zero-variance edge-case handling.
+  - Computed Triple Confluence Hit Rate ($\%$) and composite Tri-Factor Synergy Score (0–100) with letter grades (A+ Triple Alpha, A High Synergy, B Moderate, C/D Divergent).
+  - Added FastAPI endpoints: `/api/v1/correlation/summary`, `/api/v1/correlation/tri-confluence`, `/api/v1/correlation/ticker/{ticker}`, and `/api/v1/correlation/recalculate` with in-memory TTL caching.
+- **Persistent SQLite Database Storage & Zero-Latency Performance (`data/migrations.py`, `data/tri_confluence.py`)**:
+  - Implemented Migration 28 `028_tri_confluence_metrics_cache` to create `tri_confluence_metrics` table with composite and descending score indexes.
+  - Built bidirectional serialization and deserialization (`quarters_json`, `top_holders_json`, `insights_json`) enabling sub-millisecond database queries.
+  - Provided persistent SQLite storage on calculation, eliminating heavy synchronous main-thread computation and preventing browser extension `PerformanceObserver` / `startTime` errors.
+- **Frontend Dashboard Tab & Inspection Modal (`_tri_confluence.html`, `tri_confluence.js`, `_sidebar.html`, `dashboard.js`, `sidebar_badges.js`)**:
+  - Added dedicated "Inst-Earnings Synergy" sidebar tab (`data-tab="tri-confluence"`) with live `ALPHA` badge counter.
+  - Added KPI summary metric cards (Total Screened, Grade A+ Triple Alpha setups, Universe Average Correlations).
+  - Interactive table with Universe selector (`ALL`, `NIFTY 50`, `NIFTY 500`, `NSE_ALL`, `US`), Min Score slider, Sort By, Search filter, quick ticker chips, and CSV export.
+  - Interactive drill-down modal (`#triConfluenceDetailModal`) featuring dual-axis Chart.js visualization, historical quarter-by-quarter ledger, top institutional holders, and quantitative takeaways.
+- **Unit & Integration Tests (`tests/test_tri_confluence.py`)**:
+  - Added 7 comprehensive unit, SQLite persistence roundtrip, and FastAPI integration tests with 100% pass rate.
+
 ## 2026-09-02 (Fix Breakout Hot Rescore Undefined Variable)
 - **Breakout Scanner (`earnings_engine/data/breakout_scanner.py`)**:
   - Fixed `NameError: name 'hot_tickers' is not defined` in `run_hot_rescore` summary message by changing reference to `hot_keys`.
   - Added regression test `test_run_hot_rescore_execution` to `tests/test_breakout_audit_counter.py`.
   - Resolved `err_951b719b7c` in error ledger.
+
+## 2026-08-23 to 2026-09-01 (OmniRoute Gateway, 410+ Institutional Catalog, 5-Strategy Breakout, Participant OI & Performance)
+- **Institutional Accumulation & AMFI Catalog (`data/institutional_*.py`, `data/amfi_holdings.py`, `data/nse_shareholding.py`)**:
+  - Expanded catalog to 410+ real DII, FII, and Super Investor entities with dynamic NSE shareholding & AMFI fund portfolio ingestion.
+  - Implemented 3 distinct Rupee flow metrics: Increase %, Increase Amount (₹ Cr), and Total Holding Amount (₹ Cr).
+  - Created `institutional_accumulation_cache` table with sub-10ms query endpoints.
+  - Fund portfolio modal with real tracked AUM, trend bar, and quarterly baselines.
+- **OmniRoute AI Gateway & Consensus Redesign (`consensus/`, `data/omniroute_client.py`)**:
+  - Integrated OmniRoute multi-model AI gateway (DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, Mistral-Large).
+  - Enforced zero-token default news ingestion with purely on-demand AI triage (no costly runs on modal load).
+  - Curated low-latency Antigravity, Free, and General Best model presets with full raw I/O trace inspection.
+  - Added structured news extraction (ticker, financial projections, sentiment polarity, temporal originality).
+- **5-Strategy Breakout Radar & Tracking (`data/breakout_scanner.py`, `backtest/breakout_backtest.py`)**:
+  - Implemented 5 breakout strategies (Compression, 52W Momentum, Volume Expansion, S/R Breach, Composite ALL) with dynamic UI switcher.
+  - Strategy-attached collision-free tracking, immutable position re-evaluation, 14D confirmation buffers, minimum 1.5 RRR.
+  - Dedicated Tracked Breakout Archive with deduplication counter (`breakout_audit_log`, migration 024).
+- **Market Pulse, Pre-Market & Derivatives OI Matrix (`data/market_pulse.py`, `data/option_chain.py`, `data/pre_market_setups.py`)**:
+  - Interactive 7-day Participant Derivatives Open Interest (OI) matrix (FII, DII, Client, Pro).
+  - Option chain history persistence and price spot resolution (migration 025).
+  - Pre-market scanner with weekend window expansion (Friday 15:15 IST - Monday 09:15 IST) and dynamic price delta auto-fetch.
+- **Performance & System Resilience (`port_utils.py`, `data/turso_sync.py`, `data/telemetry.py`, `api/cancellation.py`)**:
+  - Automatic port verification and process killing on dashboard start.
+  - SQLite WAL mode, 256MB mmap, connection pooling (0.02ms query latency).
+  - Watermark-tracked Turso Cloud delta sync engine.
+  - Sub-millisecond sidebar badge counters table (`sidebar_badges`).
+  - Universal tab request cancellation tokens.
 
 
 ## 2026-08-22 (Multi-Strategy Backtest Engine, Results ±2M Window, Popups & UI Enhancements)

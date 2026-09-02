@@ -110,6 +110,13 @@ def _connect(settings: Settings) -> Any:
         )
         """
     )
+    try:
+        cols = {r[1] for r in connection.execute("PRAGMA table_info(earnings_fetch_log)").fetchall()}
+        if cols and "fetch_date" not in cols:
+            connection.execute("DROP TABLE IF EXISTS earnings_fetch_log")
+    except Exception:
+        pass
+
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS earnings_fetch_log (
@@ -121,6 +128,13 @@ def _connect(settings: Settings) -> Any:
         )
         """
     )
+    try:
+        cols_mc = {r[1] for r in connection.execute("PRAGMA table_info(earnings_month_cache)").fetchall()}
+        if cols_mc and "payload_json" not in cols_mc:
+            connection.execute("DROP TABLE IF EXISTS earnings_month_cache")
+    except Exception:
+        pass
+
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS earnings_month_cache (

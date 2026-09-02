@@ -620,7 +620,7 @@ const API_BASE = window.location.origin;
 
             switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'home').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'gainers', 'breakout', 'institutional', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'home';
 
                 this.currentTab = name;
@@ -680,6 +680,7 @@ const API_BASE = window.location.origin;
                         'gainers': 'Gainers & Breakouts',
                         'breakout': '⚡ Breakout Radar',
                         'institutional': '🏛️ Institutional Flows',
+                        'tri-confluence': '🔗 Inst-Earnings Synergy',
                         'repeaters': '🔁 Quarter Repeaters',
                         'new-additions': '🆕 Recent Additions & IPOs',
                         'swing': 'Swing Ranges',
@@ -819,6 +820,14 @@ const API_BASE = window.location.origin;
                     const activeSub = (app._subtabState && app._subtabState['kronos']) || localStorage.getItem('subtab_kronos') || 'latest';
                     if (typeof this.switchKronosTab === 'function') {
                         this.switchKronosTab(activeSub);
+                    }
+                }
+                if (name === 'tri-confluence') {
+                    if (!this._triConfluenceLoaded) {
+                        if (typeof app.loadTriConfluence === 'function') {
+                            this._triConfluenceLoaded = true;
+                            app.loadTriConfluence();
+                        }
                     }
                 }
                 if (name === 'repeaters') {

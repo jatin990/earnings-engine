@@ -42,6 +42,11 @@
 | Change email behavior | 09-cli-config |
 | Add/change API endpoint | 08-api-dashboard |
 | Kronos predictions / audit | 08-api-dashboard + 02-data-layer (predictions) |
+| Multi-Model AI Consensus & OmniRoute | 04-models + 08-api-dashboard |
+| Institutional Flow & AMFI Catalog | 02-data-layer + 08-api-dashboard |
+| Tri-Factor Synergy & Cross-Correlation | 02-data-layer + 08-api-dashboard |
+| Breakout Radar & 5-Strategy Scanner | 05-backtest + 08-api-dashboard |
+| Market Pulse & Participant OI Matrix | 02-data-layer + 08-api-dashboard |
 | Run tests | 12-tests |
 | Change env/config | 13-config-env |
 | See what changed recently | 15-changelog |

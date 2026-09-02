@@ -45,7 +45,7 @@
                 this.renderParticipantOI(data.participant_oi || {});
                 this.renderSectors(data.sectors || []);
                 this.renderMacroCharts(data.macro_charts || {});
-                this.loadConfluenceSetups();
+                // Note: Confluence setups are loaded on-demand via user trigger
 
             } catch (e) {
                 console.error('[MARKET_PULSE] Error loading market pulse:', e);
@@ -704,7 +704,22 @@
 
         async loadConfluenceSetups(forceRefresh = false) {
             const tbody = document.getElementById('pulseConfluenceTableBody');
+            const btn = document.getElementById('btnSyncPulseConfluence');
             if (!tbody) return;
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading-spinner" style="display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:middle;"></span> Scanning...';
+            }
+
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align:center;padding:1.5rem;color:#94a3b8;">
+                        <div class="loading-spinner" style="margin:0 auto 0.4rem auto;"></div>
+                        <div>Evaluating multi-strategy confluences across Breakout, Swing, AI & News...</div>
+                    </td>
+                </tr>
+            `;
 
             try {
                 const res = await fetch(API_BASE + '/api/v1/dashboard/confluence?min_level=1&limit=20');
@@ -715,8 +730,8 @@
                 if (!setups.length) {
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="7" style="text-align:center;padding:1.25rem;color:#94a3b8;">
-                                🛡️ No multi-strategy confluence setups currently active. All engines operating normally.
+                            <td colspan="7" style="text-align:center;padding:1.5rem;color:#94a3b8;">
+                                🛡️ No multi-strategy confluence setups currently active. All scanner engines operating normally.
                             </td>
                         </tr>
                     `;
@@ -729,11 +744,11 @@
                     const badgeBg = s.confluence_level >= 3 ? 'rgba(244,63,94,0.2)' : (s.confluence_level >= 2 ? 'rgba(56,189,248,0.2)' : 'rgba(16,185,129,0.15)');
                     const badgeColor = s.badge_color || '#38bdf8';
 
-                    const breakoutCell = s.breakout_tier === 'HOT' 
+                    const breakoutCell = s.breakout_tier === 'HOT'
                         ? `<span class="signal-badge" style="background:rgba(244,63,94,0.15);color:#fb7185;font-size:0.65rem;">🔥 HOT Breakout</span>`
                         : (s.breakout_tier === 'WARM' ? `<span class="signal-badge" style="background:rgba(251,191,36,0.15);color:#fbbf24;font-size:0.65rem;">⚡ Coiling (Warm)</span>` : `<span style="color:#64748b;">—</span>`);
 
-                    const swingCell = s.is_swing_buy 
+                    const swingCell = s.is_swing_buy
                         ? `<span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.65rem;">🎯 Buy Zone Floor</span>`
                         : (s.swing_tier === 'WARM' ? `<span style="color:#fbbf24;font-size:0.68rem;">Channel Compression</span>` : `<span style="color:#64748b;">—</span>`);
 
@@ -779,6 +794,11 @@
                         </td>
                     </tr>
                 `;
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '🔄 Re-scan Confluences';
+                }
             }
         }
     };

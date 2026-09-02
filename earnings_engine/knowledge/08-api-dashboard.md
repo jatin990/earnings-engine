@@ -16,6 +16,10 @@
 - `POST /api/v1/universe/add` — add tickers to universe file
 - `POST /api/v1/universe/remove` — remove tickers from universe file
 - `POST /api/v1/universe/create` — create a new universe file (body `{"file","tickers"}`)
+- `GET /api/v1/correlation/summary` — aggregate macro metrics for Tri-Factor Institutional-Earnings-Returns synergy
+- `GET /api/v1/correlation/tri-confluence?universe=&min_score=&sort_by=&limit=` — scan & rank equities exhibiting direct positive correlation across institutional flows, earnings beats, and returns
+- `GET /api/v1/correlation/ticker/{ticker}` — multi-quarter time series, correlation coefficients, and institutional holdings for a specific ticker
+- `POST /api/v1/correlation/recalculate` — flush cache and bulk-sync Tri-Factor synergy metrics into SQLite cache
 - `GET /dashboard` — serve interactive dashboard HTML
 - `GET /api/v1/dashboard/overview` — dataset summary + refresh status + watchlist + universe files
 - `GET /api/v1/dashboard/results` — upcoming earnings with market context
@@ -62,6 +66,19 @@
 - `POST /api/v1/dashboard/predict/run` — on-demand Kronos AI forecast for individual ticker or batch
 
 Root endpoint lists: `universe_create`, `kronos_predictions`, `kronos_run`, `kronos_latest`, `kronos_audit`, `audit_strategy`, `backtest_run`.
+
+## `api/routers/` (Modular REST Handlers)
+FastAPI routes are organized into modular router files under `earnings_engine/api/routers/`:
+- `stocks.py`: Stock overview, decoupled micro-APIs, valuation, and notes (`/api/v1/stock/...`)
+- `consensus.py`: Multi-model AI consensus execution, model selector, and trace inspection (`/api/v1/consensus/...`)
+- `institutional.py`: Institutional accumulation scores, flow deltas, and fund portfolio catalog (`/api/v1/institutional/...`)
+- `breakout.py`: 5-strategy Breakout Radar, tracked signal history, and outcome auditing (`/api/v1/breakout/...`)
+- `news.py`: News harvesting, catalyst analysis, and structured extraction (`/api/v1/news/...`)
+- `premarket.py`: Pre-market gap scanner, overnight news, and session outcomes (`/api/v1/premarket/...`)
+- `system.py`: Sub-millisecond sidebar badge counters, health status, and schedule controls
+- `trading_agents.py`: Autonomous financial multi-agent workflows
+- `tri_confluence.py`: Tri-Factor Synergy & Institutional-Earnings-Returns cross-correlation analytics (`/api/v1/correlation/...`)
+- `cards.py`, `wealth.py`, `trips.py`, `zepto.py`, `auth.py`: Scoped application hubs and RBAC session control
 
 ## `api/dashboard_api.py`
 **Purpose:** Data aggregation for the interactive dashboard tabs.

@@ -108,8 +108,9 @@ def evaluate_all_catalyst_outcomes(
                 "elapsed_seconds": 0.0,
             }
 
-        # Batch load/fetch price histories using parallel price loader
-        price_map = prices_mod.ensure_prices_batch(tickers, settings, max_workers=10)
+        # Batch load price histories using parallel price loader
+        tickers = list({cat["ticker"] for cat in catalysts if cat.get("ticker")})
+        price_map = prices_mod.load_prices_batch(tickers, settings)
 
         now_str = datetime.now(timezone.utc).isoformat()
         evaluated_count = 0

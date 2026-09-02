@@ -92,10 +92,19 @@ def _migration_001_core_schema(conn: Any) -> None:
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS earnings_fetch_log (
-            ticker TEXT PRIMARY KEY,
+            fetch_date TEXT NOT NULL PRIMARY KEY,
             fetched_at TEXT NOT NULL,
             status TEXT NOT NULL,
-            row_count INTEGER NOT NULL DEFAULT 0
+            events_count INTEGER DEFAULT 0,
+            inserted_count INTEGER DEFAULT 0
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS earnings_month_cache (
+            cache_key TEXT NOT NULL PRIMARY KEY,
+            updated_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL
         )
     """)
 
@@ -1288,6 +1297,86 @@ def _migration_027_nse_shareholding_freshness(conn: Any) -> None:
         pass
 
 
+def _migration_028_tri_confluence_metrics_cache(conn: Any) -> None:
+    """Create tri_confluence_metrics table for persistent SQLite caching of Tri-Factor synergy metrics."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS tri_confluence_metrics (
+            ticker TEXT PRIMARY KEY,
+            clean_ticker TEXT,
+            company_name TEXT,
+            sector TEXT,
+            industry TEXT,
+            market TEXT DEFAULT 'IN',
+            market_cap REAL DEFAULT 0,
+            market_cap_cr REAL DEFAULT 0,
+            current_price REAL DEFAULT 0,
+            synergy_score REAL DEFAULT 50.0,
+            grade TEXT DEFAULT 'B',
+            rating_label TEXT,
+            rating_badge TEXT,
+            status_desc TEXT,
+            hit_rate_pct REAL DEFAULT 50.0,
+            confluent_quarters INTEGER DEFAULT 0,
+            total_quarters INTEGER DEFAULT 0,
+            corr_inst_return REAL DEFAULT 0.0,
+            corr_surprise_return REAL DEFAULT 0.0,
+            corr_inst_surprise REAL DEFAULT 0.0,
+            latest_quarter TEXT,
+            latest_inst_pct REAL DEFAULT 0.0,
+            latest_inst_delta REAL DEFAULT 0.0,
+            latest_surprise_pct REAL DEFAULT 0.0,
+            latest_return_pct REAL DEFAULT 0.0,
+            latest_confluence_aligned INTEGER DEFAULT 0,
+            quarters_json TEXT DEFAULT '[]',
+            top_holders_json TEXT DEFAULT '[]',
+            insights_json TEXT DEFAULT '[]',
+            calculated_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tri_conf_score ON tri_confluence_metrics (synergy_score DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tri_conf_grade ON tri_confluence_metrics (grade)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tri_conf_market ON tri_confluence_metrics (market)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tri_conf_updated ON tri_confluence_metrics (updated_at DESC)")
+    except Exception:
+        pass
+
+
+def _migration_029_earnings_fetch_log_schema_alignment(conn: Any) -> None:
+    """Align earnings_fetch_log and earnings_month_cache schema with current queries."""
+    try:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(earnings_fetch_log)").fetchall()}
+        if cols and "fetch_date" not in cols:
+            conn.execute("DROP TABLE IF EXISTS earnings_fetch_log")
+    except Exception:
+        pass
+
+    try:
+        cols_mc = {r[1] for r in conn.execute("PRAGMA table_info(earnings_month_cache)").fetchall()}
+        if cols_mc and "payload_json" not in cols_mc:
+            conn.execute("DROP TABLE IF EXISTS earnings_month_cache")
+    except Exception:
+        pass
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS earnings_fetch_log (
+            fetch_date TEXT NOT NULL PRIMARY KEY,
+            fetched_at TEXT NOT NULL,
+            status TEXT NOT NULL,
+            events_count INTEGER DEFAULT 0,
+            inserted_count INTEGER DEFAULT 0
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS earnings_month_cache (
+            cache_key TEXT NOT NULL PRIMARY KEY,
+            updated_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL
+        )
+    """)
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1317,6 +1406,8 @@ MIGRATIONS: list[Migration] = [
     Migration(25, "025_option_chain_history", _migration_025_option_chain_history),
     Migration(26, "026_institutional_accumulation_cache", _migration_026_institutional_accumulation_cache),
     Migration(27, "027_nse_shareholding_freshness", _migration_027_nse_shareholding_freshness),
+    Migration(28, "028_tri_confluence_metrics_cache", _migration_028_tri_confluence_metrics_cache),
+    Migration(29, "029_earnings_fetch_log_schema_alignment", _migration_029_earnings_fetch_log_schema_alignment),
 ]
 
 
