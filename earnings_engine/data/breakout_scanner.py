@@ -3297,7 +3297,7 @@ def run_hot_rescore(settings: Settings) -> None:
     _pool["last_hot_scan_at"] = now_iso
     _pool["last_scan_at"] = now_iso
 
-    summary_msg = f"Rescored {len(hot_tickers)} hot tickers"
+    summary_msg = f"Rescored {len(hot_keys)} hot setups (hot={len(_pool['hot'])}, warm={len(_pool['warm'])})"
     record_job_finish("breakout_hot_rescore", elapsed, summary_msg, settings=settings)
 
     logger.debug(

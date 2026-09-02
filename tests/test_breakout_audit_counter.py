@@ -6,6 +6,7 @@ from earnings_engine.data.breakout_scanner import (
     get_breakout_audit_log,
     get_stock_breakout_timeline,
     get_cached_scan_results,
+    run_hot_rescore,
     _pool,
 )
 from earnings_engine.data.migrations import apply_migrations
@@ -179,3 +180,53 @@ def test_migration_024_backpopulates_legacy_audit_records(tmp_path, monkeypatch)
     assert len(logs) == 1
     assert logs[0]["strategy"] == "Classic Technical"
     assert logs[0]["counter"] == 1
+
+
+def test_run_hot_rescore_execution(tmp_path, monkeypatch):
+    """Verify that run_hot_rescore executes cleanly without NameError or crash."""
+    prices_dir = tmp_path / "prices"
+    prices_dir.mkdir(parents=True, exist_ok=True)
+    earnings_dir = tmp_path / "earnings"
+    earnings_dir.mkdir(parents=True, exist_ok=True)
+    settings = Settings(data_dirs={"prices": prices_dir, "earnings": earnings_dir})
+
+    test_db = prices_dir / "test.sqlite3"
+    db_conn_fn = lambda s=None: sqlite3.connect(str(test_db))
+    monkeypatch.setattr("earnings_engine.data.db.get_db_connection", db_conn_fn)
+    monkeypatch.setattr("earnings_engine.data.breakout_scanner.get_db_connection", db_conn_fn)
+    apply_migrations(settings)
+
+    _pool["hot"].clear()
+    _pool["warm"].clear()
+    _pool["hot"]["TCS.NS::CLASSIC_TECHNICAL"] = {
+        "result": {
+            "ticker": "TCS.NS",
+            "composite_score": 85.0,
+            "tier": "HOT",
+            "company_name": "Tata Consultancy Services",
+            "current_price": 3500.0,
+            "signal_price": 3480.0,
+        },
+        "consecutive_low": 0,
+    }
+
+    # Mock external fetches
+    monkeypatch.setattr("earnings_engine.data.prices.fetch_batch_live_quotes", lambda *a, **kw: {})
+    monkeypatch.setattr(
+        "earnings_engine.data.breakout_scanner._score_single_ticker",
+        lambda t, s, **kw: {
+            "ticker": t,
+            "composite_score": 88.0,
+            "tier": "HOT",
+            "company_name": "Tata Consultancy Services",
+            "current_price": 3520.0,
+            "signal_price": 3480.0,
+        },
+    )
+
+    # Run hot rescore - should not throw NameError
+    run_hot_rescore(settings)
+
+    assert "TCS.NS::CLASSIC_TECHNICAL" in _pool["hot"]
+    assert _pool["hot"]["TCS.NS::CLASSIC_TECHNICAL"]["result"]["composite_score"] == 88.0
+

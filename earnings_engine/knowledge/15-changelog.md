@@ -2,6 +2,13 @@
 
 > Related: [14-modification-points](14-modification-points.md) → [00-index](00-index.md)
 
+## 2026-09-02 (Fix Breakout Hot Rescore Undefined Variable)
+- **Breakout Scanner (`earnings_engine/data/breakout_scanner.py`)**:
+  - Fixed `NameError: name 'hot_tickers' is not defined` in `run_hot_rescore` summary message by changing reference to `hot_keys`.
+  - Added regression test `test_run_hot_rescore_execution` to `tests/test_breakout_audit_counter.py`.
+  - Resolved `err_951b719b7c` in error ledger.
+
+
 ## 2026-08-22 (Multi-Strategy Backtest Engine, Results ±2M Window, Popups & UI Enhancements)
 - **Multi-Strategy Backtest Engine** (`backtest/swing_backtest.py`, `data/strategy_auditor.py`, `api/server.py`):
   - Unified `/api/v1/backtest/run` dispatcher supporting individual strategy simulations:
