@@ -1893,7 +1893,7 @@
                     if (subEl) {
 
                         const computedAum = data.total_aum_tracked_cr != null ? data.total_aum_tracked_cr : holdings.reduce((sum, h) => sum + Number(h.holding_value_cr || h.total_amount_cr || 0), 0);
-                        subEl.innerText = ${data.fund_type || 'Fund'} Portfolio ·  Positions Tracked · Total Tracked Value: ₹ Cr;
+                        subEl.innerText = `${data.fund_type || 'Fund'} Portfolio · ${holdings.length} Positions Tracked · Total Tracked Value: ₹${Number(computedAum).toLocaleString('en-IN', { maximumFractionDigits: 1 })} Cr`;
 
                     }
 
