@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import time
 from typing import Any
+import urllib.parse
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +36,8 @@ from earnings_engine.api.routers import (
     stocks,
     swing,
     system,
+    trading_agents,
+    tri_confluence,
     trips,
     watchlists,
     wealth,
@@ -56,7 +59,7 @@ _news_catalyst_task: asyncio.Task | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Run database migrations, schedule initialization, and background tasks on startup."""
+    """Clean, structured 6-stage startup and teardown lifecycle for Earnings Engine."""
     global _breakout_scanner_task, _news_catalyst_task
 
     is_serverless = bool(
@@ -64,87 +67,73 @@ async def lifespan(app: FastAPI):
         or os.getenv("SERVERLESS") == "1"
         or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
         or os.getenv("K_SERVICE")
+        or os.getenv("PYTEST_CURRENT_TEST")
+        or os.getenv("TESTING") == "1"
     )
 
+    logger.info("[STARTUP] Initializing Earnings Engine Platform lifecycle...")
+
+    # STAGE 1: Database Migrations & Storage Integrity
     try:
         applied = apply_migrations(_settings)
         if applied:
-            logger.info("Database migrations applied on startup: %s", ", ".join(applied))
+            logger.info("[STARTUP:1/5] Database migrations applied: %s", ", ".join(applied))
+        else:
+            logger.info("[STARTUP:1/5] Database schema verified and up-to-date.")
     except Exception as e:
-        logger.warning("Startup database migration check failed: %s", e)
+        logger.warning("[STARTUP:1/5] Database migration check warning: %s", e)
+
     log_startup_diagnostics(logger)
 
-    # In serverless environments (e.g. Vercel), do NOT start long-running background daemon loops
-    # as ASGI serverless runtimes will wait indefinitely for unfinished event loop tasks.
     if not is_serverless:
-        # Initialize automated schedule registry
+        # STAGE 2: Core Datasets & Turso Cloud Synchronization
         try:
             from earnings_engine.data.automation_schedules import init_automation_schedules
             init_automation_schedules(_settings)
-        except Exception as e:
-            logger.warning("[SCHEDULES] Startup schedule init warning: %s", e)
 
-        # Initialize institutional dataset
-        try:
             from earnings_engine.data.institutional_accumulation import init_institutional_db
             init_institutional_db(_settings)
-        except Exception as e:
-            logger.warning("[INSTITUTIONAL] Startup institutional DB init warning: %s", e)
 
-        # Sync local SQLite state with upstream Turso Cloud on startup
+            # Schedule background cloud database sync if Turso is configured
+            if os.getenv("TURSO_DATABASE_URL") and os.getenv("TURSO_AUTH_TOKEN"):
+                from earnings_engine.data.turso_sync import sync_local_to_upstream
+
+                async def _run_startup_sync():
+                    try:
+                        loop = asyncio.get_running_loop()
+                        await loop.run_in_executor(None, sync_local_to_upstream, _settings)
+                        logger.info("[STARTUP:2/5] Background Turso Cloud DB sync completed.")
+                    except Exception as sync_err:
+                        logger.warning("[STARTUP:2/5] Background Turso sync issue: %s", sync_err)
+
+                asyncio.create_task(_run_startup_sync(), name="turso_upstream_sync")
+            logger.info("[STARTUP:2/5] Core datasets & sync pipeline initialized.")
+        except Exception as e:
+            logger.warning("[STARTUP:2/5] Core datasets initialization warning: %s", e)
+
+        # STAGE 3: In-Memory Pool Hydration (Swing, Breakout, Confluence)
         try:
-            from earnings_engine.data.turso_sync import sync_local_to_upstream
+            from earnings_engine.data.swing_scanner import load_swing_pool_from_db
+            from earnings_engine.data.breakout_scanner import load_breakout_pool_from_db
+            from earnings_engine.data.cross_strategy import load_confluence_radar_from_db
 
-            async def _run_startup_sync():
-                try:
-                    loop = asyncio.get_running_loop()
-                    await loop.run_in_executor(None, sync_local_to_upstream, _settings)
-                except Exception as sync_err:
-                    logger.warning("[TURSO-SYNC] Background startup sync issue: %s", sync_err)
-
-            asyncio.create_task(_run_startup_sync(), name="turso_upstream_sync")
+            load_swing_pool_from_db(_settings)
+            load_breakout_pool_from_db(_settings)
+            load_confluence_radar_from_db(min_level=1, limit=30, settings=_settings)
+            logger.info("[STARTUP:3/5] In-memory scanner pools (Swing, Breakout, Confluence) hydrated from DB.")
         except Exception as e:
-            logger.warning("[TURSO-SYNC] Could not schedule startup upstream sync: %s", e)
+            logger.warning("[STARTUP:3/5] Scanner pool hydration warning: %s", e)
 
-        # Start the background category scanner sweep (only if market is open)
-        try:
-            from earnings_engine.data.category_scanner import compute_and_save_scanner_universe
-            from earnings_engine.data.market_pulse import is_market_open
-            import time
-
-            async def _run_startup_scanner_sweep():
-                try:
-                    if not is_market_open(time.time()):
-                        logger.info("[SCANNER] Market closed or weekend; skipping startup scanner sweep.")
-                        return
-                    loop = asyncio.get_running_loop()
-                    await loop.run_in_executor(None, compute_and_save_scanner_universe, "NSE_TOP", _settings)
-                    logger.info("[SCANNER] Startup background multi-category sweep finished.")
-                except Exception as scan_err:
-                    logger.warning("[SCANNER] Startup sweep background task warning: %s", scan_err)
-
-            asyncio.create_task(_run_startup_scanner_sweep(), name="category_scanner_sweep")
-        except Exception as e:
-            logger.warning("[SCANNER] Could not schedule startup category sweep: %s", e)
-
-        # Initialize & Start Centralized Automation Scheduler Engine
+        # STAGE 4: Automation Scheduler Engine
         try:
             from earnings_engine.data.scheduler_engine import get_scheduler_engine
             _engine = get_scheduler_engine()
             _engine.start(_settings)
-            logger.info("[SCHEDULER] Master background scheduler engine active.")
+            logger.info("[STARTUP:4/5] Master Automation Scheduler Engine started.")
         except Exception as e:
-            logger.warning("[SCHEDULER] Startup scheduler engine warning: %s", e)
+            logger.warning("[STARTUP:4/5] Scheduler engine startup warning: %s", e)
 
-        # Hydrate swing scanner pool from database on startup
-        try:
-            from earnings_engine.data.swing_scanner import load_swing_pool_from_db
-            load_swing_pool_from_db(_settings)
-            logger.info("[SWING] Swing scanner pool hydrated on startup.")
-        except Exception as e:
-            logger.warning("[SWING] Startup swing scanner pool warning: %s", e)
-
-        # Pre-scan and cache available local LLM models (Ollama / LM Studio)
+        # STAGE 5: Local AI Model & Provider Discovery
         try:
             from earnings_engine.api.routers.consensus import _scan_and_cache_local_models
 
@@ -152,21 +141,26 @@ async def lifespan(app: FastAPI):
                 try:
                     loop = asyncio.get_running_loop()
                     await loop.run_in_executor(None, _scan_and_cache_local_models)
+                    logger.info("[STARTUP:5/5] Local AI models (Ollama/LM Studio) discovery complete.")
                 except Exception as scan_err:
-                    logger.warning("[LOCAL-MODELS] Startup model scan warning: %s", scan_err)
+                    logger.warning("[STARTUP:5/5] Local model scan warning: %s", scan_err)
 
             asyncio.create_task(_run_startup_local_model_scan(), name="local_model_startup_scan")
         except Exception as e:
-            logger.warning("[LOCAL-MODELS] Could not schedule startup local model scan: %s", e)
+            logger.warning("[STARTUP:5/5] Local model discovery task warning: %s", e)
+
+        logger.info("[STARTUP] ✅ All 5 startup stages ready. API server accepting traffic.")
 
     yield
 
-    # Graceful shutdown: stop scheduler engine
+    # STAGE 6: Graceful Teardown
+    logger.info("[SHUTDOWN] Stopping background services and scheduler...")
     try:
         from earnings_engine.data.scheduler_engine import get_scheduler_engine
         get_scheduler_engine().stop()
+        logger.info("[SHUTDOWN] Scheduler engine stopped cleanly.")
     except Exception as e:
-        logger.debug("[SCHEDULER] Shutdown error: %s", e)
+        logger.debug("[SHUTDOWN] Scheduler shutdown note: %s", e)
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +376,8 @@ async def enforce_auth_middleware(request: Request, call_next):
 
         if not is_route_authorized(path, session):
             if path in ("/dashboard", "/credit-card", "/trips", "/net-worth", "/zepto", "/dashboard.html") or not path.startswith("/api/"):
-                return RedirectResponse(url=f"/portal?unauthorized=true&redirect={path}", status_code=302)
+                enc_path = urllib.parse.quote(path)
+                return RedirectResponse(url=f"/portal?unauthorized=true&redirect={enc_path}", status_code=302)
             return JSONResponse(
                 status_code=403,
                 content={"detail": f"Access forbidden: Your active passcode/tier does not grant permission for '{path}'."},
@@ -409,7 +404,8 @@ async def enforce_auth_middleware(request: Request, call_next):
         return response
 
     if not path.startswith("/api/"):
-        return RedirectResponse(url=f"/portal?redirect={path}", status_code=302)
+        enc_path = urllib.parse.quote(path)
+        return RedirectResponse(url=f"/portal?redirect={enc_path}", status_code=302)
 
     return JSONResponse(
         status_code=401,
@@ -462,7 +458,9 @@ app.include_router(premarket.router)
 app.include_router(scanner.router)
 app.include_router(repeaters.router)
 app.include_router(institutional.router)
+app.include_router(tri_confluence.router)
 app.include_router(swing.router)
+app.include_router(trading_agents.router)
 app.include_router(audit.router)
 app.include_router(playground.router)
 

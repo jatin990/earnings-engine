@@ -15,14 +15,23 @@ logger = get_logger("earnings_engine.api.routers.breakout")
 router = APIRouter(tags=["Breakout Radar & Scanner"])
 
 
+@router.get("/api/v1/breakout-radar/strategies")
+async def get_breakout_strategies_endpoint():
+    """Retrieve all available multi-strategy breakout models with descriptions and mathematical formulas."""
+    strategies = breakout_scanner_mod.get_breakout_strategies()
+    return {"success": True, "count": len(strategies), "strategies": strategies}
+
+
 @router.get("/api/v1/breakout-radar")
 async def get_breakout_radar_endpoint(
     universe: str | None = Query(None, description="Universe or watchlist to filter/scan (e.g. nifty_50, nse_top, nse_large_cap, us_top, all)"),
+    strategy: str = Query("CLASSIC_TECHNICAL", description="Breakout strategy model (CLASSIC_TECHNICAL, NSE_DELIVERY_ABSORPTION, NSE_FO_CALL_WALL, VOLUME_PROFILE_VAH, DONCHIAN_TTM_SQUEEZE)"),
     min_score: float = Query(35.0, description="Minimum composite score to include"),
     limit: int = Query(50, ge=1, le=200, description="Max candidates to return"),
     sort_by: str = Query("composite_score", description="Sort field (composite_score, fundamental_score, resistance_score, volume_score, realized_return_pct)"),
     asof_date: str | None = Query(None, description="Point-in-time scan date in YYYY-MM-DD format"),
     live: bool = Query(False, description="Force live real-time price fetching for candidates"),
+    real_tracked_only: bool = Query(False, description="Filter to show ONLY real-time tracked entries persisted in database archive"),
 ):
     """Return breakout candidates from the background scanner or point-in-time historical backtest."""
     import pandas as pd
@@ -32,13 +41,21 @@ async def get_breakout_radar_endpoint(
             universe=universe,
             settings=_settings,
             asof_date=asof_date,
+            strategy=strategy,
         )
         if candidates is None:
             candidates = []
         status = await asyncio.to_thread(breakout_scanner_mod.get_scan_status, universe=universe)
 
+        # Reject any test or dummy tickers
+        candidates = [c for c in candidates if not any(x in str(c.get("ticker", "")).upper() for x in ("TEST", "MOCK", "DUMMY"))]
+
         # Apply min_score filter
         candidates = [c for c in candidates if (c.get("composite_score") or 0) >= min_score]
+
+        # Apply real_tracked_only filter if requested
+        if real_tracked_only:
+            candidates = [c for c in candidates if bool(c.get("is_real_tracked"))]
 
         # Live parallel price fetching if requested
         if live and candidates and not asof_date:
@@ -47,7 +64,7 @@ async def get_breakout_radar_endpoint(
             
             def _fetch_live(c: dict[str, Any]) -> None:
                 t = c.get("ticker")
-                if not t:
+                if not t or "TEST" in t.upper() or "MOCK" in t.upper() or "DUMMY" in t.upper():
                     return
                 try:
                     df = fetch_prices(t, _settings, force=True)
@@ -234,19 +251,28 @@ async def evaluate_breakout_candidates_endpoint(request: dict | None = None):
 @router.post("/api/v1/breakout-radar/refresh")
 async def refresh_breakout_radar(
     universe: str | None = Query(None, description="Universe or watchlist to refresh scan for"),
+    strategy: str = Query("ALL", description="Breakout strategy model (ALL, CLASSIC_TECHNICAL, NSE_DELIVERY_ABSORPTION, NSE_FO_CALL_WALL, VOLUME_PROFILE_VAH, DONCHIAN_TTM_SQUEEZE)"),
 ):
     """Trigger an immediate re-scan of tickers (runs in a background thread)."""
     import threading
 
     def _run():
         try:
-            breakout_scanner_mod.run_breakout_scan(_settings, universe=universe)
+            strat_clean = (strategy or "ALL").upper().strip()
+            if strat_clean in ("ALL", "*"):
+                for s_key in breakout_scanner_mod.BREAKOUT_STRATEGIES.keys():
+                    try:
+                        breakout_scanner_mod.run_breakout_scan(_settings, universe=universe, strategy=s_key)
+                    except Exception as s_err:
+                        logger.debug("[BREAKOUT] Multi-strategy refresh error for %s: %s", s_key, s_err)
+            else:
+                breakout_scanner_mod.run_breakout_scan(_settings, universe=universe, strategy=strat_clean)
         except Exception as e:
             logger.error("[BREAKOUT] Manual refresh error: %s", e)
 
     t = threading.Thread(target=_run, daemon=True, name="breakout_manual_refresh")
     t.start()
-    return {"success": True, "message": f"Breakout scan triggered for {universe or 'all universes'} in background. Check /api/v1/breakout-radar shortly."}
+    return {"success": True, "message": f"Breakout scan ({strategy}) triggered for {universe or 'all universes'} in background. Check /api/v1/breakout-radar shortly."}
 
 
 @router.get("/api/v1/breakout-radar/search")
@@ -280,6 +306,7 @@ async def get_breakout_scan_status(
 @router.get("/api/v1/breakout-radar/audit-log")
 async def get_breakout_audit_log_endpoint(
     ticker: str | None = Query(None, description="Filter by ticker"),
+    strategy: str | None = Query(None, description="Filter by strategy (e.g. CLASSIC_TECHNICAL, NSE_DELIVERY_ABSORPTION, etc.)"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """Retrieve historical audit logs of tracked breakout signals."""
@@ -288,12 +315,30 @@ async def get_breakout_audit_log_endpoint(
             breakout_scanner_mod.get_breakout_audit_log,
             ticker=ticker,
             limit=limit,
+            strategy=strategy,
             settings=_settings,
         )
         return {"success": True, "count": len(logs), "logs": logs}
     except Exception as e:
         logger.exception("Error in get_breakout_audit_log: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching breakout audit log: {str(e)}")
+
+
+@router.get("/api/v1/breakout-radar/history/{ticker}")
+async def get_breakout_stock_history_endpoint(
+    ticker: str,
+):
+    """Retrieve full chronological lifecycle timeline & transition notes for a single stock."""
+    try:
+        data = await asyncio.to_thread(
+            breakout_scanner_mod.get_stock_breakout_timeline,
+            ticker=ticker,
+            settings=_settings,
+        )
+        return data
+    except Exception as e:
+        logger.exception("Error in get_breakout_stock_history: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching stock breakout history: {str(e)}")
 
 
 @router.get("/api/v1/breakout/tracked")
@@ -304,6 +349,7 @@ async def get_tracked_breakouts_endpoint(
     end_date: str | None = Query(None, description="End date filter in YYYY-MM-DD format"),
     tier: str | None = Query(None, description="Filter by tier: ALL, HOT, WARM"),
     outcome: str | None = Query(None, description="Filter by outcome: ALL, TRIGGERED, TARGET_HIT, ACTIVE, STOP_HIT"),
+    strategy: str | None = Query(None, description="Filter by breakout strategy model"),
     sort_by: str = Query("signal_date", description="Sort field (signal_date, return_pct, max_gain, score, days_elapsed)"),
     limit: int = Query(200, ge=1, le=500, description="Max records to return"),
     live: bool = Query(False, description="Optionally refresh current prices and realized returns"),
@@ -317,6 +363,7 @@ async def get_tracked_breakouts_endpoint(
             end_date=end_date,
             tier=tier,
             outcome=outcome,
+            strategy=strategy,
             sort_by=sort_by,
             limit=limit,
             live=live,
@@ -350,6 +397,7 @@ async def evaluate_single_breakout(
     ticker: str,
     asof_date: str | None = Query(None, description="Point-in-time evaluation date in YYYY-MM-DD format"),
     force_tier: str | None = Query(None, description="Force promotion into 'hot' or 'warm' tier pool"),
+    strategy: str = Query("CLASSIC_TECHNICAL", description="Breakout strategy model"),
 ):
     """Evaluate breakout potential for a single ticker."""
     sym = ticker.strip().upper()
@@ -359,6 +407,7 @@ async def evaluate_single_breakout(
             ticker=sym,
             asof_date=asof_date,
             force_tier=force_tier,
+            strategy=strategy,
             settings=_settings,
         )
         return result
@@ -413,3 +462,115 @@ async def get_breakout_ai_reasoning_endpoint(
     except Exception as e:
         logger.exception("Error fetching breakout AI reasoning for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Error fetching AI reasoning: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# Multi-Strategy Parallel Scheduling & Automation Integration
+# ---------------------------------------------------------------------------
+
+@router.get("/api/v1/breakout-radar/schedules")
+async def get_breakout_schedules_endpoint():
+    """Retrieve all active and registered breakout scanning schedules and cadence states."""
+    from earnings_engine.data.automation_schedules import get_all_schedules
+    all_s = await asyncio.to_thread(get_all_schedules, _settings)
+    breakout_schedules = [s for s in all_s if s.get("category") == "Breakout Radar" or str(s.get("job_id", "")).startswith("breakout")]
+    return {"success": True, "count": len(breakout_schedules), "schedules": breakout_schedules}
+
+
+@router.get("/api/v1/breakout-radar/status")
+async def get_breakout_status_endpoint(universe: str | None = Query(None)):
+    """Check current background scan execution status and pool metrics."""
+    status = await asyncio.to_thread(breakout_scanner_mod.get_scan_status, universe=universe)
+    return {
+        "success": True,
+        "status": status.get("status", "idle"),
+        "is_scanning": status.get("status") == "running",
+        "last_scan_at": status.get("last_scan_at"),
+        "last_scan_duration_s": status.get("last_scan_duration_s", 0.0),
+        "hot_count": status.get("hot_count", 0),
+        "warm_count": status.get("warm_count", 0),
+        "candidates_count": status.get("candidates_count", 0),
+        "error": status.get("error"),
+    }
+
+
+@router.post("/api/v1/breakout-radar/refresh")
+async def refresh_breakout_radar_endpoint(
+    universe: str | None = Query(None),
+    strategy: str = Query("CLASSIC_TECHNICAL"),
+):
+    """Schedule breakout scan in background."""
+    from earnings_engine.data.scheduler_engine import get_scheduler_engine
+    engine = get_scheduler_engine()
+    job_id = "breakout_all_strategies_parallel" if strategy.upper() in ("ALL", "*") else f"breakout_{strategy.lower()}_scan"
+    if job_id not in engine.handlers:
+        job_id = "breakout_all_strategies_parallel"
+    dispatched = engine.dispatch_job(job_id, _settings)
+    return {
+        "success": True,
+        "status": "scheduled",
+        "job_id": job_id,
+        "dispatched": dispatched,
+        "message": "Breakout scan is scheduled in the background. Please check back in a few moments as data is populated.",
+    }
+
+
+@router.post("/api/v1/breakout-radar/schedules/parallel-scan")
+async def trigger_breakout_parallel_scan_endpoint(
+    universe: str | None = Query(None, description="Universe to scan in parallel (e.g. NSE_ALL)"),
+    min_score: float = Query(30.0, description="Minimum composite score threshold"),
+    background: bool = Query(True, description="Run in background thread without waiting"),
+):
+    """Trigger parallel multi-strategy breakout scan across all 5 quantitative models asynchronously."""
+    from earnings_engine.data.scheduler_engine import get_scheduler_engine
+    engine = get_scheduler_engine()
+    job_id = "breakout_all_strategies_parallel"
+    dispatched = engine.dispatch_job(job_id, _settings)
+    return {
+        "success": True,
+        "status": "scheduled",
+        "job_id": job_id,
+        "dispatched": dispatched,
+        "message": "Parallel 5-strategy breakout scan is scheduled in the background. Please check back in a few moments as data is populated.",
+    }
+
+
+@router.post("/api/v1/breakout-radar/schedules/configure")
+async def configure_breakout_schedule_endpoint(
+    job_id: str = Query(..., description="Job ID (e.g. breakout_all_strategies_parallel, breakout_delivery_absorption_scan)"),
+    interval_seconds: int | None = Query(None, ge=30, le=86400, description="Scan interval in seconds"),
+    is_enabled: bool | None = Query(None, description="Enable or disable schedule"),
+    status: str | None = Query(None, description="Status: 'active' or 'paused'"),
+):
+    """Update cadence interval or enabled state for any breakout strategy schedule."""
+    from earnings_engine.data.automation_schedules import update_schedule
+    updates = {}
+    if interval_seconds is not None:
+        updates["interval_seconds"] = interval_seconds
+    if is_enabled is not None:
+        updates["is_enabled"] = is_enabled
+    if status is not None:
+        updates["status"] = status
+
+    try:
+        updated = await asyncio.to_thread(update_schedule, job_id, updates, _settings)
+        return {"success": True, "message": f"Updated schedule '{job_id}'", "schedule": updated}
+    except Exception as e:
+        logger.exception("Error configuring breakout schedule %s: %s", job_id, e)
+        raise HTTPException(status_code=500, detail=f"Failed to configure schedule: {str(e)}")
+
+
+@router.post("/api/v1/breakout-radar/schedules/{job_id}/trigger")
+async def trigger_breakout_single_schedule_endpoint(job_id: str):
+    """Trigger immediate execution of a specific breakout strategy schedule asynchronously in the background."""
+    from earnings_engine.data.scheduler_engine import get_scheduler_engine
+    engine = get_scheduler_engine()
+    dispatched = engine.dispatch_job(job_id, _settings)
+    return {
+        "success": True,
+        "status": "scheduled",
+        "job_id": job_id,
+        "dispatched": dispatched,
+        "message": f"Breakout scan for '{job_id}' is scheduled in the background. Please check back in a few moments as data is populated." if dispatched else f"Job '{job_id}' is already running.",
+    }
+

@@ -17,51 +17,92 @@ const API_BASE = window.location.origin;
 
 
             activeFetchControllers: {},
+            tabDataCache: {},
 
-            fetchWithAbort(taskName, url, options = {}) {
-                if (this.activeFetchControllers[taskName]) {
-                    try {
-                        const prev = this.activeFetchControllers[taskName];
-                        if (prev.controller) prev.controller.abort('Superseded by new request');
-                        if (prev.reqId) {
-                            fetch('/api/v1/tasks/' + encodeURIComponent(prev.reqId) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
-                        }
-                    } catch (e) {}
+            getTabCache(tabKey, maxAgeMs = 60000) {
+                const entry = this.tabDataCache ? this.tabDataCache[tabKey] : null;
+                if (!entry) return null;
+                if (Date.now() - entry.ts < maxAgeMs) {
+                    return entry.data;
                 }
-                const controller = new AbortController();
-                const reqId = 'req_' + taskName + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-                const opts = { ...options, signal: controller.signal };
-                opts.headers = { ...(opts.headers || {}), 'X-Request-ID': reqId };
+                delete this.tabDataCache[tabKey];
+                return null;
+            },
 
-                this.activeFetchControllers[taskName] = { controller, reqId };
+            setTabCache(tabKey, data) {
+                if (!this.tabDataCache) this.tabDataCache = {};
+                this.tabDataCache[tabKey] = { ts: Date.now(), data: data };
+            },
+
+            clearTabCache(tabKey = null) {
+                if (!this.tabDataCache) return;
+                if (tabKey) {
+                    delete this.tabDataCache[tabKey];
+                } else {
+                    this.tabDataCache = {};
+                }
+            },
+
+            apiFetch(url, options = {}, tabContext = null) {
+                const tab = tabContext || this.currentTab || 'global';
+                const controller = new AbortController();
+                const reqId = 'req_' + tab + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+                const reqKey = reqId;
+
+                const opts = { ...options, signal: controller.signal };
+                opts.headers = { ...(opts.headers || {}), 'X-Request-ID': reqId, 'X-Tab-Context': tab };
+
+                if (!this.activeFetchControllers) this.activeFetchControllers = {};
+                this.activeFetchControllers[reqKey] = { controller, reqId, tabName: tab };
 
                 return fetch(url, opts)
+                    .catch(err => {
+                        if (err.name === 'AbortError' || err.message === 'The user aborted a request.') {
+                            console.debug(`[REQUEST-CANCELLED] ${tab} -> ${url}`);
+                            return new Response(JSON.stringify({ success: false, aborted: true, message: 'Request cancelled' }), {
+                                status: 499,
+                                headers: { 'Content-Type': 'application/json' }
+                            });
+                        }
+                        throw err;
+                    })
                     .finally(() => {
-                        const current = this.activeFetchControllers[taskName];
-                        if (current && current.controller === controller) {
-                            delete this.activeFetchControllers[taskName];
+                        if (this.activeFetchControllers && this.activeFetchControllers[reqKey]) {
+                            delete this.activeFetchControllers[reqKey];
                         }
                     });
             },
 
+            fetchWithAbort(taskName, url, options = {}) {
+                return this.apiFetch(url, options, taskName);
+            },
+
+            cancelTabRequests(tabName, reason = 'Tab switched') {
+                if (!this.activeFetchControllers) return;
+                Object.keys(this.activeFetchControllers).forEach(key => {
+                    const entry = this.activeFetchControllers[key];
+                    if (entry && (entry.tabName === tabName || entry.tabName === ('tab-' + tabName))) {
+                        try {
+                            if (entry.controller) entry.controller.abort(reason);
+                            if (entry.reqId) {
+                                fetch('/api/v1/tasks/' + encodeURIComponent(entry.reqId) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
+                            }
+                        } catch (e) {}
+                        delete this.activeFetchControllers[key];
+                    }
+                });
+            },
+
             cancelReportLoad(taskName) {
-                const entry = this.activeFetchControllers[taskName];
-                if (entry) {
-                    try {
-                        if (entry.controller) entry.controller.abort('User cancelled');
-                        if (entry.reqId) {
-                            fetch('/api/v1/tasks/' + encodeURIComponent(entry.reqId) + '/cancel', { method: 'POST', keepalive: true }).catch(() => {});
-                        }
-                    } catch (e) {}
-                    delete this.activeFetchControllers[taskName];
-                }
+                this.cancelTabRequests(taskName, 'User cancelled');
                 this.resetTaskLoadingUI(taskName, '⚠️ Request cancelled by user.');
             },
 
             cancelAllPendingRequests(reason = 'Tab switched') {
-                Object.keys(this.activeFetchControllers || {}).forEach(taskName => {
+                if (!this.activeFetchControllers) return;
+                Object.keys(this.activeFetchControllers).forEach(key => {
                     try {
-                        const entry = this.activeFetchControllers[taskName];
+                        const entry = this.activeFetchControllers[key];
                         if (entry) {
                             if (entry.controller) entry.controller.abort(reason);
                             if (entry.reqId) {
@@ -69,7 +110,7 @@ const API_BASE = window.location.origin;
                             }
                         }
                     } catch (e) {}
-                    this.resetTaskLoadingUI(taskName, '⚠️ Loading cancelled (' + reason + ').');
+                    delete this.activeFetchControllers[key];
                 });
                 this.activeFetchControllers = {};
             },
@@ -228,6 +269,9 @@ const API_BASE = window.location.origin;
                 this.populateWatchlistDropdowns();
                 this.loadOverview();
                 this.loadConsensusCache();
+                if (typeof this.loadTradingAgentsCache === 'function') {
+                    this.loadTradingAgentsCache();
+                }
                 this.updateTopRateLimitPill();
                 this.updateWatchlistFreshnessPill(localStorage.getItem('selectedGlobalWatchlist') || '');
                 setInterval(() => {
@@ -576,7 +620,7 @@ const API_BASE = window.location.origin;
 
             switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'home').toLowerCase().replace('#', '').replace('tab=', '');
-                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'gainers', 'breakout', 'institutional', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
+                const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'home';
 
                 this.currentTab = name;
@@ -599,11 +643,28 @@ const API_BASE = window.location.origin;
                     }
                 });
 
-                // Sync Vercel Sidebar Active Item
+                // Subtab state registry
+                if (!app._subtabState) {
+                    app._subtabState = {
+                        breakout: localStorage.getItem('subtab_breakout') || 'scanner',
+                        premarket: localStorage.getItem('subtab_premarket') || 'active',
+                        gainers: localStorage.getItem('subtab_gainers') || 'gainers',
+                        institutional: localStorage.getItem('subtab_institutional') || localStorage.getItem('ee_institutional_subpage') || 'equities',
+                        kronos: localStorage.getItem('subtab_kronos') || 'latest'
+                    };
+                }
+
+                // Sync Vercel Sidebar Active Item & Accordion Trees
                 document.querySelectorAll('.sidebar-nav-item').forEach(el => {
                     const tabKey = el.getAttribute('data-tab');
                     const isActive = (tabKey === name);
                     el.classList.toggle('active', isActive);
+                });
+
+                document.querySelectorAll('.sidebar-nav-tree').forEach(tree => {
+                    const parentTab = tree.getAttribute('data-parent-tab');
+                    const isOpen = (parentTab === name);
+                    tree.classList.toggle('open', isOpen);
                 });
 
                 // Update Breadcrumb Tab Title
@@ -619,6 +680,7 @@ const API_BASE = window.location.origin;
                         'gainers': 'Gainers & Breakouts',
                         'breakout': '⚡ Breakout Radar',
                         'institutional': '🏛️ Institutional Flows',
+                        'tri-confluence': '🔗 Inst-Earnings Synergy',
                         'repeaters': '🔁 Quarter Repeaters',
                         'new-additions': '🆕 Recent Additions & IPOs',
                         'swing': 'Swing Ranges',
@@ -673,9 +735,6 @@ const API_BASE = window.location.origin;
                 if (name === 'home') {
                     if (typeof this.loadMarketPulseData === 'function') this.loadMarketPulseData();
                 }
-                if (name === 'institutional') {
-                    if (typeof this.loadInstitutionalData === 'function') this.loadInstitutionalData();
-                }
                 if (name === 'results') {
                     this.updateResultsMonthSummaryCards();
                 }
@@ -704,14 +763,12 @@ const API_BASE = window.location.origin;
                     this.initBacktestTab();
                 }
                 if (name === 'breakout') {
-                    // Lazy-load on first visit; start auto-polling while active
+                    const activeSub = (app._subtabState && app._subtabState['breakout']) || localStorage.getItem('subtab_breakout') || 'scanner';
+                    if (typeof this.switchBreakoutSubtab === 'function') {
+                        this.switchBreakoutSubtab(activeSub);
+                    }
                     if (!this._breakoutLoaded) {
                         this._breakoutLoaded = true;
-                        if (this._activeBreakoutSubtab === 'tracked') {
-                            this.loadTrackedBreakouts();
-                        } else {
-                            this.loadBreakoutRadar();
-                        }
                     }
                     this.loadAutomationSchedules();
                     this.loadBreakoutAuditLog();
@@ -739,18 +796,37 @@ const API_BASE = window.location.origin;
                     this.loadAutomationSchedules();
                 }
                 if (name === 'premarket') {
+                    const activeSub = (app._subtabState && app._subtabState['premarket']) || localStorage.getItem('subtab_premarket') || 'active';
+                    if (typeof this.switchPremarketView === 'function') {
+                        this.switchPremarketView(activeSub);
+                    }
                     if (typeof this.loadPremarketSetups === 'function') {
                         this.loadPremarketSetups();
                     }
                 }
+                if (name === 'gainers') {
+                    const activeSub = (app._subtabState && app._subtabState['gainers']) || localStorage.getItem('subtab_gainers') || 'gainers';
+                    if (typeof this.switchGainersSubTab === 'function') {
+                        this.switchGainersSubTab(activeSub);
+                    }
+                }
                 if (name === 'institutional') {
-                    if (!this._institutionalLoaded) {
-                        this._institutionalLoaded = true;
-                        if (typeof this.loadInstitutionalData === 'function') this.loadInstitutionalData();
-                    } else {
-                        const savedSub = localStorage.getItem('ee_institutional_subpage') || 'equities';
-                        if (typeof this.switchInstitutionalPage === 'function') {
-                            this.switchInstitutionalPage(savedSub);
+                    const activeSub = (app._subtabState && app._subtabState['institutional']) || localStorage.getItem('subtab_institutional') || localStorage.getItem('ee_institutional_subpage') || 'equities';
+                    if (typeof this.switchInstitutionalPage === 'function') {
+                        this.switchInstitutionalPage(activeSub);
+                    }
+                }
+                if (name === 'kronos') {
+                    const activeSub = (app._subtabState && app._subtabState['kronos']) || localStorage.getItem('subtab_kronos') || 'latest';
+                    if (typeof this.switchKronosTab === 'function') {
+                        this.switchKronosTab(activeSub);
+                    }
+                }
+                if (name === 'tri-confluence') {
+                    if (!this._triConfluenceLoaded) {
+                        if (typeof app.loadTriConfluence === 'function') {
+                            this._triConfluenceLoaded = true;
+                            app.loadTriConfluence();
                         }
                     }
                 }

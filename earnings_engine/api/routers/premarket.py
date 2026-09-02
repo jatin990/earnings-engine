@@ -19,7 +19,7 @@ router = APIRouter(tags=["Pre-Market Setups"])
 
 @router.get("/api/v1/premarket/setups")
 async def get_premarket_setups_endpoint(
-    window: str = Query("standard_6pm", description="Window mode: standard_6pm, full_post_market, early_morning, all_recent"),
+    window: str = Query("full_post_market", description="Window mode: full_post_market, standard_6pm, early_morning, all_recent"),
     category: str = Query("ALL", description="Category filter (e.g. Order Wins, SEBI, USFDA)"),
     direction: str = Query("ALL", description="Direction filter: ALL, BULLISH, BEARISH"),
     min_impact: float = Query(0.0, ge=0.0, le=100.0, description="Minimum impact score threshold"),
@@ -28,7 +28,7 @@ async def get_premarket_setups_endpoint(
     limit: int = Query(100, ge=1, le=500, description="Max setups to return"),
     live: bool = Query(False, description="Whether to refresh live quotes"),
 ):
-    """Retrieve scored pre-market setups from after-hours SEBI submissions and news (6:00 PM to 09:15 AM)."""
+    """Retrieve scored pre-market setups from after-hours SEBI submissions and news (3:15 PM to 09:15 AM)."""
     try:
         data = await asyncio.to_thread(
             get_premarket_setups,
@@ -50,7 +50,7 @@ async def get_premarket_setups_endpoint(
 
 @router.get("/api/v1/premarket/summary")
 async def get_premarket_summary_endpoint(
-    window: str = Query("standard_6pm"),
+    window: str = Query("full_post_market"),
     days: int = Query(7),
 ):
     """Retrieve pre-market summary metrics for KPI dashboard cards."""
@@ -103,7 +103,7 @@ async def get_premarket_outcomes_endpoint(
 
 @router.post("/api/v1/premarket/scan")
 async def post_premarket_scan_endpoint():
-    """Trigger background refresh and scan of overnight SEBI filings & news."""
+    """Trigger background refresh and scan of overnight SEBI filings & news across active universe."""
     try:
         res = await asyncio.to_thread(scan_premarket_filings, settings=_settings)
         return res

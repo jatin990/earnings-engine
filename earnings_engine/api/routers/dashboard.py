@@ -109,6 +109,12 @@ async def dashboard_results_month_summary(
             market=market,
             past_days=past_days,
         )
+    except (RuntimeError, asyncio.CancelledError) as e:
+        if "shutdown" in str(e).lower() or isinstance(e, asyncio.CancelledError):
+            logger.debug("[DASHBOARD] Month summary request interrupted during server shutdown.")
+            return {"success": False, "months": [], "message": "Server shutting down"}
+        logger.exception("Error in month summary: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching month summary: {str(e)}")
     except Exception as e:
         logger.exception("Error in month summary: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching month summary: {str(e)}")
@@ -356,6 +362,7 @@ async def dashboard_predict_run(request: dict | None = None):
 
 @router.get("/api/v1/market/pulse")
 @router.get("/api/v1/dashboard/market-pulse")
+@router.get("/api/v1/market-pulse")
 async def api_get_market_pulse(
     force_refresh: bool = Query(False, description="Force refresh cache"),
 ):
@@ -366,6 +373,78 @@ async def api_get_market_pulse(
     except Exception as e:
         logger.exception("Error in api_get_market_pulse: %s", e)
         raise HTTPException(status_code=500, detail=f"Error retrieving market pulse: {e}")
+
+
+@router.get("/api/v1/market-pulse/indices")
+@router.get("/api/v1/indices/quotes")
+async def api_get_indices_quotes(
+    force_refresh: bool = Query(False, description="Force refresh cache"),
+):
+    """Retrieve batch price quotes and 1D/7D/30D returns for major benchmark and sectoral indices."""
+    try:
+        from earnings_engine.data.market_pulse import compute_indices_quotes
+        indices = await asyncio.to_thread(compute_indices_quotes, settings=_settings, force_refresh=force_refresh)
+        return {"success": True, "count": len(indices), "indices": indices}
+    except Exception as e:
+        logger.exception("Error in api_get_indices_quotes: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error retrieving index quotes: {e}")
+
+
+@router.get("/api/v1/market-pulse/sectors")
+async def api_get_sector_heatmap(
+    force_refresh: bool = Query(False, description="Force refresh cache"),
+):
+    """Retrieve Sectoral Heatmap using authoritative NSE index prices with constituent breadth."""
+    try:
+        from earnings_engine.data.market_pulse import compute_sector_heatmap
+        sectors = await asyncio.to_thread(compute_sector_heatmap, settings=_settings, force_refresh=force_refresh)
+        return {"success": True, "count": len(sectors), "sectors": sectors}
+    except Exception as e:
+        logger.exception("Error in api_get_sector_heatmap: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error retrieving sector heatmap: {e}")
+
+
+@router.get("/api/v1/market-pulse/liquidity")
+@router.get("/api/v1/market-pulse/institutional-flows")
+@router.get("/api/v1/liquidity/overview")
+async def api_get_net_cash_liquidity(
+    force_refresh: bool = Query(False, description="Force refresh cache"),
+):
+    """Retrieve Net Cash Liquidity, FII vs DII breakdown, 7D/30D cumulative flows and regime."""
+    try:
+        from earnings_engine.data.market_pulse import compute_net_cash_liquidity
+        liquidity = await asyncio.to_thread(compute_net_cash_liquidity, settings=_settings, force_refresh=force_refresh)
+        return {"success": True, "liquidity": liquidity}
+    except Exception as e:
+        logger.exception("Error in api_get_net_cash_liquidity: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error retrieving liquidity data: {e}")
+
+
+@router.get("/api/v1/market-pulse/sentiment")
+async def api_get_market_sentiment_matrix():
+    """Retrieve Fear & Greed score, Market Breadth, Volatility Matrix, and 30D macro time-series."""
+    try:
+        from earnings_engine.data.market_pulse import compute_market_sentiment_matrix
+        sentiment = await asyncio.to_thread(compute_market_sentiment_matrix, settings=_settings)
+        return {"success": True, "sentiment": sentiment}
+    except Exception as e:
+        logger.exception("Error in api_get_market_sentiment_matrix: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error retrieving market sentiment: {e}")
+
+
+@router.get("/api/v1/market-pulse/participant-oi")
+@router.get("/api/v1/market_pulse/participant_oi")
+async def api_get_participant_oi(
+    force_refresh: bool = Query(False, description="Force refresh cache"),
+):
+    """Retrieve Participant Derivatives Open Interest (OI) & Long/Short positioning breakdown."""
+    try:
+        from earnings_engine.data.market_pulse import compute_participant_oi_matrix
+        oi_data = await asyncio.to_thread(compute_participant_oi_matrix, settings=_settings, force_refresh=force_refresh)
+        return {"success": True, "participant_oi": oi_data}
+    except Exception as e:
+        logger.exception("Error in api_get_participant_oi: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error retrieving participant OI data: {e}")
 
 
 @router.get("/api/v1/dashboard/market-macro")
@@ -391,34 +470,25 @@ async def api_get_stock_cross_intelligence(ticker: str):
 
 
 @router.get("/api/v1/dashboard/confluence")
+@router.get("/api/v1/breakout-radar/confluence")
+@router.get("/api/v1/confluence-radar")
 async def api_get_confluence_setups(
-    min_level: int = Query(1, ge=1, le=3, description="Minimum confluence tier (1: Single, 2: Dual, 3: Triple)"),
+    min_level: int = Query(1, ge=0, le=3, description="Minimum confluence tier (0: All, 1: Single, 2: Dual, 3: Triple)"),
     limit: int = Query(30, ge=1, le=100),
 ):
-    """Retrieve top cross-module confluence setups across all active scanners."""
+    """Retrieve top cross-module confluence setups across all active scanners from pre-computed scheduled database."""
     try:
-        from earnings_engine.data.cross_strategy import get_stock_confluence
-        from earnings_engine.data.swing_scanner import _pool as swing_pool
-        from earnings_engine.data.breakout_scanner import _pool as breakout_pool
-
-        # Gather active candidates from hot & warm pools
-        candidates = set()
-        candidates.update(swing_pool.get("hot", {}).keys())
-        candidates.update(swing_pool.get("warm", {}).keys())
-        candidates.update(breakout_pool.get("hot", {}).keys())
-        candidates.update(breakout_pool.get("warm", {}).keys())
-
-        confluence_list = []
-        for ticker in candidates:
-            c = get_stock_confluence(ticker, settings=_settings)
-            if c.get("confluence_level", 0) >= min_level:
-                confluence_list.append(c)
-
-        confluence_list.sort(key=lambda x: x.get("confluence_level", 0), reverse=True)
+        from earnings_engine.data.cross_strategy import load_confluence_radar_from_db
+        confluence_list = await asyncio.to_thread(
+            load_confluence_radar_from_db,
+            min_level=min_level,
+            limit=limit,
+            settings=_settings,
+        )
         return {
             "success": True,
-            "count": len(confluence_list[:limit]),
-            "setups": confluence_list[:limit],
+            "count": len(confluence_list),
+            "setups": confluence_list,
         }
     except Exception as e:
         logger.exception("Error in api_get_confluence_setups: %s", e)
@@ -592,6 +662,7 @@ async def get_single_market_cap(
 
 
 @router.get("/api/v1/price-history/{ticker}")
+@router.get("/api/v1/stock/{ticker}/price-history")
 async def get_price_history(
     ticker: str,
     start_date: str | None = Query(None, description="Start date (YYYY-MM-DD)"),

@@ -99,7 +99,16 @@ async def get_fund_portfolio(fund_name: str):
     """Reverse lookup: retrieve all equities held and recent actions for a specific mutual fund or super investor."""
     try:
         items = await asyncio.to_thread(inst_mod.get_fund_portfolio_activity, fund_name=fund_name, settings=_settings)
-        return {"success": True, "fund_name": fund_name, "count": len(items), "holdings": items}
+        total_aum = round(sum(float(h.get("holding_value_cr") or 0.0) for h in items), 1)
+        fund_type = items[0].get("fund_type") if items and items[0].get("fund_type") else "Mutual Fund (DII)"
+        return {
+            "success": True,
+            "fund_name": fund_name,
+            "fund_type": fund_type,
+            "count": len(items),
+            "total_aum_tracked_cr": total_aum,
+            "holdings": items,
+        }
     except Exception as e:
         logger.exception("Error in get_fund_portfolio for %s: %s", fund_name, e)
         raise HTTPException(status_code=500, detail=f"Error fetching fund portfolio: {str(e)}")
@@ -116,6 +125,28 @@ async def get_stock_institutional_details(ticker: str):
         raise HTTPException(status_code=500, detail=f"Error fetching stock institutional data: {str(e)}")
 
 
+@router.get("/api/v1/institutional/freshness")
+async def get_institutional_data_freshness():
+    """Inspect and return last refresh timestamps, cadences, and counts across institutional data types."""
+    try:
+        data = await asyncio.to_thread(inst_mod.check_institutional_data_freshness, settings=_settings)
+        return data
+    except Exception as e:
+        logger.exception("Error in get_institutional_data_freshness: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error checking freshness: {str(e)}")
+
+
+@router.post("/api/v1/institutional/recalculate")
+async def trigger_institutional_recalculation(force: bool = Query(False)):
+    """Trigger complete batch recalculation and cache population for all stocks in the database."""
+    try:
+        res = await asyncio.to_thread(inst_mod.recalculate_all_institutional_metrics, settings=_settings, force=force)
+        return res
+    except Exception as e:
+        logger.exception("Error in trigger_institutional_recalculation: %s", e)
+        raise HTTPException(status_code=500, detail=f"Recalculation failed: {str(e)}")
+
+
 @router.post("/api/v1/institutional/scan")
 async def run_institutional_scan(request: dict | None = None):
     """Trigger background computation of institutional flows via live corporate ownership fetch."""
@@ -124,8 +155,9 @@ async def run_institutional_scan(request: dict | None = None):
         if ticker:
             res = await asyncio.to_thread(inst_mod.fetch_live_corporate_ownership, ticker=ticker, settings=_settings)
         else:
-            res = {"message": "Provide a ticker for targeted institutional ownership fetch"}
+            res = await asyncio.to_thread(inst_mod.recalculate_all_institutional_metrics, settings=_settings, force=True)
         return {"success": True, "result": res}
     except Exception as e:
         logger.exception("Error in run_institutional_scan: %s", e)
         raise HTTPException(status_code=500, detail=f"Institutional scan failed: {str(e)}")
+

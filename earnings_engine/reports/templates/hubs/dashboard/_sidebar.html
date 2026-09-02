@@ -64,25 +64,97 @@
                     <span class="sidebar-label">Catalysts & News</span>
                     <span id="sidebarCatalystCountBadge" class="sidebar-pill" style="display:none;background:rgba(239,68,68,0.22);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Recent High-Impact Catalysts (>50% Impact)">0</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="premarket" onclick="app.switchTab('premarket')">
-                    <span class="sidebar-icon">🌅</span>
-                    <span class="sidebar-label">Pre-Market Setups</span>
-                    <span id="sidebarPremarketCountBadge" class="sidebar-pill" style="display:none;background:rgba(249,115,22,0.2);color:#fb923c;border:1px solid rgba(249,115,22,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Overnight SEBI Filings & Pre-Market Setups">0</span>
-                </a>
-                <a class="sidebar-nav-item" data-tab="gainers" onclick="app.switchTab('gainers')">
-                    <span class="sidebar-icon">🚀</span>
-                    <span class="sidebar-label">Gainers &amp; Breakouts</span>
-                    <span id="sidebarGainersCountBadge" class="sidebar-pill" style="display:none;background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">0</span>
-                </a>
-                <a class="sidebar-nav-item" data-tab="breakout" onclick="app.switchTab('breakout')">
-                    <span class="sidebar-icon">⚡</span>
-                    <span class="sidebar-label">Breakout Radar</span>
-                    <span id="sidebarBreakoutCountBadge" class="sidebar-pill" style="display:none;background:rgba(245,158,11,0.22);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Active Breakout Setups & Candidates">0</span>
-                </a>
-                <a class="sidebar-nav-item" data-tab="institutional" onclick="app.switchTab('institutional')">
-                    <span class="sidebar-icon">🏛️</span>
-                    <span class="sidebar-label">Institutional Flows</span>
-                    <span class="sidebar-pill" style="background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">Funds</span>
+                <!-- Pre-Market Setups with Nested Subtabs -->
+                <div class="sidebar-nav-tree" id="sidebarTree-premarket" data-parent-tab="premarket">
+                    <a class="sidebar-nav-item" data-tab="premarket" onclick="app.switchTab('premarket')">
+                        <span class="sidebar-icon">🌅</span>
+                        <span class="sidebar-label">Pre-Market Setups</span>
+                        <span id="sidebarPremarketCountBadge" class="sidebar-pill" style="display:none;background:rgba(249,115,22,0.2);color:#fb923c;border:1px solid rgba(249,115,22,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Overnight SEBI Filings & Pre-Market Setups">0</span>
+                    </a>
+                    <div class="sidebar-sub-items" id="sidebarPremarketSubItems">
+                        <a class="sidebar-sub-item active" id="sidebarSubPremarketActive" onclick="app.switchTab('premarket'); app.switchPremarketView('active');">
+                            <span style="font-size:0.75rem;">🌅</span>
+                            <span>Active Filings</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubPremarketOutcomes" onclick="app.switchTab('premarket'); app.switchPremarketView('outcomes');">
+                            <span style="font-size:0.75rem;">📜</span>
+                            <span>Filings Outcomes</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Gainers & Breakouts with Nested Subtabs -->
+                <div class="sidebar-nav-tree" id="sidebarTree-gainers" data-parent-tab="gainers">
+                    <a class="sidebar-nav-item" data-tab="gainers" onclick="app.switchTab('gainers')">
+                        <span class="sidebar-icon">🚀</span>
+                        <span class="sidebar-label">Gainers &amp; Breakouts</span>
+                        <span id="sidebarGainersCountBadge" class="sidebar-pill" style="display:none;background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">0</span>
+                    </a>
+                    <div class="sidebar-sub-items" id="sidebarGainersSubItems">
+                        <a class="sidebar-sub-item active" id="sidebarSubGainersTop" onclick="app.switchTab('gainers'); app.switchGainersSubTab('gainers');">
+                            <span style="font-size:0.75rem;">🏆</span>
+                            <span>Top Gainers</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubGainersPatterns" onclick="app.switchTab('gainers'); app.switchGainersSubTab('patterns');">
+                            <span style="font-size:0.75rem;">🧩</span>
+                            <span>Pattern Archetypes</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubGainersSetups" onclick="app.switchTab('gainers'); app.switchGainersSubTab('setups');">
+                            <span style="font-size:0.75rem;">🔮</span>
+                            <span>Watchlist Setups</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Breakout Radar with Nested Subtabs -->
+                <div class="sidebar-nav-tree" id="sidebarTree-breakout" data-parent-tab="breakout">
+                    <a class="sidebar-nav-item" data-tab="breakout" onclick="app.switchTab('breakout')">
+                        <span class="sidebar-icon">⚡</span>
+                        <span class="sidebar-label">Breakout Radar</span>
+                        <span id="sidebarBreakoutCountBadge" class="sidebar-pill" style="display:none;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:700;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Active Breakout Setups & Candidates">0</span>
+                    </a>
+                    <div class="sidebar-sub-items" id="sidebarBreakoutSubItems">
+                        <a class="sidebar-sub-item active" id="sidebarSubBreakoutScanner" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('scanner');">
+                            <span style="font-size:0.75rem;">⚡</span>
+                            <span>Active Setup Pool</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubBreakoutBacktest" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('backtest');">
+                            <span style="font-size:0.75rem;">📅</span>
+                            <span>Date Backtest</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubBreakoutTracked" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('tracked');">
+                            <span style="font-size:0.75rem;">📜</span>
+                            <span>Tracked History</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Institutional Flows with Nested Subtabs -->
+                <div class="sidebar-nav-tree" id="sidebarTree-institutional" data-parent-tab="institutional">
+                    <a class="sidebar-nav-item" data-tab="institutional" onclick="app.switchTab('institutional')">
+                        <span class="sidebar-icon">🏛️</span>
+                        <span class="sidebar-label">Institutional Flows</span>
+                        <span class="sidebar-pill" style="background:rgba(59,130,246,0.2);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">Funds</span>
+                    </a>
+                    <div class="sidebar-sub-items" id="sidebarInstitutionalSubItems">
+                        <a class="sidebar-sub-item active" id="sidebarSubInstEquities" onclick="app.switchTab('institutional'); app.switchInstitutionalPage('equities');">
+                            <span style="font-size:0.75rem;">🏛️</span>
+                            <span>Equities &amp; Radar</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubInstAdditions" onclick="app.switchTab('institutional'); app.switchInstitutionalPage('top-additions');">
+                            <span style="font-size:0.75rem;">🚀</span>
+                            <span>Top Additions</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubInstInvestors" onclick="app.switchTab('institutional'); app.switchInstitutionalPage('investors');">
+                            <span style="font-size:0.75rem;">💼</span>
+                            <span>Smart Portfolios</span>
+                        </a>
+                    </div>
+                </div>
+                <a class="sidebar-nav-item" data-tab="tri-confluence" onclick="app.switchTab('tri-confluence')">
+                    <span class="sidebar-icon">🔗</span>
+                    <span class="sidebar-label">Inst-Earnings Synergy</span>
+                    <span id="sidebarConfluenceBadge" class="sidebar-pill" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">ALPHA</span>
                 </a>
                 <a class="sidebar-nav-item" data-tab="repeaters" onclick="app.switchTab('repeaters')">
                     <span class="sidebar-icon">🔁</span>
@@ -105,10 +177,28 @@
                     <span class="sidebar-icon">🔄</span>
                     <span class="sidebar-label">Swing Ranges</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="kronos" onclick="app.switchTab('kronos')">
-                    <span class="sidebar-icon">🤖</span>
-                    <span class="sidebar-label">Kronos 14D Forecast</span>
-                </a>
+
+                <!-- Kronos 14D Forecast with Nested Subtabs -->
+                <div class="sidebar-nav-tree" id="sidebarTree-kronos" data-parent-tab="kronos">
+                    <a class="sidebar-nav-item" data-tab="kronos" onclick="app.switchTab('kronos')">
+                        <span class="sidebar-icon">🤖</span>
+                        <span class="sidebar-label">Kronos 14D Forecast</span>
+                    </a>
+                    <div class="sidebar-sub-items" id="sidebarKronosSubItems">
+                        <a class="sidebar-sub-item active" id="sidebarSubKronosLatest" onclick="app.switchTab('kronos'); app.switchKronosTab('latest');">
+                            <span style="font-size:0.75rem;">📈</span>
+                            <span>Latest Charts</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubKronosList" onclick="app.switchTab('kronos'); app.switchKronosTab('list');">
+                            <span style="font-size:0.75rem;">📋</span>
+                            <span>Overview List</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubKronosAudit" onclick="app.switchTab('kronos'); app.switchKronosTab('audit');">
+                            <span style="font-size:0.75rem;">📜</span>
+                            <span>Audit History</span>
+                        </a>
+                    </div>
+                </div>
                 <a class="sidebar-nav-item" data-tab="consensus" onclick="app.switchTab('consensus')">
                     <span class="sidebar-icon">🧠</span>
                     <span class="sidebar-label">4-Model Consensus</span>

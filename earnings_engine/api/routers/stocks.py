@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import html
+import urllib.parse
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -21,14 +23,24 @@ logger = get_logger("earnings_engine.api.routers.stocks")
 router = APIRouter(tags=["Stock Intelligence & Factors"])
 
 
-@router.get("/stock/{ticker}", tags=["UI"], response_class=HTMLResponse)
+def clean_ticker_param(ticker: str | None) -> str:
+    """Normalize a ticker string, decoding URL components and unescaping HTML entities like &amp;."""
+    if not ticker:
+        return ""
+    unquoted = urllib.parse.unquote(str(ticker))
+    unescaped = html.unescape(unquoted)
+    return unescaped.strip().upper()
+
+
+@router.get("/stock/{ticker:path}", tags=["UI"], response_class=HTMLResponse)
 async def serve_stock_detail(ticker: str):
     """Serve the dedicated Stock Detail & AI Consensus Engine page."""
+    sym = clean_ticker_param(ticker)
     try:
         env = get_template_env()
         template = env.get_template("hubs/stock/detail.html")
-        html = template.render(ticker=ticker.upper())
-        return HTMLResponse(html)
+        html_content = template.render(ticker=sym)
+        return HTMLResponse(html_content)
     except Exception as exc:
         return HTMLResponse(
             f"<html><body><h1>Stock Detail render error</h1><p>{exc}</p></body></html>",
@@ -39,37 +51,117 @@ async def serve_stock_detail(ticker: str):
 @router.get("/api/v1/stock/{ticker}/overview")
 async def get_stock_overview_endpoint(ticker: str):
     """Return full stock overview including live quote, metrics, and EPS history."""
+    sym = clean_ticker_param(ticker)
     try:
-        return await asyncio.to_thread(stock_api.get_stock_overview, ticker=ticker.upper(), settings=_settings)
+        return await asyncio.to_thread(stock_api.get_stock_overview, ticker=sym, settings=_settings)
     except Exception as e:
-        logger.exception("Error in get_stock_overview for %s: %s", ticker, e)
+        logger.exception("Error in get_stock_overview for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Error fetching stock overview: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/quote")
+async def get_stock_quote_endpoint(ticker: str):
+    """Fast endpoint returning live market quote, 52W levels, and profile metadata."""
+    sym = clean_ticker_param(ticker)
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_quote, ticker=sym, settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_quote for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching stock quote: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/technicals")
+async def get_stock_technicals_endpoint(ticker: str):
+    """Fast endpoint returning swing range channels, support/resistance, and moving averages."""
+    sym = clean_ticker_param(ticker)
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_technicals, ticker=sym, settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_technicals for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching technicals: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/earnings")
+async def get_stock_earnings_endpoint(ticker: str):
+    """Fast endpoint returning 12-quarter earnings history, EPS surprises, and week moves."""
+    sym = clean_ticker_param(ticker)
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_earnings, ticker=sym, settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_earnings for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching earnings: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/consensus")
+async def get_stock_consensus_endpoint(ticker: str):
+    """Fast endpoint returning multi-model AI consensus predictions."""
+    sym = clean_ticker_param(ticker)
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_consensus, ticker=sym, settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_consensus for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching consensus: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/kronos")
+async def get_stock_kronos_endpoint(ticker: str):
+    """Fast endpoint returning Kronos AI 14-day sequence trajectory forecast."""
+    sym = clean_ticker_param(ticker)
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_kronos, ticker=sym, settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_kronos for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching Kronos prediction: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/institutional")
+async def get_stock_institutional_endpoint(ticker: str):
+    """Fast endpoint returning institutional flows, shareholding trend, and top holdings."""
+    sym = clean_ticker_param(ticker)
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_institutional, ticker=sym, settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_institutional for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching institutional flows: {str(e)}")
+
+
+@router.get("/api/v1/stock/{ticker}/catalysts")
+async def get_stock_catalysts_endpoint(ticker: str):
+    """Fast endpoint returning short-term news catalysts, impact scores, and sentiment."""
+    sym = clean_ticker_param(ticker)
+    try:
+        return await asyncio.to_thread(stock_api.get_stock_catalysts, ticker=sym, settings=_settings)
+    except Exception as e:
+        logger.exception("Error in get_stock_catalysts for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching news catalysts: {str(e)}")
 
 
 @router.get("/api/v1/stock/{ticker}/factor-evaluation")
 async def get_stock_factor_evaluation_endpoint(ticker: str):
     """Return factor evaluation score breakdown for a stock."""
+    sym = clean_ticker_param(ticker)
     try:
-        return await asyncio.to_thread(stock_api.get_stock_factor_evaluation, ticker=ticker.upper(), settings=_settings)
+        return await asyncio.to_thread(stock_api.get_stock_factor_evaluation, ticker=sym, settings=_settings)
     except Exception as e:
-        logger.exception("Error in get_stock_factor_evaluation for %s: %s", ticker, e)
+        logger.exception("Error in get_stock_factor_evaluation for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Error fetching factor evaluation: {str(e)}")
 
 
 @router.get("/api/v1/stock/{ticker}/notes")
-async def get_stock_notes_endpoint(ticker: str):
+async def get_stock_notes_endpoint(ticker: str, include_ai: bool = Query(False, description="Include the AI forward thesis (slow LLM inference). Defaults to false for a fast core note that the UI lazy-loads the AI thesis into.")):
     """Return consolidated AI intelligence notes for a stock."""
+    sym = clean_ticker_param(ticker)
     try:
-        return await asyncio.to_thread(stock_api.get_stock_intelligence_note, ticker=ticker.upper(), settings=_settings)
+        return await asyncio.to_thread(stock_api.get_stock_intelligence_note, ticker=sym, settings=_settings, include_ai=include_ai)
     except Exception as e:
-        logger.exception("Error in get_stock_notes for %s: %s", ticker, e)
+        logger.exception("Error in get_stock_notes for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Error fetching notes: {str(e)}")
 
 
 @router.get("/api/v1/stock/{ticker}/rating")
 async def get_stock_rating_endpoint(ticker: str):
     """Retrieve the industry-benchmarked fundamental rating, technical score, and AI note."""
-    sym = ticker.upper().strip()
+    sym = clean_ticker_param(ticker)
     try:
         from earnings_engine.data.stock_rating import get_stock_rating, recalculate_stock_rating
         rating = await asyncio.to_thread(get_stock_rating, sym, _settings)
@@ -84,15 +176,16 @@ async def get_stock_rating_endpoint(ticker: str):
 @router.api_route("/api/v1/stock/{ticker}/fetch-news", methods=["GET", "POST"])
 async def fetch_stock_news_endpoint(ticker: str):
     """Fetch fresh news headlines and corporate announcements delta for a stock."""
+    sym = clean_ticker_param(ticker)
     try:
-        res = await asyncio.to_thread(stock_api.refresh_stock_news, ticker.upper().strip(), _settings)
+        res = await asyncio.to_thread(stock_api.refresh_stock_news, sym, _settings)
         if not res.get("success"):
             raise HTTPException(status_code=400, detail=res.get("error", "Failed to refresh news delta"))
         return res
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Error in fetch_stock_news for %s: %s", ticker, e)
+        logger.exception("Error in fetch_stock_news for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Failed to refresh news: {str(e)}")
 
 
@@ -104,16 +197,17 @@ async def get_stock_intelligence_note_endpoint(
     provider: str | None = Query(None, description="Preferred provider"),
 ):
     """Return or generate an AI intelligence note for a stock."""
+    sym = clean_ticker_param(ticker)
     try:
         return await asyncio.to_thread(
             stock_api.get_stock_intelligence_note,
-            ticker=ticker.upper(),
+            ticker=sym,
             model_name=model_name,
             provider=provider,
             settings=_settings,
         )
     except Exception as e:
-        logger.exception("Error in stock intelligence note for %s: %s", ticker, e)
+        logger.exception("Error in stock intelligence note for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Error with intelligence note: {str(e)}")
 
 
@@ -124,7 +218,8 @@ async def get_batch_stock_ratings(request: dict):
     try:
         results = {}
         for t in tickers:
-            results[t] = stock_api.calculate_stock_rating(ticker=t.upper(), settings=_settings)
+            sym = clean_ticker_param(t)
+            results[sym] = stock_api.calculate_stock_rating(ticker=sym, settings=_settings)
         return {"success": True, "ratings": results}
     except Exception as e:
         logger.exception("Error in batch stock ratings: %s", e)
@@ -135,30 +230,35 @@ async def get_batch_stock_ratings(request: dict):
 @router.post("/api/v1/earnings/{ticker}/calculate-eps")
 async def calculate_eps_endpoint(ticker: str, req: CalculateEpsRequest):
     """Calculate and derive EPS estimate, reported values, surprise %, and quality score."""
+    sym = clean_ticker_param(ticker)
     try:
         return await asyncio.to_thread(
             stock_api.calculate_or_fetch_eps,
-            ticker=ticker.upper(),
+            ticker=sym,
             earnings_date=req.earnings_date,
             override_estimate=req.override_estimate,
             override_reported=req.override_reported,
             settings=_settings,
         )
     except Exception as e:
-        logger.exception("Error in calculate_eps for %s: %s", ticker, e)
+        logger.exception("Error in calculate_eps for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Error calculating EPS: {str(e)}")
+
+
 @router.post("/api/v1/stock/{ticker}/refresh-earnings-source")
 @router.post("/api/v1/earnings/{ticker}/refresh-from-source")
 async def refresh_earnings_source_endpoint(ticker: str):
     """Force re-fetch official earnings calendar and reported EPS from authentic sources (yfinance & NSE)."""
+    sym = clean_ticker_param(ticker)
     try:
         from earnings_engine.data.earnings import refresh_earnings_from_source
         return await asyncio.to_thread(
             refresh_earnings_from_source,
-            ticker=ticker.upper(),
+            ticker=sym,
             settings=_settings,
         )
     except Exception as e:
-        logger.exception("Error in refresh_earnings_source for %s: %s", ticker, e)
+        logger.exception("Error in refresh_earnings_source for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Error refreshing earnings from source: {str(e)}")
 
 
@@ -167,15 +267,16 @@ async def recalculate_ticker_metrics_endpoint(
     ticker: str = Query(..., description="Stock ticker symbol to refresh and recalculate"),
 ):
     """Force refresh earnings date, prices, recalculate technical/quality metrics, and log audit trail."""
+    sym = clean_ticker_param(ticker)
     try:
         res = await asyncio.to_thread(
             recalculate_api.recalculate_ticker_metrics,
-            ticker=ticker.upper(),
+            ticker=sym,
             settings=_settings,
         )
         return res
     except Exception as e:
-        logger.exception("Error in recalculate_ticker_metrics: %s", e)
+        logger.exception("Error in recalculate_ticker_metrics for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Recalculation error: {str(e)}")
 
 
@@ -183,7 +284,7 @@ async def recalculate_ticker_metrics_endpoint(
 @router.post("/api/v1/recalculate/{ticker}")
 async def recalculate_stock_path_endpoint(ticker: str, request: dict | None = None):
     """Force refresh earnings date, prices, recalculate technical/quality metrics for path ticker."""
-    sym = ticker.upper().strip()
+    sym = clean_ticker_param(ticker)
     src = (request or {}).get("source", "user_recalculate")
     try:
         from earnings_engine.data.stock_rating import recalculate_stock_rating
@@ -196,24 +297,141 @@ async def recalculate_stock_path_endpoint(ticker: str, request: dict | None = No
         combined["technical"] = (rating_res or {}).get("technical")
         return combined
     except Exception as e:
-        logger.exception("Error in recalculate_ticker_metrics: %s", e)
+        logger.exception("Error in recalculate_ticker_metrics for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Recalculation error: {str(e)}")
 
 
 @router.api_route("/api/v1/stock/{ticker}/live-week-hl", methods=["GET", "POST"])
 async def get_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Query(None)):
     """Calculate and return real-time post-earnings week move high/low statistics."""
+    sym = clean_ticker_param(ticker)
     try:
         from earnings_engine.api.stock_api import get_live_week_hl
-        res = await asyncio.to_thread(get_live_week_hl, ticker, earnings_date, _settings)
+        res = await asyncio.to_thread(get_live_week_hl, sym, earnings_date, _settings)
         if not res.get("success"):
             raise HTTPException(status_code=400, detail=res.get("error", "Failed to calculate live week high/low"))
         return res
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Error in live_week_hl for %s: %s", ticker, e)
+        logger.exception("Error in live_week_hl for %s: %s", sym, e)
         raise HTTPException(status_code=500, detail=f"Failed to calculate live week high/low: {str(e)}")
+
+
+@router.post("/api/v1/stock/{ticker}/refresh-prices")
+@router.post("/api/v1/stock/{ticker}/hard-refresh-prices")
+async def refresh_stock_prices_endpoint(
+    ticker: str,
+    hard: bool = Query(False, description="Whether to hard-refresh full history from 2015"),
+    from_year: int | None = Query(None, description="Starting year for historical prices (e.g. 2015)"),
+):
+    """Force download latest OHLCV price bars, market cap, and return updated quote & technicals.
+    
+    If hard=True or from_year is specified, fetches full historical prices from 2015 (or listing date).
+    """
+    sym = clean_ticker_param(ticker)
+    is_hard = hard or (from_year is not None)
+    start_dt = f"{from_year}-01-01" if from_year else ("2015-01-01" if is_hard else None)
+    try:
+        from earnings_engine.data.prices import ingest_prices, load_prices
+        from earnings_engine.data.universe import ingest_market_caps
+        await asyncio.to_thread(
+            ingest_prices,
+            [sym],
+            settings=_settings,
+            force=True,
+            hard_refresh=is_hard,
+            start_date=start_dt,
+        )
+        await asyncio.to_thread(ingest_market_caps, [sym], force=True, settings=_settings)
+        overview = await asyncio.to_thread(stock_api.get_stock_overview, ticker=sym, settings=_settings)
+        technicals = await asyncio.to_thread(stock_api.get_stock_technicals, ticker=sym, settings=_settings)
+
+        df = await asyncio.to_thread(load_prices, sym, _settings)
+        bar_count = len(df) if df is not None and not df.empty else 0
+        min_date = df.index.min().strftime("%Y-%m-%d") if bar_count > 0 else "—"
+        max_date = df.index.max().strftime("%Y-%m-%d") if bar_count > 0 else "—"
+
+        msg = (
+            f"Successfully hard-refreshed {bar_count} price bars from {min_date} to {max_date} for {sym}"
+            if is_hard
+            else f"Successfully fetched latest price bars and refreshed quote for {sym}"
+        )
+        return {
+            "success": True,
+            "ticker": sym,
+            "message": msg,
+            "hard_refresh": is_hard,
+            "start_date": min_date,
+            "end_date": max_date,
+            "total_bars": bar_count,
+            "overview": overview,
+            "technicals": technicals,
+        }
+    except Exception as e:
+        logger.exception("Error in refresh_stock_prices for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Failed to refresh prices: {str(e)}")
+
+
+@router.post("/api/v1/stock/{ticker}/refresh-institutional")
+async def refresh_stock_institutional_endpoint(ticker: str):
+    """Force re-derive and calculate institutional activity, fund actions, and amount-based score."""
+    sym = clean_ticker_param(ticker)
+    try:
+        from earnings_engine.data.institutional_accumulation import get_stock_institutional_activity
+        data = await asyncio.to_thread(get_stock_institutional_activity, ticker=sym, settings=_settings, force_refresh=True)
+        return {
+            "success": True,
+            "ticker": sym,
+            "message": f"Successfully recalculated institutional activity for {sym}",
+            "data": data,
+        }
+    except Exception as e:
+        logger.exception("Error in refresh_stock_institutional for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Failed to refresh institutional data: {str(e)}")
+
+
+@router.post("/api/v1/stock/{ticker}/recalculate-technicals")
+async def recalculate_stock_technicals_endpoint(ticker: str):
+    """Recalculate swing ranges, moving averages, and technical indicators for stock."""
+    sym = clean_ticker_param(ticker)
+    try:
+        technicals = await asyncio.to_thread(stock_api.get_stock_technicals, ticker=sym, settings=_settings)
+        return {
+            "success": True,
+            "ticker": sym,
+            "message": f"Successfully recalculated technical structure for {sym}",
+            "technicals": technicals,
+        }
+    except Exception as e:
+        logger.exception("Error in recalculate_stock_technicals for %s: %s", sym, e)
+        raise HTTPException(status_code=500, detail=f"Failed to recalculate technicals: {str(e)}")
+
+
+@router.post("/api/v1/stock/{ticker}/run-kronos")
+async def run_stock_kronos_endpoint(ticker: str):
+    """Run on-demand Kronos AI 14-day sequence trajectory forecast."""
+    sym = clean_ticker_param(ticker)
+    try:
+        from earnings_engine.kronos_predictor import predict_single_stock
+        forecast = await asyncio.to_thread(predict_single_stock, symbol=sym, settings=_settings)
+        return {
+            "success": True,
+            "ticker": sym,
+            "message": f"Successfully generated Kronos 14-day AI forecast for {sym}",
+            "kronos": forecast,
+        }
+    except Exception as e:
+        logger.exception("Error running Kronos for %s: %s", sym, e)
+        # Fallback to existing latest prediction if model generation encounters GPU/CUDA mismatch
+        latest = await asyncio.to_thread(stock_api.get_stock_kronos, ticker=sym, settings=_settings)
+        return {
+            "success": latest.get("success", False),
+            "ticker": sym,
+            "warning": f"Live inference notice: {str(e)}. Returned latest cached forecast.",
+            "kronos": latest.get("kronos"),
+        }
+
 
 
 @router.get("/api/v1/ticker/audit-log")

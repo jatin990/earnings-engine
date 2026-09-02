@@ -259,6 +259,34 @@ async def get_multi_horizon_consensus(ticker: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/v1/consensus/omniroute-models")
+@router.get("/api/v1/omniroute/models")
+async def get_omniroute_models(
+    host: str | None = Query(None, description="Optional custom OmniRoute host"),
+    api_key: str | None = Query(None, description="Optional API key override"),
+):
+    """Return available OmniRoute models, categories, and gateway health."""
+    from earnings_engine.data.omniroute_client import OmniRouteClient
+    client = OmniRouteClient(_settings)
+    return await asyncio.to_thread(client.get_available_models_catalog, host=host, api_key=api_key)
+
+
+@router.get("/api/v1/consensus/trace/{prediction_id}")
+async def get_consensus_trace_endpoint(prediction_id: int):
+    """Retrieve full inspection trace with raw prompt, system prompt, raw response, reasoning, and telemetry."""
+    try:
+        from earnings_engine.consensus import storage
+        trace = await asyncio.to_thread(storage.get_prediction_trace, prediction_id=prediction_id, settings=_settings)
+        if not trace:
+            raise HTTPException(status_code=404, detail="Prediction trace not found")
+        return {"success": True, "trace": trace}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error in get_consensus_trace: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/api/v1/consensus/{prediction_id}")
 async def get_consensus_prediction_by_id(prediction_id: int):
     """Retrieve a specific consensus prediction by ID."""
@@ -276,7 +304,7 @@ async def get_consensus_prediction_by_id(prediction_id: int):
 
 @router.post("/api/v1/consensus/predict")
 async def run_consensus_predict(req: ConsensusPredictRequest):
-    """Execute live multi-model AI consensus reasoning workflow for a specific horizon."""
+    """Execute live multi-model AI consensus reasoning workflow with custom models and raw trace capture."""
     from earnings_engine.consensus import context_builder, model_runner, aggregator, storage
     from earnings_engine.rate_limits import get_models_rate_limits, get_ratelimits_summary
 
@@ -294,7 +322,7 @@ async def run_consensus_predict(req: ConsensusPredictRequest):
     results: list[dict[str, Any]] = []
     for ticker in target_tickers:
         try:
-            if not req.force_refresh and not req.force:
+            if not req.force_refresh and not req.force and not req.custom_directives and not req.models and not req.omniroute_model:
                 cached_preds = await asyncio.to_thread(
                     storage.get_predictions,
                     settings=_settings,
@@ -330,11 +358,17 @@ async def run_consensus_predict(req: ConsensusPredictRequest):
                 except Exception:
                     pass
 
+            raw_prompt_text = context_builder.context_to_prompt(ctx)
+            sys_prompt_text = model_runner.get_horizon_system_prompt(req.timeframe_days, custom_directives=req.custom_directives)
+
             model_outputs = await asyncio.to_thread(
                 model_runner.run_consensus_models,
                 context=ctx,
                 models=req.models,
                 local_url=req.local_model_url,
+                omniroute_model=req.omniroute_model,
+                custom_directives=req.custom_directives,
+                temperature=req.temperature,
             )
 
             # If running a single model (or subset), merge with previous model outputs for this horizon to keep matrix updated
@@ -364,6 +398,10 @@ async def run_consensus_predict(req: ConsensusPredictRequest):
                 timeframe_days=req.timeframe_days,
             )
 
+            consensus["system_prompt"] = sys_prompt_text
+            consensus["raw_context_prompt"] = raw_prompt_text
+            consensus["custom_directives"] = req.custom_directives
+
             eval_date = (datetime.now() + timedelta(days=req.timeframe_days)).strftime("%Y-%m-%d")
             pred_id = await asyncio.to_thread(storage.save_prediction, consensus, evaluation_date=eval_date, settings=_settings)
             consensus["id"] = pred_id
@@ -391,7 +429,18 @@ async def run_consensus_for_ticker_path(
     ticker: str,
     force: bool = Query(True),
     timeframe_days: int = Query(14),
+    omniroute_model: str | None = Query(None),
+    custom_directives: str | None = Query(None),
+    temperature: float = Query(0.3),
 ):
-    """Execute consensus prediction for a specific ticker path parameter."""
-    req = ConsensusPredictRequest(ticker=ticker, force=force, timeframe_days=timeframe_days)
+    """Execute consensus prediction for a specific ticker path parameter with custom options."""
+    req = ConsensusPredictRequest(
+        ticker=ticker,
+        force=force,
+        timeframe_days=timeframe_days,
+        omniroute_model=omniroute_model,
+        custom_directives=custom_directives,
+        temperature=temperature,
+    )
     return await run_consensus_predict(req)
+
