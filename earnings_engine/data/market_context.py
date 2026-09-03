@@ -834,7 +834,18 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 # Only declared PAST earnings events contribute to the Q1/Q2/Q3 breakdown.
                 # Unconfirmed/tentative calendar estimates without reported EPS or surprise must NOT leak into quarter
                 # scores, week-high/low, or price-after-earnings.
-                declared_historical = earnings[(earnings["earnings_date"] < today) & (earnings["eps_reported"].notna() | earnings["surprise_pct"].notna())]
+                has_eps = "eps_reported" in earnings.columns
+                has_surp = "surprise_pct" in earnings.columns
+                if has_eps and has_surp:
+                    declared_mask = earnings["eps_reported"].notna() | earnings["surprise_pct"].notna()
+                elif has_eps:
+                    declared_mask = earnings["eps_reported"].notna()
+                elif has_surp:
+                    declared_mask = earnings["surprise_pct"].notna()
+                else:
+                    declared_mask = pd.Series([True] * len(earnings), index=earnings.index)
+
+                declared_historical = earnings[(earnings["earnings_date"] < today) & declared_mask]
                 historical_earnings = declared_historical if not declared_historical.empty else earnings[earnings["earnings_date"] < today]
                 recent_earnings = historical_earnings.sort_values("earnings_date").tail(3)  # last 3 past quarters
                 quarter_scores: list[int] = []
@@ -915,7 +926,18 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             # (exclude upcoming/future events and unconfirmed estimates where these values are naturally null)
             if not earnings.empty:
                 today = pd.Timestamp.today().normalize()
-                declared_hist = earnings[(earnings["earnings_date"] < today) & (earnings["eps_reported"].notna() | earnings["surprise_pct"].notna())]
+                has_eps = "eps_reported" in earnings.columns
+                has_surp = "surprise_pct" in earnings.columns
+                if has_eps and has_surp:
+                    declared_mask = earnings["eps_reported"].notna() | earnings["surprise_pct"].notna()
+                elif has_eps:
+                    declared_mask = earnings["eps_reported"].notna()
+                elif has_surp:
+                    declared_mask = earnings["surprise_pct"].notna()
+                else:
+                    declared_mask = pd.Series([True] * len(earnings), index=earnings.index)
+
+                declared_hist = earnings[(earnings["earnings_date"] < today) & declared_mask]
                 historical = declared_hist if not declared_hist.empty else earnings[earnings["earnings_date"] < today]
                 if not historical.empty:
                     latest_earnings = historical.sort_values("earnings_date").iloc[-1]

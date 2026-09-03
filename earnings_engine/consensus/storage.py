@@ -17,14 +17,8 @@ from earnings_engine.data.db import get_db_connection, is_turso_enabled
 
 logger = logging.getLogger("earnings_engine.consensus.storage")
 
-_TABLE_CREATED = False
-
-
 def _ensure_table(conn: Any) -> None:
     """Create the consensus_predictions table if it doesn't exist, and migrate columns."""
-    global _TABLE_CREATED
-    if _TABLE_CREATED:
-        return
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS consensus_predictions (
@@ -75,7 +69,6 @@ def _ensure_table(conn: Any) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_consensus_status ON consensus_predictions(settlement_status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_consensus_eval_date ON consensus_predictions(evaluation_date)")
     conn.commit()
-    _TABLE_CREATED = True
 
 
 def _connect(settings: Settings) -> Any:

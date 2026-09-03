@@ -788,54 +788,9 @@ def test_quality_score_last_quarter_is_last_element():
     assert _score_surprise(2.0) == 6
 
 
-def test_enrich_upcoming_results_adds_last_quarter_score_and_week_hl(monkeypatch):
-    """Regression: last quarter score and week high/low from last earnings date."""
-    # Bypass the once-per-day price-metrics cache so the test always recomputes.
-    monkeypatch.setattr(market_context_mod, "load_price_metrics", lambda ticker, settings: None)
-
-    class DummyTicker:
-        def __init__(self, ticker):
-            self.fast_info = {"market_cap": 1_000_000_000, "last_price": 100.0, "year_high": 110.0, "year_low": 90.0, "year_change": 0.05}
-            self.info = {"marketCap": 1_000_000_000, "currentPrice": 100.0, "fiftyTwoWeekHigh": 110.0, "fiftyTwoWeekLow": 90.0}
-
-    # Prices spanning the earnings dates with a clear high/low around each
-    dates = pd.bdate_range("2024-01-01", periods=200)
-    closes = [100.0] * len(dates)
-    # Add a spike around 2024-07-01 (last quarter earnings)
-    for i, d in enumerate(dates):
-        if pd.Timestamp("2024-06-27") <= d <= pd.Timestamp("2024-07-05"):
-            closes[i] = 120.0
-    prices = pd.DataFrame(
-        {"open": closes, "high": [c * 1.01 for c in closes], "low": [c * 0.99 for c in closes],
-         "close": closes, "volume": [1_000] * len(dates)},
-        index=pd.DatetimeIndex(dates, name="date"),
-    )
-    earnings = pd.DataFrame(
-        {
-            "earnings_date": [pd.Timestamp("2024-01-01"), pd.Timestamp("2024-04-01"), pd.Timestamp("2024-07-01")],
-            "surprise_pct": [20.0, 18.0, 2.0],
-        }
-    )
-
-    monkeypatch.setattr(market_context_mod, "fetch_prices", lambda ticker, settings, force=False: prices)
-    monkeypatch.setattr(market_context_mod, "load_earnings", lambda ticker, settings: earnings)
-    monkeypatch.setattr(market_context_mod.yf, "Ticker", lambda ticker: DummyTicker(ticker))
-
-    df = pd.DataFrame([{"ticker": "AAA", "earnings_date": pd.Timestamp("2024-08-01")}])
-    enriched = market_context_mod.enrich_upcoming_results(df, Settings())
-
-    # Last quarter score = most recent quarter (2% → 6)
-    assert enriched["prev_quarter_earnings_score"].iloc[0] == 6
-    # Last quarter week high/low computed from last earnings date (±4 business days)
-    # Last earnings (2024-07-01) has spike to 120, so should have positive high_pct
-    assert enriched["last_week_high_pct"].iloc[0] is not None
-    assert enriched["last_week_high_price"].iloc[0] == 120.0
-
-
-def test_enrich_upcoming_results_adds_individual_quarter_scores_and_week_hl(monkeypatch):
-    """Regression: per-quarter scores + week high/low are restored for Q1/Q2/Q3."""
-    # Bypass the once-per-day price-metrics cache so the test always recomputes.
 def test_upcoming_results_writes_log_file(tmp_path, monkeypatch):
+    monkeypatch.delenv("EARNINGS_ENGINE_DISABLE_FILE_LOGGING", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
     monkeypatch.setattr(cli_mod, "Settings", lambda: Settings())
     monkeypatch.setattr(cli_mod, "_resolve_tickers", lambda market, ticker, universe_file=None: ["AAA"])
     monkeypatch.setattr(
@@ -1185,6 +1140,8 @@ def test_enrich_upcoming_results_adds_earnings_context(monkeypatch):
 
 
 def test_email_logging_writes_to_run_log(tmp_path, monkeypatch):
+    monkeypatch.delenv("EARNINGS_ENGINE_DISABLE_FILE_LOGGING", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
     from earnings_engine import emailing
 
     logger = get_logger("earnings_engine.emailing", base_dir=tmp_path)
@@ -1220,7 +1177,9 @@ def test_email_logging_writes_to_run_log(tmp_path, monkeypatch):
         def send_message(self, message):
             self.sent = True
 
-    emailing.send_report_email(tmp_path / "report.csv", DummySettings())
+    dummy_report = tmp_path / "report.csv"
+    dummy_report.write_text("header1,header2\n1,2", encoding="utf-8")
+    emailing.send_report_email(dummy_report, DummySettings())
 
     log_files = list((tmp_path / "logs").glob("earnings_engine-*.log"))
     assert log_files

@@ -13,6 +13,17 @@ from earnings_engine.data.category_scanner import (
     get_categories_overview,
     deep_universe_sweep,
 )
+from earnings_engine.data import category_scanner as cs
+
+
+@pytest.fixture(autouse=True)
+def mock_news_network_harvest(monkeypatch):
+    """Keep tests fast and offline by mocking external news RSS scraping."""
+    monkeypatch.setattr(
+        cs,
+        "scan_watchlist_catalysts",
+        lambda *args, **kwargs: {"catalysts_fetched": 0, "scanned_tickers": 0},
+    )
 
 
 def test_scanner_categories_definitions():

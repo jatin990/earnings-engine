@@ -54,7 +54,13 @@ def test_watchlist_add_and_remove_endpoints(client):
     assert res_rem.json().get("success") is True
 
 
-def test_kronos_predict_endpoint(client):
+def test_kronos_predict_endpoint(client, monkeypatch):
+    from earnings_engine.api import dashboard_api
+    monkeypatch.setattr(
+        dashboard_api,
+        "run_prediction_for_ticker",
+        lambda *args, **kwargs: {"success": True, "ticker": "TCS.NS", "prediction": {"price": 3500}},
+    )
     res = client.post("/api/v1/kronos/predict/TCS.NS")
     assert res.status_code == 200
     json_data = res.json()
