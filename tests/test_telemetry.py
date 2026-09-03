@@ -42,6 +42,8 @@ def test_telemetry_direct_recording(temp_settings: Settings):
 
 def test_telemetry_api_endpoints(temp_settings: Settings, monkeypatch):
     monkeypatch.setattr("earnings_engine.api.server._settings", temp_settings)
+    monkeypatch.setattr("earnings_engine.api.dependencies._settings", temp_settings)
+    monkeypatch.setattr("earnings_engine.api.routers.system._settings", temp_settings)
     client = TestClient(app)
 
     # Trigger dashboard request with passcode header to invoke middleware telemetry
