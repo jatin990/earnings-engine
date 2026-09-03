@@ -211,6 +211,24 @@ def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None
             ).fetchall()
 
         if not rows or len(rows) < 2:
+            # Fallback: try on-demand fetch_prices for missing symbols (e.g. REITs like MINDSPACE.NS)
+            try:
+                from earnings_engine.data.prices import fetch_prices
+                df = fetch_prices(target_sym, force=False)
+                if df is not None and not df.empty and "close" in df.columns:
+                    rows = conn.execute(
+                        "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
+                        (target_sym,),
+                    ).fetchall()
+                    if not rows and target_sym.endswith(".NS"):
+                        rows = conn.execute(
+                            "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
+                            (target_sym.replace(".NS", ""),),
+                        ).fetchall()
+            except Exception as e:
+                logger.debug("Failed on-demand fetch_prices in _get_ticker_returns for %s: %s", target_sym, e)
+
+        if not rows or len(rows) < 2:
             _TICKER_RETURNS_MEMO[target_sym] = (now + 600.0, (None, None, None))
             return None, None, None
 

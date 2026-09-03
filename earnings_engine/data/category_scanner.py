@@ -239,10 +239,19 @@ def _resolve_universe_tickers(universe_or_watchlist: str = "NSE_TOP", settings: 
 def _compute_category_candidates_live(
     category_id: str,
     universe_or_watchlist: str = "NSE_TOP",
-    limit: int = 50,
+    limit: int | Settings = 50,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     """Internal calculation engine for a specific category with quantitative target, SL, and severity."""
+    if isinstance(limit, Settings):
+        settings = limit
+        limit = 50
+    elif not isinstance(limit, int):
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = 50
+
     settings = settings or Settings()
     cat_id = category_id.lower().strip()
     cat_meta = SCANNER_CATEGORIES.get(cat_id)
@@ -556,10 +565,19 @@ def _compute_category_candidates_live(
 
 def compute_and_save_scanner_universe(
     universe_or_watchlist: str = "NSE_TOP",
-    limit_per_category: int = 35,
+    limit_per_category: int | Settings = 35,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Background Worker Task: Runs full universe scanner and persists results to SQLite DB."""
+    if isinstance(limit_per_category, Settings):
+        settings = limit_per_category
+        limit_per_category = 35
+    elif not isinstance(limit_per_category, int):
+        try:
+            limit_per_category = int(limit_per_category)
+        except (TypeError, ValueError):
+            limit_per_category = 35
+
     settings = settings or Settings()
     now_iso = datetime.now(timezone.utc).isoformat()
     logger.info("[SCANNER-WORKER] Starting background sweep for universe '%s'...", universe_or_watchlist)

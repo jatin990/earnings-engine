@@ -630,13 +630,9 @@
 
                 const fundsInStr = `<span style="color:#34d399;font-weight:700;">+${it.funds_accumulating_count || 0} in</span> / <span style="color:#f87171;">-${it.funds_selling_count || 0} out</span>`;
 
-                const ret7d = it.return_7d_pct != null ? it.return_7d_pct : 0;
+                const ret7dStr = it.return_7d_pct != null ? `<span style="color:${it.return_7d_pct >= 0 ? '#34d399' : '#f87171'};font-weight:600;">${it.return_7d_pct >= 0 ? '+' : ''}${it.return_7d_pct}%</span>` : `<span style="color:#71717a;">N/A</span>`;
 
-                const ret30d = it.return_30d_pct != null ? it.return_30d_pct : 0;
-
-                const ret7dCol = ret7d >= 0 ? '#34d399' : '#f87171';
-
-                const ret30dCol = ret30d >= 0 ? '#34d399' : '#f87171';
+                const ret30dStr = it.return_30d_pct != null ? `<span style="color:${it.return_30d_pct >= 0 ? '#34d399' : '#f87171'};font-weight:600;">${it.return_30d_pct >= 0 ? '+' : ''}${it.return_30d_pct}%</span>` : `<span style="color:#71717a;">N/A</span>`;
 
                 const netFlow = it.increase_amount_cr != null ? it.increase_amount_cr : (it.net_flow_cr || 0);
 
@@ -656,9 +652,9 @@
 
                         <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-weight:800;color:#38bdf8;">${it.accumulation_score}</td>
 
-                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);color:${ret7dCol};font-weight:600;">${ret7d >= 0 ? '+' : ''}${ret7d}%</td>
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);">${ret7dStr}</td>
 
-                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);color:${ret30dCol};font-weight:600;">${ret30d >= 0 ? '+' : ''}${ret30d}%</td>
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);">${ret30dStr}</td>
 
                         <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;">${fundsInStr}</td>
 
@@ -712,13 +708,9 @@
 
                 const fundsInStr = `<span style="color:#34d399;">+${it.funds_accumulating_count || 0}</span> / <span style="color:#f87171;font-weight:700;">-${it.funds_selling_count || 0}</span>`;
 
-                const ret7d = it.return_7d_pct != null ? it.return_7d_pct : 0;
+                const ret7dStr = it.return_7d_pct != null ? `<span style="color:${it.return_7d_pct >= 0 ? '#34d399' : '#f87171'};font-weight:600;">${it.return_7d_pct >= 0 ? '+' : ''}${it.return_7d_pct}%</span>` : `<span style="color:#71717a;">N/A</span>`;
 
-                const ret30d = it.return_30d_pct != null ? it.return_30d_pct : 0;
-
-                const ret7dCol = ret7d >= 0 ? '#34d399' : '#f87171';
-
-                const ret30dCol = ret30d >= 0 ? '#34d399' : '#f87171';
+                const ret30dStr = it.return_30d_pct != null ? `<span style="color:${it.return_30d_pct >= 0 ? '#34d399' : '#f87171'};font-weight:600;">${it.return_30d_pct >= 0 ? '+' : ''}${it.return_30d_pct}%</span>` : `<span style="color:#71717a;">N/A</span>`;
 
                 const netFlow = it.increase_amount_cr != null ? it.increase_amount_cr : (it.net_flow_cr || 0);
 
@@ -738,9 +730,9 @@
 
                         <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#f87171;">${it.accumulation_score}</td>
 
-                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);color:${ret7dCol};font-weight:600;">${ret7d >= 0 ? '+' : ''}${ret7d}%</td>
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);">${ret7dStr}</td>
 
-                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);color:${ret30dCol};font-weight:600;">${ret30d >= 0 ? '+' : ''}${ret30d}%</td>
+                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);">${ret30dStr}</td>
 
                         <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;">${fundsInStr}</td>
 
@@ -792,13 +784,9 @@
 
             tbody.innerHTML = funds.map(f => {
 
-                const ret30 = f.return_30d_pct != null ? f.return_30d_pct : 0;
+                const ret30Str = f.return_30d_pct != null ? `<span style="color:${f.return_30d_pct >= 0 ? '#34d399' : '#f87171'};font-weight:700;">${f.return_30d_pct >= 0 ? '+' : ''}${f.return_30d_pct}%</span>` : `<span style="color:#71717a;">N/A</span>`;
 
-                const ret1y = f.return_1y_pct != null ? f.return_1y_pct : 0;
-
-                const ret30Col = ret30 >= 0 ? '#34d399' : '#f87171';
-
-                const ret1yCol = ret1y >= 0 ? '#34d399' : '#f87171';
+                const ret1yStr = f.return_1y_pct != null ? `<span style="color:${f.return_1y_pct >= 0 ? '#34d399' : '#f87171'};font-weight:700;">${f.return_1y_pct >= 0 ? '+' : ''}${f.return_1y_pct}%</span>` : `<span style="color:#71717a;">N/A</span>`;
 
 
 
@@ -816,9 +804,9 @@
 
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#f87171;font-weight:700;">-${f.selling_actions}</td>
 
-                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:${ret30Col};font-weight:700;">${ret30 >= 0 ? '+' : ''}${ret30}%</td>
+                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);">${ret30Str}</td>
 
-                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:${ret1yCol};font-weight:700;">${ret1y >= 0 ? '+' : ''}${ret1y}%</td>
+                        <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);">${ret1yStr}</td>
 
                         <td style="padding:0.65rem 0.8rem;font-family:var(--font-mono);color:#38bdf8;font-weight:700;">₹${Number(f.total_aum_tracked_cr || 0).toLocaleString()} Cr</td>
 
@@ -1048,13 +1036,9 @@
 
                 const fundsInStr = `<span style="color:#ffffff;font-weight:700;">+${it.funds_accumulating_count || 0}</span> / <span style="color:#71717a;">-${it.funds_selling_count || 0}</span>`;
 
-                const ret7d = it.return_7d_pct != null ? it.return_7d_pct : 0;
+                const ret7dStr = it.return_7d_pct != null ? `<div style="color:${it.return_7d_pct >= 0 ? '#34d399' : '#f87171'};">7D: ${it.return_7d_pct >= 0 ? '+' : ''}${it.return_7d_pct}%</div>` : `<div style="color:#71717a;">7D: N/A</div>`;
 
-                const ret30d = it.return_30d_pct != null ? it.return_30d_pct : 0;
-
-                const ret7dCol = ret7d >= 0 ? '#34d399' : '#f87171';
-
-                const ret30dCol = ret30d >= 0 ? '#34d399' : '#f87171';
+                const ret30dStr = it.return_30d_pct != null ? `<div style="color:${it.return_30d_pct >= 0 ? '#34d399' : '#f87171'};">30D: ${it.return_30d_pct >= 0 ? '+' : ''}${it.return_30d_pct}%</div>` : `<div style="color:#71717a;">30D: N/A</div>`;
 
 
 
@@ -1108,9 +1092,9 @@
 
                         <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;">
 
-                            <div style="color:${ret7dCol};">7D: ${ret7d >= 0 ? '+' : ''}${ret7d}%</div>
+                            ${ret7dStr}
 
-                            <div style="color:${ret30dCol};">30D: ${ret30d >= 0 ? '+' : ''}${ret30d}%</div>
+                            ${ret30dStr}
 
                         </td>
 
@@ -1923,13 +1907,9 @@
 
 
 
-                                const ret30 = h.return_30d_pct != null ? h.return_30d_pct : 0;
+                                const ret30Str = h.return_30d_pct != null ? `<span style="color:${h.return_30d_pct >= 0 ? '#34d399' : '#f87171'};font-weight:700;">${h.return_30d_pct >= 0 ? '+' : ''}${h.return_30d_pct}%</span>` : `<span style="color:#71717a;">N/A</span>`;
 
-                                const ret1y = h.return_1y_pct != null ? h.return_1y_pct : 0;
-
-                                const ret30Col = ret30 >= 0 ? '#34d399' : '#f87171';
-
-                                const ret1yCol = ret1y >= 0 ? '#34d399' : '#f87171';
+                                const ret1yStr = h.return_1y_pct != null ? `<span style="color:${h.return_1y_pct >= 0 ? '#34d399' : '#f87171'};font-weight:700;">${h.return_1y_pct >= 0 ? '+' : ''}${h.return_1y_pct}%</span>` : `<span style="color:#71717a;">N/A</span>`;
 
 
 
@@ -1973,9 +1953,9 @@
 
                                         <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:#ffffff;">${h.stake_pct}%</td>
 
-                                        <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:${ret30Col};">${ret30 >= 0 ? '+' : ''}${ret30}%</td>
+                                        <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);">${ret30Str}</td>
 
-                                        <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:${ret1yCol};">${ret1y >= 0 ? '+' : ''}${ret1y}%</td>
+                                        <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);">${ret1yStr}</td>
 
                                         <td style="padding:0.5rem 0.6rem;font-family:var(--font-mono);color:#71717a;font-size:0.68rem;">${h.reported_date || '—'}</td>
 

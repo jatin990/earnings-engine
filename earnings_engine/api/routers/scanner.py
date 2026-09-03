@@ -66,7 +66,7 @@ async def run_full_category_scan(request: dict | None = None):
     """Execute complete multi-universe scan across all 12 categories."""
     universe = (request or {}).get("universe", "NSE_TOP")
     try:
-        res = await asyncio.to_thread(scanner_mod.compute_and_save_scanner_universe, universe, _settings)
+        res = await asyncio.to_thread(scanner_mod.compute_and_save_scanner_universe, universe, settings=_settings)
         return {
             "success": True,
             "result": res,

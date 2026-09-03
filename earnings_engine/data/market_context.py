@@ -831,12 +831,11 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
 
             if not earnings.empty:
                 today = pd.Timestamp.today().normalize()
-                # Only PAST earnings events contribute to the Q1/Q2/Q3 breakdown.
-                # The upcoming event (e.g. +4d) must NOT leak into the quarter
-                # scores, week-high/low, or price-after-earnings — otherwise the
-                # "result week" would be the upcoming print's pre-move instead of
-                # a historical result week.
-                historical_earnings = earnings[earnings["earnings_date"] < today]
+                # Only declared PAST earnings events contribute to the Q1/Q2/Q3 breakdown.
+                # Unconfirmed/tentative calendar estimates without reported EPS or surprise must NOT leak into quarter
+                # scores, week-high/low, or price-after-earnings.
+                declared_historical = earnings[(earnings["earnings_date"] < today) & (earnings["eps_reported"].notna() | earnings["surprise_pct"].notna())]
+                historical_earnings = declared_historical if not declared_historical.empty else earnings[earnings["earnings_date"] < today]
                 recent_earnings = historical_earnings.sort_values("earnings_date").tail(3)  # last 3 past quarters
                 quarter_scores: list[int] = []
                 n_quarters = len(recent_earnings)
@@ -913,10 +912,11 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             prev_quarter_earnings_score = last_quarter_score if last_quarter_score is not None else 5
 
             # Extract EPS estimate, reported, and surprise from the most recent **historical** earnings
-            # (exclude upcoming/future events where these values are naturally null)
+            # (exclude upcoming/future events and unconfirmed estimates where these values are naturally null)
             if not earnings.empty:
                 today = pd.Timestamp.today().normalize()
-                historical = earnings[earnings["earnings_date"] < today]
+                declared_hist = earnings[(earnings["earnings_date"] < today) & (earnings["eps_reported"].notna() | earnings["surprise_pct"].notna())]
+                historical = declared_hist if not declared_hist.empty else earnings[earnings["earnings_date"] < today]
                 if not historical.empty:
                     latest_earnings = historical.sort_values("earnings_date").iloc[-1]
                     eps_estimate = latest_earnings.get("eps_estimate")

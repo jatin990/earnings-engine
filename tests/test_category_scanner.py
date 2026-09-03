@@ -131,3 +131,28 @@ def test_scheduled_category_scanner_job_and_fields():
         assert "outcome_label" in cand
         assert "outcome_badge" in cand
 
+
+def test_compute_and_save_scanner_universe_positional_and_slices(monkeypatch):
+    """Regression test: verify positional settings passing and category candidate slicing."""
+    from earnings_engine.data import category_scanner as cs
+    settings = Settings()
+
+    # Mock news network harvest to keep test instant and offline
+    monkeypatch.setattr(cs, "scan_watchlist_catalysts", lambda *args, **kwargs: {"catalysts_fetched": 0, "scanned_tickers": 0})
+
+    # 1. Test _compute_category_candidates_live with positional Settings as 3rd arg
+    res_live = cs._compute_category_candidates_live("blue_sky_52w", "NSE_TOP", settings)
+    assert isinstance(res_live, list)
+
+    # 2. Test compute_and_save_scanner_universe with positional Settings as 2nd arg
+    res_pos = cs.compute_and_save_scanner_universe("NSE_TOP", settings)
+    assert isinstance(res_pos, dict)
+    assert "total_saved" in res_pos
+
+    # 3. Test with keyword arguments
+    res_kw = cs.compute_and_save_scanner_universe("NSE_TOP", limit_per_category=10, settings=settings)
+    assert isinstance(res_kw, dict)
+    assert "total_saved" in res_kw
+
+
+

@@ -192,8 +192,8 @@ class SchedulerEngine:
     def _handle_category_sweep(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data.category_scanner import compute_and_save_scanner_universe
         universe = params.get("universe") or params.get("watchlist") or "NSE_TOP"
-        res = compute_and_save_scanner_universe(universe, settings)
-        count = len(res) if isinstance(res, list) else 0
+        res = compute_and_save_scanner_universe(universe, settings=settings)
+        count = len(res.get("saved_candidates", [])) if isinstance(res, dict) else (len(res) if isinstance(res, list) else 0)
         return f"Multi-category sweep refreshed {count} candidates for {universe}."
 
     def _handle_quarter_repeaters(self, settings: Settings, params: dict[str, Any]) -> str:

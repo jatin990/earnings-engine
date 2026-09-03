@@ -274,6 +274,7 @@ const API_BASE = window.location.origin;
                 }
                 this.updateTopRateLimitPill();
                 this.updateWatchlistFreshnessPill(localStorage.getItem('selectedGlobalWatchlist') || '');
+                this.initGlobalPriceRefresh?.();
                 setInterval(() => {
                     this.updateTopRateLimitPill();
                 }, 30000);
@@ -772,25 +773,6 @@ const API_BASE = window.location.origin;
                     }
                     this.loadAutomationSchedules();
                     this.loadBreakoutAuditLog();
-                    // Start 5-minute auto-poll (cleared when leaving the tab)
-                    this._breakoutPollTimer = setInterval(() => {
-                        if (document.getElementById('tab-breakout')?.classList.contains('active')) {
-                            if (this._activeBreakoutSubtab === 'tracked') {
-                                this.loadTrackedBreakouts();
-                            } else {
-                                this.loadBreakoutRadar();
-                            }
-                            this.loadAutomationSchedules();
-                        } else {
-                            clearInterval(this._breakoutPollTimer);
-                        }
-                    }, 5 * 60 * 1000);
-                } else {
-                    // Clear poll when leaving the breakout tab
-                    if (this._breakoutPollTimer) {
-                        clearInterval(this._breakoutPollTimer);
-                        this._breakoutPollTimer = null;
-                    }
                 }
                 if (name === 'catalysts') {
                     this.loadAutomationSchedules();

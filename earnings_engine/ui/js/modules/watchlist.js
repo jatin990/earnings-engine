@@ -278,8 +278,10 @@ app.watchlistTab = {
 
                 toggleLiveTracking() {
                     this.isLiveTracking = !this.isLiveTracking;
-                    this.liveIntervalMs = parseInt(localStorage.getItem('nexus_wl_refresh_interval') || '300000', 10);
-                    
+                    const globalSec = parseInt(localStorage.getItem('nexus_price_refresh_interval') || '300', 10);
+                    const defaultMs = (globalSec > 0 ? globalSec * 1000 : 300000);
+                    this.liveIntervalMs = parseInt(localStorage.getItem('nexus_wl_refresh_interval') || String(defaultMs), 10);
+
                     const sel = document.getElementById('wlLiveIntervalSelect');
                     if (sel) sel.value = String(this.liveIntervalMs);
 

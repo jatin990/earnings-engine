@@ -360,8 +360,8 @@ async def enforce_auth_middleware(request: Request, call_next):
     if not session:
         import os
         test_info = os.environ.get("PYTEST_CURRENT_TEST", "").lower()
-        has_auth_tests = any(kw in test_info for kw in ("test_auth", "test_rbac", "test_passcode", "test_portal"))
-        if ("PYTEST_CURRENT_TEST" in os.environ and not has_auth_tests) or os.getenv("TESTING") == "true":
+        has_auth_tests = any(kw in test_info for kw in ("auth", "rbac", "passcode", "portal"))
+        if not has_auth_tests and ("PYTEST_CURRENT_TEST" in os.environ or os.getenv("TESTING") == "true"):
             session = {
                 "sub": "test_user",
                 "role": "owner",

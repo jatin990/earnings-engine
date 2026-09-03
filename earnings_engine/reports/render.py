@@ -921,11 +921,26 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
         else:
             seq_badge_html = ""
 
+        # Result Declaration / Confirmation Status Badge
+        status_badge = ""
+        eps_rep = row.get("eps_reported")
+        surp = row.get("surprise_pct")
+        ed_val = row.get("earnings_date")
+        src = str(row.get("source", "")).lower()
+        if eps_rep is not None and not pd.isna(eps_rep):
+            status_badge = '<span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.25rem;" title="Official Financial Results Declared">✅ Declared</span>'
+        elif src == "nse":
+            status_badge = '<span class="signal-badge" style="background:rgba(147,51,234,0.15);color:#c084fc;border:1px solid rgba(147,51,234,0.3);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.25rem;" title="NSE Corporate Board Meeting Notice">🏛️ Board Meeting</span>'
+        elif pd.notna(ed_val) and pd.Timestamp(ed_val) < pd.Timestamp.today().normalize() and (eps_rep is None or pd.isna(eps_rep)) and (surp is None or pd.isna(surp)):
+            status_badge = '<span class="signal-badge" style="background:rgba(239,68,68,0.12);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);font-size:0.62rem;padding:0.08rem 0.35rem;border-radius:4px;font-weight:700;margin-left:0.25rem;" title="Tentative / Estimated Date - Official Results Not Yet Filed">⏳ Unconfirmed</span>'
+
+        full_badges = (seq_badge_html + " " + status_badge).strip() if (seq_badge_html or status_badge) else ""
+
         row_values = {
             "ticker": ticker,
             "row_ticker_id": re.sub(r"[^a-zA-Z0-9]", "_", ticker),
             "company_name": company_name,
-            "result_sequence_badge_html": seq_badge_html,
+            "result_sequence_badge_html": full_badges,
             "earnings_date": earnings_date_display,
             "day_class": day_class,
             "market_cap": market_cap,

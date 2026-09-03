@@ -309,6 +309,28 @@ def test_get_recent_results_sorted_best_to_worst(settings):
     assert pcts == sorted(pcts, reverse=True)
 
 
+def test_load_recent_results_excludes_unconfirmed_nse_board_meetings(settings):
+    """Ensure tentative/scheduled board meetings without declared financial results are not included in recent results."""
+    conn = sqlite3.connect(str(_db_path(settings)))
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS earnings_history (ticker TEXT, earnings_date TEXT, source TEXT, surprise_pct REAL, eps_reported REAL, eps_estimate REAL)"
+    )
+    # MM.NS has a scheduled board meeting with no reported EPS
+    conn.execute("INSERT INTO earnings_history (ticker, earnings_date, source, eps_reported, surprise_pct) VALUES ('MM.NS', '2026-05-14', 'nse', NULL, NULL)")
+    # TCS.NS has declared results (yfinance source)
+    conn.execute("INSERT INTO earnings_history (ticker, earnings_date, source, eps_reported, surprise_pct) VALUES ('TCS.NS', '2026-05-14', 'yfinance', 25.0, 5.0)")
+    # INFY.NS has declared results from nse with reported EPS
+    conn.execute("INSERT INTO earnings_history (ticker, earnings_date, source, eps_reported, surprise_pct) VALUES ('INFY.NS', '2026-05-14', 'nse', 15.0, 2.0)")
+    conn.commit()
+    conn.close()
+
+    res = load_recent_results(["MM.NS", "TCS.NS", "INFY.NS"], settings, now=_now())
+    tickers_loaded = [t for t, _ in res]
+    assert "MM.NS" not in tickers_loaded
+    assert "TCS.NS" in tickers_loaded
+    assert "INFY.NS" in tickers_loaded
+
+
 # ---------------------------------------------------------------------------
 # New: date-range scan, dip-then-recovery signal, opt-in verdict
 # ---------------------------------------------------------------------------
@@ -416,7 +438,7 @@ def test_compute_patterns_metrics(settings):
 def _seed_ohlc(settings, ticker, edate, idx, ohlc_rows):
     conn = sqlite3.connect(str(_db_path(settings)))
     conn.execute("CREATE TABLE IF NOT EXISTS price_history (ticker TEXT, date TEXT, open REAL, high REAL, low REAL, close REAL, volume INTEGER)")
-    conn.execute("CREATE TABLE IF NOT EXISTS earnings_history (ticker TEXT, earnings_date TEXT, source TEXT)")
+    conn.execute("CREATE TABLE IF NOT EXISTS earnings_history (ticker TEXT, earnings_date TEXT, source TEXT, surprise_pct REAL, eps_reported REAL, eps_estimate REAL)")
     for d, (o, h, l, c) in zip(idx, ohlc_rows):
         conn.execute(
             "INSERT OR REPLACE INTO price_history (ticker, date, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)",

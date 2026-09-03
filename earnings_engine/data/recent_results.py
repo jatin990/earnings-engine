@@ -72,30 +72,48 @@ def load_recent_results(
         return []
     placeholders = ",".join("?" for _ in tickers)
 
-    if start_date or end_date:
-        conds = [f"ticker IN ({placeholders})"]
-        params: list[Any] = list(tickers)
-        if start_date:
-            conds.append("earnings_date >= ?")
-            params.append(start_date)
-        if end_date:
-            conds.append("earnings_date <= ?")
-            params.append(end_date)
-        where = " AND ".join(conds)
-        query = (
-            "SELECT DISTINCT ticker, earnings_date FROM earnings_history "
-            f"WHERE {where}"
-        )
-    else:
-        dates = _eligible_dates(now)
-        date_placeholders = ",".join("?" for _ in dates)
-        query = (
-            "SELECT DISTINCT ticker, earnings_date FROM earnings_history "
-            f"WHERE ticker IN ({placeholders}) AND earnings_date IN ({date_placeholders})"
-        )
-        params = tickers + dates
-
     with _earnings_connect(settings) as connection:
+        cols = {row[1] for row in connection.execute("PRAGMA table_info(earnings_history)").fetchall()}
+        has_eps = "eps_reported" in cols
+        has_surprise = "surprise_pct" in cols
+        has_source = "source" in cols
+
+        # Filter out unconfirmed/scheduled board meetings where financials were never filed
+        if has_source and (has_eps or has_surprise):
+            extra = []
+            if has_eps:
+                extra.append("eps_reported IS NOT NULL")
+            if has_surprise:
+                extra.append("surprise_pct IS NOT NULL")
+            declared_filter = f"(source != 'nse' OR {' OR '.join(extra)})"
+        elif has_source:
+            declared_filter = "source != 'nse'"
+        else:
+            declared_filter = "1=1"
+
+        if start_date or end_date:
+            conds = [f"ticker IN ({placeholders})", declared_filter]
+            params: list[Any] = list(tickers)
+            if start_date:
+                conds.append("earnings_date >= ?")
+                params.append(start_date)
+            if end_date:
+                conds.append("earnings_date <= ?")
+                params.append(end_date)
+            where = " AND ".join(conds)
+            query = (
+                "SELECT DISTINCT ticker, earnings_date FROM earnings_history "
+                f"WHERE {where}"
+            )
+        else:
+            dates = _eligible_dates(now)
+            date_placeholders = ",".join("?" for _ in dates)
+            query = (
+                "SELECT DISTINCT ticker, earnings_date FROM earnings_history "
+                f"WHERE ticker IN ({placeholders}) AND earnings_date IN ({date_placeholders}) AND {declared_filter}"
+            )
+            params = tickers + dates
+
         rows = connection.execute(query, params).fetchall()
     return [(t, pd.Timestamp(d)) for t, d in rows]
 
