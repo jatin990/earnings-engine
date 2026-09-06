@@ -19,5 +19,6 @@ nsetools>=2.0
 nselib>=2.5.0
 jugaad-data>=0.35.0
 cryptography>=42.0.0
-libsql-experimental>=0.0.34
+python-multipart>=0.0.9
+
 
