@@ -1,7 +1,7 @@
 <!-- Tab 4: Zepto Security Deposit & 50-50 Partner Capital Contribution Ledger -->
 <div class="space-y-2.5">
     <!-- Equity Split Visual Dashboard Card -->
-    <div class="glass-panel p-3.5 border-amber-500/30">
+    <div class="glass-panel p-3.5 border-white/10">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pb-2.5 border-b border-white/10">
             <div>
                 <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">Zepto Franchise Capital Commitment</span>
@@ -24,58 +24,56 @@
         <!-- 50-50 Partner Split Comparison Bars -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2.5">
             <!-- Partner 1 Card -->
-            <div class="glass-panel-sub border-purple-500/25 p-3">
+            <div class="glass-panel-sub p-3">
                 <div class="flex justify-between items-center mb-1.5">
                     <div class="flex items-center gap-2">
                         <span id="secPartner1Initials"
-                            class="w-6 h-6 rounded-md bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center font-black text-[10px]">JA</span>
+                            class="w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-300 flex items-center justify-center font-black text-[10px]">JA</span>
                         <span class="font-bold text-xs text-white" id="secPartner1Name">Jatin Abrol</span>
                     </div>
-                    <span class="text-xs font-mono font-bold text-purple-400" id="secPartner1Pct">0%</span>
+                    <span class="text-xs font-mono font-bold text-amber-300" id="secPartner1Pct">0%</span>
                 </div>
                 <div class="text-lg font-extrabold font-mono text-white mb-1.5" id="secPartner1Paid">₹0</div>
-                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-white/5">
+                <div class="w-full bg-black rounded-full h-2 overflow-hidden border border-white/10">
                     <div id="secPartner1Bar"
-                        class="bg-gradient-to-r from-purple-600 to-fuchsia-500 h-2 rounded-full transition-all duration-500"
+                        class="bg-amber-400 h-2 rounded-full transition-all duration-500"
                         style="width: 0%"></div>
                 </div>
                 <div class="flex justify-between text-[10px] text-slate-400 mt-1.5">
                     <span>Target: ₹37,50,000 (50%)</span>
-                    <span id="secPartner1Remaining" class="text-purple-300 font-mono font-semibold">₹37,50,000 Pending</span>
+                    <span id="secPartner1Remaining" class="text-amber-300 font-mono font-semibold">₹37,50,000 Pending</span>
                 </div>
             </div>
 
             <!-- Partner 2 Card -->
-            <div class="glass-panel-sub border-pink-500/25 p-3">
+            <div class="glass-panel-sub p-3">
                 <div class="flex justify-between items-center mb-1.5">
                     <div class="flex items-center gap-2">
                         <span id="secPartner2Initials"
-                            class="w-6 h-6 rounded-md bg-pink-500/20 border border-pink-500/40 text-pink-300 flex items-center justify-center font-black text-[10px]">HB</span>
+                            class="w-6 h-6 rounded-md bg-sky-500/10 border border-sky-500/25 text-sky-300 flex items-center justify-center font-black text-[10px]">HB</span>
                         <span class="font-bold text-xs text-white" id="secPartner2Name">Harshiv Bargotra</span>
                     </div>
-                    <span class="text-xs font-mono font-bold text-pink-400" id="secPartner2Pct">0%</span>
+                    <span class="text-xs font-mono font-bold text-sky-300" id="secPartner2Pct">0%</span>
                 </div>
                 <div class="text-lg font-extrabold font-mono text-white mb-1.5" id="secPartner2Paid">₹0</div>
-                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-white/5">
+                <div class="w-full bg-black rounded-full h-2 overflow-hidden border border-white/10">
                     <div id="secPartner2Bar"
-                        class="bg-gradient-to-r from-pink-600 to-rose-500 h-2 rounded-full transition-all duration-500"
+                        class="bg-sky-400 h-2 rounded-full transition-all duration-500"
                         style="width: 0%"></div>
                 </div>
                 <div class="flex justify-between text-[10px] text-slate-400 mt-1.5">
                     <span>Target: ₹37,50,000 (50%)</span>
-                    <span id="secPartner2Remaining" class="text-pink-300 font-mono font-semibold">₹37,50,000 Pending</span>
+                    <span id="secPartner2Remaining" class="text-sky-300 font-mono font-semibold">₹37,50,000 Pending</span>
                 </div>
             </div>
         </div>
 
         <!-- Equalization Status Banner -->
-        <div
-            class="mt-2.5 px-3 py-2 rounded-md bg-slate-900/90 border border-white/10 flex items-center justify-between text-xs">
+        <div class="mt-2.5 px-3 py-2 rounded-md bg-black border border-white/10 flex items-center justify-between text-xs">
             <div class="flex items-center gap-2 text-slate-300">
                 <span>⚖️</span>
                 <span class="font-semibold text-[11px]">Equalization:</span>
-                <span id="secEqualizationStatus" class="font-mono text-emerald-400 font-bold text-[11px]">Checking split
-                    balance...</span>
+                <span id="secEqualizationStatus" class="font-mono text-emerald-400 font-bold text-[11px]">Checking split balance...</span>
             </div>
             <span class="text-slate-400 text-[10px] font-mono" id="secOverallProgressText">Total Progress: 0% of ₹75L</span>
         </div>

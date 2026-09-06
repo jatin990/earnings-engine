@@ -1,17 +1,160 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>{title}</title>
-<style>
- body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 2rem; color: #1a1a2e; }
- h1 { font-size: 1.4rem; } .meta { color: #666; font-size: .85rem; margin-bottom: 1rem; }
- table { border-collapse: collapse; width: 100%; font-size: .9rem; }
- th, td { padding: .45rem .7rem; border-bottom: 1px solid #e3e3ee; text-align: right; }
- th { background: #f4f4fb; text-transform: uppercase; font-size: .72rem; letter-spacing: .04em; }
- td:first-child, th:first-child { text-align: left; }
- .up { color: #0a7a3d; font-weight: 600; } .down { color: #b3261e; font-weight: 600; }
- .note { margin-top: 1.2rem; color: #666; font-size: .8rem; }
-</style></head><body>
-<h1>{title}</h1>
-<div class="meta">Generated {generated} · {subtitle}</div>
-{table}
-<div class="note">{note}</div>
-</body></html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #000000;
+            --surface-glass: linear-gradient(180deg, rgba(14, 14, 20, 0.75) 0%, rgba(6, 6, 10, 0.85) 100%);
+            --border-glass: rgba(255, 255, 255, 0.1);
+            --border-glass-focus: rgba(255, 255, 255, 0.25);
+            --text-primary: #ffffff;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-green: #34d399;
+            --accent-red: #f87171;
+            --accent-blue: #38bdf8;
+            --accent-gold: #d4af37;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #000000;
+            background-image:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(56, 189, 248, 0.04), transparent),
+                radial-gradient(ellipse 60% 40% at 100% 100%, rgba(212, 175, 55, 0.02), transparent);
+            background-attachment: fixed;
+            margin: 0;
+            padding: 2rem 1.5rem;
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header-card {
+            background: var(--surface-glass);
+            border: 1px solid var(--border-glass);
+            backdrop-filter: blur(24px);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin: 0;
+            color: #ffffff;
+            letter-spacing: -0.02em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .meta {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-top: 0.35rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .table-panel {
+            background: var(--surface-glass);
+            border: 1px solid var(--border-glass);
+            backdrop-filter: blur(24px);
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.9), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+        }
+        .table-responsive {
+            overflow-x: auto;
+            max-height: 75vh;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 0.85rem;
+            text-align: right;
+        }
+        thead th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 20 !important;
+            background: #000000 !important;
+            color: var(--text-secondary) !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.06em;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.14) !important;
+            white-space: nowrap;
+        }
+        td {
+            padding: 0.7rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-family: 'JetBrains Mono', monospace;
+            color: #cbd5e1;
+        }
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
+            color: #ffffff;
+        }
+        td:first-child, th:first-child {
+            text-align: left;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .up {
+            color: var(--accent-green) !important;
+            font-weight: 700;
+        }
+        .down {
+            color: var(--accent-red) !important;
+            font-weight: 700;
+        }
+        .note {
+            margin-top: 1.25rem;
+            padding: 1rem 1.25rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 0.75rem;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+        @media (max-width: 768px) {
+            body { padding: 1rem 0.75rem; }
+            h1 { font-size: 1.25rem; }
+            td, th { padding: 0.5rem 0.6rem; font-size: 0.75rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header-card">
+        <div>
+            <h1><span>⚡</span> {title}</h1>
+            <div class="meta">Generated {generated} · {subtitle}</div>
+        </div>
+    </div>
+    <div class="table-panel">
+        <div class="table-responsive">
+            {table}
+        </div>
+    </div>
+    <div class="note">{note}</div>
+</div>
+</body>
+</html>

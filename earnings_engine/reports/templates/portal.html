@@ -1,31 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nexus Gateway // Personal Access & Scoped Hubs</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
-            --font-sans: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
-            --font-heading: 'Geist', 'Space Grotesk', sans-serif;
-
-            --bg: #030712;
-            --card-bg: rgba(15, 23, 42, 0.85);
-            --card-border: rgba(59, 130, 246, 0.22);
-            --accent: #3b82f6;
-            --accent-glow: rgba(59, 130, 246, 0.35);
-            --cyan: #38bdf8;
-            --green: #10b981;
-            --purple: #60a5fa;
-            --amber: #fbbf24;
-            --red: #f43f5e;
-            --light: #f8fafc;
-            --muted: #94a3b8;
+            --bg-base: #000000;
+            --card-surface: #06060a;
+            --card-elevated: #0a0a10;
+            --border-soft: rgba(255, 255, 255, 0.08);
+            --border-highlight: rgba(255, 255, 255, 0.20);
+            --gold: #d4af37;
+            --gold-glow: rgba(212, 175, 55, 0.25);
+            --emerald: #10b981;
+            --rose: #ef4444;
+            --sky: #38bdf8;
+            --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'Geist Mono', monospace;
+            --font-heading: 'Space Grotesk', sans-serif;
         }
 
         * { box-sizing: border-box; }
@@ -34,12 +31,13 @@
             margin: 0;
             padding: 0;
             min-height: 100vh;
-            background-color: var(--bg);
-            background-image: 
-                radial-gradient(circle at 50% -20%, rgba(59, 130, 246, 0.18), transparent 60%),
-                radial-gradient(circle at 0% 100%, rgba(56, 189, 248, 0.08), transparent 50%),
-                radial-gradient(circle at 100% 50%, rgba(37, 99, 235, 0.12), transparent 50%);
-            color: var(--light);
+            background-color: #000000;
+            background-image:
+                radial-gradient(ellipse at 50% -10%, rgba(212, 175, 55, 0.04) 0px, transparent 65%),
+                radial-gradient(ellipse at 100% 40%, rgba(16, 185, 129, 0.03) 0px, transparent 55%),
+                radial-gradient(ellipse at 0% 100%, rgba(56, 189, 248, 0.025) 0px, transparent 60%);
+            background-attachment: fixed;
+            color: #ffffff;
             font-family: var(--font-sans);
             display: flex;
             flex-direction: column;
@@ -49,14 +47,14 @@
             position: relative;
         }
 
-        /* Subtle cyber grid lines */
+        /* Subtle luxury hairline cyber grid */
         body::before {
             content: "";
             position: absolute;
             inset: 0;
-            background-image: linear-gradient(rgba(59, 130, 246, 0.04) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
-            background-size: 40px 40px;
+            background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 48px 48px;
             pointer-events: none;
             z-index: 0;
         }
@@ -65,79 +63,88 @@
             position: relative;
             z-index: 10;
             width: 100%;
-            max-width: 1180px;
-            padding: 2rem 1.5rem;
+            max-width: 1200px;
+            padding: 2.5rem 1.5rem;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
 
         .glass-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(28px) saturate(190%);
-            -webkit-backdrop-filter: blur(28px) saturate(190%);
-            border: 1px solid var(--card-border);
+            background: linear-gradient(180deg, #09090f 0%, #050508 100%);
+            border: 1px solid var(--border-soft);
             border-radius: 1.25rem;
-            box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 45px -10px var(--accent-glow);
+            box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.9), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .glass-card:hover {
-            border-color: rgba(96, 165, 250, 0.65);
-            box-shadow: 0 35px 80px -15px rgba(0, 0, 0, 0.95), 0 0 50px rgba(59, 130, 246, 0.35);
+            border-color: rgba(255, 255, 255, 0.18);
+            box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.95), 0 0 30px rgba(212, 175, 55, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.14);
         }
 
         .brand-title {
-            font-family: 'Space Grotesk', sans-serif;
+            font-family: var(--font-heading);
             letter-spacing: -0.03em;
-            background: linear-gradient(135deg, #ffffff 0%, #bae6fd 45%, #60a5fa 100%);
+            background: linear-gradient(180deg, #ffffff 0%, #d4d4d8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-title-gold {
+            font-family: var(--font-heading);
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #ffffff 0%, #fef08a 40%, #d4af37 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .mono {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
         }
 
         .input-box {
-            background: rgba(6, 11, 25, 0.88);
-            border: 1px solid rgba(59, 130, 246, 0.28);
-            color: var(--light);
+            background: #000000;
+            border: 1px solid var(--border-soft);
+            color: #ffffff;
             transition: all 0.22s ease;
         }
 
         .input-box:focus {
             outline: none;
-            border-color: #60a5fa;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3), 0 0 25px rgba(59, 130, 246, 0.25);
+            border-color: rgba(212, 175, 55, 0.5);
+            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.15), 0 0 20px rgba(212, 175, 55, 0.12);
         }
 
         .glow-btn {
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-            color: #ffffff;
-            font-weight: 700;
-            border: 1px solid rgba(191, 219, 254, 0.3);
-            box-shadow: 0 4px 22px rgba(37, 99, 235, 0.5);
+            background: linear-gradient(135deg, #d4af37 0%, #b89728 100%);
+            color: #000000;
+            font-weight: 800;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 20px rgba(212, 175, 55, 0.35);
             transition: all 0.2s ease;
         }
 
         .glow-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 32px rgba(37, 99, 235, 0.75), 0 0 16px rgba(96, 165, 250, 0.5);
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 8px 30px rgba(212, 175, 55, 0.55);
+            background: linear-gradient(135deg, #fef08a 0%, #d4af37 100%);
         }
 
         .app-card {
-            background: rgba(10, 16, 32, 0.75);
-            border: 1px solid rgba(59, 130, 246, 0.2);
+            background: linear-gradient(180deg, #09090f 0%, #050508 100%);
+            border: 1px solid var(--border-soft);
             border-radius: 1.15rem;
-            padding: 1.6rem;
+            padding: 1.75rem;
             position: relative;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            min-height: 230px;
+            min-height: 240px;
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.85), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
@@ -146,15 +153,15 @@
         }
 
         .app-card.authorized:hover {
-            transform: translateY(-5px);
-            border-color: rgba(96, 165, 250, 0.8);
-            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.9), 0 0 35px rgba(59, 130, 246, 0.45);
-            background: rgba(15, 23, 42, 0.92);
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.24);
+            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.95), 0 0 25px rgba(212, 175, 55, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
+            background: linear-gradient(180deg, #0d0d15 0%, #07070c 100%);
         }
 
         .app-card.restricted {
-            opacity: 0.55;
-            filter: grayscale(40%);
+            opacity: 0.45;
+            filter: grayscale(60%);
             cursor: not-allowed;
             border-style: dashed;
         }
@@ -165,8 +172,9 @@
             position: sticky !important;
             top: 0 !important;
             z-index: 10 !important;
-            background: #0b1329 !important;
-            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12);
+            background: #000000 !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.95);
         }
 
         .shake {
@@ -180,11 +188,17 @@
             40%, 60% { transform: translate3d(4px, 0, 0); }
         }
 
-        .tab-switch-btn.active {
-            background: rgba(59, 130, 246, 0.28);
-            color: #ffffff;
-            border-color: rgba(96, 165, 250, 0.6);
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+            background: #000000;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
         }
     </style>
 </head>
@@ -193,22 +207,22 @@
     <div class="portal-wrapper">
 
         <!-- Top Header Bar (when authenticated) -->
-        <header id="portalHeader" class="w-full mb-8 flex justify-between items-center px-4 py-3 glass-card" style="display: none;">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold text-sm">
+        <header id="portalHeader" class="w-full mb-8 flex justify-between items-center px-5 py-3.5 glass-card" style="display: none;">
+            <div class="flex items-center gap-3.5">
+                <div class="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-[#d4af37] font-bold text-base shadow-inner">
                     ⬡
                 </div>
                 <div>
                     <h1 class="brand-title text-base font-bold text-white tracking-wide leading-none">NEXUS GATEWAY</h1>
-                    <span class="text-[11px] text-slate-400">Authenticated Access Session</span>
+                    <span class="text-[11px] text-zinc-400">Authenticated Access Session</span>
                 </div>
             </div>
 
             <div class="flex items-center gap-3">
-                <span id="userLabelBadge" class="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-semibold text-xs mono">
+                <span id="userLabelBadge" class="px-3.5 py-1 rounded-full bg-white/[0.04] border border-white/10 text-zinc-200 font-semibold text-xs mono">
                     Loading...
                 </span>
-                <button type="button" onclick="portal.lockSession()" class="px-3 py-1 rounded-lg bg-white/5 hover:bg-rose-500/20 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 text-xs font-semibold transition flex items-center gap-1.5">
+                <button type="button" onclick="portal.lockSession()" class="px-3.5 py-1.5 rounded-lg bg-white/[0.03] hover:bg-rose-500/15 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 text-xs font-semibold transition flex items-center gap-1.5">
                     <span>🔒</span> Logout
                 </button>
             </div>
@@ -216,18 +230,18 @@
 
         <!-- ================= PHASE 1: ACCESS GATE & JOIN FLOW ================= -->
         <div id="gateSection" class="w-full max-w-md glass-card p-8 text-center relative overflow-hidden">
-            <!-- Ambient top glow -->
-            <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+            <!-- Ambient top gold glow -->
+            <div class="absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-[#d4af37]/15 rounded-full blur-3xl pointer-events-none"></div>
 
-            <div class="w-16 h-16 mx-auto mb-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-3xl shadow-inner">
+            <div class="w-16 h-16 mx-auto mb-5 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-3xl shadow-inner">
                 🔐
             </div>
 
-            <h2 class="brand-title text-2xl font-extrabold text-white mb-1">Nexus Command Hub</h2>
-            <p class="text-xs text-slate-400 mb-6">Enter your personal access passcode to unlock your personalized command deck.</p>
+            <h2 class="brand-title-gold text-2xl font-extrabold text-white mb-1.5">Nexus Command Hub</h2>
+            <p class="text-xs text-zinc-400 mb-6">Enter your personal access passcode to unlock your personalized command deck.</p>
 
             <!-- Error Banner -->
-            <div id="errorAlert" class="hidden mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium flex items-center gap-2 text-left">
+            <div id="errorAlert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium flex items-center gap-2 text-left">
                 <span>⚠️</span>
                 <span id="errorMessage">Invalid access credentials.</span>
             </div>
@@ -235,14 +249,14 @@
             <!-- UNIFIED PASSCODE FORM -->
             <form id="passcodeForm" onsubmit="portal.handleVerify(event)" class="space-y-4">
                 <div class="relative">
-                    <input 
-                        type="password" 
-                        id="passcodeInput" 
-                        placeholder="ENTER ACCESS CODE..." 
+                    <input
+                        type="password"
+                        id="passcodeInput"
+                        placeholder="ENTER ACCESS CODE..."
                         autocomplete="off"
-                        class="input-box w-full px-4 py-3.5 rounded-xl mono text-center font-bold tracking-widest text-sm text-indigo-200 placeholder:text-slate-600 uppercase"
+                        class="input-box w-full px-4 py-3.5 rounded-xl mono text-center font-bold tracking-widest text-sm text-zinc-100 placeholder:text-zinc-600 uppercase"
                     >
-                    <button type="button" onclick="portal.toggleShowPasscode()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 text-xs">
+                    <button type="button" onclick="portal.toggleShowPasscode()" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 p-1 text-xs">
                         👁️
                     </button>
                 </div>
@@ -254,19 +268,19 @@
 
                 <!-- Optional Email OTP Collapsible Toggle -->
                 <div class="pt-2">
-                    <button type="button" onclick="portal.toggleEmailOtpView()" class="text-[11px] font-semibold text-slate-400 hover:text-indigo-300 transition">
+                    <button type="button" onclick="portal.toggleEmailOtpView()" class="text-[11px] font-semibold text-zinc-400 hover:text-zinc-200 transition">
                         ✉️ Have an Email Invite Code? Click here to verify via OTP
                     </button>
                 </div>
 
                 <!-- Collapsible Email OTP Drawer -->
                 <div id="emailOtpCollapsible" class="pt-3 border-t border-white/5 space-y-2.5 text-left" style="display: none;">
-                    <span class="text-[11px] font-semibold text-slate-400 block">Enter your registered email for one-time code:</span>
-                    <input 
-                        type="email" 
-                        id="friendEmailInput" 
-                        placeholder="your.email@example.com" 
-                        class="input-box w-full px-3 py-2 rounded-lg text-xs text-white placeholder:text-slate-600"
+                    <span class="text-[11px] font-semibold text-zinc-400 block">Enter your registered email for one-time code:</span>
+                    <input
+                        type="email"
+                        id="friendEmailInput"
+                        placeholder="your.email@example.com"
+                        class="input-box w-full px-3 py-2.5 rounded-lg text-xs text-white placeholder:text-zinc-600"
                     >
                     <button type="button" onclick="portal.handleRequestOtp(event)" id="btnRequestOtp" class="w-full py-2.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold text-xs flex items-center justify-center gap-2 transition">
                         <span>Send Email OTP</span>
@@ -274,7 +288,6 @@
                     </button>
                 </div>
             </form>
-        </div>
         </div>
 
 
@@ -284,7 +297,7 @@
             <div class="flex justify-between items-end mb-2">
                 <div>
                     <h2 class="brand-title text-2xl font-extrabold text-white">Your Authorized Command Deck</h2>
-                    <p class="text-xs text-slate-400">Applications and hubs unlocked for your profile.</p>
+                    <p class="text-xs text-zinc-400">Applications and hubs unlocked for your profile.</p>
                 </div>
             </div>
 
@@ -294,38 +307,38 @@
             </div>
 
             <!-- OWNER / ADMIN FRIEND & PASSCODE MANAGER -->
-            <div id="adminKeyManagerCard" class="glass-card p-6 border-indigo-500/30 relative" style="display: none;">
-                <div class="flex justify-between items-center mb-4">
+            <div id="adminKeyManagerCard" class="glass-card p-6 border-white/10 relative" style="display: none;">
+                <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-5">
                     <div>
                         <h3 class="brand-title text-lg font-bold text-white flex items-center gap-2">
                             <span>🔑</span> Friend Permissions & Scoped Invites
                         </h3>
-                        <p class="text-xs text-slate-400">Generate invite codes with specific section scopes and manage friend access.</p>
+                        <p class="text-xs text-zinc-400">Generate invite codes with specific section scopes and manage friend access.</p>
                     </div>
 
-                    <button type="button" onclick="portal.toggleGeneratorForm()" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition">
+                    <button type="button" onclick="portal.toggleGeneratorForm()" class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold text-xs flex items-center gap-1.5 transition">
                         <span>➕</span> Create Scoped Invite
                     </button>
                 </div>
 
                 <!-- Create Invite Drawer -->
-                <div id="generatorDrawer" class="p-4 rounded-xl bg-black/40 border border-white/10 mb-4" style="display: none;">
-                    <h4 class="text-xs font-bold text-indigo-300 uppercase tracking-wider mb-3">Create Scoped Invite</h4>
+                <div id="generatorDrawer" class="p-5 rounded-xl bg-black/60 border border-white/10 mb-5" style="display: none;">
+                    <h4 class="text-xs font-bold text-[#d4af37] uppercase tracking-wider mb-3">Create Scoped Invite</h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1 font-semibold">Friend Name / Label</label>
+                            <label class="block text-[11px] text-zinc-400 mb-1 font-semibold">Friend Name / Label</label>
                             <input type="text" id="newCodeLabel" placeholder="e.g. Alex, VIP Trader Group" class="input-box w-full px-3 py-2 rounded-lg text-xs">
                         </div>
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1 font-semibold">Restrict to Email (Optional)</label>
+                            <label class="block text-[11px] text-zinc-400 mb-1 font-semibold">Restrict to Email (Optional)</label>
                             <input type="email" id="newCodeEmailLock" placeholder="alex@gmail.com (Lock to single email)" class="input-box w-full px-3 py-2 rounded-lg text-xs">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1 font-semibold">Usage Limit (Max Uses):</label>
-                            <select id="newCodeMaxUses" class="input-box w-full px-3 py-2 rounded-lg text-xs bg-slate-900 border border-white/15 text-white">
+                            <label class="block text-[11px] text-zinc-400 mb-1 font-semibold">Usage Limit (Max Uses):</label>
+                            <select id="newCodeMaxUses" class="input-box w-full px-3 py-2 rounded-lg text-xs bg-black border border-white/15 text-white">
                                 <option value="1" selected>1 Use (Single-Use)</option>
                                 <option value="5">5 Uses</option>
                                 <option value="10">10 Uses</option>
@@ -335,8 +348,8 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1 font-semibold">Validity Timeframe (Expiry):</label>
-                            <select id="newCodeExpiry" class="input-box w-full px-3 py-2 rounded-lg text-xs bg-slate-900 border border-white/15 text-white">
+                            <label class="block text-[11px] text-zinc-400 mb-1 font-semibold">Validity Timeframe (Expiry):</label>
+                            <select id="newCodeExpiry" class="input-box w-full px-3 py-2 rounded-lg text-xs bg-black border border-white/15 text-white">
                                 <option value="0.0416">1 Hour (Quick Trial)</option>
                                 <option value="1">24 Hours (1 Day)</option>
                                 <option value="7" selected>7 Days (1 Week)</option>
@@ -347,63 +360,63 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-[11px] text-slate-400 mb-1 font-semibold">Custom Code (Optional):</label>
+                            <label class="block text-[11px] text-zinc-400 mb-1 font-semibold">Custom Code (Optional):</label>
                             <input type="text" id="newCustomCode" placeholder="e.g. VIP-ALEX-2026" class="input-box w-full px-3 py-2 rounded-lg text-xs mono uppercase">
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="block text-[11px] text-slate-400 mb-1.5 font-semibold">Allowed Section Scopes:</label>
+                    <div class="mb-4">
+                        <label class="block text-[11px] text-zinc-400 mb-1.5 font-semibold">Allowed Section Scopes:</label>
                         <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
-                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
-                                <input type="checkbox" id="scope_trips" checked>
+                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer hover:border-white/20 transition">
+                                <input type="checkbox" id="scope_trips" checked class="accent-[#d4af37]">
                                 <span>✈️ Trips</span>
                             </label>
-                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
-                                <input type="checkbox" id="scope_cards" checked>
+                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer hover:border-white/20 transition">
+                                <input type="checkbox" id="scope_cards" checked class="accent-[#d4af37]">
                                 <span>💳 Cards</span>
                             </label>
-                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
-                                <input type="checkbox" id="scope_net_worth" checked>
+                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer hover:border-white/20 transition">
+                                <input type="checkbox" id="scope_net_worth" checked class="accent-[#d4af37]">
                                 <span>💰 Net Worth</span>
                             </label>
-                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
-                                <input type="checkbox" id="scope_zepto" checked>
+                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer hover:border-white/20 transition">
+                                <input type="checkbox" id="scope_zepto" checked class="accent-[#d4af37]">
                                 <span>⚡ Zepto Store</span>
                             </label>
-                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer">
-                                <input type="checkbox" id="scope_dashboard">
+                            <label class="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 text-xs cursor-pointer hover:border-white/20 transition">
+                                <input type="checkbox" id="scope_dashboard" class="accent-[#d4af37]">
                                 <span>📈 Trading</span>
                             </label>
                         </div>
                     </div>
 
                     <div class="flex justify-end gap-2">
-                        <button type="button" onclick="portal.toggleGeneratorForm()" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 text-xs font-semibold">Cancel</button>
-                        <button type="button" onclick="portal.submitCreateInvite()" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">Generate Scoped Invite</button>
+                        <button type="button" onclick="portal.toggleGeneratorForm()" class="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 text-xs font-semibold">Cancel</button>
+                        <button type="button" onclick="portal.submitCreateInvite()" class="px-4 py-1.5 rounded-lg bg-white text-black font-bold text-xs hover:bg-zinc-200 transition">Generate Scoped Invite</button>
                     </div>
                 </div>
 
                 <!-- Active Invites List -->
                 <div class="mb-6">
-                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 flex items-center justify-between">
                         <span>Active Scoped Invites & Passcodes</span>
-                        <span id="inviteCountBadge" class="text-[10px] text-indigo-400 font-mono">0 active</span>
+                        <span id="inviteCountBadge" class="text-[10px] text-[#d4af37] font-mono">0 active</span>
                     </h4>
-                    <div class="overflow-x-auto rounded-lg border border-white/5">
+                    <div class="overflow-x-auto rounded-xl border border-white/10">
                         <table class="w-full text-left text-xs">
                             <thead>
-                                <tr class="bg-black/50 text-slate-400 font-semibold border-b border-white/10">
-                                    <th class="py-2 px-3">Invite Code</th>
-                                    <th class="py-2 px-3">Label / Recipient</th>
-                                    <th class="py-2 px-3">Allowed Scopes</th>
-                                    <th class="py-2 px-3">Uses / Max</th>
-                                    <th class="py-2 px-3">Valid Until</th>
-                                    <th class="py-2 px-3 text-right">Actions</th>
+                                <tr class="bg-black text-zinc-400 font-semibold border-b border-white/10">
+                                    <th class="py-2.5 px-3.5">Invite Code</th>
+                                    <th class="py-2.5 px-3.5">Label / Recipient</th>
+                                    <th class="py-2.5 px-3.5">Allowed Scopes</th>
+                                    <th class="py-2.5 px-3.5">Uses / Max</th>
+                                    <th class="py-2.5 px-3.5">Valid Until</th>
+                                    <th class="py-2.5 px-3.5 text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="invitesTableBody" class="divide-y divide-white/5">
-                                <tr><td colspan="6" class="text-center py-3 text-slate-500">Loading active invites...</td></tr>
+                            <tbody id="invitesTableBody" class="divide-y divide-white/5 bg-black/40">
+                                <tr><td colspan="6" class="text-center py-4 text-zinc-500">Loading active invites...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -411,21 +424,21 @@
 
                 <!-- Registered Friends Table -->
                 <div>
-                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Registered Friends & Access Permissions</h4>
-                    <div class="overflow-x-auto rounded-lg border border-white/5">
+                    <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Registered Friends & Access Permissions</h4>
+                    <div class="overflow-x-auto rounded-xl border border-white/10">
                         <table class="w-full text-left text-xs">
                             <thead>
-                                <tr class="bg-black/50 text-slate-400 font-semibold border-b border-white/10">
-                                    <th class="py-2 px-3">Friend / Email</th>
-                                    <th class="py-2 px-3">Role</th>
-                                    <th class="py-2 px-3">Trips Scope</th>
-                                    <th class="py-2 px-3">Cards Scope</th>
-                                    <th class="py-2 px-3">Net Worth Scope</th>
-                                    <th class="py-2 px-3 text-right">Actions</th>
+                                <tr class="bg-black text-zinc-400 font-semibold border-b border-white/10">
+                                    <th class="py-2.5 px-3.5">Friend / Email</th>
+                                    <th class="py-2.5 px-3.5">Role</th>
+                                    <th class="py-2.5 px-3.5">Trips Scope</th>
+                                    <th class="py-2.5 px-3.5">Cards Scope</th>
+                                    <th class="py-2.5 px-3.5">Net Worth Scope</th>
+                                    <th class="py-2.5 px-3.5 text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody id="friendsTableBody" class="divide-y divide-white/5">
-                                <tr><td colspan="6" class="text-center py-4 text-slate-500">Loading registered friends...</td></tr>
+                            <tbody id="friendsTableBody" class="divide-y divide-white/5 bg-black/40">
+                                <tr><td colspan="6" class="text-center py-4 text-zinc-500">Loading registered friends...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -437,65 +450,65 @@
     </div>
 
     <!-- ================= OTP VERIFICATION MODAL ================= -->
-    <div id="otpModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; align-items: center; justify-content: center; padding: 1rem;">
-        <div class="glass-card max-w-sm w-full p-6 text-center border-indigo-500/50">
-            <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-2xl mx-auto mb-3">
+    <div id="otpModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 99999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(12px);">
+        <div class="glass-card max-w-sm w-full p-6 text-center border-white/15">
+            <div class="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-2xl mx-auto mb-3">
                 ✉️
             </div>
             <h3 class="brand-title text-lg font-bold text-white mb-1">Enter 6-Digit OTP</h3>
-            <p id="otpModalSubtitle" class="text-xs text-slate-400 mb-4">We sent a verification code to your email.</p>
+            <p id="otpModalSubtitle" class="text-xs text-zinc-400 mb-4">We sent a verification code to your email.</p>
 
             <div class="mb-4">
-                <input 
-                    type="text" 
-                    id="otpInput" 
-                    maxlength="6" 
-                    placeholder="------" 
-                    class="input-box w-full px-4 py-3 rounded-xl mono text-center font-extrabold text-2xl tracking-[0.5em] text-cyan-300"
+                <input
+                    type="text"
+                    id="otpInput"
+                    maxlength="6"
+                    placeholder="------"
+                    class="input-box w-full px-4 py-3 rounded-xl mono text-center font-extrabold text-2xl tracking-[0.5em] text-white"
                 >
             </div>
 
             <div class="flex gap-2">
-                <button type="button" onclick="document.getElementById('otpModal').style.display='none'" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 text-xs font-semibold">Cancel</button>
+                <button type="button" onclick="document.getElementById('otpModal').style.display='none'" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 text-xs font-semibold">Cancel</button>
                 <button type="button" onclick="portal.submitVerifyOtp()" id="btnSubmitOtp" class="glow-btn flex-1 py-2.5 rounded-xl text-xs font-bold">Verify & Unlock</button>
             </div>
         </div>
     </div>
 
     <!-- ================= TRIPS & TRAVEL PLANS MODAL ================= -->
-    <div id="tripsModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; align-items: center; justify-content: center; padding: 1.5rem;">
-        <div class="glass-card max-w-2xl w-full p-6 border-indigo-500/40 max-h-[85vh] overflow-y-auto">
+    <div id="tripsModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 99999; align-items: center; justify-content: center; padding: 1.5rem; backdrop-filter: blur(12px);">
+        <div class="glass-card max-w-2xl w-full p-6 border-white/15 max-h-[85vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-3">
                 <div class="flex items-center gap-2.5">
                     <span class="text-2xl">✈️</span>
                     <div>
                         <h3 class="brand-title text-lg font-bold text-white">Trips & Personal Travel Itineraries</h3>
-                        <p class="text-xs text-slate-400">Upcoming journeys and curated travel plans.</p>
+                        <p class="text-xs text-zinc-400">Upcoming journeys and curated travel plans.</p>
                     </div>
                 </div>
-                <button type="button" onclick="document.getElementById('tripsModal').style.display='none'" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                <button type="button" onclick="document.getElementById('tripsModal').style.display='none'" class="text-zinc-400 hover:text-white font-bold p-1">✕</button>
             </div>
             <div id="tripsListContainer" class="space-y-3">
-                <p class="text-xs text-slate-500 text-center py-6">Loading itineraries...</p>
+                <p class="text-xs text-zinc-500 text-center py-6">Loading itineraries...</p>
             </div>
         </div>
     </div>
 
     <!-- ================= NET WORTH & WEALTH ALLOCATION MODAL ================= -->
-    <div id="netWorthModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; align-items: center; justify-content: center; padding: 1.5rem;">
-        <div class="glass-card max-w-xl w-full p-6 border-indigo-500/40">
+    <div id="netWorthModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 99999; align-items: center; justify-content: center; padding: 1.5rem; backdrop-filter: blur(12px);">
+        <div class="glass-card max-w-xl w-full p-6 border-white/15">
             <div class="flex justify-between items-center mb-4 border-b border-white/10 pb-3">
                 <div class="flex items-center gap-2.5">
                     <span class="text-2xl">💰</span>
                     <div>
                         <h3 class="brand-title text-lg font-bold text-white">High-Level Net Worth & Asset Allocation</h3>
-                        <p class="text-xs text-slate-400">Category breakdown and portfolio distribution.</p>
+                        <p class="text-xs text-zinc-400">Category breakdown and portfolio distribution.</p>
                     </div>
                 </div>
-                <button type="button" onclick="document.getElementById('netWorthModal').style.display='none'" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                <button type="button" onclick="document.getElementById('netWorthModal').style.display='none'" class="text-zinc-400 hover:text-white font-bold p-1">✕</button>
             </div>
             <div id="netWorthContainer" class="space-y-4">
-                <p class="text-xs text-slate-500 text-center py-6">Loading net worth snapshot...</p>
+                <p class="text-xs text-zinc-500 text-center py-6">Loading net worth snapshot...</p>
             </div>
         </div>
     </div>
@@ -507,7 +520,6 @@
             pendingOtpData: null,
 
             async init() {
-                // Check if invite/passcode was passed in URL query (e.g. /join?code=... or /portal?code=...)
                 const urlParams = new URLSearchParams(window.location.search);
                 const codeParam = urlParams.get('code') || urlParams.get('invite') || urlParams.get('passcode');
 
@@ -517,12 +529,10 @@
                     return;
                 }
 
-                // Check stored session
                 const storedCode = localStorage.getItem('ee_passcode');
                 if (storedCode) {
                     await this.verifyCode(storedCode, true);
                 } else {
-                    // Try session cookie
                     await this.checkActiveSession();
                 }
             },
@@ -539,6 +549,13 @@
                 const el = document.getElementById('passcodeInput');
                 if (!el) return;
                 el.type = el.type === 'password' ? 'text' : 'password';
+            },
+
+            toggleEmailOtpView() {
+                const drawer = document.getElementById('emailOtpCollapsible');
+                if (drawer) {
+                    drawer.style.display = drawer.style.display === 'none' ? 'block' : 'none';
+                }
             },
 
             async handleVerify(e) {
@@ -572,12 +589,10 @@
                         throw new Error(data.detail || 'Authentication failed');
                     }
 
-                    // Save session
                     this.session = data.user || data;
                     localStorage.setItem('ee_passcode', code);
                     localStorage.setItem('ee_friend_name', this.session.name || this.session.label || 'Nexus User');
 
-                    // Check for direct redirect (e.g. /portal?code=...&redirect=/trips or group invite)
                     const urlParams = new URLSearchParams(window.location.search);
                     const redirectUrl = urlParams.get('redirect');
                     if (redirectUrl && (redirectUrl.startsWith('/') || redirectUrl.startsWith(window.location.origin))) {
@@ -639,8 +654,7 @@
                     this.pendingOtpData = { code, email };
                     document.getElementById('otpModalSubtitle').textContent = `We sent a 6-digit code to ${email}`;
                     document.getElementById('otpModal').style.display = 'flex';
-                    
-                    // Auto-fill dev code if returned
+
                     if (data.dev_otp) {
                         document.getElementById('otpInput').value = data.dev_otp;
                     }
@@ -652,7 +666,7 @@
                 } finally {
                     if (btn) {
                         btn.disabled = false;
-                        btn.innerHTML = '<span>Send Verification Code (OTP)</span><span>✉️</span>';
+                        btn.innerHTML = '<span>Send Email OTP</span><span>✉️</span>';
                     }
                 }
             },
@@ -717,7 +731,7 @@
                 document.getElementById('gateSection').style.display = 'none';
                 document.getElementById('deckSection').style.display = 'block';
                 document.getElementById('portalHeader').style.display = 'flex';
-                
+
                 const isOwner = user.role === 'owner' || (user.scopes && user.scopes.includes('admin'));
                 document.getElementById('userLabelBadge').textContent = `${user.name || user.label} [${user.role || 'user'}]`;
 
@@ -741,7 +755,7 @@
                         id: 'credit_card',
                         name: 'Credit Card & Wealth Hub',
                         icon: '💳',
-                        description: 'Luxury obsidian card mockup, reward multiplier matrix, and spend simulator.',
+                        description: 'Luxury obsidian card visualizer, reward multiplier matrix, and spend simulator.',
                         badge: 'Luxury Finance',
                         path: '/credit-card',
                         is_auth: isOwner || scopes.includes('can_view_cards') || scopes.includes('credit_card'),
@@ -761,7 +775,7 @@
                         id: 'zepto',
                         name: 'Zepto Dark Store Hub',
                         icon: '⚡',
-                        description: 'Staffing matrix, MoM payroll, out-of-pocket expenses & ₹75L 50-50 partner equity ledger.',
+                        description: 'Staffing matrix, MoM payroll, store spend ledger & ₹75L 50-50 partner equity ledger.',
                         badge: 'Store Operations',
                         path: '/zepto',
                         is_auth: isOwner || scopes.includes('can_view_zepto') || scopes.includes('zepto'),
@@ -792,18 +806,18 @@
                         <div class="app-card ${app.is_auth ? 'authorized' : 'restricted'}" ${onclick}>
                             <div>
                                 <div class="flex justify-between items-start mb-4">
-                                    <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-2xl">
+                                    <div class="w-12 h-12 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-2xl shadow-inner">
                                         ${app.icon}
                                     </div>
                                     ${actionBadge}
                                 </div>
                                 <h3 class="brand-title text-lg font-bold text-white mb-1.5">${app.name}</h3>
-                                <p class="text-xs text-slate-400 leading-relaxed mb-6">${app.description}</p>
+                                <p class="text-xs text-zinc-400 leading-relaxed mb-6">${app.description}</p>
                             </div>
 
                             <div class="flex items-center justify-between pt-4 border-t border-white/5 mt-auto">
-                                <span class="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">${app.badge}</span>
-                                <span class="text-xs font-bold ${app.is_auth ? 'text-indigo-300' : 'text-slate-500'} flex items-center gap-1">
+                                <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">${app.badge}</span>
+                                <span class="text-xs font-bold ${app.is_auth ? 'text-zinc-200 hover:text-white' : 'text-zinc-600'} flex items-center gap-1">
                                     ${app.is_auth ? (app.is_modal ? 'View Hub ↗' : 'Launch App →') : 'Scope Missing'}
                                 </span>
                             </div>
@@ -811,7 +825,6 @@
                     `;
                 }).join('');
 
-                // If owner, show friend manager
                 const adminCard = document.getElementById('adminKeyManagerCard');
                 if (isOwner) {
                     adminCard.style.display = 'block';
@@ -835,25 +848,25 @@
 
                     const trips = data.trips || [];
                     if (!trips.length) {
-                        container.innerHTML = '<p class="text-xs text-slate-500 text-center py-6">No trips scheduled.</p>';
+                        container.innerHTML = '<p class="text-xs text-zinc-500 text-center py-6">No trips scheduled.</p>';
                         return;
                     }
 
                     container.innerHTML = trips.map(t => `
-                        <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10 hover:border-indigo-500/30 transition">
+                        <div class="p-4 rounded-xl bg-white/[0.02] border border-white/10 hover:border-white/20 transition">
                             <div class="flex justify-between items-start mb-2">
                                 <div>
                                     <h4 class="brand-title text-base font-bold text-white">${t.title}</h4>
-                                    <span class="text-xs text-cyan-400 font-semibold">📍 ${t.destination}</span>
+                                    <span class="text-xs text-[#38bdf8] font-semibold">📍 ${t.destination}</span>
                                 </div>
-                                <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${t.status === 'confirmed' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'} capitalize">
+                                <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${t.status === 'confirmed' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30'} capitalize">
                                     ${t.status}
                                 </span>
                             </div>
-                            <div class="flex items-center gap-4 text-xs text-slate-400 mb-2 mono">
+                            <div class="flex items-center gap-4 text-xs text-zinc-400 mb-2 mono">
                                 <span>📅 ${t.start_date} ${t.end_date ? '→ ' + t.end_date : ''}</span>
                             </div>
-                            <p class="text-xs text-slate-300 bg-black/30 p-2.5 rounded-lg border border-white/5">${t.notes || 'No extra notes.'}</p>
+                            <p class="text-xs text-zinc-300 bg-black/40 p-2.5 rounded-lg border border-white/5">${t.notes || 'No extra notes.'}</p>
                         </div>
                     `).join('');
                 } catch (err) {
@@ -871,21 +884,21 @@
 
                     const snap = data.snapshot;
                     if (!snap) {
-                        container.innerHTML = '<p class="text-xs text-slate-500 text-center py-6">No snapshot available.</p>';
+                        container.innerHTML = '<p class="text-xs text-zinc-500 text-center py-6">No snapshot available.</p>';
                         return;
                     }
 
                     const alloc = snap.allocation_pct || {};
                     let allocHtml = Object.entries(alloc).map(([k, v]) => `
                         <div class="flex justify-between items-center py-2 border-b border-white/5 text-xs">
-                            <span class="text-slate-300 font-medium">${k}</span>
-                            <span class="mono font-bold text-cyan-300">${v}%</span>
+                            <span class="text-zinc-300 font-medium">${k}</span>
+                            <span class="mono font-bold text-zinc-100">${v}%</span>
                         </div>
                     `).join('');
 
                     container.innerHTML = `
-                        <div class="p-5 rounded-2xl bg-gradient-to-br from-indigo-950/40 to-slate-900/60 border border-indigo-500/30 text-center">
-                            <span class="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block mb-1">Total Net Worth Range</span>
+                        <div class="p-5 rounded-2xl bg-gradient-to-b from-[#09090f] to-[#050508] border border-white/10 text-center">
+                            <span class="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider block mb-1">Total Net Worth Range</span>
                             <h3 class="brand-title text-3xl font-extrabold text-white mb-2">${snap.total_net_worth_band}</h3>
                             <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
                                 🚀 +${snap.yoy_growth_pct}% YoY Portfolio Growth
@@ -893,8 +906,8 @@
                         </div>
 
                         <div>
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Asset Allocation Matrix</h4>
-                            <div class="bg-black/30 p-3 rounded-xl border border-white/5">
+                            <h4 class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Asset Allocation Matrix</h4>
+                            <div class="bg-black/40 p-3.5 rounded-xl border border-white/5">
                                 ${allocHtml}
                             </div>
                         </div>
@@ -915,29 +928,29 @@
                     const friends = data.friends || [];
 
                     if (!friends.length) {
-                        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-slate-500">No friends onboarded yet. Create an invite above.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-zinc-500">No friends onboarded yet. Create an invite above.</td></tr>';
                         return;
                     }
 
                     tbody.innerHTML = friends.map(f => `
                         <tr class="hover:bg-white/[0.02] transition">
-                            <td class="py-2.5 px-3">
+                            <td class="py-3 px-3.5">
                                 <div class="font-bold text-white">${f.name}</div>
-                                <div class="text-[11px] text-slate-400 mono">${f.email}</div>
+                                <div class="text-[11px] text-zinc-400 mono">${f.email}</div>
                             </td>
-                            <td class="py-2.5 px-3">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${f.role === 'owner' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}">${f.role}</span>
+                            <td class="py-3 px-3.5">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${f.role === 'owner' ? 'bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30' : 'bg-white/10 text-zinc-300 border border-white/10'}">${f.role}</span>
                             </td>
-                            <td class="py-2.5 px-3">
-                                <input type="checkbox" onchange="portal.toggleFriendScope('${f.id}', 'can_view_trips', this.checked)" ${f.scopes.can_view_trips ? 'checked' : ''} class="cursor-pointer">
+                            <td class="py-3 px-3.5">
+                                <input type="checkbox" onchange="portal.toggleFriendScope('${f.id}', 'can_view_trips', this.checked)" ${f.scopes.can_view_trips ? 'checked' : ''} class="cursor-pointer accent-[#d4af37]">
                             </td>
-                            <td class="py-2.5 px-3">
-                                <input type="checkbox" onchange="portal.toggleFriendScope('${f.id}', 'can_view_cards', this.checked)" ${f.scopes.can_view_cards ? 'checked' : ''} class="cursor-pointer">
+                            <td class="py-3 px-3.5">
+                                <input type="checkbox" onchange="portal.toggleFriendScope('${f.id}', 'can_view_cards', this.checked)" ${f.scopes.can_view_cards ? 'checked' : ''} class="cursor-pointer accent-[#d4af37]">
                             </td>
-                            <td class="py-2.5 px-3">
-                                <input type="checkbox" onchange="portal.toggleFriendScope('${f.id}', 'can_view_net_worth', this.checked)" ${f.scopes.can_view_net_worth ? 'checked' : ''} class="cursor-pointer">
+                            <td class="py-3 px-3.5">
+                                <input type="checkbox" onchange="portal.toggleFriendScope('${f.id}', 'can_view_net_worth', this.checked)" ${f.scopes.can_view_net_worth ? 'checked' : ''} class="cursor-pointer accent-[#d4af37]">
                             </td>
-                            <td class="py-2.5 px-3 text-right">
+                            <td class="py-3 px-3.5 text-right">
                                 <button type="button" onclick="portal.revokeFriend('${f.id}')" class="text-rose-400 hover:text-rose-300 font-semibold" title="Revoke Friend Access">Revoke</button>
                             </td>
                         </tr>
@@ -960,7 +973,7 @@
                     if (countBadge) countBadge.textContent = `${invites.length} active`;
 
                     if (!invites.length) {
-                        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3 text-slate-500">No active invites. Click "Create Scoped Invite" to create one.</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-zinc-500">No active invites. Click "Create Scoped Invite" to create one.</td></tr>';
                         return;
                     }
 
@@ -976,38 +989,38 @@
                             } else {
                                 const diffHours = Math.round(diffMs / (1000 * 60 * 60));
                                 if (diffHours < 24) {
-                                    expDisplay = `<span class="text-amber-300 font-mono">⏳ ${diffHours}h left</span>`;
+                                    expDisplay = `<span class="text-[#d4af37] font-mono">⏳ ${diffHours}h left</span>`;
                                 } else {
                                     const diffDays = Math.round(diffHours / 24);
-                                    expDisplay = `<span class="text-indigo-300 font-mono">⏳ ${diffDays}d left</span>`;
+                                    expDisplay = `<span class="text-zinc-300 font-mono">⏳ ${diffDays}d left</span>`;
                                 }
                             }
                         }
 
                         const scopesHtml = (inv.scopes || []).map(s => {
                             let label = s.replace('can_view_', '');
-                            return `<span class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] text-indigo-300">${label}</span>`;
+                            return `<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] text-zinc-300">${label}</span>`;
                         }).join(' ');
 
                         return `
                             <tr class="hover:bg-white/[0.02] transition">
-                                <td class="py-2.5 px-3 font-mono font-bold text-indigo-400">${inv.code}</td>
-                                <td class="py-2.5 px-3">
+                                <td class="py-3 px-3.5 font-mono font-bold text-[#d4af37]">${inv.code}</td>
+                                <td class="py-3 px-3.5">
                                     <div class="font-semibold text-white">${inv.label}</div>
-                                    ${inv.allowed_email ? `<div class="text-[10px] text-slate-400 mono">🔒 ${inv.allowed_email}</div>` : ''}
+                                    ${inv.allowed_email ? `<div class="text-[10px] text-zinc-400 mono">🔒 ${inv.allowed_email}</div>` : ''}
                                 </td>
-                                <td class="py-2.5 px-3">${scopesHtml || '<span class="text-slate-500">None</span>'}</td>
-                                <td class="py-2.5 px-3 font-mono text-slate-300">${maxStr}</td>
-                                <td class="py-2.5 px-3">${expDisplay}</td>
-                                <td class="py-2.5 px-3 text-right whitespace-nowrap">
-                                    <button type="button" onclick="portal.copyInviteLink('${inv.code}')" class="px-2 py-1 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold text-xs mr-1" title="Copy join link">📋 Copy</button>
-                                    <button type="button" onclick="portal.deleteInvite('${inv.code}')" class="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-xs" title="Revoke & Delete Invite">🗑️</button>
+                                <td class="py-3 px-3.5">${scopesHtml || '<span class="text-zinc-500">None</span>'}</td>
+                                <td class="py-3 px-3.5 font-mono text-zinc-300">${maxStr}</td>
+                                <td class="py-3 px-3.5">${expDisplay}</td>
+                                <td class="py-3 px-3.5 text-right whitespace-nowrap">
+                                    <button type="button" onclick="portal.copyInviteLink('${inv.code}')" class="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs mr-1" title="Copy join link">📋 Copy</button>
+                                    <button type="button" onclick="portal.deleteInvite('${inv.code}')" class="px-2 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 font-bold text-xs" title="Revoke & Delete Invite">🗑️</button>
                                 </td>
                             </tr>
                         `;
                     }).join('');
                 } catch (e) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-rose-400">Failed loading invites: ${e.message}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-rose-400">Failed loading invites: ${e.message}</td></tr>`;
                 }
             },
 

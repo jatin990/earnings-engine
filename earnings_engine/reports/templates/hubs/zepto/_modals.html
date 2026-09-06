@@ -1,13 +1,13 @@
 <!-- ================= 1. ADD / EDIT EMPLOYEE MODAL ================= -->
 <div id="modalEmployee" style="display: none;"
-    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-panel max-w-2xl w-full p-6 border-purple-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel max-w-2xl w-full p-6 border-white/15 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <h3 class="text-base font-extrabold text-white flex items-center gap-2" id="modalEmployeeTitle">
                 <span>👤</span> Add Store Employee
             </h3>
             <button type="button" onclick="zeptoApp.closeModal('modalEmployee')"
-                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                class="text-slate-400 hover:text-white font-bold p-1 transition">✕</button>
         </div>
 
         <form id="formEmployee" onsubmit="zeptoApp.saveEmployee(event)" class="space-y-4 text-xs">
@@ -17,12 +17,12 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Full Name *</label>
                     <input type="text" id="empFormName" required placeholder="e.g. Rahul Sharma"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Role Profile *</label>
                     <select id="empFormRole" required
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                         <option value="PICKER">🛒 Picker</option>
                         <option value="SHIFT_INCHARGE">⚡ Shift Incharge</option>
                         <option value="SECURITY_GUARD">🛡️ Security Guard</option>
@@ -35,12 +35,12 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Phone Number</label>
                     <input type="tel" id="empFormPhone" placeholder="+91 98765 43210"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Email Address</label>
                     <input type="email" id="empFormEmail" placeholder="staff@darkstore.in"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
             </div>
 
@@ -48,7 +48,7 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Status</label>
                     <select id="empFormStatus"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                         <option value="ACTIVE">🟢 Active</option>
                         <option value="ON_PROBATION">🟡 On Probation</option>
                         <option value="RESIGNED">🔴 Resigned</option>
@@ -57,12 +57,12 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Monthly Base Salary (₹) *</label>
                     <input type="number" step="100" id="empFormSalary" required placeholder="18500"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Performance Rating (1-5 ⭐)</label>
                     <input type="number" step="0.1" min="1.0" max="5.0" id="empFormRating" value="5.0"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-amber-300 font-bold focus:outline-none focus:border-white/30 transition">
                 </div>
             </div>
 
@@ -70,23 +70,23 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Joining Date *</label>
                     <input type="date" id="empFormJoiningDate" required
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Resignation Date (If resigned)</label>
                     <input type="date" id="empFormResignationDate"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
             </div>
 
             <div id="resignationReasonGroup" class="space-y-1" style="display: none;">
                 <label class="block text-rose-300 font-semibold">Resignation Reason</label>
                 <input type="text" id="empFormResignationReason" placeholder="e.g. Better opportunity, relocation..."
-                    class="w-full bg-slate-900 border border-rose-500/30 rounded-lg px-3 py-2 text-white">
+                    class="w-full bg-black border border-rose-500/30 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-rose-400 transition">
             </div>
 
             <!-- Documents Upload Area -->
-            <div class="p-3 rounded-lg bg-black/40 border border-white/10 space-y-2">
+            <div class="p-3 rounded-lg bg-white/[0.02] border border-white/10 space-y-2">
                 <span class="font-bold text-slate-300 block">Attach Employee Documents:</span>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
@@ -108,12 +108,12 @@
                 <label class="block text-slate-300 font-semibold mb-1">Operational Notes & Performance Remarks</label>
                 <textarea id="empFormNotes" rows="2"
                     placeholder="e.g. Verified background check, morning shift preference..."
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
                 <button type="button" onclick="zeptoApp.closeModal('modalEmployee')"
-                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold transition">Cancel</button>
                 <button type="submit" id="btnSaveEmployee" class="btn-zepto font-bold">Save Staff Record</button>
             </div>
         </form>
@@ -123,8 +123,8 @@
 
 <!-- ================= 2. MOM SALARY DRILLDOWN & BONUS MODAL ================= -->
 <div id="modalSalaryDrilldown" style="display: none;"
-    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-panel max-w-3xl w-full p-6 border-purple-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel max-w-3xl w-full p-6 border-white/15 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <div>
                 <h3 class="text-base font-extrabold text-white flex items-center gap-2" id="modalSalaryEmpName">
@@ -133,19 +133,19 @@
                 <p class="text-xs text-slate-400" id="modalSalaryEmpMeta">Base Salary: ₹0 · Role: Picker</p>
             </div>
             <button type="button" onclick="zeptoApp.closeModal('modalSalaryDrilldown')"
-                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                class="text-slate-400 hover:text-white font-bold p-1 transition">✕</button>
         </div>
 
         <!-- Quick Performance Bonus Award Card -->
         <div
-            class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 mb-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+            class="p-3.5 rounded-xl bg-white/[0.02] border border-white/10 mb-4 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div>
-                <span class="font-bold text-xs text-purple-300 block">🎁 Award Instant Performance Bonus</span>
+                <span class="font-bold text-xs text-white block">🎁 Award Instant Performance Bonus</span>
                 <span class="text-[11px] text-slate-400">Bonus adds directly to current month compensation payout.</span>
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <input type="number" id="quickBonusInput" placeholder="Amount ₹"
-                    class="w-24 bg-slate-900 border border-purple-500/40 rounded-lg px-2.5 py-1.5 text-xs text-white">
+                    class="w-28 bg-black border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-white/30 transition">
                 <button type="button" onclick="zeptoApp.submitQuickBonus()" class="btn-zepto text-xs whitespace-nowrap">
                     + Award
                 </button>
@@ -159,7 +159,7 @@
         </div>
         <div class="overflow-x-auto rounded-lg border border-white/10">
             <table class="w-full text-left text-xs">
-                <thead class="bg-slate-900 text-slate-400 font-bold uppercase text-[10px]">
+                <thead class="bg-black text-slate-400 font-bold uppercase text-[10px] border-b border-white/10">
                     <tr>
                         <th class="p-2.5">Month</th>
                         <th class="p-2.5 text-center">Month Rating</th>
@@ -187,22 +187,22 @@
                 <div>
                     <label class="block text-[10px] text-slate-400 font-semibold mb-1">Month</label>
                     <input type="month" id="salSlipMonth" required
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-[10px] text-slate-400 font-semibold mb-1">Base Wage (₹)</label>
                     <input type="number" id="salSlipBase" required placeholder="Base (₹)"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-2 py-1.5 text-white font-mono focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-[10px] text-slate-400 font-semibold mb-1">Bonus (₹)</label>
                     <input type="number" id="salSlipBonus" value="0" placeholder="Bonus (₹)"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-2 py-1.5 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-2 py-1.5 text-white font-mono focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-[10px] text-slate-400 font-semibold mb-1">Rating (1-5)</label>
                     <input type="number" id="salSlipRating" value="5.0" min="1.0" max="5.0" step="0.1" placeholder="Rating"
-                        class="w-full bg-slate-900 border border-amber-500/30 rounded-lg px-2 py-1.5 text-amber-300 font-bold">
+                        class="w-full bg-black border border-white/15 rounded-lg px-2 py-1.5 text-amber-300 font-bold focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div class="flex items-end">
                     <button type="submit"
@@ -218,8 +218,8 @@
 
 <!-- ================= 2B. MONTHLY PERFORMANCE RATING MODAL ================= -->
 <div id="modalMonthlyRating" style="display: none;"
-    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-panel max-w-md w-full p-5 border-amber-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel max-w-md w-full p-5 border-white/15 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <div>
                 <h3 class="text-sm font-extrabold text-white flex items-center gap-2" id="modalRatingTitle">
@@ -228,7 +228,7 @@
                 <p class="text-[11px] text-slate-400" id="modalRatingSub">Log monthly review score & feedback</p>
             </div>
             <button type="button" onclick="zeptoApp.closeModal('modalMonthlyRating')"
-                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                class="text-slate-400 hover:text-white font-bold p-1 transition">✕</button>
         </div>
 
         <form id="formMonthlyRating" onsubmit="zeptoApp.saveMonthlyRating(event)" class="space-y-3.5 text-xs">
@@ -236,7 +236,7 @@
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Review Month *</label>
                 <input type="month" id="ratingMonthInput" required
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
             </div>
 
             <div>
@@ -253,14 +253,14 @@
                 <label class="block text-slate-300 font-semibold mb-1">Performance Remarks / Operational Feedback</label>
                 <textarea id="ratingFeedbackInput" rows="3"
                     placeholder="e.g. Maintained 99.8% picking accuracy, zero shift delays, proactive in warehouse organization..."
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
                 <button type="button" onclick="zeptoApp.closeModal('modalMonthlyRating')"
-                    class="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                    class="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold transition">Cancel</button>
                 <button type="submit" id="btnSaveMonthlyRating"
-                    class="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition">Save Monthly Rating</button>
+                    class="btn-zepto font-bold">Save Monthly Rating</button>
             </div>
         </form>
     </div>
@@ -269,14 +269,14 @@
 
 <!-- ================= 3. ADD STORE EXPENSE MODAL ================= -->
 <div id="modalExpense" style="display: none;"
-    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-panel max-w-lg w-full p-6 border-pink-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel max-w-lg w-full p-6 border-white/15 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <h3 class="text-base font-extrabold text-white flex items-center gap-2">
                 <span>🧾</span> Record Store Out-of-Pocket Expense
             </h3>
             <button type="button" onclick="zeptoApp.closeModal('modalExpense')"
-                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                class="text-slate-400 hover:text-white font-bold p-1 transition">✕</button>
         </div>
 
         <form id="formExpense" onsubmit="zeptoApp.saveExpense(event)" class="space-y-4 text-xs">
@@ -284,14 +284,14 @@
                 <label class="block text-slate-300 font-semibold mb-1">Expense Title / Item Name *</label>
                 <input type="text" id="expFormTitle" required
                     placeholder="e.g. Training Batch 1, Uniform Sets, Warehouse Racks..."
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Category *</label>
                     <select id="expFormCategory" required
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                         <option value="TRAINING">🎓 Training & Onboarding</option>
                         <option value="UNIFORMS_GEAR">👕 Uniforms & Gear</option>
                         <option value="EQUIPMENT">🏗️ Equipment & Racks</option>
@@ -305,7 +305,7 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Amount (₹) *</label>
                     <input type="number" step="1" id="expFormAmount" required placeholder="45000"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-white/30 transition">
                 </div>
             </div>
 
@@ -313,12 +313,12 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Expense Date *</label>
                     <input type="date" id="expFormDate" required
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Incurred By *</label>
                     <select id="expFormIncurred"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                         <option value="Jatin Abrol">Jatin Abrol</option>
                         <option value="Harshiv Bargotra">Harshiv Bargotra</option>
                         <option value="STORE_CASH">Store Cash</option>
@@ -329,7 +329,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Reimbursement Eligibility / Tracking</label>
-                    <select id="expFormReimbursementOption" class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    <select id="expFormReimbursementOption" class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                         <option value="NONE">❌ No / Optional (Direct Non-Claimable Spend)</option>
                         <option value="PENDING" selected>⏳ Yes, Track as Pending Reimbursement</option>
                         <option value="SETTLED">✅ Yes, Already Reimbursed / Settled</option>
@@ -346,15 +346,13 @@
                 <label class="block text-slate-300 font-semibold mb-1">Expense Notes</label>
                 <textarea id="expFormNotes" rows="2"
                     placeholder="e.g. Paid directly via card for picker safety jackets..."
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
                 <button type="button" onclick="zeptoApp.closeModal('modalExpense')"
-                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
-                <button type="submit" id="btnSaveExpense"
-                    class="px-4 py-2 rounded-lg bg-pink-600 hover:bg-pink-500 text-white font-bold">Save
-                    Expense</button>
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold transition">Cancel</button>
+                <button type="submit" id="btnSaveExpense" class="btn-zepto font-bold">Save Expense</button>
             </div>
         </form>
     </div>
@@ -363,14 +361,14 @@
 
 <!-- ================= 4. ADD / EDIT CANDIDATE MODAL ================= -->
 <div id="modalCandidate" style="display: none;"
-    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-panel max-w-lg w-full p-6 border-purple-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel max-w-lg w-full p-6 border-white/15 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <h3 class="text-base font-extrabold text-white flex items-center gap-2" id="modalCandidateTitle">
                 <span>🎯</span> Add Prospective Candidate
             </h3>
             <button type="button" onclick="zeptoApp.closeModal('modalCandidate')"
-                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                class="text-slate-400 hover:text-white font-bold p-1 transition">✕</button>
         </div>
 
         <form id="formCandidate" onsubmit="zeptoApp.saveCandidate(event)" class="space-y-4 text-xs">
@@ -379,19 +377,19 @@
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Candidate Name *</label>
                 <input type="text" id="candFormName" required placeholder="e.g. Rohit Verma"
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Phone Number</label>
                     <input type="tel" id="candFormPhone" placeholder="+91 99887 66554"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Email Address</label>
                     <input type="email" id="candFormEmail" placeholder="candidate@gmail.com"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
             </div>
 
@@ -399,7 +397,7 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Target Role Profile *</label>
                     <select id="candFormRole" required
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                         <option value="PICKER">🛒 Picker</option>
                         <option value="SHIFT_INCHARGE">⚡ Shift Incharge</option>
                         <option value="SECURITY_GUARD">🛡️ Security Guard</option>
@@ -409,7 +407,7 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Pipeline Stage *</label>
                     <select id="candFormStage"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                         <option value="APPLIED">📥 Applied</option>
                         <option value="INTERVIEWING">🗣️ Interviewing</option>
                         <option value="SHORTLISTED">⭐ Shortlisted</option>
@@ -423,12 +421,12 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Expected Salary (₹)</label>
                     <input type="number" id="candFormSalary" placeholder="18000"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Candidate Rating (1-5 ⭐)</label>
                     <input type="number" step="0.1" min="1.0" max="5.0" id="candFormRating" value="4.5"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-amber-300 font-bold focus:outline-none focus:border-white/30 transition">
                 </div>
             </div>
 
@@ -449,12 +447,12 @@
                 <label class="block text-slate-300 font-semibold mb-1">Interview Feedback & Notes</label>
                 <textarea id="candFormNotes" rows="2"
                     placeholder="e.g. Previous experience at grocery warehouse, good speed..."
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
                 <button type="button" onclick="zeptoApp.closeModal('modalCandidate')"
-                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold transition">Cancel</button>
                 <button type="submit" id="btnSaveCandidate" class="btn-zepto font-bold">Save Candidate</button>
             </div>
         </form>
@@ -464,34 +462,34 @@
 
 <!-- ================= 5. ONE-CLICK HIRE / CONVERT CANDIDATE MODAL ================= -->
 <div id="modalConvertCandidate" style="display: none;"
-    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-panel max-w-md w-full p-6 border-emerald-500/40">
+    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel max-w-md w-full p-6 border-white/15 shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <h3 class="text-base font-extrabold text-emerald-400 flex items-center gap-2">
                 <span>🎉</span> Convert Candidate to Active Employee
             </h3>
             <button type="button" onclick="zeptoApp.closeModal('modalConvertCandidate')"
-                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                class="text-slate-400 hover:text-white font-bold p-1 transition">✕</button>
         </div>
 
         <form id="formConvertCandidate" onsubmit="zeptoApp.submitConvertCandidate(event)" class="space-y-4 text-xs">
             <input type="hidden" id="convertCandId">
 
-            <div class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+            <div class="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
                 <span class="font-bold text-white block text-sm" id="convertCandName">Candidate Name</span>
-                <span class="text-slate-300 text-xs" id="convertCandMeta">Role: PICKER</span>
+                <span class="text-emerald-300 text-xs font-mono" id="convertCandMeta">Role: PICKER</span>
             </div>
 
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Official Joining Date *</label>
                 <input type="date" id="convertJoiningDate" required
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
             </div>
 
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Agreed Monthly Starting Salary (₹) *</label>
                 <input type="number" id="convertStartingSalary" required
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono">
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-white/30 transition">
             </div>
 
             <p class="text-[11px] text-slate-400">
@@ -500,10 +498,9 @@
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
                 <button type="button" onclick="zeptoApp.closeModal('modalConvertCandidate')"
-                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold transition">Cancel</button>
                 <button type="submit" id="btnSubmitConvert"
-                    class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">Confirm & Hire
-                    Staff</button>
+                    class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition shadow-md">Confirm & Hire Staff</button>
             </div>
         </form>
     </div>
@@ -512,14 +509,14 @@
 
 <!-- ================= 6. RECORD / EDIT CAPITAL TRANCHE MODAL ================= -->
 <div id="modalTranche" style="display: none;"
-    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-panel max-w-lg w-full p-6 border-amber-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel max-w-lg w-full p-6 border-white/15 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
-            <h3 id="modalTrancheTitle" class="text-base font-extrabold text-amber-400 flex items-center gap-2">
+            <h3 id="modalTrancheTitle" class="text-base font-extrabold text-amber-300 flex items-center gap-2">
                 <span>💰</span> Record Zepto Security Capital Tranche
             </h3>
             <button type="button" onclick="zeptoApp.closeModal('modalTranche')"
-                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                class="text-slate-400 hover:text-white font-bold p-1 transition">✕</button>
         </div>
 
         <form id="formTranche" onsubmit="zeptoApp.saveTranche(event)" class="space-y-4 text-xs">
@@ -529,19 +526,19 @@
                 <label class="block text-slate-300 font-semibold mb-1">Tranche Title / Description *</label>
                 <input type="text" id="trancheFormTitle" required
                     placeholder="e.g. Franchise Security Tranche 3, Capex Deposit..."
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Amount Sent (₹) *</label>
                     <input type="number" step="1000" id="trancheFormAmount" required placeholder="1000000"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono font-bold text-amber-300">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-amber-300 font-mono font-bold focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Payment Date *</label>
                     <input type="date" id="trancheFormDate" required
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
             </div>
 
@@ -549,7 +546,7 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Paid By (50-50 Partner) *</label>
                     <select id="trancheFormPartner" required
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                         <option value="Jatin Abrol">Jatin Abrol</option>
                         <option value="Harshiv Bargotra">Harshiv Bargotra</option>
                     </select>
@@ -557,7 +554,7 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Payment Mode</label>
                     <select id="trancheFormMode"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                         <option value="NEFT_RTGS">NEFT / RTGS Bank Transfer</option>
                         <option value="IMPS">IMPS Instant Transfer</option>
                         <option value="CHEQUE">Bank Cheque / DD</option>
@@ -568,7 +565,7 @@
             <div>
                 <label class="block text-slate-300 font-semibold mb-1">Bank Reference / UTR Number</label>
                 <input type="text" id="trancheFormUtr" placeholder="e.g. HDFC20260829001928"
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white font-mono uppercase">
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white font-mono uppercase focus:outline-none focus:border-white/30 transition">
             </div>
 
             <div>
@@ -585,23 +582,22 @@
                 <label class="block text-slate-300 font-semibold mb-1">Tranche Notes</label>
                 <textarea id="trancheFormNotes" rows="2"
                     placeholder="e.g. Sent to Zepto operations official escrow account..."
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
                 <button type="button" onclick="zeptoApp.closeModal('modalTranche')"
-                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold transition">Cancel</button>
                 <button type="submit" id="btnSaveTranche"
-                    class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold">Save
-                    Tranche</button>
+                    class="btn-zepto font-bold">Save Tranche</button>
             </div>
         </form>
     </div>
 </div>
 
 <!-- Modal 6: Configure Staffing Requirements & Role Base Pay -->
-<div id="modalStaffingTargets" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 hidden">
-    <div class="glass-panel w-full max-w-xl p-6 border-purple-500/40 relative shadow-2xl">
+<div id="modalStaffingTargets" class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 hidden">
+    <div class="glass-panel w-full max-w-xl p-6 border-white/15 relative shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <div>
                 <h3 class="text-base font-bold text-white flex items-center gap-2">
@@ -609,29 +605,29 @@
                 </h3>
                 <p class="text-xs text-slate-400 mt-0.5">Customize active staffing capacity thresholds and benchmark monthly base pay per role.</p>
             </div>
-            <button type="button" onclick="zeptoApp.closeModal('modalStaffingTargets')" class="text-slate-400 hover:text-white text-lg">✕</button>
+            <button type="button" onclick="zeptoApp.closeModal('modalStaffingTargets')" class="text-slate-400 hover:text-white text-lg transition">✕</button>
         </div>
 
         <form id="formStaffingTargets" onsubmit="zeptoApp.saveStaffingTargets(event)" class="space-y-4 text-xs">
             <div class="space-y-3">
                 <!-- 1. Pickers -->
-                <div class="p-3 rounded-xl bg-purple-500/[0.06] border border-purple-500/20 space-y-2">
+                <div class="glass-panel-sub p-3 space-y-2">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-lg">🛒</span>
                             <div>
-                                <div class="text-xs font-bold text-purple-200">Pickers</div>
+                                <div class="text-xs font-bold text-white">Pickers</div>
                                 <div class="text-[10px] text-slate-400">Order item picking, bagging & shelf staging</div>
                             </div>
                         </div>
-                        <span class="text-[11px] font-mono text-purple-300 font-bold" id="roleProjected-PICKER">₹1,62,000/mo</span>
+                        <span class="text-[11px] font-mono text-white font-bold" id="roleProjected-PICKER">₹1,62,000/mo</span>
                     </div>
                     <div class="grid grid-cols-2 gap-3 pt-1">
                         <div>
                             <label class="block text-[10px] text-slate-400 font-semibold mb-1">Target Headcount</label>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" id="targetInput-PICKER" min="0" max="100" required value="9"
-                                    class="w-full bg-slate-900 border border-purple-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-purple-400">
+                                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-white/30 transition">
                                 <span class="text-slate-400 text-[11px]">Staff</span>
                             </div>
                         </div>
@@ -639,7 +635,7 @@
                             <label class="block text-[10px] text-slate-400 font-semibold mb-1">Monthly Base Pay (₹)</label>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" id="payInput-PICKER" min="0" step="500" required value="18000"
-                                    class="w-full bg-slate-900 border border-purple-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-purple-400">
+                                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-white/30 transition">
                                 <span class="text-slate-400 text-[11px]">/mo</span>
                             </div>
                         </div>
@@ -647,23 +643,23 @@
                 </div>
 
                 <!-- 2. Shift Incharges -->
-                <div class="p-3 rounded-xl bg-indigo-500/[0.06] border border-indigo-500/20 space-y-2">
+                <div class="glass-panel-sub p-3 space-y-2">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-lg">⚡</span>
                             <div>
-                                <div class="text-xs font-bold text-indigo-200">Shift Incharges</div>
+                                <div class="text-xs font-bold text-sky-300">Shift Incharges</div>
                                 <div class="text-[10px] text-slate-400">Shift supervision, dispatch & accuracy lead</div>
                             </div>
                         </div>
-                        <span class="text-[11px] font-mono text-indigo-300 font-bold" id="roleProjected-SHIFT_INCHARGE">₹75,000/mo</span>
+                        <span class="text-[11px] font-mono text-sky-300 font-bold" id="roleProjected-SHIFT_INCHARGE">₹75,000/mo</span>
                     </div>
                     <div class="grid grid-cols-2 gap-3 pt-1">
                         <div>
                             <label class="block text-[10px] text-slate-400 font-semibold mb-1">Target Headcount</label>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" id="targetInput-SHIFT_INCHARGE" min="0" max="50" required value="3"
-                                    class="w-full bg-slate-900 border border-indigo-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-indigo-400">
+                                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-white/30 transition">
                                 <span class="text-slate-400 text-[11px]">Staff</span>
                             </div>
                         </div>
@@ -671,7 +667,7 @@
                             <label class="block text-[10px] text-slate-400 font-semibold mb-1">Monthly Base Pay (₹)</label>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" id="payInput-SHIFT_INCHARGE" min="0" step="500" required value="25000"
-                                    class="w-full bg-slate-900 border border-indigo-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-indigo-400">
+                                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-white/30 transition">
                                 <span class="text-slate-400 text-[11px]">/mo</span>
                             </div>
                         </div>
@@ -679,23 +675,23 @@
                 </div>
 
                 <!-- 3. Security Guards -->
-                <div class="p-3 rounded-xl bg-blue-500/[0.06] border border-blue-500/20 space-y-2">
+                <div class="glass-panel-sub p-3 space-y-2">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-lg">🛡️</span>
                             <div>
-                                <div class="text-xs font-bold text-blue-200">Security Guards</div>
+                                <div class="text-xs font-bold text-amber-300">Security Guards</div>
                                 <div class="text-[10px] text-slate-400">Store gate security & 24/7 inventory safety</div>
                             </div>
                         </div>
-                        <span class="text-[11px] font-mono text-blue-300 font-bold" id="roleProjected-SECURITY_GUARD">₹32,000/mo</span>
+                        <span class="text-[11px] font-mono text-amber-300 font-bold" id="roleProjected-SECURITY_GUARD">₹32,000/mo</span>
                     </div>
                     <div class="grid grid-cols-2 gap-3 pt-1">
                         <div>
                             <label class="block text-[10px] text-slate-400 font-semibold mb-1">Target Headcount</label>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" id="targetInput-SECURITY_GUARD" min="0" max="20" required value="2"
-                                    class="w-full bg-slate-900 border border-blue-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-blue-400">
+                                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-white/30 transition">
                                 <span class="text-slate-400 text-[11px]">Staff</span>
                             </div>
                         </div>
@@ -703,7 +699,7 @@
                             <label class="block text-[10px] text-slate-400 font-semibold mb-1">Monthly Base Pay (₹)</label>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" id="payInput-SECURITY_GUARD" min="0" step="500" required value="16000"
-                                    class="w-full bg-slate-900 border border-blue-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-blue-400">
+                                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-white/30 transition">
                                 <span class="text-slate-400 text-[11px]">/mo</span>
                             </div>
                         </div>
@@ -711,12 +707,12 @@
                 </div>
 
                 <!-- 4. House Keeping -->
-                <div class="p-3 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/20 space-y-2">
+                <div class="glass-panel-sub p-3 space-y-2">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span class="text-lg">🧹</span>
                             <div>
-                                <div class="text-xs font-bold text-emerald-200">House Keeping</div>
+                                <div class="text-xs font-bold text-emerald-300">House Keeping</div>
                                 <div class="text-[10px] text-slate-400">Warehouse floor sanitation & spill cleaning</div>
                             </div>
                         </div>
@@ -727,7 +723,7 @@
                             <label class="block text-[10px] text-slate-400 font-semibold mb-1">Target Headcount</label>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" id="targetInput-HOUSEKEEPING" min="0" max="20" required value="1"
-                                    class="w-full bg-slate-900 border border-emerald-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-emerald-400">
+                                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-white/30 transition">
                                 <span class="text-slate-400 text-[11px]">Staff</span>
                             </div>
                         </div>
@@ -735,7 +731,7 @@
                             <label class="block text-[10px] text-slate-400 font-semibold mb-1">Monthly Base Pay (₹)</label>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" id="payInput-HOUSEKEEPING" min="0" step="500" required value="14000"
-                                    class="w-full bg-slate-900 border border-emerald-500/40 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-emerald-400">
+                                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-1.5 text-white font-mono font-bold text-xs focus:outline-none focus:border-white/30 transition">
                                 <span class="text-slate-400 text-[11px]">/mo</span>
                             </div>
                         </div>
@@ -747,7 +743,7 @@
             <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 grid grid-cols-2 gap-3 text-xs">
                 <div>
                     <span class="text-slate-400 block text-[10px] uppercase font-semibold">Total Target Headcount</span>
-                    <span class="font-mono font-extrabold text-purple-300 text-sm" id="modalTargetTotalCount">15 Staff</span>
+                    <span class="font-mono font-extrabold text-white text-sm" id="modalTargetTotalCount">15 Staff</span>
                 </div>
                 <div class="text-right">
                     <span class="text-slate-400 block text-[10px] uppercase font-semibold">Projected Target Payroll</span>
@@ -757,9 +753,9 @@
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
                 <button type="button" onclick="zeptoApp.closeModal('modalStaffingTargets')"
-                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold transition">Cancel</button>
                 <button type="submit" id="btnSaveStaffingTargets"
-                    class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition">Save Configurations</button>
+                    class="btn-zepto font-bold">Save Configurations</button>
             </div>
         </form>
     </div>
@@ -768,14 +764,14 @@
 
 <!-- ================= 7. RECORD / EDIT STORE INCOME MODAL ================= -->
 <div id="modalIncome" style="display: none;"
-    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-panel max-w-xl w-full p-6 border-emerald-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel max-w-xl w-full p-6 border-white/15 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <h3 class="text-base font-extrabold text-white flex items-center gap-2" id="modalIncomeTitle">
                 <span>💵</span> Record Store Income Payment
             </h3>
             <button type="button" onclick="zeptoApp.closeModal('modalIncome')"
-                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                class="text-slate-400 hover:text-white font-bold p-1 transition">✕</button>
         </div>
 
         <form id="formIncome" onsubmit="zeptoApp.saveIncome(event)" class="space-y-4 text-xs">
@@ -785,14 +781,14 @@
                 <label class="block text-slate-300 font-semibold mb-1">Income Title / Payout Description *</label>
                 <input type="text" id="incFormTitle" required
                     placeholder="e.g. Zepto Dark Store Commission Payout, Peak Surge Incentive..."
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Income Stream / Category *</label>
                     <select id="incFormSource" required
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                         <option value="COMMISSION">🛍️ Order Commission (Base Margin)</option>
                         <option value="GROWTH_INCENTIVE">🚀 SLA & Growth Incentive</option>
                         <option value="ORDER_SLOTTING">🏷️ Brand Slotting Fee</option>
@@ -803,31 +799,31 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Payment Date *</label>
                     <input type="date" id="incFormDate" required
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
             </div>
 
             <!-- Financials: Gross, Deductions, Net -->
-            <div class="p-3.5 rounded-xl bg-black/40 border border-white/10 space-y-3">
+            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/10 space-y-3">
                 <div class="grid grid-cols-3 gap-3">
                     <div>
                         <label class="block text-[11px] text-slate-300 font-semibold mb-1">Gross Invoiced (₹) *</label>
                         <input type="number" id="incFormGross" required min="0" step="0.01"
                             oninput="zeptoApp.calculateIncomeNetAndSplit()"
                             placeholder="0.00"
-                            class="w-full bg-slate-900 border border-white/20 rounded-lg px-3 py-1.5 text-white font-mono font-bold">
+                            class="w-full bg-black border border-white/20 rounded-lg px-3 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-white/30 transition">
                     </div>
                     <div>
                         <label class="block text-[11px] text-slate-300 font-semibold mb-1">TDS / Deductions (₹)</label>
                         <input type="number" id="incFormDeductions" min="0" step="0.01" value="0"
                             oninput="zeptoApp.calculateIncomeNetAndSplit()"
                             placeholder="0.00"
-                            class="w-full bg-slate-900 border border-rose-500/30 rounded-lg px-3 py-1.5 text-rose-300 font-mono font-bold">
+                            class="w-full bg-black border border-rose-500/30 rounded-lg px-3 py-1.5 text-rose-300 font-mono font-bold focus:outline-none focus:border-rose-400 transition">
                     </div>
                     <div>
                         <label class="block text-[11px] text-emerald-400 font-semibold mb-1">Net Received (₹)</label>
                         <input type="number" id="incFormNet" readonly
-                            class="w-full bg-slate-900/80 border border-emerald-500/40 rounded-lg px-3 py-1.5 text-emerald-300 font-mono font-black text-sm">
+                            class="w-full bg-black border border-emerald-500/40 rounded-lg px-3 py-1.5 text-emerald-300 font-mono font-black text-sm">
                     </div>
                 </div>
 
@@ -839,25 +835,25 @@
                             <span class="text-[10px] text-slate-400">Jatin %:</span>
                             <input type="number" id="incFormP1Pct" min="0" max="100" step="0.5" value="50"
                                 oninput="zeptoApp.onFormP1PctChange(this.value)"
-                                class="w-14 bg-slate-900 border border-purple-500/40 rounded px-1.5 py-0.5 text-purple-300 font-mono font-bold text-center text-xs">
+                                class="w-14 bg-black border border-white/20 rounded px-1.5 py-0.5 text-amber-300 font-mono font-bold text-center text-xs focus:outline-none focus:border-white/40">
                             <span class="text-[10px] text-slate-400">Harshiv %:</span>
                             <input type="number" id="incFormP2Pct" min="0" max="100" step="0.5" value="50"
                                 oninput="zeptoApp.onFormP2PctChange(this.value)"
-                                class="w-14 bg-slate-900 border border-pink-500/40 rounded px-1.5 py-0.5 text-pink-300 font-mono font-bold text-center text-xs">
+                                class="w-14 bg-black border border-white/20 rounded px-1.5 py-0.5 text-sky-300 font-mono font-bold text-center text-xs focus:outline-none focus:border-white/40">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-3 text-xs">
-                        <div class="p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/30 flex justify-between items-center">
+                        <div class="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 flex justify-between items-center">
                             <div>
                                 <span class="text-[10px] text-slate-400 block font-semibold">Jatin Abrol (<span id="incModalP1PctLabel">50%</span>)</span>
-                                <span class="font-mono font-black text-purple-300 text-sm" id="incModalP1Amt">₹0</span>
+                                <span class="font-mono font-black text-amber-300 text-sm" id="incModalP1Amt">₹0</span>
                             </div>
                             <span class="text-sm">👑</span>
                         </div>
-                        <div class="p-2.5 rounded-lg bg-pink-500/10 border border-pink-500/30 flex justify-between items-center">
+                        <div class="p-2.5 rounded-lg bg-sky-500/10 border border-sky-500/25 flex justify-between items-center">
                             <div>
                                 <span class="text-[10px] text-slate-400 block font-semibold">Harshiv Bargotra (<span id="incModalP2PctLabel">50%</span>)</span>
-                                <span class="font-mono font-black text-pink-300 text-sm" id="incModalP2Amt">₹0</span>
+                                <span class="font-mono font-black text-sky-300 text-sm" id="incModalP2Amt">₹0</span>
                             </div>
                             <span class="text-sm">⚡</span>
                         </div>
@@ -869,7 +865,7 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Payment Mode</label>
                     <select id="incFormPaymentMode"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                         <option value="BANK_TRANSFER">🏦 Direct Bank Transfer / NEFT</option>
                         <option value="ZEPTO_ESCROW">⚡ Zepto Escrow Settlement</option>
                         <option value="UPI">📱 UPI Payment</option>
@@ -879,7 +875,7 @@
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Reference UTR / Invoice No.</label>
                     <input type="text" id="incFormUtr" placeholder="e.g. ZEPTO-COM-202608-9901"
-                        class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition">
                 </div>
             </div>
 
@@ -894,12 +890,12 @@
                 <label class="block text-slate-300 font-semibold mb-1">Remarks & Settlement Notes</label>
                 <textarea id="incFormNotes" rows="2"
                     placeholder="e.g. Approved monthly billing cycle payout from Zepto Hub Escrow..."
-                    class="w-full bg-slate-900 border border-white/15 rounded-lg px-3 py-2 text-white"></textarea>
+                    class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-white/30 transition"></textarea>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
                 <button type="button" onclick="zeptoApp.closeModal('modalIncome')"
-                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold transition">Cancel</button>
                 <button type="submit" id="btnSaveIncome" class="btn-zepto font-bold">Save Income Record</button>
             </div>
         </form>
@@ -909,8 +905,8 @@
 
 <!-- ================= 8. CUSTOMIZE PARTNER SPLIT RATIO MODAL ================= -->
 <div id="modalIncomeSplitSettings" style="display: none;"
-    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-panel max-w-md w-full p-6 border-purple-500/40 max-h-[90vh] overflow-y-auto custom-scrollbar">
+    class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel max-w-md w-full p-6 border-white/15 max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
         <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-4">
             <div>
                 <h3 class="text-base font-extrabold text-white flex items-center gap-2">
@@ -919,7 +915,7 @@
                 <p class="text-xs text-slate-400">Configure default profit share % between Jatin & Harshiv</p>
             </div>
             <button type="button" onclick="zeptoApp.closeModal('modalIncomeSplitSettings')"
-                class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                class="text-slate-400 hover:text-white font-bold p-1 transition">✕</button>
         </div>
 
         <form id="formIncomeSplit" onsubmit="zeptoApp.saveIncomeSplitSettings(event)" class="space-y-4 text-xs">
@@ -927,29 +923,29 @@
             <div>
                 <label class="block text-slate-400 font-semibold text-[11px] mb-1.5 uppercase">Quick Preset Ratios:</label>
                 <div class="grid grid-cols-4 gap-1.5">
-                    <button type="button" onclick="zeptoApp.setSplitPreset(50, 50)" class="py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 font-mono font-bold text-center transition">
+                    <button type="button" onclick="zeptoApp.setSplitPreset(50, 50)" class="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/15 text-white font-mono font-bold text-center transition">
                         50 - 50
                     </button>
-                    <button type="button" onclick="zeptoApp.setSplitPreset(60, 40)" class="py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 font-mono font-bold text-center transition">
+                    <button type="button" onclick="zeptoApp.setSplitPreset(60, 40)" class="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/15 text-white font-mono font-bold text-center transition">
                         60 - 40
                     </button>
-                    <button type="button" onclick="zeptoApp.setSplitPreset(70, 30)" class="py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 font-mono font-bold text-center transition">
+                    <button type="button" onclick="zeptoApp.setSplitPreset(70, 30)" class="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/15 text-white font-mono font-bold text-center transition">
                         70 - 30
                     </button>
-                    <button type="button" onclick="zeptoApp.setSplitPreset(55, 45)" class="py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 font-mono font-bold text-center transition">
+                    <button type="button" onclick="zeptoApp.setSplitPreset(55, 45)" class="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/15 text-white font-mono font-bold text-center transition">
                         55 - 45
                     </button>
                 </div>
             </div>
 
             <!-- Two-tone split visual -->
-            <div class="space-y-2 p-3.5 rounded-xl bg-black/40 border border-white/10">
+            <div class="space-y-2 p-3.5 rounded-xl bg-white/[0.02] border border-white/10">
                 <div class="flex items-center justify-between text-sm font-bold font-mono">
-                    <div class="text-purple-300">
+                    <div class="text-amber-300">
                         <span>Jatin Abrol: </span>
                         <span id="splitModalP1Display">50.0%</span>
                     </div>
-                    <div class="text-pink-300">
+                    <div class="text-sky-300">
                         <span>Harshiv Bargotra: </span>
                         <span id="splitModalP2Display">50.0%</span>
                     </div>
@@ -957,11 +953,11 @@
 
                 <input type="range" id="splitModalSlider" min="0" max="100" step="0.5" value="50"
                     oninput="zeptoApp.onSplitSliderChange(this.value)"
-                    class="w-full accent-purple-500 cursor-pointer h-2 bg-slate-800 rounded-lg">
+                    class="w-full accent-amber-400 cursor-pointer h-2 bg-black rounded-lg border border-white/10">
 
-                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden flex border border-white/10 mt-2">
-                    <div id="splitModalBarP1" class="bg-gradient-to-r from-purple-600 to-purple-400 h-2.5 transition-all duration-300" style="width: 50%"></div>
-                    <div id="splitModalBarP2" class="bg-gradient-to-r from-pink-400 to-pink-600 h-2.5 transition-all duration-300" style="width: 50%"></div>
+                <div class="w-full bg-black rounded-full h-2.5 overflow-hidden flex border border-white/10 mt-2">
+                    <div id="splitModalBarP1" class="bg-amber-400 h-2.5 transition-all duration-300" style="width: 50%"></div>
+                    <div id="splitModalBarP2" class="bg-sky-400 h-2.5 transition-all duration-300" style="width: 50%"></div>
                 </div>
             </div>
 
@@ -971,13 +967,13 @@
                     <label class="block text-slate-300 font-semibold mb-1">Jatin Abrol (%)</label>
                     <input type="number" id="splitInputP1" min="0" max="100" step="0.1" value="50" required
                         oninput="zeptoApp.onSplitInputP1Change(this.value)"
-                        class="w-full bg-slate-900 border border-purple-500/40 rounded-lg px-3 py-2 text-purple-300 font-mono font-bold text-center">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-amber-300 font-mono font-bold text-center focus:outline-none focus:border-white/30 transition">
                 </div>
                 <div>
                     <label class="block text-slate-300 font-semibold mb-1">Harshiv Bargotra (%)</label>
                     <input type="number" id="splitInputP2" min="0" max="100" step="0.1" value="50" required
                         oninput="zeptoApp.onSplitInputP2Change(this.value)"
-                        class="w-full bg-slate-900 border border-pink-500/40 rounded-lg px-3 py-2 text-pink-300 font-mono font-bold text-center">
+                        class="w-full bg-black border border-white/15 rounded-lg px-3 py-2 text-sky-300 font-mono font-bold text-center focus:outline-none focus:border-white/30 transition">
                 </div>
             </div>
 
@@ -987,9 +983,9 @@
 
             <div class="flex justify-end gap-2 pt-3 border-t border-white/10">
                 <button type="button" onclick="zeptoApp.closeModal('modalIncomeSplitSettings')"
-                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold">Cancel</button>
+                    class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 font-semibold transition">Cancel</button>
                 <button type="submit" id="btnSaveSplitSettings"
-                    class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold transition">Apply Split Ratio</button>
+                    class="btn-zepto font-bold">Apply Split Ratio</button>
             </div>
         </form>
     </div>

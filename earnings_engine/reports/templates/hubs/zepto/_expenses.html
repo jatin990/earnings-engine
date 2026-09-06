@@ -3,99 +3,99 @@
     <!-- Store Expenses & Reimbursement Summary Banner -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
         <!-- 1. Total Incurred Spend -->
-        <div class="glass-panel p-3 flex flex-col justify-between border-pink-500/25">
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
             <div class="flex justify-between items-center">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-pink-400">Total Store Spend</span>
-                <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-pink-500/15 text-pink-300 border border-pink-500/30">All Expenses</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Store Spend</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">All Expenses</span>
             </div>
             <div class="my-1.5">
-                <div class="text-xl sm:text-2xl font-black font-mono text-pink-300 tracking-tight" id="expSummaryTotalSpend">₹0</div>
+                <div class="text-xl sm:text-2xl font-black font-mono text-white tracking-tight" id="expSummaryTotalSpend">₹0</div>
                 <div class="text-[10px] text-slate-400 mt-0.5" id="expSummaryCount">0 expenses logged</div>
             </div>
-            <div class="text-[10px] text-slate-500 pt-1.5 border-t border-white/5 flex justify-between">
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
                 <span>Spend Per Staff:</span>
                 <span class="font-mono font-bold text-slate-300" id="expSummaryPerStaff">₹0</span>
             </div>
         </div>
 
         <!-- 2. Reimbursed & Store Cash -->
-        <div class="glass-panel p-3 flex flex-col justify-between border-emerald-500/25">
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
             <div class="flex justify-between items-center">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Settled / Reimbursed</span>
-                <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">✅ Settled</span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-mono">✅ Settled</span>
             </div>
             <div class="my-1.5">
                 <div class="text-xl sm:text-2xl font-black font-mono text-emerald-400 tracking-tight" id="expSummaryReimbursed">₹0</div>
                 <div class="text-[10px] text-slate-400 mt-0.5 truncate">Paid via store cash or reimbursed</div>
             </div>
-            <div class="text-[10px] text-emerald-400/80 pt-1.5 border-t border-white/5 flex justify-between">
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
                 <span>Settled Ratio:</span>
-                <span class="font-mono font-bold" id="expSummaryReimbursedPct">0%</span>
+                <span class="font-mono font-bold text-emerald-400" id="expSummaryReimbursedPct">0%</span>
             </div>
         </div>
 
         <!-- 3. Pending Partner Reimbursements -->
-        <div class="glass-panel p-3 flex flex-col justify-between border-amber-500/30 bg-amber-500/[0.03]">
+        <div class="glass-panel p-3.5 flex flex-col justify-between">
             <div class="flex justify-between items-center">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-300">Pending Reimbursements</span>
-                <span class="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40" id="expSummaryPendingBadge">⏳ 0 Pending</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400">Pending Reimbursements</span>
+                <span class="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/25 font-mono" id="expSummaryPendingBadge">⏳ 0 Pending</span>
             </div>
             <div class="my-1.5">
                 <div class="text-xl sm:text-2xl font-black font-mono text-amber-300 tracking-tight" id="expSummaryPendingAmount">₹0</div>
-                <div class="text-[10px] text-slate-300 mt-0.5 truncate" id="expSummaryPendingBreakdown">
+                <div class="text-[10px] text-slate-400 mt-0.5 truncate" id="expSummaryPendingBreakdown">
                     Awaiting payback from store cash
                 </div>
             </div>
-            <div class="text-[10px] text-amber-400/90 pt-1.5 border-t border-white/5 flex justify-between">
+            <div class="text-[10px] text-slate-400 pt-1.5 border-t border-white/5 flex justify-between">
                 <span>Pending Ratio:</span>
-                <span class="font-mono font-bold" id="expSummaryPendingPct">0%</span>
+                <span class="font-mono font-bold text-amber-300" id="expSummaryPendingPct">0%</span>
             </div>
         </div>
     </div>
 
     <!-- Category Spend Distribution Row -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2" id="expenseCategoryCards">
-        <div class="glass-panel-sub p-2 text-center border-purple-500/20">
+        <div class="glass-panel-sub p-2.5 text-center">
             <div class="text-[9px] font-bold text-slate-400 uppercase">🎓 Training</div>
-            <div class="text-sm font-extrabold font-mono text-purple-300 mt-0.5" id="catSpend-TRAINING">₹--</div>
+            <div class="text-sm font-extrabold font-mono text-white mt-0.5" id="catSpend-TRAINING">₹--</div>
         </div>
-        <div class="glass-panel-sub p-2 text-center border-pink-500/20">
+        <div class="glass-panel-sub p-2.5 text-center">
             <div class="text-[9px] font-bold text-slate-400 uppercase">👕 Uniforms</div>
-            <div class="text-sm font-extrabold font-mono text-pink-300 mt-0.5" id="catSpend-UNIFORMS_GEAR">₹--</div>
+            <div class="text-sm font-extrabold font-mono text-white mt-0.5" id="catSpend-UNIFORMS_GEAR">₹--</div>
         </div>
-        <div class="glass-panel-sub p-2 text-center border-indigo-500/20">
+        <div class="glass-panel-sub p-2.5 text-center">
             <div class="text-[9px] font-bold text-slate-400 uppercase">🏗️ Equipment</div>
-            <div class="text-sm font-extrabold font-mono text-indigo-300 mt-0.5" id="catSpend-EQUIPMENT">₹--</div>
+            <div class="text-sm font-extrabold font-mono text-white mt-0.5" id="catSpend-EQUIPMENT">₹--</div>
         </div>
-        <div class="glass-panel-sub p-2 text-center border-amber-500/20">
+        <div class="glass-panel-sub p-2.5 text-center">
             <div class="text-[9px] font-bold text-slate-400 uppercase">☕ Snacks</div>
             <div class="text-sm font-extrabold font-mono text-amber-300 mt-0.5" id="catSpend-SNACKS_WELFARE">₹--</div>
         </div>
-        <div class="glass-panel-sub p-2 text-center border-emerald-500/20">
+        <div class="glass-panel-sub p-2.5 text-center">
             <div class="text-[9px] font-bold text-slate-400 uppercase">🧹 Maintenance</div>
             <div class="text-sm font-extrabold font-mono text-emerald-300 mt-0.5" id="catSpend-STORE_MAINTENANCE">₹--</div>
         </div>
-        <div class="glass-panel-sub p-2 text-center border-blue-500/20">
+        <div class="glass-panel-sub p-2.5 text-center">
             <div class="text-[9px] font-bold text-slate-400 uppercase">📦 Ops Supplies</div>
-            <div class="text-sm font-extrabold font-mono text-blue-300 mt-0.5" id="catSpend-OPERATIONAL">₹--</div>
+            <div class="text-sm font-extrabold font-mono text-sky-300 mt-0.5" id="catSpend-OPERATIONAL">₹--</div>
         </div>
     </div>
 
     <!-- Filter Bar -->
-    <div class="glass-panel px-3 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+    <div class="glass-panel px-3.5 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
         <div class="flex items-center gap-2 flex-wrap flex-1">
             <div class="relative min-w-[200px] flex-1">
                 <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
-                <input 
-                    type="text" 
-                    id="expSearchInput" 
-                    oninput="zeptoApp.filterExpenses()" 
-                    placeholder="Search expense description, notes..." 
-                    class="w-full bg-slate-900/90 border border-white/10 rounded-md pl-7 pr-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-pink-500 transition"
+                <input
+                    type="text"
+                    id="expSearchInput"
+                    oninput="zeptoApp.filterExpenses()"
+                    placeholder="Search expense description, notes..."
+                    class="w-full bg-black border border-white/10 rounded-md pl-7 pr-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-white/30 transition"
                 >
             </div>
 
-            <select id="expCategoryFilter" onchange="zeptoApp.filterExpenses()" class="bg-slate-900/90 border border-white/15 rounded-md px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-pink-500">
+            <select id="expCategoryFilter" onchange="zeptoApp.filterExpenses()" class="bg-black border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
                 <option value="ALL" selected>⚡ All Categories</option>
                 <option value="TRAINING">🎓 Training & Onboarding</option>
                 <option value="UNIFORMS_GEAR">👕 Uniforms & Gear</option>
@@ -107,14 +107,14 @@
                 <option value="MISC">📁 Misc Out-of-Pocket</option>
             </select>
 
-            <select id="expIncurredFilter" onchange="zeptoApp.filterExpenses()" class="bg-slate-900/90 border border-white/15 rounded-md px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-pink-500">
+            <select id="expIncurredFilter" onchange="zeptoApp.filterExpenses()" class="bg-black border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
                 <option value="ALL">All Payers</option>
                 <option value="Jatin Abrol">Jatin Abrol</option>
                 <option value="Harshiv Bargotra">Harshiv Bargotra</option>
                 <option value="STORE_CASH">Store Cash</option>
             </select>
 
-            <select id="expReimbursementFilter" onchange="zeptoApp.filterExpenses()" class="bg-slate-900/90 border border-white/15 rounded-md px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-pink-500">
+            <select id="expReimbursementFilter" onchange="zeptoApp.filterExpenses()" class="bg-black border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
                 <option value="ALL">All Reimbursements</option>
                 <option value="PENDING">⏳ Pending Reimbursement</option>
                 <option value="REIMBURSED">✅ Settled / Reimbursed</option>
@@ -123,7 +123,7 @@
         </div>
 
         <div class="flex items-center gap-2">
-            <span class="text-xs font-mono text-pink-300 font-bold" id="expTotalAmountBadge">Total: ₹0</span>
+            <span class="text-xs font-mono text-white font-bold" id="expTotalAmountBadge">Total: ₹0</span>
             <button type="button" onclick="zeptoApp.openAddExpenseModal()" class="btn-zepto text-xs whitespace-nowrap">
                 <span>➕</span> Record Expense
             </button>

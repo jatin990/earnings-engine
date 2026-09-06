@@ -14,19 +14,19 @@
             --font-mono: 'JetBrains Mono', monospace;
             --font-heading: 'Outfit', 'Plus Jakarta Sans', sans-serif;
 
-            --bg-void: #030712;
-            --bg-surface: #0b101b;
-            --bg-elevated: #111827;
-            --bg-card: rgba(15, 23, 42, 0.75);
+            --bg-void: #000000;
+            --bg-surface: #050508;
+            --bg-elevated: #09090f;
+            --bg-card: rgba(8, 8, 14, 0.85);
             --border-subtle: rgba(255, 255, 255, 0.08);
             --border-highlight: rgba(56, 189, 248, 0.35);
 
-            --accent-cyan: #38bdf8;
+            --accent-sky: #38bdf8;
             --accent-emerald: #10b981;
             --accent-amber: #f59e0b;
-            --accent-indigo: #6366f1;
+            --accent-gold: #d4af37;
             --accent-rose: #f43f5e;
-            --accent-purple: #a855f7;
+            --accent-purple: #c084fc;
         }
 
         * {
@@ -35,14 +35,13 @@
 
         body {
             font-family: var(--font-sans);
-            background-color: var(--bg-void);
-            color: #f1f5f9;
+            background-color: #000000;
+            color: #ffffff;
             min-height: 100vh;
-            background-image: 
-                radial-gradient(circle at 10% 10%, rgba(56, 189, 248, 0.07) 0%, transparent 45%),
-                radial-gradient(circle at 90% 15%, rgba(99, 102, 241, 0.06) 0%, transparent 45%),
-                radial-gradient(circle at 50% 90%, rgba(16, 185, 129, 0.04) 0%, transparent 50%),
-                linear-gradient(180deg, #030712 0%, #080d1a 100%);
+            background-image:
+                radial-gradient(ellipse at 50% -10%, rgba(56, 189, 248, 0.05) 0px, transparent 65%),
+                radial-gradient(ellipse at 100% 40%, rgba(212, 175, 55, 0.03) 0px, transparent 55%),
+                radial-gradient(ellipse at 0% 100%, rgba(16, 185, 129, 0.025) 0px, transparent 60%);
             background-attachment: fixed;
             margin: 0;
             padding: 0;
@@ -57,32 +56,41 @@
             font-family: var(--font-mono);
         }
 
-        /* Glassmorphic Obsidian Card */
+        /* Glassmorphic OLED Obsidian Card */
         .glass-card {
-            background: linear-gradient(180deg, rgba(17, 24, 39, 0.75) 0%, rgba(11, 16, 27, 0.85) 100%);
+            background: linear-gradient(180deg, #09090f 0%, #050508 100%);
             border: 1px solid var(--border-subtle);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 1px 1px rgba(255, 255, 255, 0.02) inset;
+            border-radius: 1.25rem;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.9), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
             transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .glass-card:hover {
-            border-color: rgba(56, 189, 248, 0.25);
-            box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), 0 0 20px -5px rgba(56, 189, 248, 0.15);
+            border-color: rgba(56, 189, 248, 0.3);
+            box-shadow: 0 24px 60px -10px rgba(0, 0, 0, 0.95), 0 0 25px -5px rgba(56, 189, 248, 0.12), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
             transform: translateY(-2px);
         }
 
         /* Interactive Filter Chip */
         .filter-chip {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #a1a1aa;
             transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
             user-select: none;
+        }
+        .filter-chip:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(255, 255, 255, 0.18);
+            color: #ffffff;
         }
         .filter-chip.active {
             background: rgba(56, 189, 248, 0.15);
             color: #38bdf8;
-            border-color: rgba(56, 189, 248, 0.4);
-            box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+            border-color: rgba(56, 189, 248, 0.45);
+            box-shadow: 0 0 16px rgba(56, 189, 248, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
             font-weight: 700;
         }
 
@@ -91,36 +99,75 @@
             position: relative;
             border-radius: 1.5rem;
             overflow: hidden;
-            background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(14, 116, 144, 0.4) 50%, rgba(3, 7, 18, 0.98) 100%);
-            border: 1px solid rgba(56, 189, 248, 0.25);
-            box-shadow: 0 25px 50px -15px rgba(0, 0, 0, 0.8), 0 0 30px -5px rgba(14, 116, 144, 0.3);
+            background: linear-gradient(135deg, #0a0e17 0%, #060910 50%, #000000 100%);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.95), 0 0 35px -5px rgba(56, 189, 248, 0.18), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
         }
 
         .hero-banner::before {
             content: '';
             position: absolute;
             top: 0; right: 0; bottom: 0; left: 0;
-            background: radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.15), transparent 60%);
+            background: radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.12), transparent 60%);
             pointer-events: none;
+        }
+
+        /* Luxury CTAs */
+        .btn-luxury-sky {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.25);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .btn-luxury-sky:hover {
+            background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+            box-shadow: 0 6px 20px rgba(56, 189, 248, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .btn-luxury-gold {
+            background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+            border: 1px solid rgba(212, 175, 55, 0.5);
+            box-shadow: 0 4px 14px rgba(212, 175, 55, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
+            color: #000000;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .btn-luxury-gold:hover {
+            background: linear-gradient(135deg, #f59e0b 0%, #d4af37 100%);
+            box-shadow: 0 6px 20px rgba(212, 175, 55, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.45);
+            transform: translateY(-1px);
+        }
+
+        /* Inputs and Selects */
+        .input-luxury {
+            background: #000000 !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            color: #ffffff !important;
+            transition: all 0.2s;
+        }
+        .input-luxury:focus {
+            outline: none !important;
+            border-color: rgba(56, 189, 248, 0.5) !important;
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.15) !important;
         }
 
         /* Modals & Backdrops */
         .modal-overlay {
-            background: rgba(3, 7, 18, 0.8);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
         }
 
         .modal-card {
-            background: linear-gradient(180deg, #0f172a 0%, #0b1120 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 30px rgba(56, 189, 248, 0.1);
+            background: linear-gradient(180deg, #0c0d14 0%, #050508 100%);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.95), 0 0 30px rgba(56, 189, 248, 0.1), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
         }
 
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
-        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 9999px; }
+        ::-webkit-scrollbar-track { background: #000000; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 9999px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.4); }
 
         /* Reactive Upvote Button */
@@ -146,14 +193,14 @@
         }
     </style>
 </head>
-<body class="p-4 md:p-8 text-slate-200">
+<body class="p-4 md:p-8 text-white">
 
     <div class="max-w-7xl mx-auto space-y-8">
 
         <!-- ================= MASTER HEADER NAV ================= -->
         <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/[0.08]">
             <div class="flex items-center gap-4">
-                <a href="/portal" class="p-2.5 rounded-xl border border-white/10 bg-slate-900/80 text-slate-400 hover:text-white hover:border-sky-500/50 hover:bg-sky-500/10 transition shadow-sm" title="Back to Nexus Portal">
+                <a href="/portal" class="p-2.5 rounded-xl border border-white/10 bg-[#06060a] text-zinc-400 hover:text-white hover:border-sky-500/50 hover:bg-sky-500/10 transition shadow-sm" title="Back to Nexus Portal">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </a>
                 <div>
@@ -162,17 +209,17 @@
                         <h1 class="heading-title text-2xl md:text-3xl font-black tracking-tight text-white">TRIPS & EXPEDITIONS</h1>
                         <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider bg-sky-500/15 text-sky-400 border border-sky-500/30">Nexus Travel Vault</span>
                     </div>
-                    <p class="text-xs text-slate-400 font-medium mt-0.5">Global itineraries, flight manifests, luxury resort stays, and collaborative member excursions</p>
+                    <p class="text-xs text-zinc-400 font-medium mt-0.5">Global itineraries, flight manifests, luxury resort stays, and collaborative member excursions</p>
                 </div>
             </div>
 
             <div class="flex items-center gap-3">
-                <div id="userBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-white/10 text-xs font-semibold text-slate-300">
+                <div id="userBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#06060a] border border-white/10 text-xs font-semibold text-zinc-300">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                     <span id="userNameLabel">Verifying access...</span>
                 </div>
 
-                <button type="button" id="addTripBtn" onclick="openAddTripModal()" class="hidden items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-bold transition shadow-lg shadow-sky-500/25">
+                <button type="button" id="addTripBtn" onclick="openAddTripModal()" class="hidden items-center gap-2 px-4 py-2 rounded-xl btn-luxury-sky text-white text-xs font-bold transition">
                     <span>+ Add Trip</span>
                 </button>
             </div>
@@ -182,7 +229,7 @@
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="glass-card p-4 rounded-2xl relative overflow-hidden">
                 <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-sky-500 to-transparent"></div>
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+                <div class="flex items-center justify-between text-zinc-400 text-xs font-semibold mb-1">
                     <span>Active Expeditions</span>
                     <span class="text-sky-400 text-sm">🌏</span>
                 </div>
@@ -194,7 +241,7 @@
 
             <div class="glass-card p-4 rounded-2xl relative overflow-hidden">
                 <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-amber-500 to-transparent"></div>
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+                <div class="flex items-center justify-between text-zinc-400 text-xs font-semibold mb-1">
                     <span>Next Departure</span>
                     <span class="text-amber-400 text-sm">⏳</span>
                 </div>
@@ -204,7 +251,7 @@
 
             <div class="glass-card p-4 rounded-2xl relative overflow-hidden">
                 <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 to-transparent"></div>
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+                <div class="flex items-center justify-between text-zinc-400 text-xs font-semibold mb-1">
                     <span>Group Budget Est.</span>
                     <span class="text-indigo-400 text-sm">💳</span>
                 </div>
@@ -214,7 +261,7 @@
 
             <div class="glass-card p-4 rounded-2xl relative overflow-hidden">
                 <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-transparent"></div>
-                <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+                <div class="flex items-center justify-between text-zinc-400 text-xs font-semibold mb-1">
                     <span>Community Ideas</span>
                     <span class="text-purple-400 text-sm">💡</span>
                 </div>
@@ -232,7 +279,7 @@
                         <span id="heroStatusBadge" class="px-3 py-0.5 bg-emerald-500/20 border border-emerald-400/30 backdrop-blur-md rounded-full text-[10px] font-bold tracking-wider uppercase text-emerald-300">Confirmed</span>
                     </div>
                     <h2 id="heroTripTitle" class="heading-title text-2xl md:text-3xl font-black tracking-tight text-white">Kyoto & Tokyo Cherry Blossom Expedition</h2>
-                    <p id="heroTripDates" class="text-xs md:text-sm font-medium text-slate-300 flex items-center gap-2 flex-wrap">
+                    <p id="heroTripDates" class="text-xs md:text-sm font-medium text-zinc-300 flex items-center gap-2 flex-wrap">
                         <span>🗓️ Oct 10, 2026 – Oct 22, 2026</span>
                         <span>•</span>
                         <span>📍 Japan (Kyoto & Tokyo)</span>
@@ -240,7 +287,7 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <button type="button" onclick="openActivityModalForFeatured()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-sky-500/20 flex items-center gap-2">
+                    <button type="button" onclick="openActivityModalForFeatured()" class="px-4 py-2.5 rounded-xl btn-luxury-sky text-white text-xs font-bold transition flex items-center gap-2">
                         <span>💡 Suggest Activity</span>
                     </button>
                 </div>
@@ -248,22 +295,22 @@
 
             <!-- Flight and Hotel Fast Info -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
-                <div class="bg-slate-900/70 backdrop-blur-md p-4 rounded-xl border border-white/10 space-y-2">
+                <div class="bg-[#050508]/80 backdrop-blur-md p-4 rounded-xl border border-white/10 space-y-2">
                     <div class="flex items-center justify-between text-xs font-bold text-sky-400 uppercase tracking-wider">
                         <span class="flex items-center gap-1.5"><span>✈️</span> <span>Flight Manifest</span></span>
-                        <span class="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded">Confirmed</span>
+                        <span class="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded font-bold">Confirmed</span>
                     </div>
                     <div id="heroFlightDetails" class="text-sm font-semibold text-white">ANA All Nippon NH-830 (BOM -> HND)</div>
-                    <div class="text-xs text-slate-400">Baggage: 2x 23kg included • Terminal 2</div>
+                    <div class="text-xs text-zinc-400">Baggage: 2x 23kg included • Terminal 2</div>
                 </div>
 
-                <div class="bg-slate-900/70 backdrop-blur-md p-4 rounded-xl border border-white/10 space-y-2">
+                <div class="bg-[#050508]/80 backdrop-blur-md p-4 rounded-xl border border-white/10 space-y-2">
                     <div class="flex items-center justify-between text-xs font-bold text-emerald-400 uppercase tracking-wider">
                         <span class="flex items-center gap-1.5"><span>🏨</span> <span>Luxury Accommodation</span></span>
-                        <span class="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">Reserved</span>
+                        <span class="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">Reserved</span>
                     </div>
                     <div id="heroHotelDetails" class="text-sm font-semibold text-white">Hyatt Regency Kyoto & Cerulean Tower Shibuya</div>
-                    <div class="text-xs text-slate-400">Breakfast included • Mountain & City Skyline view</div>
+                    <div class="text-xs text-zinc-400">Breakfast included • Mountain & City Skyline view</div>
                 </div>
             </div>
         </div>
@@ -275,14 +322,14 @@
                     <span class="text-xl">👥</span>
                     <div>
                         <h3 class="heading-title text-sm font-bold text-white">Travel Groups & Circles</h3>
-                        <p class="text-[11px] text-slate-400">Collaborative travel pods, member directories, and scoped group itineraries</p>
+                        <p class="text-[11px] text-zinc-400">Collaborative travel pods, member directories, and scoped group itineraries</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button type="button" id="manageGroupBtn" onclick="openManageCurrentGroupModal()" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 border border-white/10 text-slate-300 hover:text-white hover:bg-slate-700 text-xs font-bold transition">
+                    <button type="button" id="manageGroupBtn" onclick="openManageCurrentGroupModal()" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#06060a] border border-white/10 text-zinc-300 hover:text-white hover:bg-white/[0.05] text-xs font-bold transition">
                         <span>⚙️ Manage Group & Roster</span>
                     </button>
-                    <button type="button" id="createGroupBtn" onclick="openCreateGroupModal()" class="hidden items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition shadow-sm shadow-sky-500/20">
+                    <button type="button" id="createGroupBtn" onclick="openCreateGroupModal()" class="hidden items-center gap-1.5 px-3.5 py-1.5 rounded-xl btn-luxury-sky text-white text-xs font-bold transition">
                         <span>+ Create Group</span>
                     </button>
                 </div>
@@ -300,9 +347,9 @@
                         <span id="tripsSectionIcon">🗺️</span>
                         <span id="tripsSectionTitle">All Expeditions & Itineraries</span>
                     </h2>
-                    <p class="text-xs text-slate-400" id="tripsSectionSubtitle">Upcoming travel schedules and destinations</p>
+                    <p class="text-xs text-zinc-400" id="tripsSectionSubtitle">Upcoming travel schedules and destinations</p>
                 </div>
-                <div class="text-xs text-slate-400 font-semibold" id="tripsCountLabel">Loading trips...</div>
+                <div class="text-xs text-zinc-400 font-semibold" id="tripsCountLabel">Loading trips...</div>
             </div>
 
             <div id="tripsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -312,7 +359,7 @@
 
         <!-- ================= REDESIGNED SUGGESTIONS & ACTIVITIES SECTION ================= -->
         <section class="glass-card p-6 rounded-2xl space-y-6 relative overflow-hidden">
-            <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 via-sky-500 to-purple-500"></div>
+            <div class="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-500"></div>
 
             <!-- Header & Action Bar -->
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
@@ -322,30 +369,30 @@
                         <h2 class="heading-title text-lg font-bold text-white">Community Suggestions & Excursions</h2>
                         <span id="activitiesTotalBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">0</span>
                     </div>
-                    <p class="text-xs text-slate-400 mt-0.5">Collaborative spots, hidden gems, and dining recommendations proposed by friends</p>
+                    <p class="text-xs text-zinc-400 mt-0.5">Collaborative spots, hidden gems, and dining recommendations proposed by friends</p>
                 </div>
-                <button type="button" onclick="openActivityModal()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-500 hover:to-sky-500 text-white text-xs font-bold transition flex items-center gap-2 self-start md:self-auto shadow-md shadow-indigo-500/20">
+                <button type="button" onclick="openActivityModal()" class="px-4 py-2 rounded-xl btn-luxury-sky text-white text-xs font-bold transition flex items-center gap-2 self-start md:self-auto">
                     <span>+ Suggest New Activity</span>
                 </button>
             </div>
 
             <!-- Controls & Filters Strip (Clean & Uncluttered) -->
-            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-white/[0.06]">
+            <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-[#030306] p-3 rounded-xl border border-white/[0.08]">
                 <!-- Category Filter Chips -->
                 <div class="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 text-xs">
-                    <button type="button" onclick="setActivityCategoryFilter('ALL')" id="catChip_ALL" class="filter-chip active px-3 py-1 rounded-lg border border-white/10 text-slate-400 hover:text-white whitespace-nowrap">
+                    <button type="button" onclick="setActivityCategoryFilter('ALL')" id="catChip_ALL" class="filter-chip active px-3 py-1 rounded-lg text-xs whitespace-nowrap">
                         🌟 All (<span id="catCount_ALL">0</span>)
                     </button>
-                    <button type="button" onclick="setActivityCategoryFilter('DINING')" id="catChip_DINING" class="filter-chip px-3 py-1 rounded-lg border border-white/10 text-slate-400 hover:text-white whitespace-nowrap">
+                    <button type="button" onclick="setActivityCategoryFilter('DINING')" id="catChip_DINING" class="filter-chip px-3 py-1 rounded-lg text-xs whitespace-nowrap">
                         🍽️ Food & Dining (<span id="catCount_DINING">0</span>)
                     </button>
-                    <button type="button" onclick="setActivityCategoryFilter('ADVENTURE')" id="catChip_ADVENTURE" class="filter-chip px-3 py-1 rounded-lg border border-white/10 text-slate-400 hover:text-white whitespace-nowrap">
+                    <button type="button" onclick="setActivityCategoryFilter('ADVENTURE')" id="catChip_ADVENTURE" class="filter-chip px-3 py-1 rounded-lg text-xs whitespace-nowrap">
                         🏔️ Adventure (<span id="catCount_ADVENTURE">0</span>)
                     </button>
-                    <button type="button" onclick="setActivityCategoryFilter('SIGHTSEEING')" id="catChip_SIGHTSEEING" class="filter-chip px-3 py-1 rounded-lg border border-white/10 text-slate-400 hover:text-white whitespace-nowrap">
+                    <button type="button" onclick="setActivityCategoryFilter('SIGHTSEEING')" id="catChip_SIGHTSEEING" class="filter-chip px-3 py-1 rounded-lg text-xs whitespace-nowrap">
                         🏛️ Culture (<span id="catCount_SIGHTSEEING">0</span>)
                     </button>
-                    <button type="button" onclick="setActivityCategoryFilter('NIGHTLIFE')" id="catChip_NIGHTLIFE" class="filter-chip px-3 py-1 rounded-lg border border-white/10 text-slate-400 hover:text-white whitespace-nowrap">
+                    <button type="button" onclick="setActivityCategoryFilter('NIGHTLIFE')" id="catChip_NIGHTLIFE" class="filter-chip px-3 py-1 rounded-lg text-xs whitespace-nowrap">
                         🍸 Nightlife (<span id="catCount_NIGHTLIFE">0</span>)
                     </button>
                 </div>
@@ -353,13 +400,13 @@
                 <!-- Search & Sort Controls -->
                 <div class="flex items-center gap-2">
                     <!-- Target Trip Selector -->
-                    <select id="actTripFilterSelect" onchange="applyActivityFilters()" class="bg-slate-800 border border-white/10 text-slate-200 text-xs font-semibold px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-sky-500 max-w-[160px] truncate">
+                    <select id="actTripFilterSelect" onchange="applyActivityFilters()" class="input-luxury text-xs font-semibold px-2.5 py-1.5 rounded-lg max-w-[160px] truncate">
                         <option value="ALL">All Itineraries</option>
                         <!-- Populated by JS -->
                     </select>
 
                     <!-- Sort Selector -->
-                    <select id="actSortSelect" onchange="applyActivityFilters()" class="bg-slate-800 border border-white/10 text-slate-200 text-xs font-semibold px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-sky-500">
+                    <select id="actSortSelect" onchange="applyActivityFilters()" class="input-luxury text-xs font-semibold px-2.5 py-1.5 rounded-lg">
                         <option value="votes">🔥 Most Voted</option>
                         <option value="newest">✨ Newest</option>
                         <option value="cost_asc">💰 Budget: Low to High</option>
@@ -368,7 +415,7 @@
 
                     <!-- Search Input -->
                     <div class="relative min-w-[160px]">
-                        <input type="text" id="actSearchInput" oninput="applyActivityFilters()" placeholder="Search..." class="w-full bg-slate-800 border border-white/10 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-sky-500 placeholder-slate-500">
+                        <input type="text" id="actSearchInput" oninput="applyActivityFilters()" placeholder="Search..." class="w-full input-luxury text-xs px-2.5 py-1.5 rounded-lg placeholder-zinc-500">
                     </div>
                 </div>
             </div>
@@ -389,18 +436,18 @@
                     <span class="text-xl">🌴</span>
                     <h3 class="heading-title text-base font-bold text-white">Create New Travel Group</h3>
                 </div>
-                <button type="button" onclick="closeCreateGroupModal()" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                <button type="button" onclick="closeCreateGroupModal()" class="text-zinc-400 hover:text-white font-bold p-1">✕</button>
             </div>
 
             <form id="createGroupForm" onsubmit="submitNewGroup(event)" class="space-y-4">
                 <div class="grid grid-cols-3 gap-3">
                     <div class="col-span-2">
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Group Name</label>
-                        <input type="text" id="grpName" required placeholder="e.g. Bali Expedition 2026" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Group Name</label>
+                        <input type="text" id="grpName" required placeholder="e.g. Bali Expedition 2026" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Icon</label>
-                        <select id="grpIcon" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Icon</label>
+                        <select id="grpIcon" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                             <option value="🌴">🌴 Tropical</option>
                             <option value="⛰️">⛰️ Mountains</option>
                             <option value="✈️">✈️ Global</option>
@@ -413,20 +460,20 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Description</label>
-                    <textarea id="grpDescription" rows="2" placeholder="Brief note about this group or travel circle..." class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500"></textarea>
+                    <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Description</label>
+                    <textarea id="grpDescription" rows="2" placeholder="Brief note about this group or travel circle..." class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold"></textarea>
                 </div>
 
                 <!-- Add Friends Section -->
-                <div class="bg-slate-900/80 p-4 rounded-xl border border-white/10 space-y-3">
+                <div class="bg-[#000000] p-4 rounded-xl border border-white/10 space-y-3">
                     <div class="flex items-center justify-between">
-                        <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">👥 Add Friends & Dispatch Invites</label>
-                        <span class="text-[10px] text-slate-500 font-semibold">Auto-links friend codes</span>
+                        <label class="block text-xs font-bold text-zinc-300 uppercase tracking-wider">👥 Add Friends & Dispatch Invites</label>
+                        <span class="text-[10px] text-zinc-500 font-semibold">Auto-links friend codes</span>
                     </div>
 
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="text" id="memberInputName" placeholder="Friend Name (e.g. Alice)" class="bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500">
-                        <input type="email" id="memberInputEmail" oninput="checkFriendEmailLookup(this.value)" placeholder="Friend Email (e.g. alice@...)" class="bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500">
+                        <input type="text" id="memberInputName" placeholder="Friend Name (e.g. Alice)" class="input-luxury px-3 py-1.5 rounded-xl text-xs">
+                        <input type="email" id="memberInputEmail" oninput="checkFriendEmailLookup(this.value)" placeholder="Friend Email (e.g. alice@...)" class="input-luxury px-3 py-1.5 rounded-xl text-xs">
                     </div>
 
                     <div id="emailLookupStatus" class="hidden text-[11px] font-semibold px-2 py-1 rounded-lg"></div>
@@ -440,16 +487,16 @@
                 </div>
 
                 <!-- Attach Trips Section -->
-                <div class="bg-slate-900/80 p-4 rounded-xl border border-white/10 space-y-2">
-                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">🗺️ Attach Existing Trips</label>
+                <div class="bg-[#000000] p-4 rounded-xl border border-white/10 space-y-2">
+                    <label class="block text-xs font-bold text-zinc-300 uppercase tracking-wider">🗺️ Attach Existing Trips</label>
                     <div id="tripCheckboxesContainer" class="space-y-1.5 max-h-32 overflow-y-auto text-xs">
                         <!-- Populated by JS -->
                     </div>
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-                    <button type="button" onclick="closeCreateGroupModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800">Cancel</button>
-                    <button type="submit" class="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-sky-500/20">Create Group & Dispatch Invites</button>
+                    <button type="button" onclick="closeCreateGroupModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:bg-white/[0.05]">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl btn-luxury-sky text-white text-xs font-bold">Create Group & Dispatch Invites</button>
                 </div>
             </form>
         </div>
@@ -463,29 +510,29 @@
                     <span id="manageGroupIcon" class="text-xl">🌴</span>
                     <div>
                         <h3 id="manageGroupName" class="heading-title text-base font-bold text-white">Group Management</h3>
-                        <p id="manageGroupDesc" class="text-xs text-slate-400"></p>
+                        <p id="manageGroupDesc" class="text-xs text-zinc-400"></p>
                     </div>
                 </div>
-                <button type="button" onclick="closeManageGroupModal()" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                <button type="button" onclick="closeManageGroupModal()" class="text-zinc-400 hover:text-white font-bold p-1">✕</button>
             </div>
 
             <!-- Group Invite Link & Share Card -->
-            <div class="bg-gradient-to-r from-sky-950/40 to-indigo-950/40 p-4 rounded-xl border border-sky-500/30 space-y-3">
+            <div class="bg-[#000000] p-4 rounded-xl border border-sky-500/30 space-y-3">
                 <div class="flex items-center justify-between">
                     <span class="text-xs font-bold text-sky-300 uppercase tracking-wider flex items-center gap-1.5">
                         <span>🔗 Personalized Group Invite Link</span>
                     </span>
-                    <span id="manageGroupCodeBadge" class="text-xs font-mono font-bold bg-slate-900 px-2 py-0.5 rounded border border-sky-400/40 text-sky-400">NEXUS-GRP-XXXX</span>
+                    <span id="manageGroupCodeBadge" class="text-xs font-mono font-bold bg-[#06060a] px-2 py-0.5 rounded border border-sky-400/40 text-sky-400">NEXUS-GRP-XXXX</span>
                 </div>
-                <p class="text-xs text-slate-400">
+                <p class="text-xs text-zinc-400">
                     Friends using this link or code land directly on this group's trip page with verified access.
                 </p>
                 <div class="flex items-center gap-2">
-                    <input type="text" id="manageGroupInviteUrl" readonly class="flex-1 bg-slate-900 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono text-slate-300 select-all">
-                    <button type="button" onclick="copyGroupInviteUrl()" class="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                    <input type="text" id="manageGroupInviteUrl" readonly class="flex-1 input-luxury px-3 py-1.5 rounded-xl text-xs font-mono select-all">
+                    <button type="button" onclick="copyGroupInviteUrl()" class="px-3.5 py-1.5 btn-luxury-sky text-white rounded-xl text-xs font-bold transition">
                         Copy Link
                     </button>
-                    <button type="button" onclick="shareGroupOnWhatsApp()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                    <button type="button" onclick="shareGroupOnWhatsApp()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-sm border border-emerald-500/30">
                         WhatsApp
                     </button>
                 </div>
@@ -494,10 +541,10 @@
             <!-- Members Directory & Personal Passcodes -->
             <div class="space-y-3">
                 <div class="flex items-center justify-between">
-                    <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <h4 class="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
                         <span>👥 Member Directory & Passcodes</span>
                     </h4>
-                    <span id="manageMemberCount" class="text-xs font-semibold text-slate-400">0 members</span>
+                    <span id="manageMemberCount" class="text-xs font-semibold text-zinc-400">0 members</span>
                 </div>
 
                 <div id="manageMembersContainer" class="space-y-2 max-h-56 overflow-y-auto">
@@ -505,14 +552,14 @@
                 </div>
 
                 <!-- Add Member Form inside Manage Modal (Owner only) -->
-                <div id="manageAddMemberForm" class="bg-slate-900/80 p-3.5 rounded-xl border border-white/10 space-y-2">
-                    <span class="text-xs font-bold text-slate-300 block">Add Friend to Group</span>
+                <div id="manageAddMemberForm" class="bg-[#000000] p-3.5 rounded-xl border border-white/10 space-y-2">
+                    <span class="text-xs font-bold text-zinc-300 block">Add Friend to Group</span>
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="text" id="quickAddName" placeholder="Name (e.g. Bob)" class="bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500">
-                        <input type="email" id="quickAddEmail" oninput="checkQuickFriendEmailLookup(this.value)" placeholder="Email (e.g. bob@...)" class="bg-slate-800 border border-white/10 px-3 py-1.5 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500">
+                        <input type="text" id="quickAddName" placeholder="Name (e.g. Bob)" class="input-luxury px-3 py-1.5 rounded-xl text-xs">
+                        <input type="email" id="quickAddEmail" oninput="checkQuickFriendEmailLookup(this.value)" placeholder="Email (e.g. bob@...)" class="input-luxury px-3 py-1.5 rounded-xl text-xs">
                     </div>
                     <div id="quickLookupStatus" class="hidden text-[11px] font-semibold px-2 py-1 rounded-lg"></div>
-                    <button type="button" onclick="submitQuickAddMember()" class="w-full py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition shadow-sm">
+                    <button type="button" onclick="submitQuickAddMember()" class="w-full py-1.5 btn-luxury-sky text-white rounded-xl text-xs font-bold transition">
                         + Add Member & Send Email Invite
                     </button>
                 </div>
@@ -521,7 +568,7 @@
             <!-- Attached Trips in Manage Modal -->
             <div class="space-y-2 pt-2 border-t border-white/10">
                 <div class="flex items-center justify-between">
-                    <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">🗺️ Attached Trips</h4>
+                    <h4 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">🗺️ Attached Trips</h4>
                     <button type="button" id="btnSaveAttachedTrips" onclick="saveAttachedTripsForCurrentGroup()" class="text-xs text-sky-400 hover:text-sky-300 font-bold">
                         Save Attached Trips
                     </button>
@@ -535,7 +582,7 @@
                 <button type="button" id="btnDeleteCurrentGroup" onclick="deleteCurrentGroup()" class="text-xs text-rose-400 hover:text-rose-300 font-semibold">
                     Delete Group
                 </button>
-                <button type="button" onclick="closeManageGroupModal()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold">
+                <button type="button" onclick="closeManageGroupModal()" class="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold">
                     Done
                 </button>
             </div>
@@ -550,23 +597,23 @@
                     <span class="text-xl">✈️</span>
                     <h3 class="heading-title text-base font-bold text-white">Add New Trip Itinerary</h3>
                 </div>
-                <button type="button" onclick="closeAddTripModal()" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                <button type="button" onclick="closeAddTripModal()" class="text-zinc-400 hover:text-white font-bold p-1">✕</button>
             </div>
 
             <form id="addTripForm" onsubmit="submitNewTrip(event)" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Trip Title</label>
-                    <input type="text" id="tripTitle" required placeholder="e.g. Iceland Northern Lights & Glacier Tour" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                    <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Trip Title</label>
+                    <input type="text" id="tripTitle" required placeholder="e.g. Iceland Northern Lights & Glacier Tour" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Destination</label>
-                        <input type="text" id="tripDestination" required placeholder="e.g. Reykjavik, Iceland" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Destination</label>
+                        <input type="text" id="tripDestination" required placeholder="e.g. Reykjavik, Iceland" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Status</label>
-                        <select id="tripStatus" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Status</label>
+                        <select id="tripStatus" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                             <option value="planning">Planning (Draft)</option>
                             <option value="confirmed" selected>Confirmed</option>
                             <option value="completed">Completed</option>
@@ -576,23 +623,23 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Start Date</label>
-                        <input type="date" id="tripStartDate" required class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Start Date</label>
+                        <input type="date" id="tripStartDate" required class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">End Date</label>
-                        <input type="date" id="tripEndDate" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">End Date</label>
+                        <input type="date" id="tripEndDate" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Estimated Budget (₹)</label>
-                        <input type="number" id="tripBudget" value="250000" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Estimated Budget (₹)</label>
+                        <input type="number" id="tripBudget" value="250000" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Cover Theme</label>
-                        <select id="tripCover" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Cover Theme</label>
+                        <select id="tripCover" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                             <option value="japan">🌸 Japan / Asian Garden</option>
                             <option value="swiss">🏔️ Swiss Alps / Mountains</option>
                             <option value="amalfi">⛵ Mediterranean Coast</option>
@@ -603,30 +650,30 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Flight Details (Optional)</label>
-                    <input type="text" id="tripFlights" placeholder="e.g. Qatar Airways QR-556 (BOM -> DOH -> KEF)" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                    <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Flight Details (Optional)</label>
+                    <input type="text" id="tripFlights" placeholder="e.g. Qatar Airways QR-556 (BOM -> DOH -> KEF)" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Accommodation / Hotel (Optional)</label>
-                    <input type="text" id="tripHotels" placeholder="e.g. The Reykjavik EDITION & Ion Adventure Hotel" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500">
+                    <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Accommodation / Hotel (Optional)</label>
+                    <input type="text" id="tripHotels" placeholder="e.g. The Reykjavik EDITION & Ion Adventure Hotel" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Trip Notes & Highlights</label>
-                    <textarea id="tripNotes" rows="2" placeholder="Key landmarks, visa guidelines, packing notes..." class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-sky-500"></textarea>
+                    <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Trip Notes & Highlights</label>
+                    <textarea id="tripNotes" rows="2" placeholder="Key landmarks, visa guidelines, packing notes..." class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold"></textarea>
                 </div>
 
-                <div class="flex items-center gap-2 p-3 bg-sky-950/40 rounded-xl border border-sky-500/30">
-                    <input type="checkbox" id="tripShared" checked class="w-4 h-4 rounded text-sky-500 focus:ring-0 bg-slate-900 border-white/20">
+                <div class="flex items-center gap-2 p-3 bg-[#06060a] rounded-xl border border-sky-500/30">
+                    <input type="checkbox" id="tripShared" checked class="w-4 h-4 rounded text-sky-500 focus:ring-0 bg-[#000000] border-white/20">
                     <label for="tripShared" class="text-xs font-semibold text-sky-300 cursor-pointer">
                         Share this trip itinerary with verified friends
                     </label>
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-                    <button type="button" onclick="closeAddTripModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800">Cancel</button>
-                    <button type="submit" class="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-sky-500/20">Create Trip</button>
+                    <button type="button" onclick="closeAddTripModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:bg-white/[0.05]">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl btn-luxury-sky text-white text-xs font-bold">Create Trip</button>
                 </div>
             </form>
         </div>
@@ -640,27 +687,27 @@
                     <span class="text-xl">💡</span>
                     <h3 class="heading-title text-base font-bold text-white">Suggest Activity</h3>
                 </div>
-                <button type="button" onclick="closeActivityModal()" class="text-slate-400 hover:text-white font-bold p-1">✕</button>
+                <button type="button" onclick="closeActivityModal()" class="text-zinc-400 hover:text-white font-bold p-1">✕</button>
             </div>
 
             <form id="suggestActivityForm" onsubmit="submitActivitySuggestion(event)" class="space-y-3">
                 <input type="hidden" id="actTripId">
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Target Itinerary</label>
-                    <select id="actTripSelect" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                    <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Target Itinerary</label>
+                    <select id="actTripSelect" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                         <!-- Populated by JS -->
                     </select>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Your Name</label>
-                        <input type="text" id="actMemberName" required placeholder="e.g. Rohan / Sarah" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Your Name</label>
+                        <input type="text" id="actMemberName" required placeholder="e.g. Rohan / Sarah" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Category</label>
-                        <select id="actCategorySelect" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Category</label>
+                        <select id="actCategorySelect" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                             <option value="DINING">🍽️ Food & Dining</option>
                             <option value="ADVENTURE">🏔️ Adventure & Outdoors</option>
                             <option value="SIGHTSEEING" selected>🏛️ Sightseeing & Heritage</option>
@@ -671,24 +718,24 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Activity Title</label>
-                    <input type="text" id="actTitle" required placeholder="e.g. Helicopter tour over Mount Fuji" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                    <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Activity Title</label>
+                    <input type="text" id="actTitle" required placeholder="e.g. Helicopter tour over Mount Fuji" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Location / Spot</label>
-                        <input type="text" id="actLocation" placeholder="e.g. Tokyo, Japan" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Location / Spot</label>
+                        <input type="text" id="actLocation" placeholder="e.g. Tokyo, Japan" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Approx Cost (₹)</label>
-                        <input type="number" id="actCost" value="5000" class="w-full bg-slate-900 border border-white/10 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                        <label class="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Approx Cost (₹)</label>
+                        <input type="number" id="actCost" value="5000" class="w-full input-luxury px-3 py-2 rounded-xl text-xs font-semibold">
                     </div>
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-                    <button type="button" onclick="closeActivityModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800">Cancel</button>
-                    <button type="submit" class="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-sky-500 hover:from-indigo-400 hover:to-sky-400 text-white text-xs font-bold shadow-md shadow-indigo-500/20">Submit Suggestion</button>
+                    <button type="button" onclick="closeActivityModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:bg-white/[0.05]">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl btn-luxury-sky text-white text-xs font-bold">Submit Suggestion</button>
                 </div>
             </form>
         </div>
@@ -755,7 +802,7 @@
             } catch (err) {
                 console.error(err);
                 document.getElementById('tripsGrid').innerHTML = `
-                    <div class="col-span-3 text-center py-12 text-slate-500 text-xs">
+                    <div class="col-span-3 text-center py-12 text-zinc-500 text-xs">
                         Failed to fetch trips. Please ensure your access passcode is active.
                     </div>
                 `;
@@ -775,18 +822,18 @@
             }
 
             let tabsHtml = `
-                <button type="button" onclick="selectGroupTab('all')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${activeGroupId === 'all' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm shadow-sky-500/10' : 'bg-slate-900 border border-white/10 text-slate-400 hover:text-white hover:bg-slate-800'}">
+                <button type="button" onclick="selectGroupTab('all')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${activeGroupId === 'all' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm shadow-sky-500/10' : 'bg-[#06060a] border border-white/10 text-zinc-400 hover:text-white hover:bg-white/[0.05]'}">
                     <span>🌟 All Expeditions</span>
-                    <span class="text-[10px] px-1.5 py-0.2 rounded-full ${activeGroupId === 'all' ? 'bg-sky-500/30 text-sky-200' : 'bg-slate-800 text-slate-400'}">${allTrips.length}</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full ${activeGroupId === 'all' ? 'bg-sky-500/30 text-sky-200' : 'bg-white/10 text-zinc-400'}">${allTrips.length}</span>
                 </button>
             `;
 
             tabsHtml += allGroups.map(g => {
                 const isActive = activeGroupId === g.id;
                 return `
-                    <button type="button" onclick="selectGroupTab('${g.id}')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 whitespace-nowrap ${isActive ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm shadow-sky-500/10' : 'bg-slate-900 border border-white/10 text-slate-400 hover:text-white hover:bg-slate-800'}">
+                    <button type="button" onclick="selectGroupTab('${g.id}')" class="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 whitespace-nowrap ${isActive ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm shadow-sky-500/10' : 'bg-[#06060a] border border-white/10 text-zinc-400 hover:text-white hover:bg-white/[0.05]'}">
                         <span>${g.icon || '🌴'} ${g.name}</span>
-                        <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-sky-500/30 text-sky-200' : 'bg-slate-800 text-slate-400'}">${g.trip_count || 0}</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-sky-500/30 text-sky-200' : 'bg-white/10 text-zinc-400'}">${g.trip_count || 0}</span>
                     </button>
                 `;
             }).join('');
@@ -844,7 +891,7 @@
 
         function renderTripsGrid() {
             const container = document.getElementById('tripsGrid');
-            
+
             // Filter trips based on active group tab
             let displayTrips = allTrips;
             if (activeGroupId !== 'all') {
@@ -857,7 +904,7 @@
 
             if (!displayTrips.length) {
                 container.innerHTML = `
-                    <div class="col-span-3 text-center py-12 text-slate-500 text-xs font-semibold">
+                    <div class="col-span-3 text-center py-12 text-zinc-500 text-xs font-semibold">
                         No scheduled trips found ${activeGroupId !== 'all' ? 'in this group' : ''}.
                     </div>
                 `;
@@ -866,7 +913,7 @@
 
             container.innerHTML = displayTrips.map(t => {
                 const statusBg = t.status === 'confirmed' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
-                                 t.status === 'completed' ? 'bg-slate-800 text-slate-400 border-white/10' :
+                                 t.status === 'completed' ? 'bg-[#06060a] text-zinc-400 border-white/10' :
                                  'bg-amber-500/15 text-amber-400 border-amber-500/30';
 
                 // Cover icon
@@ -893,7 +940,7 @@
                                     </span>
                                     ${groupChips}
                                 </div>
-                                <span class="text-xs text-slate-400 font-mono">₹${((t.estimated_budget || 0) / 1000).toLocaleString('en-IN')}k</span>
+                                <span class="text-xs text-zinc-400 font-mono">₹${((t.estimated_budget || 0) / 1000).toLocaleString('en-IN')}k</span>
                             </div>
 
                             <div>
@@ -904,27 +951,27 @@
                                 <p class="text-xs text-sky-400 font-semibold">📍 ${t.destination}</p>
                             </div>
 
-                            <div class="bg-slate-900/80 border border-white/[0.08] rounded-xl p-3 text-xs text-slate-300 space-y-1.5">
-                                <div class="flex items-center justify-between text-slate-400 font-semibold">
+                            <div class="bg-[#000000] border border-white/[0.08] rounded-xl p-3 text-xs text-zinc-300 space-y-1.5">
+                                <div class="flex items-center justify-between text-zinc-400 font-semibold">
                                     <span>🗓️ Dates</span>
                                     <span class="text-white">${t.start_date} ${t.end_date ? '→ ' + t.end_date : ''}</span>
                                 </div>
                                 ${t.flight_details ? `
-                                    <div class="flex items-center justify-between text-slate-400 font-semibold truncate">
+                                    <div class="flex items-center justify-between text-zinc-400 font-semibold truncate">
                                         <span>✈️ Flight</span>
-                                        <span class="text-slate-200 truncate ml-2">${t.flight_details}</span>
+                                        <span class="text-zinc-200 truncate ml-2">${t.flight_details}</span>
                                     </div>
                                 ` : ''}
                                 ${t.hotel_details ? `
-                                    <div class="flex items-center justify-between text-slate-400 font-semibold truncate">
+                                    <div class="flex items-center justify-between text-zinc-400 font-semibold truncate">
                                         <span>🏨 Stay</span>
-                                        <span class="text-slate-200 truncate ml-2">${t.hotel_details}</span>
+                                        <span class="text-zinc-200 truncate ml-2">${t.hotel_details}</span>
                                     </div>
                                 ` : ''}
                             </div>
 
                             ${t.notes ? `
-                                <p class="text-xs text-slate-400 line-clamp-2 italic">"${t.notes}"</p>
+                                <p class="text-xs text-zinc-400 line-clamp-2 italic">"${t.notes}"</p>
                             ` : ''}
                         </div>
 
@@ -1047,7 +1094,7 @@
 
             // 3. Search query
             if (searchQuery) {
-                filtered = filtered.filter(a => 
+                filtered = filtered.filter(a =>
                     (a.activity_title || '').toLowerCase().includes(searchQuery) ||
                     (a.location || '').toLowerCase().includes(searchQuery) ||
                     (a.suggested_by_name || '').toLowerCase().includes(searchQuery) ||
@@ -1068,9 +1115,9 @@
 
             if (!filtered.length) {
                 container.innerHTML = `
-                    <div class="col-span-full py-12 text-center text-slate-500 text-xs">
+                    <div class="col-span-full py-12 text-center text-zinc-500 text-xs">
                         <div class="text-2xl mb-2">🔍</div>
-                        <div class="font-bold text-slate-400">No suggestions match the selected criteria.</div>
+                        <div class="font-bold text-zinc-400">No suggestions match the selected criteria.</div>
                         <p class="mt-1">Try switching category tabs or click "+ Suggest New Activity".</p>
                     </div>
                 `;
@@ -1094,7 +1141,7 @@
                                 <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider flex items-center gap-1">
                                     <span>${catIcon}</span> <span>${catLabel}</span>
                                 </span>
-                                <span class="text-[10px] text-slate-400 font-mono">
+                                <span class="text-[10px] text-zinc-400 font-mono">
                                     ₹${Number(a.approx_cost || 0).toLocaleString('en-IN')}
                                 </span>
                             </div>
@@ -1102,33 +1149,33 @@
                             <!-- Title & Location -->
                             <div>
                                 <h4 class="text-sm font-bold text-white tracking-tight leading-snug group-hover:text-sky-300 transition">${a.activity_title}</h4>
-                                <p class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1 truncate">
+                                <p class="text-[11px] text-zinc-400 mt-0.5 flex items-center gap-1 truncate">
                                     <span>📍</span> <span class="truncate">${a.location || a.trip_dest || 'Local area'}</span>
                                 </p>
                             </div>
 
                             <!-- Trip Tag -->
-                            <div class="text-[10px] text-slate-500 flex items-center gap-1 truncate">
-                                <span class="text-slate-400 font-semibold truncate">Trip:</span>
+                            <div class="text-[10px] text-zinc-500 flex items-center gap-1 truncate">
+                                <span class="text-zinc-400 font-semibold truncate">Trip:</span>
                                 <span class="text-sky-400/90 truncate">${a.trip_title}</span>
                             </div>
                         </div>
 
                         <!-- Footer Actions -->
                         <div class="flex items-center justify-between pt-2.5 border-t border-white/[0.06] text-xs">
-                            <div class="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                                <span class="w-4 h-4 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-[8px] text-slate-300 font-bold">@</span>
+                            <div class="flex items-center gap-1.5 text-zinc-400 text-[11px]">
+                                <span class="w-4 h-4 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-[8px] text-zinc-300 font-bold">@</span>
                                 <span>${a.suggested_by_name}</span>
                             </div>
 
                             <div class="flex items-center gap-1.5">
                                 ${isOwner ? `
-                                    <button type="button" onclick="deleteActivity('${a.trip_id}', '${a.id}')" class="text-slate-500 hover:text-rose-400 p-1 text-[11px] transition" title="Delete suggestion">
+                                    <button type="button" onclick="deleteActivity('${a.trip_id}', '${a.id}')" class="text-zinc-500 hover:text-rose-400 p-1 text-[11px] transition" title="Delete suggestion">
                                         🗑️
                                     </button>
                                 ` : ''}
 
-                                <button type="button" onclick="voteForActivity('${a.trip_id}', '${a.id}', this)" class="btn-vote ${isVoted ? 'voted' : ''} flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800/90 border border-white/10 hover:border-sky-500/40 text-xs font-bold text-slate-200 shadow-sm">
+                                <button type="button" onclick="voteForActivity('${a.trip_id}', '${a.id}', this)" class="btn-vote ${isVoted ? 'voted' : ''} flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#06060a] border border-white/10 hover:border-sky-500/40 text-xs font-bold text-zinc-200 shadow-sm">
                                     <span>👍</span>
                                     <span class="vote-count font-mono">${a.votes_count || 1}</span>
                                 </button>
@@ -1143,7 +1190,7 @@
             try {
                 const countSpan = btn.querySelector('.vote-count');
                 const current = parseInt(countSpan.textContent || '1', 10);
-                
+
                 // Optimistic UI update
                 btn.classList.add('voted');
                 countSpan.textContent = current + 1;
@@ -1188,13 +1235,13 @@
         function populateTripsCheckboxes(containerId, checkedTripIds = []) {
             const container = document.getElementById(containerId);
             if (!allTrips.length) {
-                container.innerHTML = `<span class="text-slate-500">No trips available to attach.</span>`;
+                container.innerHTML = `<span class="text-zinc-500">No trips available to attach.</span>`;
                 return;
             }
             container.innerHTML = allTrips.map(t => `
-                <label class="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-800 cursor-pointer">
-                    <input type="checkbox" value="${t.id}" ${checkedTripIds.includes(t.id) ? 'checked' : ''} class="trip-checkbox rounded text-sky-500 focus:ring-0 bg-slate-900 border-white/20">
-                    <span class="font-medium text-slate-300">${t.title} (${t.destination})</span>
+                <label class="flex items-center gap-2 p-1.5 rounded-lg hover:bg-white/[0.05] cursor-pointer">
+                    <input type="checkbox" value="${t.id}" ${checkedTripIds.includes(t.id) ? 'checked' : ''} class="trip-checkbox rounded text-sky-500 focus:ring-0 bg-[#000000] border-white/20">
+                    <span class="font-medium text-zinc-300">${t.title} (${t.destination})</span>
                 </label>
             `).join('');
         }
@@ -1272,14 +1319,14 @@
         function renderStagedMembers() {
             const container = document.getElementById('stagedMembersList');
             if (!stagedMembers.length) {
-                container.innerHTML = `<span class="text-[11px] text-slate-500">No friends added to roster yet.</span>`;
+                container.innerHTML = `<span class="text-[11px] text-zinc-500">No friends added to roster yet.</span>`;
                 return;
             }
             container.innerHTML = stagedMembers.map((m, idx) => `
-                <div class="flex items-center justify-between p-2 rounded-lg bg-slate-800 border border-white/10 text-xs">
+                <div class="flex items-center justify-between p-2 rounded-lg bg-[#06060a] border border-white/10 text-xs">
                     <div>
                         <span class="font-bold text-white">${m.name}</span>
-                        <span class="text-slate-400 font-mono ml-1">&lt;${m.email}&gt;</span>
+                        <span class="text-zinc-400 font-mono ml-1">&lt;${m.email}&gt;</span>
                     </div>
                     <button type="button" onclick="removeStagedMember(${idx})" class="text-rose-400 hover:text-rose-300 font-bold px-1.5">✕</button>
                 </div>
@@ -1364,25 +1411,25 @@
             countEl.textContent = `${(grp.members || []).length} members`;
 
             if (!grp.members || !grp.members.length) {
-                container.innerHTML = `<div class="text-xs text-slate-500 py-3 text-center">No members in this group yet. Add friends below.</div>`;
+                container.innerHTML = `<div class="text-xs text-zinc-500 py-3 text-center">No members in this group yet. Add friends below.</div>`;
                 return;
             }
 
             container.innerHTML = grp.members.map(m => `
-                <div class="p-3 rounded-xl border border-white/10 bg-slate-900 flex items-center justify-between gap-3">
+                <div class="p-3 rounded-xl border border-white/10 bg-[#000000] flex items-center justify-between gap-3">
                     <div class="space-y-0.5">
                         <div class="flex items-center gap-2">
                             <span class="text-xs font-bold text-white">${m.name}</span>
                             <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${m.role === 'owner' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'}">${m.role}</span>
                         </div>
-                        <div class="text-[11px] text-slate-400 font-mono">${m.email}</div>
+                        <div class="text-[11px] text-zinc-400 font-mono">${m.email}</div>
                     </div>
 
                     <div class="flex items-center gap-2">
-                        <div class="flex items-center gap-1.5 bg-slate-800 border border-white/10 px-2 py-1 rounded-lg">
-                            <span class="text-[10px] text-slate-500 font-bold uppercase">Code:</span>
+                        <div class="flex items-center gap-1.5 bg-[#06060a] border border-white/10 px-2 py-1 rounded-lg">
+                            <span class="text-[10px] text-zinc-500 font-bold uppercase">Code:</span>
                             <span class="text-xs font-mono font-bold text-sky-300">${m.passcode}</span>
-                            <button type="button" onclick="copyText('${m.passcode}')" class="text-slate-400 hover:text-sky-300 ml-1" title="Copy Passcode">📋</button>
+                            <button type="button" onclick="copyText('${m.passcode}')" class="text-zinc-400 hover:text-sky-300 ml-1" title="Copy Passcode">📋</button>
                         </div>
 
                         ${isOwner ? `

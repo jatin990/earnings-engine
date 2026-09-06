@@ -1,0 +1,15 @@
+# Exclude heavy local artifacts from Vercel deploys
+.venv/
+data/
+logs/
+tests/
+scratch/
+.claude/
+.git/
+reports/
+*.sqlite3
+*.parquet
+__pycache__/
+*.py[cod]
+.env
+.env.*

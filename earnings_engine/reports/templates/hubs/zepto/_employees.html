@@ -1,13 +1,13 @@
 <!-- Tab 1: Staff & Employee Management Matrix -->
 <div class="space-y-2.5">
     <!-- Staffing Targets & Fulfillment Capacity Matrix -->
-    <div class="glass-panel p-3 border-purple-500/30">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/10">
+    <div class="glass-panel p-3.5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-white/10">
             <div>
                 <div class="flex items-center gap-2">
                     <span class="text-sm">⚡</span>
                     <h3 class="text-xs font-black text-white uppercase tracking-wider">Dark Store Staffing Requirements</h3>
-                    <span id="staffingOverallBadge" class="text-[10px] font-extrabold px-2 py-0.2 rounded bg-purple-500/20 text-purple-200 border border-purple-500/40 font-mono">
+                    <span id="staffingOverallBadge" class="text-[10px] font-extrabold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono">
                         0 / 15 Active Staff
                     </span>
                 </div>
@@ -15,7 +15,7 @@
                     Customizable active headcount thresholds & base pays for 24/7 dark store shift operations.
                 </p>
             </div>
-            <button type="button" onclick="zeptoApp.openStaffingTargetsModal()" class="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/15 text-slate-200 text-xs font-bold transition flex items-center gap-1 self-start sm:self-auto">
+            <button type="button" onclick="zeptoApp.openStaffingTargetsModal()" class="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/15 text-white text-xs font-bold transition flex items-center gap-1 self-start sm:self-auto shadow-sm">
                 <span>⚙️</span> Configure Targets
             </button>
         </div>
@@ -23,89 +23,89 @@
         <!-- 4 Role Capacity Cards -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 pt-2.5" id="staffingCapacityGrid">
             <!-- 1. Pickers -->
-            <div class="glass-panel-sub border-purple-500/25 p-2.5 flex flex-col justify-between">
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
                 <div class="flex justify-between items-start">
                     <div class="flex items-center gap-1.5">
                         <span class="text-sm">🛒</span>
-                        <span class="text-xs font-bold text-purple-200">Pickers</span>
+                        <span class="text-xs font-bold text-white">Pickers</span>
                     </div>
-                    <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono" id="capBadge-PICKER">0 / 9</span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="capBadge-PICKER">0 / 9</span>
                 </div>
-                <div class="my-1.5">
-                    <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-purple-500 h-1.5 rounded-full transition-all duration-500" id="capBar-PICKER" style="width: 0%"></div>
+                <div class="my-2">
+                    <div class="w-full bg-black rounded-full h-1.5 overflow-hidden border border-white/10">
+                        <div class="bg-white h-1.5 rounded-full transition-all duration-500" id="capBar-PICKER" style="width: 0%"></div>
                     </div>
                 </div>
                 <div class="flex justify-between items-center text-[10px]">
                     <span class="text-slate-400" id="capStatus-PICKER">9 more needed</span>
-                    <span class="text-purple-300 font-mono font-bold" id="capPct-PICKER">0%</span>
+                    <span class="text-white font-mono font-bold" id="capPct-PICKER">0%</span>
                 </div>
                 <div class="mt-1.5 pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
                     <span>Base Pay:</span>
-                    <span class="font-mono font-bold text-purple-300" id="capPay-PICKER">₹18,000/mo</span>
+                    <span class="font-mono font-bold text-white" id="capPay-PICKER">₹18,000/mo</span>
                 </div>
             </div>
 
             <!-- 2. Shift Incharges -->
-            <div class="glass-panel-sub border-indigo-500/25 p-2.5 flex flex-col justify-between">
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
                 <div class="flex justify-between items-start">
                     <div class="flex items-center gap-1.5">
                         <span class="text-sm">⚡</span>
-                        <span class="text-xs font-bold text-indigo-200">Shift Incharges</span>
+                        <span class="text-xs font-bold text-white">Shift Incharges</span>
                     </div>
-                    <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono" id="capBadge-SHIFT_INCHARGE">0 / 3</span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="capBadge-SHIFT_INCHARGE">0 / 3</span>
                 </div>
-                <div class="my-1.5">
-                    <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" id="capBar-SHIFT_INCHARGE" style="width: 0%"></div>
+                <div class="my-2">
+                    <div class="w-full bg-black rounded-full h-1.5 overflow-hidden border border-white/10">
+                        <div class="bg-sky-400 h-1.5 rounded-full transition-all duration-500" id="capBar-SHIFT_INCHARGE" style="width: 0%"></div>
                     </div>
                 </div>
                 <div class="flex justify-between items-center text-[10px]">
                     <span class="text-slate-400" id="capStatus-SHIFT_INCHARGE">3 more needed</span>
-                    <span class="text-indigo-300 font-mono font-bold" id="capPct-SHIFT_INCHARGE">0%</span>
+                    <span class="text-sky-300 font-mono font-bold" id="capPct-SHIFT_INCHARGE">0%</span>
                 </div>
                 <div class="mt-1.5 pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
                     <span>Base Pay:</span>
-                    <span class="font-mono font-bold text-indigo-300" id="capPay-SHIFT_INCHARGE">₹25,000/mo</span>
+                    <span class="font-mono font-bold text-white" id="capPay-SHIFT_INCHARGE">₹25,000/mo</span>
                 </div>
             </div>
 
             <!-- 3. Security Guards -->
-            <div class="glass-panel-sub border-blue-500/25 p-2.5 flex flex-col justify-between">
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
                 <div class="flex justify-between items-start">
                     <div class="flex items-center gap-1.5">
                         <span class="text-sm">🛡️</span>
-                        <span class="text-xs font-bold text-blue-200">Security Guards</span>
+                        <span class="text-xs font-bold text-white">Security Guards</span>
                     </div>
-                    <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono" id="capBadge-SECURITY_GUARD">0 / 2</span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="capBadge-SECURITY_GUARD">0 / 2</span>
                 </div>
-                <div class="my-1.5">
-                    <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-blue-500 h-1.5 rounded-full transition-all duration-500" id="capBar-SECURITY_GUARD" style="width: 0%"></div>
+                <div class="my-2">
+                    <div class="w-full bg-black rounded-full h-1.5 overflow-hidden border border-white/10">
+                        <div class="bg-amber-400 h-1.5 rounded-full transition-all duration-500" id="capBar-SECURITY_GUARD" style="width: 0%"></div>
                     </div>
                 </div>
                 <div class="flex justify-between items-center text-[10px]">
                     <span class="text-slate-400" id="capStatus-SECURITY_GUARD">2 more needed</span>
-                    <span class="text-blue-300 font-mono font-bold" id="capPct-SECURITY_GUARD">0%</span>
+                    <span class="text-amber-300 font-mono font-bold" id="capPct-SECURITY_GUARD">0%</span>
                 </div>
                 <div class="mt-1.5 pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
                     <span>Base Pay:</span>
-                    <span class="font-mono font-bold text-blue-300" id="capPay-SECURITY_GUARD">₹16,000/mo</span>
+                    <span class="font-mono font-bold text-white" id="capPay-SECURITY_GUARD">₹16,000/mo</span>
                 </div>
             </div>
 
             <!-- 4. House Keeping -->
-            <div class="glass-panel-sub border-emerald-500/25 p-2.5 flex flex-col justify-between">
+            <div class="glass-panel-sub p-3 flex flex-col justify-between">
                 <div class="flex justify-between items-start">
                     <div class="flex items-center gap-1.5">
                         <span class="text-sm">🧹</span>
-                        <span class="text-xs font-bold text-emerald-200">House Keeping</span>
+                        <span class="text-xs font-bold text-white">House Keeping</span>
                     </div>
-                    <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono" id="capBadge-HOUSEKEEPING">0 / 1</span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 font-mono" id="capBadge-HOUSEKEEPING">0 / 1</span>
                 </div>
-                <div class="my-1.5">
-                    <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" id="capBar-HOUSEKEEPING" style="width: 0%"></div>
+                <div class="my-2">
+                    <div class="w-full bg-black rounded-full h-1.5 overflow-hidden border border-white/10">
+                        <div class="bg-emerald-400 h-1.5 rounded-full transition-all duration-500" id="capBar-HOUSEKEEPING" style="width: 0%"></div>
                     </div>
                 </div>
                 <div class="flex justify-between items-center text-[10px]">
@@ -114,29 +114,29 @@
                 </div>
                 <div class="mt-1.5 pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
                     <span>Base Pay:</span>
-                    <span class="font-mono font-bold text-emerald-300" id="capPay-HOUSEKEEPING">₹14,000/mo</span>
+                    <span class="font-mono font-bold text-white" id="capPay-HOUSEKEEPING">₹14,000/mo</span>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Filter & Action Controls -->
-    <div class="glass-panel px-3 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+    <div class="glass-panel px-3.5 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
         <div class="flex items-center gap-2 flex-wrap flex-1">
             <!-- Search -->
             <div class="relative min-w-[200px] flex-1">
                 <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
-                <input 
-                    type="text" 
-                    id="empSearchInput" 
-                    oninput="zeptoApp.filterEmployees()" 
-                    placeholder="Search employee by name, phone..." 
-                    class="w-full bg-slate-900/90 border border-white/10 rounded-md pl-7 pr-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition"
+                <input
+                    type="text"
+                    id="empSearchInput"
+                    oninput="zeptoApp.filterEmployees()"
+                    placeholder="Search employee by name, phone..."
+                    class="w-full bg-black border border-white/10 rounded-md pl-7 pr-2.5 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-white/30 transition"
                 >
             </div>
 
             <!-- Role Filter (Only 4 Strict Roles) -->
-            <select id="empRoleFilter" onchange="zeptoApp.filterEmployees()" class="bg-slate-900/90 border border-white/15 rounded-md px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+            <select id="empRoleFilter" onchange="zeptoApp.filterEmployees()" class="bg-black border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
                 <option value="ALL" selected>⚡ All 4 Roles</option>
                 <option value="PICKER">🛒 Pickers (9 Req)</option>
                 <option value="SHIFT_INCHARGE">⚡ Shift Incharges (3 Req)</option>
@@ -145,14 +145,14 @@
             </select>
 
             <!-- Status Filter -->
-            <select id="empStatusFilter" onchange="zeptoApp.filterEmployees()" class="bg-slate-900/90 border border-white/15 rounded-md px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
+            <select id="empStatusFilter" onchange="zeptoApp.filterEmployees()" class="bg-black border border-white/10 rounded-md px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-white/30">
                 <option value="ALL">All Statuses</option>
                 <option value="ACTIVE" selected>🟢 Active Staff</option>
                 <option value="ON_PROBATION">🟡 On Probation</option>
                 <option value="RESIGNED">🔴 Resigned Staff</option>
             </select>
 
-            <button type="button" onclick="zeptoApp.resetEmployeeFilters()" class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition">
+            <button type="button" onclick="zeptoApp.resetEmployeeFilters()" class="text-xs text-slate-400 hover:text-white px-2.5 py-1.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 transition">
                 Reset
             </button>
         </div>

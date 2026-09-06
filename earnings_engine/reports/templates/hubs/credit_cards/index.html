@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,23 +14,20 @@
             --font-mono: 'JetBrains Mono', monospace;
             --font-heading: 'Outfit', 'Plus Jakarta Sans', sans-serif;
 
-            --bg-base: #f8fafc;
-            --card-surface: #ffffff;
-            --border-soft: #e2e8f0;
-            --border-highlight: #cbd5e1;
-            
-            --primary: #4f46e5;
-            --primary-light: #e0e7ff;
-            --emerald: #059669;
-            --emerald-light: #d1fae5;
-            --amber: #d97706;
-            --amber-light: #fef3c7;
-            --rose: #e11d48;
-            --rose-light: #ffe4e6;
-            --sky: #0284c7;
-            --sky-light: #e0f2fe;
-            --purple: #7c3aed;
-            --purple-light: #ede9fe;
+            --bg-base: #000000;
+            --card-surface: #06060a;
+            --card-elevated: #0a0a10;
+            --border-soft: rgba(255, 255, 255, 0.08);
+            --border-highlight: rgba(255, 255, 255, 0.20);
+
+            --emerald: #10b981;
+            --emerald-subtle: rgba(16, 185, 129, 0.12);
+            --gold: #d4af37;
+            --gold-subtle: rgba(212, 175, 55, 0.15);
+            --rose: #ef4444;
+            --rose-subtle: rgba(239, 68, 68, 0.15);
+            --sky: #38bdf8;
+            --sky-subtle: rgba(56, 189, 248, 0.12);
         }
 
         * { box-sizing: border-box; }
@@ -39,15 +36,16 @@
             margin: 0;
             padding: 0;
             min-height: 100vh;
-            background-color: var(--bg-base);
-            background-image: 
-                radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.09), transparent 40%),
-                radial-gradient(circle at 90% 15%, rgba(236, 72, 153, 0.07), transparent 45%),
-                radial-gradient(circle at 50% 100%, rgba(16, 185, 129, 0.08), transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(14, 165, 233, 0.07), transparent 45%);
-            color: #1e293b;
+            background-color: #000000;
+            background-image:
+                radial-gradient(ellipse at 50% 0%, rgba(212, 175, 55, 0.035) 0px, transparent 65%),
+                radial-gradient(ellipse at 100% 40%, rgba(16, 185, 129, 0.03) 0px, transparent 55%),
+                radial-gradient(ellipse at 0% 100%, rgba(56, 189, 248, 0.025) 0px, transparent 60%);
+            background-attachment: fixed;
+            color: #ffffff;
             font-family: var(--font-sans);
             overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
         .heading-title {
@@ -57,19 +55,21 @@
 
         .mono {
             font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
         }
 
         .soft-card {
-            background: var(--card-surface);
+            background: linear-gradient(180deg, #09090f 0%, #050508 100%);
             border: 1px solid var(--border-soft);
             border-radius: 1.25rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 10px 25px -5px rgba(0, 0, 0, 0.04);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.85), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(16px);
             transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .soft-card:hover {
-            border-color: #cbd5e1;
-            box-shadow: 0 15px 35px -5px rgba(99, 102, 241, 0.08), 0 0 0 1px rgba(199, 210, 254, 0.6);
+            border-color: var(--border-highlight);
+            box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.95), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
             transform: translateY(-2px);
         }
 
@@ -79,8 +79,10 @@
             position: sticky !important;
             top: 0 !important;
             z-index: 10 !important;
-            background: #ffffff !important;
-            box-shadow: 0 1px 0 #e2e8f0;
+            background: #000000 !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.95), inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+            color: #a1a1aa;
         }
 
         /* 3D Luxury Credit Card Display */
@@ -95,7 +97,7 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.35), 0 0 30px rgba(99, 102, 241, 0.2);
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.95), inset 0 1px 0 0 rgba(255, 255, 255, 0.25), 0 0 40px rgba(0, 0, 0, 0.8);
             transition: transform 0.4s ease, box-shadow 0.4s ease;
             color: #ffffff;
             user-select: none;
@@ -103,32 +105,32 @@
 
         .credit-card-3d:hover {
             transform: translateY(-6px) rotateX(4deg) rotateY(-3deg);
-            box-shadow: 0 28px 55px -12px rgba(15, 23, 42, 0.45), 0 0 40px rgba(99, 102, 241, 0.35);
+            box-shadow: 0 35px 70px -15px rgba(0, 0, 0, 1), inset 0 1px 0 0 rgba(255, 255, 255, 0.35), 0 0 50px rgba(212, 175, 55, 0.15);
         }
 
         .theme-obsidian {
-            background: linear-gradient(135deg, #18181b 0%, #09090b 50%, #27272a 100%);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: linear-gradient(135deg, #111118 0%, #050508 50%, #171722 100%);
+            border: 1px solid rgba(255, 255, 255, 0.18);
         }
         .theme-emerald-gold {
-            background: linear-gradient(135deg, #064e3b 0%, #022c22 55%, #065f46 100%);
-            border: 1px solid rgba(16, 185, 129, 0.4);
+            background: linear-gradient(135deg, #05241b 0%, #03140f 55%, #08382b 100%);
+            border: 1px solid rgba(16, 185, 129, 0.35);
         }
         .theme-platinum-frost {
-            background: linear-gradient(135deg, #334155 0%, #1e293b 50%, #475569 100%);
-            border: 1px solid rgba(203, 213, 225, 0.4);
+            background: linear-gradient(135deg, #1e222e 0%, #0e111a 50%, #293040 100%);
+            border: 1px solid rgba(203, 213, 225, 0.25);
         }
         .theme-burgundy-rose {
-            background: linear-gradient(135deg, #881337 0%, #4c0519 50%, #9f1239 100%);
-            border: 1px solid rgba(244, 63, 94, 0.4);
+            background: linear-gradient(135deg, #2c0914 0%, #150308 50%, #3d0e1e 100%);
+            border: 1px solid rgba(244, 63, 94, 0.35);
         }
         .theme-sapphire-indigo {
-            background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 50%, #312e81 100%);
-            border: 1px solid rgba(99, 102, 241, 0.4);
+            background: linear-gradient(135deg, #0a1128 0%, #030612 50%, #101c42 100%);
+            border: 1px solid rgba(56, 189, 248, 0.35);
         }
         .theme-sunset-coral {
-            background: linear-gradient(135deg, #7c2d12 0%, #431407 50%, #9a3412 100%);
-            border: 1px solid rgba(249, 115, 22, 0.4);
+            background: linear-gradient(135deg, #2b1206 0%, #130702 50%, #3e1b09 100%);
+            border: 1px solid rgba(249, 115, 22, 0.35);
         }
 
         .credit-card-3d::before {
@@ -138,32 +140,32 @@
             left: -60%;
             width: 220%;
             height: 220%;
-            background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 65%);
+            background: radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 65%);
             pointer-events: none;
         }
 
         .emv-chip {
             width: 46px;
             height: 35px;
-            background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+            background: linear-gradient(135deg, #d4af37 0%, #997a15 100%);
             border-radius: 6px;
             position: relative;
-            border: 1px solid rgba(0,0,0,0.25);
-            box-shadow: inset 0 1px 2px rgba(255,255,255,0.4);
+            border: 1px solid rgba(0,0,0,0.6);
+            box-shadow: inset 0 1px 2px rgba(255,255,255,0.5), 0 2px 5px rgba(0,0,0,0.5);
         }
 
         .emv-chip::after {
             content: "";
             position: absolute;
             inset: 6px;
-            border: 1px solid rgba(0,0,0,0.25);
+            border: 1px solid rgba(0,0,0,0.35);
             border-radius: 3px;
         }
 
         /* Animated Pulse for Pending OTP */
         @keyframes pulseGlow {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4); }
-            50% { box-shadow: 0 0 0 10px rgba(217, 119, 6, 0); }
+            0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0); }
         }
         .otp-pulse {
             animation: pulseGlow 2s infinite;
@@ -171,49 +173,62 @@
 
         /* Modal Overlay */
         .modal-overlay {
-            background: rgba(15, 23, 42, 0.45);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        /* Input styling */
+        .glass-input {
+            background: #020205;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            transition: all 0.2s ease;
+        }
+        .glass-input:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
         }
 
         /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        ::-webkit-scrollbar-track { background: #000000; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
     </style>
 </head>
 <body class="p-4 sm:p-6 lg:p-8">
 
     <div class="max-w-7xl mx-auto space-y-7">
-        
+
         <!-- Navigation & Header Bar -->
-        <header class="soft-card p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 border-slate-200/80">
+        <header class="soft-card p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-3.5">
-                <a href="/portal" class="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-200/80 flex items-center justify-center text-indigo-600 text-lg font-bold shadow-sm hover:scale-105 hover:bg-indigo-100 transition" title="Return to Nexus Portal">
+                <a href="/portal" class="w-11 h-11 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-gold text-lg font-bold shadow-sm hover:scale-105 hover:bg-white/[0.08] hover:border-white/20 transition" title="Return to Nexus Portal">
                     💳
                 </a>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="heading-title text-xl font-extrabold text-slate-900 tracking-tight">NEXUS // CREDIT & WEALTH HUB</h1>
-                        <span id="roleBadge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        <h1 class="heading-title text-xl font-extrabold text-white tracking-tight">NEXUS // CREDIT & WEALTH HUB</h1>
+                        <span id="roleBadge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
                             👑 Vault Owner
                         </span>
                     </div>
-                    <p class="text-xs text-slate-500 mt-0.5">High-Yield Reward Maximizer, Lounge Manager & Friend OTP Shared Access</p>
+                    <p class="text-xs text-zinc-400 mt-0.5">High-Yield Reward Maximizer, Lounge Quota Engine & Friend OTP Shared Vault</p>
                 </div>
             </div>
 
             <div class="flex items-center gap-2.5">
-                <button type="button" id="addCardBtn" onclick="openAddCardModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-200 flex items-center gap-1.5 transition">
+                <button type="button" id="addCardBtn" onclick="openAddCardModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black shadow-lg shadow-amber-900/30 flex items-center gap-1.5 transition">
                     <span>➕</span>
                     <span>Add Credit Card</span>
                 </button>
-                <a href="/dashboard" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 transition flex items-center gap-1.5">
+                <a href="/dashboard" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/[0.04] border border-white/10 text-zinc-300 hover:bg-white/[0.08] hover:text-white transition flex items-center gap-1.5">
                     <span>📈</span>
                     <span>Trading Terminal</span>
                 </a>
-                <a href="/portal" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition shadow-sm">
+                <a href="/portal" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/[0.02] border border-white/10 text-zinc-400 hover:bg-white/[0.06] hover:text-white transition shadow-sm">
                     🧭 Switch App
                 </a>
             </div>
@@ -227,18 +242,18 @@
 
             <!-- Left Column: 3D Card Visualizer & Quick Stats (5 Cols) -->
             <div class="lg:col-span-5 flex flex-col gap-6">
-                
+
                 <!-- 3D Interactive Card Showcase -->
-                <div class="soft-card p-6 flex flex-col items-center bg-gradient-to-b from-white to-slate-50/50">
+                <div class="soft-card p-6 flex flex-col items-center">
                     <div class="w-full flex justify-between items-center mb-4">
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Active Card Preview</span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-zinc-400">Active Card Preview</span>
                         <div class="flex items-center gap-1.5" id="cardDotsContainer"></div>
                     </div>
 
                     <div id="card3dVisual" class="credit-card-3d theme-obsidian">
                         <div class="flex justify-between items-start">
                             <div>
-                                <span id="visualCardIssuer" class="text-[10px] font-bold tracking-widest text-indigo-300 uppercase block">HDFC BANK</span>
+                                <span id="visualCardIssuer" class="text-[10px] font-bold tracking-widest text-zinc-400 uppercase block">HDFC BANK</span>
                                 <h3 id="visualCardName" class="heading-title text-lg font-extrabold text-white tracking-wide">OBSIDIAN INFINITE</h3>
                             </div>
                             <span class="text-xl">📡</span>
@@ -250,17 +265,17 @@
                         </div>
 
                         <div>
-                            <div class="mono text-lg tracking-[0.25em] text-slate-100 font-semibold mb-2" id="visualCardNumber">
+                            <div class="mono text-lg tracking-[0.25em] text-white font-semibold mb-2" id="visualCardNumber">
                                 •••• •••• •••• 8842
                             </div>
                             <div class="flex justify-between items-end">
                                 <div>
-                                    <span class="text-[9px] text-slate-300 block uppercase font-medium">Card Holder</span>
+                                    <span class="text-[9px] text-zinc-400 block uppercase font-medium">Card Holder</span>
                                     <span class="text-xs font-bold text-white tracking-wider uppercase" id="visualCardHolder">JATIN</span>
                                 </div>
                                 <div>
-                                    <span class="text-[9px] text-slate-300 block uppercase font-medium">Expires</span>
-                                    <span class="text-xs font-mono text-slate-100 font-bold">12/30</span>
+                                    <span class="text-[9px] text-zinc-400 block uppercase font-medium">Expires</span>
+                                    <span class="text-xs font-mono text-zinc-300 font-bold">12/30</span>
                                 </div>
                                 <div class="text-right">
                                     <span class="heading-title font-black italic text-lg text-white" id="visualNetworkLogo">VISA</span>
@@ -277,53 +292,53 @@
                 <div class="soft-card p-6">
                     <div class="flex justify-between items-center mb-4">
                         <div>
-                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Credit Portfolio</span>
-                            <h4 class="heading-title text-sm font-bold text-slate-800">Total Credit Line & Utilization</h4>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Credit Portfolio</span>
+                            <h4 class="heading-title text-sm font-bold text-white">Total Credit Line & Utilization</h4>
                         </div>
-                        <span id="utilizationBadge" class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        <span id="utilizationBadge" class="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full mono">
                             14.2% Optimal
                         </span>
                     </div>
 
                     <div class="space-y-3">
                         <div class="flex justify-between text-xs">
-                            <span class="text-slate-500 font-medium">Total Credit Available:</span>
-                            <span class="font-mono font-bold text-emerald-600 text-sm" id="statAvailableLimit">₹27,95,000</span>
+                            <span class="text-zinc-400 font-medium">Total Credit Available:</span>
+                            <span class="font-mono font-bold text-emerald-400 text-sm" id="statAvailableLimit">₹27,95,000</span>
                         </div>
                         <div class="flex justify-between text-xs">
-                            <span class="text-slate-500 font-medium">Total Spending Cap:</span>
-                            <span class="font-mono font-bold text-slate-800" id="statTotalLimit">₹31,50,000</span>
+                            <span class="text-zinc-400 font-medium">Total Spending Cap:</span>
+                            <span class="font-mono font-bold text-white" id="statTotalLimit">₹31,50,000</span>
                         </div>
-                        <div class="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
-                            <div id="utilizationProgressBar" class="h-full bg-gradient-to-r from-emerald-500 to-indigo-500 rounded-full transition-all duration-500" style="width: 14.2%;"></div>
+                        <div class="w-full h-2 rounded-full bg-zinc-900 overflow-hidden border border-white/5">
+                            <div id="utilizationProgressBar" class="h-full bg-gradient-to-r from-emerald-500 to-sky-500 rounded-full transition-all duration-500" style="width: 14.2%;"></div>
                         </div>
-                        <span class="text-[11px] text-slate-400 block pt-1">Auto-revolving billing cycle resets on 15th of each month.</span>
+                        <span class="text-[11px] text-zinc-500 block pt-1">Auto-revolving billing cycle resets on 15th of each month.</span>
                     </div>
                 </div>
 
                 <!-- Tier Perks & Lounge Tracker -->
                 <div class="soft-card p-6">
-                    <h4 class="heading-title text-sm font-bold text-slate-800 mb-3.5">Tier Benefits & Luxury Quotas</h4>
+                    <h4 class="heading-title text-sm font-bold text-white mb-3.5">Tier Benefits & Luxury Quotas</h4>
                     <div class="grid grid-cols-2 gap-3" id="perksOverviewGrid">
-                        <div class="bg-indigo-50/60 p-3.5 rounded-xl border border-indigo-100">
-                            <span class="text-[11px] font-semibold text-indigo-700 block">Airport Lounges</span>
-                            <span class="text-base font-bold text-slate-800 font-mono">Unlimited Intl</span>
-                            <span class="text-[10px] text-slate-500 block mt-0.5">Priority Pass + Guest</span>
+                        <div class="bg-white/[0.02] p-3.5 rounded-xl border border-white/5">
+                            <span class="text-[11px] font-semibold text-sky-400 block">Airport Lounges</span>
+                            <span class="text-base font-bold text-white font-mono">Unlimited Intl</span>
+                            <span class="text-[10px] text-zinc-400 block mt-0.5">Priority Pass + Guest</span>
                         </div>
-                        <div class="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-100">
-                            <span class="text-[11px] font-semibold text-emerald-700 block">Forex Markup</span>
-                            <span class="text-base font-bold text-slate-800 font-mono">0.0% - 2.0%</span>
-                            <span class="text-[10px] text-slate-500 block mt-0.5">Zero surcharge overseas</span>
+                        <div class="bg-white/[0.02] p-3.5 rounded-xl border border-white/5">
+                            <span class="text-[11px] font-semibold text-emerald-400 block">Forex Markup</span>
+                            <span class="text-base font-bold text-white font-mono">0.0% - 2.0%</span>
+                            <span class="text-[10px] text-zinc-400 block mt-0.5">Zero surcharge overseas</span>
                         </div>
-                        <div class="bg-amber-50/60 p-3.5 rounded-xl border border-amber-100">
-                            <span class="text-[11px] font-semibold text-amber-700 block">Golf Access</span>
-                            <span class="text-base font-bold text-slate-800 font-mono">4 Compl. / Qtr</span>
-                            <span class="text-[10px] text-slate-500 block mt-0.5">All PGA partner clubs</span>
+                        <div class="bg-white/[0.02] p-3.5 rounded-xl border border-white/5">
+                            <span class="text-[11px] font-semibold text-amber-400 block">Golf Access</span>
+                            <span class="text-base font-bold text-white font-mono">4 Compl. / Qtr</span>
+                            <span class="text-[10px] text-zinc-400 block mt-0.5">All PGA partner clubs</span>
                         </div>
-                        <div class="bg-purple-50/60 p-3.5 rounded-xl border border-purple-100">
-                            <span class="text-[11px] font-semibold text-purple-700 block">Reward Rate</span>
-                            <span class="text-base font-bold text-slate-800 font-mono">Up to 33.3%</span>
-                            <span class="text-[10px] text-slate-500 block mt-0.5">10x Multiplier portals</span>
+                        <div class="bg-white/[0.02] p-3.5 rounded-xl border border-white/5">
+                            <span class="text-[11px] font-semibold text-zinc-300 block">Reward Rate</span>
+                            <span class="text-base font-bold text-white font-mono">Up to 33.3%</span>
+                            <span class="text-[10px] text-zinc-400 block mt-0.5">10x Multiplier portals</span>
                         </div>
                     </div>
                 </div>
@@ -334,23 +349,23 @@
             <div class="lg:col-span-7 flex flex-col gap-6">
 
                 <!-- Live OTP Requests Hub (Real-Time) -->
-                <div class="soft-card p-6 border-amber-200/80 bg-gradient-to-b from-white to-amber-50/20">
+                <div class="soft-card p-6 border-amber-500/30">
                     <div class="flex justify-between items-center mb-4">
                         <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
-                            <h3 class="heading-title text-base font-bold text-slate-900">Live OTP Requests Hub</h3>
-                            <span id="pendingOtpBadge" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+                            <h3 class="heading-title text-base font-bold text-white">Live OTP Requests Hub</h3>
+                            <span id="pendingOtpBadge" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
                                 0 Active
                             </span>
                         </div>
-                        <button type="button" onclick="fetchOtpRequests()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                        <button type="button" onclick="fetchOtpRequests()" class="text-xs font-semibold text-zinc-400 hover:text-white flex items-center gap-1 transition">
                             <span>🔄</span>
                             <span>Refresh</span>
                         </button>
                     </div>
 
                     <div id="otpRequestsContainer" class="space-y-3">
-                        <div class="text-center py-6 text-xs text-slate-400">
+                        <div class="text-center py-6 text-xs text-zinc-500">
                             Loading active OTP requests...
                         </div>
                     </div>
@@ -360,10 +375,10 @@
                 <div class="soft-card p-6">
                     <div class="flex justify-between items-center mb-5">
                         <div>
-                            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600 block">Shared Access Portfolio</span>
-                            <h3 class="heading-title text-lg font-bold text-slate-900">Available Credit Cards & Multipliers</h3>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">Shared Access Portfolio</span>
+                            <h3 class="heading-title text-lg font-bold text-white">Available Credit Cards & Multipliers</h3>
                         </div>
-                        <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-semibold border border-slate-200" id="cardCountBadge">
+                        <span class="text-xs bg-white/[0.04] text-zinc-300 px-3 py-1 rounded-full font-semibold border border-white/10" id="cardCountBadge">
                             4 Cards
                         </span>
                     </div>
@@ -377,63 +392,63 @@
                 <div class="soft-card p-6 sm:p-7">
                     <div class="flex justify-between items-center mb-6">
                         <div>
-                            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Yield Maximizer</span>
-                            <h3 class="heading-title text-lg font-bold text-slate-900 mt-0.5">Interactive Spends & Reward Simulator</h3>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Yield Maximizer</span>
+                            <h3 class="heading-title text-lg font-bold text-white mt-0.5">Interactive Spends & Reward Simulator</h3>
                         </div>
-                        <span class="text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded-full font-bold">
+                        <span class="text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full font-bold">
                             ✨ 10x Max Accelerator
                         </span>
                     </div>
 
                     <!-- Category Multipliers Summary -->
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                        <div class="p-3.5 rounded-xl bg-indigo-50/50 border border-indigo-100">
-                            <span class="text-[11px] font-semibold text-indigo-700 block">✈️ Flights & Hotels</span>
-                            <span class="text-base font-bold font-mono text-slate-800">10x Points</span>
-                            <span class="text-[10px] text-slate-500 block">33.3% return rate</span>
+                        <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                            <span class="text-[11px] font-semibold text-sky-400 block">✈️ Flights & Hotels</span>
+                            <span class="text-base font-bold font-mono text-white">10x Points</span>
+                            <span class="text-[10px] text-zinc-400 block">33.3% return rate</span>
                         </div>
-                        <div class="p-3.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
-                            <span class="text-[11px] font-semibold text-emerald-700 block">🍽️ Dining & Bars</span>
-                            <span class="text-base font-bold font-mono text-slate-800">5x Points</span>
-                            <span class="text-[10px] text-slate-500 block">EazyDiner / Dineout</span>
+                        <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                            <span class="text-[11px] font-semibold text-emerald-400 block">🍽️ Dining & Bars</span>
+                            <span class="text-base font-bold font-mono text-white">5x Points</span>
+                            <span class="text-[10px] text-zinc-400 block">EazyDiner / Dineout</span>
                         </div>
-                        <div class="p-3.5 rounded-xl bg-sky-50/50 border border-sky-100">
-                            <span class="text-[11px] font-semibold text-sky-700 block">⛽ Fuel & Travel</span>
-                            <span class="text-base font-bold font-mono text-slate-800">3x + Zero Fee</span>
-                            <span class="text-[10px] text-slate-500 block">Surcharge waiver</span>
+                        <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                            <span class="text-[11px] font-semibold text-amber-400 block">⛽ Fuel & Travel</span>
+                            <span class="text-base font-bold font-mono text-white">3x + Zero Fee</span>
+                            <span class="text-[10px] text-zinc-400 block">Surcharge waiver</span>
                         </div>
-                        <div class="p-3.5 rounded-xl bg-purple-50/50 border border-purple-100">
-                            <span class="text-[11px] font-semibold text-purple-700 block">🛍️ General Spends</span>
-                            <span class="text-base font-bold font-mono text-slate-800">3.3% Base</span>
-                            <span class="text-[10px] text-slate-500 block">All retail & online</span>
+                        <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                            <span class="text-[11px] font-semibold text-zinc-300 block">🛍️ General Spends</span>
+                            <span class="text-base font-bold font-mono text-white">3.3% Base</span>
+                            <span class="text-[10px] text-zinc-400 block">All retail & online</span>
                         </div>
                     </div>
 
                     <!-- Interactive Inputs -->
-                    <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                    <div class="p-5 rounded-2xl bg-black/50 border border-white/5">
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                             <div>
-                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Monthly Flights & Hotels (₹)</label>
-                                <input type="number" id="calcTravel" value="35000" oninput="recalculateYield()" class="w-full bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Monthly Flights & Hotels (₹)</label>
+                                <input type="number" id="calcTravel" value="35000" oninput="recalculateYield()" class="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-white focus:outline-none">
                             </div>
                             <div>
-                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Monthly Dining & Outings (₹)</label>
-                                <input type="number" id="calcDining" value="20000" oninput="recalculateYield()" class="w-full bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Monthly Dining & Outings (₹)</label>
+                                <input type="number" id="calcDining" value="20000" oninput="recalculateYield()" class="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-white focus:outline-none">
                             </div>
                             <div>
-                                <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Monthly Retail & Other (₹)</label>
-                                <input type="number" id="calcOther" value="50000" oninput="recalculateYield()" class="w-full bg-white border border-slate-300 px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                                <label class="block text-[11px] font-semibold text-zinc-400 mb-1.5">Monthly Retail & Other (₹)</label>
+                                <input type="number" id="calcOther" value="50000" oninput="recalculateYield()" class="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-white focus:outline-none">
                             </div>
                         </div>
 
-                        <div class="flex flex-wrap items-center justify-between pt-4 border-t border-slate-200 gap-4">
+                        <div class="flex flex-wrap items-center justify-between pt-4 border-t border-white/5 gap-4">
                             <div>
-                                <span class="text-xs text-slate-500 block font-medium">Estimated Annual Value Unlocked</span>
-                                <span class="text-2xl font-extrabold text-emerald-600 font-mono" id="annualRewardsVal">₹84,000 / yr</span>
+                                <span class="text-xs text-zinc-400 block font-medium">Estimated Annual Value Unlocked</span>
+                                <span class="text-2xl font-extrabold text-emerald-400 font-mono" id="annualRewardsVal">₹84,000 / yr</span>
                             </div>
                             <div>
-                                <span class="text-xs text-slate-500 block font-medium">Total Annual Reward Points</span>
-                                <span class="text-2xl font-extrabold text-indigo-600 font-mono" id="annualPointsVal">1,68,000 pts</span>
+                                <span class="text-xs text-zinc-400 block font-medium">Total Annual Reward Points</span>
+                                <span class="text-2xl font-extrabold text-white font-mono" id="annualPointsVal">1,68,000 pts</span>
                             </div>
                         </div>
                     </div>
@@ -447,18 +462,18 @@
 
     <!-- Request OTP Modal -->
     <div id="requestOtpModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay hidden">
-        <div class="soft-card max-w-md w-full p-6 sm:p-7 bg-white relative shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div class="soft-card max-w-md w-full p-6 sm:p-7 relative shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div class="flex justify-between items-center mb-5">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 font-bold">
+                    <div class="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold">
                         ⚡
                     </div>
                     <div>
-                        <h3 class="heading-title text-base font-bold text-slate-900">Request Card OTP</h3>
-                        <p class="text-xs text-slate-500" id="otpModalCardSubtitle">Card: Infinia Metal (•••• 8842)</p>
+                        <h3 class="heading-title text-base font-bold text-white">Request Card OTP</h3>
+                        <p class="text-xs text-zinc-400" id="otpModalCardSubtitle">Card: Infinia Metal (•••• 8842)</p>
                     </div>
                 </div>
-                <button type="button" onclick="closeRequestOtpModal()" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm transition">
+                <button type="button" onclick="closeRequestOtpModal()" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white flex items-center justify-center font-bold text-sm transition">
                     ✕
                 </button>
             </div>
@@ -467,42 +482,42 @@
                 <input type="hidden" id="otpCardId">
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Your Name / Identifier</label>
-                    <input type="text" id="otpFriendName" required placeholder="e.g. Rohan (Friend)" class="w-full bg-slate-50 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Your Name / Identifier</label>
+                    <input type="text" id="otpFriendName" required placeholder="e.g. Rohan (Friend)" class="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs font-semibold text-white">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Transaction Amount (₹)</label>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Transaction Amount (₹)</label>
                     <div class="relative">
-                        <span class="absolute left-3.5 top-2.5 text-xs text-slate-400 font-mono font-bold">₹</span>
-                        <input type="number" step="0.01" id="otpAmount" required placeholder="2450.00" class="w-full bg-slate-50 border border-slate-300 pl-7 pr-3.5 py-2.5 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-500">
+                        <span class="absolute left-3.5 top-2.5 text-xs text-zinc-500 font-mono font-bold">₹</span>
+                        <input type="number" step="0.01" id="otpAmount" required placeholder="2450.00" class="w-full glass-input pl-7 pr-3.5 py-2.5 rounded-xl text-xs font-mono font-bold text-white">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Merchant / Platform</label>
-                    <input type="text" id="otpMerchant" required placeholder="e.g. MakeMyTrip, Amazon, Apple Store" class="w-full bg-slate-50 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Merchant / Platform</label>
+                    <input type="text" id="otpMerchant" required placeholder="e.g. MakeMyTrip, Amazon, Apple Store" class="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs font-semibold text-white">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Purpose / Item Description (Optional)</label>
-                    <input type="text" id="otpPurpose" placeholder="e.g. Flight tickets to Bengaluru" class="w-full bg-slate-50 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-indigo-500">
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Purpose / Item Description (Optional)</label>
+                    <input type="text" id="otpPurpose" placeholder="e.g. Flight tickets to Bengaluru" class="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs text-white">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Urgency</label>
-                    <select id="otpUrgency" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:border-indigo-500">
-                        <option value="normal">Normal (Next 10-15 mins)</option>
-                        <option value="high">High (Active checkout window)</option>
-                        <option value="immediate">Immediate / Urgent (Flash sale / Flight timer)</option>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Urgency</label>
+                    <select id="otpUrgency" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-medium text-white">
+                        <option value="normal" class="bg-zinc-900 text-white">Normal (Next 10-15 mins)</option>
+                        <option value="high" class="bg-zinc-900 text-white">High (Active checkout window)</option>
+                        <option value="immediate" class="bg-zinc-900 text-white">Immediate / Urgent (Flash sale / Flight timer)</option>
                     </select>
                 </div>
 
                 <div class="pt-2 flex items-center justify-end gap-3">
-                    <button type="button" onclick="closeRequestOtpModal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                    <button type="button" onclick="closeRequestOtpModal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5 transition">
                         Cancel
                     </button>
-                    <button type="submit" id="submitOtpBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-sm shadow-amber-200 transition">
+                    <button type="submit" id="submitOtpBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-900/30 transition">
                         Send OTP Request ⚡
                     </button>
                 </div>
@@ -512,18 +527,18 @@
 
     <!-- Approve OTP Modal (For Owner) -->
     <div id="approveOtpModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay hidden">
-        <div class="soft-card max-w-md w-full p-6 sm:p-7 bg-white relative shadow-2xl">
+        <div class="soft-card max-w-md w-full p-6 sm:p-7 relative shadow-2xl">
             <div class="flex justify-between items-center mb-5">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 font-bold">
+                    <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">
                         🔐
                     </div>
                     <div>
-                        <h3 class="heading-title text-base font-bold text-slate-900">Approve & Send OTP</h3>
-                        <p class="text-xs text-slate-500" id="approveModalSubtitle">Request for ₹0 at Merchant</p>
+                        <h3 class="heading-title text-base font-bold text-white">Approve & Send OTP</h3>
+                        <p class="text-xs text-zinc-400" id="approveModalSubtitle">Request for ₹0 at Merchant</p>
                     </div>
                 </div>
-                <button type="button" onclick="closeApproveOtpModal()" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm transition">
+                <button type="button" onclick="closeApproveOtpModal()" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white flex items-center justify-center font-bold text-sm transition">
                     ✕
                 </button>
             </div>
@@ -532,30 +547,30 @@
                 <input type="hidden" id="approveRequestId">
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Enter Bank OTP Code (or leave blank to auto-generate)</label>
-                    <input type="text" id="approveOtpCode" placeholder="e.g. 584920" maxlength="8" class="w-full bg-slate-50 border border-slate-300 px-3.5 py-2.5 rounded-xl text-sm font-mono font-bold tracking-widest text-slate-900 focus:outline-none focus:border-emerald-500">
-                    <span class="text-[10px] text-slate-400 mt-1 block">If your bank sent an SMS OTP, type it above. Otherwise a secure code will be generated.</span>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Enter Bank OTP Code (or leave blank to auto-generate)</label>
+                    <input type="text" id="approveOtpCode" placeholder="e.g. 584920" maxlength="8" class="w-full glass-input px-3.5 py-2.5 rounded-xl text-sm font-mono font-bold tracking-widest text-emerald-400">
+                    <span class="text-[10px] text-zinc-500 mt-1 block">If your bank sent an SMS OTP, type it above. Otherwise a secure code will be generated.</span>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Active Duration (Minutes)</label>
-                    <select id="approveDuration" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:border-emerald-500">
-                        <option value="5" selected>5 Minutes (Standard Bank Window)</option>
-                        <option value="10">10 Minutes</option>
-                        <option value="15">15 Minutes</option>
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Active Duration (Minutes)</label>
+                    <select id="approveDuration" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-medium text-white">
+                        <option value="5" selected class="bg-zinc-900 text-white">5 Minutes (Standard Bank Window)</option>
+                        <option value="10" class="bg-zinc-900 text-white">10 Minutes</option>
+                        <option value="15" class="bg-zinc-900 text-white">15 Minutes</option>
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Note to Friend (Optional)</label>
-                    <input type="text" id="approveNotes" placeholder="e.g. Approved for flight booking" class="w-full bg-slate-50 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-emerald-500">
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Note to Friend (Optional)</label>
+                    <input type="text" id="approveNotes" placeholder="e.g. Approved for flight booking" class="w-full glass-input px-3.5 py-2.5 rounded-xl text-xs text-white">
                 </div>
 
                 <div class="pt-2 flex items-center justify-end gap-3">
-                    <button type="button" onclick="closeApproveOtpModal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                    <button type="button" onclick="closeApproveOtpModal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5 transition">
                         Cancel
                     </button>
-                    <button type="submit" id="submitApproveBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-200 transition">
+                    <button type="submit" id="submitApproveBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black shadow-lg shadow-emerald-900/30 transition">
                         Authorize & Reveal OTP 🚀
                     </button>
                 </div>
@@ -565,18 +580,18 @@
 
     <!-- Add Credit Card Modal (For Owner) -->
     <div id="addCardModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay hidden">
-        <div class="soft-card max-w-lg w-full p-6 sm:p-7 bg-white relative shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="soft-card max-w-lg w-full p-6 sm:p-7 relative shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-5">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 font-bold">
+                    <div class="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-amber-400 font-bold">
                         💳
                     </div>
                     <div>
-                        <h3 class="heading-title text-base font-bold text-slate-900">Add Credit Card</h3>
-                        <p class="text-xs text-slate-500">Register a new card to portfolio & friend sharing</p>
+                        <h3 class="heading-title text-base font-bold text-white">Add Credit Card</h3>
+                        <p class="text-xs text-zinc-400">Register a new card to portfolio & friend sharing</p>
                     </div>
                 </div>
-                <button type="button" onclick="closeAddCardModal()" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center font-bold text-sm transition">
+                <button type="button" onclick="closeAddCardModal()" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white flex items-center justify-center font-bold text-sm transition">
                     ✕
                 </button>
             </div>
@@ -584,81 +599,81 @@
             <form id="addCardForm" onsubmit="submitAddCard(event)" class="space-y-4">
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Card Name</label>
-                        <input type="text" id="newCardName" required placeholder="e.g. Infinia Metal" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                        <label class="block text-xs font-semibold text-zinc-300 mb-1">Card Name</label>
+                        <input type="text" id="newCardName" required placeholder="e.g. Infinia Metal" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold text-white">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Issuer Bank</label>
-                        <input type="text" id="newCardIssuer" required placeholder="e.g. HDFC Bank" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                        <label class="block text-xs font-semibold text-zinc-300 mb-1">Issuer Bank</label>
+                        <input type="text" id="newCardIssuer" required placeholder="e.g. HDFC Bank" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold text-white">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Network</label>
-                        <select id="newCardNetwork" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:border-indigo-500">
-                            <option value="Visa Infinite">Visa Infinite</option>
-                            <option value="Mastercard World Elite">Mastercard World Elite</option>
-                            <option value="American Express">American Express</option>
-                            <option value="RuPay Select">RuPay Select</option>
-                            <option value="Diners Club Black">Diners Club Black</option>
+                        <label class="block text-xs font-semibold text-zinc-300 mb-1">Network</label>
+                        <select id="newCardNetwork" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-medium text-white">
+                            <option value="visa_infinite" class="bg-zinc-900 text-white">Visa Infinite / Signature</option>
+                            <option value="mastercard_world" class="bg-zinc-900 text-white">Mastercard World Elite</option>
+                            <option value="amex" class="bg-zinc-900 text-white">American Express</option>
+                            <option value="rupay_select" class="bg-zinc-900 text-white">RuPay Select</option>
+                            <option value="diners_black" class="bg-zinc-900 text-white">Diners Club Black</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Last 4 Digits</label>
-                        <input type="text" id="newCardLast4" required maxlength="4" placeholder="8842" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-indigo-500">
+                        <label class="block text-xs font-semibold text-zinc-300 mb-1">Last 4 Digits</label>
+                        <input type="text" id="newCardLast4" required maxlength="4" placeholder="8842" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-mono font-bold text-white">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Credit Limit (₹)</label>
-                        <input type="number" id="newCardLimit" required value="500000" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                        <label class="block text-xs font-semibold text-zinc-300 mb-1">Total Credit Limit (₹)</label>
+                        <input type="number" id="newCardLimit" required placeholder="500000" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-mono font-bold text-white">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Available Limit (₹)</label>
-                        <input type="number" id="newCardAvail" required value="450000" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                        <label class="block text-xs font-semibold text-zinc-300 mb-1">Available Limit (₹)</label>
+                        <input type="number" id="newCardAvail" required placeholder="450000" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-mono font-bold text-white">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Card Color Skin</label>
-                        <select id="newCardTheme" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:border-indigo-500">
-                            <option value="obsidian">Obsidian Black (Gold)</option>
-                            <option value="emerald-gold">Emerald Forest (Gold)</option>
-                            <option value="platinum-frost">Platinum Slate (Silver)</option>
-                            <option value="burgundy-rose">Burgundy Reserve (Rose)</option>
-                            <option value="sapphire-indigo">Sapphire Deep (Indigo)</option>
-                            <option value="sunset-coral">Sunset Amber (Coral)</option>
+                        <label class="block text-xs font-semibold text-zinc-300 mb-1">Billing Cycle Day</label>
+                        <input type="number" id="newCardCycle" value="15" min="1" max="31" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-mono text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-300 mb-1">Color Theme</label>
+                        <select id="newCardTheme" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-medium text-white">
+                            <option value="theme-obsidian" selected class="bg-zinc-900 text-white">Obsidian Infinite (Black Glass)</option>
+                            <option value="theme-emerald-gold" class="bg-zinc-900 text-white">Emerald Luxury</option>
+                            <option value="theme-platinum-frost" class="bg-zinc-900 text-white">Platinum Titanium</option>
+                            <option value="theme-burgundy-rose" class="bg-zinc-900 text-white">Burgundy Velvet</option>
+                            <option value="theme-sapphire-indigo" class="bg-zinc-900 text-white">Sapphire Blue</option>
+                            <option value="theme-sunset-coral" class="bg-zinc-900 text-white">Sunset Amber</option>
                         </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1">Billing Cycle Day</label>
-                        <input type="number" id="newCardCycle" min="1" max="31" value="15" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Airport Lounge Summary</label>
-                    <input type="text" id="newCardLounge" placeholder="e.g. Unlimited International & Domestic Lounge Access" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-indigo-500">
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Category Perks & Multipliers (Comma Separated)</label>
+                    <input type="text" id="newCardPerks" placeholder="10x Flights (33% yield), 5x Dining, 3x SmartBuy" class="w-full glass-input px-3 py-2 rounded-xl text-xs text-white">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Reward Highlights (Comma-separated)</label>
-                    <input type="text" id="newCardPerks" placeholder="10x Flights & Hotels, 5x Dining, 0% Forex Markup" class="w-full bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-indigo-500">
+                    <label class="block text-xs font-semibold text-zinc-300 mb-1">Lounge Access Summary</label>
+                    <input type="text" id="newCardLounge" placeholder="Unlimited Intl + Domestic with Priority Pass" class="w-full glass-input px-3 py-2 rounded-xl text-xs text-white">
                 </div>
 
                 <div class="flex items-center gap-2 pt-1">
-                    <input type="checkbox" id="newCardShared" checked class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500">
-                    <label for="newCardShared" class="text-xs font-semibold text-slate-700">Share with Friends (Friends can view & request OTP)</label>
+                    <input type="checkbox" id="newCardShared" checked class="rounded border-zinc-700 bg-zinc-900 text-amber-500 focus:ring-amber-500">
+                    <label for="newCardShared" class="text-xs font-medium text-zinc-300">Allow friends to see and request OTP on this card</label>
                 </div>
 
                 <div class="pt-3 flex items-center justify-end gap-3">
-                    <button type="button" onclick="closeAddCardModal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                    <button type="button" onclick="closeAddCardModal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5 transition">
                         Cancel
                     </button>
-                    <button type="submit" id="submitAddCardBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-200 transition">
+                    <button type="submit" id="submitAddCardBtn" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black shadow-lg shadow-amber-900/30 transition">
                         Save Card to Vault 💳
                     </button>
                 </div>
@@ -666,75 +681,67 @@
         </div>
     </div>
 
-    <!-- Frontend Logic -->
     <script>
+        // State
         let allCards = [];
         let activeCardIndex = 0;
-        let isOwnerUser = true;
+        let isOwnerUser = true; // Auto-detected from authentication token
         let otpPollInterval = null;
 
-        // Toast Helper
+        // Toast Notification Helper
         function showToast(message, type = 'success') {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
-            const isErr = type === 'error';
-            toast.className = `px-4 py-3 rounded-2xl shadow-xl border pointer-events-auto flex items-center gap-2.5 text-xs font-bold transform transition duration-300 translate-y-2 opacity-0 ${
-                isErr ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-            }`;
-            toast.innerHTML = `<span>${isErr ? '⚠️' : '✅'}</span><span>${message}</span>`;
+            const bgClass = type === 'success' ? 'bg-[#09090f] border-emerald-500/40 text-emerald-300' : 'bg-[#09090f] border-rose-500/40 text-rose-300';
+            toast.className = `p-4 rounded-xl border ${bgClass} shadow-2xl backdrop-blur-xl text-xs font-semibold flex items-center gap-2.5 transition-all transform duration-300 pointer-events-auto`;
+            toast.innerHTML = `<span>${type === 'success' ? '✨' : '⚠️'}</span><span>${message}</span>`;
             container.appendChild(toast);
-            requestAnimationFrame(() => {
-                toast.classList.remove('translate-y-2', 'opacity-0');
-            });
             setTimeout(() => {
                 toast.classList.add('opacity-0', 'translate-y-2');
                 setTimeout(() => toast.remove(), 300);
-            }, 4000);
+            }, 3500);
         }
 
-        // Fetch All Cards
+        // Fetch Cards
         async function fetchCards() {
             try {
                 const res = await fetch('/api/v1/cards');
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) throw new Error('Failed to load credit cards');
                 const data = await res.json();
                 allCards = data.cards || [];
-                isOwnerUser = Boolean(data.is_owner);
+                isOwnerUser = data.is_owner !== undefined ? data.is_owner : true;
 
-                // Update Role indicator
+                // Adjust UI for Owner vs Friend
                 const roleBadge = document.getElementById('roleBadge');
-                const addCardBtn = document.getElementById('addCardBtn');
-                if (!isOwnerUser) {
-                    if (roleBadge) {
-                        roleBadge.textContent = '👥 Verified Friend';
-                        roleBadge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200';
-                    }
-                    if (addCardBtn) addCardBtn.classList.add('hidden');
+                const addBtn = document.getElementById('addCardBtn');
+                if (isOwnerUser) {
+                    roleBadge.textContent = '👑 Vault Owner';
+                    roleBadge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30';
+                    if (addBtn) addBtn.style.display = 'flex';
                 } else {
-                    if (roleBadge) {
-                        roleBadge.textContent = '👑 Vault Owner';
-                        roleBadge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200';
-                    }
-                    if (addCardBtn) addCardBtn.classList.remove('hidden');
+                    roleBadge.textContent = '🤝 Authorized Friend';
+                    roleBadge.className = 'text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/30';
+                    if (addBtn) addBtn.style.display = 'none';
                 }
 
-                document.getElementById('cardCountBadge').textContent = `${allCards.length} Card${allCards.length === 1 ? '' : 's'}`;
-                renderCardsList();
+                document.getElementById('cardCountBadge').textContent = `${allCards.length} Cards`;
                 renderCardVisualizer();
+                renderCardsList();
                 updatePortfolioStats();
             } catch (err) {
                 console.error('Failed to load cards:', err);
-                showToast('Failed to load credit cards', 'error');
+                showToast(err.message, 'error');
             }
         }
 
-        // Render 3D Visualizer & Thumbnails
+        // Render Active 3D Card Visualizer
         function renderCardVisualizer() {
             if (!allCards.length) return;
             const card = allCards[activeCardIndex] || allCards[0];
-
             const visual = document.getElementById('card3dVisual');
-            visual.className = `credit-card-3d theme-${card.color_theme || 'obsidian'}`;
+
+            // Apply theme class
+            visual.className = `credit-card-3d ${card.color_theme || 'theme-obsidian'}`;
 
             document.getElementById('visualCardIssuer').textContent = (card.issuer || 'BANK').toUpperCase();
             document.getElementById('visualCardName').textContent = (card.card_name || 'PREMIUM CARD').toUpperCase();
@@ -755,10 +762,10 @@
             thumbContainer.innerHTML = allCards.map((c, i) => `
                 <button type="button" onclick="selectVisualCard(${i})" class="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
                     i === activeCardIndex
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        ? 'bg-white/[0.12] text-white border-white/30 shadow-sm'
+                        : 'bg-white/[0.02] text-zinc-400 border-white/5 hover:bg-white/[0.06] hover:text-zinc-200'
                 }">
-                    <span class="w-2 h-2 rounded-full ${i === activeCardIndex ? 'bg-white' : 'bg-indigo-500'}"></span>
+                    <span class="w-2 h-2 rounded-full ${i === activeCardIndex ? 'bg-amber-400' : 'bg-zinc-600'}"></span>
                     <span>${c.card_name}</span>
                 </button>
             `).join('');
@@ -773,7 +780,7 @@
         function renderCardsList() {
             const grid = document.getElementById('cardsListGrid');
             if (!allCards.length) {
-                grid.innerHTML = `<div class="col-span-2 text-center py-8 text-xs text-slate-400">No cards registered in portfolio yet.</div>`;
+                grid.innerHTML = `<div class="col-span-2 text-center py-8 text-xs text-zinc-500">No cards registered in portfolio yet.</div>`;
                 return;
             }
 
@@ -781,14 +788,14 @@
                 const perks = c.category_perks || {};
                 const perkEntries = Object.entries(perks).slice(0, 3);
                 return `
-                    <div class="p-5 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:shadow-md transition flex flex-col justify-between group">
+                    <div class="p-5 rounded-2xl bg-[#06060a] border border-white/10 shadow-lg hover:border-white/20 transition flex flex-col justify-between group">
                         <div>
                             <div class="flex justify-between items-start mb-2.5">
                                 <div>
-                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">${c.issuer}</span>
-                                    <h4 class="heading-title text-sm font-bold text-slate-900">${c.card_name}</h4>
+                                    <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">${c.issuer}</span>
+                                    <h4 class="heading-title text-sm font-bold text-white">${c.card_name}</h4>
                                 </div>
-                                <span class="font-mono text-xs px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold border border-slate-200">
+                                <span class="font-mono text-xs px-2 py-0.5 rounded-md bg-white/5 text-zinc-300 font-bold border border-white/10">
                                     •••• ${c.last4}
                                 </span>
                             </div>
@@ -796,13 +803,13 @@
                             <!-- Perks Pill List -->
                             <div class="space-y-1.5 my-3">
                                 ${perkEntries.map(([k, v]) => `
-                                    <div class="text-[11px] flex items-center gap-1.5 text-slate-600">
-                                        <span class="text-indigo-500 font-bold">✓</span>
+                                    <div class="text-[11px] flex items-center gap-1.5 text-zinc-300">
+                                        <span class="text-amber-400 font-bold">✓</span>
                                         <span class="capitalize font-medium">${v}</span>
                                     </div>
                                 `).join('')}
                                 ${c.lounge_access_summary ? `
-                                    <div class="text-[11px] flex items-center gap-1.5 text-emerald-700 font-medium">
+                                    <div class="text-[11px] flex items-center gap-1.5 text-emerald-400 font-medium">
                                         <span>🛋️</span>
                                         <span>${c.lounge_access_summary}</span>
                                     </div>
@@ -810,18 +817,18 @@
                             </div>
                         </div>
 
-                        <div class="pt-4 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
+                        <div class="pt-4 border-t border-white/5 flex items-center justify-between gap-2 mt-2">
                             <div>
-                                <span class="text-[10px] text-slate-400 block font-medium">Available Limit</span>
-                                <span class="font-mono font-bold text-xs text-emerald-600">₹${Number(c.available_limit || 0).toLocaleString('en-IN')}</span>
+                                <span class="text-[10px] text-zinc-400 block font-medium">Available Limit</span>
+                                <span class="font-mono font-bold text-xs text-emerald-400">₹${Number(c.available_limit || 0).toLocaleString('en-IN')}</span>
                             </div>
                             <div class="flex items-center gap-1.5">
                                 ${isOwnerUser ? `
-                                    <button type="button" onclick="deleteCard('${c.id}')" class="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="Delete Card">
+                                    <button type="button" onclick="deleteCard('${c.id}')" class="p-2 rounded-xl text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition" title="Delete Card">
                                         🗑️
                                     </button>
                                 ` : ''}
-                                <button type="button" onclick="openRequestOtpModal('${c.id}', '${c.card_name}', '${c.last4}')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 transition flex items-center gap-1">
+                                <button type="button" onclick="openRequestOtpModal('${c.id}', '${c.card_name}', '${c.last4}')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 transition flex items-center gap-1">
                                     <span>⚡</span>
                                     <span>Request OTP</span>
                                 </button>
@@ -840,7 +847,7 @@
 
             document.getElementById('statTotalLimit').textContent = '₹' + Math.round(total).toLocaleString('en-IN');
             document.getElementById('statAvailableLimit').textContent = '₹' + Math.round(avail).toLocaleString('en-IN');
-            
+
             const badge = document.getElementById('utilizationBadge');
             const pbar = document.getElementById('utilizationProgressBar');
             badge.textContent = `${utilized.toFixed(1)}% Utilized`;
@@ -859,15 +866,15 @@
                 const badge = document.getElementById('pendingOtpBadge');
                 badge.textContent = `${pendingCount} Active`;
                 if (pendingCount > 0) {
-                    badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white animate-pulse';
+                    badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-black animate-pulse';
                 } else {
-                    badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300';
+                    badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30';
                 }
 
                 const container = document.getElementById('otpRequestsContainer');
                 if (!requests.length) {
                     container.innerHTML = `
-                        <div class="text-center py-6 text-xs text-slate-400 bg-white/60 rounded-xl border border-slate-200/60">
+                        <div class="text-center py-6 text-xs text-zinc-500 bg-white/[0.02] rounded-xl border border-white/5">
                             No active OTP requests right now. Click <strong>Request OTP</strong> on any card to generate one.
                         </div>
                     `;
@@ -882,40 +889,40 @@
 
                     let statusPill = '';
                     if (isPending) {
-                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1"><span>⏳</span> Pending Owner</span>`;
+                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1"><span>⏳</span> Pending Owner</span>`;
                     } else if (isApproved && !isExpired) {
-                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1"><span>✅</span> Active OTP</span>`;
+                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><span>✅</span> Active OTP</span>`;
                     } else if (isExpired) {
-                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">Expired</span>`;
+                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/5 text-zinc-400 border border-white/10">Expired</span>`;
                     } else {
-                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">Declined</span>`;
+                        statusPill = `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30">Declined</span>`;
                     }
 
                     return `
-                        <div class="p-4 rounded-xl bg-white border ${isPending ? 'border-amber-300 shadow-sm otp-pulse' : 'border-slate-200'} transition flex flex-wrap items-center justify-between gap-3">
+                        <div class="p-4 rounded-xl bg-[#06060a] border ${isPending ? 'border-amber-500/40 shadow-sm otp-pulse' : 'border-white/10'} transition flex flex-wrap items-center justify-between gap-3">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl ${isPending ? 'bg-amber-100 text-amber-800' : (isApproved && !isExpired ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500')} flex items-center justify-center font-bold text-sm">
+                                <div class="w-10 h-10 rounded-xl ${isPending ? 'bg-amber-500/15 text-amber-300' : (isApproved && !isExpired ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/5 text-zinc-400')} flex items-center justify-center font-bold text-sm">
                                     ${isPending ? '⚡' : (isApproved && !isExpired ? '🔑' : '📋')}
                                 </div>
                                 <div>
                                     <div class="flex items-center gap-2">
-                                        <h5 class="text-xs font-bold text-slate-900">${r.requested_by_name}</h5>
-                                        <span class="text-[10px] text-slate-400 font-mono font-medium">${r.card_name} (•••• ${r.last4})</span>
+                                        <h5 class="text-xs font-bold text-white">${r.requested_by_name}</h5>
+                                        <span class="text-[10px] text-zinc-400 font-mono font-medium">${r.card_name} (•••• ${r.last4})</span>
                                     </div>
-                                    <p class="text-xs text-slate-600 mt-0.5">
-                                        <strong class="font-mono text-slate-900">₹${Number(r.amount).toLocaleString('en-IN')}</strong> at <span class="font-semibold">${r.merchant}</span>
-                                        ${r.purpose ? ` · <span class="text-slate-500">${r.purpose}</span>` : ''}
+                                    <p class="text-xs text-zinc-300 mt-0.5">
+                                        <strong class="font-mono text-white">₹${Number(r.amount).toLocaleString('en-IN')}</strong> at <span class="font-semibold text-white">${r.merchant}</span>
+                                        ${r.purpose ? ` · <span class="text-zinc-400">${r.purpose}</span>` : ''}
                                     </p>
                                 </div>
                             </div>
 
                             <div class="flex items-center gap-3">
                                 ${isApproved && !isExpired && r.otp_code ? `
-                                    <div class="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
-                                        <span class="text-[10px] text-emerald-700 font-semibold uppercase">OTP:</span>
-                                        <span class="font-mono text-sm font-extrabold text-emerald-800 tracking-wider select-all">${r.otp_code}</span>
-                                        <button type="button" onclick="navigator.clipboard.writeText('${r.otp_code}'); showToast('OTP copied to clipboard!')" class="text-xs text-emerald-700 hover:text-emerald-900" title="Copy OTP">📋</button>
-                                        <span class="text-[10px] font-mono text-emerald-600 font-bold">(${Math.floor(r.remaining_seconds / 60)}m ${r.remaining_seconds % 60}s)</span>
+                                    <div class="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-xl">
+                                        <span class="text-[10px] text-emerald-300 font-semibold uppercase">OTP:</span>
+                                        <span class="font-mono text-sm font-extrabold text-emerald-400 tracking-wider select-all">${r.otp_code}</span>
+                                        <button type="button" onclick="navigator.clipboard.writeText('${r.otp_code}'); showToast('OTP copied to clipboard!')" class="text-xs text-emerald-400 hover:text-emerald-300" title="Copy OTP">📋</button>
+                                        <span class="text-[10px] font-mono text-emerald-400 font-bold">(${Math.floor(r.remaining_seconds / 60)}m ${r.remaining_seconds % 60}s)</span>
                                     </div>
                                 ` : ''}
 
@@ -923,10 +930,10 @@
 
                                 ${isOwnerUser && isPending ? `
                                     <div class="flex items-center gap-1.5">
-                                        <button type="button" onclick="openApproveOtpModal('${r.id}', '${r.amount}', '${r.merchant}', '${r.requested_by_name}')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition">
+                                        <button type="button" onclick="openApproveOtpModal('${r.id}', '${r.amount}', '${r.merchant}', '${r.requested_by_name}')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black shadow-sm transition">
                                             Approve OTP
                                         </button>
-                                        <button type="button" onclick="rejectOtpRequest('${r.id}')" class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition">
+                                        <button type="button" onclick="rejectOtpRequest('${r.id}')" class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 transition">
                                             Decline
                                         </button>
                                     </div>
