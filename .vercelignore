@@ -1,4 +1,4 @@
-# Exclude heavy local artifacts from Vercel deploys
+# Exclude heavy local artifacts and dev folders from Vercel serverless deploys
 /.venv/
 /data/
 /logs/
@@ -6,15 +6,25 @@
 /scratch/
 /.claude/
 /.git/
+/.agents/
+/.continue/
+/.vscode/
+/docs/
+/scripts/
+/pine_script/
+/playground/
 /reports/archive/
 /reports/*.html
 /reports/*.csv
 /reports/*.json
 /reports/*.cache.json
+/earnings_engine.egg-info/
 *.sqlite3
 *.parquet
+*.pdf
 __pycache__/
 *.py[cod]
 .env
 .env.*
-
+/*.md
+/*.txt

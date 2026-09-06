@@ -9,10 +9,20 @@ rows) and noisy, so the model is kept shallow and heavily regularized.
 
 import numpy as np
 import pandas as pd
-from lightgbm import LGBMClassifier
-from sklearn.calibration import CalibratedClassifierCV
 
 from earnings_engine.models.base import DirectionModel
+
+def _require_gbm_dependencies():
+    """Lazily load LightGBM and scikit-learn with clear diagnostics if missing."""
+    try:
+        from lightgbm import LGBMClassifier
+        from sklearn.calibration import CalibratedClassifierCV
+        return LGBMClassifier, CalibratedClassifierCV
+    except ImportError as e:
+        raise RuntimeError(
+            "LightGBM and scikit-learn are required to fit the GBClassifier model. "
+            "Please install them via: pip install lightgbm scikit-learn"
+        ) from e
 
 DEFAULT_PARAMS = dict(
     n_estimators=120,
@@ -47,6 +57,8 @@ class GBClassifier(DirectionModel):
     def fit(self, train: pd.DataFrame) -> "GBClassifier":
         from earnings_engine.dataset import FEATURE_COLUMNS
 
+        LGBMClassifier, CalibratedClassifierCV = _require_gbm_dependencies()
+
         self.feature_columns = FEATURE_COLUMNS
         X = self._features(train)
         y = train["label"].astype(int)
@@ -67,9 +79,12 @@ class GBClassifier(DirectionModel):
         """Mean gain-based importance (averaged over calibration folds)."""
         if self.model is None or self.feature_columns is None:
             raise RuntimeError("Model not fitted")
-        if isinstance(self.model, CalibratedClassifierCV):
+
+        # Check if calibrated or standalone
+        calibrated_classifiers = getattr(self.model, "calibrated_classifiers_", None)
+        if calibrated_classifiers:
             imps = np.mean(
-                [cc.estimator.feature_importances_ for cc in self.model.calibrated_classifiers_],
+                [cc.estimator.feature_importances_ for cc in calibrated_classifiers],
                 axis=0,
             )
         else:
