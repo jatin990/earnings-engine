@@ -447,6 +447,41 @@ async def api_get_participant_oi(
         raise HTTPException(status_code=500, detail=f"Error retrieving participant OI data: {e}")
 
 
+@router.get("/api/v1/market-pulse/playbook")
+@router.get("/api/v1/market_pulse/playbook")
+@router.get("/api/v1/market/playbook")
+async def api_get_market_playbook(
+    force_refresh: bool = Query(False, description="Force refresh cache"),
+):
+    """Retrieve Algorithmic Next-Day Actionable Market Playbook & Volatility Corridor."""
+    try:
+        from earnings_engine.data.market_pulse import get_market_pulse_data
+        pulse = await asyncio.to_thread(get_market_pulse_data, settings=_settings, force_refresh=force_refresh)
+        return {
+            "success": True,
+            "playbook": pulse.get("next_day_playbook", {}),
+            "participant_oi": pulse.get("participant_oi", {}),
+            "volatility": pulse.get("volatility", {}),
+        }
+    except Exception as e:
+        logger.exception("Error in api_get_market_playbook: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error retrieving market playbook: {e}")
+
+
+@router.get("/api/v1/market-pulse/glossary")
+@router.get("/api/v1/market_pulse/glossary")
+@router.get("/api/v1/market/glossary")
+async def api_get_metric_glossary():
+    """Retrieve structured Metric Glossary & Educational Trading Guide."""
+    try:
+        from earnings_engine.data.market_pulse import get_metric_glossary
+        glossary = await asyncio.to_thread(get_metric_glossary)
+        return {"success": True, "glossary": glossary}
+    except Exception as e:
+        logger.exception("Error in api_get_metric_glossary: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error retrieving metric glossary: {e}")
+
+
 @router.get("/api/v1/dashboard/market-macro")
 async def api_get_market_macro():
     """Retrieve concise market sentiment and volatility regime summary."""

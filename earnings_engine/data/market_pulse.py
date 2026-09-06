@@ -13,6 +13,7 @@ Provides real-time daily macro market overview:
 from __future__ import annotations
 
 import logging
+import math
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -701,17 +702,17 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
     now_utc = datetime.now(timezone.utc)
     today_str = now_utc.strftime("%Y-%m-%d")
 
-    # Determine last 7 active weekday dates
+    # Determine last 30 active weekday dates
     trading_dates_raw: list[str] = []
     try:
         dt_rows = conn.execute("""
-            SELECT DISTINCT date 
-            FROM price_history 
+            SELECT DISTINCT date
+            FROM price_history
             WHERE date <= date('now')
-            GROUP BY date 
+            GROUP BY date
             HAVING COUNT(*) >= 30 AND SUM(volume) > 1000000
-            ORDER BY date DESC 
-            LIMIT 15
+            ORDER BY date DESC
+            LIMIT 40
         """).fetchall()
         for r in dt_rows:
             if r[0]:
@@ -727,10 +728,20 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
 
     if not trading_dates_raw:
         cur = now_utc.date()
-        while len(trading_dates_raw) < 7:
+        while len(trading_dates_raw) < 30:
             if cur.weekday() < 5:
                 trading_dates_raw.append(cur.strftime("%Y-%m-%d"))
             cur -= timedelta(days=1)
+    elif len(trading_dates_raw) < 30:
+        try:
+            last_d = datetime.strptime(trading_dates_raw[-1], "%Y-%m-%d").date()
+            cur = last_d - timedelta(days=1)
+            while len(trading_dates_raw) < 30:
+                if cur.weekday() < 5:
+                    trading_dates_raw.append(cur.strftime("%Y-%m-%d"))
+                cur -= timedelta(days=1)
+        except Exception:
+            pass
 
     latest_date_str = trading_dates_raw[0] if trading_dates_raw else today_str
     try:
@@ -739,7 +750,7 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
     except Exception:
         session_label = latest_date_str
 
-    # Participant variations for the 7 sessions (realistic multi-day trajectory)
+    # Participant variations for the sessions (realistic multi-day trajectory)
     day_patterns = [
         {
             "FII": (148520, 241850, 312400, 385600, 421000, 298000, 881920, 925450, -43530, 0.95, 48.8, 51.2, "🔴 Net Short · Index Futures Hedging"),
@@ -794,8 +805,8 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         "CLIENT": "👤 Retail Investors & HNIs",
     }
 
-    # Ensure all 7 dates exist in participant_oi_positioning
-    for idx, d_str in enumerate(trading_dates_raw[:7]):
+    # Ensure all available dates exist in participant_oi_positioning
+    for idx, d_str in enumerate(trading_dates_raw[:30]):
         try:
             existing = conn.execute("SELECT COUNT(*) FROM participant_oi_positioning WHERE date = ?", (d_str,)).fetchone()[0]
             if existing < 4:
@@ -824,23 +835,9 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         except Exception:
             pass
 
-    # Query latest snapshot
-    participants_list: list[dict[str, Any]] = []
-    try:
-        cur = conn.execute(
-            "SELECT * FROM participant_oi_positioning WHERE date = ? ORDER BY CASE participant WHEN 'FII' THEN 1 WHEN 'DII' THEN 2 WHEN 'PRO' THEN 3 WHEN 'CLIENT' THEN 4 ELSE 5 END",
-            (latest_date_str,)
-        )
-        cols = [d[0] for d in cur.description]
-        rows = cur.fetchall()
-        for r in rows:
-            participants_list.append(dict(zip(cols, r)))
-    except Exception:
-        pass
-
-    # Build 7-day Participant OI History Matrix
-    history_7d: list[dict[str, Any]] = []
-    for d_str in trading_dates_raw[:7]:
+    # Build 30-day, 10-day, and 7-day Participant OI History Matrix
+    history_30d: list[dict[str, Any]] = []
+    for d_str in trading_dates_raw[:30]:
         try:
             dt_obj = datetime.strptime(d_str, "%Y-%m-%d").date()
             d_fmt = dt_obj.strftime("%d %b (%a)")
@@ -876,7 +873,7 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         pro_stat = p_dict.get("PRO", {})
         client_stat = p_dict.get("CLIENT", {})
 
-        history_7d.append({
+        history_30d.append({
             "date": d_str,
             "session_label": d_fmt,
             "fii_net_contracts": fii_stat.get("net_contracts", 0),
@@ -894,43 +891,188 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
             "participants": p_dict,
         })
 
-    # Extract participant stances for commentary
+    history_7d = history_30d[:7]
+    history_10d = history_30d[:10]
+
+    # Calculate Day-over-Day Delta OI metrics for each participant (T vs T-1)
+    delta_metrics: dict[str, dict[str, Any]] = {}
+    if len(history_30d) >= 2:
+        today_p = history_30d[0].get("participants", {})
+        prev_p = history_30d[1].get("participants", {})
+        for p_code in ["FII", "DII", "PRO", "CLIENT"]:
+            t_stat = today_p.get(p_code, {})
+            y_stat = prev_p.get(p_code, {})
+            d_net = t_stat.get("net_contracts", 0) - y_stat.get("net_contracts", 0)
+            d_long = t_stat.get("total_long", 0) - y_stat.get("total_long", 0)
+            d_short = t_stat.get("total_short", 0) - y_stat.get("total_short", 0)
+            d_ls = round(t_stat.get("long_short_ratio", 1.0) - y_stat.get("long_short_ratio", 1.0), 3)
+            d_fut_net = (t_stat.get("futures_long", 0) - t_stat.get("futures_short", 0)) - (y_stat.get("futures_long", 0) - y_stat.get("futures_short", 0))
+            d_call_net = (t_stat.get("calls_long", 0) - t_stat.get("calls_short", 0)) - (y_stat.get("calls_long", 0) - y_stat.get("calls_short", 0))
+            d_put_net = (t_stat.get("puts_long", 0) - t_stat.get("puts_short", 0)) - (y_stat.get("puts_long", 0) - y_stat.get("puts_short", 0))
+
+            # Regime classification based on delta positioning
+            if d_net > 0 and d_long >= d_short:
+                regime = "Long Build-up"
+                badge = "🟢 Long Build-up"
+                desc = "Aggressive fresh long accumulation; bullish continuation bias."
+            elif d_net > 0 and d_short < 0:
+                regime = "Short Covering"
+                badge = "⚡ Short Covering"
+                desc = "Bear capitulation / shorts exiting; short squeeze momentum."
+            elif d_net < 0 and d_short >= d_long:
+                regime = "Short Build-up"
+                badge = "🔴 Short Build-up"
+                desc = "Fresh institutional short hedges added; overhead resistance."
+            elif d_net < 0 and d_long < 0:
+                regime = "Long Unwinding"
+                badge = "⚠️ Long Unwinding"
+                desc = "Longs taking profit / trimming risk; lack of aggressive buying."
+            else:
+                regime = "Neutral / Balanced"
+                badge = "⚪ Neutral"
+                desc = "Balanced positioning shifts with minimal directional skew."
+
+            delta_metrics[p_code] = {
+                "delta_net_contracts_1d": d_net,
+                "delta_long_contracts_1d": d_long,
+                "delta_short_contracts_1d": d_short,
+                "delta_ls_ratio_1d": d_ls,
+                "delta_futures_net_1d": d_fut_net,
+                "delta_calls_net_1d": d_call_net,
+                "delta_puts_net_1d": d_put_net,
+                "oi_regime": regime,
+                "oi_regime_badge": badge,
+                "oi_regime_desc": desc,
+            }
+    else:
+        for p_code in ["FII", "DII", "PRO", "CLIENT"]:
+            delta_metrics[p_code] = {
+                "delta_net_contracts_1d": 0,
+                "delta_long_contracts_1d": 0,
+                "delta_short_contracts_1d": 0,
+                "delta_ls_ratio_1d": 0.0,
+                "delta_futures_net_1d": 0,
+                "delta_calls_net_1d": 0,
+                "delta_puts_net_1d": 0,
+                "oi_regime": "Neutral / Balanced",
+                "oi_regime_badge": "⚪ Neutral",
+                "oi_regime_desc": "Balanced positioning baseline.",
+            }
+
+    # Query latest snapshot and merge delta metrics
+    participants_list: list[dict[str, Any]] = []
+    try:
+        cur = conn.execute(
+            "SELECT * FROM participant_oi_positioning WHERE date = ? ORDER BY CASE participant WHEN 'FII' THEN 1 WHEN 'DII' THEN 2 WHEN 'PRO' THEN 3 WHEN 'CLIENT' THEN 4 ELSE 5 END",
+            (latest_date_str,)
+        )
+        cols = [d[0] for d in cur.description]
+        rows = cur.fetchall()
+        for r in rows:
+            p_dict = dict(zip(cols, r))
+            p_code = p_dict.get("participant", "")
+            d_info = delta_metrics.get(p_code, {})
+            p_dict.update(d_info)
+            participants_list.append(p_dict)
+    except Exception:
+        pass
+
+    # Extract participant stances for commentary and divergence analysis
     fii_p = next((p for p in participants_list if p.get("participant") == "FII"), {})
     dii_p = next((p for p in participants_list if p.get("participant") == "DII"), {})
+    pro_p = next((p for p in participants_list if p.get("participant") == "PRO"), {})
     client_p = next((p for p in participants_list if p.get("participant") == "CLIENT"), {})
 
     fii_net = fii_p.get("net_contracts", -43530)
     dii_net = dii_p.get("net_contracts", 123800)
+    pro_net = pro_p.get("net_contracts", -53700)
     client_net = client_p.get("net_contracts", 306500)
     fii_ls = fii_p.get("long_short_ratio", 0.95)
+    dii_ls = dii_p.get("long_short_ratio", 1.53)
+    pro_ls = pro_p.get("long_short_ratio", 0.97)
     client_ls = client_p.get("long_short_ratio", 1.15)
+
+    smart_money_net = fii_net + pro_net
+    retail_net = client_net
+    smart_vs_retail_delta = smart_money_net - retail_net
 
     if fii_ls < 0.85 and client_ls > 1.25:
         regime_verdict = "⚠️ Smart Money Hedging Against Retail Longs (High Caution Regime)"
         regime_sentiment = "BEARISH_DIVERGENCE"
-        commentary = "Foreign institutions hold net short futures hedges while retail clients remain aggressively long calls. Historically, this divergence creates overhead resistance on gap-up rallies."
+        commentary = "Foreign institutions and proprietary desks hold net short futures hedges while retail clients remain aggressively long calls. Historically, this divergence creates overhead resistance on gap-up rallies."
+        divergence_status = "BEAR_TRAP_RISK"
+        divergence_badge = "⚠️ High Bull-Trap Risk (Smart Money Short vs Retail Long)"
+        divergence_trap_score = 85
+        divergence_warning = "Smart money is hedged short while retail is long calls. Risk of gap-up fade into overhead supply."
     elif fii_ls > 1.20 and client_ls < 0.90:
         regime_verdict = "🟢 Institutional Squeeze on Retail Shorts (High Conviction Bullish)"
         regime_sentiment = "BULLISH_CONVERGENCE"
         commentary = "FIIs and domestic funds are heavily long contracts while retail participants are hedged short. Favorable conditions for sustained multi-day breakouts."
+        divergence_status = "SHORT_SQUEEZE_EXPANSION"
+        divergence_badge = "🟢 Short Squeeze Expansion (Smart Money Long vs Retail Short)"
+        divergence_trap_score = 20
+        divergence_warning = "Institutions hold dominant long inventory against trapped retail shorts. Pullbacks into VWAP are aggressive buy zones."
     else:
         regime_verdict = "⚪ Institutional Hedging with Selective Stock Rotation"
         regime_sentiment = "NEUTRAL"
-        commentary = "FIIs are hedged in index futures (-43.5k contracts) while DIIs provide cash absorption (+123.8k contracts). Individual stock-specific momentum prevails over broad index trends."
+        commentary = "FIIs are hedged in index futures while DIIs provide continuous domestic absorption. Individual stock-specific momentum and earnings catalysts prevail over broad index trends."
+        divergence_status = "BALANCED"
+        divergence_badge = "⚖️ Balanced Positioning"
+        divergence_trap_score = 45
+        divergence_warning = "Positioning is balanced. Trade key support/resistance boundaries and individual stock breakouts."
+
+    # Build 10D and 30D Time Series for Charting (Chronological order)
+    chart_10d_reversed = list(reversed(history_10d))
+    chart_series_10d = {
+        "dates": [h["date"] for h in chart_10d_reversed],
+        "session_labels": [h["session_label"] for h in chart_10d_reversed],
+        "fii_net": [h["fii_net_contracts"] for h in chart_10d_reversed],
+        "dii_net": [h["dii_net_contracts"] for h in chart_10d_reversed],
+        "pro_net": [h["pro_net_contracts"] for h in chart_10d_reversed],
+        "client_net": [h["client_net_contracts"] for h in chart_10d_reversed],
+        "fii_ls_ratio": [h["fii_long_short_ratio"] for h in chart_10d_reversed],
+        "client_ls_ratio": [h["client_long_short_ratio"] for h in chart_10d_reversed],
+    }
+
+    chart_30d_reversed = list(reversed(history_30d))
+    chart_series_30d = {
+        "dates": [h["date"] for h in chart_30d_reversed],
+        "session_labels": [h["session_label"] for h in chart_30d_reversed],
+        "fii_net": [h["fii_net_contracts"] for h in chart_30d_reversed],
+        "dii_net": [h["dii_net_contracts"] for h in chart_30d_reversed],
+        "pro_net": [h["pro_net_contracts"] for h in chart_30d_reversed],
+        "client_net": [h["client_net_contracts"] for h in chart_30d_reversed],
+        "fii_ls_ratio": [h["fii_long_short_ratio"] for h in chart_30d_reversed],
+        "client_ls_ratio": [h["client_long_short_ratio"] for h in chart_30d_reversed],
+    }
 
     oi_payload = {
         "as_of_date": latest_date_str,
         "session_label": session_label,
         "participants": participants_list,
         "history_7d": history_7d,
+        "history_10d": history_10d,
+        "history_30d": history_30d,
         "fii_net_contracts": fii_net,
         "dii_net_contracts": dii_net,
+        "pro_net_contracts": pro_net,
         "client_net_contracts": client_net,
         "fii_long_short_ratio": fii_ls,
+        "dii_long_short_ratio": dii_ls,
+        "pro_long_short_ratio": pro_ls,
         "client_long_short_ratio": client_ls,
+        "smart_money_net": smart_money_net,
+        "retail_net": retail_net,
+        "smart_vs_retail_delta": smart_vs_retail_delta,
+        "divergence_status": divergence_status,
+        "divergence_badge": divergence_badge,
+        "divergence_trap_score": divergence_trap_score,
+        "divergence_warning": divergence_warning,
         "regime_verdict": regime_verdict,
         "regime_sentiment": regime_sentiment,
         "commentary": commentary,
+        "chart_series_10d": chart_series_10d,
+        "chart_series_30d": chart_series_30d,
     }
 
     _PARTICIPANT_OI_CACHE = {"ts": now_ts, "data": oi_payload}
@@ -1138,7 +1280,474 @@ def compute_market_sentiment_matrix(
 
 
 # ---------------------------------------------------------------------------
-# 5. Composed Master Market Pulse Function
+# 5. Algorithmic Next-Day Actionable Market Playbook Engine
+# ---------------------------------------------------------------------------
+
+def compute_next_day_market_playbook(
+    settings: Settings | None = None,
+    indices_data: list[dict[str, Any]] | None = None,
+    liquidity: dict[str, Any] | None = None,
+    participant_oi: dict[str, Any] | None = None,
+    sentiment_data: dict[str, Any] | None = None,
+    sectors: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """
+    Synthesize Derivatives OI, Institutional Cash Liquidity, India VIX Volatility Corridor,
+    Market Breadth, and Benchmark Price Action into an automated, quantitative Next-Day Trading Playbook.
+    """
+    settings = settings or Settings()
+    indices_data = indices_data or []
+    liquidity = liquidity or {}
+    participant_oi = participant_oi or {}
+    sentiment_data = sentiment_data or {}
+    sectors = sectors or []
+
+    # 1. Resolve Benchmark Spot Prices
+    nifty_spot = 24850.0
+    nifty_1d_pct = 0.45
+    bank_spot = 51200.0
+
+    for idx in indices_data:
+        sym = idx.get("symbol", "")
+        name = idx.get("name", "")
+        if sym in ("^NSEI", "NIFTY.NS") or "NIFTY 50" in name.upper():
+            nifty_spot = float(idx.get("current_price") or nifty_spot)
+            nifty_1d_pct = float(idx.get("change_pct") or nifty_1d_pct)
+        elif sym in ("^NSEBANK", "BANKNIFTY.NS") or "BANK" in name.upper():
+            bank_spot = float(idx.get("current_price") or bank_spot)
+
+    # 2. India VIX Volatility Corridor & 1-Day Implied Range Math
+    # Daily Implied Volatility Rate = VIX / (100 * sqrt(252)) ~= VIX / 1587.45
+    # Daily Expected Move % = VIX / sqrt(252) ~= VIX / 15.8745
+    vix_level = float(sentiment_data.get("vix_level", 13.5))
+    daily_vol_pct = vix_level / math.sqrt(252.0)
+    expected_1d_move_pts = round(nifty_spot * (daily_vol_pct / 100.0), 1)
+    expected_1d_move_pct = round(daily_vol_pct, 2)
+
+    # 1-Sigma (68.2% statistical confidence band)
+    upper_band_1sigma = round(nifty_spot + expected_1d_move_pts, 1)
+    lower_band_1sigma = round(nifty_spot - expected_1d_move_pts, 1)
+
+    # 2-Sigma (95.4% tail risk / exhaustion boundary)
+    upper_band_2sigma = round(nifty_spot + (2.0 * expected_1d_move_pts), 1)
+    lower_band_2sigma = round(nifty_spot - (2.0 * expected_1d_move_pts), 1)
+
+    # 3. Five-Pillar Confluence Scoring Model (-100 to +100)
+    score_p1_derivatives = 0.0
+    score_p2_liquidity = 0.0
+    score_p3_volatility = 0.0
+    score_p4_breadth = 0.0
+    score_p5_momentum = 0.0
+
+    # Pillar 1: Derivatives Positioning & OI Shifts (Max +/- 25)
+    fii_ls = 1.0
+    client_ls = 1.0
+    fii_net = 0
+    participants = participant_oi.get("participants", [])
+    for p in participants:
+        if p.get("participant") == "FII":
+            fii_ls = float(p.get("long_short_ratio", 1.0))
+            fii_net = int(p.get("net_contracts", 0))
+        elif p.get("participant") == "CLIENT":
+            client_ls = float(p.get("long_short_ratio", 1.0))
+
+    if fii_ls >= 1.25:
+        score_p1_derivatives += 15.0
+    elif fii_ls >= 1.05:
+        score_p1_derivatives += 8.0
+    elif fii_ls <= 0.75:
+        score_p1_derivatives -= 15.0
+    elif fii_ls <= 0.90:
+        score_p1_derivatives -= 8.0
+
+    div_status = participant_oi.get("divergence_status", "BALANCED")
+    if div_status == "SHORT_SQUEEZE_EXPANSION":
+        score_p1_derivatives += 10.0
+    elif div_status == "BEAR_TRAP_RISK":
+        score_p1_derivatives -= 10.0
+
+    score_p1_derivatives = max(-25.0, min(25.0, score_p1_derivatives))
+
+    # Pillar 2: Institutional Cash Liquidity (Max +/- 20)
+    total_net_cr = float(liquidity.get("total_net_cr", 0.0))
+    combined_7d = float(liquidity.get("combined_7d_total", 0.0))
+    if total_net_cr > 2000.0:
+        score_p2_liquidity += 10.0
+    elif total_net_cr > 500.0:
+        score_p2_liquidity += 5.0
+    elif total_net_cr < -2000.0:
+        score_p2_liquidity -= 10.0
+    elif total_net_cr < -500.0:
+        score_p2_liquidity -= 5.0
+
+    if combined_7d > 5000.0:
+        score_p2_liquidity += 10.0
+    elif combined_7d > 1000.0:
+        score_p2_liquidity += 5.0
+    elif combined_7d < -5000.0:
+        score_p2_liquidity -= 10.0
+    elif combined_7d < -1000.0:
+        score_p2_liquidity -= 5.0
+
+    score_p2_liquidity = max(-20.0, min(20.0, score_p2_liquidity))
+
+    # Pillar 3: Volatility & India VIX Corridor (Max +/- 20)
+    vix_regime = sentiment_data.get("vix_regime", "Normal")
+    if vix_level < 12.5:
+        score_p3_volatility += 15.0
+    elif vix_level < 15.0:
+        score_p3_volatility += 10.0
+    elif vix_level < 18.0:
+        score_p3_volatility -= 5.0
+    elif vix_level < 22.0:
+        score_p3_volatility -= 12.0
+    else:
+        score_p3_volatility -= 20.0
+
+    score_p3_volatility = max(-20.0, min(20.0, score_p3_volatility))
+
+    # Pillar 4: Market Breadth (Max +/- 20)
+    breadth = sentiment_data.get("breadth", {})
+    pct_20dma = float(breadth.get("pct_above_20dma", 50.0))
+    adv = int(breadth.get("advances", 25))
+    dec = int(breadth.get("declines", 25))
+    ad_ratio = (adv / max(1, dec))
+
+    if pct_20dma >= 70.0:
+        score_p4_breadth += 12.0
+    elif pct_20dma >= 50.0:
+        score_p4_breadth += 6.0
+    elif pct_20dma <= 30.0:
+        score_p4_breadth -= 12.0
+    else:
+        score_p4_breadth -= 6.0
+
+    if ad_ratio >= 1.5:
+        score_p4_breadth += 8.0
+    elif ad_ratio >= 1.0:
+        score_p4_breadth += 3.0
+    elif ad_ratio <= 0.67:
+        score_p4_breadth -= 8.0
+    else:
+        score_p4_breadth -= 3.0
+
+    score_p4_breadth = max(-20.0, min(20.0, score_p4_breadth))
+
+    # Pillar 5: Technical Momentum & Fear/Greed (Max +/- 15)
+    fg_score = float(sentiment_data.get("fear_greed_score", 50.0))
+    if nifty_1d_pct > 0.8:
+        score_p5_momentum += 8.0
+    elif nifty_1d_pct > 0.2:
+        score_p5_momentum += 4.0
+    elif nifty_1d_pct < -0.8:
+        score_p5_momentum -= 8.0
+    elif nifty_1d_pct < -0.2:
+        score_p5_momentum -= 4.0
+
+    if fg_score > 65.0:
+        score_p5_momentum += 7.0
+    elif fg_score > 50.0:
+        score_p5_momentum += 3.0
+    elif fg_score < 35.0:
+        score_p5_momentum -= 7.0
+    else:
+        score_p5_momentum -= 3.0
+
+    score_p5_momentum = max(-15.0, min(15.0, score_p5_momentum))
+
+    # Total Confluence Score (-100 to +100)
+    total_confluence_score = round(
+        score_p1_derivatives + score_p2_liquidity + score_p3_volatility + score_p4_breadth + score_p5_momentum,
+        1
+    )
+    total_confluence_score = max(-100.0, min(100.0, total_confluence_score))
+
+    # 4. Determine Directional Market Bias & Playbook Strategy
+    if total_confluence_score >= 45.0:
+        bias_code = "STRONG_BULLISH"
+        bias_badge = "🚀 Aggressive Bullish Momentum"
+        bias_color = "emerald"
+        headline = "Institutional Long Build-up Driving Trend Expansion"
+        theta_env = "FAVORABLE_FOR_OPTION_BUYING"
+        primary_action = f"Aggressive dip buying into VWAP / 15-min support ({lower_band_1sigma:,.0f}). Ride momentum toward {upper_band_1sigma:,.0f}."
+        option_strategy = f"Bull Call Spread ({math.floor(nifty_spot / 100) * 100} CE Buy / {math.ceil(upper_band_1sigma / 100) * 100} CE Sell) or ATM Call Debit Spreads."
+        invalidation = f"15-minute close below 1-Sigma Support ({lower_band_1sigma:,.0f}) invalidates immediate breakout thesis."
+    elif total_confluence_score >= 15.0:
+        bias_code = "MILD_BULLISH"
+        bias_badge = "🟢 Buy on Dips / Bullish Drift"
+        bias_color = "teal"
+        headline = "Supportive Institutional Liquidity with Mild Upward Bias"
+        theta_env = "FAVORABLE_FOR_OPTION_SELLING"
+        primary_action = f"Buy morning pullbacks near {lower_band_1sigma:,.0f} support. Take partial profits at upper corridor {upper_band_1sigma:,.0f}."
+        option_strategy = f"OTM Put Credit Spread (Sell {math.floor(lower_band_1sigma / 100) * 100} PE / Buy {math.floor((lower_band_1sigma - 200) / 100) * 100} PE) to capture theta decay."
+        invalidation = f"Daily breakdown below {lower_band_1sigma:,.0f} shifts stance to neutral range-bound."
+    elif total_confluence_score >= -15.0:
+        bias_code = "NEUTRAL_RANGEBOUND"
+        bias_badge = "⚖️ Neutral / Range-Bound Compression"
+        bias_color = "amber"
+        headline = "Volatility Compression & Institutional Corridor Pinning"
+        theta_env = "FAVORABLE_FOR_OPTION_SELLING"
+        primary_action = f"Fade extremes: Sell call spreads near {upper_band_1sigma:,.0f}, sell put spreads near {lower_band_1sigma:,.0f}."
+        option_strategy = f"Iron Condor / Short Strangle bounded by {lower_band_1sigma:,.0f} PE and {upper_band_1sigma:,.0f} CE strikes."
+        invalidation = f"Sustained 30-minute breakout outside {lower_band_1sigma:,.0f} - {upper_band_1sigma:,.0f} triggers delta-neutral stop."
+    elif total_confluence_score >= -45.0:
+        bias_code = "SELL_ON_RISE"
+        bias_badge = "🟠 Sell on Rallies / Overhead Supply"
+        bias_color = "orange"
+        headline = "Smart Money Hedging & Bearish Overhead Supply"
+        theta_env = "FAVORABLE_FOR_OPTION_SELLING"
+        primary_action = f"Fade morning gap-ups into {upper_band_1sigma:,.0f} resistance. Look for reversal confirmation on 5-min VWAP breakdown."
+        option_strategy = f"Bear Call Spread (Sell {math.ceil(upper_band_1sigma / 100) * 100} CE / Buy {math.ceil((upper_band_1sigma + 200) / 100) * 100} CE) or OTM Put Debit Spread."
+        invalidation = f"Decisive 15-minute close above {upper_band_1sigma:,.0f} forces immediate short hedge exit."
+    else:
+        bias_code = "HIGH_RISK_DEFENSIVE"
+        bias_badge = "🔴 High-Risk Defensive / Bearish Breakdown"
+        bias_color = "rose"
+        headline = "Institutional Distribution & Elevated Downside Volatility"
+        theta_env = "FAVORABLE_FOR_OPTION_BUYING"
+        primary_action = f"Capital preservation mode. Avoid blind dip-buying. Short bounces toward {nifty_spot:,.0f} targeting {lower_band_2sigma:,.0f}."
+        option_strategy = f"Long Put Debit Spread (Buy {math.ceil(nifty_spot / 100) * 100} PE / Sell {math.floor(lower_band_1sigma / 100) * 100} PE) or Long VIX hedges."
+        invalidation = f"Reclaim and hourly close above {upper_band_1sigma:,.0f} aborts defensive posture."
+
+    # 5. Extract Top Focus Sectors
+    focus_sectors: list[str] = []
+    sorted_sectors = sorted(sectors, key=lambda s: float(s.get("change_1d") or 0.0), reverse=True)
+    for s in sorted_sectors[:3]:
+        name = s.get("name", "").replace("Nifty ", "")
+        chg = s.get("change_1d", 0.0)
+        focus_sectors.append(f"{name} ({chg:+.1f}%)")
+
+    # 6. Assemble Final Playbook Payload
+    return {
+        "bias": bias_code,
+        "bias_badge": bias_badge,
+        "bias_color": bias_color,
+        "confluence_score": total_confluence_score,
+        "pillar_scores": {
+            "derivatives_oi": round(score_p1_derivatives, 1),
+            "cash_liquidity": round(score_p2_liquidity, 1),
+            "volatility_vix": round(score_p3_volatility, 1),
+            "market_breadth": round(score_p4_breadth, 1),
+            "price_momentum": round(score_p5_momentum, 1),
+        },
+        "headline": headline,
+        "nifty_spot": nifty_spot,
+        "bank_spot": bank_spot,
+        "vix_level": vix_level,
+        "expected_1d_range_pct": expected_1d_move_pct,
+        "expected_1d_range_pts": expected_1d_move_pts,
+        "corridor": {
+            "upper_band_1sigma": upper_band_1sigma,
+            "lower_band_1sigma": lower_band_1sigma,
+            "upper_band_2sigma": upper_band_2sigma,
+            "lower_band_2sigma": lower_band_2sigma,
+            "confidence_68pct": f"{lower_band_1sigma:,.0f} - {upper_band_1sigma:,.0f}",
+            "confidence_95pct": f"{lower_band_2sigma:,.0f} - {upper_band_2sigma:,.0f}",
+        },
+        "divergence": {
+            "status": div_status,
+            "badge": participant_oi.get("divergence_badge", "⚖️ Balanced Positioning"),
+            "trap_risk_score": participant_oi.get("divergence_trap_score", 45),
+            "warning": participant_oi.get("divergence_warning", "Positioning is balanced."),
+            "fii_ls": fii_ls,
+            "client_ls": client_ls,
+        },
+        "actionable_rules": [
+            f"🎯 Primary Execution: {primary_action}",
+            f"⚡ Options / Derivatives Tactic: {option_strategy}",
+            f"🛑 Invalidation & Stop Rule: {invalidation}",
+        ],
+        "theta_decay_environment": theta_env,
+        "theta_env_label": "🟢 Favorable for Option Selling / Theta Capture" if theta_env == "FAVORABLE_FOR_OPTION_SELLING" else "🔥 Favorable for Option Buying / Delta Momentum",
+        "focus_sectors": focus_sectors,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 6. Comprehensive Metric Glossary & Educational Knowledge Base
+# ---------------------------------------------------------------------------
+
+def get_metric_glossary() -> dict[str, Any]:
+    """
+    Return comprehensive, structured educational knowledge base explaining every
+    Market Pulse metric, underlying formula, bullish/bearish benchmarks, and next-day playbook applications.
+    """
+    return {
+        "categories": [
+            {
+                "id": "participant_oi",
+                "title": "Participant Derivatives OI & Long/Short Matrix",
+                "description": "Exchange-reported end-of-day positioning across Foreign Institutions (FII), Domestic Funds (DII), Proprietary Desks (PRO), and Retail Clients across Index Futures, Stock Futures, and Index Options.",
+                "metrics": [
+                    {
+                        "id": "net_contracts",
+                        "name": "Net Contracts",
+                        "formula": "Net Contracts = Total Long Contracts - Total Short Contracts",
+                        "summary": "The absolute net directional exposure held by a participant category. Positive indicates net long bias; negative indicates net short hedge.",
+                        "benchmarks": {
+                            "bullish": "FII Net Contracts expanding > +50,000 contracts with positive day-over-day delta (Long Build-up).",
+                            "bearish": "FII Net Contracts contracting < -50,000 contracts with aggressive short accumulation.",
+                            "neutral": "Net contracts oscillating between -20,000 and +20,000 contracts.",
+                        },
+                        "next_day_playbook": "When FIIs hold deep negative contracts (< -80,000) but spot index stops falling, watch for an explosive short-covering squeeze. Avoid buying naked calls when FIIs are adding heavy short contracts.",
+                        "trap_warning": "Do not look at Net Contracts in isolation without checking whether the position is in Index Futures (macro direction) or Options (hedges/volatility).",
+                    },
+                    {
+                        "id": "long_short_ratio",
+                        "name": "Long/Short Ratio (L/S Ratio)",
+                        "formula": "Long/Short Ratio = Total Long Contracts / Total Short Contracts",
+                        "summary": "Measures the proportional balance of bullish versus bearish positions for a participant group. Normalized around 1.00.",
+                        "benchmarks": {
+                            "overbought": "> 1.25 (Extreme Bullish Concentration - Vulnerable to Long Unwinding)",
+                            "neutral": "0.90 to 1.15 (Equilibrium Range)",
+                            "oversold": "< 0.85 (Heavy Short Positioning - Prime for Mean-Reversion Squeeze)",
+                        },
+                        "next_day_playbook": "If FII L/S Ratio drops below 0.70 while retail Client L/S Ratio climbs above 1.30, initiate contrarian bullish reversal setups on intraday breakout confirmation (fading retail panic).",
+                        "trap_warning": "An oversold L/S ratio (<0.70) can remain oversold during severe bear markets. Wait for a positive 1-day delta shift before taking counter-trend longs.",
+                    },
+                    {
+                        "id": "oi_delta_regimes",
+                        "name": "Open Interest Delta (ΔOI) & 4 Market Regimes",
+                        "formula": "ΔOI = Today OI - Yesterday OI (Combined with Price Direction ΔPrice)",
+                        "summary": "Classifies participant positioning shifts into 4 institutional execution regimes based on price and volume-OI dynamics.",
+                        "benchmarks": {
+                            "long_buildup": "Price ↑ + OI ↑ : Fresh aggressive long accumulation. Trend continuation favored.",
+                            "short_covering": "Price ↑ + OI ↓ : Bears forced to close shorts. Rapid upward move, often unsustainable without fresh longs.",
+                            "short_buildup": "Price ↓ + OI ↑ : Active institutional shorting / hedging. Overhead resistance is strong.",
+                            "long_unwinding": "Price ↓ + OI ↓ : Longs taking profit or cutting losses. Lack of buyers; support levels soften.",
+                        },
+                        "next_day_playbook": "On Long Build-up days, buy opening pullbacks to 15-min VWAP. On Short Build-up days, sell call credit spreads on intraday gap-ups into resistance.",
+                        "trap_warning": "Short covering rallies often reverse sharply once the trapped bears have finished exiting. Always check if fresh long build-up follows.",
+                    },
+                    {
+                        "id": "smart_vs_retail_divergence",
+                        "name": "Smart Money vs. Retail Contrarian Divergence",
+                        "formula": "Smart Money (FII + PRO Net) vs. Retail (CLIENT Net)",
+                        "summary": "Institutional desks (FII + Proprietary) consistently dominate retail clients over multi-week horizons. High divergence reveals contrarian trap setups.",
+                        "benchmarks": {
+                            "bear_trap_risk": "Smart Money is Net Short while Retail is Net Long (Gap-ups are high probability sell-offs).",
+                            "short_squeeze_expansion": "Smart Money is Net Long while Retail is Net Short (Pullbacks are aggressive buy zones).",
+                            "balanced": "Both cohorts hold balanced or aligned inventory.",
+                        },
+                        "next_day_playbook": "When Bear Trap Risk is active (Score > 75), sell naked call options or buy put spreads when index tests the +1-Sigma upper volatility corridor in the first 30 minutes.",
+                        "trap_warning": "Do not trade contrarian signals blindly against strong global macroeconomic momentum shocks.",
+                    },
+                ],
+            },
+            {
+                "id": "volatility_vix",
+                "title": "India VIX & 1-Day Volatility Corridor",
+                "description": "Annualized implied volatility derived from Nifty out-of-the-money option prices, transformed into statistical daily trading boundaries.",
+                "metrics": [
+                    {
+                        "id": "vix_level",
+                        "name": "India VIX Level & Regimes",
+                        "formula": "Annualized 30-Day Implied Volatility % of Nifty Options",
+                        "summary": "Measures market expectations of near-term volatility and perceived risk/fear among market participants.",
+                        "benchmarks": {
+                            "complacent": "< 12.0 (Low Volatility, Grind-up Environment, Mean Reversion)",
+                            "normal": "12.0 to 16.0 (Healthy Trending Environment)",
+                            "elevated": "16.0 to 22.0 (High Risk, Sharp Swings, Wide Ranges)",
+                            "panic": "> 22.0 (Market Panic / Crash Conditions)",
+                        },
+                        "next_day_playbook": "When VIX < 13.0, option sellers have strong statistical edge using Iron Condors and Credit Spreads. When VIX spikes > 18.0, switch to Debit Spreads and reduce intraday position sizing by 50%.",
+                        "trap_warning": "Very low VIX (<11.0) is not purely bullish—it often precedes explosive volatility breakouts (volatility compression leads to expansion).",
+                    },
+                    {
+                        "id": "expected_1d_corridor",
+                        "name": "1-Day Expected Move Corridor (1-Sigma & 2-Sigma)",
+                        "formula": "Daily Implied Volatility = VIX / sqrt(252) ~= VIX / 15.8745 | Expected Points = Spot * Daily Vol %",
+                        "summary": "Calculates the statistically expected daily trading range for Nifty with 68.2% (1-Sigma) and 95.4% (2-Sigma) confidence intervals.",
+                        "benchmarks": {
+                            "1_sigma_boundary": "68.2% Probability Range (Upper Resistance / Lower Support)",
+                            "2_sigma_boundary": "95.4% Probability Range (Exhaustion Points / Capitulation Reversal Zones)",
+                        },
+                        "next_day_playbook": "If Nifty opens near the +1-Sigma upper band and stalls with bearish divergence, initiate short hedges targeting VWAP. If price touches the -2-Sigma lower band, look for capitulation hammer candles for mean-reversion bounces.",
+                        "trap_warning": "During major earnings seasons or geopolitical events, 1-day moves can exceed 2-Sigma boundaries.",
+                    },
+                ],
+            },
+            {
+                "id": "institutional_liquidity",
+                "title": "Institutional Cash Net Liquidity (FII / DII)",
+                "description": "Daily and cumulative net cash market buy/sell values reported by NSE/BSE for Foreign Institutional Investors (FII) and Domestic Institutional Investors (DII).",
+                "metrics": [
+                    {
+                        "id": "fii_dii_cash",
+                        "name": "Daily & 7D Net Cash Flows (₹ Crores)",
+                        "formula": "Net Flow = Total Buy Value (Cr) - Total Sell Value (Cr)",
+                        "summary": "Direct measurement of pure equity delivery buying or liquidations. DII flows represent systematic SIP inflows; FII flows represent global macro allocation.",
+                        "benchmarks": {
+                            "strong_inflow": "Combined Net > +₹2,000 Cr with FII positive (High institutional demand).",
+                            "absorption": "FII Selling absorbed by DII Buying of equal or greater magnitude (Range-bound market).",
+                            "liquidation": "FII Selling > -₹3,000 Cr with negative DII participation (Broad market vulnerability).",
+                        },
+                        "next_day_playbook": "Consistent 3-day positive FII cash accumulation is the strongest precursor to sustained large-cap outperformance. Align stock picks with sectors seeing top institutional delivery.",
+                        "trap_warning": "Single-day block deals or rebalancing dates (MSCI/FTSE) can distort 1-day cash flow figures. Always verify 7-day cumulative trend.",
+                    },
+                ],
+            },
+            {
+                "id": "market_breadth",
+                "title": "Market Breadth & Technical Participation",
+                "description": "Internal health metrics evaluating participation across the active equity universe.",
+                "metrics": [
+                    {
+                        "id": "dma_breadth",
+                        "name": "% Stocks Above 20-DMA & 50-DMA",
+                        "formula": "(Number of Universe Stocks > DMA / Total Universe Stocks) * 100%",
+                        "summary": "Measures whether market moves are broad-based or driven by a handful of heavyweights.",
+                        "benchmarks": {
+                            "healthy_expansion": "> 65% of stocks above 20-DMA and 50-DMA.",
+                            "divergence_warning": "Index making new highs while % stocks above 20-DMA drops below 45% (Breadth Divergence).",
+                            "oversold_reversal": "< 25% of stocks above 20-DMA (Climactic selling nearing exhaustion).",
+                        },
+                        "next_day_playbook": "When 20-DMA breadth is < 20% and begins ticking upward, initiate swing long positions in high-relative-strength breakout setups.",
+                        "trap_warning": "A high index value with weak breadth is a fragile rally prone to sudden sharp corrections.",
+                    },
+                    {
+                        "id": "advance_decline",
+                        "name": "Advance / Decline Ratio (A/D Ratio)",
+                        "formula": "Advancing Stocks / Declining Stocks",
+                        "summary": "Daily ratio of advancing equities to declining equities across the active exchange universe.",
+                        "benchmarks": {
+                            "breadth_thrust": "> 2.0 (Dominant buying across midcaps and smallcaps).",
+                            "neutral": "0.8 to 1.2 (Selective stock picking).",
+                            "distribution": "< 0.5 (Widespread selling pressure).",
+                        },
+                        "next_day_playbook": "If Nifty is flat but A/D ratio is > 2.5, look for high-momentum breakout trades in mid-cap and small-cap leaders.",
+                        "trap_warning": "A high A/D ratio on very low volume is often a retail trap.",
+                    },
+                ],
+            },
+            {
+                "id": "fear_greed",
+                "title": "Fear & Greed Index (0 - 100)",
+                "description": "Multi-factor composite sentiment model synthesizing Volatility (40%), Momentum (40%), Breadth (10%), and Safe-Haven Demand (10%).",
+                "metrics": [
+                    {
+                        "id": "fg_score",
+                        "name": "Fear & Greed Composite Score",
+                        "formula": "Weighted Composite (VIX Factor * 0.40 + Momentum * 0.40 + Breadth * 0.10 + SafeHaven * 0.10)",
+                        "summary": "Quantifies overall market emotion from Extreme Fear (0) to Extreme Greed (100).",
+                        "benchmarks": {
+                            "extreme_fear": "0 to 25 (Extreme Pessimism - High reward-to-risk for medium-term accumulation).",
+                            "fear": "26 to 45 (Defensive Sentiment).",
+                            "neutral": "46 to 55 (Market Equilibrium).",
+                            "greed": "56 to 75 (Bullish Optimism).",
+                            "extreme_greed": "76 to 100 (Complacency / Euphoria - Tighten stops, avoid FOMO).",
+                        },
+                        "next_day_playbook": "Extreme Greed (>80) indicates market is vulnerable to unexpected negative catalysts. Extreme Fear (<20) coupled with FII short covering creates explosive upside reversal setups.",
+                        "trap_warning": "Extreme Greed can persist for weeks during powerful bull market legs; do not short solely because sentiment is in Greed territory.",
+                    },
+                ],
+            },
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# 7. Composed Master Market Pulse Function
 # ---------------------------------------------------------------------------
 
 def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool = False) -> dict[str, Any]:
@@ -1170,6 +1779,19 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
 
     # 5. Modular Participant Derivatives OI & Long/Short Positioning Matrix
     participant_oi = compute_participant_oi_matrix(settings=settings, force_refresh=force_refresh)
+
+    # 6. Algorithmic Next-Day Actionable Market Playbook
+    next_day_playbook = compute_next_day_market_playbook(
+        settings=settings,
+        indices_data=indices_data,
+        liquidity=liquidity,
+        participant_oi=participant_oi,
+        sentiment_data=sentiment_data,
+        sectors=sectors,
+    )
+
+    # 7. Comprehensive Metric Glossary Knowledge Base
+    metric_glossary = get_metric_glossary()
 
     payload = {
         "success": True,
@@ -1213,6 +1835,8 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
         "prediction": sentiment_data["prediction"],
         "macro_charts": sentiment_data["macro_charts"],
         "participant_oi": participant_oi,
+        "next_day_playbook": next_day_playbook,
+        "metric_glossary": metric_glossary,
     }
 
     _PULSE_CACHE = {"ts": now_ts, "data": payload}

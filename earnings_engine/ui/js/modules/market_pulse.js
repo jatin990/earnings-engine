@@ -10,7 +10,12 @@
         pulseData: null,
         _pulseLoaded: false,
         _isFlowHistoryExpanded: false,
+        _isOiHistoryView: false,
         _lastFlowsData: null,
+        _lastOiData: null,
+        _glossaryData: null,
+        _currentGlossaryCategory: 'all',
+        _currentGlossarySearch: '',
 
         async loadMarketPulseData(forceRefresh = false) {
             const timeEl = document.getElementById('pulseAsOfTime');
@@ -21,13 +26,19 @@
                 const url = API_BASE + '/api/v1/market/pulse' + (forceRefresh ? '?force_refresh=true' : '');
                 const res = await fetch(url);
                 if (!res.ok) throw new Error('HTTP ' + res.status);
-                
+
                 const data = await res.json();
                 this.pulseData = data;
                 this._pulseLoaded = true;
+                if (data.metric_glossary) {
+                    this._glossaryData = data.metric_glossary;
+                }
                 if (window.app) {
                     window.app.pulseData = data;
                     window.app._pulseLoaded = true;
+                    if (data.metric_glossary) {
+                        window.app._glossaryData = data.metric_glossary;
+                    }
                 }
 
                 if (timeEl) {
@@ -37,6 +48,7 @@
                 if (badgeEl) badgeEl.textContent = '● LIVE TICK';
 
                 this.renderIndices(data.indices || []);
+                this.renderNextDayPlaybook(data.next_day_playbook || {});
                 this.renderFearAndGreed(data.fear_and_greed || {});
                 this.renderVolatility(data.volatility || {});
                 this.renderPrediction(data.prediction || {});
@@ -44,7 +56,7 @@
                 this.renderInstitutionalFlows(data.institutional_flows || {});
                 this.renderParticipantOI(data.participant_oi || {});
                 this.renderSectors(data.sectors || []);
-                this.renderMacroCharts(data.macro_charts || {});
+                this.renderMacroCharts(data.macro_charts || {}, data.participant_oi || {});
                 // Note: Confluence setups are loaded on-demand via user trigger
 
             } catch (e) {
@@ -65,7 +77,7 @@
             grid.innerHTML = indices.map(idx => {
                 const isPositive = idx.change_pct >= 0;
                 const isVix = idx.symbol === '^INDIAVIX';
-                
+
                 // For VIX, down is good (green), up is volatility risk (red)
                 const col = isVix ? (idx.change_pct <= 0 ? '#34d399' : '#f87171') : (isPositive ? '#34d399' : '#f87171');
                 const sign = idx.change_pct >= 0 ? '+' : '';
@@ -98,7 +110,7 @@
                             <div>
                                 <div style="font-size:0.68rem;color:#94a3b8;font-weight:700;letter-spacing:0.04em;">${idx.name}</div>
                                 <div style="font-size:1.05rem;font-weight:900;color:#f8fafc;font-family:var(--font-mono);margin-top:0.15rem;">
-                                    ${idx.current_price.toLocaleString()}
+                                    ${(idx.current_price || 0).toLocaleString()}
                                 </div>
                             </div>
                             <div style="text-align:right;">
@@ -116,6 +128,163 @@
             }).join('');
         },
 
+        // =====================================================================
+        // 🎯 1.5. Next-Day Actionable Strategy Playbook Renderer
+        // =====================================================================
+        renderNextDayPlaybook(pb) {
+            if (!pb || Object.keys(pb).length === 0) return;
+
+            const biasBadge = document.getElementById('pulsePlaybookBiasBadge');
+            const headlineEl = document.getElementById('pulsePlaybookHeadline');
+            const confPill = document.getElementById('pulsePlaybookConfluencePill');
+            const vixTag = document.getElementById('pulsePlaybookVixTag');
+            const spotEl = document.getElementById('pulsePlaybookNiftySpot');
+            const expMoveEl = document.getElementById('pulsePlaybookExpectedMove');
+            const sigma1El = document.getElementById('pulsePlaybook1SigmaRange');
+            const sigma2El = document.getElementById('pulsePlaybook2SigmaRange');
+            const thetaEnvEl = document.getElementById('pulsePlaybookThetaEnv');
+            const divBadge = document.getElementById('pulsePlaybookDivergenceBadge');
+            const fiiLsEl = document.getElementById('pulsePlaybookFiiLs');
+            const clientLsEl = document.getElementById('pulsePlaybookClientLs');
+            const trapWarnEl = document.getElementById('pulsePlaybookTrapWarning');
+            const trapScoreEl = document.getElementById('pulsePlaybookTrapScore');
+            const divDeltaEl = document.getElementById('pulsePlaybookDivDelta');
+            const rulesContainer = document.getElementById('pulsePlaybookRulesContainer');
+            const focusSectorsEl = document.getElementById('pulsePlaybookFocusSectors');
+
+            // Bias Badge & Colors
+            if (biasBadge) {
+                const label = pb.bias_label || (pb.bias ? pb.bias.replace(/_/g, ' ') : 'Neutral Stance');
+                biasBadge.textContent = label;
+                const bias = (pb.bias || '').toUpperCase();
+                if (bias.includes('BULLISH') || bias.includes('ACCUMULATION')) {
+                    biasBadge.style.background = 'rgba(52,211,153,0.18)';
+                    biasBadge.style.color = '#34d399';
+                    biasBadge.style.borderColor = 'rgba(52,211,153,0.35)';
+                } else if (bias.includes('BEARISH') || bias.includes('DEFENSIVE') || bias.includes('SELL')) {
+                    biasBadge.style.background = 'rgba(239,68,68,0.18)';
+                    biasBadge.style.color = '#f87171';
+                    biasBadge.style.borderColor = 'rgba(239,68,68,0.35)';
+                } else {
+                    biasBadge.style.background = 'rgba(251,191,36,0.18)';
+                    biasBadge.style.color = '#fbbf24';
+                    biasBadge.style.borderColor = 'rgba(251,191,36,0.35)';
+                }
+            }
+
+            if (headlineEl && pb.headline) {
+                headlineEl.textContent = pb.headline;
+            }
+
+            if (confPill && pb.confluence_score !== undefined) {
+                const s = pb.confluence_score >= 0 ? '+' : '';
+                confPill.textContent = `Confluence: ${s}${pb.confluence_score}/100`;
+                if (pb.confluence_score >= 20) {
+                    confPill.style.color = '#34d399';
+                    confPill.style.background = 'rgba(52,211,153,0.15)';
+                    confPill.style.borderColor = 'rgba(52,211,153,0.3)';
+                } else if (pb.confluence_score <= -20) {
+                    confPill.style.color = '#f87171';
+                    confPill.style.background = 'rgba(239,68,68,0.15)';
+                    confPill.style.borderColor = 'rgba(239,68,68,0.3)';
+                }
+            }
+
+            // Column 1: Volatility & Corridor
+            if (vixTag && pb.vix_level != null) {
+                vixTag.textContent = `VIX: ${pb.vix_level}`;
+            }
+            if (spotEl && pb.nifty_spot) {
+                spotEl.textContent = pb.nifty_spot.toLocaleString();
+            }
+            if (expMoveEl) {
+                const pts = pb.expected_1d_move_pts || (pb.corridor ? pb.corridor.expected_1d_move_pts : 0);
+                const pct = pb.expected_1d_move_pct || (pb.corridor ? pb.corridor.expected_1d_move_pct : 0);
+                expMoveEl.textContent = `±${pct}% (±${pts} Pts)`;
+            }
+            if (sigma1El) {
+                const low = pb.corridor?.lower_1sigma ?? pb.lower_band_1sigma ?? 0;
+                const high = pb.corridor?.upper_1sigma ?? pb.upper_band_1sigma ?? 0;
+                sigma1El.textContent = `${low.toLocaleString()} – ${high.toLocaleString()}`;
+            }
+            if (sigma2El) {
+                const low = pb.corridor?.lower_2sigma ?? pb.lower_band_2sigma ?? 0;
+                const high = pb.corridor?.upper_2sigma ?? pb.upper_band_2sigma ?? 0;
+                sigma2El.textContent = `${low.toLocaleString()} – ${high.toLocaleString()}`;
+            }
+            if (thetaEnvEl && pb.theta_environment) {
+                thetaEnvEl.textContent = pb.theta_environment;
+                if (pb.theta_environment.includes('Selling') || pb.theta_environment.includes('Decay')) {
+                    thetaEnvEl.style.background = 'rgba(16,185,129,0.12)';
+                    thetaEnvEl.style.color = '#34d399';
+                    thetaEnvEl.style.borderColor = 'rgba(16,185,129,0.25)';
+                } else if (pb.theta_environment.includes('Buying') || pb.theta_environment.includes('Expansion')) {
+                    thetaEnvEl.style.background = 'rgba(56,189,248,0.12)';
+                    thetaEnvEl.style.color = '#38bdf8';
+                    thetaEnvEl.style.borderColor = 'rgba(56,189,248,0.25)';
+                } else {
+                    thetaEnvEl.style.background = 'rgba(251,191,36,0.12)';
+                    thetaEnvEl.style.color = '#fbbf24';
+                    thetaEnvEl.style.borderColor = 'rgba(251,191,36,0.25)';
+                }
+            }
+
+            // Column 2: Divergence
+            const sm = pb.smart_money_vs_retail || {};
+            if (divBadge) {
+                divBadge.textContent = sm.status || 'Balanced';
+                if ((sm.status || '').includes('BULLISH')) {
+                    divBadge.style.color = '#34d399';
+                } else if ((sm.status || '').includes('BEARISH')) {
+                    divBadge.style.color = '#f87171';
+                } else {
+                    divBadge.style.color = '#38bdf8';
+                }
+            }
+            if (fiiLsEl) {
+                fiiLsEl.textContent = `${(sm.fii_ls_ratio || 1.0).toFixed(2)}x`;
+                fiiLsEl.style.color = (sm.fii_ls_ratio || 1.0) >= 1.0 ? '#34d399' : '#f87171';
+            }
+            if (clientLsEl) {
+                clientLsEl.textContent = `${(sm.client_ls_ratio || 1.0).toFixed(2)}x`;
+                clientLsEl.style.color = (sm.client_ls_ratio || 1.0) >= 1.0 ? '#fb923c' : '#94a3b8';
+            }
+            if (trapWarnEl && sm.trap_warning) {
+                trapWarnEl.textContent = sm.trap_warning;
+            }
+            if (trapScoreEl) {
+                const score = sm.trap_risk_score !== undefined ? sm.trap_risk_score : 35;
+                const label = sm.trap_risk_label || (score > 60 ? 'High' : score > 35 ? 'Moderate' : 'Low');
+                trapScoreEl.textContent = `${score}/100 (${label})`;
+                trapScoreEl.style.color = score > 60 ? '#f87171' : score > 35 ? '#fbbf24' : '#34d399';
+            }
+            if (divDeltaEl && sm.divergence_delta !== undefined) {
+                const s = sm.divergence_delta >= 0 ? '+' : '';
+                divDeltaEl.textContent = `${s}${sm.divergence_delta.toFixed(2)}`;
+                divDeltaEl.style.color = sm.divergence_delta >= 0 ? '#34d399' : '#f87171';
+            }
+
+            // Column 3: Rules
+            if (rulesContainer && pb.actionable_rules && pb.actionable_rules.length) {
+                rulesContainer.innerHTML = pb.actionable_rules.map(rule => {
+                    let icon = '📌';
+                    if (rule.startsWith('Primary') || rule.startsWith('1.')) icon = '🎯';
+                    else if (rule.startsWith('Option') || rule.startsWith('2.')) icon = '⚡';
+                    else if (rule.startsWith('Invalidation') || rule.startsWith('3.')) icon = '🛑';
+                    return `<div>${icon} ${rule}</div>`;
+                }).join('');
+            }
+
+            // Focus Sectors
+            if (focusSectorsEl && pb.focus_sectors) {
+                if (Array.isArray(pb.focus_sectors) && pb.focus_sectors.length) {
+                    focusSectorsEl.textContent = pb.focus_sectors.join(', ');
+                } else if (typeof pb.focus_sectors === 'string') {
+                    focusSectorsEl.textContent = pb.focus_sectors;
+                }
+            }
+        },
+
         renderFearAndGreed(fg) {
             const scoreEl = document.getElementById('pulseFgScore');
             const badgeEl = document.getElementById('pulseFgBadge');
@@ -124,6 +293,7 @@
             const momEl = document.getElementById('pulseFgMom');
             const vixEl = document.getElementById('pulseFgVix');
             const breadthEl = document.getElementById('pulseFgBreadth');
+            const deltaEl = document.getElementById('pulseFgDelta');
 
             if (scoreEl) {
                 scoreEl.textContent = fg.score != null ? fg.score : '—';
@@ -141,6 +311,11 @@
             if (momEl) momEl.textContent = fg.momentum_factor != null ? fg.momentum_factor : '—';
             if (vixEl) vixEl.textContent = fg.vix_factor != null ? fg.vix_factor : '—';
             if (breadthEl) breadthEl.textContent = fg.breadth_factor != null ? fg.breadth_factor : '—';
+            if (deltaEl && fg.change_7d != null) {
+                const s = fg.change_7d >= 0 ? '+' : '';
+                deltaEl.textContent = `${s}${fg.change_7d} (7D)`;
+                deltaEl.style.color = fg.change_7d >= 0 ? '#34d399' : '#f87171';
+            }
         },
 
         renderVolatility(vix) {
@@ -151,6 +326,11 @@
             const stanceEl = document.getElementById('pulseVixStance');
 
             if (levelEl) levelEl.textContent = vix.vix_level != null ? vix.vix_level : '13.8';
+            if (changeEl && vix.change_1d != null) {
+                const s = vix.change_1d >= 0 ? '+' : '';
+                changeEl.textContent = `${s}${vix.change_1d}% 1D`;
+                changeEl.style.color = vix.change_1d <= 0 ? '#34d399' : '#f87171';
+            }
             if (badgeEl && vix.regime) badgeEl.textContent = vix.regime;
             if (descEl && vix.description) descEl.textContent = vix.description;
             if (stanceEl && vix.stance) {
@@ -165,12 +345,20 @@
             const convPill = document.getElementById('pulseConvictionPill');
             const supEl = document.getElementById('pulseNiftySupport');
             const resEl = document.getElementById('pulseNiftyResistance');
+            const niftyLvl = document.getElementById('pulseNiftyLevel');
+            const niftyChg = document.getElementById('pulseNiftyChange');
 
             if (regimeEl && pred.regime) regimeEl.textContent = pred.regime;
             if (commEl && pred.commentary) commEl.textContent = pred.commentary;
             if (convPill && pred.conviction_pct) convPill.textContent = `${pred.conviction_pct}% CONVICTION`;
             if (supEl && pred.nifty_support) supEl.textContent = pred.nifty_support;
             if (resEl && pred.nifty_resistance) resEl.textContent = pred.nifty_resistance;
+            if (niftyLvl && pred.nifty_spot) niftyLvl.textContent = (pred.nifty_spot).toLocaleString();
+            if (niftyChg && pred.nifty_change_1d != null) {
+                const s = pred.nifty_change_1d >= 0 ? '+' : '';
+                niftyChg.textContent = `${s}${pred.nifty_change_1d}% 1D`;
+                niftyChg.style.color = pred.nifty_change_1d >= 0 ? '#34d399' : '#f87171';
+            }
         },
 
         renderBreadth(b) {
@@ -353,6 +541,9 @@
             this.renderInstitutionalFlows(flows);
         },
 
+        // =====================================================================
+        // 🏛️ Enhanced Participant Derivatives OI & Long/Short Matrix
+        // =====================================================================
         renderParticipantOI(oiData) {
             this._lastOiData = oiData;
             const tableBody = document.getElementById('pulseParticipantOiTableBody');
@@ -361,7 +552,7 @@
             const sessionSub = document.getElementById('pulseOiSessionSub');
             const commentaryEl = document.getElementById('pulseOiCommentary');
 
-            if (!oiData || (!oiData.participants && !oiData.history_7d)) {
+            if (!oiData || (!oiData.participants && !oiData.history_10d && !oiData.history_7d)) {
                 if (tableBody) {
                     tableBody.innerHTML = `
                         <tr>
@@ -405,7 +596,15 @@
                     const netVal = p.net_contracts || 0;
                     const netCol = netVal > 0 ? '#34d399' : (netVal < 0 ? '#f87171' : '#94a3b8');
                     const netSign = netVal > 0 ? '+' : '';
-                    
+
+                    const deltaVal = p.delta_net_contracts !== undefined ? p.delta_net_contracts : null;
+                    let deltaStr = '';
+                    if (deltaVal !== null) {
+                        const dSign = deltaVal >= 0 ? '+' : '';
+                        const dCol = deltaVal >= 0 ? '#34d399' : '#f87171';
+                        deltaStr = `<div style="font-size:0.62rem;color:${dCol};font-weight:600;">Δ ${dSign}${deltaVal.toLocaleString()}</div>`;
+                    }
+
                     const lsRatio = p.long_short_ratio || 1.0;
                     let lsCol = '#94a3b8';
                     let lsBg = 'rgba(255,255,255,0.05)';
@@ -418,12 +617,13 @@
                     }
 
                     const stance = p.stance || 'Balanced';
+                    const shiftRegime = p.shift_regime || stance;
                     let stanceBg = 'rgba(255,255,255,0.04)';
                     let stanceCol = '#cbd5e1';
-                    if (stance.includes('🟢') || stance.includes('Long')) {
+                    if (shiftRegime.includes('🟢') || shiftRegime.includes('Long') || shiftRegime.includes('Covering')) {
                         stanceBg = 'rgba(16,185,129,0.1)';
                         stanceCol = '#34d399';
-                    } else if (stance.includes('🔴') || stance.includes('Short')) {
+                    } else if (shiftRegime.includes('🔴') || shiftRegime.includes('Short') || shiftRegime.includes('Unwinding')) {
                         stanceBg = 'rgba(239,68,68,0.1)';
                         stanceCol = '#f87171';
                     }
@@ -443,7 +643,8 @@
                                 <span style="color:#34d399;">${(p.puts_long || 0).toLocaleString()}</span> / <span style="color:#f87171;">${(p.puts_short || 0).toLocaleString()}</span>
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${netCol};">
-                                ${netSign}${netVal.toLocaleString()}
+                                <div>${netSign}${netVal.toLocaleString()}</div>
+                                ${deltaStr}
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:center;">
                                 <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${lsBg};color:${lsCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${lsCol}33;">
@@ -452,7 +653,7 @@
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:left;">
                                 <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:600;font-family:var(--font-mono);">
-                                    ${stance}
+                                    ${shiftRegime}
                                 </span>
                             </td>
                         </tr>
@@ -460,12 +661,13 @@
                 }).join('');
             }
 
-            // Render 7-Day History Matrix Table
-            if (historyBody && oiData.history_7d && oiData.history_7d.length) {
-                historyBody.innerHTML = oiData.history_7d.map((row, idx) => {
+            // Render 10-Day History Matrix Table
+            const history = oiData.history_10d || oiData.history_7d || [];
+            if (historyBody && history.length) {
+                historyBody.innerHTML = history.map((row, idx) => {
                     const isToday = idx === 0;
                     const rowBg = isToday ? 'rgba(56,189,248,0.06)' : 'transparent';
-                    
+
                     const fNet = row.fii_net_contracts || 0;
                     const fSign = fNet >= 0 ? '+' : '';
                     const fCol = fNet >= 0 ? '#34d399' : '#f87171';
@@ -486,10 +688,16 @@
                     const cCol = cNet >= 0 ? '#34d399' : '#f87171';
                     const cRatio = row.client_long_short_ratio || 1.0;
 
-                    const isFiiLong = fNet >= 0;
-                    const biasText = isFiiLong ? '🟢 FII Long Bias' : '🔴 FII Short Hedge';
-                    const biasBg = isFiiLong ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)';
-                    const biasCol = isFiiLong ? '#34d399' : '#f87171';
+                    const shiftRegime = row.fii_shift_regime || row.shift_regime || (fNet >= 0 ? '🟢 FII Long Bias' : '🔴 FII Short Hedge');
+                    let biasBg = 'rgba(52,211,153,0.12)';
+                    let biasCol = '#34d399';
+                    if (shiftRegime.includes('🔴') || shiftRegime.includes('Short') || shiftRegime.includes('Unwinding')) {
+                        biasBg = 'rgba(248,113,113,0.12)';
+                        biasCol = '#f87171';
+                    } else if (shiftRegime.includes('🚀') || shiftRegime.includes('Covering')) {
+                        biasBg = 'rgba(56,189,248,0.12)';
+                        biasCol = '#38bdf8';
+                    }
 
                     return `
                         <tr style="border-bottom:1px solid rgba(255,255,255,0.04);background:${rowBg};">
@@ -510,7 +718,7 @@
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:center;">
                                 <span style="font-size:0.62rem;padding:0.12rem 0.4rem;border-radius:3px;background:${biasBg};color:${biasCol};font-weight:700;font-family:var(--font-mono);">
-                                    ${biasText}
+                                    ${shiftRegime}
                                 </span>
                             </td>
                         </tr>
@@ -533,7 +741,7 @@
                 } else {
                     snapContainer.style.display = 'block';
                     histContainer.style.display = 'none';
-                    if (btn) btn.innerHTML = '📅 Past 7 Days Matrix';
+                    if (btn) btn.innerHTML = '📅 Past 10 Days Matrix';
                 }
             }
         },
@@ -569,7 +777,10 @@
             }).join('');
         },
 
-        renderMacroCharts(charts) {
+        // =====================================================================
+        // 📈 Macro Charts Rendering (5-Chart Grid)
+        // =====================================================================
+        renderMacroCharts(charts, participantOi = {}) {
             if (!charts) return;
 
             // 1. Fear & Greed 30D Trend Wave Chart
@@ -606,6 +817,74 @@
                     gradientFrom: 'rgba(129, 140, 248, 0.25)',
                     gradientTo: 'rgba(129, 140, 248, 0.0)',
                 });
+            }
+
+            // 4. Participant OI 10D Net Contracts Trajectory (Multi-Line)
+            const oiHistory = (participantOi && (participantOi.history_10d || participantOi.history_7d))
+                || charts.participant_oi_history
+                || [];
+
+            if (oiHistory.length >= 2) {
+                const chronological = [...oiHistory].reverse();
+                const fiiSeries = chronological.map(x => x.fii_net_contracts || 0);
+                const proSeries = chronological.map(x => x.pro_net_contracts || 0);
+                const clientSeries = chronological.map(x => x.client_net_contracts || 0);
+
+                this.drawMultiLineChart('chartParticipantOi', [
+                    { name: 'FII', values: fiiSeries, color: '#34d399' },
+                    { name: 'PRO', values: proSeries, color: '#818cf8' },
+                    { name: 'CLIENT', values: clientSeries, color: '#fb923c' }
+                ], { showZeroLine: true });
+
+                const latestFii = oiHistory[0]?.fii_net_contracts ?? 0;
+                const fiiBadge = document.getElementById('pulseParticipantOiChartBadge');
+                const fiiPill = document.getElementById('pulseFiiNetContractsPill');
+                if (fiiBadge) {
+                    fiiBadge.textContent = latestFii >= 0 ? 'FII Net Long' : 'FII Net Short';
+                    fiiBadge.style.color = latestFii >= 0 ? '#34d399' : '#f87171';
+                    fiiBadge.style.background = latestFii >= 0 ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)';
+                }
+                if (fiiPill) {
+                    const s = latestFii >= 0 ? '+' : '';
+                    fiiPill.textContent = `${s}${latestFii.toLocaleString()}`;
+                    fiiPill.style.color = latestFii >= 0 ? '#34d399' : '#f87171';
+                }
+            }
+
+            // 5. FII Long/Short Ratio Oscillator
+            if (oiHistory.length >= 2) {
+                const chronological = [...oiHistory].reverse();
+                const fiiLsSeries = chronological.map(x => x.fii_long_short_ratio || 1.0);
+                this.drawSparklineChart('chartFiiLsRatio', fiiLsSeries, {
+                    color: '#38bdf8',
+                    gradientFrom: 'rgba(56, 189, 248, 0.25)',
+                    gradientTo: 'rgba(56, 189, 248, 0.0)',
+                    referenceLines: [0.85, 1.0, 1.25],
+                    refLineColors: ['rgba(244,63,94,0.4)', 'rgba(251,191,36,0.3)', 'rgba(16,185,129,0.4)'],
+                });
+
+                const latestLs = oiHistory[0]?.fii_long_short_ratio ?? 1.15;
+                const oscBadge = document.getElementById('pulseFiiLsOscBadge');
+                const oscPill = document.getElementById('pulseFiiLsRatioPill');
+                if (oscBadge) {
+                    if (latestLs >= 1.25) {
+                        oscBadge.textContent = 'Overbought (>1.25)';
+                        oscBadge.style.color = '#34d399';
+                        oscBadge.style.background = 'rgba(52,211,153,0.15)';
+                    } else if (latestLs <= 0.85) {
+                        oscBadge.textContent = 'Oversold Squeeze (<0.85)';
+                        oscBadge.style.color = '#f87171';
+                        oscBadge.style.background = 'rgba(239,68,68,0.15)';
+                    } else {
+                        oscBadge.textContent = latestLs >= 1.0 ? 'Normal Bullish' : 'Mild Bearish';
+                        oscBadge.style.color = latestLs >= 1.0 ? '#38bdf8' : '#fbbf24';
+                        oscBadge.style.background = latestLs >= 1.0 ? 'rgba(56,189,248,0.15)' : 'rgba(251,191,36,0.15)';
+                    }
+                }
+                if (oscPill) {
+                    oscPill.textContent = `${latestLs.toFixed(2)}x`;
+                    oscPill.style.color = latestLs >= 1.0 ? '#38bdf8' : '#fb923c';
+                }
             }
         },
 
@@ -702,6 +981,264 @@
             ctx.shadowBlur = 0;
         },
 
+        drawMultiLineChart(canvasId, datasets, options = {}) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas || !datasets || !datasets.length) return;
+
+            const rect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : { width: 300, height: 100 };
+            const dpr = window.devicePixelRatio || 1;
+            const w = rect.width || 300;
+            const h = rect.height || 100;
+
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, w, h);
+
+            let allVals = [];
+            datasets.forEach(ds => { allVals = allVals.concat(ds.values || []); });
+            if (allVals.length === 0) return;
+
+            const minVal = Math.min(...allVals);
+            const maxVal = Math.max(...allVals);
+            const valRange = (maxVal - minVal) || 1.0;
+
+            const padding = 6;
+            const drawW = w - padding * 2;
+            const drawH = h - padding * 2;
+
+            // Zero line
+            if (options.showZeroLine && minVal <= 0 && maxVal >= 0) {
+                const zeroY = padding + drawH - ((0 - minVal) / valRange) * drawH;
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 2]);
+                ctx.moveTo(padding, zeroY);
+                ctx.lineTo(w - padding, zeroY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Draw each dataset curve
+            datasets.forEach(ds => {
+                const vals = ds.values || [];
+                if (vals.length < 2) return;
+
+                const points = vals.map((v, i) => {
+                    const x = padding + (i / (vals.length - 1)) * drawW;
+                    const y = padding + drawH - ((v - minVal) / valRange) * drawH;
+                    return { x, y, v };
+                });
+
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    const prev = points[i - 1];
+                    const curr = points[i];
+                    const cpX = (prev.x + curr.x) / 2;
+                    ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
+                }
+                ctx.strokeStyle = ds.color || '#38bdf8';
+                ctx.lineWidth = 1.8;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.stroke();
+
+                // Terminal dot
+                const last = points[points.length - 1];
+                ctx.beginPath();
+                ctx.arc(last.x, last.y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = ds.color || '#38bdf8';
+                ctx.fill();
+            });
+        },
+
+        // =====================================================================
+        // 📖 Metric Glossary & Educational Trading Guide Controller
+        // =====================================================================
+        async openMetricGlossary(targetCategoryOrKey = 'all') {
+            const modal = document.getElementById('modalPulseGlossary');
+            if (!modal) return;
+            modal.style.display = 'flex';
+
+            if (!this._glossaryData) {
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/market-pulse/glossary');
+                    if (res.ok) {
+                        const data = await res.json();
+                        this._glossaryData = data.categories || data;
+                    }
+                } catch (e) {
+                    console.error('[GLOSSARY] Error fetching metric glossary:', e);
+                }
+            }
+
+            let catFilter = 'all';
+            let scrollTarget = null;
+            if (targetCategoryOrKey && targetCategoryOrKey !== 'all') {
+                const knownCats = ['participant_oi', 'volatility_vix', 'institutional_liquidity', 'market_breadth', 'fear_greed'];
+                if (knownCats.includes(targetCategoryOrKey)) {
+                    catFilter = targetCategoryOrKey;
+                } else {
+                    scrollTarget = targetCategoryOrKey;
+                }
+            }
+
+            this._currentGlossaryCategory = catFilter;
+            this.filterGlossaryCategory(catFilter);
+
+            if (scrollTarget) {
+                setTimeout(() => {
+                    const targetEl = document.getElementById(`glossary-card-${scrollTarget}`);
+                    if (targetEl) {
+                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        targetEl.style.boxShadow = '0 0 15px rgba(168,85,247,0.5)';
+                        setTimeout(() => { targetEl.style.boxShadow = ''; }, 2000);
+                    }
+                }, 100);
+            }
+        },
+
+        closeMetricGlossary() {
+            const modal = document.getElementById('modalPulseGlossary');
+            if (modal) modal.style.display = 'none';
+        },
+
+        filterGlossaryCategory(category) {
+            this._currentGlossaryCategory = category;
+            const tabs = document.querySelectorAll('.pulse-glossary-tab');
+            tabs.forEach(tab => {
+                if (tab.getAttribute('data-cat') === category) {
+                    tab.style.background = 'rgba(56,189,248,0.15)';
+                    tab.style.color = '#38bdf8';
+                    tab.style.borderColor = 'rgba(56,189,248,0.3)';
+                } else {
+                    tab.style.background = 'transparent';
+                    tab.style.color = '#94a3b8';
+                    tab.style.borderColor = 'rgba(255,255,255,0.08)';
+                }
+            });
+
+            this.renderGlossaryCards();
+        },
+
+        searchGlossary(query) {
+            this._currentGlossarySearch = (query || '').toLowerCase().trim();
+            this.renderGlossaryCards();
+        },
+
+        renderGlossaryCards() {
+            const body = document.getElementById('pulseGlossaryBody');
+            if (!body) return;
+
+            let categories = this._glossaryData;
+            if (!categories) {
+                body.innerHTML = '<div style="color:#64748b;text-align:center;padding:2rem;">Glossary data loading...</div>';
+                return;
+            }
+
+            if (!Array.isArray(categories) && typeof categories === 'object') {
+                categories = categories.categories || Object.values(categories);
+            }
+
+            const catFilter = this._currentGlossaryCategory;
+            const search = this._currentGlossarySearch;
+
+            let matchingCards = [];
+            categories.forEach(cat => {
+                if (catFilter !== 'all' && cat.category_id !== catFilter) return;
+
+                (cat.metrics || []).forEach(m => {
+                    if (search) {
+                        const str = `${m.title} ${m.metric_id} ${m.summary} ${m.formula} ${m.bullish_benchmark} ${m.bearish_benchmark} ${m.next_day_playbook} ${m.trap_warning}`.toLowerCase();
+                        if (!str.includes(search)) return;
+                    }
+                    matchingCards.push({ ...m, catTitle: cat.title, catId: cat.category_id });
+                });
+            });
+
+            if (!matchingCards.length) {
+                body.innerHTML = `
+                    <div style="text-align:center;padding:3rem 1rem;color:#64748b;">
+                        <div style="font-size:1.5rem;margin-bottom:0.5rem;">🔍</div>
+                        <div>No glossary metrics found matching your filter or search query.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            body.innerHTML = matchingCards.map(m => {
+                return `
+                    <div id="glossary-card-${m.metric_id}" class="card" style="padding:1.15rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);border-radius:8px;display:flex;flex-direction:column;gap:0.75rem;">
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0.6rem;">
+                            <div>
+                                <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.2rem;">
+                                    <span style="font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:3px;background:rgba(168,85,247,0.15);color:#c084fc;font-weight:700;">
+                                        ${m.catTitle}
+                                    </span>
+                                    <span style="font-size:0.62rem;color:#64748b;font-family:var(--font-mono);">
+                                        #${m.metric_id}
+                                    </span>
+                                </div>
+                                <div style="font-size:0.95rem;font-weight:800;color:#f8fafc;">
+                                    ${m.title}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Summary -->
+                        <div style="font-size:0.75rem;color:#cbd5e1;line-height:1.45;">
+                            ${m.summary}
+                        </div>
+
+                        <!-- Formula Box -->
+                        ${m.formula ? `
+                            <div style="background:#060a16;padding:0.5rem 0.75rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                                <div style="font-size:0.65rem;color:#94a3b8;font-weight:700;margin-bottom:0.2rem;">📐 Formula &amp; Mathematical Definition:</div>
+                                <div style="font-family:var(--font-mono);font-size:0.72rem;color:#38bdf8;line-height:1.4;">
+                                    ${m.formula}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <!-- Bullish vs Bearish Benchmarks Grid -->
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.70rem;">
+                            <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);padding:0.5rem 0.65rem;border-radius:6px;">
+                                <div style="color:#34d399;font-weight:800;margin-bottom:0.15rem;">🟢 Bullish Benchmark</div>
+                                <div style="color:#cbd5e1;line-height:1.35;">${m.bullish_benchmark}</div>
+                            </div>
+                            <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);padding:0.5rem 0.65rem;border-radius:6px;">
+                                <div style="color:#f87171;font-weight:800;margin-bottom:0.15rem;">🔴 Bearish Benchmark</div>
+                                <div style="color:#cbd5e1;line-height:1.35;">${m.bearish_benchmark}</div>
+                            </div>
+                        </div>
+
+                        <!-- Next-Day Playbook Directive -->
+                        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);padding:0.6rem 0.75rem;border-radius:6px;font-size:0.72rem;">
+                            <div style="color:#60a5fa;font-weight:800;margin-bottom:0.2rem;display:flex;align-items:center;gap:0.3rem;">
+                                <span>🎯</span> Next-Day Market Application &amp; Trading Strategy:
+                            </div>
+                            <div style="color:#e2e8f0;line-height:1.4;">
+                                ${m.next_day_playbook}
+                            </div>
+                        </div>
+
+                        <!-- Trap Warning Alert -->
+                        <div style="background:rgba(244,63,94,0.06);border:1px solid rgba(244,63,94,0.2);padding:0.5rem 0.75rem;border-radius:6px;font-size:0.70rem;">
+                            <div style="color:#fb7185;font-weight:800;margin-bottom:0.15rem;display:flex;align-items:center;gap:0.3rem;">
+                                <span>⚠️</span> Trap Warning &amp; Pitfalls:
+                            </div>
+                            <div style="color:#cbd5e1;line-height:1.35;">
+                                ${m.trap_warning}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        },
+
         async loadConfluenceSetups(forceRefresh = false) {
             const tbody = document.getElementById('pulseConfluenceTableBody');
             const btn = document.getElementById('btnSyncPulseConfluence');
@@ -716,7 +1253,7 @@
                 <tr>
                     <td colspan="7" style="text-align:center;padding:1.5rem;color:#94a3b8;">
                         <div class="loading-spinner" style="margin:0 auto 0.4rem auto;"></div>
-                        <div>Evaluating multi-strategy confluences across Breakout, Swing, AI & News...</div>
+                        <div>Evaluating multi-strategy confluences across Breakout, Swing, AI &amp; News...</div>
                     </td>
                 </tr>
             `;

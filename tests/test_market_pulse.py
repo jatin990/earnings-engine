@@ -149,3 +149,40 @@ def test_institutional_flows_dedicated_endpoint(client):
     assert "fii_net_cr" in liq
     assert "dii_net_cr" in liq
 
+
+def test_market_playbook_dedicated_endpoint(client):
+    res = client.get("/api/v1/market-pulse/playbook")
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["success"] is True
+    assert "playbook" in payload
+    playbook = payload["playbook"]
+    assert "bias" in playbook
+    assert "confluence_score" in playbook
+    assert "actionable_rules" in playbook
+    assert len(playbook["actionable_rules"]) >= 3
+    assert "corridor" in playbook
+    assert "expected_1d_range_pct" in playbook
+    assert "nifty_spot" in playbook
+    assert "divergence" in playbook
+    assert "theta_decay_environment" in playbook
+
+
+def test_metric_glossary_dedicated_endpoint(client):
+    res = client.get("/api/v1/market-pulse/glossary")
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload["success"] is True
+    assert "glossary" in payload
+    glossary = payload["glossary"]
+    assert "categories" in glossary
+    cat_ids = [c["id"] for c in glossary["categories"]]
+    assert "participant_oi" in cat_ids
+    assert "volatility_vix" in cat_ids
+    assert "institutional_liquidity" in cat_ids
+    assert "market_breadth" in cat_ids
+    assert "fear_greed" in cat_ids
+
+
+
+
