@@ -2769,7 +2769,7 @@ def _score_single_ticker(
         # 1. Live Price integration for Hot stocks / on-demand re-eval
         if use_live_quote and not asof_date:
             try:
-                live_q = fetch_live_quote(ticker, settings, sync_db=False)
+                live_q = fetch_live_quote(ticker, settings, sync_db=True)
                 if live_q and live_q.get("current_price"):
                     live_price = float(live_q["current_price"])
                     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")

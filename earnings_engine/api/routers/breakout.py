@@ -57,23 +57,35 @@ async def get_breakout_radar_endpoint(
         if real_tracked_only:
             candidates = [c for c in candidates if bool(c.get("is_real_tracked"))]
 
-        # Live parallel price fetching if requested
-        if live and candidates and not asof_date:
-            from concurrent.futures import ThreadPoolExecutor
-            from earnings_engine.data.prices import fetch_prices
-            
-            def _fetch_live(c: dict[str, Any]) -> None:
-                t = c.get("ticker")
-                if not t or "TEST" in t.upper() or "MOCK" in t.upper() or "DUMMY" in t.upper():
-                    return
+        # Synchronize candidate prices: live parallel quote fetch or SQLite price_history sync
+        if candidates and not asof_date:
+            candidate_tickers = [
+                c.get("ticker")
+                for c in candidates
+                if c.get("ticker") and not any(x in str(c.get("ticker", "")).upper() for x in ("TEST", "MOCK", "DUMMY"))
+            ]
+            if live and candidate_tickers:
+                from earnings_engine.data.prices import fetch_batch_live_quotes
                 try:
-                    df = fetch_prices(t, _settings, force=True)
-                    if not df.empty and "close" in df.columns:
-                        closes = pd.to_numeric(df["close"], errors="coerce").dropna()
-                        if not closes.empty:
-                            cur_p = round(float(closes.iloc[-1]), 2)
+                    live_quotes = fetch_batch_live_quotes(candidate_tickers, settings=_settings, sync_db=True, max_workers=10)
+                    for c in candidates:
+                        t = c.get("ticker")
+                        lq = live_quotes.get(t)
+                        if lq and lq.get("current_price"):
+                            cur_p = lq["current_price"]
                             c["current_price"] = cur_p
-                            c["current_date"] = str(df.index[-1])[:10]
+                            c["is_live"] = lq.get("is_live", True)
+                            if lq.get("day_change_pct") is not None:
+                                c["day_change_pct"] = lq["day_change_pct"]
+                            if lq.get("day_change") is not None:
+                                c["day_change"] = lq["day_change"]
+                            if lq.get("day_high") is not None:
+                                c["day_high"] = lq["day_high"]
+                            if lq.get("day_low") is not None:
+                                c["day_low"] = lq["day_low"]
+                            if lq.get("volume") is not None:
+                                c["volume"] = lq["volume"]
+                            c["current_date"] = datetime.now().strftime("%Y-%m-%d")
                             sig_p = c.get("predicted_value") or c.get("signal_price")
                             if sig_p and sig_p > 0:
                                 c["realized_return_pct"] = round(((cur_p - sig_p) / sig_p) * 100, 2)
@@ -81,10 +93,26 @@ async def get_breakout_radar_endpoint(
                             if trig:
                                 c["breakout_happened"] = cur_p >= trig
                 except Exception as e:
-                    logger.debug("Failed live breakout refresh for %s: %s", t, e)
-
-            with ThreadPoolExecutor(max_workers=min(10, len(candidates))) as pool:
-                list(pool.map(_fetch_live, candidates))
+                    logger.debug("Failed live breakout batch refresh: %s", e)
+            elif candidate_tickers:
+                from earnings_engine.data.prices import get_latest_cached_prices
+                try:
+                    latest_prices = get_latest_cached_prices(candidate_tickers, settings=_settings)
+                    for c in candidates:
+                        t = c.get("ticker")
+                        lp = latest_prices.get(t)
+                        if lp and lp.get("close"):
+                            cur_p = lp["close"]
+                            c["current_price"] = cur_p
+                            c["current_date"] = lp.get("date") or c.get("current_date")
+                            sig_p = c.get("predicted_value") or c.get("signal_price")
+                            if sig_p and sig_p > 0:
+                                c["realized_return_pct"] = round(((cur_p - sig_p) / sig_p) * 100, 2)
+                            trig = c.get("breakout_trigger")
+                            if trig:
+                                c["breakout_happened"] = cur_p >= trig
+                except Exception as e:
+                    logger.debug("Failed syncing latest cached prices for breakout candidates: %s", e)
 
         # Compute prediction signals & color-coding for all candidates
         for c in candidates:

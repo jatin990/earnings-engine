@@ -834,3 +834,51 @@ def fetch_batch_live_quotes(
     return results
 
 
+def get_latest_cached_prices(
+    tickers: list[str],
+    settings: Settings | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Batch retrieve the latest cached price record for a list of tickers from SQLite price_history.
+
+    Returns a dict mapping ticker -> {ticker, date, open, high, low, close, volume}.
+    Uses SQLite window functions to extract the latest bar per ticker in a single fast query.
+    """
+    settings = settings or Settings()
+    if not tickers:
+        return {}
+
+    unique_tickers = list(dict.fromkeys([canonical_symbol(t) for t in tickers if t]))
+    results: dict[str, dict[str, Any]] = {}
+
+    try:
+        with _connect(settings) as conn:
+            placeholders = ",".join("?" for _ in unique_tickers)
+            query = f"""
+                SELECT ticker, date, open, high, low, close, volume FROM (
+                    SELECT ticker, date, open, high, low, close, volume,
+                           ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) as rn
+                    FROM price_history
+                    WHERE ticker IN ({placeholders})
+                ) WHERE rn = 1
+            """
+            rows = conn.execute(query, unique_tickers).fetchall()
+            for r in rows:
+                sym = r[0]
+                close_p = float(r[5]) if r[5] is not None else None
+                if close_p is not None:
+                    results[sym] = {
+                        "ticker": sym,
+                        "date": str(r[1]),
+                        "open": float(r[2]) if r[2] is not None else None,
+                        "high": float(r[3]) if r[3] is not None else None,
+                        "low": float(r[4]) if r[4] is not None else None,
+                        "close": round(close_p, 2),
+                        "volume": int(r[6]) if r[6] is not None else None,
+                    }
+    except Exception as e:
+        logger.debug("[GET-LATEST-PRICES] Error querying price_history: %s", e)
+
+    return results
+
+
+
