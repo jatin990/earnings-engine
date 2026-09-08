@@ -1547,7 +1547,7 @@
                 btn.innerHTML = '<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span>';
             }
             try {
-                const strat = document.getElementById('breakoutStrategySelect')?.value || app._breakoutStrategy || 'CLASSIC_TECHNICAL';
+                const strat = document.getElementById('breakoutStrategySelect')?.value || app._breakoutStrategy || 'ALL';
                 let url = `/api/v1/breakout-radar/evaluate/${encodeURIComponent(ticker)}?strategy=${encodeURIComponent(strat)}`;
                 if (forceTier) url += `&force_tier=${encodeURIComponent(forceTier)}`;
                 const res = await fetch(url);
@@ -1790,8 +1790,8 @@
         app.refreshBreakoutScan = async function() {
             const btn = document.getElementById('breakoutRefreshBtn');
             const icon = document.getElementById('breakoutRefreshIcon');
-            const universe = document.getElementById('breakoutUniverseSelect')?.value || 'nifty_50';
-            const strategy = document.getElementById('breakoutStrategySelect')?.value || app._breakoutStrategy || 'CLASSIC_TECHNICAL';
+            const universe = document.getElementById('breakoutUniverseSelect')?.value || 'nse_large_cap';
+            const strategy = document.getElementById('breakoutStrategySelect')?.value || app._breakoutStrategy || 'ALL';
             if (btn) btn.disabled = true;
             if (icon) icon.textContent = '⏱️';
             try {
@@ -1815,7 +1815,7 @@
         };
 
         app.onBreakoutUniverseChange = async function(val) {
-            app._breakoutUniverse = val || 'all';
+            app._breakoutUniverse = val || 'nse_large_cap';
             await app.loadBreakoutRadar(false);
         };
 

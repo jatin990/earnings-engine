@@ -30,16 +30,21 @@ logger = logging.getLogger("earnings_engine.data.turso_sync")
 
 # Core state tables synchronized and merged bidirectionally
 SYNC_TABLES = [
+    # Core User, Auth & Watchlists
     "watchlists",
     "watchlist_meta",
     "passcodes",
+    "users",
     "user_auth",
     "user_sessions",
+    "invite_codes",
+    "friend_access",
+    "otp_verifications",
+    # Quantitative Predictions & Market Radar
     "consensus_predictions",
     "breakout_radar",
     "breakout_tracked_signals",
     "breakout_audit_log",
-    "sidebar_badge_counters",
     "scanner_candidates",
     "swing_ranges",
     "swing_cycle_history",
@@ -48,13 +53,34 @@ SYNC_TABLES = [
     "strategy_audit_logs",
     "ai_news_predictions",
     "news_catalysts",
-    "universes",
+    "quarter_repeater_predictions",
+    "tri_confluence_metrics",
+    "option_chain_history",
+    # Automation Schedules, Logs & Badges
+    "sidebar_badge_counters",
+    "automation_schedules",
+    "automation_schedule_logs",
     "daily_top_gainers",
+    # Institutional & Market Universe
+    "institutional_holdings",
+    "institutional_block_deals",
+    "shareholding_patterns",
+    "institutional_accumulation_cache",
+    "nse_shareholding_freshness",
+    "universes",
+    "universe_stocks",
+    "universe_freshness",
+    "earnings_fetch_log",
+    "earnings_month_cache",
+    # Personal Finance & Lifestyle
     "trips",
     "trip_activities",
     "trip_groups",
     "trip_group_members",
     "trip_group_trips",
+    "credit_cards",
+    "credit_card_otp_requests",
+    "net_worth_snapshots",
 ]
 
 
@@ -101,15 +127,35 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "detected_at",
     "fetched_at",
     "audited_at",
+    "calculated_at",
+    "started_at",
     "run_at",
     "predicted_at",
     "added_at",
+    "last_login_at",
+    "cached_at",
+    "reported_date",
+    "deal_date",
+    "as_of_date",
     "cycle_start",
     "cycle_end",
     "trade_date",
     "signal_date",
+    "fetch_date",
     "date",
 ]
+
+DATE_ONLY_COLUMNS = {
+    "trade_date",
+    "signal_date",
+    "deal_date",
+    "as_of_date",
+    "fetch_date",
+    "reported_date",
+    "cycle_start",
+    "cycle_end",
+    "date",
+}
 
 
 def _get_watermark_column(cols: list[str]) -> str | None:
@@ -303,16 +349,29 @@ def sync_local_to_upstream(settings: Settings | None = None, force_full: bool = 
                 except Exception as e:
                     logger.debug("[TURSO-SYNC] Row count check error on %s: %s", table, e)
 
+            # Determine delta filter query if incremental sync is active
+            delta_sql = None
+            delta_params = None
+            if watermark_col and last_synced_at:
+                if watermark_col in DATE_ONLY_COLUMNS:
+                    delta_filter_val = last_synced_at[:10]
+                    delta_where = f'"{watermark_col}" >= ?'
+                else:
+                    delta_filter_val = last_synced_at.replace("T", " ")
+                    delta_where = f'replace("{watermark_col}", \'T\', \' \') > ?'
+                delta_sql = f'SELECT {col_str} FROM "{table}" WHERE {delta_where}'
+                delta_params = (delta_filter_val,)
+            else:
+                delta_sql = f'SELECT {col_str} FROM "{table}"'
+                delta_params = ()
+
             # 1. Fetch Local Delta Rows (only records updated after last_synced_at)
             local_rows = []
             if table in local_tables:
-                if watermark_col and last_synced_at:
-                    local_rows = local_conn.execute(
-                        f'SELECT {col_str} FROM "{table}" WHERE "{watermark_col}" > ?',
-                        (last_synced_at,),
-                    ).fetchall()
+                if delta_params:
+                    local_rows = local_conn.execute(delta_sql, delta_params).fetchall()
                 else:
-                    local_rows = local_conn.execute(f'SELECT {col_str} FROM "{table}"').fetchall()
+                    local_rows = local_conn.execute(delta_sql).fetchall()
 
             # 2. Push Local Delta Rows Upstream to Turso (Union Merge)
             pushed = 0
@@ -327,13 +386,10 @@ def sync_local_to_upstream(settings: Settings | None = None, force_full: bool = 
             pulled = 0
             if table in remote_tables:
                 try:
-                    if watermark_col and last_synced_at:
-                        remote_rows = remote_conn.execute(
-                            f'SELECT {col_str} FROM "{table}" WHERE "{watermark_col}" > ?',
-                            (last_synced_at,),
-                        ).fetchall()
+                    if delta_params:
+                        remote_rows = remote_conn.execute(delta_sql, delta_params).fetchall()
                     else:
-                        remote_rows = remote_conn.execute(f'SELECT {col_str} FROM "{table}"').fetchall()
+                        remote_rows = remote_conn.execute(delta_sql).fetchall()
 
                     if remote_rows:
                         with local_conn:
