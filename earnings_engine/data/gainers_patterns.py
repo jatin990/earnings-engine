@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 from earnings_engine.config import Settings
-from earnings_engine.data.prices import _cache_path, _connect, load_prices, fetch_prices
+from earnings_engine.data.prices import _cache_path, _connect, load_prices, load_prices_batch, fetch_prices
 from earnings_engine.data.names import get_name
 from earnings_engine.data.catalysts_news import score_catalyst_headline
 
@@ -338,10 +338,10 @@ def get_daily_top_gainers(
             tickers = get_universe(universe_or_watchlist, settings)
 
     if not tickers:
-        # Load distinct tickers from price_history
+        # Load tickers from master table
         with _connect(settings) as conn:
-            rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 300").fetchall()
-            tickers = [r[0] for r in rows]
+            rows = conn.execute("SELECT ticker FROM tickers WHERE ticker IS NOT NULL LIMIT 300").fetchall()
+            tickers = [r[0] for r in rows if r[0]]
 
     # Filter out test and mock tickers and deduplicate
     tickers = list(dict.fromkeys([t for t in tickers if not any(x in t.upper() for x in ("TEST", "MOCK", "SAMPLE"))]))
@@ -349,12 +349,15 @@ def get_daily_top_gainers(
     if not tickers:
         tickers = ["PCJEWELLER.NS", "FORCEMOT.NS", "JIOFIN.NS", "IDBI.NS", "RELIANCE.NS", "TCS.NS", "INFY.NS", "SBIN.NS", "HDFCBANK.NS", "ETERNAL.NS"]
 
+    # Batch load prices for all tickers
+    prices_by_ticker = load_prices_batch(tickers, settings=settings, days=400)
+
     # Calculate metrics for all tickers
     scored_items: list[dict[str, Any]] = []
     for t in tickers:
         try:
-            df = load_prices(t, settings=settings)
-            if df.empty or len(df) < 2:
+            df = prices_by_ticker.get(t)
+            if df is None or df.empty or len(df) < 2:
                 continue
             telem = compute_stock_daily_telemetry(t, df)
             if telem and telem["return_pct"] > 0:

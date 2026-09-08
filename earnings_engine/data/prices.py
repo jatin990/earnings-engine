@@ -348,10 +348,18 @@ def fetch_prices(
     return df
 
 
-def load_prices_batch(tickers: list[str], settings: Settings) -> dict[str, pd.DataFrame]:
+def load_prices_batch(
+    tickers: list[str],
+    settings: Settings,
+    since_date: str | None = None,
+    days: int | None = None,
+) -> dict[str, pd.DataFrame]:
     """Load price DataFrames for multiple tickers in a single batched database query with in-memory caching."""
     if not tickers:
         return {}
+
+    if days and not since_date:
+        since_date = (pd.Timestamp.now() - pd.Timedelta(days=days)).strftime("%Y-%m-%d")
 
     cleaned = [canonical_symbol(t) for t in tickers if t and t.strip()]
     unique_tickers = list(dict.fromkeys(cleaned))
@@ -361,7 +369,10 @@ def load_prices_batch(tickers: list[str], settings: Settings) -> dict[str, pd.Da
     for t in unique_tickers:
         cached = get_cached_price_df(t)
         if cached is not None:
-            result[t] = cached
+            if since_date and not cached.empty:
+                result[t] = cached.loc[cached.index >= since_date]
+            else:
+                result[t] = cached
         else:
             missing.append(t)
 
@@ -371,30 +382,33 @@ def load_prices_batch(tickers: list[str], settings: Settings) -> dict[str, pd.Da
             for i in range(0, len(missing), CHUNK_SIZE):
                 chunk = missing[i : i + CHUNK_SIZE]
                 placeholders = ",".join("?" for _ in chunk)
-                rows = connection.execute(
-                    f"SELECT ticker, date, open, high, low, close, volume FROM price_history WHERE ticker IN ({placeholders}) ORDER BY ticker, date ASC",
-                    chunk,
-                ).fetchall()
+                if since_date:
+                    query = f"SELECT ticker, date, open, high, low, close, volume FROM price_history WHERE ticker IN ({placeholders}) AND date >= ? ORDER BY ticker, date ASC"
+                    params = [*chunk, since_date]
+                else:
+                    query = f"SELECT ticker, date, open, high, low, close, volume FROM price_history WHERE ticker IN ({placeholders}) ORDER BY ticker, date ASC"
+                    params = chunk
+                rows = connection.execute(query, params).fetchall()
 
-                grouped: dict[str, list[Any]] = {sym: [] for sym in chunk}
-                for r in rows:
-                    grouped[r[0]].append((r[1], r[2], r[3], r[4], r[5], r[6]))
+                if rows:
+                    all_df = pd.DataFrame(rows, columns=["ticker", "date", *COLUMNS])
+                    all_df["date"] = pd.to_datetime(all_df["date"])
+                    for col in COLUMNS:
+                        all_df[col] = pd.to_numeric(all_df[col], errors="coerce")
+                    all_df = all_df.astype({"volume": "Int64"}, errors="ignore")
+                    for sym, g in all_df.groupby("ticker", sort=False):
+                        g = g.drop(columns=["ticker"]).set_index("date")
+                        g.index.name = "date"
+                        result[sym] = g
+                        if not since_date:
+                            set_cached_price_df(sym, g)
 
-                for sym, row_list in grouped.items():
-                    if not row_list:
+                for sym in chunk:
+                    if sym not in result:
                         empty_df = _empty_frame()
                         result[sym] = empty_df
-                        set_cached_price_df(sym, empty_df)
-                    else:
-                        frame = pd.DataFrame(row_list, columns=["date", *COLUMNS])
-                        frame["date"] = pd.to_datetime(frame["date"])
-                        frame = frame.set_index("date")
-                        for col in COLUMNS:
-                            frame[col] = pd.to_numeric(frame[col], errors="coerce")
-                        frame = frame.astype({"volume": "Int64"}, errors="ignore")
-                        frame.index.name = "date"
-                        result[sym] = frame
-                        set_cached_price_df(sym, frame)
+                        if not since_date:
+                            set_cached_price_df(sym, empty_df)
 
     # Also map any requested original aliases to their canonical result
     for orig in tickers:
@@ -437,15 +451,21 @@ def ensure_prices_batch(
     return load_prices_batch(unique_tickers, settings)
 
 
-def load_prices(ticker: str, settings: Settings) -> pd.DataFrame:
+def load_prices(
+    ticker: str,
+    settings: Settings,
+    since_date: str | None = None,
+    days: int | None = None,
+) -> pd.DataFrame:
     """Load prices from in-memory cache or SQLite if present."""
     if not ticker:
         return _empty_frame()
     sym = canonical_symbol(ticker)
-    cached = get_cached_price_df(sym)
-    if cached is not None:
-        return cached
-    res = load_prices_batch([sym], settings)
+    if not since_date and not days:
+        cached = get_cached_price_df(sym)
+        if cached is not None:
+            return cached
+    res = load_prices_batch([sym], settings, since_date=since_date, days=days)
     return res.get(sym, _empty_frame())
 
 
@@ -841,7 +861,7 @@ def get_latest_cached_prices(
     """Batch retrieve the latest cached price record for a list of tickers from SQLite price_history.
 
     Returns a dict mapping ticker -> {ticker, date, open, high, low, close, volume}.
-    Uses SQLite window functions to extract the latest bar per ticker in a single fast query.
+    Uses an indexed MAX(date) self-join to extract the latest bar per ticker in a single fast query.
     """
     settings = settings or Settings()
     if not tickers:
@@ -854,12 +874,14 @@ def get_latest_cached_prices(
         with _connect(settings) as conn:
             placeholders = ",".join("?" for _ in unique_tickers)
             query = f"""
-                SELECT ticker, date, open, high, low, close, volume FROM (
-                    SELECT ticker, date, open, high, low, close, volume,
-                           ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) as rn
+                SELECT p.ticker, p.date, p.open, p.high, p.low, p.close, p.volume
+                FROM price_history p
+                INNER JOIN (
+                    SELECT ticker, MAX(date) AS max_date
                     FROM price_history
                     WHERE ticker IN ({placeholders})
-                ) WHERE rn = 1
+                    GROUP BY ticker
+                ) m ON p.ticker = m.ticker AND p.date = m.max_date
             """
             rows = conn.execute(query, unique_tickers).fetchall()
             for r in rows:
@@ -877,6 +899,13 @@ def get_latest_cached_prices(
                     }
     except Exception as e:
         logger.debug("[GET-LATEST-PRICES] Error querying price_history: %s", e)
+
+    # Also map any requested original aliases to their canonical result
+    for orig in tickers:
+        if orig and orig.strip():
+            canon = canonical_symbol(orig)
+            if canon in results and orig not in results:
+                results[orig] = results[canon]
 
     return results
 

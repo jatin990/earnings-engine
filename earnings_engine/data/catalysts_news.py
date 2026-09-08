@@ -717,21 +717,6 @@ def get_short_term_catalysts(
                     logger.debug("[CATALYSTS] fetch_batch_live_quotes failed: %s", e)
 
                 latest_cached = get_latest_cached_prices(tickers, settings=settings)
-
-                placeholders = ",".join("?" for _ in tickers)
-                try:
-                    latest_rows = conn.execute(
-                        f"""
-                        SELECT ticker, close, date FROM price_history
-                        WHERE ticker IN ({placeholders})
-                        AND date = (SELECT MAX(date) FROM price_history p2 WHERE p2.ticker = price_history.ticker)
-                        """,
-                        tickers,
-                    ).fetchall()
-                    latest_map = {r[0]: (float(r[1]), r[2]) for r in latest_rows if r[1] is not None}
-                except Exception:
-                    latest_map = {}
-
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
                 for v in valid:
@@ -753,9 +738,6 @@ def get_short_term_catalysts(
                             cur_price = float(lc["close"])
                         elif isinstance(lc, (int, float)) and lc > 0:
                             cur_price = float(lc)
-
-                    if (cur_price is None or cur_price <= 0) and t in latest_map:
-                        cur_price = float(latest_map[t][0])
 
                     if (cur_price is None or cur_price <= 0) and v.get("current_price"):
                         cur_price = float(v["current_price"])

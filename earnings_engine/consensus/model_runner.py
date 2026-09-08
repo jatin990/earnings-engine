@@ -19,22 +19,22 @@ from earnings_engine.consensus.context_builder import context_to_prompt
 
 logger = logging.getLogger("earnings_engine.consensus.model_runner")
 
-# Default curated model suite (Antigravity & Free + General Best)
+# Default curated model suite (Routed exclusively via OmniRoute Gateway)
 DEFAULT_MODELS = [
-    "google/gemini-2.0-flash-001",
-    "meta-llama/llama-3.3-70b-instruct",
-    "deepseek/deepseek-r1",
-    "google/gemma-4-31b-it:free",
+    "omniroute/deepseek/deepseek-r1",
+    "omniroute/meta-llama/llama-3.3-70b-instruct",
+    "omniroute/qwen/qwen-2.5-72b-instruct",
+    "omniroute/google/gemini-2.0-flash-001",
 ]
 
 # Fallback models when primary model encounters 429 rate limit or 404 endpoint deprecation
 MODEL_FALLBACKS: dict[str, str] = {
-    "mistralai/mistral-large": "google/gemini-2.0-flash-001",
+    "mistralai/mistral-large": "deepseek/deepseek-r1",
     "qwen/qwen-2.5-72b-instruct": "meta-llama/llama-3.3-70b-instruct",
     "deepseek/deepseek-r1": "google/gemini-2.0-flash-001",
     "google/gemma-4-31b-it:free": "google/gemini-2.0-flash-001",
     "google/gemma-4-31b-it": "google/gemini-2.0-flash-001",
-    "z-ai/glm-5.2": "google/gemini-2.0-flash-001",
+    "z-ai/glm-5.2": "deepseek/deepseek-r1",
 }
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -65,7 +65,16 @@ def get_horizon_system_prompt(timeframe_days: int = 14, custom_directives: str |
 
     directives_block = f"\nCustom User Focus Directives:\n{custom_directives.strip()}\n" if custom_directives else ""
 
-    return f"""You are a quantitative stock analyst and swing trader specializing in {horizon_name}. Given the stock analysis context below, provide your prediction as a STRICT JSON object with exactly these fields:
+    return f"""You are a senior quantitative equity analyst and swing trader specializing in {horizon_name}.
+You are analyzing a high-conviction Point-in-Time quantitative dataset.
+
+CRITICAL INSTRUCTIONS - MANDATORY DOUBLE-VERIFICATION PROTOCOL:
+1. Cross-Verify News & Catalysts vs Price Action: Do not blindly follow headline sentiment. Cross-reference breaking news against actual price action geometry (e.g. is price making higher highs on news, or is it a 'sell-the-news' distribution trap?).
+2. Cross-Verify Volume Surges vs Institutional Accumulation: Verify if high volume spikes are supported by high deliverable percentages, DII/Mutual Fund accumulation QoQ, or FII block deals rather than speculative retail churn.
+3. Cross-Verify Technical Structure vs Earnings Track Record: Validate technical breakout patterns against historical EPS beat streaks and post-earnings drift behavior.
+4. Enforce Strict Invalidation Rules: Every trade thesis MUST have a non-negotiable invalidation stop-loss price and an honest risk/reward ratio calculation (R:R > 1.8 preferred for buy recommendations).
+
+Provide your structured prediction as a STRICT JSON object with exactly these fields:
 
 {{
   "direction": "BULLISH" or "BEARISH" or "NEUTRAL",
@@ -87,12 +96,12 @@ Horizon Directives ({horizon_name}):
 {horizon_guidance}{directives_block}
 
 Rules:
-- Respond with ONLY the JSON object. No markdown, no explanation, no commentary.
+- Respond with ONLY the JSON object. No markdown fences, no conversational preamble, no commentary outside the JSON.
 - confidence_pct reflects how certain you are in the direction call (0-100).
 - target_return_pct is positive for BULLISH, negative for BEARISH, near-zero for NEUTRAL over {timeframe_days} trading days.
 - stop_loss_price should be a sensible invalidation level below support (for bullish) or above resistance (for bearish).
-- key_drivers should list 2-3 concise reasons for your directional call for this {timeframe_days}-day horizon.
-- primary_risk should state the single biggest risk to your thesis over this horizon.
+- key_drivers should list 2-3 concise, double-verified reasons for your directional call for this {timeframe_days}-day horizon.
+- primary_risk should state the single biggest risk/falsification condition to your thesis over this horizon.
 - All price fields should use the same currency as the context."""
 
 

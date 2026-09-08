@@ -1577,6 +1577,32 @@ def sync_institutional_cmd(force: bool) -> None:
     click.echo()
 
 
+@cli.command("prune-data")
+@click.option("--price-days", "-p", type=int, default=365, show_default=True, help="Number of days of price history to retain (default: 365 = 1 year).")
+@click.option("--earnings-days", "-e", type=int, default=730, show_default=True, help="Number of days of earnings history to retain (default: 730 = 2 years).")
+@click.option("--vacuum/--no-vacuum", default=True, show_default=True, help="Execute SQLite VACUUM to reclaim disk space after pruning.")
+def prune_data_cmd(price_days: int, earnings_days: int, vacuum: bool) -> None:
+    """Prune historical prices older than 1 year and earnings older than 2 years, then VACUUM database."""
+    from earnings_engine.data.prune_data import prune_all_data
+
+    settings = Settings()
+    click.echo(f"\n[DATA RETENTION] Pruning data older than {price_days}d (prices) and {earnings_days}d (earnings)...")
+    res = prune_all_data(price_days=price_days, earnings_days=earnings_days, vacuum=vacuum, settings=settings)
+    if res.get("success"):
+        click.secho(
+            f"[SUCCESS] Retention policy enforced!\n"
+            f"  - Price rows deleted:    {res.get('prices_deleted', 0):,}\n"
+            f"  - Earnings rows deleted: {res.get('earnings_deleted', 0):,}\n"
+            f"  - Auxiliary logs deleted:{res.get('auxiliary_deleted', {})}\n"
+            f"  - Database vacuumed:     {'YES' if res.get('vacuumed') else 'NO'}",
+            fg="green",
+            bold=True,
+        )
+    else:
+        click.secho(f"[ERROR] Data pruning failed: {res.get('error')}", fg="red")
+    click.echo()
+
+
 if __name__ == "__main__":
     cli()
 

@@ -16,7 +16,7 @@ from typing import Any
 import pandas as pd
 
 from earnings_engine.config import Settings
-from earnings_engine.data.prices import _connect, load_prices
+from earnings_engine.data.prices import _connect, load_prices, load_prices_batch
 from earnings_engine.data.names import get_name
 from earnings_engine.data.watchlists import get_watchlist
 from earnings_engine.data.universe import get_universe
@@ -239,8 +239,8 @@ def _resolve_universe_tickers(universe_or_watchlist: str = "NSE_TOP", settings: 
 
     if not tickers:
         with _connect(settings) as conn:
-            rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 350").fetchall()
-            tickers = [r[0] for r in rows]
+            rows = conn.execute("SELECT ticker FROM tickers WHERE ticker IS NOT NULL LIMIT 350").fetchall()
+            tickers = [r[0] for r in rows if r[0]]
 
     if not tickers:
         tickers = [
@@ -288,19 +288,24 @@ def _compute_category_candidates_live(
             "risk_alerts": "Litigation, Risk & Probes",
         }
         target_news_cat = news_cat_map.get(cat_id, "")
-        
+
         items = get_short_term_catalysts(
             category_filter=target_news_cat,
             limit=limit * 2,
             settings=settings,
         )
 
+        item_tickers = list({item.get("ticker") for item in items if item.get("ticker")})
+        prices_by_ticker = load_prices_batch(item_tickers, settings=settings, days=400) if item_tickers else {}
+
         for item in items:
             t = item.get("ticker", "")
             if tickers and t not in tickers and universe_or_watchlist.upper() not in ("ALL", "GLOBAL", "NSE_ALL"):
                 continue
 
-            df = load_prices(t, settings=settings)
+            df = prices_by_ticker.get(t)
+            if df is None or df.empty:
+                df = load_prices(t, settings=settings)
             telem = compute_stock_daily_telemetry(t, df) if not df.empty and len(df) >= 2 else None
 
             curr_price = telem["close"] if telem else 0.0
@@ -409,6 +414,20 @@ def _compute_category_candidates_live(
 
     # 2. Technical Setup Categories
     else:
+        # Pre-load missing prices in a single batch to avoid N+1 queries
+        missing_telem_tickers = [
+            t for t in tickers
+            if t not in _TELEM_CACHE or (time.time() - _TELEM_CACHE[t][0]) >= 120.0
+        ]
+        if missing_telem_tickers:
+            batch_dfs = load_prices_batch(missing_telem_tickers, settings=settings, days=400)
+            now = time.time()
+            for t, df in batch_dfs.items():
+                if df is not None and not df.empty and len(df) >= 15:
+                    telem = compute_stock_daily_telemetry(t, df)
+                    if telem:
+                        _TELEM_CACHE[t] = (now, telem)
+
         for t in tickers:
             try:
                 telem = _get_cached_stock_telemetry(t, settings=settings)

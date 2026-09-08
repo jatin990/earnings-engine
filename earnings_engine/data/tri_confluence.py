@@ -508,7 +508,7 @@ def compute_ticker_tri_confluence(
 
     try:
         t_row = local_conn.execute(
-            "SELECT name, sector, industry, market_cap, current_price FROM tickers WHERE ticker = ? OR ticker = ?",
+            "SELECT name, sector, industry, market_cap FROM tickers WHERE ticker = ? OR ticker = ?",
             (target_sym, clean_sym),
         ).fetchone()
         if t_row:
@@ -517,8 +517,6 @@ def compute_ticker_tri_confluence(
             industry = t_row[2] or industry
             if t_row[3] and float(t_row[3]) > 0:
                 mcap_cr = round(float(t_row[3]) / 1e7, 1)
-            if t_row[4] and float(t_row[4]) > 0:
-                curr_price = float(t_row[4])
     except Exception as e:
         logger.debug("Ticker info fetch notice: %s", e)
 
@@ -591,6 +589,8 @@ def compute_ticker_tri_confluence(
 
     price_map: dict[str, float] = {r[0][:10]: float(r[1]) for r in price_rows if r[0] and r[1]}
     sorted_dates = sorted(price_map.keys())
+    if sorted_dates:
+        curr_price = round(price_map[sorted_dates[-1]], 2)
 
     # Build quarterly structured timeline
     quarter_dict: dict[str, dict[str, Any]] = {}

@@ -993,7 +993,7 @@ def backtest_strategy_history(
     if not tickers:
         try:
             with _connect(settings) as conn:
-                db_tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM price_history").fetchall() if r[0]]
+                db_tickers = [r[0] for r in conn.execute("SELECT ticker FROM tickers WHERE ticker IS NOT NULL").fetchall() if r[0]]
                 if db_tickers:
                     tickers = db_tickers
         except Exception:
