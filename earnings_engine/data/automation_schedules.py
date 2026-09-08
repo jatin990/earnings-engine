@@ -211,7 +211,7 @@ _SCHEDULES_SEEDED = False
 
 
 def init_automation_schedules(settings: Settings | None = None, force: bool = False) -> None:
-    """Ensure all default background schedules are seeded in the database."""
+    """Ensure all default background schedules are seeded in the database with minimal roundtrips."""
     global _SCHEDULES_SEEDED
     if _SCHEDULES_SEEDED and not force:
         return
@@ -223,21 +223,23 @@ def init_automation_schedules(settings: Settings | None = None, force: bool = Fa
         now_dt = datetime.now(timezone.utc)
         now_iso = now_dt.isoformat()
 
-        for s in DEFAULT_SCHEDULES:
-            next_iso = (now_dt + timedelta(seconds=s["interval_seconds"])).isoformat()
-            run_after = int(s.get("run_after_hours", 0))
-            session = s.get("market_session", "market_hours_only")
-            is_en = int(s.get("is_enabled", 1))
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO automation_schedules (
-                    job_id, job_name, category, interval_seconds,
-                    last_run_at, next_run_at, status, last_duration_s,
-                    total_runs, last_summary, error_message, updated_at,
-                    is_enabled, params_json, run_after_hours, market_session
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
+        # 1. Check existing schedules in a single query
+        try:
+            existing_rows = conn.execute("SELECT job_id, params_json FROM automation_schedules").fetchall()
+            existing_ids = {r[0] if isinstance(r, (tuple, list)) else r["job_id"] for r in existing_rows}
+        except Exception:
+            existing_ids = set()
+
+        # 2. Batch insert missing default schedules in a single executemany call
+        missing_schedules = [s for s in DEFAULT_SCHEDULES if s["job_id"] not in existing_ids]
+        if missing_schedules:
+            insert_tuples = []
+            for s in missing_schedules:
+                next_iso = (now_dt + timedelta(seconds=s["interval_seconds"])).isoformat()
+                run_after = int(s.get("run_after_hours", 0))
+                session = s.get("market_session", "market_hours_only")
+                is_en = int(s.get("is_enabled", 1))
+                insert_tuples.append((
                     s["job_id"],
                     s["job_name"],
                     s["category"],
@@ -254,60 +256,56 @@ def init_automation_schedules(settings: Settings | None = None, force: bool = Fa
                     s.get("params_json"),
                     run_after,
                     session,
-                ),
-            )
-            # If params_json is null on existing row, update it
-            if s.get("params_json"):
-                conn.execute(
-                    """
-                    UPDATE automation_schedules
-                    SET params_json = ?
-                    WHERE job_id = ? AND (params_json IS NULL OR params_json = '')
-                    """,
-                    (s["params_json"], s["job_id"]),
-                )
-            conn.execute(
+                ))
+            conn.executemany(
                 """
-                UPDATE automation_schedules
-                SET run_after_hours = ?,
-                    market_session = ?
-                WHERE job_id = ?
+                INSERT OR IGNORE INTO automation_schedules (
+                    job_id, job_name, category, interval_seconds,
+                    last_run_at, next_run_at, status, last_duration_s,
+                    total_runs, last_summary, error_message, updated_at,
+                    is_enabled, params_json, run_after_hours, market_session
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (run_after, session, s["job_id"]),
+                insert_tuples,
             )
-            # If job is disabled in code defaults (e.g. redundant individual sweeps or kronos), ensure is_enabled is synced
-            if is_en == 0:
-                conn.execute(
-                    """
-                    UPDATE automation_schedules
-                    SET is_enabled = 0,
-                        status = 'paused'
-                    WHERE job_id = ?
-                    """,
-                    (s["job_id"],),
-                )
 
-        # 1. Reset any stuck 'running' status back to 'active' on server startup
+        # 3. Reset any stuck 'running' status back to 'active' on server startup (single query)
         conn.execute("UPDATE automation_schedules SET status = 'active' WHERE status = 'running'")
 
-        # 2. Reset overdue next_run_at timestamps so jobs don't storm-fire concurrently on startup
-        overdue_rows = conn.execute("SELECT job_id, interval_seconds, next_run_at FROM automation_schedules WHERE is_enabled = 1").fetchall()
-        stagger_offset = 60
-        for r_job, r_int, r_next in overdue_rows:
-            is_overdue = False
-            if not r_next:
-                is_overdue = True
-            else:
-                try:
-                    dt = datetime.fromisoformat(r_next.replace("Z", "+00:00"))
-                    if dt < now_dt:
-                        is_overdue = True
-                except Exception:
+        # 4. Batch update overdue next_run_at timestamps in memory and execute single batch
+        try:
+            overdue_rows = conn.execute(
+                "SELECT job_id, interval_seconds, next_run_at FROM automation_schedules WHERE is_enabled = 1"
+            ).fetchall()
+            stagger_offset = 60
+            overdue_updates = []
+            for r in overdue_rows:
+                r_job = r[0] if isinstance(r, (tuple, list)) else r["job_id"]
+                r_int = r[1] if isinstance(r, (tuple, list)) else r["interval_seconds"]
+                r_next = r[2] if isinstance(r, (tuple, list)) else r["next_run_at"]
+
+                is_overdue = False
+                if not r_next:
                     is_overdue = True
-            if is_overdue:
-                fut_iso = (now_dt + timedelta(seconds=max(int(r_int or 600), stagger_offset))).isoformat()
-                conn.execute("UPDATE automation_schedules SET next_run_at = ?, updated_at = ? WHERE job_id = ?", (fut_iso, now_iso, r_job))
-                stagger_offset += 60
+                else:
+                    try:
+                        dt = datetime.fromisoformat(str(r_next).replace("Z", "+00:00"))
+                        if dt < now_dt:
+                            is_overdue = True
+                    except Exception:
+                        is_overdue = True
+                if is_overdue:
+                    fut_iso = (now_dt + timedelta(seconds=max(int(r_int or 600), stagger_offset))).isoformat()
+                    overdue_updates.append((fut_iso, now_iso, r_job))
+                    stagger_offset += 60
+
+            if overdue_updates:
+                conn.executemany(
+                    "UPDATE automation_schedules SET next_run_at = ?, updated_at = ? WHERE job_id = ?",
+                    overdue_updates,
+                )
+        except Exception as e:
+            logger.debug("[SCHEDULES] Overdue reset error: %s", e)
 
         if hasattr(conn, "commit"):
             conn.commit()
@@ -666,7 +664,8 @@ def set_schedule_status(job_id: str, status: str, settings: Settings | None = No
 def get_all_schedules(settings: Settings | None = None) -> list[dict[str, Any]]:
     """Retrieve all automation schedule states with dynamic countdown seconds."""
     settings = settings or Settings()
-    init_automation_schedules(settings)
+    if not _SCHEDULES_SEEDED:
+        init_automation_schedules(settings)
     schedules: list[dict[str, Any]] = []
 
     try:
@@ -703,7 +702,7 @@ def get_all_schedules(settings: Settings | None = None) -> list[dict[str, Any]]:
             is_active = d.get("status") in ("active", "running")
             if d.get("next_run_at") and is_active:
                 try:
-                    next_dt = datetime.fromisoformat(d["next_run_at"].replace("Z", "+00:00"))
+                    next_dt = datetime.fromisoformat(str(d["next_run_at"]).replace("Z", "+00:00"))
                     secs_until = max(0, int((next_dt - now_dt).total_seconds()))
                 except Exception:
                     secs_until = d.get("interval_seconds", 60)

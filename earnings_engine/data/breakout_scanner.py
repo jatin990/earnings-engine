@@ -591,6 +591,20 @@ def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
         except Exception:
             _pool["last_scan_at"] = datetime.now(timezone.utc).isoformat()
         logger.info("[BREAKOUT-DB] Loaded %d hot and %d warm candidates from database.", hot_count, warm_count)
+
+        # Trigger background live quote sync for all hot and active setups so prices & dates are fresh
+        import threading
+        def _sync_hot_pool_quotes():
+            try:
+                hot_tickers = list({k.split("::")[0] for k in _pool.get("hot", {}).keys() if k})
+                if hot_tickers:
+                    from earnings_engine.data.prices import fetch_batch_live_quotes
+                    fetch_batch_live_quotes(hot_tickers, settings=settings, sync_db=True, max_workers=8)
+                    logger.debug("[BREAKOUT-DB] Auto-synced live prices for %d hot setups.", len(hot_tickers))
+            except Exception as e:
+                logger.debug("[BREAKOUT-DB] Background quote sync notice: %s", e)
+        threading.Thread(target=_sync_hot_pool_quotes, daemon=True, name="breakout_hot_quote_sync").start()
+
         try:
             from earnings_engine.api.routers.system import set_badge_counter
             unique_hot_tickers = len({k.split("::")[0] for k in _pool.get("hot", {}).keys()})
@@ -3045,6 +3059,17 @@ def run_multi_strategy_parallel_scan(
     _rebuild_candidates()
     save_breakout_pool_to_db(settings)
 
+    # Batch-fetch and sync latest quotes for all discovered setups & hot stocks
+    try:
+        cand_tickers = list({res.get("ticker") for _, strat_cands, _ in parallel_outputs for res in strat_cands if res.get("ticker")})
+        hot_tickers = list({k.split("::")[0] for k in _pool.get("hot", {}).keys() if k})
+        all_sync_tickers = list(dict.fromkeys(hot_tickers + cand_tickers))[:80]
+        if all_sync_tickers:
+            from earnings_engine.data.prices import fetch_batch_live_quotes
+            fetch_batch_live_quotes(all_sync_tickers, settings=settings, sync_db=True, max_workers=10)
+    except Exception as sync_err:
+        logger.debug("[BREAKOUT-PARALLEL] Auto-quote sync notice: %s", sync_err)
+
     elapsed = round(time.perf_counter() - t0, 2)
     now_iso = datetime.now(timezone.utc).isoformat()
     _pool.update({
@@ -3150,6 +3175,17 @@ def run_cold_scan(
 
     _rebuild_candidates()
     save_breakout_pool_to_db(settings)
+
+    # Batch-fetch and sync latest quotes for all discovered setups & hot stocks
+    try:
+        disc_tickers = [t for t, r in scored if r is not None and (r.get("composite_score") or 0) >= (min_score or 30.0)]
+        hot_tickers = list({k.split("::")[0] for k in _pool.get("hot", {}).keys() if k})
+        all_sync_tickers = list(dict.fromkeys(hot_tickers + disc_tickers))[:60]
+        if all_sync_tickers:
+            from earnings_engine.data.prices import fetch_batch_live_quotes
+            fetch_batch_live_quotes(all_sync_tickers, settings=settings, sync_db=True, max_workers=10)
+    except Exception as sync_err:
+        logger.debug("[BREAKOUT-COLD] Auto-quote sync notice: %s", sync_err)
 
     elapsed = round(time.perf_counter() - t0, 2)
     now_iso = datetime.now(timezone.utc).isoformat()

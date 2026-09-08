@@ -29,23 +29,44 @@ logger = logging.getLogger("earnings_engine.data.names")
 
 # In-process guard so we only hit nsetools once per process (it is slow / network).
 _seeded: bool = False
+_migrations_applied: bool = False
+_NAME_CACHE: dict[str, str] = {}
 
 
 def _connect(settings: Settings) -> Any:
+    global _migrations_applied
     settings.ensure_dirs()
-    from earnings_engine.data.migrations import apply_migrations
-    apply_migrations(settings)
+    if not _migrations_applied:
+        try:
+            from earnings_engine.data.migrations import apply_migrations
+            apply_migrations(settings)
+            _migrations_applied = True
+        except Exception as e:
+            logger.debug("names: apply_migrations skipped/warning: %s", e)
     return get_db_connection(settings)
 
 
 def get_name(ticker: str, settings: Settings | None = None) -> str | None:
     """Return the stored display name for a ticker, or None."""
+    if not ticker:
+        return None
+    clean_sym = ticker.strip().upper()
+    if clean_sym in _NAME_CACHE:
+        return _NAME_CACHE[clean_sym]
+
     settings = settings or Settings()
-    with _connect(settings) as conn:
-        row = conn.execute(
-            "SELECT name FROM tickers WHERE ticker = ?", (ticker.strip().upper(),)
-        ).fetchone()
-    return row[0] if row else None
+    try:
+        with _connect(settings) as conn:
+            row = conn.execute(
+                "SELECT name FROM tickers WHERE ticker = ?", (clean_sym,)
+            ).fetchone()
+        name = row[0] if row and row[0] else None
+        if name:
+            _NAME_CACHE[clean_sym] = name
+        return name
+    except Exception as e:
+        logger.debug("get_name failed for %s: %s", clean_sym, e)
+        return None
 
 
 def store_name(
@@ -60,6 +81,7 @@ def store_name(
     name = (name or "").strip()
     if not ticker or not name:
         return None
+    _NAME_CACHE[ticker] = name
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         with _connect(settings) as conn:

@@ -71,9 +71,9 @@
             if (app._breakoutFilterBreakingOut) {
                 list = list.filter(app.isItemBreaking);
                 if (fireCard) {
-                    fireCard.style.outline = '2px solid #f97316';
-                    fireCard.style.boxShadow = '0 0 20px rgba(249,115,22,0.5)';
-                    fireCard.style.background = '#1e1610';
+                    fireCard.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+                    fireCard.style.boxShadow = 'none';
+                    fireCard.style.background = '#18181b';
                 }
                 if (totalCard) {
                     totalCard.style.opacity = '0.75';
@@ -86,18 +86,18 @@
                 }
                 if (activeNotice) {
                     activeNotice.style.display = 'inline-flex';
-                    activeNotice.innerHTML = `🔥 Filtering: <strong>Breaking Out Only (${list.length} setup${list.length === 1 ? '' : 's'})</strong> <button type="button" onclick="app.clearBreakoutFilter(); event.stopPropagation();" style="margin-left:0.45rem;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fdba74;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕ Show All (${app._breakoutData.length})</button>`;
+                    activeNotice.innerHTML = `<span>⚡</span> Filtering: <strong>Breaking Out Only (${list.length} setup${list.length === 1 ? '' : 's'})</strong> <button type="button" onclick="app.clearBreakoutFilter(); event.stopPropagation();" style="margin-left:0.45rem;background:#18181b;border:1px solid rgba(255,255,255,0.25);color:#f4f4f5;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕ Show All (${app._breakoutData.length})</button>`;
                 }
             } else if (app._breakoutRealTrackedOnly) {
                 if (activeNotice) {
                     activeNotice.style.display = 'inline-flex';
-                    activeNotice.innerHTML = `🟢 Filtering: <strong>Real Tracked Entries Only (${list.length} setup${list.length === 1 ? '' : 's'})</strong> <button type="button" onclick="app.clearBreakoutRealTrackedFilter(); event.stopPropagation();" style="margin-left:0.45rem;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#34d399;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕ Show All (${app._breakoutData.length})</button>`;
+                    activeNotice.innerHTML = `<span>🟢</span> Filtering: <strong>Real Tracked Entries Only (${list.length} setup${list.length === 1 ? '' : 's'})</strong> <button type="button" onclick="app.clearBreakoutRealTrackedFilter(); event.stopPropagation();" style="margin-left:0.45rem;background:#18181b;border:1px solid rgba(255,255,255,0.25);color:#f4f4f5;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕ Show All (${app._breakoutData.length})</button>`;
                 }
             } else {
                 if (fireCard) {
-                    fireCard.style.outline = '';
-                    fireCard.style.boxShadow = '';
-                    fireCard.style.background = '#0f172a';
+                    fireCard.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+                    fireCard.style.boxShadow = 'none';
+                    fireCard.style.background = '#090d16';
                 }
                 if (totalCard) {
                     totalCard.style.opacity = '1';
@@ -466,25 +466,25 @@
                 : `${Math.round(app.breakoutLiveIntervalMs / 1000)}s`;
 
             if (app.breakoutLiveTracking) {
-                btn.style.background = 'rgba(16, 185, 129, 0.2)';
+                btn.style.background = '#18181b';
                 btn.style.color = '#34d399';
-                btn.style.borderColor = 'rgba(16, 185, 129, 0.5)';
+                btn.style.borderColor = 'rgba(52, 211, 153, 0.4)';
                 text.textContent = `🟢 Live (${intLabel})`;
                 ind.style.background = '#34d399';
-                ind.style.boxShadow = '0 0 6px #34d399';
+                ind.style.boxShadow = 'none';
             } else {
-                btn.style.background = 'rgba(239, 68, 68, 0.12)';
-                btn.style.color = '#f87171';
-                btn.style.borderColor = 'rgba(239, 68, 68, 0.35)';
-                text.textContent = '🔴 Track Live Prices';
-                ind.style.background = '#f87171';
+                btn.style.background = '#18181b';
+                btn.style.color = '#a1a1aa';
+                btn.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+                text.textContent = '⏱️ Track Live Prices';
+                ind.style.background = '#71717a';
                 ind.style.boxShadow = 'none';
             }
         };
 
-        app._breakoutStrategy = 'CLASSIC_TECHNICAL';
+        app._breakoutStrategy = 'ALL';
         app.onBreakoutStrategyChange = function(strategy) {
-            app._breakoutStrategy = strategy || 'CLASSIC_TECHNICAL';
+            app._breakoutStrategy = strategy || 'ALL';
             app.loadBreakoutRadar();
         };
 
@@ -501,8 +501,8 @@
             const tbody = document.getElementById('breakoutTableBody');
             if (badge && !silent) badge.style.display = 'inline-block';
 
-            const universe = document.getElementById('breakoutUniverseSelect')?.value || 'all';
-            const strategy = document.getElementById('breakoutStrategySelect')?.value || app._breakoutStrategy || 'CLASSIC_TECHNICAL';
+            const universe = document.getElementById('breakoutUniverseSelect')?.value || 'nse_large_cap';
+            const strategy = document.getElementById('breakoutStrategySelect')?.value || app._breakoutStrategy || 'ALL';
             const sortBy = document.getElementById('breakoutSortBy')?.value || 'composite_score';
             const minScore = document.getElementById('breakoutMinScore')?.value || 35;
             const asofDate = app._breakoutAsofDate || document.getElementById('breakoutDateInput')?.value || null;

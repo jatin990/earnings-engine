@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import math
 import os
 import sqlite3
 import shutil
@@ -91,6 +92,8 @@ def _serialize_arg(val: Any) -> dict[str, Any]:
     if isinstance(val, int):
         return {"type": "integer", "value": str(val)}
     if isinstance(val, float):
+        if math.isnan(val) or math.isinf(val):
+            return {"type": "null"}
         return {"type": "float", "value": val}
     if isinstance(val, bytes):
         return {"type": "blob", "base64": base64.b64encode(val).decode("ascii")}
@@ -338,12 +341,32 @@ class TursoConnectionCursor:
         self._conn = connection
         self._cursor: TursoCursor | None = None
 
+    @property
+    def description(self) -> tuple[Any, ...] | None:
+        return self._cursor.description if self._cursor is not None else None
+
+    @property
+    def rowcount(self) -> int:
+        return self._cursor.rowcount if self._cursor is not None else -1
+
+    @property
+    def lastrowid(self) -> int | None:
+        return self._cursor.lastrowid if self._cursor is not None else None
+
+    @property
+    def connection(self) -> TursoConnection:
+        return self._conn
+
     def execute(self, sql: str, parameters: Sequence[Any] | None = None) -> TursoConnectionCursor:
         self._cursor = self._conn.execute(sql, parameters)
         return self
 
     def executemany(self, sql: str, seq_of_parameters: Sequence[Sequence[Any]]) -> TursoConnectionCursor:
         self._cursor = self._conn.executemany(sql, seq_of_parameters)
+        return self
+
+    def executescript(self, sql_script: str) -> TursoConnectionCursor:
+        self._conn.executescript(sql_script)
         return self
 
     def fetchone(self) -> Any | None:
@@ -365,6 +388,12 @@ class TursoConnectionCursor:
         if self._cursor is not None:
             yield from self._cursor
 
+    def __enter__(self) -> TursoConnectionCursor:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        pass
+
     def close(self) -> None:
         pass
 
@@ -380,6 +409,7 @@ def is_server_environment() -> bool:
     """Return True if running in a serverless, cloud, or production deployment."""
     return bool(
         os.getenv("VERCEL") == "1"
+        or os.getenv("SERVERLESS") == "1"
         or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
         or os.getenv("K_SERVICE")
         or os.getenv("ENV", "").lower() in ("production", "prod", "staging")

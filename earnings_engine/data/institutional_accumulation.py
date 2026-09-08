@@ -18,7 +18,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from earnings_engine.config import Settings
-from earnings_engine.data.db import get_db_connection
+from earnings_engine.data.db import get_db_connection, is_server_environment
+from earnings_engine.data.names import _NAME_CACHE, get_name
 
 logger = logging.getLogger(__name__)
 
@@ -112,16 +113,6 @@ CORE_BENCHMARK_UNIVERSE: list[str] = [
 ]
 
 
-def init_institutional_db(settings: Settings | None = None) -> None:
-    """Ensure institutional database tables and schema migrations are applied."""
-    settings = settings or Settings()
-    try:
-        from earnings_engine.data.migrations import apply_migrations
-        apply_migrations(settings)
-    except Exception as e:
-        logger.debug("[INSTITUTIONAL] DB init migrations warning: %s", e)
-
-
 def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]:
     """Retrieve live corporate ownership breakdown from yfinance and local SQLite cache."""
     promoter_pct: float | None = None
@@ -142,9 +133,9 @@ def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]
         except Exception:
             pass
 
-    # 2. Try yfinance if missing market cap or promoter data and not in testing environment
-    import os
-    if not os.environ.get("PYTEST_CURRENT_TEST") and (mcap_cr is None or mcap_cr <= 0):
+    # 2. Try yfinance if missing market cap or promoter data, not in testing, and not in serverless environment
+    is_serverless = is_server_environment() or os.environ.get("VERCEL") == "1" or os.environ.get("SERVERLESS") == "1"
+    if not os.environ.get("PYTEST_CURRENT_TEST") and not is_serverless and (mcap_cr is None or mcap_cr <= 0):
         try:
             from earnings_engine.rate_limits import record_request
             try:
@@ -216,22 +207,24 @@ def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None
             ).fetchall()
 
         if not rows or len(rows) < 2:
-            # Fallback: try on-demand fetch_prices for missing symbols (e.g. REITs like MINDSPACE.NS)
-            try:
-                from earnings_engine.data.prices import fetch_prices
-                df = fetch_prices(target_sym, force=False)
-                if df is not None and not df.empty and "close" in df.columns:
-                    rows = conn.execute(
-                        "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
-                        (target_sym,),
-                    ).fetchall()
-                    if not rows and target_sym.endswith(".NS"):
+            # Fallback: try on-demand fetch_prices for missing symbols (skip in serverless to prevent blocking timeouts)
+            is_serverless = is_server_environment() or os.environ.get("VERCEL") == "1" or os.environ.get("SERVERLESS") == "1"
+            if not is_serverless:
+                try:
+                    from earnings_engine.data.prices import fetch_prices
+                    df = fetch_prices(target_sym, force=False)
+                    if df is not None and not df.empty and "close" in df.columns:
                         rows = conn.execute(
                             "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
-                            (target_sym.replace(".NS", ""),),
+                            (target_sym,),
                         ).fetchall()
-            except Exception as e:
-                logger.debug("Failed on-demand fetch_prices in _get_ticker_returns for %s: %s", target_sym, e)
+                        if not rows and target_sym.endswith(".NS"):
+                            rows = conn.execute(
+                                "SELECT date, close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 260",
+                                (target_sym.replace(".NS", ""),),
+                            ).fetchall()
+                except Exception as e:
+                    logger.debug("Failed on-demand fetch_prices in _get_ticker_returns for %s: %s", target_sym, e)
 
         if not rows or len(rows) < 2:
             _TICKER_RETURNS_MEMO[target_sym] = (now + 600.0, (None, None, None))
@@ -468,17 +461,22 @@ def init_institutional_db(settings: Settings | None = None, force_refresh: bool 
         max_cached_delta = conn.execute("SELECT MAX(inst_addition_pct) FROM institutional_accumulation_cache").fetchone()[0] or 0.0
         
         is_test = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+        is_serverless = is_server_environment() or os.environ.get("VERCEL") == "1" or os.environ.get("SERVERLESS") == "1"
         should_seed = False
         if not is_test:
-            should_seed = (
-                force_refresh
-                or old_check > 0
-                or count < len(CORE_BENCHMARK_UNIVERSE)
-                or missing_txn_date > 0
-                or invalid_sums > 0
-                or bd_check == 0
-                or max_cached_delta < 2.0
-            )
+            if is_serverless:
+                # In serverless runtime, only seed if table is completely empty or explicitly forced
+                should_seed = force_refresh or (count == 0 and old_check == 0)
+            else:
+                should_seed = (
+                    force_refresh
+                    or old_check > 0
+                    or count < len(CORE_BENCHMARK_UNIVERSE)
+                    or missing_txn_date > 0
+                    or invalid_sums > 0
+                    or bd_check == 0
+                    or max_cached_delta < 2.0
+                )
         else:
             should_seed = force_refresh or (count == 0 and old_check == 0 and missing_txn_date == 0)
 
@@ -511,10 +509,14 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
         from collections import defaultdict
         from earnings_engine.data.names import get_name
 
-        # 1. Load names and market caps
-        names_map = {}
+        # 1. Load names and market caps into in-memory dictionary
+        names_map: dict[str, tuple[str | None, Any]] = {}
         for r in conn.execute("SELECT ticker, name, market_cap FROM tickers").fetchall():
-            names_map[r[0]] = (r[1], r[2])
+            if r[0]:
+                tk = str(r[0]).strip().upper()
+                names_map[tk] = (r[1], r[2])
+                if tk.endswith(".NS") or tk.endswith(".BO"):
+                    names_map[tk[:-3]] = (r[1], r[2])
 
         # 2. Load holdings
         holdings_by_ticker = defaultdict(list)
@@ -727,8 +729,8 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
                 })
 
             # Market cap and names
-            raw_info = names_map.get(sym) or (None, None)
-            cname = raw_info[0] or get_name(sym) or sym.replace(".NS", "").replace(".BO", "")
+            raw_info = names_map.get(sym.upper()) or names_map.get(sym.upper().replace(".NS", "").replace(".BO", "")) or (None, None)
+            cname = raw_info[0] or _NAME_CACHE.get(sym.upper()) or sym.replace(".NS", "").replace(".BO", "")
             mcap_val = raw_info[1]
             mcap_cr = round(float(mcap_val) / 1e7, 1) if mcap_val and float(mcap_val) > 0 else None
 
@@ -1261,8 +1263,15 @@ def get_stock_institutional_activity(
         ret_7d, ret_30d, ret_1y = _get_ticker_returns(sym, conn)
 
         # Company name lookup — resolve real name from local database, never return raw ticker
-        from earnings_engine.data.names import get_name
-        raw_name = get_name(sym)
+        raw_name = _NAME_CACHE.get(sym)
+        if not raw_name:
+            try:
+                row_n = conn.execute("SELECT name FROM tickers WHERE ticker = ?", (sym,)).fetchone()
+                if row_n and row_n[0]:
+                    raw_name = row_n[0]
+                    _NAME_CACHE[sym] = raw_name
+            except Exception:
+                pass
         if raw_name and raw_name != sym and not raw_name.endswith(".NS") and not raw_name.endswith(".BO"):
             company_name = raw_name
         else:
