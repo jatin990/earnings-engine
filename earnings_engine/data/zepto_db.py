@@ -23,6 +23,27 @@ logger = logging.getLogger(__name__)
 ZEPTO_TOTAL_SECURITY_TARGET = 7500000.0  # ₹75 Lakhs total franchise deposit
 PARTNER_EQUITY_SHARE = 0.50             # 50% equity share each (₹37.5L)
 
+def _get_table_columns(conn: Any, table_name: str) -> set[str]:
+    """Safely inspect existing column names for a table using PRAGMA table_info."""
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        cols = set()
+        for r in rows:
+            if hasattr(r, "get"):
+                c = r.get("name")
+            elif isinstance(r, (tuple, list)) and len(r) > 1:
+                c = r[1]
+            elif hasattr(r, "keys") and "name" in r.keys():
+                c = r["name"]
+            else:
+                c = None
+            if c:
+                cols.add(c)
+        return cols
+    except Exception:
+        return set()
+
+
 # ===========================================================================
 # Centralized Partners Configuration (Single Source of Truth)
 # ===========================================================================
@@ -233,20 +254,29 @@ def ensure_zepto_schema(settings: Settings | None = None) -> None:
         """)
 
         # Migration: Ensure performance_rating column exists on zepto_salaries
-        sal_cols = [c[1] for c in conn.execute("PRAGMA table_info(zepto_salaries)").fetchall()]
-        if "performance_rating" not in sal_cols:
-            conn.execute("ALTER TABLE zepto_salaries ADD COLUMN performance_rating REAL DEFAULT 5.0")
+        sal_cols = _get_table_columns(conn, "zepto_salaries")
+        if not sal_cols or "performance_rating" not in sal_cols:
+            try:
+                conn.execute("ALTER TABLE zepto_salaries ADD COLUMN performance_rating REAL DEFAULT 5.0")
+            except Exception:
+                pass
 
         # Migration: Ensure default_base_salary column exists on zepto_staffing_targets
-        cols = [c[1] for c in conn.execute("PRAGMA table_info(zepto_staffing_targets)").fetchall()]
-        if "default_base_salary" not in cols:
-            conn.execute("ALTER TABLE zepto_staffing_targets ADD COLUMN default_base_salary REAL DEFAULT 0.0")
+        cols = _get_table_columns(conn, "zepto_staffing_targets")
+        if not cols or "default_base_salary" not in cols:
+            try:
+                conn.execute("ALTER TABLE zepto_staffing_targets ADD COLUMN default_base_salary REAL DEFAULT 0.0")
+            except Exception:
+                pass
 
         # Migration: Ensure is_reimbursable column exists on zepto_expenses
-        exp_cols = [c[1] for c in conn.execute("PRAGMA table_info(zepto_expenses)").fetchall()]
-        if "is_reimbursable" not in exp_cols:
-            conn.execute("ALTER TABLE zepto_expenses ADD COLUMN is_reimbursable INTEGER DEFAULT 1")
-            conn.execute("UPDATE zepto_expenses SET is_reimbursable = 0, is_reimbursed = 1 WHERE incurred_by = 'STORE_CASH'")
+        exp_cols = _get_table_columns(conn, "zepto_expenses")
+        if not exp_cols or "is_reimbursable" not in exp_cols:
+            try:
+                conn.execute("ALTER TABLE zepto_expenses ADD COLUMN is_reimbursable INTEGER DEFAULT 1")
+                conn.execute("UPDATE zepto_expenses SET is_reimbursable = 0, is_reimbursed = 1 WHERE incurred_by = 'STORE_CASH'")
+            except Exception:
+                pass
 
         # Ensure default income split settings exist
         now_iso = datetime.now(timezone.utc).isoformat()

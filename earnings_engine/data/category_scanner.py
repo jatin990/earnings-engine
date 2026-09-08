@@ -184,7 +184,23 @@ def _connect_scanner_db(settings: Settings) -> sqlite3.Connection:
         """
     )
     # Self-healing column additions for existing tables
-    existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(scanner_candidates)").fetchall()}
+    existing_cols = set()
+    try:
+        rows = conn.execute("PRAGMA table_info(scanner_candidates)").fetchall()
+        for r in rows:
+            if hasattr(r, "get"):
+                c = r.get("name")
+            elif isinstance(r, (tuple, list)) and len(r) > 1:
+                c = r[1]
+            elif hasattr(r, "keys") and "name" in r.keys():
+                c = r["name"]
+            else:
+                c = None
+            if c:
+                existing_cols.add(c)
+    except Exception:
+        pass
+
     col_defs = {
         "signal_date": "TEXT",
         "signal_price": "REAL",
@@ -196,7 +212,7 @@ def _connect_scanner_db(settings: Settings) -> sqlite3.Connection:
         "outcome_badge": "TEXT",
     }
     for col, col_type in col_defs.items():
-        if col not in existing_cols:
+        if not existing_cols or col not in existing_cols:
             try:
                 conn.execute(f"ALTER TABLE scanner_candidates ADD COLUMN {col} {col_type}")
             except Exception:

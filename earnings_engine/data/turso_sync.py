@@ -75,6 +75,11 @@ def _get_table_columns_info(conn: Any, table_name: str) -> dict[str, str]:
                 col_type = r[2] or "TEXT"
                 if col_name:
                     cols[col_name] = col_type
+            elif hasattr(r, "keys") and "name" in r.keys():
+                col_name = r["name"]
+                col_type = r["type"] if "type" in r.keys() else "TEXT"
+                if col_name:
+                    cols[col_name] = col_type or "TEXT"
         return cols
     except Exception as e:
         logger.debug("[TURSO-SYNC] Failed to get schema info for %s: %s", table_name, e)

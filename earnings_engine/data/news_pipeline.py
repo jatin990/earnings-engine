@@ -26,8 +26,22 @@ def ensure_news_verification_schema(settings: Settings | None = None) -> None:
     settings = settings or Settings()
     with _connect(settings) as conn:
         # Check existing columns
-        existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(news_catalysts)").fetchall()}
-        
+        existing_cols = set()
+        try:
+            for r in conn.execute("PRAGMA table_info(news_catalysts)").fetchall():
+                if hasattr(r, "get"):
+                    c = r.get("name")
+                elif isinstance(r, (tuple, list)) and len(r) > 1:
+                    c = r[1]
+                elif hasattr(r, "keys") and "name" in r.keys():
+                    c = r["name"]
+                else:
+                    c = None
+                if c:
+                    existing_cols.add(c)
+        except Exception:
+            pass
+
         new_columns = [
             ("verification_status", "TEXT DEFAULT 'VERIFIED'"),
             ("verification_flags", "TEXT DEFAULT '[]'"),
@@ -54,7 +68,7 @@ def ensure_news_verification_schema(settings: Settings | None = None) -> None:
         ]
 
         for col_name, col_type in new_columns:
-            if col_name not in existing_cols:
+            if not existing_cols or col_name not in existing_cols:
                 try:
                     conn.execute(f"ALTER TABLE news_catalysts ADD COLUMN {col_name} {col_type}")
                     logger.info("[NEWS-PIPELINE] Added column %s to news_catalysts", col_name)

@@ -33,9 +33,17 @@ def _connect(settings: Settings) -> Any:
     needs_migration = False
     try:
         schema = connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='earnings_history'").fetchone()
-        if schema and "source TEXT DEFAULT 'yfinance'" in schema[0] and "PRIMARY KEY (ticker, earnings_date)" in schema[0]:
+        sql_text = ""
+        if schema is not None:
+            if hasattr(schema, "get"):
+                sql_text = schema.get("sql") or ""
+            elif isinstance(schema, (tuple, list)) and len(schema) > 0:
+                sql_text = schema[0] or ""
+            elif hasattr(schema, "keys") and "sql" in schema.keys():
+                sql_text = schema["sql"] or ""
+        if sql_text and "source TEXT DEFAULT 'yfinance'" in sql_text and "PRIMARY KEY (ticker, earnings_date)" in sql_text:
             needs_migration = True
-    except sqlite3.OperationalError:
+    except Exception:
         pass
 
     if needs_migration:

@@ -258,7 +258,19 @@ def _connect(settings: Settings) -> Any:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_nct_catalyst_id ON news_catalysts_tickers (catalyst_id)")
 
     try:
-        existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(news_catalysts)").fetchall()}
+        existing_cols = set()
+        for r in conn.execute("PRAGMA table_info(news_catalysts)").fetchall():
+            if hasattr(r, "get"):
+                c = r.get("name")
+            elif isinstance(r, (tuple, list)) and len(r) > 1:
+                c = r[1]
+            elif hasattr(r, "keys") and "name" in r.keys():
+                c = r["name"]
+            else:
+                c = None
+            if c:
+                existing_cols.add(c)
+
         for col_name, col_type in [
             ("verification_status", "TEXT DEFAULT 'VERIFIED'"),
             ("verification_flags", "TEXT DEFAULT '[]'"),
@@ -283,8 +295,11 @@ def _connect(settings: Settings) -> Any:
             ("originality_rationale", "TEXT DEFAULT ''"),
             ("affected_tickers", "TEXT DEFAULT '[]'"),
         ]:
-            if col_name not in existing_cols:
-                conn.execute(f"ALTER TABLE news_catalysts ADD COLUMN {col_name} {col_type}")
+            if not existing_cols or col_name not in existing_cols:
+                try:
+                    conn.execute(f"ALTER TABLE news_catalysts ADD COLUMN {col_name} {col_type}")
+                except Exception:
+                    pass
     except Exception:
         pass
     # Self-healing: Ensure any raw RFC date strings with comma are converted to standard ISO YYYY-MM-DD HH:MM:SS
