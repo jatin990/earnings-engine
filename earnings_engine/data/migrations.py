@@ -21,6 +21,39 @@ class Migration(NamedTuple):
     up: Callable[[Any], None]
 
 
+def _get_table_columns(conn: Any, table_name: str) -> set[str]:
+    """Safely inspect existing column names for a table using PRAGMA table_info."""
+    try:
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        cols = set()
+        for r in rows:
+            if hasattr(r, "get"):
+                c = r.get("name")
+            elif isinstance(r, (tuple, list)) and len(r) > 1:
+                c = r[1]
+            elif hasattr(r, "keys") and "name" in r.keys():
+                c = r["name"]
+            else:
+                c = None
+            if c:
+                cols.add(c)
+        return cols
+    except Exception:
+        return set()
+
+
+def _add_column_if_missing(conn: Any, table_name: str, col_name: str, col_type: str) -> bool:
+    """Idempotently add a column to a table only if it does not already exist."""
+    existing = _get_table_columns(conn, table_name)
+    if not existing or col_name not in existing:
+        try:
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
+            return True
+        except Exception:
+            return False
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Individual Migrations
 # ---------------------------------------------------------------------------
@@ -290,10 +323,7 @@ def _migration_007_consolidate_earnings_and_freshness(conn: Any) -> None:
     """Deduplicate earnings_history to (ticker, earnings_date) and consolidate freshness into tickers."""
     # 1. Add freshness columns to master tickers table
     for col in ("earnings_fetched_at", "prices_fetched_at"):
-        try:
-            conn.execute(f"ALTER TABLE tickers ADD COLUMN {col} TEXT")
-        except Exception:
-            pass
+        _add_column_if_missing(conn, "tickers", col, "TEXT")
 
     # 2. Migrate existing freshness records into tickers
     try:
@@ -551,8 +581,6 @@ def _migration_010_credit_cards_and_otp_requests(conn: Any) -> None:
     """)
     
     # Add new columns if missing
-    existing_cols = {r[1] for r in conn.execute("PRAGMA table_info(credit_cards)").fetchall()}
-    
     new_cols = [
         ("last4", "TEXT DEFAULT '8842'"),
         ("card_holder", "TEXT DEFAULT 'VIP Member'"),
@@ -564,11 +592,7 @@ def _migration_010_credit_cards_and_otp_requests(conn: Any) -> None:
         ("created_at", "TEXT"),
     ]
     for col_name, col_type in new_cols:
-        if col_name not in existing_cols:
-            try:
-                conn.execute(f"ALTER TABLE credit_cards ADD COLUMN {col_name} {col_type}")
-            except Exception:
-                pass
+        _add_column_if_missing(conn, "credit_cards", col_name, col_type)
 
     # 2. OTP Requests Table
     conn.execute("""
@@ -630,7 +654,6 @@ def _migration_011_trips_and_net_worth_expansion(conn: Any) -> None:
     now_str = datetime.now().isoformat(timespec="seconds")
 
     # 1. Enhance trips table
-    existing_trip_cols = {r[1] for r in conn.execute("PRAGMA table_info(trips)").fetchall()}
     new_trip_cols = [
         ("cover_image", "TEXT DEFAULT 'japan'"),
         ("estimated_budget", "REAL DEFAULT 150000.0"),
@@ -640,11 +663,7 @@ def _migration_011_trips_and_net_worth_expansion(conn: Any) -> None:
         ("packing_list", "TEXT"),
     ]
     for col_name, col_type in new_trip_cols:
-        if col_name not in existing_trip_cols:
-            try:
-                conn.execute(f"ALTER TABLE trips ADD COLUMN {col_name} {col_type}")
-            except Exception:
-                pass
+        _add_column_if_missing(conn, "trips", col_name, col_type)
 
     # 2. Trip Activities & Suggestions Table
     conn.execute("""
@@ -806,14 +825,8 @@ def _migration_013_automation_and_institutional(conn: Any) -> None:
             created_at TEXT NOT NULL
         )
     """)
-    try:
-        conn.execute("ALTER TABLE institutional_holdings ADD COLUMN avg_price REAL DEFAULT 0.0")
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE institutional_holdings ADD COLUMN recent_buy_price REAL DEFAULT 0.0")
-    except Exception:
-        pass
+    _add_column_if_missing(conn, "institutional_holdings", "avg_price", "REAL DEFAULT 0.0")
+    _add_column_if_missing(conn, "institutional_holdings", "recent_buy_price", "REAL DEFAULT 0.0")
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_holdings_ticker ON institutional_holdings (ticker)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_holdings_fund ON institutional_holdings (fund_name)")
@@ -863,14 +876,8 @@ def _migration_013_automation_and_institutional(conn: Any) -> None:
 
 def _migration_014_institutional_avg_and_recent_price(conn: Any) -> None:
     """Add avg_price and recent_buy_price columns to institutional_holdings."""
-    try:
-        conn.execute("ALTER TABLE institutional_holdings ADD COLUMN avg_price REAL DEFAULT 0.0")
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE institutional_holdings ADD COLUMN recent_buy_price REAL DEFAULT 0.0")
-    except Exception:
-        pass
+    _add_column_if_missing(conn, "institutional_holdings", "avg_price", "REAL DEFAULT 0.0")
+    _add_column_if_missing(conn, "institutional_holdings", "recent_buy_price", "REAL DEFAULT 0.0")
 
 
 def _migration_015_scanner_candidates_schema(conn: Any) -> None:
@@ -918,10 +925,7 @@ def _migration_015_scanner_candidates_schema(conn: Any) -> None:
         ("outcome_label", "TEXT"),
         ("outcome_badge", "TEXT"),
     ]:
-        try:
-            conn.execute(f"ALTER TABLE scanner_candidates ADD COLUMN {col} {col_type}")
-        except Exception:
-            pass
+        _add_column_if_missing(conn, "scanner_candidates", col, col_type)
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_scanner_univ_cat ON scanner_candidates(universe, category_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_scanner_scanned_at ON scanner_candidates(scanned_at DESC)")
@@ -937,10 +941,7 @@ def _migration_016_automation_schedule_logs_and_flow_controls(conn: Any) -> None
         ("params_json", "TEXT"),
         ("cron_expression", "TEXT"),
     ]:
-        try:
-            conn.execute(f"ALTER TABLE automation_schedules ADD COLUMN {col_def[0]} {col_def[1]}")
-        except Exception:
-            pass
+        _add_column_if_missing(conn, "automation_schedules", col_def[0], col_def[1])
 
     # Create persistent execution logs table
     conn.execute("""
@@ -1040,12 +1041,7 @@ def _migration_018_breakout_tracked_signals(conn: Any) -> None:
             UNIQUE(ticker, signal_date)
         )
     """)
-    try:
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(breakout_tracked_signals)").fetchall()}
-        if "avg_quality_score" not in cols:
-            conn.execute("ALTER TABLE breakout_tracked_signals ADD COLUMN avg_quality_score REAL")
-    except Exception:
-        pass
+    _add_column_if_missing(conn, "breakout_tracked_signals", "avg_quality_score", "REAL")
 
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_bk_tracked_date ON breakout_tracked_signals (signal_date DESC)")
@@ -1092,21 +1088,13 @@ def _migration_019_automation_schedules_market_hours(conn: Any) -> None:
         ("run_after_hours", "INTEGER NOT NULL DEFAULT 1"),
         ("market_session", "TEXT NOT NULL DEFAULT 'all'"),
     ]:
-        try:
-            conn.execute(f"ALTER TABLE automation_schedules ADD COLUMN {col_name} {col_type}")
-        except Exception:
-            pass
+        _add_column_if_missing(conn, "automation_schedules", col_name, col_type)
 
 
 def _migration_020_breakout_strategy_tracking(conn: Any) -> None:
     """Add strategy column to breakout_radar and breakout_tracked_signals and purge test data."""
     for tbl in ["breakout_radar", "breakout_tracked_signals"]:
-        try:
-            cols = {r[1] for r in conn.execute(f"PRAGMA table_info({tbl})").fetchall()}
-            if "strategy" not in cols:
-                conn.execute(f"ALTER TABLE {tbl} ADD COLUMN strategy TEXT NOT NULL DEFAULT 'CLASSIC_TECHNICAL'")
-        except Exception as e:
-            logger.debug("[MIGRATION-020] Add strategy to %s notice: %s", tbl, e)
+        _add_column_if_missing(conn, tbl, "strategy", "TEXT NOT NULL DEFAULT 'CLASSIC_TECHNICAL'")
 
     # Purge any test/dummy/mock records across tables
     for tbl in ["breakout_radar", "breakout_tracked_signals", "breakout_audit_log", "consensus_predictions", "tickers"]:
@@ -1153,10 +1141,7 @@ def _migration_022_institutional_amount_metrics(conn: sqlite3.Connection | Turso
         ("recent_txn_type", "TEXT"),
     ]
     for c_name, c_type in cols:
-        try:
-            conn.execute(f"ALTER TABLE institutional_holdings ADD COLUMN {c_name} {c_type}")
-        except Exception:
-            pass
+        _add_column_if_missing(conn, "institutional_holdings", c_name, c_type)
 
 
 def _migration_023_news_structured_extraction(conn: sqlite3.Connection | TursoConnection) -> None:
@@ -1169,10 +1154,7 @@ def _migration_023_news_structured_extraction(conn: sqlite3.Connection | TursoCo
         ("originality_rationale", "TEXT DEFAULT ''"),
     ]
     for c_name, c_type in cols:
-        try:
-            conn.execute(f"ALTER TABLE news_catalysts ADD COLUMN {c_name} {c_type}")
-        except Exception:
-            pass
+        _add_column_if_missing(conn, "news_catalysts", c_name, c_type)
 
 
 def _migration_024_breakout_audit_counter_and_strategy(conn: sqlite3.Connection | TursoConnection) -> None:
@@ -1183,10 +1165,7 @@ def _migration_024_breakout_audit_counter_and_strategy(conn: sqlite3.Connection 
         ("updated_at", "TEXT"),
     ]
     for c_name, c_type in cols:
-        try:
-            conn.execute(f"ALTER TABLE breakout_audit_log ADD COLUMN {c_name} {c_type}")
-        except Exception:
-            pass
+        _add_column_if_missing(conn, "breakout_audit_log", c_name, c_type)
 
     try:
         conn.execute("UPDATE breakout_audit_log SET strategy = 'Classic Technical' WHERE strategy IS NULL OR strategy = '' OR strategy = 'CLASSIC_TECHNICAL'")
@@ -1346,14 +1325,14 @@ def _migration_028_tri_confluence_metrics_cache(conn: Any) -> None:
 def _migration_029_earnings_fetch_log_schema_alignment(conn: Any) -> None:
     """Align earnings_fetch_log and earnings_month_cache schema with current queries."""
     try:
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(earnings_fetch_log)").fetchall()}
+        cols = _get_table_columns(conn, "earnings_fetch_log")
         if cols and "fetch_date" not in cols:
             conn.execute("DROP TABLE IF EXISTS earnings_fetch_log")
     except Exception:
         pass
 
     try:
-        cols_mc = {r[1] for r in conn.execute("PRAGMA table_info(earnings_month_cache)").fetchall()}
+        cols_mc = _get_table_columns(conn, "earnings_month_cache")
         if cols_mc and "payload_json" not in cols_mc:
             conn.execute("DROP TABLE IF EXISTS earnings_month_cache")
     except Exception:

@@ -51,18 +51,36 @@ def _ensure_table(conn: Any) -> None:
             failure_post_mortem TEXT
         )
     """)
-    # Migrations for existing database instances
-    for col_def in (
-        "timeframe_days INTEGER DEFAULT 14",
-        "system_prompt TEXT",
-        "raw_context_prompt TEXT",
-        "custom_directives TEXT",
+    # Migrations for existing database instances (idempotent pre-flight check)
+    existing_cols = set()
+    try:
+        rows = conn.execute("PRAGMA table_info(consensus_predictions)").fetchall()
+        for r in rows:
+            if hasattr(r, "get"):
+                c = r.get("name")
+            elif isinstance(r, (tuple, list)) and len(r) > 1:
+                c = r[1]
+            elif hasattr(r, "keys") and "name" in r.keys():
+                c = r["name"]
+            else:
+                c = None
+            if c:
+                existing_cols.add(c)
+    except Exception:
+        pass
+
+    for col_name, col_def in (
+        ("timeframe_days", "timeframe_days INTEGER DEFAULT 14"),
+        ("system_prompt", "system_prompt TEXT"),
+        ("raw_context_prompt", "raw_context_prompt TEXT"),
+        ("custom_directives", "custom_directives TEXT"),
     ):
-        try:
-            conn.execute(f"ALTER TABLE consensus_predictions ADD COLUMN {col_def}")
-            conn.commit()
-        except Exception:
-            pass
+        if not existing_cols or col_name not in existing_cols:
+            try:
+                conn.execute(f"ALTER TABLE consensus_predictions ADD COLUMN {col_def}")
+                conn.commit()
+            except Exception:
+                pass
 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_consensus_ticker ON consensus_predictions(ticker)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_consensus_ticker_timeframe ON consensus_predictions(ticker, timeframe_days)")

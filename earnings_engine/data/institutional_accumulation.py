@@ -423,7 +423,24 @@ def init_institutional_db(settings: Settings | None = None, force_refresh: bool 
         apply_migrations(settings)
         conn = get_db_connection(settings)
         
-        # Ensure avg_price, recent_buy_price, and recent_txn columns exist in institutional_holdings
+        # Ensure avg_price, recent_buy_price, and recent_txn columns exist in institutional_holdings (idempotent check)
+        existing_holdings_cols = set()
+        try:
+            rows = conn.execute("PRAGMA table_info(institutional_holdings)").fetchall()
+            for r in rows:
+                if hasattr(r, "get"):
+                    c = r.get("name")
+                elif isinstance(r, (tuple, list)) and len(r) > 1:
+                    c = r[1]
+                elif hasattr(r, "keys") and "name" in r.keys():
+                    c = r["name"]
+                else:
+                    c = None
+                if c:
+                    existing_holdings_cols.add(c)
+        except Exception:
+            pass
+
         for col, ctype in [
             ("avg_price", "REAL DEFAULT 0.0"),
             ("recent_buy_price", "REAL DEFAULT NULL"),
@@ -431,10 +448,11 @@ def init_institutional_db(settings: Settings | None = None, force_refresh: bool 
             ("recent_txn_date", "TEXT DEFAULT NULL"),
             ("recent_txn_type", "TEXT DEFAULT NULL"),
         ]:
-            try:
-                conn.execute(f"ALTER TABLE institutional_holdings ADD COLUMN {col} {ctype}")
-            except Exception:
-                pass
+            if not existing_holdings_cols or col not in existing_holdings_cols:
+                try:
+                    conn.execute(f"ALTER TABLE institutional_holdings ADD COLUMN {col} {ctype}")
+                except Exception:
+                    pass
         
         # Check if table has old 2024/2025 quarters or is empty or missing recent_txn_date or un-normalized shareholding or missing block deals
         old_check = conn.execute("SELECT COUNT(*) FROM shareholding_patterns WHERE quarter LIKE '%FY25%' OR quarter LIKE '%FY24%'").fetchone()[0]

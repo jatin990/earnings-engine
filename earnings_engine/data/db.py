@@ -241,6 +241,9 @@ class TursoConnection:
             err_msg = str(res.get("error", {}).get("message", res))
             if "UNIQUE constraint" in err_msg or "constraint failed" in err_msg.lower():
                 raise sqlite3.IntegrityError(err_msg)
+            if "duplicate column name" in err_msg.lower() or "already exists" in err_msg.lower():
+                logger.debug("[TURSO-QUERY-INFO] Remote statement notice: %s (SQL: %.100s)", err_msg, sql)
+                raise sqlite3.OperationalError(f"Turso Query Error: {err_msg}")
             logger.error("[TURSO-QUERY-ERROR] Remote statement execution failed: %s (SQL: %.100s)", err_msg, sql)
             raise sqlite3.OperationalError(f"Turso Query Error: {err_msg}")
 

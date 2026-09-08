@@ -58,96 +58,86 @@
             <!-- ================= VIEW 1: LIVE CATALYST FEED ================= -->
             <div id="catalystsFeedView" style="display: block;">
                 <!-- ⚡ Top Summary KPI Cards for Live Feed -->
-                <div id="catalystKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
-                    <div class="card" style="padding:0.75rem 0.9rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                            <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Catalysts Scanned</span>
-                            <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Live Feeds</span>
+                <div id="catalystKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.5rem; margin-bottom: 0.65rem;">
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Catalysts Scanned</span>
+                            <span style="background:rgba(255,255,255,0.04);color:#a1a1aa;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">Live</span>
                         </div>
-                        <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="catStatTotal">0</strong> <span style="font-size:0.85rem;color:#a1a1aa;font-weight:500;">Headlines</span></div>
-                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Multi-source RSS & filings</div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#f4f4f5;font-family:var(--font-heading);"><strong id="catStatTotal">0</strong> <span style="font-size:0.75rem;color:#71717a;font-weight:400;">items</span></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">RSS & Exchange filings</div>
                     </div>
 
-                    <div class="card" style="padding:0.75rem 0.9rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                            <span style="font-size:0.7rem;color:#f87171;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🔥 High Impact (Urgent)</span>
-                            <span class="signal-badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.62rem;">≥ 75% Score</span>
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">High Impact (Urgent)</span>
+                            <span style="background:rgba(239,68,68,0.08);color:#f87171;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);font-weight:600;">≥75%</span>
                         </div>
-                        <div style="font-size:1.45rem;font-weight:800;color:#f87171;font-family:var(--font-heading);"><strong id="catStatHigh">0</strong> <span style="font-size:0.85rem;color:#fca5a5;font-weight:500;">Urgent</span></div>
-                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Order wins, FDA, large contracts</div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#f87171;font-family:var(--font-heading);"><strong id="catStatHigh">0</strong> <span style="font-size:0.75rem;color:#fca5a5;font-weight:400;">urgent</span></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Order wins, FDA, deals</div>
                     </div>
 
-                    <div class="card" style="padding:0.75rem 0.9rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                            <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Market Bias</span>
-                            <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Sentiment</span>
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Market Bias</span>
+                            <span style="background:rgba(255,255,255,0.04);color:#a1a1aa;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">Sentiment</span>
                         </div>
-                        <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="catStatBias"><span style="color:#34d399;">0</span> / <span style="color:#f87171;">0</span></strong></div>
-                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Bullish vs Bearish Ratio</div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#f4f4f5;font-family:var(--font-heading);"><strong id="catStatBias"><span style="color:#34d399;">0</span> / <span style="color:#f87171;">0</span></strong></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Bullish vs Bearish</div>
                     </div>
 
-                    <div class="card" style="padding:0.75rem 0.9rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                            <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Top Catalyst Category</span>
-                            <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">Dominant</span>
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Top Theme</span>
+                            <span style="background:rgba(255,255,255,0.04);color:#a1a1aa;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">Category</span>
                         </div>
-                        <div style="font-size:1.15rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><strong id="catStatTopCat">—</strong></div>
-                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Most frequent theme</div>
+                        <div style="font-size:1.05rem;font-weight:700;color:#e4e4e7;font-family:var(--font-heading);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><strong id="catStatTopCat">—</strong></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Dominant catalyst theme</div>
                     </div>
                 </div>
 
                 <!-- Live Feed Section -->
-                <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #000000; border-radius: 8px;">
-
-                    <!-- Section Header & Controls -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
-                        <div style="display: flex; align-items: center; gap: 0.45rem;">
-                            <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
-                                <span>📰 Short-Term Market Moving Catalysts</span>
-                                <span id="catFeedCountBadge" class="signal-badge" style="font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.12rem 0.45rem;">0 headlines</span>
-                            </h3>
-                        </div>
-                    </div>
+                <section class="card" style="padding: 0.65rem 0.85rem; border: 1px solid rgba(255,255,255,0.07); background: #000000; border-radius: 6px;">
 
                     <!-- Operations Filter Toolbar -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #050505; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.45rem;">
-                        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
-                            <label style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.75rem;color:#cbd5e1;cursor:pointer;background:#000000;border:1px solid rgba(255,255,255,0.12);padding:0.25rem 0.55rem;border-radius:4px;" title="Select all visible news items for batch AI analysis">
-                                <input type="checkbox" id="catSelectAllCheckbox" onchange="app.toggleSelectAllCatalysts(this.checked)" style="cursor:pointer;accent-color:#3b82f6;">
-                                <span style="font-weight:600;">Select All</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: #050505; border: 1px solid rgba(255,255,255,0.06); border-radius: 5px; margin-bottom: 0.55rem; flex-wrap: wrap; gap: 0.35rem;">
+                        <div style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap;">
+                            <label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.72rem;color:#a1a1aa;cursor:pointer;background:#000000;border:1px solid rgba(255,255,255,0.08);padding:0.2rem 0.45rem;border-radius:4px;" title="Select all visible news items for batch AI analysis">
+                                <input type="checkbox" id="catSelectAllCheckbox" onchange="app.toggleSelectAllCatalysts(this.checked)" style="cursor:pointer;accent-color:#3b82f6;width:12px;height:12px;">
+                                <span style="font-weight:500;">Select All</span>
                             </label>
-                            <button type="button" id="catAnalyzeBatchBtn" onclick="app.analyzeSelectedCatalysts()" class="btn btn-sm" style="display:none;background:linear-gradient(135deg, rgba(168,85,247,0.3), rgba(59,130,246,0.3));color:#e9d5ff;border:1px solid rgba(168,85,247,0.5);font-weight:700;padding:0.25rem 0.65rem;font-size:0.75rem;" title="Run on-demand AI analysis on selected news items">
+                            <button type="button" id="catAnalyzeBatchBtn" onclick="app.analyzeSelectedCatalysts()" class="btn btn-sm" style="display:none;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-weight:600;padding:0.2rem 0.55rem;font-size:0.72rem;border-radius:4px;" title="Run on-demand AI analysis on selected news items">
                                 <span id="catBatchBtnIcon">⚡</span> Analyze Selected (<span id="catSelectedCount">0</span>)
                             </button>
-                            <select id="catModelSelect" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#000000;color:#c084fc;border:1px solid rgba(168,85,247,0.4);border-radius:4px;outline:none;font-weight:600;" title="Select AI Model for News Ingestion and On-Demand Re-evaluation">
-                                <option value="google/gemini-2.5-flash" selected>⚡ Gemini Flash (Fast / Ingestion)</option>
+                            <select id="catModelSelect" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#c084fc;border:1px solid rgba(168,85,247,0.3);border-radius:4px;outline:none;font-weight:500;" title="Select AI Model for News Ingestion and On-Demand Re-evaluation">
+                                <option value="google/gemini-2.5-flash" selected>⚡ Gemini Flash (Fast)</option>
                                 <option value="google/gemini-3.7-flash">✨ Gemini 3.7 Flash</option>
                                 <option value="deepseek/deepseek-r1">🧠 DeepSeek-R1 (Reasoning)</option>
-                                <option value="meta-llama/llama-3.3-70b-instruct">🏛️ Llama 3.3 70B (Institutional)</option>
-                                <option value="qwen/qwen-2.5-72b-instruct">🌐 Qwen 2.5 72B (Quantitative)</option>
+                                <option value="meta-llama/llama-3.3-70b-instruct">🏛️ Llama 3.3 70B</option>
+                                <option value="qwen/qwen-2.5-72b-instruct">🌐 Qwen 2.5 72B</option>
                                 <option value="anthropic/claude-3.5-sonnet">🎯 Claude 3.5 Sonnet</option>
                                 <option value="openai/gpt-4o">🤖 GPT-4o</option>
                             </select>
-                            <input type="text" id="catSearchInput" oninput="app.filterCatalysts()" placeholder="🔍 Search stock, order, FDA..." style="padding:0.25rem 0.55rem;font-size:0.75rem;background:#000000;color:var(--light);border:1px solid rgba(255,255,255,0.12);border-radius:4px;min-width:180px;font-family:var(--font-mono);outline:none;">
-                            <select id="catDaysFilter" onchange="app.onCatDaysFilterChange(this.value)" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#000000;color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:4px;outline:none;font-weight:600;" title="Filter by publication recency timeframe">
+                            <input type="text" id="catSearchInput" oninput="app.filterCatalysts()" placeholder="🔍 Search stock, order, deal..." style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#f4f4f5;border:1px solid rgba(255,255,255,0.08);border-radius:4px;min-width:160px;font-family:var(--font-mono);outline:none;">
+                            <select id="catDaysFilter" onchange="app.onCatDaysFilterChange(this.value)" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;font-weight:500;" title="Filter by publication recency timeframe">
                                 <option value="1">⏱️ Last 24 Hours</option>
                                 <option value="3">📅 Last 3 Days</option>
                                 <option value="7">📅 Last 7 Days</option>
-                                <option value="14" selected>📅 Last 14 Days (Default)</option>
+                                <option value="14" selected>📅 Last 14 Days</option>
                                 <option value="30">📅 Last 30 Days</option>
                                 <option value="0">🌐 All Time</option>
                             </select>
-                            <select id="catImpactFilter" onchange="app.filterCatalysts()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#000000;color:var(--light);border:1px solid rgba(255,255,255,0.12);border-radius:4px;outline:none;">
-                                <option value="ALL">All Impact Levels</option>
+                            <select id="catImpactFilter" onchange="app.filterCatalysts()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
+                                <option value="ALL">All Impact</option>
                                 <option value="HIGH">🔥 High Impact (≥75%)</option>
                                 <option value="MEDIUM+">⚡ Medium+ (≥50%)</option>
                             </select>
-                            <select id="catDirectionFilter" onchange="app.filterCatalysts()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#000000;color:var(--light);border:1px solid rgba(255,255,255,0.12);border-radius:4px;outline:none;">
-                                <option value="ALL">All Directions</option>
-                                <option value="BULLISH">🟢 Bullish Catalysts</option>
-                                <option value="BEARISH">🔴 Bearish Threats</option>
+                            <select id="catDirectionFilter" onchange="app.filterCatalysts()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
+                                <option value="ALL">All Bias</option>
+                                <option value="BULLISH">▲ Bullish</option>
+                                <option value="BEARISH">▼ Bearish</option>
                             </select>
-                            <select id="catCategoryFilter" onchange="app.filterCatalysts()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#000000;color:var(--light);border:1px solid rgba(255,255,255,0.12);border-radius:4px;outline:none;">
+                            <select id="catCategoryFilter" onchange="app.filterCatalysts()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
                                 <option value="ALL">All Categories</option>
                                 <option value="Order Wins & Contracts">🤝 Order Wins & Deals</option>
                                 <option value="Earnings & Guidance Surprise">📈 Earnings & Guidance</option>
@@ -155,20 +145,21 @@
                                 <option value="M&A, Stake & Expansion">🏢 M&A & Expansion</option>
                                 <option value="Analyst Ratings & Targets">📊 Analyst Upgrades</option>
                                 <option value="Litigation, Risk & Probes">⚠️ Litigation & Risk</option>
-                                <option value="Corporate Action & Dividends">🎁 Dividends & Corporate</option>
+                                <option value="Corporate Action & Dividends">🎁 Dividends & Corp</option>
                             </select>
                         </div>
+                        <div style="font-size:0.7rem;color:#71717a;font-family:var(--font-mono);" id="catFeedCountBadge">0 headlines</div>
                     </div>
 
                     <!-- Feed Grid / Container -->
-                    <div id="catalystsFeedGrid" style="display: flex; flex-direction: column; gap: 0.65rem;">
-                        <div class="card" style="text-align:center;padding:2.5rem 1.5rem;color:var(--muted);background:#050505;border:1px dashed rgba(255,255,255,0.1);border-radius:8px;margin:0;">
-                            <div style="font-size:2rem;margin-bottom:0.5rem;">📰</div>
-                            <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;">Catalysts Feed Ready</h4>
-                            <p style="max-width:520px;margin:0 auto 1rem auto;font-size:0.8rem;line-height:1.45;color:var(--text-muted);">
+                    <div id="catalystsFeedGrid" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <div class="card" style="text-align:center;padding:2rem 1.5rem;color:var(--muted);background:#050505;border:1px dashed rgba(255,255,255,0.08);border-radius:6px;margin:0;">
+                            <div style="font-size:1.6rem;margin-bottom:0.4rem;">📰</div>
+                            <h4 style="margin:0 0 0.25rem 0;color:var(--light);font-size:0.95rem;">Catalysts Feed Ready</h4>
+                            <p style="max-width:480px;margin:0 auto 0.85rem auto;font-size:0.76rem;line-height:1.45;color:var(--text-muted);">
                                 Click <strong>Scan Feeds</strong> to aggregate breaking news, regulatory filings, and market-moving events on demand.
                             </p>
-                            <button type="button" onclick="app.scanCatalystsNow()" class="btn btn-primary btn-sm" style="font-weight:600;">⚡ Scan Breaking Feeds</button>
+                            <button type="button" onclick="app.scanCatalystsNow()" class="btn btn-primary btn-sm" style="font-weight:600;padding:0.25rem 0.65rem;font-size:0.74rem;">⚡ Scan Feeds</button>
                         </div>
                     </div>
                 </section>
@@ -178,76 +169,76 @@
             <div id="catalystsOutcomesView" style="display: none;">
 
                 <!-- 🎯 Quantitative Trade-Readiness KPI Cards -->
-                <div id="outcomesKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+                <div id="outcomesKpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.5rem; margin-bottom: 0.65rem;">
 
-                    <div class="card" style="padding:0.75rem 0.9rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                            <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🎯 Trade Win Rate</span>
-                            <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Edge KPI</span>
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Win Rate</span>
+                            <span style="background:rgba(16,185,129,0.08);color:#34d399;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);font-weight:600;">Edge</span>
                         </div>
-                        <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);"><strong id="outcomeWinRate">0.0%</strong></div>
-                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;" id="outcomeDirWinRates">Bull: 0.0% | Bear: 0.0%</div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#34d399;font-family:var(--font-heading);"><strong id="outcomeWinRate">0.0%</strong></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;" id="outcomeDirWinRates">Bull: 0.0% | Bear: 0.0%</div>
                     </div>
 
-                    <div class="card" style="padding:0.75rem 0.9rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                            <span style="font-size:0.7rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">📈 Trade Expectancy</span>
-                            <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.62rem;">EV Per Trade</span>
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Expectancy</span>
+                            <span style="background:rgba(255,255,255,0.04);color:#a1a1aa;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">EV</span>
                         </div>
-                        <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="outcomeExpectancy">+0.00%</strong></div>
-                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Avg Net Return: <span id="outcomeAvgReturn">0.0%</span></div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#f4f4f5;font-family:var(--font-heading);"><strong id="outcomeExpectancy">+0.00%</strong></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Avg Net Return: <span id="outcomeAvgReturn">0.0%</span></div>
                     </div>
 
-                    <div class="card" style="padding:0.75rem 0.9rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                            <span style="font-size:0.7rem;color:#38bdf8;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">⚖️ Profit Factor</span>
-                            <span class="signal-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:0.62rem;">Gross G/L</span>
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Profit Factor</span>
+                            <span style="background:rgba(255,255,255,0.04);color:#a1a1aa;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">G/L</span>
                         </div>
-                        <div style="font-size:1.45rem;font-weight:800;color:#38bdf8;font-family:var(--font-heading);"><strong id="outcomeProfitFactor">0.00</strong></div>
-                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Payoff: <span id="outcomePayoff">0.0x</span></div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#f4f4f5;font-family:var(--font-heading);"><strong id="outcomeProfitFactor">0.00</strong></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Payoff: <span id="outcomePayoff">0.0x</span></div>
                     </div>
 
-                    <div class="card" style="padding:0.75rem 0.9rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                            <span style="font-size:0.7rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🚀 Top Max Gainer</span>
-                            <span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-size:0.62rem;">Peak Move</span>
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Top Peak Gainer</span>
+                            <span style="background:rgba(16,185,129,0.08);color:#34d399;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);font-weight:600;">Peak</span>
                         </div>
-                        <div style="font-size:1.45rem;font-weight:800;color:#34d399;font-family:var(--font-heading);"><strong id="outcomeTopGainerVal">+0.0%</strong></div>
-                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="outcomeTopGainerTicker">—</div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#34d399;font-family:var(--font-heading);"><strong id="outcomeTopGainerVal">+0.0%</strong></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="outcomeTopGainerTicker">—</div>
                     </div>
 
-                    <div class="card" style="padding:0.75rem 0.9rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                            <span style="font-size:0.7rem;color:#a1a1aa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Events Evaluated</span>
-                            <span class="signal-badge" style="background:rgba(255,255,255,0.06);color:#a1a1aa;font-size:0.62rem;">Backtest</span>
+                    <div class="card" style="padding:0.55rem 0.75rem;margin-bottom:0;background:#050505;border:1px solid rgba(255,255,255,0.07);border-radius:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem;">
+                            <span style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">Events Evaluated</span>
+                            <span style="background:rgba(255,255,255,0.04);color:#a1a1aa;font-size:0.6rem;padding:0.05rem 0.3rem;border-radius:3px;font-family:var(--font-mono);">Count</span>
                         </div>
-                        <div style="font-size:1.45rem;font-weight:800;color:#ffffff;font-family:var(--font-heading);"><strong id="outcomeTotalCount">0</strong></div>
-                        <div style="font-size:0.68rem;color:#a1a1aa;margin-top:0.2rem;">Verified: <span id="outcomeVerifiedCount">0</span> | Active: <span id="outcomeActiveCount">0</span></div>
+                        <div style="font-size:1.25rem;font-weight:700;color:#f4f4f5;font-family:var(--font-heading);"><strong id="outcomeTotalCount">0</strong></div>
+                        <div style="font-size:0.65rem;color:#71717a;margin-top:0.1rem;">Verified: <span id="outcomeVerifiedCount">0</span> | Active: <span id="outcomeActiveCount">0</span></div>
                     </div>
 
                 </div>
 
                 <!-- 📊 Category Alpha & Edge Table -->
-                <div class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #000000; border-radius: 8px; margin-bottom: 0.75rem;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                        <h4 style="margin:0;font-size:0.95rem;font-family:'Space Grotesk',sans-serif;color:#ffffff;display:flex;align-items:center;gap:0.4rem;">
+                <div class="card" style="padding: 0.65rem 0.85rem; border: 1px solid rgba(255,255,255,0.07); background: #000000; border-radius: 6px; margin-bottom: 0.65rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                        <h4 style="margin:0;font-size:0.85rem;font-family:var(--font-heading);color:#f4f4f5;display:flex;align-items:center;gap:0.35rem;">
                             <span>🏆 Catalyst Category Alpha & Strategy Edge</span>
                         </h4>
-                        <div style="font-size:0.72rem;color:#94a3b8;font-family:var(--font-mono);">
+                        <div style="font-size:0.68rem;color:#71717a;font-family:var(--font-mono);">
                             1D: <span id="horizon1d" style="color:#60a5fa;">0.0%</span> | 3D: <span id="horizon3d" style="color:#34d399;">0.0%</span> | 5D: <span id="horizon5d" style="color:#38bdf8;">0.0%</span>
                         </div>
                     </div>
                     <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 0.76rem; text-align: left;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.72rem; text-align: left;">
                             <thead>
-                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8;">
-                                    <th style="padding: 0.4rem 0.5rem;">Category</th>
-                                    <th style="padding: 0.4rem 0.5rem; text-align: right;">Events</th>
-                                    <th style="padding: 0.4rem 0.5rem; text-align: right;">Win Rate (%)</th>
-                                    <th style="padding: 0.4rem 0.5rem; text-align: right;">Avg Net Return</th>
-                                    <th style="padding: 0.4rem 0.5rem; text-align: right;">Avg Peak Gain</th>
-                                    <th style="padding: 0.4rem 0.5rem; text-align: right;">Profit Factor</th>
-                                    <th style="padding: 0.4rem 0.5rem; text-align: center;">Trade Edge</th>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: #71717a;">
+                                    <th style="padding: 0.35rem 0.45rem;">Category</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: right;">Events</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: right;">Win Rate (%)</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: right;">Avg Net Return</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: right;">Avg Peak Gain</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: right;">Profit Factor</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: center;">Trade Edge</th>
                                 </tr>
                             </thead>
                             <tbody id="outcomeCategoryTableBody">
@@ -258,20 +249,13 @@
                 </div>
 
                 <!-- 📜 Historical Verified News Outcomes Table -->
-                <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #000000; border-radius: 8px;">
-
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
-                        <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
-                            <span>📜 Historical Verified News & Post-Event Returns</span>
-                            <span id="outcomesCountBadge" class="signal-badge" style="font-size:0.68rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.12rem 0.45rem;">0 verified</span>
-                        </h3>
-                    </div>
+                <section class="card" style="padding: 0.65rem 0.85rem; border: 1px solid rgba(255,255,255,0.07); background: #000000; border-radius: 6px;">
 
                     <!-- Outcomes Filter Toolbar -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #050505; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.45rem;">
-                        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
-                            <input type="text" id="outcomesSearchInput" oninput="app.filterOutcomes()" placeholder="🔍 Search ticker or headline..." style="padding:0.25rem 0.55rem;font-size:0.75rem;background:#000000;color:var(--light);border:1px solid rgba(255,255,255,0.12);border-radius:4px;min-width:180px;font-family:var(--font-mono);outline:none;">
-                            <select id="outcomesCategoryFilter" onchange="app.filterOutcomes()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#000000;color:var(--light);border:1px solid rgba(255,255,255,0.12);border-radius:4px;outline:none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0.5rem; background: #050505; border: 1px solid rgba(255,255,255,0.06); border-radius: 5px; margin-bottom: 0.55rem; flex-wrap: wrap; gap: 0.35rem;">
+                        <div style="display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="outcomesSearchInput" oninput="app.filterOutcomes()" placeholder="🔍 Search ticker or headline..." style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#f4f4f5;border:1px solid rgba(255,255,255,0.08);border-radius:4px;min-width:160px;font-family:var(--font-mono);outline:none;">
+                            <select id="outcomesCategoryFilter" onchange="app.filterOutcomes()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
                                 <option value="ALL">All Categories</option>
                                 <option value="Order Wins & Contracts">🤝 Order Wins & Deals</option>
                                 <option value="Earnings & Guidance Surprise">📈 Earnings & Guidance</option>
@@ -279,42 +263,43 @@
                                 <option value="M&A, Stake & Expansion">🏢 M&A & Expansion</option>
                                 <option value="Analyst Ratings & Targets">📊 Analyst Upgrades</option>
                                 <option value="Litigation, Risk & Probes">⚠️ Litigation & Risk</option>
-                                <option value="Corporate Action & Dividends">🎁 Dividends & Corporate</option>
+                                <option value="Corporate Action & Dividends">🎁 Dividends & Corp</option>
                             </select>
-                            <select id="outcomesDirectionFilter" onchange="app.filterOutcomes()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#000000;color:var(--light);border:1px solid rgba(255,255,255,0.12);border-radius:4px;outline:none;">
-                                <option value="ALL">All Directions</option>
-                                <option value="BULLISH">🟢 Bullish</option>
-                                <option value="BEARISH">🔴 Bearish</option>
+                            <select id="outcomesDirectionFilter" onchange="app.filterOutcomes()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
+                                <option value="ALL">All Bias</option>
+                                <option value="BULLISH">▲ Bullish</option>
+                                <option value="BEARISH">▼ Bearish</option>
                             </select>
-                            <select id="outcomesStatusFilter" onchange="app.filterOutcomes()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#000000;color:var(--light);border:1px solid rgba(255,255,255,0.12);border-radius:4px;outline:none;">
+                            <select id="outcomesStatusFilter" onchange="app.filterOutcomes()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
                                 <option value="ALL">All Status</option>
                                 <option value="VERIFIED">✅ Verified Only</option>
                                 <option value="ACTIVE">⏳ Active In-Flight</option>
                             </select>
-                            <select id="outcomesSortBy" onchange="app.filterOutcomes()" style="padding:0.25rem 0.5rem;font-size:0.75rem;background:#000000;color:var(--light);border:1px solid rgba(255,255,255,0.12);border-radius:4px;outline:none;">
+                            <select id="outcomesSortBy" onchange="app.filterOutcomes()" style="padding:0.2rem 0.45rem;font-size:0.72rem;background:#000000;color:#a1a1aa;border:1px solid rgba(255,255,255,0.08);border-radius:4px;outline:none;">
                                 <option value="max_gain">🚀 Sort by Max Gain %</option>
                                 <option value="net_return">📈 Sort by Net Return %</option>
                                 <option value="published_at">📅 Sort by Date (Newest)</option>
                                 <option value="impact">⚡ Sort by Impact Score</option>
                             </select>
                         </div>
+                        <div style="font-size:0.7rem;color:#71717a;font-family:var(--font-mono);" id="outcomesCountBadge">0 verified</div>
                     </div>
 
                     <!-- Outcomes Table -->
                     <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 0.76rem; text-align: left;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.72rem; text-align: left;">
                             <thead>
-                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: #94a3b8;">
-                                    <th style="padding: 0.45rem 0.5rem;">Stock</th>
-                                    <th style="padding: 0.45rem 0.5rem;">Date</th>
-                                    <th style="padding: 0.45rem 0.5rem;">Headline & Category</th>
-                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">Entry Px</th>
-                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">1D Return</th>
-                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">3D Return</th>
-                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">5D Return</th>
-                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">Peak Gain</th>
-                                    <th style="padding: 0.45rem 0.5rem; text-align: right;">Max Drawdown</th>
-                                    <th style="padding: 0.45rem 0.5rem; text-align: center;">Outcome</th>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: #71717a;">
+                                    <th style="padding: 0.35rem 0.45rem;">Stock</th>
+                                    <th style="padding: 0.35rem 0.45rem;">Date</th>
+                                    <th style="padding: 0.35rem 0.45rem;">Headline & Category</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: right;">Entry Px</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: right;">1D Return</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: right;">3D Return</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: right;">5D Return</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: right;">Peak Gain</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: right;">Max Drawdown</th>
+                                    <th style="padding: 0.35rem 0.45rem; text-align: center;">Outcome</th>
                                 </tr>
                             </thead>
                             <tbody id="outcomesTableBody">
@@ -326,4 +311,3 @@
             </div>
 
         </div>
-
