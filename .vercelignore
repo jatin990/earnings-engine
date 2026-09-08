@@ -27,4 +27,3 @@ __pycache__/
 .env
 .env.*
 /*.md
-/*.txt

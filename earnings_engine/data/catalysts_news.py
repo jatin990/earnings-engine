@@ -692,12 +692,23 @@ def get_short_term_catalysts(
         if valid:
             tickers = list({v["ticker"] for v in valid if v.get("ticker")})
             if tickers:
+                from earnings_engine.data.prices import fetch_batch_live_quotes, get_latest_cached_prices
+
+                # Fetch real-time live quotes in parallel with graceful fallback
+                live_quotes: dict[str, Any] = {}
+                try:
+                    live_quotes = fetch_batch_live_quotes(tickers, settings=settings, sync_db=True, max_workers=10)
+                except Exception as e:
+                    logger.debug("[CATALYSTS] fetch_batch_live_quotes failed: %s", e)
+
+                latest_cached = get_latest_cached_prices(tickers, settings=settings)
+
                 placeholders = ",".join("?" for _ in tickers)
                 try:
                     latest_rows = conn.execute(
                         f"""
-                        SELECT ticker, close, date FROM price_history 
-                        WHERE ticker IN ({placeholders}) 
+                        SELECT ticker, close, date FROM price_history
+                        WHERE ticker IN ({placeholders})
                         AND date = (SELECT MAX(date) FROM price_history p2 WHERE p2.ticker = price_history.ticker)
                         """,
                         tickers,
@@ -706,45 +717,87 @@ def get_short_term_catalysts(
                 except Exception:
                     latest_map = {}
 
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
                 for v in valid:
                     t = v.get("ticker")
                     pub_d = (v.get("published_at") or "")[:10]
-                    cur_price, _ = latest_map.get(t, (None, None))
+
+                    # 1. Resolve current live market price
+                    cur_price = None
+                    if t and t in live_quotes and live_quotes[t]:
+                        lq = live_quotes[t]
+                        if isinstance(lq, dict):
+                            cur_price = lq.get("price") or lq.get("close")
+                        elif isinstance(lq, (int, float)):
+                            cur_price = float(lq)
+
+                    if (cur_price is None or cur_price <= 0) and t in latest_cached:
+                        lc = latest_cached[t]
+                        if isinstance(lc, dict) and lc.get("close") and float(lc["close"]) > 0:
+                            cur_price = float(lc["close"])
+                        elif isinstance(lc, (int, float)) and lc > 0:
+                            cur_price = float(lc)
+
+                    if (cur_price is None or cur_price <= 0) and t in latest_map:
+                        cur_price = float(latest_map[t][0])
+
+                    if (cur_price is None or cur_price <= 0) and v.get("current_price"):
+                        cur_price = float(v["current_price"])
+
                     v["current_price"] = cur_price
 
-                    # Look up signal price on or right before published_at date
+                    # 2. Resolve pre-catalyst signal price (benchmark entry price)
+                    existing_sig = v.get("signal_price")
+                    sig_price = float(existing_sig) if existing_sig and float(existing_sig) > 0 else None
+                    sig_date = v.get("signal_date")
+
                     if t and pub_d:
                         try:
-                            sig_row = conn.execute(
-                                "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? ORDER BY date DESC LIMIT 1",
-                                (t, pub_d),
-                            ).fetchone()
+                            # If published today or after market open, anchor to prior session close
+                            if pub_d >= today_str:
+                                sig_row = conn.execute(
+                                    "SELECT close, date FROM price_history WHERE ticker = ? AND date < ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                                    (t, pub_d),
+                                ).fetchone()
+                                if not sig_row:
+                                    sig_row = conn.execute(
+                                        "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                                        (t, pub_d),
+                                    ).fetchone()
+                            else:
+                                sig_row = conn.execute(
+                                    "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                                    (t, pub_d),
+                                ).fetchone()
+
                             if sig_row and sig_row[0] is not None:
                                 try:
                                     d_pub = datetime.strptime(pub_d[:10], "%Y-%m-%d").date()
                                     d_sig = datetime.strptime(str(sig_row[1])[:10], "%Y-%m-%d").date()
-                                    if (d_pub - d_sig).days <= 7:
-                                        v["signal_price"] = float(sig_row[0])
-                                        v["signal_date"] = sig_row[1]
-                                    else:
-                                        v["signal_price"] = cur_price
-                                        v["signal_date"] = pub_d
+                                    if (d_pub - d_sig).days <= 14:
+                                        # Prefer the anchor query if missing or if existing was identical to current price
+                                        if sig_price is None or (cur_price and abs(sig_price - cur_price) < 1e-4 and (d_pub - d_sig).days >= 0):
+                                            sig_price = float(sig_row[0])
+                                            sig_date = sig_row[1]
                                 except Exception:
-                                    v["signal_price"] = float(sig_row[0])
-                                    v["signal_date"] = sig_row[1]
-                            else:
-                                v["signal_price"] = cur_price
-                                v["signal_date"] = pub_d
-                        except Exception:
-                            v["signal_price"] = cur_price
-                            v["signal_date"] = pub_d
-                    else:
-                        v["signal_price"] = cur_price
-                        v["signal_date"] = pub_d
+                                    if sig_price is None:
+                                        sig_price = float(sig_row[0])
+                                        sig_date = sig_row[1]
+                        except Exception as e:
+                            logger.debug("[CATALYSTS] sig_price query error for %s: %s", t, e)
 
-                    if v.get("signal_price") and v.get("current_price") and v["signal_price"] > 0:
+                    if sig_price is None or sig_price <= 0:
+                        sig_price = cur_price
+                        sig_date = pub_d
+
+                    v["signal_price"] = sig_price
+                    v["signal_date"] = sig_date
+
+                    # 3. Calculate price change percentage
+                    if sig_price and cur_price and sig_price > 0:
                         v["price_change_pct"] = round(
-                            ((v["current_price"] - v["signal_price"]) / v["signal_price"]) * 100.0, 2
+                            ((cur_price - sig_price) / sig_price) * 100.0, 2
                         )
                     else:
                         v["price_change_pct"] = 0.0

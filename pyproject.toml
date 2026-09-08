@@ -8,8 +8,6 @@ dependencies = [
     "pandas>=2.0",
     "lxml>=5.0",
     "numpy>=1.26",
-    "lightgbm>=4.0",
-    "scikit-learn>=1.4",
     "click>=8.0",
     "python-dotenv>=1.0",
     "nsetools>=2.0",
@@ -30,6 +28,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+ml = [
+    "lightgbm>=4.0",
+    "scikit-learn>=1.4",
+]
 nse = [
     "nselib>=0.9",
     "jugaad-data>=0.28",
@@ -42,7 +44,7 @@ brokers = [
     "fyers-apiv3>=3.1.0",
 ]
 all = [
-    "earnings-engine[dev,nse,brokers]",
+    "earnings-engine[dev,ml,nse,brokers]",
 ]
 
 [tool.pytest.ini_options]
