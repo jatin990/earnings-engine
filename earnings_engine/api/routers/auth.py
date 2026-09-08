@@ -29,6 +29,9 @@ router = APIRouter(tags=["Auth & Access Control"])
 @router.get("/", tags=["UI"], response_class=HTMLResponse)
 @router.get("/portal", tags=["UI"], response_class=HTMLResponse)
 @router.get("/join", tags=["UI"], response_class=HTMLResponse)
+@router.get("/api/index.py", tags=["UI"], response_class=HTMLResponse, include_in_schema=False)
+@router.get("/api/index", tags=["UI"], response_class=HTMLResponse, include_in_schema=False)
+@router.get("/api", tags=["UI"], response_class=HTMLResponse, include_in_schema=False)
 async def serve_portal():
     """Serve the Nexus Passcode Portal, Join Onboarding & App Launcher."""
     try:

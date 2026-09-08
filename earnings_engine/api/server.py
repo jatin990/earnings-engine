@@ -232,6 +232,8 @@ async def log_and_cancel_api_requests(request: Request, call_next):
             "/favicon.ico",
             "/health",
             "/ping",
+            "/api/index.py",
+            "/api/index",
         }
         is_silent = path in silent_paths or path.startswith(("/static", "/ui", "/docs", "/openapi.json"))
 
@@ -256,6 +258,9 @@ PUBLIC_EXACT_PATHS = {
     "/portal",
     "/join",
     "/login",
+    "/api/index.py",
+    "/api/index",
+    "/api",
     "/favicon.ico",
     "/health",
     "/api/health",

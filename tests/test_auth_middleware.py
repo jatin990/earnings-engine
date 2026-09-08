@@ -57,6 +57,14 @@ def test_public_routes_accessible_without_auth():
     resp_join = client.get("/join")
     assert resp_join.status_code == 200
 
+    # Vercel entrypoint direct access
+    resp_vercel = client.get("/api/index.py")
+    assert resp_vercel.status_code == 200
+    assert "NEXUS GATEWAY" in resp_vercel.text
+
+    resp_vercel_idx = client.get("/api/index")
+    assert resp_vercel_idx.status_code == 200
+
     # Auth verify-code API
     resp_api = client.post("/api/v1/auth/verify-code", json={"code": "NEXUS-MASTER"})
     assert resp_api.status_code == 200
@@ -74,4 +82,24 @@ def test_invalid_passcode_rejected():
     # Invalid code in header redirects to portal
     resp_hdr = client.get("/dashboard", headers={"X-Passcode": "WRONG-CODE-999"})
     assert resp_hdr.status_code == 302
+
+
+def test_vercel_path_fix_middleware():
+    from api.index import VercelPathFixMiddleware
+    vercel_app = VercelPathFixMiddleware(app)
+    vclient = TestClient(vercel_app, follow_redirects=False)
+
+    # 1. Test request routed to /api/index.py with x-now-route-matches for /portal
+    resp = vclient.get("/api/index.py", headers={"x-now-route-matches": "1=%2Fportal"})
+    assert resp.status_code == 200
+    assert "NEXUS GATEWAY" in resp.text
+
+    # 2. Test request routed to /api/index.py with x-matched-path for /join
+    resp_join = vclient.get("/api/index.py", headers={"x-matched-path": "/join"})
+    assert resp_join.status_code == 200
+
+    # 3. Test request routed to /api/index.py with no headers falls back to root /
+    resp_root = vclient.get("/api/index.py")
+    assert resp_root.status_code == 200
+    assert "NEXUS GATEWAY" in resp_root.text
 

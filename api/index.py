@@ -2,11 +2,13 @@
 
 import os
 import sys
+import urllib.parse
 from pathlib import Path
 
-# Ensure serverless environment flags are active before importing server
-os.environ["VERCEL"] = "1"
-os.environ["SERVERLESS"] = "1"
+# Ensure serverless environment flags are active before importing server (when not running tests)
+if "PYTEST_CURRENT_TEST" not in os.environ and "TESTING" not in os.environ:
+    os.environ["VERCEL"] = "1"
+    os.environ["SERVERLESS"] = "1"
 
 # Add project root to sys.path so earnings_engine package can be resolved
 _root_dir = Path(__file__).resolve().parent.parent
@@ -19,10 +21,11 @@ from earnings_engine.api.server import app as _fastapi_app
 class VercelPathFixMiddleware:
     """ASGI middleware to restore original request path on Vercel deployments.
 
-    Vercel CLI 59+ internal rewrites route requests to /api/index.py, passing
+    Vercel internal rewrites route requests to /api/index.py, passing
     the destination path in scope['path']. This middleware extracts the original
-    requested URI from Vercel's x-matched-path, x-forwarded-uri, or x-invoke-path
-    headers so FastAPI correctly routes to /dashboard, /portal, /api/v1/..., etc.
+    requested URI from Vercel's headers (x-now-route-matches, x-matched-path,
+    x-forwarded-uri, x-invoke-path, etc.) so FastAPI correctly routes to
+    /dashboard, /portal, /api/v1/..., etc.
     """
 
     def __init__(self, app):
@@ -31,29 +34,51 @@ class VercelPathFixMiddleware:
     async def __call__(self, scope, receive, send):
         if scope.get("type") in ("http", "websocket"):
             headers = dict(scope.get("headers", []))
-
-            # Extract matched/forwarded path from Vercel headers
-            matched_header = (
-                headers.get(b"x-matched-path")
-                or headers.get(b"x-forwarded-uri")
-                or headers.get(b"x-invoke-path")
-            )
-
             current_path = scope.get("path", "")
 
-            if matched_header:
-                orig_path = matched_header.decode("utf-8", errors="ignore").split("?")[0]
-                if orig_path and (
-                    current_path in ("/api/index.py", "/api/index", "/api", "/api/index.py/")
-                    or current_path.startswith("/api/index.py")
+            # 1. Try extracting path from x-now-route-matches (Vercel regex capture group 1)
+            target_path = None
+            route_matches = headers.get(b"x-now-route-matches") or headers.get(b"x-vercel-route-matches")
+            if route_matches:
+                try:
+                    match_str = route_matches.decode("utf-8", errors="ignore")
+                    params = urllib.parse.parse_qs(match_str)
+                    if "1" in params and params["1"]:
+                        val = params["1"][0]
+                        if val:
+                            target_path = "/" + val.lstrip("/")
+                        else:
+                            target_path = "/"
+                except Exception:
+                    pass
+
+            # 2. Fall back to other Vercel proxy headers
+            if not target_path or target_path in ("/api/index.py", "/api/index", "/api", "/api/index.py/"):
+                for header_key in (
+                    b"x-forwarded-uri",
+                    b"x-original-uri",
+                    b"x-rewrite-url",
+                    b"x-matched-path",
+                    b"x-invoke-path",
                 ):
-                    scope = dict(scope)
-                    scope["path"] = orig_path
-                    scope["raw_path"] = orig_path.encode("utf-8")
+                    raw_val = headers.get(header_key)
+                    if raw_val:
+                        decoded = raw_val.decode("utf-8", errors="ignore").split("?")[0]
+                        if decoded and decoded not in ("/api/index.py", "/api/index", "/api", "/api/index.py/"):
+                            target_path = decoded
+                            break
+
+            # 3. If current path is the serverless entrypoint, route to target_path or fallback to root "/"
+            if current_path in ("/api/index.py", "/api/index", "/api", "/api/index.py/") or current_path.startswith("/api/index.py"):
+                final_path = target_path if (target_path and target_path not in ("/api/index.py", "/api/index", "/api", "/api/index.py/")) else "/"
+                scope = dict(scope)
+                scope["path"] = final_path
+                scope["raw_path"] = final_path.encode("utf-8")
 
         await self.app(scope, receive, send)
 
 
 # Export the wrapped ASGI application for Vercel Python runtime
 app = VercelPathFixMiddleware(_fastapi_app)
+
 
