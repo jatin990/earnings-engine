@@ -1518,8 +1518,30 @@ def compute_next_day_market_playbook(
         focus_sectors.append(f"{name} ({chg:+.1f}%)")
 
     # 6. Assemble Final Playbook Payload
+    div_trap_score = participant_oi.get("divergence_trap_score", 45)
+    div_trap_label = "High" if div_trap_score > 60 else "Moderate" if div_trap_score > 35 else "Low"
+    div_warning = participant_oi.get("divergence_warning", "Positioning is balanced.")
+    div_badge_text = participant_oi.get("divergence_badge", "⚖️ Balanced Positioning")
+    div_delta = round(fii_ls - client_ls, 2)
+    theta_label = "🟢 Favorable for Option Selling / Theta Capture" if theta_env == "FAVORABLE_FOR_OPTION_SELLING" else "🔥 Favorable for Option Buying / Delta Momentum"
+
+    divergence_payload = {
+        "status": div_status,
+        "badge": div_badge_text,
+        "trap_risk_score": div_trap_score,
+        "trap_risk_label": div_trap_label,
+        "trap_warning": div_warning,
+        "warning": div_warning,
+        "fii_ls": fii_ls,
+        "client_ls": client_ls,
+        "fii_ls_ratio": fii_ls,
+        "client_ls_ratio": client_ls,
+        "divergence_delta": div_delta,
+    }
+
     return {
         "bias": bias_code,
+        "bias_label": bias_badge,
         "bias_badge": bias_badge,
         "bias_color": bias_color,
         "confluence_score": total_confluence_score,
@@ -1536,29 +1558,34 @@ def compute_next_day_market_playbook(
         "vix_level": vix_level,
         "expected_1d_range_pct": expected_1d_move_pct,
         "expected_1d_range_pts": expected_1d_move_pts,
+        "expected_1d_move_pct": expected_1d_move_pct,
+        "expected_1d_move_pts": expected_1d_move_pts,
         "corridor": {
             "upper_band_1sigma": upper_band_1sigma,
             "lower_band_1sigma": lower_band_1sigma,
             "upper_band_2sigma": upper_band_2sigma,
             "lower_band_2sigma": lower_band_2sigma,
+            "upper_1sigma": upper_band_1sigma,
+            "lower_1sigma": lower_band_1sigma,
+            "upper_2sigma": upper_band_2sigma,
+            "lower_2sigma": lower_band_2sigma,
+            "expected_1d_range_pct": expected_1d_move_pct,
+            "expected_1d_range_pts": expected_1d_move_pts,
+            "expected_1d_move_pct": expected_1d_move_pct,
+            "expected_1d_move_pts": expected_1d_move_pts,
             "confidence_68pct": f"{lower_band_1sigma:,.0f} - {upper_band_1sigma:,.0f}",
             "confidence_95pct": f"{lower_band_2sigma:,.0f} - {upper_band_2sigma:,.0f}",
         },
-        "divergence": {
-            "status": div_status,
-            "badge": participant_oi.get("divergence_badge", "⚖️ Balanced Positioning"),
-            "trap_risk_score": participant_oi.get("divergence_trap_score", 45),
-            "warning": participant_oi.get("divergence_warning", "Positioning is balanced."),
-            "fii_ls": fii_ls,
-            "client_ls": client_ls,
-        },
+        "divergence": divergence_payload,
+        "smart_money_vs_retail": divergence_payload,
         "actionable_rules": [
             f"🎯 Primary Execution: {primary_action}",
             f"⚡ Options / Derivatives Tactic: {option_strategy}",
             f"🛑 Invalidation & Stop Rule: {invalidation}",
         ],
         "theta_decay_environment": theta_env,
-        "theta_env_label": "🟢 Favorable for Option Selling / Theta Capture" if theta_env == "FAVORABLE_FOR_OPTION_SELLING" else "🔥 Favorable for Option Buying / Delta Momentum",
+        "theta_environment": theta_label,
+        "theta_env_label": theta_label,
         "focus_sectors": focus_sectors,
     }
 
