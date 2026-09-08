@@ -589,17 +589,20 @@ Object.assign(app, {
                     const isBull = c.direction === 'BULLISH';
                     const isBear = c.direction === 'BEARISH';
 
-                    const impactBadgeBg = isHigh ? 'rgba(239,68,68,0.2)' : 'rgba(251,191,36,0.2)';
+                    const impactBadgeBg = isHigh ? 'rgba(239,68,68,0.15)' : 'rgba(251,191,36,0.15)';
+                    const impactBadgeBorder = isHigh ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)';
                     const impactBadgeColor = isHigh ? '#f87171' : '#fbbf24';
-                    const impactLabel = isHigh ? '🔥 HIGH IMPACT (' + c.impact_score + '%)' : '⚡ MEDIUM (' + c.impact_score + '%)';
 
-                    const dirBadgeBg = isBull ? 'rgba(16,185,129,0.2)' : isBear ? 'rgba(239,68,68,0.2)' : 'rgba(148,163,184,0.2)';
+                    const dirBadgeBg = isBull ? 'rgba(16,185,129,0.12)' : isBear ? 'rgba(239,68,68,0.12)' : 'rgba(148,163,184,0.12)';
+                    const dirBadgeBorder = isBull ? 'rgba(16,185,129,0.3)' : isBear ? 'rgba(239,68,68,0.3)' : 'rgba(148,163,184,0.25)';
                     const dirColor = isBull ? '#34d399' : isBear ? '#f87171' : '#94a3b8';
-                    const dirIcon = isBull ? '🟢 BULLISH CATALYST' : isBear ? '🔴 BEARISH THREAT' : '⚪ NEUTRAL';
+                    const dirIcon = isBull ? '🟢 Bullish' : isBear ? '🔴 Bearish' : '⚪ Neutral';
 
-                    const cardBorder = isHigh ? 'border-left: 4px solid #ef4444;' : (isBull ? 'border-left: 4px solid #10b981;' : 'border-left: 4px solid #60a5fa;');
+                    const cardBorder = isHigh ? 'border-left: 3px solid #ef4444;' : (isBull ? 'border-left: 3px solid #10b981;' : (isBear ? 'border-left: 3px solid #ef4444;' : 'border-left: 3px solid #38bdf8;'));
 
-                    const headlineLink = c.link ? '<a href="' + c.link + '" target="_blank" rel="noopener noreferrer" style="color:var(--light);text-decoration:none;font-weight:700;font-size:0.95rem;line-height:1.4;" onmouseover="this.style.color=\'#60a5fa\'" onmouseout="this.style.color=\'var(--light)\'">' + c.title + ' ↗</a>' : '<span style="font-weight:700;font-size:0.95rem;color:var(--light);">' + c.title + '</span>';
+                    const headlineLink = c.link
+                        ? '<a href="' + c.link + '" target="_blank" rel="noopener noreferrer" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:1.02rem;line-height:1.45;transition:color 0.15s ease;" onmouseover="this.style.color=\'#60a5fa\'" onmouseout="this.style.color=\'#ffffff\'">' + c.title + ' <span style="font-size:0.8rem;opacity:0.75;">↗</span></a>'
+                        : '<span style="font-weight:700;font-size:1.02rem;color:#ffffff;line-height:1.45;">' + c.title + '</span>';
 
                     const dateDisplay = this.formatNewsDate(c.published_at);
 
@@ -608,28 +611,29 @@ Object.assign(app, {
                     const chgPct = c.price_change_pct || 0;
                     const chgColor = chgPct > 0 ? '#34d399' : (chgPct < 0 ? '#f87171' : '#94a3b8');
                     const chgSign = chgPct > 0 ? '+' : '';
+
                     const priceBadge = (sigPrice && curPrice) ? `
-                        <div style="display:inline-flex;align-items:center;gap:0.4rem;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.12);border-radius:5px;padding:0.12rem 0.5rem;font-size:0.72rem;" title="Price at time of news disclosure vs latest quote">
-                            <span style="color:#94a3b8;">Signal Price: <strong style="color:#f8fafc;font-family:var(--font-mono);">${sigPrice}</strong></span>
-                            <span style="color:#64748b;">→</span>
-                            <span style="color:#94a3b8;">Now: <strong style="color:#38bdf8;font-family:var(--font-mono);">${curPrice}</strong></span>
-                            <span style="color:${chgColor};font-weight:700;font-family:var(--font-mono);margin-left:0.2rem;">(${chgSign}${chgPct.toFixed(2)}%)</span>
+                        <div style="display:inline-flex;align-items:center;gap:0.45rem;font-family:var(--font-mono);font-size:0.75rem;" title="Benchmark Signal Price at disclosure vs Latest Live Price">
+                            <span style="color:#71717a;">Signal Ref: <strong style="color:#f4f4f5;font-weight:600;">${sigPrice}</strong></span>
+                            <span style="color:#52525b;">→</span>
+                            <span style="color:#71717a;">Live: <strong style="color:#38bdf8;font-weight:700;">${curPrice}</strong></span>
+                            <span style="color:${chgColor};font-weight:800;margin-left:0.15rem;">(${chgSign}${chgPct.toFixed(2)}%)</span>
                         </div>
                     ` : (curPrice ? `
-                        <div style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.08);border-radius:5px;padding:0.12rem 0.45rem;font-size:0.72rem;">
-                            <span style="color:#94a3b8;">Live Price: <strong style="color:#38bdf8;font-family:var(--font-mono);">${curPrice}</strong></span>
+                        <div style="display:inline-flex;align-items:center;gap:0.4rem;font-family:var(--font-mono);font-size:0.75rem;">
+                            <span style="color:#71717a;">Live Price: <strong style="color:#38bdf8;font-weight:700;">${curPrice}</strong></span>
                         </div>
                     ` : '');
 
                     const aiTargetBadge = (c.ai_target != null && c.ai_target > 0) ? `
-                        <div style="display:inline-flex;align-items:center;gap:0.35rem;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:5px;padding:0.12rem 0.45rem;font-size:0.70rem;" title="OmniRouter AI Target Price & Defensive Invalidation Stop">
-                            <span style="color:#34d399;font-weight:700;font-family:var(--font-mono);">🎯 Target: ₹${Number(c.ai_target).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2})}</span>
-                            ${(c.ai_stop_loss != null && c.ai_stop_loss > 0) ? `<span style="color:#64748b;">|</span><span style="color:#f87171;font-weight:600;font-family:var(--font-mono);">🛡️ Stop: ₹${Number(c.ai_stop_loss).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2})}</span>` : ''}
+                        <div style="display:inline-flex;align-items:center;gap:0.35rem;font-family:var(--font-mono);font-size:0.72rem;padding-left:0.6rem;border-left:1px solid rgba(255,255,255,0.08);" title="OmniRouter AI Target Price & Defensive Invalidation Stop">
+                            <span style="color:#34d399;font-weight:700;">🎯 Target: ₹${Number(c.ai_target).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2})}</span>
+                            ${(c.ai_stop_loss != null && c.ai_stop_loss > 0) ? `<span style="color:#52525b;">|</span><span style="color:#f87171;font-weight:600;">🛡️ Stop: ₹${Number(c.ai_stop_loss).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2})}</span>` : ''}
                         </div>
                     ` : '';
 
                     const aiModelBadge = c.ai_model ? `
-                        <span style="background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-weight:700;font-family:var(--font-mono);" title="Analyzed by OmniRouter AI Engine">🤖 ${c.ai_model.replace('omnirouter/', '')}</span>
+                        <span style="background:rgba(168,85,247,0.1);color:#c084fc;border:1px solid rgba(168,85,247,0.25);padding:0.12rem 0.45rem;border-radius:4px;font-size:0.68rem;font-weight:600;font-family:var(--font-mono);" title="Analyzed by OmniRouter AI Engine">🤖 ${c.ai_model.replace('omnirouter/', '')}</span>
                     ` : '';
 
                     let parsedAi = null;
@@ -642,12 +646,12 @@ Object.assign(app, {
                     }
                     const latVal = c.latency_ms || (parsedAi && parsedAi.latency_ms);
                     const latBadge = latVal ? `
-                        <span style="background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.25);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-family:var(--font-mono);" title="Inference response round-trip latency">⏱️ ${latVal > 100 ? (latVal / 1000).toFixed(2) + 's' : latVal + 'ms'}</span>
+                        <span style="color:#fbbf24;" title="Inference response round-trip latency">⏱️ ${latVal > 100 ? (latVal / 1000).toFixed(2) + 's' : latVal + 'ms'}</span>
                     ` : '';
 
                     const tokVal = c.tokens_used || (parsedAi && parsedAi.tokens_used);
                     const tokBadge = tokVal ? `
-                        <span style="background:rgba(148,163,184,0.1);color:#94a3b8;border:1px solid rgba(148,163,184,0.2);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-family:var(--font-mono);" title="Token usage (Prompt + Completion)">🔢 ${tokVal} tok</span>
+                        <span style="color:#a1a1aa;" title="Token usage (Prompt + Completion)">🔢 ${tokVal} tok</span>
                     ` : '';
 
                     const displayTakeaway = c.ai_takeaway || (parsedAi && parsedAi.trading_takeaway) || c.why_it_matters || '';
@@ -655,13 +659,13 @@ Object.assign(app, {
                     const isRePub = c.is_republication === 1 || c.is_republication === true || c.temporal_originality === 'REPUBLICATION';
                     const origType = c.temporal_originality || (isRePub ? 'REPUBLICATION' : 'NEW_PUBLICATION');
                     const origRationale = c.originality_rationale || (isRePub ? 'Repetitive or historical recap of past event.' : 'Novel primary news disclosure.');
-                    
+
                     const origBadge = isRePub ? `
-                        <span style="background:rgba(245,158,11,0.18);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-weight:700;" title="${origRationale}">🔄 Republication</span>
+                        <span style="background:rgba(245,158,11,0.12);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);padding:0.12rem 0.45rem;border-radius:4px;font-size:0.68rem;font-weight:700;" title="${origRationale}">🔄 Republication</span>
                     ` : (origType === 'BREAKING' ? `
-                        <span style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-weight:700;" title="${origRationale}">⚡ Fresh Breaking</span>
+                        <span style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.35);padding:0.12rem 0.45rem;border-radius:4px;font-size:0.68rem;font-weight:700;" title="${origRationale}">⚡ Fresh Breaking</span>
                     ` : `
-                        <span style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.12rem 0.45rem;border-radius:0.3rem;font-size:0.68rem;font-weight:600;" title="${origRationale}">📰 New Publication</span>
+                        <span style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);padding:0.12rem 0.45rem;border-radius:4px;font-size:0.68rem;font-weight:600;" title="${origRationale}">📰 New Publication</span>
                     `);
 
                     let parsedProj = null;
@@ -673,7 +677,7 @@ Object.assign(app, {
                         }
                     }
                     const projBadge = (parsedProj && (parsedProj.order_value_cr || parsedProj.revenue_projection_cr || parsedProj.ebitda_margin_pct || parsedProj.growth_rate_pct)) ? `
-                        <div style="display:inline-flex;align-items:center;gap:0.3rem;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);border-radius:5px;padding:0.12rem 0.45rem;font-size:0.70rem;color:#fcd34d;" title="Extracted Financial Projections">
+                        <div style="display:inline-flex;align-items:center;gap:0.5rem;font-family:var(--font-mono);font-size:0.72rem;color:#fcd34d;" title="Extracted Financial Projections">
                             ${parsedProj.order_value_cr ? `<span>💼 Order: <strong>₹${parsedProj.order_value_cr} Cr</strong></span>` : ''}
                             ${parsedProj.revenue_projection_cr ? `<span>📊 Rev: <strong>₹${parsedProj.revenue_projection_cr} Cr</strong></span>` : ''}
                             ${parsedProj.ebitda_margin_pct ? `<span>📈 Margin: <strong>${parsedProj.ebitda_margin_pct}%</strong></span>` : ''}
@@ -691,49 +695,94 @@ Object.assign(app, {
                     }
                     const otherPeers = Array.isArray(affTickers) ? affTickers.filter(t => String(t).toUpperCase() !== String(c.ticker).toUpperCase()) : [];
                     const multiStockBadge = otherPeers.length > 0
-                        ? `<span class="signal-badge" style="background:rgba(236,72,153,0.15);color:#f472b6;border:1px solid rgba(236,72,153,0.35);font-size:0.7rem;padding:0.12rem 0.45rem;border-radius:0.3rem;" title="Multi-stock impact: ${otherPeers.join(', ')}">⚡ Also Impacts: ${otherPeers.slice(0, 3).map(t => `<a href="/stock/${encodeURIComponent(t)}" target="_blank" style="color:#f472b6;text-decoration:none;font-weight:700;">${String(t).replace('.NS','')}</a>`).join(', ')}${otherPeers.length > 3 ? ` +${otherPeers.length - 3}` : ''}</span>`
+                        ? `<span class="signal-badge" style="background:rgba(236,72,153,0.12);color:#f472b6;border:1px solid rgba(236,72,153,0.3);font-size:0.68rem;padding:0.12rem 0.45rem;border-radius:4px;" title="Multi-stock impact: ${otherPeers.join(', ')}">⚡ Also Impacts: ${otherPeers.slice(0, 3).map(t => `<a href="/stock/${encodeURIComponent(t)}" target="_blank" style="color:#f472b6;text-decoration:none;font-weight:700;">${String(t).replace('.NS','')}</a>`).join(', ')}${otherPeers.length > 3 ? ` +${otherPeers.length - 3}` : ''}</span>`
                         : '';
 
                     const isSel = (this.selectedCatalysts && this.selectedCatalysts.has(c.ticker + '|||' + c.title)) ? 'checked' : '';
 
-                    return '<div class="card" style="margin:0;padding:1rem;background:rgba(255,255,255,0.03);' + cardBorder + 'transition:transform 0.15s ease;">' +
-                        '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.45rem;">' +
-                            '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">' +
-                                `<input type="checkbox" class="cat-select-checkbox" data-ticker="${c.ticker}" data-title="${encodeURIComponent(c.title)}" ${isSel} onchange="app.onCatalystCheckboxChange(this)" style="cursor:pointer;width:15px;height:15px;accent-color:#3b82f6;margin-right:0.1rem;" title="Select for on-demand AI analysis">` +
-                                ((c.stock_name && c.stock_name.trim().toUpperCase() !== c.ticker.trim().toUpperCase())
-                                    ? '<strong style="font-size:1.05rem;color:#f8fafc;">' + c.stock_name + '</strong><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" class="signal-badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;font-size:0.72rem;text-decoration:none;" title="Open stock intelligence">' + c.ticker + ' ↗</a>'
-                                    : '<a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="font-size:1.05rem;font-weight:700;color:#60a5fa;text-decoration:none;">' + c.ticker + ' ↗</a>') +
-                                multiStockBadge +
-                                priceBadge +
-                                aiTargetBadge +
-                                projBadge +
-                                origBadge +
-                                '<span style="background:' + impactBadgeBg + ';color:' + impactBadgeColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + impactLabel + '</span>' +
-                                '<span style="background:' + dirBadgeBg + ';color:' + dirColor + ';padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;font-weight:700;">' + dirIcon + '</span>' +
-                                '<span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:0.15rem 0.5rem;border-radius:0.3rem;font-size:0.7rem;">' + c.category + '</span>' +
-                                aiModelBadge +
-                                latBadge +
-                                tokBadge +
-                            '</div>' +
-                            '<div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">' +
-                                '<span class="timestamp" style="font-size:0.72rem;background:rgba(255,255,255,0.05);padding:0.15rem 0.45rem;border-radius:0.25rem;">' + (c.publisher || 'News') + ' &middot; ⏱️ ' + dateDisplay + '</span>' +
-                                `<button type="button" onclick="app.analyzeSingleCatalyst('${encodeURIComponent(c.ticker)}', '${encodeURIComponent(c.title)}', this)" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(168,85,247,0.2);color:#c084fc;border:1px solid rgba(168,85,247,0.45);border-radius:0.3rem;font-weight:700;" title="Run on-demand AI re-evaluation using selected model">⚡ Re-evaluate</button>` +
-                                `<button type="button" onclick="app.showNewsRawOutput(${filtered.indexOf(c)})" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:0.3rem;" title="Inspect raw OmniRouter AI JSON telemetry">📄 Raw AI</button>` +
-                                `<button type="button" onclick="app.runConsensusForStock('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.45);border-radius:0.3rem;font-weight:700;" title="Run AI Multi-Model Consensus for Target, Resistance, Support & Buy Zone">🧠 Consensus</button>` +
-                                `<button type="button" onclick="app.openAddToWatchlistModal('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);border-radius:0.3rem;" title="Add to Watchlist">⭐ Watchlist</button>` +
-                                `<button type="button" onclick="app.runPredictionForTickerSingle('${c.ticker}')" class="btn btn-sm" style="padding:0.15rem 0.45rem;font-size:0.72rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);border-radius:0.3rem;" title="Run Kronos Forecast">🔮 Predict</button>` +
-                            '</div>' +
-                        '</div>' +
-                        '<div style="margin-bottom:0.5rem;">' + headlineLink + '</div>' +
-                        (c.summary ? '<p style="margin:0 0 0.5rem 0;font-size:0.82rem;color:#cbd5e1;line-height:1.45;">' + c.summary + '</p>' : '') +
-                        '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;background:rgba(0,0,0,0.2);padding:0.45rem 0.65rem;border-radius:0.4rem;border:1px solid rgba(255,255,255,0.06);font-size:0.75rem;">' +
-                            '<div style="color:#38bdf8;font-weight:600;"><span style="color:#c084fc;font-weight:700;">💡 AI Takeaway: </span>' + displayTakeaway + '</div>' +
-                            '<div style="display:flex;gap:0.6rem;color:var(--muted);white-space:nowrap;">' +
-                                '<span>Expected Horizon: <strong style="color:var(--light);">' + (c.expected_horizon || '1-3 Days') + '</strong></span>' +
-                                '<span>Move Est: <strong style="color:#fbbf24;">' + (c.volatility_est || '±3%') + '</strong></span>' +
-                            '</div>' +
-                        '</div>' +
-                    '</div>';
+                    const hasStripContent = Boolean(priceBadge || aiTargetBadge || projBadge);
+
+                    return `
+                    <div class="card" style="margin:0;padding:1rem 1.15rem;background:#050505;border:1px solid rgba(255,255,255,0.08);border-radius:8px;${cardBorder}display:flex;flex-direction:column;gap:0.7rem;transition:border-color 0.15s ease;">
+
+                        <!-- TIER 1: Header (Identity, Categorization & Timestamp) -->
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;padding-bottom:0.4rem;border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <div style="display:flex;align-items:center;gap:0.55rem;flex-wrap:wrap;">
+                                <input type="checkbox" class="cat-select-checkbox" data-ticker="${c.ticker}" data-title="${encodeURIComponent(c.title)}" ${isSel} onchange="app.onCatalystCheckboxChange(this)" style="cursor:pointer;width:15px;height:15px;accent-color:#3b82f6;margin-right:0.1rem;" title="Select for on-demand AI analysis">
+
+                                <a href="/stock/${encodeURIComponent(c.ticker)}" target="_blank" style="font-family:var(--font-mono);font-size:1.02rem;font-weight:800;color:#60a5fa;text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;" title="Open stock intelligence">
+                                    ${c.ticker} <span style="font-size:0.75rem;opacity:0.7;">↗</span>
+                                </a>
+
+                                ${((c.stock_name && c.stock_name.trim().toUpperCase() !== c.ticker.trim().toUpperCase())
+                                    ? `<span style="font-size:0.85rem;font-weight:600;color:#cbd5e1;">${c.stock_name}</span>`
+                                    : '')}
+
+                                <span style="background:rgba(59,130,246,0.1);color:#93c5fd;border:1px solid rgba(59,130,246,0.25);padding:0.12rem 0.5rem;border-radius:4px;font-size:0.68rem;font-weight:600;">${c.category || 'Order Wins & Contracts'}</span>
+
+                                <span style="background:${dirBadgeBg};color:${dirColor};border:1px solid ${dirBadgeBorder};padding:0.12rem 0.5rem;border-radius:4px;font-size:0.68rem;font-weight:700;display:inline-flex;align-items:center;gap:0.3rem;">
+                                    ${dirIcon} · ${c.impact_score || 75}% Impact
+                                </span>
+
+                                ${origBadge}
+                                ${aiModelBadge}
+                            </div>
+
+                            <div style="font-size:0.72rem;color:#71717a;font-family:var(--font-mono);display:flex;align-items:center;gap:0.35rem;">
+                                <span style="color:#a1a1aa;font-weight:500;">${c.publisher || 'News'}</span>
+                                <span>•</span>
+                                <span>${dateDisplay}</span>
+                            </div>
+                        </div>
+
+                        <!-- TIER 2: Price Action & Financial Projections Strip -->
+                        ${hasStripContent ? `
+                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.6rem;background:#000000;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.45rem 0.75rem;">
+                            <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+                                ${priceBadge}
+                                ${aiTargetBadge}
+                            </div>
+                            ${projBadge ? `<div>${projBadge}</div>` : ''}
+                        </div>
+                        ` : ''}
+
+                        <!-- TIER 3: Headline & Editorial Summary -->
+                        <div style="display:flex;flex-direction:column;gap:0.3rem;">
+                            <div>${headlineLink}</div>
+                            ${c.summary ? `<p style="margin:0;font-size:0.82rem;color:#cbd5e1;line-height:1.52;">${c.summary}</p>` : ''}
+                        </div>
+
+                        <!-- TIER 4: Actionable AI Takeaway Sub-Card -->
+                        <div style="background:#020203;border:1px solid rgba(168,85,247,0.22);border-left:3px solid #c084fc;border-radius:6px;padding:0.55rem 0.75rem;font-size:0.76rem;display:flex;flex-direction:column;gap:0.3rem;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;flex-wrap:wrap;">
+                                <div style="color:#e2e8f0;line-height:1.45;flex:1;min-width:240px;">
+                                    <strong style="color:#c084fc;font-weight:700;">💡 Actionable Thesis: </strong>
+                                    <span>${displayTakeaway || 'No AI thesis generated yet.'}</span>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:0.65rem;flex-shrink:0;font-family:var(--font-mono);font-size:0.7rem;color:#a1a1aa;white-space:nowrap;">
+                                    <div>Horizon: <strong style="color:#f8fafc;">${c.expected_horizon || '1-3 Days'}</strong></div>
+                                    <div>Move Est: <strong style="color:#fbbf24;">${c.volatility_est || '±3%'}</strong></div>
+                                    ${latBadge}
+                                    ${tokBadge}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TIER 5: Peer Stock Impacts & Action Bar -->
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;padding-top:0.35rem;border-top:1px solid rgba(255,255,255,0.05);">
+                            <div>
+                                ${multiStockBadge || '<span style="font-size:0.68rem;color:#52525b;font-family:var(--font-mono);">Direct Single-Stock Catalyst</span>'}
+                            </div>
+                            <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                                <button type="button" onclick="app.analyzeSingleCatalyst('${encodeURIComponent(c.ticker)}', '${encodeURIComponent(c.title)}', this)" class="btn btn-sm" style="padding:0.2rem 0.55rem;font-size:0.72rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);border-radius:4px;font-weight:600;" title="Run on-demand AI re-evaluation using selected model">⚡ Re-evaluate</button>
+                                <button type="button" onclick="app.showNewsRawOutput(${filtered.indexOf(c)})" class="btn btn-sm" style="padding:0.2rem 0.55rem;font-size:0.72rem;background:rgba(255,255,255,0.04);color:#d4d4d8;border:1px solid rgba(255,255,255,0.12);border-radius:4px;" title="Inspect raw OmniRouter AI JSON telemetry">📄 Raw AI</button>
+                                <button type="button" onclick="app.runConsensusForStock('${c.ticker}')" class="btn btn-sm" style="padding:0.2rem 0.55rem;font-size:0.72rem;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.35);border-radius:4px;font-weight:600;" title="Run AI Multi-Model Consensus for Target, Resistance, Support & Buy Zone">🧠 Consensus</button>
+                                <button type="button" onclick="app.openAddToWatchlistModal('${c.ticker}')" class="btn btn-sm" style="padding:0.2rem 0.55rem;font-size:0.72rem;background:rgba(245,158,11,0.12);color:#fbbf24;border:1px solid rgba(245,158,11,0.25);border-radius:4px;" title="Add to Watchlist">⭐ Watchlist</button>
+                                <button type="button" onclick="app.runPredictionForTickerSingle('${c.ticker}')" class="btn btn-sm" style="padding:0.2rem 0.55rem;font-size:0.72rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);border-radius:4px;" title="Run Kronos Forecast">🔮 Predict</button>
+                            </div>
+                        </div>
+
+                    </div>`;
                 }).join('');
 
                 this.updateCatalystSelectionState();
