@@ -89,17 +89,26 @@ def test_vercel_path_fix_middleware():
     vercel_app = VercelPathFixMiddleware(app)
     vclient = TestClient(vercel_app, follow_redirects=False)
 
-    # 1. Test request routed to /api/index.py with x-now-route-matches for /portal
+    # 1. Test POST request to /api/index.py with __vercel_path__ query param (Vercel rewrite)
+    resp_post = vclient.post(
+        "/api/index.py?__vercel_path__=/api/v1/auth/verify-code",
+        json={"code": "NEXUS-MASTER"},
+    )
+    assert resp_post.status_code == 200
+    assert resp_post.json()["valid"] is True
+
+    # 2. Test request routed to /api/index.py with x-now-route-matches for /portal
     resp = vclient.get("/api/index.py", headers={"x-now-route-matches": "1=%2Fportal"})
     assert resp.status_code == 200
     assert "NEXUS GATEWAY" in resp.text
 
-    # 2. Test request routed to /api/index.py with x-matched-path for /join
+    # 3. Test request routed to /api/index.py with x-matched-path for /join
     resp_join = vclient.get("/api/index.py", headers={"x-matched-path": "/join"})
     assert resp_join.status_code == 200
 
-    # 3. Test request routed to /api/index.py with no headers falls back to root /
+    # 4. Test request routed to /api/index.py with no headers falls back to root /
     resp_root = vclient.get("/api/index.py")
     assert resp_root.status_code == 200
     assert "NEXUS GATEWAY" in resp_root.text
+
 
