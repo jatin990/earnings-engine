@@ -1362,6 +1362,44 @@ def get_tracked_breakouts(
         }
 
 
+def delete_tracked_breakout(setup_id: int, settings: Settings | None = None) -> bool:
+    """Delete a single tracked breakout setup by its primary key ID."""
+    settings = settings or Settings()
+    conn = get_db_connection(settings)
+    try:
+        cur = conn.execute("DELETE FROM breakout_tracked_signals WHERE id = ?", (setup_id,))
+        conn.commit()
+        deleted = cur.rowcount if hasattr(cur, "rowcount") and cur.rowcount is not None and cur.rowcount > 0 else False
+        logger.info("[BREAKOUT-TRACKED] Deleted tracked setup ID=%s (deleted=%s)", setup_id, bool(deleted))
+        return bool(deleted)
+    except Exception as e:
+        logger.exception("[BREAKOUT-TRACKED] Failed deleting tracked setup ID=%s: %s", setup_id, e)
+        return False
+    finally:
+        conn.close()
+
+
+def delete_tracked_breakouts_by_ticker(ticker: str, settings: Settings | None = None) -> int:
+    """Delete all tracked breakout setups for a given ticker symbol."""
+    settings = settings or Settings()
+    sym = ticker.upper().strip()
+    conn = get_db_connection(settings)
+    try:
+        cur = conn.execute(
+            "DELETE FROM breakout_tracked_signals WHERE UPPER(ticker) = ? OR UPPER(ticker) = ?",
+            (sym, sym.replace(".NS", "")),
+        )
+        conn.commit()
+        deleted = cur.rowcount if hasattr(cur, "rowcount") and cur.rowcount is not None and cur.rowcount >= 0 else 0
+        logger.info("[BREAKOUT-TRACKED] Deleted %d tracked setups for ticker=%s", deleted, sym)
+        return deleted
+    except Exception as e:
+        logger.exception("[BREAKOUT-TRACKED] Failed deleting tracked setups for ticker=%s: %s", sym, e)
+        return 0
+    finally:
+        conn.close()
+
+
 def _promote(ticker: str, result: dict, settings: Settings | None = None) -> None:
     """Place a ticker into the correct tier based on its score and audit the transition."""
     settings = settings or Settings()
@@ -2962,6 +3000,8 @@ def _resolve_universe_tickers(settings: Settings, universe: str | None = None) -
             try:
                 with _connect(settings) as conn:
                     rows = conn.execute("SELECT ticker FROM tickers WHERE ticker IS NOT NULL LIMIT 100").fetchall()
+                    if not rows:
+                        rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 100").fetchall()
                     tickers.update([r[0] for r in rows if r[0]])
             except Exception:
                 pass

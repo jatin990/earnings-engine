@@ -1196,8 +1196,8 @@
                         <button type="button" onclick="refreshStockPricesFromSource()" class="btn-section-action cyan-subtle" id="btnFetchPricesSource" title="Download latest OHLCV daily price bars and market cap from NSE / yfinance">
                             🔄 Fetch Price from Source
                         </button>
-                        <button type="button" onclick="hardRefreshStockPricesFromSource()" class="btn-section-action warning-subtle" id="btnHardRefreshPrices" title="Force re-download FULL historical OHLCV from Jan 2015 (or listing date) and rebuild the cached price series">
-                            ⚡ Hard Refresh (2015+)
+                        <button type="button" onclick="hardRefreshStockPricesFromSource()" class="btn-section-action warning-subtle" id="btnHardRefreshPrices" title="Force re-download historical OHLCV for the last 1 year and rebuild the cached price series">
+                            ⚡ Hard Refresh (1 Year)
                         </button>
                         <button type="button" onclick="recalculateStockMetrics()" class="btn-section-action primary-subtle" id="btnRecalcMetrics" title="Recalculate technical, moving average, and price quality metrics">
                             ⚡ Recalculate Quote
@@ -1407,8 +1407,8 @@
                         <button type="button" id="btnRefreshTechPrices" onclick="refreshStockPricesFromSource()" class="btn-section-action cyan-subtle" title="Fetch fresh OHLCV price bars and re-calculate technical indicators">
                             🔄 Fetch Price History
                         </button>
-                        <button type="button" id="btnHardRefreshTechPrices" onclick="hardRefreshStockPricesFromSource()" class="btn-section-action warning-subtle" title="Force re-download FULL historical OHLCV from Jan 2015 (or listing date) and rebuild the cached price series">
-                            ⚡ Hard Refresh (2015+)
+                        <button type="button" id="btnHardRefreshTechPrices" onclick="hardRefreshStockPricesFromSource()" class="btn-section-action warning-subtle" title="Force re-download historical OHLCV for the last 1 year and rebuild the cached price series">
+                            ⚡ Hard Refresh (1 Year)
                         </button>
                         <button type="button" id="btnRecalcTechnicals" onclick="recalculateTechnicalsFromSource()" class="btn-section-action primary-subtle" title="Recalculate 20D & 3M swing channels, cycle counts, 20/50/200-DMAs, and structure alignment">
                             ⚡ Recalculate Technicals
@@ -2004,7 +2004,7 @@
         }
 
         async function hardRefreshStockPricesFromSource() {
-            if (!confirm(`⚠️ This will fully re-download ${ACTIVE_SYM}'s entire price history from Jan 2015 (or listing date) and rebuild the cached OHLCV series. Continue?`)) return;
+            if (!confirm(`⚠️ This will fully re-download ${ACTIVE_SYM}'s price history for the last 1 year and rebuild the cached OHLCV series. Continue?`)) return;
             const btnHeader = document.getElementById('btnFetchPricesSource');
             const btnTech = document.getElementById('btnRefreshTechPrices');
             const btn = document.getElementById('btnHardRefreshPrices');
@@ -2016,7 +2016,7 @@
                     el.innerHTML = '<span class="spinner" style="width:10px;height:10px;"></span> Hard refreshing...';
                 } else {
                     if (el.id === 'btnHardRefreshPrices' || el.id === 'btnHardRefreshTechPrices') {
-                        el.innerHTML = '⚡ Hard Refresh (2015+)';
+                        el.innerHTML = '⚡ Hard Refresh (1 Year)';
                     } else if (el.id === 'btnRefreshTechPrices') {
                         el.innerHTML = '🔄 Fetch Price History';
                     } else {
@@ -2026,7 +2026,7 @@
             };
             setBtn(btn, true); setBtn(btnHardTech, true); setBtn(btnHeader, true); setBtn(btnTech, true);
             try {
-                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/hard-refresh-prices?from_year=2015`, { method: 'POST' });
+                const res = await fetch(`/api/v1/stock/${encodeURIComponent(ACTIVE_SYM)}/hard-refresh-prices?hard=true`, { method: 'POST' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || data.error || 'Hard refresh failed');
                 if (data.overview) {

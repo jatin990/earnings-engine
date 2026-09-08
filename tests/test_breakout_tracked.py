@@ -147,3 +147,83 @@ def test_tracked_breakout_persistence():
     conn = get_db_connection(settings)
     conn.execute("DELETE FROM breakout_tracked_signals WHERE ticker = 'TEST_TRACKED_STOCK.NS'")
     conn.commit()
+
+
+def test_delete_tracked_breakout_api(app_client):
+    """Test DELETE /api/v1/breakout/tracked/{id} and DELETE /api/v1/breakout/tracked/ticker/{ticker}."""
+    settings = Settings()
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Clean any stale test rows first
+    conn = get_db_connection(settings)
+    conn.execute("DELETE FROM breakout_tracked_signals WHERE ticker = 'TEST_DEL_TICKER.NS'")
+    conn.commit()
+
+    try:
+        # Insert two test setups for a ticker
+        cur1 = conn.execute(
+            """
+            INSERT INTO breakout_tracked_signals (
+                ticker, company_name, industry, tier, signal_date,
+                signal_price, current_price, breakout_trigger, target_price, stop_loss,
+                composite_score, setup_archetype, outcome, scanned_at, created_at, updated_at
+            ) VALUES (
+                'TEST_DEL_TICKER.NS', 'Test Delete Corp', 'Software', 'HOT', ?,
+                100.0, 102.0, 105.0, 120.0, 95.0, 85.0, 'Classic Technical', 'ACTIVE',
+                ?, ?, ?
+            )
+            """,
+            (today_str, today_str, today_str, today_str),
+        )
+        id1 = cur1.lastrowid
+
+        cur2 = conn.execute(
+            """
+            INSERT INTO breakout_tracked_signals (
+                ticker, company_name, industry, tier, signal_date,
+                signal_price, current_price, breakout_trigger, target_price, stop_loss,
+                composite_score, setup_archetype, outcome, breakout_happened, scanned_at, created_at, updated_at
+            ) VALUES (
+                'TEST_DEL_TICKER.NS', 'Test Delete Corp', 'Software', 'WARM', '2026-08-28',
+                108.0, 110.0, 106.0, 125.0, 96.0, 75.0, 'NSE Delivery Surge', 'TRIGGERED', 1,
+                ?, ?, ?
+            )
+            """,
+            (today_str, today_str, today_str),
+        )
+        id2 = cur2.lastrowid
+        conn.commit()
+        conn.close()
+
+        # 1. Delete single setup by ID
+        del_resp1 = app_client.delete(f"/api/v1/breakout/tracked/{id1}")
+        assert del_resp1.status_code == 200
+        del_json1 = del_resp1.json()
+        assert del_json1["success"] is True
+        assert del_json1["id"] == id1
+
+        # Verify id2 still exists in DB
+        db_conn = get_db_connection(settings)
+        cur_check = db_conn.execute("SELECT id FROM breakout_tracked_signals WHERE id = ?", (id2,))
+        assert cur_check.fetchone() is not None
+        cur_check1 = db_conn.execute("SELECT id FROM breakout_tracked_signals WHERE id = ?", (id1,))
+        assert cur_check1.fetchone() is None
+        db_conn.close()
+
+        # 2. Delete all setups for ticker
+        del_resp2 = app_client.delete("/api/v1/breakout/tracked/ticker/TEST_DEL_TICKER.NS")
+        assert del_resp2.status_code == 200
+        del_json2 = del_resp2.json()
+        assert del_json2["success"] is True
+        assert del_json2["deleted_count"] >= 1
+
+        # Verify no setups remain in DB for ticker
+        db_conn2 = get_db_connection(settings)
+        cur_check2 = db_conn2.execute("SELECT id FROM breakout_tracked_signals WHERE ticker = 'TEST_DEL_TICKER.NS'")
+        assert cur_check2.fetchall() == []
+        db_conn2.close()
+    finally:
+        cleanup_conn = get_db_connection(settings)
+        cleanup_conn.execute("DELETE FROM breakout_tracked_signals WHERE ticker = 'TEST_DEL_TICKER.NS'")
+        cleanup_conn.commit()
+        cleanup_conn.close()

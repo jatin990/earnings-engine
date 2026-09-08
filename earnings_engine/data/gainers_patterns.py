@@ -341,6 +341,8 @@ def get_daily_top_gainers(
         # Load tickers from master table
         with _connect(settings) as conn:
             rows = conn.execute("SELECT ticker FROM tickers WHERE ticker IS NOT NULL LIMIT 300").fetchall()
+            if not rows:
+                rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 300").fetchall()
             tickers = [r[0] for r in rows if r[0]]
 
     # Filter out test and mock tickers and deduplicate

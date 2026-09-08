@@ -280,11 +280,11 @@ def fetch_prices(
     clear_price_df_cache(sym)
 
     # Delta fetch: only download the dates we're missing.
-    # If hard_refresh=True, we explicitly bypass delta fetch and pull from 2015-01-01 (or custom start_date).
+    # If hard_refresh=True, we explicitly bypass delta fetch and pull 1 year of history (or custom start_date).
     if hard_refresh:
-        start = start_date or "2015-01-01"
+        start = start_date or (pd.Timestamp.now() - pd.Timedelta(days=365)).strftime("%Y-%m-%d")
         last_cached = None
-        logger.info("[DATA-FETCH] [yfinance] Hard-refreshing full historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
+        logger.info("[DATA-FETCH] [yfinance] Hard-refreshing 1-year historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
     else:
         start = start_date or settings.history_start
         last_cached = _last_cached_date(sym, settings)

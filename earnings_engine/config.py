@@ -2,6 +2,7 @@
 
 import os
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -36,11 +37,19 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _default_history_start() -> str:
+    """Calculate the default start date for price history (1 year / 365 days ago)."""
+    raw = os.getenv("EARNINGS_ENGINE_HISTORY_START", "").strip()
+    if raw:
+        return raw
+    return (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+
+
 @dataclass
 class Settings:
     """Runtime settings for data ingestion."""
 
-    history_start: str = "2015-01-01"
+    history_start: str = field(default_factory=_default_history_start)
     # Refresh cached data if older than this many days.
     cache_max_age_days: int = 1
     # Pause between yfinance requests to stay under rate limits.

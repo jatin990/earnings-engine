@@ -994,10 +994,18 @@ def backtest_strategy_history(
         try:
             with _connect(settings) as conn:
                 db_tickers = [r[0] for r in conn.execute("SELECT ticker FROM tickers WHERE ticker IS NOT NULL").fetchall() if r[0]]
+                if not db_tickers:
+                    db_tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM price_history").fetchall() if r[0]]
                 if db_tickers:
                     tickers = db_tickers
         except Exception:
-            pass
+            try:
+                with _connect(settings) as conn:
+                    db_tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM price_history").fetchall() if r[0]]
+                    if db_tickers:
+                        tickers = db_tickers
+            except Exception:
+                pass
 
     if not tickers:
         try:

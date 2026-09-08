@@ -270,6 +270,8 @@ def scan_quarter_repeaters(
         try:
             conn = get_db_connection(settings)
             rows = conn.execute("SELECT ticker FROM tickers WHERE ticker IS NOT NULL LIMIT 200").fetchall()
+            if not rows:
+                rows = conn.execute("SELECT DISTINCT ticker FROM price_history LIMIT 200").fetchall()
             conn.close()
             tickers.update([r[0] for r in rows if r[0]])
         except Exception:

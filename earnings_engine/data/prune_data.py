@@ -100,29 +100,29 @@ def prune_auxiliary_tables(settings: Settings | None = None) -> dict[str, int]:
 def vacuum_database(settings: Settings | None = None) -> bool:
     """Execute VACUUM on the SQLite database to reclaim disk space and rebuild indexes."""
     s = settings or Settings()
+    db_path = _cache_path(s)
+
+    if db_path.exists():
+        logger.info("Compacting local SQLite database via VACUUM at %s...", db_path)
+        try:
+            conn = sqlite3.connect(str(db_path), isolation_level=None, timeout=60.0)
+            try:
+                conn.execute("VACUUM;")
+                conn.execute("PRAGMA optimize;")
+                logger.info("Local SQLite database compacted successfully.")
+            finally:
+                conn.close()
+            return True
+        except Exception as exc:
+            logger.error("Failed to vacuum SQLite database: %s", exc)
+            return False
+
     if is_turso_enabled():
         logger.info("Turso remote cloud database detected; VACUUM is managed by LibSQL engine.")
         return True
 
-    db_path = _cache_path(s)
-    if not db_path.exists():
-        logger.warning("Database path %s does not exist, skipping VACUUM.", db_path)
-        return False
-
-    logger.info("Compacting SQLite database via VACUUM at %s...", db_path)
-    try:
-        # SQLite VACUUM cannot be run inside a transaction
-        conn = sqlite3.connect(str(db_path), isolation_level=None, timeout=60.0)
-        try:
-            conn.execute("VACUUM;")
-            conn.execute("PRAGMA optimize;")
-            logger.info("Database compacted successfully.")
-            return True
-        finally:
-            conn.close()
-    except Exception as exc:
-        logger.error("Failed to vacuum SQLite database: %s", exc)
-        return False
+    logger.warning("Database path %s does not exist, skipping VACUUM.", db_path)
+    return False
 
 
 def prune_all_data(

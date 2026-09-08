@@ -322,16 +322,18 @@ async def get_live_week_hl_endpoint(ticker: str, earnings_date: str | None = Que
 @router.post("/api/v1/stock/{ticker}/hard-refresh-prices")
 async def refresh_stock_prices_endpoint(
     ticker: str,
-    hard: bool = Query(False, description="Whether to hard-refresh full history from 2015"),
-    from_year: int | None = Query(None, description="Starting year for historical prices (e.g. 2015)"),
+    hard: bool = Query(False, description="Whether to hard-refresh price history for the last 1 year"),
+    from_year: int | None = Query(None, description="Starting year for historical prices (e.g. 2025)"),
 ):
     """Force download latest OHLCV price bars, market cap, and return updated quote & technicals.
-    
-    If hard=True or from_year is specified, fetches full historical prices from 2015 (or listing date).
+
+    If hard=True or from_year is specified, fetches historical prices for the last 1 year (or specified from_year).
     """
     sym = clean_ticker_param(ticker)
     is_hard = hard or (from_year is not None)
-    start_dt = f"{from_year}-01-01" if from_year else ("2015-01-01" if is_hard else None)
+    import pandas as pd
+    default_hard_start = (pd.Timestamp.now() - pd.Timedelta(days=365)).strftime("%Y-%m-%d")
+    start_dt = f"{from_year}-01-01" if from_year else (default_hard_start if is_hard else None)
     try:
         from earnings_engine.data.prices import ingest_prices, load_prices
         from earnings_engine.data.universe import ingest_market_caps

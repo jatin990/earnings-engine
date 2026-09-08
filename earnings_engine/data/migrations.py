@@ -1390,9 +1390,21 @@ MIGRATIONS: list[Migration] = [
 ]
 
 
-def apply_migrations(settings: Settings | None = None) -> list[str]:
+_APPLIED_DBS: set[str] = set()
+
+
+def reset_migration_cache() -> None:
+    """Clear in-memory migration tracking cache."""
+    _APPLIED_DBS.clear()
+
+
+def apply_migrations(settings: Settings | None = None, force: bool = False) -> list[str]:
     """Execute all pending database migrations in order."""
     settings = settings or Settings()
+    db_key = str(getattr(settings, "db_path", ""))
+    if not force and db_key and db_key in _APPLIED_DBS:
+        return []
+
     conn = get_db_connection(settings)
 
     # 1. Ensure migrations ledger exists
@@ -1454,5 +1466,8 @@ def apply_migrations(settings: Settings | None = None) -> list[str]:
                     conn.commit()
             except Exception:
                 pass
+
+    if db_key:
+        _APPLIED_DBS.add(db_key)
 
     return applied_names

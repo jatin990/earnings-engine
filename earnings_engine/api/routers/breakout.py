@@ -415,6 +415,52 @@ async def get_tracked_breakouts_endpoint(
         raise HTTPException(status_code=500, detail=f"Error fetching tracked breakouts: {str(e)}")
 
 
+@router.delete("/api/v1/breakout/tracked/{id}")
+@router.delete("/api/v1/breakout-radar/tracked/{id}")
+async def delete_tracked_breakout_endpoint(id: int):
+    """Untrack / delete a single breakout setup by its unique record ID."""
+    try:
+        success = await asyncio.to_thread(
+            breakout_scanner_mod.delete_tracked_breakout,
+            setup_id=id,
+            settings=_settings,
+        )
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Tracked breakout setup #{id} not found")
+        return {
+            "success": True,
+            "id": id,
+            "message": f"Successfully untracked breakout setup #{id}",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error in delete_tracked_breakout_endpoint: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to untrack setup: {str(e)}")
+
+
+@router.delete("/api/v1/breakout/tracked/ticker/{ticker}")
+@router.delete("/api/v1/breakout-radar/tracked/ticker/{ticker}")
+async def delete_tracked_breakouts_by_ticker_endpoint(ticker: str):
+    """Untrack / delete all breakout setups for a given ticker."""
+    try:
+        sym = ticker.strip()
+        deleted_count = await asyncio.to_thread(
+            breakout_scanner_mod.delete_tracked_breakouts_by_ticker,
+            ticker=sym,
+            settings=_settings,
+        )
+        return {
+            "success": True,
+            "ticker": sym,
+            "deleted_count": deleted_count,
+            "message": f"Successfully untracked {deleted_count} setups for {sym}",
+        }
+    except Exception as e:
+        logger.exception("Error in delete_tracked_breakouts_by_ticker_endpoint: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to untrack setups for ticker: {str(e)}")
+
+
 @router.get("/api/v1/breakout-radar/backtest")
 async def run_breakout_historical_backtest(
     universe: str | None = Query(None, description="Universe or watchlist to run backtest on"),
