@@ -55,9 +55,10 @@
                     <div>
                         <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
                             <span>🧠 Multi-Model AI Consensus Engine</span>
+                            <span class="signal-badge" style="background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); font-size: 0.65rem;">OmniRoute Gateway</span>
                         </h3>
                         <p style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--text-muted);">
-                            Parallel ensemble forecasting across DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B & Mistral-Large with automated post-mortem diagnostics.
+                            Point-in-Time quantitative consensus & double-verified trade thesis with strict invalidation rules powered by local OmniRoute gateway.
                         </p>
                     </div>
 
@@ -65,43 +66,40 @@
                     <div style="display: flex; flex-direction: column; gap: 0.4rem;">
                         <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
                             <input type="text" id="consensusTickerInput" placeholder="Ticker (e.g. RELIANCE.NS)" style="height: 30px; padding: 0 0.55rem; font-size: 0.75rem; background: #000000; color: #ededed; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; min-width: 150px; text-transform: uppercase; font-family: var(--font-mono); outline: none;">
-                            
-                            <select id="consensusModelSelect" onchange="app.updateConsensusModelTelemetry()" style="height: 30px; padding: 0 0.55rem; font-size: 0.75rem; background: #000000; color: #ededed; border: 1px solid rgba(99,102,241,0.3); border-radius: 6px; font-family: var(--font-sans); outline: none;">
-                                <option value="ALL" selected>🧠 All AI Models (Ensemble)</option>
-                                <option value="deepseek/deepseek-r1">🤖 DeepSeek-R1 (671B MoE)</option>
-                                <option value="meta-llama/llama-3.3-70b-instruct">🦙 Llama-3.3-70B (70B Dense)</option>
-                                <option value="qwen/qwen-2.5-72b-instruct">🌐 Qwen-2.5-72B (72B Arch)</option>
-                                <option value="mistralai/mistral-large">⚡ Mistral-Large (123B Large)</option>
-                                <option value="google/gemma-4-31b-it:free">💎 Gemma-4-31B Free (31B)</option>
-                                <option value="z-ai/glm-5.2">🐉 GLM-5.2 (753B Flagship)</option>
-                                <option value="local">💻 Local (Ollama / LM Studio)</option>
+
+                            <select id="consensusModelSelect" onchange="app.updateConsensusModelTelemetry()" style="height: 30px; padding: 0 0.55rem; font-size: 0.75rem; background: #000000; color: #ededed; border: 1px solid rgba(99,102,241,0.3); border-radius: 6px; font-family: var(--font-sans); outline: none; max-width: 260px;">
+                                <option value="ALL" selected>🧠 All Discovered Models (Ensemble)</option>
+                                <option value="deepseek/deepseek-r1">🤖 DeepSeek-R1 (Reasoning / MoE)</option>
+                                <option value="meta-llama/llama-3.3-70b-instruct">🦙 Llama-3.3-70B (Dense)</option>
+                                <option value="qwen/qwen-2.5-72b-instruct">🌐 Qwen-2.5-72B (Quantitative)</option>
+                                <option value="mistralai/mistral-large">⚡ Mistral-Large (General)</option>
                             </select>
 
                             <select id="consensusTimeframeSelect" style="height: 30px; padding: 0 0.55rem; font-size: 0.75rem; background: #000000; color: #ededed; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-family: var(--font-sans); outline: none;">
-                                <option value="7">7 Days (Swing)</option>
-                                <option value="14" selected>14 Days (Standard)</option>
-                                <option value="30">30 Days (Monthly)</option>
+                                <option value="3">3 Days (Scalp / Catalyst)</option>
+                                <option value="7">7 Days (Short Swing)</option>
+                                <option value="14" selected>14 Days (Standard Swing)</option>
+                                <option value="30">30 Days (Positional)</option>
+                                <option value="90">90 Days (Quarterly)</option>
                             </select>
 
                             <button type="button" onclick="app.runConsensusPrediction()" id="consensusRunBtn" class="btn btn-primary btn-sm" style="font-weight:600; white-space: nowrap;">
-                                <span>⚡</span> Run Model / Consensus
+                                <span>⚡</span> Run Consensus / Model
                             </button>
                             <button type="button" onclick="app.settleConsensusPredictions()" id="consensusSettleBtn" class="btn btn-secondary btn-sm" style="white-space: nowrap;">
                                 <span>🔄</span> Settle Trades
                             </button>
                         </div>
 
-                        <!-- Dynamic Model Telemetry Badge & Quick 1-Click Single Model Buttons -->
+                        <!-- Dynamic Model Telemetry Badge & OmniRoute Gateway Status -->
                         <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; flex-wrap: wrap;">
-                            <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap;">
-                                <span style="font-size: 0.65rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Run 1 Model:</span>
-                                <button type="button" onclick="app.runConsensusPrediction('deepseek/deepseek-r1')" class="btn btn-sm" style="font-size: 0.65rem; padding: 0.12rem 0.4rem; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.35); color: #c7d2fe; border-radius: 4px;" title="Run DeepSeek-R1 only">🤖 DeepSeek</button>
-                                <button type="button" onclick="app.runConsensusPrediction('meta-llama/llama-3.3-70b-instruct')" class="btn btn-sm" style="font-size: 0.65rem; padding: 0.12rem 0.4rem; background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.35); color: #bae6fd; border-radius: 4px;" title="Run Llama-3.3-70B only">🦙 Llama</button>
-                                <button type="button" onclick="app.runConsensusPrediction('qwen/qwen-2.5-72b-instruct')" class="btn btn-sm" style="font-size: 0.65rem; padding: 0.12rem 0.4rem; background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.35); color: #e9d5ff; border-radius: 4px;" title="Run Qwen-2.5-72B only">🌐 Qwen</button>
-                                <button type="button" onclick="app.runConsensusPrediction('mistralai/mistral-large')" class="btn btn-sm" style="font-size: 0.65rem; padding: 0.12rem 0.4rem; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.35); color: #fde68a; border-radius: 4px;" title="Run Mistral-Large only">⚡ Mistral</button>
-                                <button type="button" onclick="app.runConsensusPrediction('google/gemma-4-31b-it:free')" class="btn btn-sm" style="font-size: 0.65rem; padding: 0.12rem 0.4rem; background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.35); color: #a5f3fc; border-radius: 4px;" title="Run Gemma-4-31B Free only">💎 Gemma</button>
-                                <button type="button" onclick="app.runConsensusPrediction('z-ai/glm-5.2')" class="btn btn-sm" style="font-size: 0.65rem; padding: 0.12rem 0.4rem; background: rgba(236,72,153,0.15); border: 1px solid rgba(236,72,153,0.35); color: #fbcfe8; border-radius: 4px;" title="Run Z.ai GLM-5.2 only">🐉 GLM-5.2</button>
-                                <button type="button" onclick="app.runConsensusPrediction('local')" class="btn btn-sm" style="font-size: 0.65rem; padding: 0.12rem 0.4rem; background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.35); color: #86efac; border-radius: 4px;" title="Run Local Ollama Model only">💻 Local</button>
+                            <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                                <span id="omniRouteGatewayStatusBadge" style="font-size: 0.65rem; color: #34d399; font-family: var(--font-mono); font-weight: 700; background: rgba(16,185,129,0.08); padding: 0.12rem 0.45rem; border-radius: 4px; border: 1px solid rgba(16,185,129,0.25);">
+                                    🟢 OmniRoute Gateway: Active
+                                </span>
+                                <button type="button" onclick="app.loadConsensusOmniRouteModels(true)" class="btn btn-sm" style="font-size: 0.65rem; padding: 0.12rem 0.45rem; background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.35); color: #d8b4fe; border-radius: 4px;" title="Scan OmniRoute Gateway Ports">
+                                    🔄 Scan Models
+                                </button>
                             </div>
                             <span id="consensusModelTelemetryBadge" style="font-size: 0.65rem; color: #38bdf8; font-family: var(--font-mono); font-weight: 700; background: rgba(56,189,248,0.08); padding: 0.12rem 0.45rem; border-radius: 4px; border: 1px solid rgba(56,189,248,0.2);">
                                 ⚡ Ensemble Avg: ~2.4s · 99.6% Success

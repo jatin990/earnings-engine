@@ -1119,42 +1119,26 @@
                 <span id="txtRatelimit">OmniRoute: Ready</span>
             </div>
 
-            <!-- Local Models Group -->
-            <div style="display: inline-flex; align-items: center; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); padding: 1px 2px; gap: 2px;">
-                <button type="button" id="btnModel-local" onclick="openLocalModelModal()" class="btn-model-opt local" style="border: none; background: transparent; padding: 0.28rem 0.45rem; color: #34d399; font-weight: 700; font-size: 0.74rem;" title="Open Local Models hub (choose active models & run individually or in parallel)">
-                    <span>💻</span> <span id="lblLocalModel">Local Models</span>
+            <!-- OmniRoute Model Selector & Actions Group -->
+            <div style="display: inline-flex; align-items: center; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: var(--radius-sm); padding: 2px 4px; gap: 4px;">
+                <span style="font-size: 0.72rem; color: #d8b4fe; font-weight: 700; padding-left: 2px;">⚡ Model:</span>
+                <select id="headerOmniRouteModelSelect" onchange="syncOmniRouteModelSelection(this.value)" style="background: #000000; color: #ffffff; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 4px; padding: 0.22rem 0.45rem; font-size: 0.74rem; font-family: var(--font-mono); outline: none; cursor: pointer; max-width: 220px;">
+                    <option value="deepseek/deepseek-r1">DeepSeek-R1 (Reasoning)</option>
+                    <option value="meta-llama/llama-3.3-70b-instruct">Llama-3.3-70B (Institutional)</option>
+                    <option value="qwen/qwen-2.5-72b-instruct">Qwen-2.5-72B (Algorithmic)</option>
+                    <option value="mistralai/mistral-large">Mistral-Large (Catalysts)</option>
+                    <option value="google/gemma-4-31b-it:free">Gemma-4-31B (Free)</option>
+                    <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
+                    <option value="z-ai/glm-5.2">GLM-5.2 (753B Flagship)</option>
+                </select>
+                <button type="button" id="btnRunSelectedModel" onclick="runConsensusWithHeaderModel()" class="btn-model-opt" style="border: none; background: rgba(168, 85, 247, 0.25); padding: 0.26rem 0.55rem; color: #e9d5ff; font-weight: 700; font-size: 0.73rem; border-radius: 3px;" title="Run selected OmniRoute model individually">
+                    <span>⚡</span> Run Model
                 </button>
-                <button type="button" id="btnModel-local-all" onclick="runAllActiveLocalConsensus()" class="btn-model-opt local" style="border: none; background: rgba(16, 185, 129, 0.18); padding: 0.28rem 0.5rem; color: #a7f3d0; font-weight: 700; font-size: 0.72rem; border-radius: 3px;" title="Dispatch prediction in parallel to ALL checked active local models">
-                    <span>⚡</span> Run Active Local
-                </button>
-                <button type="button" onclick="openLocalModelModal()" style="background: transparent; border: none; color: #6ee7b7; font-size: 0.72rem; padding: 0.25rem 0.35rem; cursor: pointer;" title="Configure local models, host & active list">⚙️</button>
+                <button type="button" onclick="toggleConsensusConfig()" style="background: transparent; border: none; color: #c084fc; font-size: 0.74rem; padding: 0.2rem 0.3rem; cursor: pointer;" title="Configure OmniRoute models, parameters & custom focus directives">⚙️</button>
             </div>
 
-            <!-- Per-Model Action Buttons -->
-            <button type="button" id="btnModel-deepseek-r1" onclick="runConsensus(true, 'deepseek/deepseek-r1')" class="btn-model-opt deepseek" title="Run DeepSeek-R1 reasoning engine (Chain of thought)">
-                <span>🤖</span> DeepSeek-R1
-            </button>
-            <button type="button" id="btnModel-llama-70b" onclick="runConsensus(true, 'meta-llama/llama-3.3-70b-instruct')" class="btn-model-opt llama" title="Run Meta Llama-3.3-70B institutional model">
-                <span>🦙</span> Llama-70B
-            </button>
-            <button type="button" id="btnModel-qwen-72b" onclick="runConsensus(true, 'qwen/qwen-2.5-72b-instruct')" class="btn-model-opt qwen" title="Run Alibaba Qwen-2.5-72B algorithmic model">
-                <span>🌐</span> Qwen-72B
-            </button>
-            <button type="button" id="btnModel-mistral-large" onclick="runConsensus(true, 'mistralai/mistral-large')" class="btn-model-opt mistral" title="Run Mistral-Large catalyst model">
-                <span>⚡</span> Mistral
-            </button>
-            <button type="button" id="btnModel-gemma-31b" onclick="runConsensus(true, 'google/gemma-4-31b-it:free')" class="btn-model-opt gemma" title="Run Google Gemma-4-31B multimodal reasoning model (Free tier)">
-                <span>💎</span> Gemma-31B
-            </button>
-            <button type="button" id="btnModel-glm-52" onclick="runConsensus(true, 'z-ai/glm-5.2')" class="btn-model-opt glm" title="Run Z.ai GLM-5.2 flagship 753B long-horizon reasoning model">
-                <span>🐉</span> GLM-5.2
-            </button>
-            <button type="button" id="btnModel-omniroute" onclick="runConsensus(true, 'omniroute/deepseek-r1')" class="btn-model-opt" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.35); color: #d8b4fe;" title="Run diegosouzapw/OmniRoute gateway reasoning & trade catalyst engine">
-                <span>⚡</span> OmniRoute
-            </button>
-
             <!-- Run All Consensus Button -->
-            <button type="button" id="btnConsensus" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.32rem 0.75rem; font-size: 0.75rem;" title="Run all AI engines in parallel and synthesize consensus">
+            <button type="button" id="btnConsensus" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.32rem 0.75rem; font-size: 0.75rem; background: linear-gradient(135deg, #2563eb, #7c3aed); border: none;" title="Run all active AI engines via OmniRoute and synthesize consensus">
                 🧠 All Consensus
             </button>
 
@@ -1648,129 +1632,52 @@
 
             <!-- STATE 1: ON-DEMAND LAUNCHER HUB (When no predictions or ready to start) -->
             <div id="aiEmptyLauncher" style="display: none;">
-                <div style="background: rgba(99, 102, 241, 0.05); border: 1px dashed rgba(99, 102, 241, 0.25); border-radius: 12px; padding: 1.5rem; text-align: center;">
+                <div style="background: linear-gradient(180deg, rgba(168, 85, 247, 0.06) 0%, rgba(15, 23, 42, 0.4) 100%); border: 1px dashed rgba(168, 85, 247, 0.35); border-radius: 12px; padding: 1.6rem; text-align: center;">
                     <div style="font-size: 2.2rem; margin-bottom: 0.35rem;">⚡</div>
-                    <h3 style="margin: 0 0 0.4rem 0; font-size: 1.15rem; color: #ffffff; font-weight: 800;">On-Demand AI Ensemble Ready</h3>
-                    <p style="max-width: 580px; margin: 0 auto 1.25rem auto; font-size: 0.82rem; line-height: 1.5; color: #94a3b8;">
-                        Synthesize multi-agent trade setup, optimal entry zones, stop losses, and directional conviction across 6 frontier LLMs in parallel.
+                    <h3 style="margin: 0 0 0.4rem 0; font-size: 1.15rem; color: #ffffff; font-weight: 800;">OmniRoute AI Gateway Ready</h3>
+                    <p style="max-width: 620px; margin: 0 auto 1.25rem auto; font-size: 0.82rem; line-height: 1.5; color: #94a3b8;">
+                        Execute institutional multi-factor quantitative consensus with double-verification across news catalysts, price geometry, volume surge absorption, and strict risk-reward invalidation.
                     </p>
 
-                    <!-- Interactive Launcher Grid of Available Models -->
-                    <div class="ai-launcher-grid">
-                        <div class="ai-launcher-item">
-                            <div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">🤖 DeepSeek-R1</span>
-                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(99, 102, 241, 0.2); color: #c7d2fe; padding: 0.15rem 0.4rem; border-radius: 4px;">671B MoE</span>
-                                </div>
-                                <div style="font-size: 0.72rem; color: #94a3b8;">Chain-of-thought deep reasoning & quantitative validation</div>
-                                <div style="font-size: 0.65rem; color: #38bdf8; font-family: var(--font-mono); margin-top: 0.3rem; display: flex; align-items: center; gap: 0.35rem;">
-                                    <span id="telemetry-deepseek-r1">⚡ ~3.4s avg · 99.2% Success</span>
-                                </div>
-                            </div>
-                            <button type="button" id="btnModel-deepseek-r1" onclick="runConsensus(true, 'deepseek/deepseek-r1')" class="btn-tile-run" style="border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;">⚡ Run DeepSeek</button>
-                        </div>
+                    <!-- Live Gateway Status Bar -->
+                    <div style="display: inline-flex; align-items: center; gap: 0.75rem; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 0.5rem 1rem; margin-bottom: 1.25rem;">
+                        <span id="launcherGatewayIndicator" style="font-size: 0.78rem; color: #34d399; font-weight: 700; font-family: var(--font-mono);">
+                            🟢 OmniRoute Gateway Connected
+                        </span>
+                        <span style="color: rgba(255,255,255,0.2);">|</span>
+                        <span id="launcherModelCountBadge" style="font-size: 0.75rem; color: #d8b4fe; font-family: var(--font-mono);">
+                            Models Discovered: Loading...
+                        </span>
+                        <button type="button" onclick="loadOmniRouteModels()" style="background: transparent; border: none; color: #38bdf8; font-size: 0.72rem; cursor: pointer; text-decoration: underline;">↻ Refresh</button>
+                    </div>
 
-                        <div class="ai-launcher-item">
-                            <div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">🦙 Llama-3.3-70B</span>
-                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(56, 189, 248, 0.2); color: #bae6fd; padding: 0.15rem 0.4rem; border-radius: 4px;">70B Dense</span>
-                                </div>
-                                <div style="font-size: 0.72rem; color: #94a3b8;">Institutional structure, supply-demand & risk alignment</div>
-                                <div style="font-size: 0.65rem; color: #38bdf8; font-family: var(--font-mono); margin-top: 0.3rem; display: flex; align-items: center; gap: 0.35rem;">
-                                    <span id="telemetry-llama-3-3-70b-instruct">⚡ ~2.1s avg · 99.8% Success</span>
-                                </div>
-                            </div>
-                            <button type="button" id="btnModel-llama-3-3-70b-instruct" onclick="runConsensus(true, 'meta-llama/llama-3.3-70b-instruct')" class="btn-tile-run" style="border-color: rgba(56, 189, 248, 0.4); color: #bae6fd;">⚡ Run Llama</button>
+                    <!-- Dynamic Model Picker & Execution Control -->
+                    <div style="max-width: 640px; margin: 0 auto 1.25rem auto; background: rgba(0,0,0,0.5); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 10px; padding: 1rem; text-align: left;">
+                        <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #d8b4fe; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                            🎯 Select AI Reasoning Engine
+                        </label>
+                        <div style="display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.75rem;">
+                            <select id="launcherOmniRouteSelect" onchange="syncOmniRouteModelSelection(this.value)" style="flex: 1; padding: 0.55rem 0.75rem; background: #000000; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #ffffff; font-size: 0.82rem; font-family: var(--font-mono); outline: none;">
+                                <option value="deepseek/deepseek-r1">DeepSeek-R1 [671B MoE · Deep Reasoning]</option>
+                                <option value="meta-llama/llama-3.3-70b-instruct">Llama-3.3-70B [70B Dense · Institutional]</option>
+                                <option value="qwen/qwen-2.5-72b-instruct">Qwen-2.5-72B [72B · Algorithmic & Momentum]</option>
+                                <option value="mistralai/mistral-large">Mistral-Large [123B · Catalysts & Earnings]</option>
+                                <option value="google/gemma-4-31b-it:free">Gemma-4-31B [31B · Mathematical Validation (Free)]</option>
+                                <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash [Fast Multi-Pillar]</option>
+                                <option value="z-ai/glm-5.2">GLM-5.2 [753B · Flagship Multi-Quarter]</option>
+                            </select>
+                            <button type="button" onclick="runConsensusWithLauncherModel()" class="btn btn-primary" style="padding: 0.55rem 1.1rem; font-size: 0.82rem; font-weight: 700; background: rgba(168, 85, 247, 0.3); border: 1px solid rgba(168, 85, 247, 0.5); color: #f3e8ff;">
+                                ⚡ Run Single Model
+                            </button>
                         </div>
-
-                        <div class="ai-launcher-item">
-                            <div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">🌐 Qwen-2.5-72B</span>
-                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(168, 85, 247, 0.2); color: #e9d5ff; padding: 0.15rem 0.4rem; border-radius: 4px;">72B Arch</span>
-                                </div>
-                                <div style="font-size: 0.72rem; color: #94a3b8;">Algorithmic price action, volume ratio & swing momentum</div>
-                                <div style="font-size: 0.65rem; color: #38bdf8; font-family: var(--font-mono); margin-top: 0.3rem; display: flex; align-items: center; gap: 0.35rem;">
-                                    <span id="telemetry-qwen-2-5-72b-instruct">⚡ ~2.3s avg · 99.6% Success</span>
-                                </div>
-                            </div>
-                            <button type="button" id="btnModel-qwen-2-5-72b-instruct" onclick="runConsensus(true, 'qwen/qwen-2.5-72b-instruct')" class="btn-tile-run" style="border-color: rgba(168, 85, 247, 0.4); color: #e9d5ff;">⚡ Run Qwen</button>
-                        </div>
-
-                        <div class="ai-launcher-item">
-                            <div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">⚡ Mistral-Large</span>
-                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(245, 158, 11, 0.2); color: #fde68a; padding: 0.15rem 0.4rem; border-radius: 4px;">123B Large</span>
-                                </div>
-                                <div style="font-size: 0.72rem; color: #94a3b8;">Corporate filing catalysts, earnings surprise & news sentiment</div>
-                                <div style="font-size: 0.65rem; color: #38bdf8; font-family: var(--font-mono); margin-top: 0.3rem; display: flex; align-items: center; gap: 0.35rem;">
-                                    <span id="telemetry-mistral-large">⚡ ~1.9s avg · 99.7% Success</span>
-                                </div>
-                            </div>
-                            <button type="button" id="btnModel-mistral-large" onclick="runConsensus(true, 'mistralai/mistral-large')" class="btn-tile-run" style="border-color: rgba(245, 158, 11, 0.4); color: #fde68a;">⚡ Run Mistral</button>
-                        </div>
-
-                        <div class="ai-launcher-item">
-                            <div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">💎 Gemma-4-31B</span>
-                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(6, 182, 212, 0.2); color: #a5f3fc; padding: 0.15rem 0.4rem; border-radius: 4px;">Free 31B</span>
-                                </div>
-                                <div style="font-size: 0.72rem; color: #94a3b8;">Mathematical precision & multi-factor validation (Free tier)</div>
-                                <div style="font-size: 0.65rem; color: #38bdf8; font-family: var(--font-mono); margin-top: 0.3rem; display: flex; align-items: center; gap: 0.35rem;">
-                                    <span id="telemetry-gemma-4-31b-it-free">⚡ ~1.6s avg · 100% Success</span>
-                                </div>
-                            </div>
-                            <button type="button" id="btnModel-gemma-4-31b-it-free" onclick="runConsensus(true, 'google/gemma-4-31b-it:free')" class="btn-tile-run" style="border-color: rgba(6, 182, 212, 0.4); color: #a5f3fc;">⚡ Run Gemma</button>
-                        </div>
-
-                        <div class="ai-launcher-item">
-                            <div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">🐉 GLM-5.2</span>
-                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(236, 72, 153, 0.2); color: #fbcfe8; padding: 0.15rem 0.4rem; border-radius: 4px;">753B Flagship</span>
-                                </div>
-                                <div style="font-size: 0.72rem; color: #94a3b8;">Z.ai long-horizon deep financial reasoning & volatility bounds</div>
-                                <div style="font-size: 0.65rem; color: #38bdf8; font-family: var(--font-mono); margin-top: 0.3rem; display: flex; align-items: center; gap: 0.35rem;">
-                                    <span id="telemetry-glm-5-2">⚡ ~3.8s avg · 99.1% Success</span>
-                                </div>
-                            </div>
-                            <button type="button" id="btnModel-glm-5-2" onclick="runConsensus(true, 'z-ai/glm-5.2')" class="btn-tile-run" style="border-color: rgba(236, 72, 153, 0.4); color: #fbcfe8;">⚡ Run GLM-5.2</button>
-                        </div>
-
-                        <div class="ai-launcher-item" style="border-color: rgba(168, 85, 247, 0.35); background: linear-gradient(180deg, rgba(168,85,247,0.06) 0%, rgba(0,0,0,0.2) 100%);">
-                            <div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">⚡ OmniRoute-AI</span>
-                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(168, 85, 247, 0.25); color: #e9d5ff; padding: 0.15rem 0.4rem; border-radius: 4px;">Gateway Proxy</span>
-                                </div>
-                                <div style="font-size: 0.72rem; color: #94a3b8;">diegosouzapw/OmniRoute quota-aware multi-LLM proxy & catalyst intelligence</div>
-                                <div style="font-size: 0.65rem; color: #c084fc; font-family: var(--font-mono); margin-top: 0.3rem; display: flex; align-items: center; gap: 0.35rem;">
-                                    <span id="telemetry-omniroute-ai">⚡ ~1.8s avg · 100% Success</span>
-                                </div>
-                            </div>
-                            <button type="button" id="btnModel-omniroute-ai" onclick="runConsensus(true, 'omniroute/deepseek-r1')" class="btn-tile-run" style="border-color: rgba(168, 85, 247, 0.5); color: #d8b4fe;">⚡ Run OmniRoute</button>
-                        </div>
-
-                        <div class="ai-launcher-item">
-                            <div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-                                    <span style="font-weight: 800; font-size: 0.88rem; color: #ffffff;">💻 Local Models</span>
-                                    <span style="font-size: 0.62rem; font-weight: 700; background: rgba(16, 185, 129, 0.2); color: #a7f3d0; padding: 0.15rem 0.4rem; border-radius: 4px;">Zero Quota</span>
-                                </div>
-                                <div style="font-size: 0.72rem; color: #94a3b8;">Ollama offline inference (DeepSeek-R1 8B, Llama-3.2, Qwen)</div>
-                                <div style="font-size: 0.65rem; color: #38bdf8; font-family: var(--font-mono); margin-top: 0.3rem; display: flex; align-items: center; gap: 0.35rem;">
-                                    <span id="telemetry-local-ai">⚡ ~1.2s avg · 100% Success</span>
-                                </div>
-                            </div>
-                            <button type="button" id="btnModel-local-deepseek-r1-8b" onclick="openLocalModelModal()" class="btn-tile-run" style="border-color: rgba(16, 185, 129, 0.4); color: #a7f3d0;">⚙️ Configure & Run</button>
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: #94a3b8;">
+                            <span>6-Pillar Analysis: News + Price Action + 52W + Institutional Flows + Volume + Surprises</span>
+                            <a href="javascript:void(0)" onclick="toggleConsensusConfig()" style="color: #38bdf8; text-decoration: none;">⚙️ Custom Directives</a>
                         </div>
                     </div>
 
-                    <button type="button" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.55rem 1.75rem; font-size: 0.9rem; font-weight: 800; background: linear-gradient(135deg, #2563eb, #7c3aed); border: none; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);">
+                    <!-- Ensemble Run Button -->
+                    <button type="button" onclick="runConsensus(true, null)" class="btn btn-primary" style="padding: 0.6rem 2rem; font-size: 0.92rem; font-weight: 800; background: linear-gradient(135deg, #2563eb, #7c3aed); border: none; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);">
                         ▶ Synthesize Full Multi-Model AI Consensus
                     </button>
                 </div>
@@ -3725,100 +3632,27 @@
             return setHorizonTimeframe(days);
         }
 
-        async function runConsensus(force = true, modelId = null) {
-            const allBtn = document.getElementById('btnConsensus') || document.getElementById('btnConsensusMain');
-            let targetBtn = allBtn;
-            let prevHtml = '';
+        function syncOmniRouteModelSelection(modelId) {
+            const hSelect = document.getElementById('headerOmniRouteModelSelect');
+            const lSelect = document.getElementById('launcherOmniRouteSelect');
+            const cSelect = document.getElementById('selectOmniRouteModel');
+            const cInput = document.getElementById('inputCustomOmniRouteModel');
+            if (hSelect && hSelect.value !== modelId) hSelect.value = modelId;
+            if (lSelect && lSelect.value !== modelId) lSelect.value = modelId;
+            if (cSelect && cSelect.value !== modelId) cSelect.value = modelId;
+            if (cInput && modelId && modelId !== '__custom__') cInput.value = modelId;
+        }
 
-            // If a specific model was chosen, locate its button
-            if (modelId) {
-                const mKey = modelId.toLowerCase();
-                const safeMid = modelId.replace(/[^a-zA-Z0-9]/g, '_');
-                targetBtn = document.getElementById(`tileBtn-${safeMid}`) ||
-                            document.getElementById(`btnModel-${safeMid}`) ||
-                            document.getElementById(
-                                mKey.includes('deepseek') ? 'btnModel-deepseek-r1' :
-                                mKey.includes('llama') ? 'btnModel-llama-3-3-70b-instruct' :
-                                mKey.includes('qwen') ? 'btnModel-qwen-2-5-72b-instruct' :
-                                mKey.includes('mistral') ? 'btnModel-mistral-large' :
-                                mKey.includes('gemma') ? 'btnModel-gemma-4-31b-it-free' :
-                                mKey.includes('glm') ? 'btnModel-glm-5-2' :
-                                mKey.includes('local') ? 'btnModel-local' : ''
-                            ) ||
-                            document.getElementById(
-                                mKey.includes('llama') ? 'btnModel-llama-70b' :
-                                mKey.includes('qwen') ? 'btnModel-qwen-72b' :
-                                mKey.includes('gemma') ? 'btnModel-gemma-31b' :
-                                mKey.includes('glm') ? 'btnModel-glm-52' : ''
-                            ) ||
-                            allBtn;
-            }
+        async function runConsensusWithHeaderModel() {
+            const hSelect = document.getElementById('headerOmniRouteModelSelect');
+            const modelId = hSelect ? hSelect.value : 'deepseek/deepseek-r1';
+            await runConsensus(true, null, { omniroute_model: modelId });
+        }
 
-            if (targetBtn) {
-                prevHtml = targetBtn.innerHTML;
-                targetBtn.disabled = true;
-                targetBtn.innerHTML = `<span class="spinner"></span> ${modelId ? 'Running ' + (modelId.split('/').pop()) + '...' : 'Running All Engines...'}`;
-            }
-
-            // Show active loading state in AI Command Center
-            const loadingState = document.getElementById('aiLoadingState');
-            const emptyLauncher = document.getElementById('aiEmptyLauncher');
-            const resultsState = document.getElementById('aiConsensusResults');
-            const progressTitle = document.getElementById('lblAiProgressTitle');
-            const progressSub = document.getElementById('lblAiProgressSub');
-
-            if (loadingState) loadingState.style.display = 'block';
-            if (emptyLauncher) emptyLauncher.style.display = 'none';
-            if (resultsState) resultsState.style.opacity = '0.4';
-
-            if (progressTitle) {
-                progressTitle.textContent = modelId ? `Running ${modelId.split('/').pop()} on ${ACTIVE_SYM}...` : `Querying Multi-Model AI Ensemble in Parallel on ${ACTIVE_SYM}...`;
-            }
-            if (progressSub) {
-                progressSub.textContent = `Analyzing ${currentSelectedTimeframe || 14}-day price paths, volume surges, and 3Q surprise quality...`;
-            }
-
-            try {
-                const reqBody = {
-                    ticker: ACTIVE_SYM,
-                    timeframe_days: currentSelectedTimeframe || 14,
-                    local_model_url: currentLocalHost,
-                    force: force
-                };
-                if (modelId) {
-                    reqBody.models = [modelId];
-                }
-
-                const res = await fetch('/api/v1/consensus/predict', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(reqBody)
-                });
-                
-                if (!res.ok) {
-                    const errData = await res.json().catch(() => ({}));
-                    throw new Error(errData.detail || 'Prediction request failed with HTTP ' + res.status);
-                }
-
-                const resData = await res.json();
-                const pred = resData.prediction || resData.consensus || resData;
-                if (stockState) {
-                    stockState.consensus = pred;
-                }
-                const currPrice = (stockState && stockState.quote && stockState.quote.current_price) || 0;
-                renderConsensus(pred, currPrice);
-                await fetchRateLimits();
-            } catch (e) {
-                alert('Error computing AI consensus: ' + e.message);
-                if (loadingState) loadingState.style.display = 'none';
-                if (resultsState) resultsState.style.opacity = '1';
-            } finally {
-                if (targetBtn) {
-                    targetBtn.disabled = false;
-                    targetBtn.innerHTML = prevHtml;
-                }
-                if (resultsState) resultsState.style.opacity = '1';
-            }
+        async function runConsensusWithLauncherModel() {
+            const lSelect = document.getElementById('launcherOmniRouteSelect');
+            const modelId = lSelect ? lSelect.value : 'deepseek/deepseek-r1';
+            await runConsensus(true, null, { omniroute_model: modelId });
         }
 
         // =========================================================================
@@ -3838,7 +3672,10 @@
 
         async function loadOmniRouteModels() {
             const selectEl = document.getElementById('selectOmniRouteModel');
+            const hSelect = document.getElementById('headerOmniRouteModelSelect');
+            const lSelect = document.getElementById('launcherOmniRouteSelect');
             const statusBadge = document.getElementById('omnirouteStatusBadge');
+            const launcherBadge = document.getElementById('launcherOmnirouteStatusBadge');
             try {
                 const res = await fetch('/api/v1/consensus/omniroute-models');
                 if (res.ok) {
@@ -3847,20 +3684,44 @@
                     const status = data.status || 'online';
                     const endpoint = data.endpoint || 'http://localhost:20128/v1';
 
+                    const badgeHtml = status === 'online' || status === 'fallback_online'
+                        ? `🟢 Gateway: Active on <span style="color:#ffffff;">${endpoint}</span> (${currentOmniRouteModels.length} models)`
+                        : `⚠️ Gateway: Offline / Auth Needed (<span style="color:#94a3b8;">${endpoint}</span>)`;
+                    const badgeColor = status === 'online' ? '#34d399' : '#fbbf24';
+
                     if (statusBadge) {
-                        statusBadge.innerHTML = status === 'online' || status === 'fallback_online'
-                            ? `🟢 Gateway: Active on <span style="color:#ffffff;">${endpoint}</span> (${currentOmniRouteModels.length} models)`
-                            : `⚠️ Gateway: Offline / Auth Needed (<span style="color:#94a3b8;">${endpoint}</span>)`;
-                        statusBadge.style.color = status === 'online' ? '#34d399' : '#fbbf24';
+                        statusBadge.innerHTML = badgeHtml;
+                        statusBadge.style.color = badgeColor;
+                    }
+                    if (launcherBadge) {
+                        launcherBadge.innerHTML = status === 'online' || status === 'fallback_online'
+                            ? `🟢 Gateway: Active (${currentOmniRouteModels.length} models)`
+                            : `⚠️ Gateway: Offline`;
+                        launcherBadge.style.color = badgeColor;
                     }
 
-                    if (selectEl && currentOmniRouteModels.length > 0) {
-                        const currentVal = selectEl.value;
-                        selectEl.innerHTML = currentOmniRouteModels.map(m => `
-                            <option value="${m.id}" ${m.id === currentVal ? 'selected' : ''}>
+                    if (currentOmniRouteModels.length > 0) {
+                        const optionsHtml = currentOmniRouteModels.map(m => `
+                            <option value="${m.id}">
                                 ${m.name} ${m.tier ? `[${m.tier}]` : ''}
                             </option>
-                        `).join('') + '<option value="__custom__">✏️ Custom Model Identifier...</option>';
+                        `).join('');
+
+                        if (selectEl) {
+                            const curVal = selectEl.value;
+                            selectEl.innerHTML = optionsHtml + '<option value="__custom__">✏️ Custom Model Identifier...</option>';
+                            if (curVal) selectEl.value = curVal;
+                        }
+                        if (hSelect) {
+                            const curVal = hSelect.value;
+                            hSelect.innerHTML = optionsHtml;
+                            if (curVal) hSelect.value = curVal;
+                        }
+                        if (lSelect) {
+                            const curVal = lSelect.value;
+                            lSelect.innerHTML = optionsHtml;
+                            if (curVal) lSelect.value = curVal;
+                        }
                     }
                 }
             } catch (e) {

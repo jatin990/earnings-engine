@@ -1610,6 +1610,9 @@ Object.assign(app, {
                     grid.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading AI consensus predictions...</div>';
                 }
 
+                // Discover OmniRoute models asynchronously
+                this.loadConsensusOmniRouteModels(false);
+
                 try {
                     // Fetch latest predictions and accuracy stats in parallel
                     const [predsRes, statsRes] = await Promise.all([
@@ -1757,6 +1760,59 @@ Object.assign(app, {
                         postMortemSnippet +
                     '</div>';
                 }).join('');
+            },
+
+            async loadConsensusOmniRouteModels(forceRefresh = false) {
+                const sel = document.getElementById('consensusModelSelect');
+                const badge = document.getElementById('omniRouteGatewayStatusBadge');
+                if (badge && forceRefresh) {
+                    badge.innerHTML = '🔄 Scanning Gateway Ports...';
+                    badge.style.color = '#c084fc';
+                }
+                try {
+                    const res = await fetch('/api/v1/consensus/omniroute-models');
+                    if (res.ok) {
+                        const data = await res.json();
+                        const catalog = data.catalog || [];
+                        const status = data.status || 'online';
+                        const endpoint = data.endpoint || 'http://localhost:20128/v1';
+
+                        if (badge) {
+                            if (status === 'online' || status === 'fallback_online') {
+                                badge.innerHTML = `🟢 OmniRoute Gateway: Active (${catalog.length} models)`;
+                                badge.style.color = '#34d399';
+                                badge.style.borderColor = 'rgba(16,185,129,0.25)';
+                            } else {
+                                badge.innerHTML = `⚠️ OmniRoute: Offline (${endpoint})`;
+                                badge.style.color = '#fbbf24';
+                                badge.style.borderColor = 'rgba(245,158,11,0.25)';
+                            }
+                        }
+
+                        if (sel && catalog.length > 0) {
+                            const curVal = sel.value;
+                            const optionsHtml = '<option value="ALL">🧠 All Discovered Models (Ensemble)</option>' +
+                                catalog.map(m => `
+                                    <option value="${m.id}">
+                                        ${m.icon || '🤖'} ${m.name} ${m.tier ? `[${m.tier}]` : ''}
+                                    </option>
+                                `).join('');
+                            sel.innerHTML = optionsHtml;
+                            if (curVal && (curVal === 'ALL' || catalog.some(m => m.id === curVal))) {
+                                sel.value = curVal;
+                            } else {
+                                sel.value = 'ALL';
+                            }
+                            this.updateConsensusModelTelemetry();
+                        }
+                    }
+                } catch (e) {
+                    console.debug('Error loading OmniRoute catalog on consensus tab:', e);
+                    if (badge) {
+                        badge.innerHTML = '⚠️ OmniRoute Gateway: Offline';
+                        badge.style.color = '#f87171';
+                    }
+                }
             },
 
             updateConsensusModelTelemetry() {

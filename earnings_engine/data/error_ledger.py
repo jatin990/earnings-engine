@@ -100,7 +100,7 @@ def consume_error_stream(
     clear_after: bool = True,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    """Read all new error events from the active stream, record them in the ledger, and clear stream."""
+    """Read all new error events from the active stream, record them in the ledger in a batch, and clear stream."""
     stream_events = read_error_stream(base_dir)
     if not stream_events:
         return {
@@ -113,21 +113,103 @@ def consume_error_stream(
         }
 
     settings = settings or Settings()
-    newly_recorded = 0
+    init_error_ledger(settings)
     total_found = len(stream_events)
+    now_str = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
+    # Aggregate stream events by signature in memory first (O(N) in Python, O(1) DB writes)
+    grouped: dict[str, dict[str, Any]] = {}
     for event in stream_events:
-        res = record_error(
-            error_type=event.get("error_type") or f"{event.get('logger', 'unknown')}.{event.get('level', 'ERROR')}",
-            message=event.get("message", ""),
-            stack_trace=event.get("stack_trace"),
-            source_file=event.get("source_file"),
-            line_no=event.get("line_no"),
-            context_data=event.get("context_data") or {"streamed": True, "timestamp": event.get("timestamp")},
-            settings=settings,
-        )
-        if res.get("occurrences", 1) == 1:
-            newly_recorded += 1
+        clean_type = (event.get("error_type") or f"{event.get('logger', 'unknown')}.{event.get('level', 'ERROR')}").strip()
+        clean_msg = (event.get("message") or "").strip()
+        source_file = event.get("source_file")
+        sig = _get_signature(clean_type, clean_msg, source_file)
+
+        if sig not in grouped:
+            grouped[sig] = {
+                "error_type": clean_type,
+                "message": clean_msg,
+                "stack_trace": event.get("stack_trace"),
+                "source_file": source_file,
+                "line_no": event.get("line_no"),
+                "context_data": event.get("context_data") or {"streamed": True, "timestamp": event.get("timestamp")},
+                "count": 1,
+            }
+        else:
+            grouped[sig]["count"] += 1
+            if event.get("stack_trace"):
+                grouped[sig]["stack_trace"] = event.get("stack_trace")
+            if source_file:
+                grouped[sig]["source_file"] = source_file
+            if event.get("line_no"):
+                grouped[sig]["line_no"] = event.get("line_no")
+
+    newly_recorded = 0
+    conn = get_db_connection(settings)
+    with conn:
+        for sig, data in grouped.items():
+            existing = conn.execute(
+                "SELECT id, occurrences, status FROM error_ledger WHERE signature = ?",
+                (sig,),
+            ).fetchone()
+
+            ctx_json = json.dumps(data["context_data"]) if data.get("context_data") else None
+
+            if existing:
+                _, _, status = existing
+                new_status = "OPEN" if status == "RESOLVED" else status
+                conn.execute(
+                    """
+                    UPDATE error_ledger
+                    SET occurrences = occurrences + ?,
+                        last_seen_at = ?,
+                        message = ?,
+                        stack_trace = COALESCE(?, stack_trace),
+                        source_file = COALESCE(?, source_file),
+                        line_no = COALESCE(?, line_no),
+                        context_data = COALESCE(?, context_data),
+                        status = ?
+                    WHERE signature = ?
+                    """,
+                    (
+                        data["count"],
+                        now_str,
+                        data["message"],
+                        data["stack_trace"],
+                        data["source_file"],
+                        data["line_no"],
+                        ctx_json,
+                        new_status,
+                        sig,
+                    ),
+                )
+            else:
+                err_id = f"err_{sig[:10]}"
+                conn.execute(
+                    """
+                    INSERT INTO error_ledger (
+                        id, signature, error_type, message, stack_trace, source_file,
+                        line_no, context_data, status, occurrences, first_seen_at, last_seen_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?)
+                    """,
+                    (
+                        err_id,
+                        sig,
+                        data["error_type"],
+                        data["message"],
+                        data["stack_trace"],
+                        data["source_file"],
+                        data["line_no"],
+                        ctx_json,
+                        data["count"],
+                        now_str,
+                        now_str,
+                    ),
+                )
+                newly_recorded += 1
+
+    _export_json_snapshot(settings)
 
     cleared_count = 0
     if clear_after:
@@ -192,6 +274,7 @@ def record_error(
     line_no: int | None = None,
     context_data: dict[str, Any] | None = None,
     settings: Settings | None = None,
+    skip_snapshot: bool = False,
 ) -> dict[str, Any]:
     """Record an error in the ledger. Deduplicates by signature and increments occurrences."""
     settings = settings or Settings()
@@ -244,8 +327,9 @@ def record_error(
             )
             total_occ = 1
 
-    # Mirror to local JSON snapshot for agent transparency
-    _export_json_snapshot(settings)
+    # Mirror to local JSON snapshot for agent transparency (skipped during batch consumption)
+    if not skip_snapshot:
+        _export_json_snapshot(settings)
 
     return {
         "id": err_id,
@@ -465,11 +549,14 @@ def scan_log_files(
                     line_no=line_no,
                     context_data={"log_file": log_path.name},
                     settings=settings,
+                    skip_snapshot=True,
                 )
                 if res.get("occurrences", 1) == 1:
                     newly_recorded += 1
             else:
                 idx += 1
+
+    _export_json_snapshot(settings)
 
     return {
         "scanned_files": len(log_files),
