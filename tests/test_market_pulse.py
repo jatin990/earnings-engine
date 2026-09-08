@@ -163,9 +163,21 @@ def test_market_playbook_dedicated_endpoint(client):
     assert len(playbook["actionable_rules"]) >= 3
     assert "corridor" in playbook
     assert "expected_1d_range_pct" in playbook
+    assert "expected_1d_move_pct" in playbook
+    assert "expected_1d_range_pts" in playbook
+    assert "expected_1d_move_pts" in playbook
+    assert "upper_band_1sigma" in playbook["corridor"]
+    assert "lower_band_1sigma" in playbook["corridor"]
+    assert "upper_1sigma" in playbook["corridor"]
+    assert "lower_1sigma" in playbook["corridor"]
     assert "nifty_spot" in playbook
     assert "divergence" in playbook
+    assert "smart_money_vs_retail" in playbook
+    assert "fii_ls_ratio" in playbook["divergence"]
+    assert "client_ls_ratio" in playbook["divergence"]
+    assert "trap_risk_score" in playbook["divergence"]
     assert "theta_decay_environment" in playbook
+    assert "theta_environment" in playbook
 
 
 def test_metric_glossary_dedicated_endpoint(client):

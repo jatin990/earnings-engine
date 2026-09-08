@@ -195,62 +195,69 @@
                 vixTag.textContent = `VIX: ${pb.vix_level}`;
             }
             if (spotEl && pb.nifty_spot) {
-                spotEl.textContent = pb.nifty_spot.toLocaleString();
+                spotEl.textContent = Number(pb.nifty_spot).toLocaleString();
             }
             if (expMoveEl) {
-                const pts = pb.expected_1d_move_pts || (pb.corridor ? pb.corridor.expected_1d_move_pts : 0);
-                const pct = pb.expected_1d_move_pct || (pb.corridor ? pb.corridor.expected_1d_move_pct : 0);
+                const pts = pb.expected_1d_move_pts ?? pb.expected_1d_range_pts ?? pb.corridor?.expected_1d_move_pts ?? pb.corridor?.expected_1d_range_pts ?? 0;
+                const pct = pb.expected_1d_move_pct ?? pb.expected_1d_range_pct ?? pb.corridor?.expected_1d_move_pct ?? pb.corridor?.expected_1d_range_pct ?? 0;
                 expMoveEl.textContent = `±${pct}% (±${pts} Pts)`;
             }
             if (sigma1El) {
-                const low = pb.corridor?.lower_1sigma ?? pb.lower_band_1sigma ?? 0;
-                const high = pb.corridor?.upper_1sigma ?? pb.upper_band_1sigma ?? 0;
-                sigma1El.textContent = `${low.toLocaleString()} – ${high.toLocaleString()}`;
+                const low = pb.corridor?.lower_band_1sigma ?? pb.corridor?.lower_1sigma ?? pb.lower_band_1sigma ?? 0;
+                const high = pb.corridor?.upper_band_1sigma ?? pb.corridor?.upper_1sigma ?? pb.upper_band_1sigma ?? 0;
+                sigma1El.textContent = `${Number(low).toLocaleString()} – ${Number(high).toLocaleString()}`;
             }
             if (sigma2El) {
-                const low = pb.corridor?.lower_2sigma ?? pb.lower_band_2sigma ?? 0;
-                const high = pb.corridor?.upper_2sigma ?? pb.upper_band_2sigma ?? 0;
-                sigma2El.textContent = `${low.toLocaleString()} – ${high.toLocaleString()}`;
+                const low = pb.corridor?.lower_band_2sigma ?? pb.corridor?.lower_2sigma ?? pb.lower_band_2sigma ?? 0;
+                const high = pb.corridor?.upper_band_2sigma ?? pb.corridor?.upper_2sigma ?? pb.upper_band_2sigma ?? 0;
+                sigma2El.textContent = `${Number(low).toLocaleString()} – ${Number(high).toLocaleString()}`;
             }
-            if (thetaEnvEl && pb.theta_environment) {
-                thetaEnvEl.textContent = pb.theta_environment;
-                if (pb.theta_environment.includes('Selling') || pb.theta_environment.includes('Decay')) {
-                    thetaEnvEl.style.background = 'rgba(16,185,129,0.12)';
-                    thetaEnvEl.style.color = '#34d399';
-                    thetaEnvEl.style.borderColor = 'rgba(16,185,129,0.25)';
-                } else if (pb.theta_environment.includes('Buying') || pb.theta_environment.includes('Expansion')) {
-                    thetaEnvEl.style.background = 'rgba(56,189,248,0.12)';
-                    thetaEnvEl.style.color = '#38bdf8';
-                    thetaEnvEl.style.borderColor = 'rgba(56,189,248,0.25)';
-                } else {
-                    thetaEnvEl.style.background = 'rgba(251,191,36,0.12)';
-                    thetaEnvEl.style.color = '#fbbf24';
-                    thetaEnvEl.style.borderColor = 'rgba(251,191,36,0.25)';
+            if (thetaEnvEl) {
+                const env = pb.theta_env_label || pb.theta_environment || pb.theta_decay_environment || '';
+                if (env) {
+                    thetaEnvEl.textContent = env.replace(/_/g, ' ');
+                    if (env.includes('Selling') || env.includes('Decay') || env.includes('SELLING')) {
+                        thetaEnvEl.style.background = 'rgba(16,185,129,0.12)';
+                        thetaEnvEl.style.color = '#34d399';
+                        thetaEnvEl.style.borderColor = 'rgba(16,185,129,0.25)';
+                    } else if (env.includes('Buying') || env.includes('Expansion') || env.includes('BUYING')) {
+                        thetaEnvEl.style.background = 'rgba(56,189,248,0.12)';
+                        thetaEnvEl.style.color = '#38bdf8';
+                        thetaEnvEl.style.borderColor = 'rgba(56,189,248,0.25)';
+                    } else {
+                        thetaEnvEl.style.background = 'rgba(251,191,36,0.12)';
+                        thetaEnvEl.style.color = '#fbbf24';
+                        thetaEnvEl.style.borderColor = 'rgba(251,191,36,0.25)';
+                    }
                 }
             }
 
             // Column 2: Divergence
-            const sm = pb.smart_money_vs_retail || {};
+            const sm = pb.smart_money_vs_retail || pb.divergence || {};
             if (divBadge) {
-                divBadge.textContent = sm.status || 'Balanced';
-                if ((sm.status || '').includes('BULLISH')) {
+                divBadge.textContent = sm.badge || sm.status || 'Balanced';
+                const st = (sm.status || sm.badge || '').toUpperCase();
+                if (st.includes('BULLISH')) {
                     divBadge.style.color = '#34d399';
-                } else if ((sm.status || '').includes('BEARISH')) {
+                } else if (st.includes('BEARISH')) {
                     divBadge.style.color = '#f87171';
                 } else {
                     divBadge.style.color = '#38bdf8';
                 }
             }
+            const fiiRatio = sm.fii_ls_ratio ?? sm.fii_ls ?? 1.0;
+            const clientRatio = sm.client_ls_ratio ?? sm.client_ls ?? 1.0;
             if (fiiLsEl) {
-                fiiLsEl.textContent = `${(sm.fii_ls_ratio || 1.0).toFixed(2)}x`;
-                fiiLsEl.style.color = (sm.fii_ls_ratio || 1.0) >= 1.0 ? '#34d399' : '#f87171';
+                fiiLsEl.textContent = `${Number(fiiRatio).toFixed(2)}x`;
+                fiiLsEl.style.color = fiiRatio >= 1.0 ? '#34d399' : '#f87171';
             }
             if (clientLsEl) {
-                clientLsEl.textContent = `${(sm.client_ls_ratio || 1.0).toFixed(2)}x`;
-                clientLsEl.style.color = (sm.client_ls_ratio || 1.0) >= 1.0 ? '#fb923c' : '#94a3b8';
+                clientLsEl.textContent = `${Number(clientRatio).toFixed(2)}x`;
+                clientLsEl.style.color = clientRatio >= 1.0 ? '#fb923c' : '#94a3b8';
             }
-            if (trapWarnEl && sm.trap_warning) {
-                trapWarnEl.textContent = sm.trap_warning;
+            const trapWarning = sm.trap_warning || sm.warning;
+            if (trapWarnEl && trapWarning) {
+                trapWarnEl.textContent = trapWarning;
             }
             if (trapScoreEl) {
                 const score = sm.trap_risk_score !== undefined ? sm.trap_risk_score : 35;
@@ -258,10 +265,11 @@
                 trapScoreEl.textContent = `${score}/100 (${label})`;
                 trapScoreEl.style.color = score > 60 ? '#f87171' : score > 35 ? '#fbbf24' : '#34d399';
             }
-            if (divDeltaEl && sm.divergence_delta !== undefined) {
-                const s = sm.divergence_delta >= 0 ? '+' : '';
-                divDeltaEl.textContent = `${s}${sm.divergence_delta.toFixed(2)}`;
-                divDeltaEl.style.color = sm.divergence_delta >= 0 ? '#34d399' : '#f87171';
+            const divDelta = sm.divergence_delta !== undefined ? sm.divergence_delta : (fiiRatio - clientRatio);
+            if (divDeltaEl && divDelta !== undefined && divDelta !== null) {
+                const s = divDelta >= 0 ? '+' : '';
+                divDeltaEl.textContent = `${s}${Number(divDelta).toFixed(2)}`;
+                divDeltaEl.style.color = divDelta >= 0 ? '#34d399' : '#f87171';
             }
 
             // Column 3: Rules
