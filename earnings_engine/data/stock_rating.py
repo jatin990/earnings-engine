@@ -510,6 +510,11 @@ def recalculate_stock_rating(
     # 2. Fetch fresh live data from yfinance & DB with local fallback
     info: dict[str, Any] = {}
     try:
+        from earnings_engine.rate_limits import record_request
+        try:
+            record_request("yfinance")
+        except Exception:
+            pass
         yf_ticker = yf.Ticker(ticker)
         info = yf_ticker.info or {}
     except Exception as e:

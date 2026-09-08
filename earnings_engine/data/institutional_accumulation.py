@@ -146,6 +146,11 @@ def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]
     import os
     if not os.environ.get("PYTEST_CURRENT_TEST") and (mcap_cr is None or mcap_cr <= 0):
         try:
+            from earnings_engine.rate_limits import record_request
+            try:
+                record_request("yfinance")
+            except Exception:
+                pass
             import yfinance as yf
             t = yf.Ticker(sym)
             info = t.info or {}

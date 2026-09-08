@@ -19,6 +19,31 @@ from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.rate_limits")
 
+# Service identifier aliases normalized to canonical DOWNSTREAM_CRITERIA keys
+SERVICE_ALIASES: dict[str, str] = {
+    "nse_direct": "nse",
+    "nselib": "nse",
+    "nse_api": "nse",
+    "nse_shareholding": "nse",
+    "nse_options": "nse",
+    "nse_derivatives": "nse",
+    "nselib_derivatives": "nse",
+    "nseindia": "nse",
+    "yahoo": "yfinance",
+    "yf": "yfinance",
+    "yahoo_finance": "yfinance",
+    "yfinance_fast_info": "yfinance",
+    "yfinance_history": "yfinance",
+    "jugaad": "jugaad_data",
+    "jugaad-data": "jugaad_data",
+    "jugaad_nse": "jugaad_data",
+    "google_gemini": "gemini",
+    "google-gemini": "gemini",
+    "gemini_api": "gemini",
+    "bse_india": "bse",
+    "bse_direct": "bse",
+}
+
 # Downstream default criteria definition (Free tier and standard limits)
 DOWNSTREAM_CRITERIA: dict[str, dict[str, Any]] = {
     "yfinance": {
@@ -418,7 +443,8 @@ class RateLimitTracker:
             ).fetchall()
             with self._lock:
                 for s_name, s_ts in call_rows:
-                    s_key = str(s_name).lower().strip()
+                    raw_s_key = str(s_name).lower().strip()
+                    s_key = SERVICE_ALIASES.get(raw_s_key, raw_s_key)
                     if s_key not in self._request_timestamps:
                         self._request_timestamps[s_key] = collections.deque(maxlen=10000)
                     self._request_timestamps[s_key].append(float(s_ts))
@@ -431,7 +457,8 @@ class RateLimitTracker:
     def record_request(self, service: str, status_code: int = 200) -> None:
         """Record an outbound request timestamp for the given downstream service or model."""
         now = time.time()
-        service_key = service.lower().strip()
+        raw_key = service.lower().strip()
+        service_key = SERVICE_ALIASES.get(raw_key, raw_key)
         with self._lock:
             if service_key not in self._request_timestamps:
                 self._request_timestamps[service_key] = collections.deque(maxlen=10000)
@@ -831,7 +858,8 @@ class RateLimitTracker:
         Returns:
             Average latency in milliseconds.
         """
-        m_key = model_key.lower().strip()
+        raw_key = model_key.lower().strip()
+        m_key = SERVICE_ALIASES.get(raw_key, raw_key)
         now = time.time()
         cutoff = now - window_seconds
 
@@ -865,7 +893,8 @@ class RateLimitTracker:
         Returns:
             A human-readable reason string if hard quota is exhausted, or ``None`` if OK to execute.
         """
-        m_key = model_key.lower().strip()
+        raw_key = model_key.lower().strip()
+        m_key = SERVICE_ALIASES.get(raw_key, raw_key)
         now = time.time()
 
         # Local models are never rate-limited by quota
@@ -925,11 +954,15 @@ class RateLimitTracker:
             conn = get_db_connection(settings)
             rows = conn.execute("SELECT service, COUNT(*) FROM downstream_api_calls GROUP BY service").fetchall()
             for s, c in rows:
-                all_time_counts[str(s).lower().strip()] = int(c)
+                raw_k = str(s).lower().strip()
+                k = SERVICE_ALIASES.get(raw_k, raw_k)
+                all_time_counts[k] = all_time_counts.get(k, 0) + int(c)
 
             today_rows = conn.execute("SELECT service, COUNT(*) FROM downstream_api_calls WHERE timestamp >= ? GROUP BY service", (today_start_ts,)).fetchall()
             for s, c in today_rows:
-                today_db_counts[str(s).lower().strip()] = int(c)
+                raw_k = str(s).lower().strip()
+                k = SERVICE_ALIASES.get(raw_k, raw_k)
+                today_db_counts[k] = today_db_counts.get(k, 0) + int(c)
         except Exception as e:
             logger.debug("Failed querying downstream_api_calls counts: %s", e)
 

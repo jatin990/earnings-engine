@@ -111,9 +111,9 @@ def test_heuristic_fallback_analysis():
 
 
 def test_news_injection_stores_omnirouter_ai_analysis(tmp_path):
-    test_db = str(tmp_path / "test_omni_news.sqlite3")
     settings = Settings()
-    settings.db_path = test_db
+    settings.data_dirs = {"prices": tmp_path / "prices", "earnings": tmp_path / "earnings"}
+    settings.ensure_dirs()
 
     with _connect(settings) as conn:
         conn.execute("""

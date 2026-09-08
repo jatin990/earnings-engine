@@ -352,6 +352,11 @@ async def run_consensus_predict(req: ConsensusPredictRequest):
             as_of_price = ctx.get("price_action", {}).get("current_price") or ctx.get("current_price", 0.0)
             if not as_of_price or as_of_price <= 0:
                 try:
+                    from earnings_engine.rate_limits import record_request
+                    try:
+                        record_request("yfinance")
+                    except Exception:
+                        pass
                     import yfinance as yf
                     info = yf.Ticker(ticker).fast_info
                     as_of_price = float(info.last_price or 0.0)

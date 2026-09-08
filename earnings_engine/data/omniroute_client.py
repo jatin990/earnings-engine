@@ -563,6 +563,11 @@ class OmniRouteClient:
             if not model_name:
                 continue
             try:
+                try:
+                    from earnings_engine.rate_limits import record_request
+                    record_request("omniroute")
+                except Exception:
+                    pass
                 logger.info("[OMNIROUTE] Querying diegosouzapw/OmniRoute for %s (model: %s, url: %s)...", item.get("ticker"), model_name, completions_url)
                 t0 = time.perf_counter()
                 resp = requests.post(
@@ -869,6 +874,11 @@ class OmniRouteClient:
         success = False
 
         try:
+            try:
+                from earnings_engine.rate_limits import record_request
+                record_request("omniroute")
+            except Exception:
+                pass
             headers = {"Content-Type": "application/json", "X-Title": "Earnings Engine OmniRoute Setup"}
             if active_key:
                 headers["Authorization"] = f"Bearer {active_key}"

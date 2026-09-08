@@ -302,11 +302,6 @@ def fetch_prices(
 
     mgr = get_data_manager(settings)
     raw = mgr.fetch_ohlcv(ticker=fetch_symbol, start_date=start)
-    try:
-        from earnings_engine.rate_limits import record_request
-        record_request("yfinance")
-    except Exception:
-        pass
 
     if raw is None or raw.empty:
         _mark_fetched(sym, settings)
@@ -661,6 +656,11 @@ def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: boo
         return None
 
     try:
+        from earnings_engine.rate_limits import record_request
+        try:
+            record_request("yfinance")
+        except Exception:
+            pass
         yf_obj = yf.Ticker(fetch_sym)
         fast = getattr(yf_obj, "fast_info", None)
 

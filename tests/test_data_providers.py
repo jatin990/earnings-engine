@@ -39,6 +39,18 @@ class TestDataProviders:
         assert isinstance(df, pd.DataFrame)
         assert "ticker" in df.columns or df.empty
 
+    def test_option_chain_rate_limit_tracked(self) -> None:
+        from earnings_engine.rate_limits import get_ratelimits_summary
+        initial_nse_count = get_ratelimits_summary()["downstreams"]["nse"]["timeframes"]["24h"]["current"]
+
+        provider = NSEDirectProvider()
+        # Fetching option chain (even when nselib is not installed or returns empty) must record request
+        provider.fetch_option_chain("INFY.NS")
+
+        new_nse_count = get_ratelimits_summary()["downstreams"]["nse"]["timeframes"]["24h"]["current"]
+        assert new_nse_count >= initial_nse_count + 1
+
+
 
 class TestOptionChainAnalytics:
     def test_max_pain_calculation(self) -> None:

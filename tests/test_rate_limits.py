@@ -80,3 +80,37 @@ def test_ratelimits_api_endpoint():
     assert "current_24h" in counter
     assert "allowed_24h" in counter
     assert "remaining_24h" in counter
+
+
+def test_service_aliases_normalization():
+    tracker = RateLimitTracker()
+    tracker._request_timestamps.clear()
+
+    # Record using various alias variations
+    tracker.record_request("nse_direct")
+    tracker.record_request("nselib_derivatives")
+    tracker.record_request("nse_options")
+    tracker.record_request("yf")
+    tracker.record_request("yahoo_finance")
+    tracker.record_request("google_gemini")
+    tracker.record_request("jugaad-data")
+    tracker.record_request("bse_india")
+
+    summary = tracker.get_downstream_summary()
+
+    # NSE should have received 3 requests
+    assert summary["downstreams"]["nse"]["timeframes"]["1m"]["current"] == 3
+    assert summary["downstreams"]["nse"]["timeframes"]["24h"]["current"] == 3
+
+    # YFinance should have received 2 requests
+    assert summary["downstreams"]["yfinance"]["timeframes"]["1m"]["current"] == 2
+
+    # Gemini should have received 1 request
+    assert summary["downstreams"]["gemini"]["timeframes"]["1m"]["current"] == 1
+
+    # Jugaad Data should have received 1 request
+    assert summary["downstreams"]["jugaad_data"]["timeframes"]["1m"]["current"] == 1
+
+    # BSE should have received 1 request
+    assert summary["downstreams"]["bse"]["timeframes"]["1m"]["current"] == 1
+

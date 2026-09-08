@@ -197,6 +197,11 @@ def _fetch_settlement_price(ticker: str, eval_date: str, settings: Settings) -> 
 
     # Fallback to yfinance if not present in DB
     try:
+        from earnings_engine.rate_limits import record_request
+        try:
+            record_request("yfinance")
+        except Exception:
+            pass
         import yfinance as yf
         t = yf.Ticker(ticker)
         hist = t.history(period="5d")

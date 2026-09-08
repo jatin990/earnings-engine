@@ -67,6 +67,11 @@ def _store(ticker: str, industry: str | None, sector: str | None, settings: Sett
 def _fetch_for_ticker(ticker: str) -> tuple[str, str | None, str | None]:
     """Fetch (ticker, industry, sector) from yfinance .info, or (ticker, None, None)."""
     try:
+        from earnings_engine.rate_limits import record_request
+        try:
+            record_request("yfinance")
+        except Exception:
+            pass
         info = yf.Ticker(ticker).info or {}
         industry = info.get("industry")
         sector = info.get("sector")

@@ -706,6 +706,11 @@ def calculate_or_fetch_eps(
     # Multi-Tier Automated Calculation
     # Tier 1: Fresh yfinance get_earnings_dates
     try:
+        from earnings_engine.rate_limits import record_request
+        try:
+            record_request("yfinance")
+        except Exception:
+            pass
         yf_ticker = yf.Ticker(sym)
         raw_dates = yf_ticker.get_earnings_dates(limit=60)
         if raw_dates is not None and not raw_dates.empty:
@@ -750,6 +755,11 @@ def calculate_or_fetch_eps(
     # Tier 2: Quarterly Income Statement (Extract Diluted EPS across all available quarters)
     inc_stmt_cols_data: list[tuple[pd.Timestamp, float]] = []
     try:
+        from earnings_engine.rate_limits import record_request
+        try:
+            record_request("yfinance")
+        except Exception:
+            pass
         yf_ticker = yf.Ticker(sym)
         inc_stmt = yf_ticker.quarterly_income_stmt
         if inc_stmt is not None and not inc_stmt.empty:
@@ -819,6 +829,11 @@ def calculate_or_fetch_eps(
         # Fallback from fast_info if still missing
         if eps_rep is None:
             try:
+                from earnings_engine.rate_limits import record_request
+                try:
+                    record_request("yfinance")
+                except Exception:
+                    pass
                 yf_ticker = yf.Ticker(sym)
                 info = yf_ticker.fast_info
                 trailing_pe = getattr(info, "trailing_pe", None)

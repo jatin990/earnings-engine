@@ -305,6 +305,11 @@ def fetch_historical_data(symbol: str, settings: Settings | None = None) -> pd.D
 
     # --- Attempt 1: Ticker.history(period=...) ---
     try:
+        from earnings_engine.rate_limits import record_request
+        try:
+            record_request("yfinance")
+        except Exception:
+            pass
         ticker = yf.Ticker(clean_sym)
         df = ticker.history(period="1y", interval="1d")
         cleaned = _history_to_clean_df(df)
@@ -316,6 +321,11 @@ def fetch_historical_data(symbol: str, settings: Settings | None = None) -> pd.D
 
     # --- Attempt 2: explicit start/end + auto_adjust=False (avoids timezone lookup) ---
     try:
+        from earnings_engine.rate_limits import record_request
+        try:
+            record_request("yfinance")
+        except Exception:
+            pass
         end = pd.Timestamp.now()
         start = end - pd.Timedelta(days=400)
         df = yf.Ticker(clean_sym).history(
@@ -333,6 +343,11 @@ def fetch_historical_data(symbol: str, settings: Settings | None = None) -> pd.D
 
     # --- Attempt 3: yf.download fallback ---
     try:
+        from earnings_engine.rate_limits import record_request
+        try:
+            record_request("yfinance")
+        except Exception:
+            pass
         df = yf.download(clean_sym, period="1y", interval="1d", progress=False, auto_adjust=False)
         cleaned = _history_to_clean_df(df)
         if cleaned is not None and len(cleaned) >= 60:

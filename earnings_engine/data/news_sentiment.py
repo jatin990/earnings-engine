@@ -165,6 +165,11 @@ def fetch_yfinance_news(ticker: str) -> list[dict[str, Any]]:
     ticker = ticker.strip().upper()
     articles: list[dict[str, Any]] = []
     try:
+        from earnings_engine.rate_limits import record_request
+        try:
+            record_request("yfinance")
+        except Exception:
+            pass
         import yfinance as yf
         t = yf.Ticker(ticker)
         raw_news = getattr(t, "news", []) or []
