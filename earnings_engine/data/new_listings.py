@@ -33,11 +33,12 @@ def fetch_all_nse_equities_cached() -> pd.DataFrame:
     ):
         return _EQUITY_LIST_CACHE["data"].copy()
 
+    # 1. Try nselib if installed
     try:
         from nselib import capital_market
         df = capital_market.equity_list()
         df.columns = [c.strip() for c in df.columns]
-        
+
         # Clean columns: SYMBOL, NAME OF COMPANY, SERIES, DATE OF LISTING, FACE VALUE
         if "DATE OF LISTING" in df.columns:
             df["LISTING_DATE"] = pd.to_datetime(df["DATE OF LISTING"], format="%d-%b-%Y", errors="coerce")
@@ -48,10 +49,35 @@ def fetch_all_nse_equities_cached() -> pd.DataFrame:
         _EQUITY_LIST_CACHE["data"] = df
         return df.copy()
     except Exception as e:
-        logger.warning("[NEW-LISTINGS] Failed to fetch equity list from nselib: %s", e)
-        if _EQUITY_LIST_CACHE["data"] is not None:
-            return _EQUITY_LIST_CACHE["data"].copy()
-        return pd.DataFrame(columns=["SYMBOL", "NAME OF COMPANY", "SERIES", "DATE OF LISTING", "LISTING_DATE"])
+        logger.debug("[NEW-LISTINGS] nselib not available or failed: %s", e)
+
+    # 2. Direct fallback to official NSE archives CSV (zero binary dependency)
+    try:
+        import io
+        import requests
+        url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+        }
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200 and len(resp.content) > 0:
+            df = pd.read_csv(io.BytesIO(resp.content))
+            df.columns = [c.strip() for c in df.columns]
+            if "DATE OF LISTING" in df.columns:
+                df["LISTING_DATE"] = pd.to_datetime(df["DATE OF LISTING"], format="%d-%b-%Y", errors="coerce")
+            else:
+                df["LISTING_DATE"] = pd.NaT
+
+            _EQUITY_LIST_CACHE["timestamp"] = now
+            _EQUITY_LIST_CACHE["data"] = df
+            return df.copy()
+    except Exception as e:
+        logger.warning("[NEW-LISTINGS] Failed to fetch equity list from direct NSE archives: %s", e)
+
+    if _EQUITY_LIST_CACHE["data"] is not None:
+        return _EQUITY_LIST_CACHE["data"].copy()
+    return pd.DataFrame(columns=["SYMBOL", "NAME OF COMPANY", "SERIES", "DATE OF LISTING", "LISTING_DATE"])
 
 
 def get_recent_nse_additions(
