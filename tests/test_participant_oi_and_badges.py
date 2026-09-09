@@ -50,7 +50,21 @@ def test_compute_participant_oi_matrix():
         assert "long_pct" in p
         assert "short_pct" in p
         assert "stance" in p
+        assert "future_index_long" in p
+        assert "future_index_short" in p
+        assert "future_index_net" in p
+        assert "future_index_long_pct" in p
         assert p["long_pct"] + p["short_pct"] == pytest.approx(100.0, rel=1e-1)
+
+    # Check contrarian prediction & smart money divergence metadata
+    assert "smart_vs_retail_divergence" in oi_data
+    assert "divergence_status" in oi_data
+    assert "divergence_badge" in oi_data
+    assert "market_maker_stance" in oi_data
+    assert "retail_stance" in oi_data
+    assert "contrarian_prediction" in oi_data
+    assert "verdict" in oi_data["contrarian_prediction"]
+    assert "trap_score" in oi_data["contrarian_prediction"]
 
 
 def test_master_market_pulse_includes_participant_oi():

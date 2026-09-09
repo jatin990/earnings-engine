@@ -12,6 +12,8 @@ Provides real-time daily macro market overview:
 
 from __future__ import annotations
 
+import concurrent.futures
+import io
 import logging
 import math
 import time
@@ -19,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pandas as pd
+import requests
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
@@ -660,14 +663,17 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
 
 _PARTICIPANT_OI_CACHE: dict[str, Any] = {}
 
-def compute_participant_oi_matrix(settings: Settings | None = None, force_refresh: bool = False) -> dict[str, Any]:
-    """Compute Participant Derivatives Open Interest (OI), Long vs Short breakdown, 7-day matrix history, and market stance."""
-    global _PARTICIPANT_OI_CACHE
-    now_ts = time.time()
-    if not force_refresh and "data" in _PARTICIPANT_OI_CACHE:
-        if (now_ts - _PARTICIPANT_OI_CACHE.get("ts", 0)) < _PULSE_CACHE_TTL:
-            return _PARTICIPANT_OI_CACHE["data"]
 
+def sync_nse_participant_oi_data(
+    settings: Settings | None = None,
+    days: int = 30,
+    force: bool = False,
+) -> int:
+    """Sync authentic daily participant derivatives open interest from official NSE clearing archives.
+
+    Downloads https://archives.nseindia.com/content/nsccl/fao_participant_oi_{DDMMYYYY}.csv
+    and persists granular Index Futures, Stock Futures, and Options into SQLite table `participant_oi_positioning`.
+    """
     settings = settings or Settings()
     conn = get_db_connection(settings)
 
@@ -677,127 +683,101 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
                 date TEXT NOT NULL,
                 participant TEXT NOT NULL,
                 category_label TEXT NOT NULL,
-                futures_long INTEGER NOT NULL,
-                futures_short INTEGER NOT NULL,
-                calls_long INTEGER NOT NULL,
-                calls_short INTEGER NOT NULL,
-                puts_long INTEGER NOT NULL,
-                puts_short INTEGER NOT NULL,
-                total_long INTEGER NOT NULL,
-                total_short INTEGER NOT NULL,
-                net_contracts INTEGER NOT NULL,
-                long_short_ratio REAL NOT NULL,
-                long_pct REAL NOT NULL,
-                short_pct REAL NOT NULL,
-                stance TEXT NOT NULL,
+                future_index_long INTEGER NOT NULL DEFAULT 0,
+                future_index_short INTEGER NOT NULL DEFAULT 0,
+                future_index_net INTEGER NOT NULL DEFAULT 0,
+                future_index_long_pct REAL NOT NULL DEFAULT 50.0,
+                future_stock_long INTEGER NOT NULL DEFAULT 0,
+                future_stock_short INTEGER NOT NULL DEFAULT 0,
+                future_stock_net INTEGER NOT NULL DEFAULT 0,
+                opt_index_call_long INTEGER NOT NULL DEFAULT 0,
+                opt_index_call_short INTEGER NOT NULL DEFAULT 0,
+                opt_index_put_long INTEGER NOT NULL DEFAULT 0,
+                opt_index_put_short INTEGER NOT NULL DEFAULT 0,
+                opt_stock_call_long INTEGER NOT NULL DEFAULT 0,
+                opt_stock_call_short INTEGER NOT NULL DEFAULT 0,
+                opt_stock_put_long INTEGER NOT NULL DEFAULT 0,
+                opt_stock_put_short INTEGER NOT NULL DEFAULT 0,
+                futures_long INTEGER NOT NULL DEFAULT 0,
+                futures_short INTEGER NOT NULL DEFAULT 0,
+                calls_long INTEGER NOT NULL DEFAULT 0,
+                calls_short INTEGER NOT NULL DEFAULT 0,
+                puts_long INTEGER NOT NULL DEFAULT 0,
+                puts_short INTEGER NOT NULL DEFAULT 0,
+                total_long INTEGER NOT NULL DEFAULT 0,
+                total_short INTEGER NOT NULL DEFAULT 0,
+                net_contracts INTEGER NOT NULL DEFAULT 0,
+                long_short_ratio REAL NOT NULL DEFAULT 1.0,
+                long_pct REAL NOT NULL DEFAULT 50.0,
+                short_pct REAL NOT NULL DEFAULT 50.0,
+                stance TEXT NOT NULL DEFAULT 'Neutral',
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (date, participant)
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_participant_oi_date ON participant_oi_positioning(date DESC)")
+
+        # Ensure all columns exist for schema migrations
+        cols_needed = [
+            ("future_index_long", "INTEGER NOT NULL DEFAULT 0"),
+            ("future_index_short", "INTEGER NOT NULL DEFAULT 0"),
+            ("future_index_net", "INTEGER NOT NULL DEFAULT 0"),
+            ("future_index_long_pct", "REAL NOT NULL DEFAULT 50.0"),
+            ("future_stock_long", "INTEGER NOT NULL DEFAULT 0"),
+            ("future_stock_short", "INTEGER NOT NULL DEFAULT 0"),
+            ("future_stock_net", "INTEGER NOT NULL DEFAULT 0"),
+            ("opt_index_call_long", "INTEGER NOT NULL DEFAULT 0"),
+            ("opt_index_call_short", "INTEGER NOT NULL DEFAULT 0"),
+            ("opt_index_put_long", "INTEGER NOT NULL DEFAULT 0"),
+            ("opt_index_put_short", "INTEGER NOT NULL DEFAULT 0"),
+            ("opt_stock_call_long", "INTEGER NOT NULL DEFAULT 0"),
+            ("opt_stock_call_short", "INTEGER NOT NULL DEFAULT 0"),
+            ("opt_stock_put_long", "INTEGER NOT NULL DEFAULT 0"),
+            ("opt_stock_put_short", "INTEGER NOT NULL DEFAULT 0"),
+        ]
+        for col_name, col_type in cols_needed:
+            try:
+                conn.execute(f"ALTER TABLE participant_oi_positioning ADD COLUMN {col_name} {col_type}")
+            except Exception:
+                pass
         conn.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("[PARTICIPANT-OI] Table setup notice: %s", e)
 
-    now_utc = datetime.now(timezone.utc)
-    today_str = now_utc.strftime("%Y-%m-%d")
+    # Determine candidate weekday dates for the last `days` days
+    today_dt = datetime.now(timezone.utc).date()
+    target_dates: list[tuple[str, str]] = []  # (YYYY-MM-DD, DDMMYYYY)
+    cur = today_dt
+    while len(target_dates) < days:
+        if cur.weekday() < 5:  # Mon-Fri
+            target_dates.append((cur.strftime("%Y-%m-%d"), cur.strftime("%d%m%Y")))
+        cur -= timedelta(days=1)
 
-    # Determine last 30 active weekday dates
-    trading_dates_raw: list[str] = []
-    try:
-        dt_rows = conn.execute("""
-            SELECT DISTINCT date
-            FROM price_history
-            WHERE date <= date('now')
-            GROUP BY date
-            HAVING COUNT(*) >= 30 AND SUM(volume) > 1000000
-            ORDER BY date DESC
-            LIMIT 40
-        """).fetchall()
-        for r in dt_rows:
-            if r[0]:
-                d_str = str(r[0])
-                try:
-                    d_obj = datetime.strptime(d_str, "%Y-%m-%d")
-                    if d_obj.weekday() < 5:
-                        trading_dates_raw.append(d_str)
-                except Exception:
-                    trading_dates_raw.append(d_str)
-    except Exception:
-        pass
+    # Check which dates already exist in SQLite
+    missing_dates: list[tuple[str, str]] = []
+    if not force:
+        for iso_d, ddmmyyyy in target_dates:
+            try:
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM participant_oi_positioning WHERE date = ? AND future_index_long > 0",
+                    (iso_d,)
+                ).fetchone()
+                if not row or row[0] < 4:
+                    missing_dates.append((iso_d, ddmmyyyy))
+            except Exception:
+                missing_dates.append((iso_d, ddmmyyyy))
+    else:
+        missing_dates = target_dates
 
-    if not trading_dates_raw:
-        cur = now_utc.date()
-        while len(trading_dates_raw) < 30:
-            if cur.weekday() < 5:
-                trading_dates_raw.append(cur.strftime("%Y-%m-%d"))
-            cur -= timedelta(days=1)
-    elif len(trading_dates_raw) < 30:
-        try:
-            last_d = datetime.strptime(trading_dates_raw[-1], "%Y-%m-%d").date()
-            cur = last_d - timedelta(days=1)
-            while len(trading_dates_raw) < 30:
-                if cur.weekday() < 5:
-                    trading_dates_raw.append(cur.strftime("%Y-%m-%d"))
-                cur -= timedelta(days=1)
-        except Exception:
-            pass
+    if not missing_dates:
+        return 0
 
-    latest_date_str = trading_dates_raw[0] if trading_dates_raw else today_str
-    try:
-        dt_obj = datetime.strptime(latest_date_str, "%Y-%m-%d").date()
-        session_label = dt_obj.strftime("%d %b (%a)")
-    except Exception:
-        session_label = latest_date_str
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
 
-    # Participant variations for the sessions (realistic multi-day trajectory)
-    day_patterns = [
-        {
-            "FII": (148520, 241850, 312400, 385600, 421000, 298000, 881920, 925450, -43530, 0.95, 48.8, 51.2, "🔴 Net Short · Index Futures Hedging"),
-            "DII": (98400, 52100, 112000, 84500, 145000, 95000, 355400, 231600, 123800, 1.53, 60.5, 39.5, "🟢 Net Long · Equity Float Accumulation"),
-            "PRO": (215600, 224800, 684500, 712000, 598000, 615000, 1498100, 1551800, -53700, 0.97, 49.1, 50.9, "⚪ Neutral Delta · Options Writing / Arbitrage"),
-            "CLIENT": (485600, 274100, 1245000, 785000, 620000, 985000, 2350600, 2044100, 306500, 1.15, 53.5, 46.5, "🟢 Net Long · Call Buying (Contrarian Risk)"),
-        },
-        {
-            "FII": (152100, 238200, 308000, 379000, 415000, 302000, 875100, 919200, -44100, 0.95, 48.8, 51.2, "🔴 Net Short · Futures Hedging"),
-            "DII": (96500, 53400, 109000, 86000, 142000, 96500, 347500, 235900, 111600, 1.47, 59.5, 40.5, "🟢 Net Long · Systematic SIP Inflows"),
-            "PRO": (212000, 228000, 672000, 705000, 590000, 622000, 1474000, 1555000, -81000, 0.95, 48.7, 51.3, "⚪ Neutral Delta · Arbitrage Desks"),
-            "CLIENT": (478000, 269000, 1210000, 792000, 631000, 970000, 2319000, 2031000, 288000, 1.14, 53.3, 46.7, "🟢 Net Long · Retail Call Momentum"),
-        },
-        {
-            "FII": (144000, 245000, 298000, 392000, 408000, 310000, 850000, 947000, -97000, 0.90, 47.3, 52.7, "🔴 Net Short · Index Protective Puts"),
-            "DII": (94000, 55000, 105000, 88000, 138000, 99000, 337000, 242000, 95000, 1.39, 58.2, 41.8, "🟢 Net Long · Domestic Inflows"),
-            "PRO": (218000, 221000, 695000, 698000, 605000, 608000, 1518000, 1527000, -9000, 0.99, 49.9, 50.1, "⚪ Delta Neutral · Option Selling"),
-            "CLIENT": (492000, 262000, 1260000, 770000, 610000, 995000, 2362000, 2027000, 335000, 1.17, 53.8, 46.2, "🟢 Net Long · Retail Buying"),
-        },
-        {
-            "FII": (156000, 232000, 325000, 370000, 429000, 289000, 910000, 891000, 19000, 1.02, 50.5, 49.5, "⚪ Mild Net Long · Futures Covering"),
-            "DII": (99800, 50200, 115000, 82000, 149000, 92000, 363800, 224200, 139600, 1.62, 61.9, 38.1, "🟢 Net Long · Equity Accumulation"),
-            "PRO": (209000, 231000, 660000, 725000, 582000, 628000, 1451000, 1584000, -133000, 0.92, 47.8, 52.2, "🔴 Mild Short · Gamma Scalping"),
-            "CLIENT": (471000, 279000, 1195000, 810000, 645000, 955000, 2311000, 2044000, 267000, 1.13, 53.1, 46.9, "🟢 Net Long · Call Longs"),
-        },
-        {
-            "FII": (161000, 228000, 338000, 362000, 435000, 281000, 934000, 871000, 63000, 1.07, 51.7, 48.3, "🟢 Net Long · Multi-Day Breakout Longs"),
-            "DII": (102000, 48500, 118000, 80500, 152000, 89000, 372000, 218000, 154000, 1.71, 63.1, 36.9, "🟢 Net Long · SIP Absorption"),
-            "PRO": (205000, 235000, 650000, 738000, 575000, 635000, 1430000, 1608000, -178000, 0.89, 47.1, 52.9, "🔴 Short Delta · Writing Resistance"),
-            "CLIENT": (462000, 285000, 1170000, 830000, 660000, 940000, 2292000, 2055000, 237000, 1.12, 52.7, 47.3, "🟢 Net Long · Momentum Longs"),
-        },
-        {
-            "FII": (149000, 240000, 315000, 382000, 418000, 295000, 882000, 917000, -35000, 0.96, 49.0, 51.0, "🔴 Net Short · Partial Hedging"),
-            "DII": (97000, 51000, 111000, 83000, 144000, 93000, 352000, 227000, 125000, 1.55, 60.8, 39.2, "🟢 Net Long · Mutual Fund Buys"),
-            "PRO": (214000, 226000, 680000, 715000, 595000, 618000, 1489000, 1559000, -70000, 0.96, 48.8, 51.2, "⚪ Neutral Delta · Hedged Desks"),
-            "CLIENT": (482000, 271000, 1230000, 788000, 625000, 978000, 2337000, 2037000, 300000, 1.15, 53.4, 46.6, "🟢 Net Long · Retail Float"),
-        },
-        {
-            "FII": (142000, 248000, 295000, 398000, 402000, 315000, 839000, 961000, -122000, 0.87, 46.6, 53.4, "🔴 Net Short · Index Protective Hedges"),
-            "DII": (93000, 56000, 103000, 89000, 136000, 101000, 332000, 246000, 86000, 1.35, 57.4, 42.6, "🟢 Net Long · Defensive Accumulation"),
-            "PRO": (220000, 219000, 702000, 692000, 612000, 602000, 1534000, 1513000, 21000, 1.01, 50.3, 49.7, "⚪ Neutral Delta · Straddle Writing"),
-            "CLIENT": (498000, 258000, 1280000, 760000, 602000, 1010000, 2380000, 2028000, 352000, 1.17, 54.0, 46.0, "🟢 Net Long · Aggressive Calls"),
-        }
-    ]
-
-    now_iso = now_utc.isoformat()
-    delta_oi_inserts: list[tuple] = []
     labels_map = {
         "FII": "🏛️ Foreign Institutions (FII / FPI)",
         "DII": "🏢 Domestic Institutions (DII / MF)",
@@ -805,35 +785,236 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         "CLIENT": "👤 Retail Investors & HNIs",
     }
 
-    # Ensure all available dates exist in participant_oi_positioning
-    for idx, d_str in enumerate(trading_dates_raw[:30]):
+    def _fetch_and_parse_day(date_info: tuple[str, str]) -> list[tuple] | None:
+        iso_date, ddmmyyyy = date_info
+        url = f"https://archives.nseindia.com/content/nsccl/fao_participant_oi_{ddmmyyyy}.csv"
         try:
-            existing = conn.execute("SELECT COUNT(*) FROM participant_oi_positioning WHERE date = ?", (d_str,)).fetchone()[0]
-            if existing < 4:
-                pat = day_patterns[idx % len(day_patterns)]
-                for p_code, p_vals in pat.items():
-                    delta_oi_inserts.append((
-                        d_str, p_code, labels_map[p_code],
-                        p_vals[0], p_vals[1], p_vals[2], p_vals[3], p_vals[4], p_vals[5],
-                        p_vals[6], p_vals[7], p_vals[8], p_vals[9], p_vals[10], p_vals[11],
-                        p_vals[12], now_iso
-                    ))
-        except Exception:
-            pass
+            resp = requests.get(url, headers=headers, timeout=8)
+            if resp.status_code != 200 or len(resp.content) < 50:
+                return None
 
-    if delta_oi_inserts:
+            raw_bytes = resp.content
+            # NSE clearing CSVs often have a title row at line 0 (e.g. "Participant wise Open Interest...")
+            df = pd.read_csv(io.BytesIO(raw_bytes))
+            df.columns = [c.strip() for c in df.columns]
+
+            p_col = None
+            for candidate in ["Client Type", "CLIENT TYPE", "Participant", "PARTICIPANT"]:
+                if candidate in df.columns:
+                    p_col = candidate
+                    break
+
+            if not p_col:
+                # Try with skiprows=1
+                df = pd.read_csv(io.BytesIO(raw_bytes), skiprows=1)
+                df.columns = [c.strip() for c in df.columns]
+                for candidate in ["Client Type", "CLIENT TYPE", "Participant", "PARTICIPANT"]:
+                    if candidate in df.columns:
+                        p_col = candidate
+                        break
+
+            if not p_col:
+                return None
+
+            now_iso = datetime.now(timezone.utc).isoformat()
+            day_records: list[tuple] = []
+
+            for _, row in df.iterrows():
+                raw_type = str(row.get(p_col, "")).strip().upper()
+                p_key = None
+                if "FII" in raw_type or "FOREIGN" in raw_type:
+                    p_key = "FII"
+                elif "DII" in raw_type or "DOMESTIC" in raw_type:
+                    p_key = "DII"
+                elif "PRO" in raw_type or "PROPRIETARY" in raw_type:
+                    p_key = "PRO"
+                elif "CLIENT" in raw_type or "RETAIL" in raw_type or "INDIVIDUAL" in raw_type:
+                    p_key = "CLIENT"
+
+                if not p_key:
+                    continue
+
+                def _safe_int(k: str) -> int:
+                    val = row.get(k, 0)
+                    try:
+                        return int(float(str(val).replace(",", "").strip()))
+                    except Exception:
+                        return 0
+
+                fi_long = _safe_int("Future Index Long")
+                fi_short = _safe_int("Future Index Short")
+                fi_net = fi_long - fi_short
+                fi_total = fi_long + fi_short
+                fi_long_pct = round((fi_long / max(1, fi_total)) * 100.0, 1)
+
+                fs_long = _safe_int("Future Stock Long")
+                fs_short = _safe_int("Future Stock Short")
+                fs_net = fs_long - fs_short
+
+                oic_long = _safe_int("Option Index Call Long")
+                oic_short = _safe_int("Option Index Call Short")
+                oip_long = _safe_int("Option Index Put Long")
+                oip_short = _safe_int("Option Index Put Short")
+
+                osc_long = _safe_int("Option Stock Call Long")
+                osc_short = _safe_int("Option Stock Call Short")
+                osp_long = _safe_int("Option Stock Put Long")
+                osp_short = _safe_int("Option Stock Put Short")
+
+                fut_long = fi_long + fs_long
+                fut_short = fi_short + fs_short
+
+                calls_long = oic_long + osc_long
+                calls_short = oic_short + osc_short
+
+                puts_long = oip_long + osp_long
+                puts_short = oip_short + osp_short
+
+                tot_long = _safe_int("Total Long Contracts") or (fut_long + calls_long + puts_long)
+                tot_short = _safe_int("Total Short Contracts") or (fut_short + calls_short + puts_short)
+                net_contracts = tot_long - tot_short
+                ls_ratio = round(tot_long / max(1, tot_short), 2)
+                sum_tot = tot_long + tot_short
+                long_pct = round((tot_long / max(1, sum_tot)) * 100.0, 1)
+                short_pct = round(100.0 - long_pct, 1)
+
+                # Classify qualitative stance
+                if p_key == "FII":
+                    if fi_long_pct >= 55.0 or (ls_ratio >= 1.15 and fi_net > 0):
+                        stance = "🟢 Net Long · Index Futures Momentum"
+                    elif fi_long_pct <= 40.0 or (ls_ratio <= 0.85 and fi_net < 0):
+                        stance = "🔴 Net Short · Index Futures Hedging"
+                    else:
+                        stance = "⚪ Neutral Delta · Hedged Positioning"
+                elif p_key == "PRO":
+                    if oic_short > oic_long and oip_short > oip_long:
+                        stance = "⚪ Delta Neutral · Straddle Writing"
+                    elif fi_long_pct >= 55.0:
+                        stance = "🟢 Long Delta · Directional Algos"
+                    elif fi_long_pct <= 40.0:
+                        stance = "🔴 Short Delta · Resistance Writing"
+                    else:
+                        stance = "⚪ Neutral Delta · Options Writing / Arbitrage"
+                elif p_key == "CLIENT":
+                    if fi_long_pct >= 60.0 or calls_long > (calls_short * 1.3):
+                        stance = "🟢 Net Long · Retail Call Momentum"
+                    elif fi_long_pct <= 40.0:
+                        stance = "🔴 Net Short · Retail Protective Puts"
+                    else:
+                        stance = "🟢 Net Long · Retail Float"
+                else:  # DII
+                    if ls_ratio >= 1.15:
+                        stance = "🟢 Net Long · Equity Float Accumulation"
+                    else:
+                        stance = "🟢 Net Long · Systematic SIP Inflows"
+
+                day_records.append((
+                    iso_date, p_key, labels_map.get(p_key, p_key),
+                    fi_long, fi_short, fi_net, fi_long_pct,
+                    fs_long, fs_short, fs_net,
+                    oic_long, oic_short, oip_long, oip_short,
+                    osc_long, osc_short, osp_long, osp_short,
+                    fut_long, fut_short,
+                    calls_long, calls_short,
+                    puts_long, puts_short,
+                    tot_long, tot_short,
+                    net_contracts, ls_ratio, long_pct, short_pct,
+                    stance, now_iso
+                ))
+
+            return day_records if len(day_records) >= 4 else None
+        except Exception as e:
+            logger.debug("[PARTICIPANT-OI] Failed scraping archive %s: %s", url, e)
+            return None
+
+    all_inserts: list[tuple] = []
+    # Scrape concurrently across candidate dates
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(missing_dates))) as executor:
+        results = executor.map(_fetch_and_parse_day, missing_dates)
+        for res in results:
+            if res:
+                all_inserts.extend(res)
+
+    if all_inserts:
         try:
             conn.executemany("""
                 INSERT OR REPLACE INTO participant_oi_positioning (
-                    date, participant, category_label, futures_long, futures_short,
-                    calls_long, calls_short, puts_long, puts_short, total_long,
-                    total_short, net_contracts, long_short_ratio, long_pct, short_pct,
+                    date, participant, category_label,
+                    future_index_long, future_index_short, future_index_net, future_index_long_pct,
+                    future_stock_long, future_stock_short, future_stock_net,
+                    opt_index_call_long, opt_index_call_short, opt_index_put_long, opt_index_put_short,
+                    opt_stock_call_long, opt_stock_call_short, opt_stock_put_long, opt_stock_put_short,
+                    futures_long, futures_short,
+                    calls_long, calls_short,
+                    puts_long, puts_short,
+                    total_long, total_short,
+                    net_contracts, long_short_ratio, long_pct, short_pct,
                     stance, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, delta_oi_inserts)
+                ) VALUES (
+                    ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?,
+                    ?, ?,
+                    ?, ?,
+                    ?, ?,
+                    ?, ?, ?, ?,
+                    ?, ?
+                )
+            """, all_inserts)
             conn.commit()
-        except Exception:
-            pass
+            logger.info("[PARTICIPANT-OI] Successfully synced %d participant records from official NSE archives", len(all_inserts))
+        except Exception as e:
+            logger.warning("[PARTICIPANT-OI] Error persisting synced records: %s", e)
+
+    return len(all_inserts)
+
+
+def compute_participant_oi_matrix(settings: Settings | None = None, force_refresh: bool = False) -> dict[str, Any]:
+    """Compute authentic Participant Derivatives Open Interest (OI), Index Futures Long/Short positioning,
+    Day-over-Day shifts, and quantitative Market Maker vs Retail Contrarian Predictions for Tomorrow.
+    """
+    global _PARTICIPANT_OI_CACHE
+    now_ts = time.time()
+    if not force_refresh and "data" in _PARTICIPANT_OI_CACHE:
+        if (now_ts - _PARTICIPANT_OI_CACHE.get("ts", 0)) < _PULSE_CACHE_TTL:
+            return _PARTICIPANT_OI_CACHE["data"]
+
+    settings = settings or Settings()
+    conn = get_db_connection(settings)
+
+    # Automatically sync latest authentic participant OI files from official NSE clearing archives
+    try:
+        sync_nse_participant_oi_data(settings, days=30, force=force_refresh)
+    except Exception as e:
+        logger.debug("[PARTICIPANT-OI] Auto-sync notice: %s", e)
+
+    # Retrieve all recorded distinct dates from SQLite
+    trading_dates_raw: list[str] = []
+    try:
+        dt_rows = conn.execute("""
+            SELECT DISTINCT date
+            FROM participant_oi_positioning
+            ORDER BY date DESC
+            LIMIT 40
+        """).fetchall()
+        for r in dt_rows:
+            if r[0]:
+                trading_dates_raw.append(str(r[0]))
+    except Exception:
+        pass
+
+    now_utc = datetime.now(timezone.utc)
+    today_str = now_utc.strftime("%Y-%m-%d")
+
+    latest_date_str = trading_dates_raw[0] if trading_dates_raw else today_str
+    try:
+        dt_obj = datetime.strptime(latest_date_str, "%Y-%m-%d").date()
+        session_label = dt_obj.strftime("%d %b (%a)")
+    except Exception:
+        session_label = latest_date_str
 
     # Build 30-day, 10-day, and 7-day Participant OI History Matrix
     history_30d: list[dict[str, Any]] = []
@@ -849,24 +1030,15 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
             (d_str,)
         ).fetchall()
 
-        p_dict = {}
+        cur = conn.execute("SELECT * FROM participant_oi_positioning WHERE date = ? LIMIT 1", (d_str,))
+        cols = [d[0] for d in cur.description] if cur.description else []
+
+        p_dict: dict[str, Any] = {}
         for r in p_rows:
-            p_code = r[1]
-            p_dict[p_code] = {
-                "futures_long": r[3],
-                "futures_short": r[4],
-                "calls_long": r[5],
-                "calls_short": r[6],
-                "puts_long": r[7],
-                "puts_short": r[8],
-                "total_long": r[9],
-                "total_short": r[10],
-                "net_contracts": r[11],
-                "long_short_ratio": r[12],
-                "long_pct": r[13],
-                "short_pct": r[14],
-                "stance": r[15],
-            }
+            row_map = dict(zip(cols, r)) if cols else {}
+            p_code = row_map.get("participant", "")
+            if p_code:
+                p_dict[p_code] = row_map
 
         fii_stat = p_dict.get("FII", {})
         dii_stat = p_dict.get("DII", {})
@@ -876,6 +1048,20 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         history_30d.append({
             "date": d_str,
             "session_label": d_fmt,
+            # Index Futures Positioning
+            "fii_future_index_long": fii_stat.get("future_index_long", 0),
+            "fii_future_index_short": fii_stat.get("future_index_short", 0),
+            "fii_future_index_net": fii_stat.get("future_index_net", 0),
+            "fii_future_index_long_pct": fii_stat.get("future_index_long_pct", 50.0),
+            "client_future_index_long": client_stat.get("future_index_long", 0),
+            "client_future_index_short": client_stat.get("future_index_short", 0),
+            "client_future_index_net": client_stat.get("future_index_net", 0),
+            "client_future_index_long_pct": client_stat.get("future_index_long_pct", 50.0),
+            "pro_future_index_net": pro_stat.get("future_index_net", 0),
+            "pro_future_index_long_pct": pro_stat.get("future_index_long_pct", 50.0),
+            "dii_future_index_net": dii_stat.get("future_index_net", 0),
+            "dii_future_index_long_pct": dii_stat.get("future_index_long_pct", 50.0),
+            # Consolidated F&O Positioning
             "fii_net_contracts": fii_stat.get("net_contracts", 0),
             "fii_long_short_ratio": fii_stat.get("long_short_ratio", 1.0),
             "fii_long_pct": fii_stat.get("long_pct", 50.0),
@@ -902,28 +1088,32 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         for p_code in ["FII", "DII", "PRO", "CLIENT"]:
             t_stat = today_p.get(p_code, {})
             y_stat = prev_p.get(p_code, {})
+
+            d_fi_net = t_stat.get("future_index_net", 0) - y_stat.get("future_index_net", 0)
+            d_fi_long = t_stat.get("future_index_long", 0) - y_stat.get("future_index_long", 0)
+            d_fi_short = t_stat.get("future_index_short", 0) - y_stat.get("future_index_short", 0)
+            d_fi_long_pct = round(t_stat.get("future_index_long_pct", 50.0) - y_stat.get("future_index_long_pct", 50.0), 1)
+
+            d_fs_net = t_stat.get("future_stock_net", 0) - y_stat.get("future_stock_net", 0)
             d_net = t_stat.get("net_contracts", 0) - y_stat.get("net_contracts", 0)
             d_long = t_stat.get("total_long", 0) - y_stat.get("total_long", 0)
             d_short = t_stat.get("total_short", 0) - y_stat.get("total_short", 0)
             d_ls = round(t_stat.get("long_short_ratio", 1.0) - y_stat.get("long_short_ratio", 1.0), 3)
-            d_fut_net = (t_stat.get("futures_long", 0) - t_stat.get("futures_short", 0)) - (y_stat.get("futures_long", 0) - y_stat.get("futures_short", 0))
-            d_call_net = (t_stat.get("calls_long", 0) - t_stat.get("calls_short", 0)) - (y_stat.get("calls_long", 0) - y_stat.get("calls_short", 0))
-            d_put_net = (t_stat.get("puts_long", 0) - t_stat.get("puts_short", 0)) - (y_stat.get("puts_long", 0) - y_stat.get("puts_short", 0))
 
-            # Regime classification based on delta positioning
-            if d_net > 0 and d_long >= d_short:
+            # Regime classification based on delta positioning in Index Futures
+            if d_fi_net > 0 and d_fi_long >= d_fi_short:
                 regime = "Long Build-up"
                 badge = "🟢 Long Build-up"
-                desc = "Aggressive fresh long accumulation; bullish continuation bias."
-            elif d_net > 0 and d_short < 0:
+                desc = "Aggressive fresh long accumulation in index futures; bullish continuation bias."
+            elif d_fi_net > 0 and d_fi_short < 0:
                 regime = "Short Covering"
                 badge = "⚡ Short Covering"
                 desc = "Bear capitulation / shorts exiting; short squeeze momentum."
-            elif d_net < 0 and d_short >= d_long:
+            elif d_fi_net < 0 and d_fi_short >= d_fi_long:
                 regime = "Short Build-up"
                 badge = "🔴 Short Build-up"
-                desc = "Fresh institutional short hedges added; overhead resistance."
-            elif d_net < 0 and d_long < 0:
+                desc = "Fresh institutional short hedges added in index futures; overhead resistance."
+            elif d_fi_net < 0 and d_fi_long < 0:
                 regime = "Long Unwinding"
                 badge = "⚠️ Long Unwinding"
                 desc = "Longs taking profit / trimming risk; lack of aggressive buying."
@@ -933,13 +1123,15 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
                 desc = "Balanced positioning shifts with minimal directional skew."
 
             delta_metrics[p_code] = {
+                "future_index_delta": d_fi_net,
+                "future_index_long_delta": d_fi_long,
+                "future_index_short_delta": d_fi_short,
+                "future_index_long_pct_delta": d_fi_long_pct,
+                "future_stock_delta": d_fs_net,
                 "delta_net_contracts_1d": d_net,
                 "delta_long_contracts_1d": d_long,
                 "delta_short_contracts_1d": d_short,
                 "delta_ls_ratio_1d": d_ls,
-                "delta_futures_net_1d": d_fut_net,
-                "delta_calls_net_1d": d_call_net,
-                "delta_puts_net_1d": d_put_net,
                 "oi_regime": regime,
                 "oi_regime_badge": badge,
                 "oi_regime_desc": desc,
@@ -947,13 +1139,15 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
     else:
         for p_code in ["FII", "DII", "PRO", "CLIENT"]:
             delta_metrics[p_code] = {
+                "future_index_delta": 0,
+                "future_index_long_delta": 0,
+                "future_index_short_delta": 0,
+                "future_index_long_pct_delta": 0.0,
+                "future_stock_delta": 0,
                 "delta_net_contracts_1d": 0,
                 "delta_long_contracts_1d": 0,
                 "delta_short_contracts_1d": 0,
                 "delta_ls_ratio_1d": 0.0,
-                "delta_futures_net_1d": 0,
-                "delta_calls_net_1d": 0,
-                "delta_puts_net_1d": 0,
                 "oi_regime": "Neutral / Balanced",
                 "oi_regime_badge": "⚪ Neutral",
                 "oi_regime_desc": "Balanced positioning baseline.",
@@ -966,7 +1160,7 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
             "SELECT * FROM participant_oi_positioning WHERE date = ? ORDER BY CASE participant WHEN 'FII' THEN 1 WHEN 'DII' THEN 2 WHEN 'PRO' THEN 3 WHEN 'CLIENT' THEN 4 ELSE 5 END",
             (latest_date_str,)
         )
-        cols = [d[0] for d in cur.description]
+        cols = [d[0] for d in cur.description] if cur.description else []
         rows = cur.fetchall()
         for r in rows:
             p_dict = dict(zip(cols, r))
@@ -977,55 +1171,143 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
     except Exception:
         pass
 
-    # Extract participant stances for commentary and divergence analysis
+    # Extract participant stats for contrarian prediction engine
     fii_p = next((p for p in participants_list if p.get("participant") == "FII"), {})
     dii_p = next((p for p in participants_list if p.get("participant") == "DII"), {})
     pro_p = next((p for p in participants_list if p.get("participant") == "PRO"), {})
     client_p = next((p for p in participants_list if p.get("participant") == "CLIENT"), {})
 
-    fii_net = fii_p.get("net_contracts", -43530)
-    dii_net = dii_p.get("net_contracts", 123800)
-    pro_net = pro_p.get("net_contracts", -53700)
-    client_net = client_p.get("net_contracts", 306500)
-    fii_ls = fii_p.get("long_short_ratio", 0.95)
-    dii_ls = dii_p.get("long_short_ratio", 1.53)
-    pro_ls = pro_p.get("long_short_ratio", 0.97)
-    client_ls = client_p.get("long_short_ratio", 1.15)
+    fii_net = int(fii_p.get("net_contracts", 0))
+    dii_net = int(dii_p.get("net_contracts", 0))
+    pro_net = int(pro_p.get("net_contracts", 0))
+    client_net = int(client_p.get("net_contracts", 0))
 
-    smart_money_net = fii_net + pro_net
-    retail_net = client_net
+    fii_ls = float(fii_p.get("long_short_ratio", 1.0))
+    dii_ls = float(dii_p.get("long_short_ratio", 1.0))
+    pro_ls = float(pro_p.get("long_short_ratio", 1.0))
+    client_ls = float(client_p.get("long_short_ratio", 1.0))
+
+    fii_fi_net = int(fii_p.get("future_index_net", 0))
+    fii_fi_long_pct = float(fii_p.get("future_index_long_pct", 50.0))
+    client_fi_net = int(client_p.get("future_index_net", 0))
+    client_fi_long_pct = float(client_p.get("future_index_long_pct", 50.0))
+    pro_fi_net = int(pro_p.get("future_index_net", 0))
+    dii_fi_net = int(dii_p.get("future_index_net", 0))
+
+    smart_money_net = fii_fi_net + pro_fi_net
+    retail_net = client_fi_net
     smart_vs_retail_delta = smart_money_net - retail_net
 
-    if fii_ls < 0.85 and client_ls > 1.25:
-        regime_verdict = "⚠️ Smart Money Hedging Against Retail Longs (High Caution Regime)"
+    # -----------------------------------------------------------------------
+    # Quantitative Market Maker vs Retail Contrarian Prediction Engine
+    # -----------------------------------------------------------------------
+    # Core Principle: Market makers & institutional desks consistently trade
+    # against retail crowds when positioning reaches extreme polar divergence.
+    # When Retail is aggressively long (e.g. > 70% long) & FII is heavily short (< 25% long),
+    # morning gap-ups face high probability of being sold off (Bull-Trap).
+    if (fii_fi_long_pct <= 25.0 or fii_fi_net < -15000) and (client_fi_long_pct >= 65.0 or client_fi_net > 20000):
+        regime_verdict = "⚠️ Extreme Smart Money Hedging vs Retail Euphoria (High Bull-Trap Risk)"
         regime_sentiment = "BEARISH_DIVERGENCE"
-        commentary = "Foreign institutions and proprietary desks hold net short futures hedges while retail clients remain aggressively long calls. Historically, this divergence creates overhead resistance on gap-up rallies."
         divergence_status = "BEAR_TRAP_RISK"
-        divergence_badge = "⚠️ High Bull-Trap Risk (Smart Money Short vs Retail Long)"
-        divergence_trap_score = 85
-        divergence_warning = "Smart money is hedged short while retail is long calls. Risk of gap-up fade into overhead supply."
-    elif fii_ls > 1.20 and client_ls < 0.90:
-        regime_verdict = "🟢 Institutional Squeeze on Retail Shorts (High Conviction Bullish)"
+        divergence_badge = "🚨 Extreme Bull-Trap Risk (Smart Money Short vs Retail Long)"
+        divergence_trap_score = 88
+        divergence_warning = "FIIs hold heavy Index Futures short inventory (~{:.1f}% Long) while Retail is aggressively long ({:.1f}% Long). Market makers are positioned to fade morning rallies into resistance.".format(
+            fii_fi_long_pct, client_fi_long_pct
+        )
+        market_maker_stance = "Net Short Index Futures & Writing Resistance Calls (Trap Formation)"
+        retail_stance = "Aggressively Long Index Futures & Buying Out-of-the-Money Calls"
+        contrarian_prediction = {
+            "verdict": "BEARISH_FADE_GAP_UPS",
+            "trap_score": 88,
+            "headline": "🚨 High Bull-Trap Risk: Market Makers Poised to Fade Morning Rallies",
+            "expected_behavior": "Morning gap-ups will struggle to sustain and are likely to face aggressive institutional supply near VWAP and key call strikes.",
+            "actionable_playbook": "Avoid chasing morning breakouts. Look for short / mean-reversion setups on failed tests of overhead resistance.",
+            "fii_long_pct": fii_fi_long_pct,
+            "client_long_pct": client_fi_long_pct,
+        }
+        commentary = (
+            f"Foreign institutions hold only {fii_fi_long_pct:.1f}% Long in Index Futures with a net short position of {abs(fii_fi_net):,} contracts. "
+            f"In contrast, Retail Clients hold {client_fi_long_pct:.1f}% Long (+{client_fi_net:,} net long contracts). "
+            "This severe divergence creates high vulnerability to gap-and-crap bull traps where opening momentum is absorbed by institutional sell orders."
+        )
+    elif (fii_fi_long_pct >= 60.0 or fii_fi_net > 15000) and (client_fi_long_pct <= 40.0 or client_fi_net < -10000):
+        regime_verdict = "🟢 Institutional Squeeze on Retail Shorts (High Conviction Bullish Continuation)"
         regime_sentiment = "BULLISH_CONVERGENCE"
-        commentary = "FIIs and domestic funds are heavily long contracts while retail participants are hedged short. Favorable conditions for sustained multi-day breakouts."
         divergence_status = "SHORT_SQUEEZE_EXPANSION"
-        divergence_badge = "🟢 Short Squeeze Expansion (Smart Money Long vs Retail Short)"
-        divergence_trap_score = 20
-        divergence_warning = "Institutions hold dominant long inventory against trapped retail shorts. Pullbacks into VWAP are aggressive buy zones."
+        divergence_badge = "⚡ Short Squeeze Expansion (Smart Money Long vs Retail Short)"
+        divergence_trap_score = 15
+        divergence_warning = "FIIs are heavily long Index Futures ({:.1f}% Long) against trapped retail short positions ({:.1f}% Long). Pullbacks into VWAP are high-probability buy zones.".format(
+            fii_fi_long_pct, client_fi_long_pct
+        )
+        market_maker_stance = "Dominant Index Futures Longs & Writing Protective Puts"
+        retail_stance = "Trapped in Index Short Hedges & Buying Puts"
+        contrarian_prediction = {
+            "verdict": "BULLISH_SHORT_SQUEEZE",
+            "trap_score": 15,
+            "headline": "⚡ Short-Squeeze Alert: Institutions Driving Upward Momentum",
+            "expected_behavior": "Morning pullbacks are rapidly absorbed by institutional buy orders, forcing retail shorts to capitulate and buy to cover.",
+            "actionable_playbook": "Buy intraday pullbacks near VWAP and 1-Sigma lower bands. Trend continuation favored over reversals.",
+            "fii_long_pct": fii_fi_long_pct,
+            "client_long_pct": client_fi_long_pct,
+        }
+        commentary = (
+            f"FIIs hold {fii_fi_long_pct:.1f}% Long in Index Futures with +{fii_fi_net:,} net contracts while Retail is net short ({client_fi_long_pct:.1f}% Long). "
+            "Historically, this setup fuels powerful short squeezes where dips are aggressively defended and bears are forced to cover."
+        )
+    elif abs(fii_fi_net) < 10000 and pro_p.get("opt_index_call_short", 0) > pro_p.get("opt_index_call_long", 0):
+        regime_verdict = "⚖️ Rangebound / Theta Capture Regime (Market Makers Short Volatility)"
+        regime_sentiment = "NEUTRAL_RANGEBOUND"
+        divergence_status = "RANGEBOUND_THETA"
+        divergence_badge = "⚖️ Rangebound / Theta Capture (Option Sellers Dominant)"
+        divergence_trap_score = 38
+        divergence_warning = "Proprietary desks and market makers hold heavy short straddles/strangles. Benchmark index likely pinned within the 1-Sigma corridor."
+        market_maker_stance = "Delta-Neutral Straddle Writing & Premium Decay Arbitrage"
+        retail_stance = "Directional Option Premium Buyers"
+        contrarian_prediction = {
+            "verdict": "RANGEBOUND_THETA_DECAY",
+            "trap_score": 38,
+            "headline": "⚖️ Rangebound Pinning: Market Makers Harvesting Premium",
+            "expected_behavior": "Index is expected to oscillate within established support/resistance bounds without clean multi-hour breakout extensions.",
+            "actionable_playbook": "Deploy non-directional option selling or mean-reversion strategies from range extremes. Avoid breakout chasing.",
+            "fii_long_pct": fii_fi_long_pct,
+            "client_long_pct": client_fi_long_pct,
+        }
+        commentary = (
+            "Proprietary desks hold delta-neutral option writing positions across major index strikes. "
+            "Directional momentum is constrained, favoring mean-reversion and premium decay strategies."
+        )
     else:
-        regime_verdict = "⚪ Institutional Hedging with Selective Stock Rotation"
+        regime_verdict = "⚪ Balanced Institutional Positioning (Sector & Stock Rotation)"
         regime_sentiment = "NEUTRAL"
-        commentary = "FIIs are hedged in index futures while DIIs provide continuous domestic absorption. Individual stock-specific momentum and earnings catalysts prevail over broad index trends."
         divergence_status = "BALANCED"
         divergence_badge = "⚖️ Balanced Positioning"
         divergence_trap_score = 45
-        divergence_warning = "Positioning is balanced. Trade key support/resistance boundaries and individual stock breakouts."
+        divergence_warning = "Positioning is balanced. Benchmark price action will follow sectoral earnings releases and technical pivots."
+        market_maker_stance = "Balanced Hedging & Systematic Arbitrage"
+        retail_stance = "Stock Specific & Mild Long Bias"
+        contrarian_prediction = {
+            "verdict": "BALANCED_ROTATION",
+            "trap_score": 45,
+            "headline": "🔄 Balanced Positioning: Stock & Sector Catalyst Focus",
+            "expected_behavior": "Index moves within normal volatility parameters. High divergence between strong and weak sectors.",
+            "actionable_playbook": "Focus on high-quality breakout setups and earnings surprise candidates. Trade benchmark indices strictly by technical levels.",
+            "fii_long_pct": fii_fi_long_pct,
+            "client_long_pct": client_fi_long_pct,
+        }
+        commentary = (
+            f"FII Index Futures Long % stands at {fii_fi_long_pct:.1f}% with Retail at {client_fi_long_pct:.1f}%. "
+            "No extreme contrarian trap conditions are present. Stock-specific catalysts and earnings momentum will drive alpha."
+        )
 
     # Build 10D and 30D Time Series for Charting (Chronological order)
     chart_10d_reversed = list(reversed(history_10d))
     chart_series_10d = {
         "dates": [h["date"] for h in chart_10d_reversed],
         "session_labels": [h["session_label"] for h in chart_10d_reversed],
+        "fii_future_index_long_pct": [h.get("fii_future_index_long_pct", 50.0) for h in chart_10d_reversed],
+        "client_future_index_long_pct": [h.get("client_future_index_long_pct", 50.0) for h in chart_10d_reversed],
+        "fii_future_index_net": [h.get("fii_future_index_net", 0) for h in chart_10d_reversed],
+        "client_future_index_net": [h.get("client_future_index_net", 0) for h in chart_10d_reversed],
         "fii_net": [h["fii_net_contracts"] for h in chart_10d_reversed],
         "dii_net": [h["dii_net_contracts"] for h in chart_10d_reversed],
         "pro_net": [h["pro_net_contracts"] for h in chart_10d_reversed],
@@ -1038,6 +1320,10 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
     chart_series_30d = {
         "dates": [h["date"] for h in chart_30d_reversed],
         "session_labels": [h["session_label"] for h in chart_30d_reversed],
+        "fii_future_index_long_pct": [h.get("fii_future_index_long_pct", 50.0) for h in chart_30d_reversed],
+        "client_future_index_long_pct": [h.get("client_future_index_long_pct", 50.0) for h in chart_30d_reversed],
+        "fii_future_index_net": [h.get("fii_future_index_net", 0) for h in chart_30d_reversed],
+        "client_future_index_net": [h.get("client_future_index_net", 0) for h in chart_30d_reversed],
         "fii_net": [h["fii_net_contracts"] for h in chart_30d_reversed],
         "dii_net": [h["dii_net_contracts"] for h in chart_30d_reversed],
         "pro_net": [h["pro_net_contracts"] for h in chart_30d_reversed],
@@ -1050,6 +1336,18 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         "as_of_date": latest_date_str,
         "session_label": session_label,
         "participants": participants_list,
+        "index_futures_summary": {
+            "fii_index_long_pct": fii_fi_long_pct,
+            "client_index_long_pct": client_fi_long_pct,
+            "pro_index_long_pct": float(pro_p.get("future_index_long_pct", 50.0)),
+            "dii_index_long_pct": float(dii_p.get("future_index_long_pct", 50.0)),
+            "fii_index_net": fii_fi_net,
+            "client_index_net": client_fi_net,
+            "pro_index_net": pro_fi_net,
+            "dii_index_net": dii_fi_net,
+            "fii_index_net_delta": delta_metrics.get("FII", {}).get("future_index_delta", 0),
+            "client_index_net_delta": delta_metrics.get("CLIENT", {}).get("future_index_delta", 0),
+        },
         "history_7d": history_7d,
         "history_10d": history_10d,
         "history_30d": history_30d,
@@ -1064,10 +1362,14 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
         "smart_money_net": smart_money_net,
         "retail_net": retail_net,
         "smart_vs_retail_delta": smart_vs_retail_delta,
+        "smart_vs_retail_divergence": smart_vs_retail_delta,
         "divergence_status": divergence_status,
         "divergence_badge": divergence_badge,
         "divergence_trap_score": divergence_trap_score,
         "divergence_warning": divergence_warning,
+        "market_maker_stance": market_maker_stance,
+        "retail_stance": retail_stance,
+        "contrarian_prediction": contrarian_prediction,
         "regime_verdict": regime_verdict,
         "regime_sentiment": regime_sentiment,
         "commentary": commentary,
@@ -1339,32 +1641,52 @@ def compute_next_day_market_playbook(
     score_p4_breadth = 0.0
     score_p5_momentum = 0.0
 
-    # Pillar 1: Derivatives Positioning & OI Shifts (Max +/- 25)
+    # Pillar 1: Derivatives Positioning, Index Futures & OI Shifts (Max +/- 25)
     fii_ls = 1.0
     client_ls = 1.0
     fii_net = 0
+    fii_fi_long_pct = 50.0
+    client_fi_long_pct = 50.0
+
+    idx_summary = participant_oi.get("index_futures_summary", {})
+    if idx_summary:
+        fii_fi_long_pct = float(idx_summary.get("fii_index_long_pct", 50.0))
+        client_fi_long_pct = float(idx_summary.get("client_index_long_pct", 50.0))
+
     participants = participant_oi.get("participants", [])
     for p in participants:
         if p.get("participant") == "FII":
             fii_ls = float(p.get("long_short_ratio", 1.0))
             fii_net = int(p.get("net_contracts", 0))
+            if not idx_summary:
+                fii_fi_long_pct = float(p.get("future_index_long_pct", 50.0))
         elif p.get("participant") == "CLIENT":
             client_ls = float(p.get("long_short_ratio", 1.0))
+            if not idx_summary:
+                client_fi_long_pct = float(p.get("future_index_long_pct", 50.0))
 
+    # Weight Index Futures Long % (Smart Money directional driver)
+    if fii_fi_long_pct >= 60.0:
+        score_p1_derivatives += 12.0
+    elif fii_fi_long_pct >= 50.0:
+        score_p1_derivatives += 6.0
+    elif fii_fi_long_pct <= 25.0:
+        score_p1_derivatives -= 14.0
+    elif fii_fi_long_pct <= 40.0:
+        score_p1_derivatives -= 7.0
+
+    # Weight Consolidated Long/Short Ratio
     if fii_ls >= 1.25:
-        score_p1_derivatives += 15.0
-    elif fii_ls >= 1.05:
         score_p1_derivatives += 8.0
     elif fii_ls <= 0.75:
-        score_p1_derivatives -= 15.0
-    elif fii_ls <= 0.90:
         score_p1_derivatives -= 8.0
 
+    # Contrarian Market Maker Divergence Impact
     div_status = participant_oi.get("divergence_status", "BALANCED")
     if div_status == "SHORT_SQUEEZE_EXPANSION":
         score_p1_derivatives += 10.0
     elif div_status == "BEAR_TRAP_RISK":
-        score_p1_derivatives -= 10.0
+        score_p1_derivatives -= 12.0
 
     score_p1_derivatives = max(-25.0, min(25.0, score_p1_derivatives))
 

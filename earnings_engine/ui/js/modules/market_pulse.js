@@ -11,6 +11,7 @@
         _pulseLoaded: false,
         _isFlowHistoryExpanded: false,
         _isOiHistoryView: false,
+        _currentOiView: 'index_futures',
         _lastFlowsData: null,
         _lastOiData: null,
         _glossaryData: null,
@@ -22,23 +23,132 @@
             const badgeEl = document.getElementById('pulseLiveBadge');
             if (badgeEl) badgeEl.textContent = '● REFRESHING...';
 
-            try {
-                const url = API_BASE + '/api/v1/market/pulse' + (forceRefresh ? '?force_refresh=true' : '');
-                const res = await fetch(url);
-                if (!res.ok) throw new Error('HTTP ' + res.status);
+            const queryParam = forceRefresh ? '?force_refresh=true' : '';
 
-                const data = await res.json();
-                this.pulseData = data;
-                this._pulseLoaded = true;
-                if (data.metric_glossary) {
-                    this._glossaryData = data.metric_glossary;
-                }
-                if (window.app) {
-                    window.app.pulseData = data;
-                    window.app._pulseLoaded = true;
-                    if (data.metric_glossary) {
-                        window.app._glossaryData = data.metric_glossary;
+            // Progressive parallel hydration tasks
+            const tasks = [
+                // 1. Indices Quotes
+                fetch(API_BASE + '/api/v1/market-pulse/indices' + queryParam)
+                    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                    .then(data => {
+                        const indices = data.indices || [];
+                        this.renderIndices(indices);
+                        return { key: 'indices', val: indices };
+                    })
+                    .catch(err => {
+                        console.warn('[MARKET_PULSE] Error fetching modular indices:', err);
+                        return null;
+                    }),
+
+                // 2. Sectoral Heatmap
+                fetch(API_BASE + '/api/v1/market-pulse/sectors' + queryParam)
+                    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                    .then(data => {
+                        const sectors = data.sectors || [];
+                        this.renderSectors(sectors);
+                        return { key: 'sectors', val: sectors };
+                    })
+                    .catch(err => {
+                        console.warn('[MARKET_PULSE] Error fetching modular sectors:', err);
+                        return null;
+                    }),
+
+                // 3. Cash Institutional Liquidity & History
+                fetch(API_BASE + '/api/v1/market-pulse/liquidity' + queryParam)
+                    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                    .then(data => {
+                        const liq = data.liquidity || {};
+                        this.renderInstitutionalFlows(liq);
+                        return { key: 'institutional_flows', val: liq };
+                    })
+                    .catch(err => {
+                        console.warn('[MARKET_PULSE] Error fetching modular liquidity:', err);
+                        return null;
+                    }),
+
+                // 4. Macro Sentiment, Breadth & 30D Trend Charts
+                fetch(API_BASE + '/api/v1/market-pulse/sentiment')
+                    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                    .then(data => {
+                        const sent = data.sentiment || {};
+                        const fg = {
+                            score: sent.fear_greed_score,
+                            label: sent.fear_greed_label,
+                            color: sent.fear_greed_color,
+                            description: sent.fear_greed_desc,
+                            momentum_factor: sent.sub_factors?.momentum_factor,
+                            vix_factor: sent.sub_factors?.vix_factor,
+                            breadth_factor: sent.sub_factors?.breadth_factor,
+                            change_7d: sent.change_7d || null,
+                        };
+                        this.renderFearAndGreed(fg);
+                        this.renderVolatility({
+                            vix_level: sent.vix_level,
+                            regime: sent.vix_regime?.regime || sent.vix_regime,
+                            description: sent.vix_regime?.description,
+                            stance: sent.vix_regime?.stance,
+                        });
+                        this.renderBreadth(sent.breadth || {});
+                        if (sent.prediction) {
+                            this.renderPrediction({
+                                regime: sent.prediction.regime,
+                                commentary: sent.prediction.commentary,
+                                conviction_pct: sent.prediction.conviction_pct,
+                                nifty_support: sent.prediction.support_level,
+                                nifty_resistance: sent.prediction.resistance_level,
+                            });
+                        }
+                        this.renderMacroCharts(sent.macro_charts || {}, this._lastOiData || {});
+                        return { key: 'sentiment', val: sent };
+                    })
+                    .catch(err => {
+                        console.warn('[MARKET_PULSE] Error fetching modular sentiment:', err);
+                        return null;
+                    }),
+
+                // 5. Official Participant Derivatives Open Interest Matrix & Contrarian Engine
+                fetch(API_BASE + '/api/v1/market-pulse/participant-oi' + queryParam)
+                    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                    .then(data => {
+                        const oi = data.participant_oi || {};
+                        this.renderParticipantOI(oi);
+                        if (this.pulseData?.sentiment?.macro_charts) {
+                            this.renderMacroCharts(this.pulseData.sentiment.macro_charts, oi);
+                        }
+                        return { key: 'participant_oi', val: oi };
+                    })
+                    .catch(err => {
+                        console.warn('[MARKET_PULSE] Error fetching modular participant OI:', err);
+                        return null;
+                    }),
+
+                // 6. Actionable Next-Day Playbook & Trading Corridors
+                fetch(API_BASE + '/api/v1/market-pulse/playbook' + queryParam)
+                    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                    .then(data => {
+                        const pb = data.playbook || {};
+                        this.renderNextDayPlaybook(pb);
+                        return { key: 'next_day_playbook', val: pb };
+                    })
+                    .catch(err => {
+                        console.warn('[MARKET_PULSE] Error fetching modular playbook:', err);
+                        return null;
+                    }),
+            ];
+
+            try {
+                const results = await Promise.allSettled(tasks);
+                const combined = {};
+                for (const r of results) {
+                    if (r.status === 'fulfilled' && r.value) {
+                        combined[r.value.key] = r.value.val;
                     }
+                }
+                this.pulseData = { ...(this.pulseData || {}), ...combined };
+                this._pulseLoaded = true;
+                if (window.app) {
+                    window.app.pulseData = this.pulseData;
+                    window.app._pulseLoaded = true;
                 }
 
                 if (timeEl) {
@@ -46,21 +156,8 @@
                     timeEl.textContent = 'Updated: ' + now.toLocaleTimeString();
                 }
                 if (badgeEl) badgeEl.textContent = '● LIVE TICK';
-
-                this.renderIndices(data.indices || []);
-                this.renderNextDayPlaybook(data.next_day_playbook || {});
-                this.renderFearAndGreed(data.fear_and_greed || {});
-                this.renderVolatility(data.volatility || {});
-                this.renderPrediction(data.prediction || {});
-                this.renderBreadth(data.breadth || {});
-                this.renderInstitutionalFlows(data.institutional_flows || {});
-                this.renderParticipantOI(data.participant_oi || {});
-                this.renderSectors(data.sectors || []);
-                this.renderMacroCharts(data.macro_charts || {}, data.participant_oi || {});
-                // Note: Confluence setups are loaded on-demand via user trigger
-
             } catch (e) {
-                console.error('[MARKET_PULSE] Error loading market pulse:', e);
+                console.error('[MARKET_PULSE] Error in progressive hydration:', e);
                 if (badgeEl) badgeEl.textContent = '⚠️ SYNC DELAY';
             }
         },
@@ -552,13 +649,70 @@
         // =====================================================================
         // 🏛️ Enhanced Participant Derivatives OI & Long/Short Matrix
         // =====================================================================
+        setParticipantOiView(viewMode) {
+            this._currentOiView = viewMode;
+            if (window.app) window.app._currentOiView = viewMode;
+
+            // Update tab button styles
+            const btnIndex = document.getElementById('btnOiViewIndex');
+            const btnConsolidated = document.getElementById('btnOiViewConsolidated');
+            const btnHistory = document.getElementById('btnOiViewHistory');
+
+            [btnIndex, btnConsolidated, btnHistory].forEach(btn => {
+                if (btn) {
+                    btn.classList.remove('active');
+                    btn.style.background = 'transparent';
+                    btn.style.color = '#94a3b8';
+                }
+            });
+
+            if (viewMode === 'index_futures' && btnIndex) {
+                btnIndex.classList.add('active');
+                btnIndex.style.background = 'rgba(56,189,248,0.18)';
+                btnIndex.style.color = '#38bdf8';
+            } else if (viewMode === 'consolidated_fo' && btnConsolidated) {
+                btnConsolidated.classList.add('active');
+                btnConsolidated.style.background = 'rgba(56,189,248,0.18)';
+                btnConsolidated.style.color = '#38bdf8';
+            } else if (viewMode === 'history_matrix' && btnHistory) {
+                btnHistory.classList.add('active');
+                btnHistory.style.background = 'rgba(56,189,248,0.18)';
+                btnHistory.style.color = '#38bdf8';
+            }
+
+            const snapContainer = document.getElementById('pulseOiSnapshotContainer');
+            const histContainer = document.getElementById('pulseOiHistoryContainer');
+
+            if (snapContainer && histContainer) {
+                if (viewMode === 'history_matrix') {
+                    snapContainer.style.display = 'none';
+                    histContainer.style.display = 'block';
+                } else {
+                    snapContainer.style.display = 'block';
+                    histContainer.style.display = 'none';
+                }
+            }
+
+            const oiData = this._lastOiData || (window.app && window.app._lastOiData) || this.pulseData?.participant_oi || {};
+            this.renderParticipantOI(oiData);
+        },
+
+        toggleParticipantOiView() {
+            const nextView = this._currentOiView === 'history_matrix' ? 'index_futures' : 'history_matrix';
+            this.setParticipantOiView(nextView);
+        },
+
         renderParticipantOI(oiData) {
             this._lastOiData = oiData;
+            if (window.app) window.app._lastOiData = oiData;
+
+            const tableHead = document.getElementById('pulseParticipantOiTableHead');
             const tableBody = document.getElementById('pulseParticipantOiTableBody');
             const historyBody = document.getElementById('pulseParticipantOiHistoryTableBody');
             const badgeEl = document.getElementById('pulseOiRegimeBadge');
             const sessionSub = document.getElementById('pulseOiSessionSub');
             const commentaryEl = document.getElementById('pulseOiCommentary');
+            const contrarianCard = document.getElementById('pulseOiContrarianCard');
 
             if (!oiData || (!oiData.participants && !oiData.history_10d && !oiData.history_7d)) {
                 if (tableBody) {
@@ -598,74 +752,226 @@
                 commentaryEl.textContent = oiData.commentary;
             }
 
-            // Render 1D Snapshot Table
-            if (tableBody && oiData.participants && oiData.participants.length) {
-                tableBody.innerHTML = oiData.participants.map(p => {
-                    const netVal = p.net_contracts || 0;
-                    const netCol = netVal > 0 ? '#34d399' : (netVal < 0 ? '#f87171' : '#94a3b8');
-                    const netSign = netVal > 0 ? '+' : '';
+            // Render Market Maker Contrarian Trap Score & Tomorrow's Prediction
+            if (contrarianCard && oiData.contrarian_prediction) {
+                const pred = oiData.contrarian_prediction;
+                const trapScore = pred.trap_score ?? 50;
+                let trapCol = '#38bdf8';
+                let trapBg = 'rgba(56,189,248,0.1)';
+                let trapBorder = 'rgba(56,189,248,0.25)';
 
-                    const deltaVal = p.delta_net_contracts !== undefined ? p.delta_net_contracts : null;
-                    let deltaStr = '';
-                    if (deltaVal !== null) {
-                        const dSign = deltaVal >= 0 ? '+' : '';
-                        const dCol = deltaVal >= 0 ? '#34d399' : '#f87171';
-                        deltaStr = `<div style="font-size:0.62rem;color:${dCol};font-weight:600;">Δ ${dSign}${deltaVal.toLocaleString()}</div>`;
-                    }
+                if (trapScore >= 70) {
+                    trapCol = '#f87171';
+                    trapBg = 'rgba(248,113,113,0.1)';
+                    trapBorder = 'rgba(248,113,113,0.25)';
+                } else if (trapScore <= 30) {
+                    trapCol = '#34d399';
+                    trapBg = 'rgba(52,211,153,0.1)';
+                    trapBorder = 'rgba(52,211,153,0.25)';
+                } else {
+                    trapCol = '#fb923c';
+                    trapBg = 'rgba(251,146,60,0.1)';
+                    trapBorder = 'rgba(251,146,60,0.25)';
+                }
 
-                    const lsRatio = p.long_short_ratio || 1.0;
-                    let lsCol = '#94a3b8';
-                    let lsBg = 'rgba(255,255,255,0.05)';
-                    if (lsRatio >= 1.25) {
-                        lsCol = '#34d399';
-                        lsBg = 'rgba(16,185,129,0.12)';
-                    } else if (lsRatio <= 0.85) {
-                        lsCol = '#f87171';
-                        lsBg = 'rgba(239,68,68,0.12)';
-                    }
-
-                    const stance = p.stance || 'Balanced';
-                    const shiftRegime = p.shift_regime || stance;
-                    let stanceBg = 'rgba(255,255,255,0.04)';
-                    let stanceCol = '#cbd5e1';
-                    if (shiftRegime.includes('🟢') || shiftRegime.includes('Long') || shiftRegime.includes('Covering')) {
-                        stanceBg = 'rgba(16,185,129,0.1)';
-                        stanceCol = '#34d399';
-                    } else if (shiftRegime.includes('🔴') || shiftRegime.includes('Short') || shiftRegime.includes('Unwinding')) {
-                        stanceBg = 'rgba(239,68,68,0.1)';
-                        stanceCol = '#f87171';
-                    }
-
-                    return `
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
-                            <td style="padding:0.45rem 0.6rem;text-align:left;font-weight:700;color:#f8fafc;">
-                                ${p.category_label || p.participant}
-                            </td>
-                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#cbd5e1;">
-                                <span style="color:#34d399;">${(p.futures_long || 0).toLocaleString()}</span> / <span style="color:#f87171;">${(p.futures_short || 0).toLocaleString()}</span>
-                            </td>
-                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#cbd5e1;">
-                                <span style="color:#34d399;">${(p.calls_long || 0).toLocaleString()}</span> / <span style="color:#f87171;">${(p.calls_short || 0).toLocaleString()}</span>
-                            </td>
-                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#cbd5e1;">
-                                <span style="color:#34d399;">${(p.puts_long || 0).toLocaleString()}</span> / <span style="color:#f87171;">${(p.puts_short || 0).toLocaleString()}</span>
-                            </td>
-                            <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${netCol};">
-                                <div>${netSign}${netVal.toLocaleString()}</div>
-                                ${deltaStr}
-                            </td>
-                            <td style="padding:0.45rem 0.6rem;text-align:center;">
-                                <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${lsBg};color:${lsCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${lsCol}33;">
-                                    ${lsRatio.toFixed(2)}x (${(p.long_pct || 50).toFixed(0)}% L)
+                contrarianCard.style.display = 'block';
+                contrarianCard.innerHTML = `
+                    <div style="background:${trapBg};border:1px solid ${trapBorder};border-radius:6px;padding:0.6rem 0.8rem;margin-bottom:0.75rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;flex-wrap:wrap;gap:0.4rem;">
+                            <div style="display:flex;align-items:center;gap:0.4rem;">
+                                <span style="font-size:0.78rem;font-weight:800;color:${trapCol};">${pred.headline || 'Institutional Contrarian Prediction'}</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:0.5rem;">
+                                <span style="font-size:0.65rem;color:#94a3b8;font-family:var(--font-mono);">
+                                    FII Long: <strong style="color:#f87171;">${(pred.fii_long_pct ?? 0).toFixed(1)}%</strong> | Client Long: <strong style="color:#34d399;">${(pred.client_long_pct ?? 0).toFixed(1)}%</strong>
                                 </span>
-                            </td>
-                            <td style="padding:0.45rem 0.6rem;text-align:left;">
-                                <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:600;font-family:var(--font-mono);">
-                                    ${shiftRegime}
+                                <span style="font-size:0.68rem;padding:0.1rem 0.45rem;border-radius:4px;background:${trapCol}22;color:${trapCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${trapCol}44;">
+                                    Trap Risk: ${trapScore}/100
                                 </span>
-                            </td>
+                            </div>
+                        </div>
+                        <div style="font-size:0.72rem;color:#cbd5e1;line-height:1.4;margin-bottom:0.3rem;">
+                            <strong style="color:#f8fafc;">Expected Market Action:</strong> ${pred.expected_behavior || ''}
+                        </div>
+                        <div style="font-size:0.7rem;color:#94a3b8;line-height:1.35;">
+                            <strong style="color:#38bdf8;">Actionable Playbook:</strong> ${pred.actionable_playbook || ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            const currentView = this._currentOiView || 'index_futures';
+
+            // Dynamic Table Headers based on View
+            if (tableHead) {
+                if (currentView === 'index_futures') {
+                    tableHead.innerHTML = `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;">
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Participant</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Index Fut Long</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Index Fut Short</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Net Index Contracts</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:center;">Index Long %</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:center;">1D Shift (Δ)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Market Maker Stance</th>
                         </tr>
                     `;
+                } else {
+                    tableHead.innerHTML = `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.08);color:#94a3b8;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;">
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Participant</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Total Futures (L/S)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Call Options (L/S)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Put Options (L/S)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Consolidated Net F&amp;O</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:center;">Long / Short Ratio</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Stance</th>
+                        </tr>
+                    `;
+                }
+            }
+
+            // Render Snapshot Table Body
+            if (tableBody && oiData.participants && oiData.participants.length) {
+                tableBody.innerHTML = oiData.participants.map(p => {
+                    const participantName = p.category_label || p.participant;
+
+                    if (currentView === 'index_futures') {
+                        const fiLong = p.future_index_long ?? p.futures_long ?? 0;
+                        const fiShort = p.future_index_short ?? p.futures_short ?? 0;
+                        const fiNet = p.future_index_net ?? (fiLong - fiShort);
+                        const fiLongPct = p.future_index_long_pct ?? ((fiLong + fiShort) > 0 ? (fiLong / (fiLong + fiShort)) * 100 : 50);
+
+                        const netCol = fiNet > 0 ? '#34d399' : (fiNet < 0 ? '#f87171' : '#94a3b8');
+                        const netSign = fiNet > 0 ? '+' : '';
+
+                        const deltaVal = p.delta_future_index_net ?? p.delta_net_contracts ?? null;
+                        let deltaStr = '<span style="color:#64748b;">-</span>';
+                        if (deltaVal !== null) {
+                            const dSign = deltaVal >= 0 ? '+' : '';
+                            const dCol = deltaVal >= 0 ? '#34d399' : '#f87171';
+                            deltaStr = `<span style="color:${dCol};font-weight:700;font-family:var(--font-mono);font-size:0.68rem;">Δ ${dSign}${deltaVal.toLocaleString()}</span>`;
+                        }
+
+                        let pctCol = '#94a3b8';
+                        let pctBg = 'rgba(255,255,255,0.05)';
+                        if (fiLongPct >= 65) {
+                            pctCol = '#34d399';
+                            pctBg = 'rgba(16,185,129,0.12)';
+                        } else if (fiLongPct <= 35) {
+                            pctCol = '#f87171';
+                            pctBg = 'rgba(239,68,68,0.12)';
+                        }
+
+                        const stance = p.stance || 'Balanced';
+                        const shiftRegime = p.shift_regime || stance;
+                        let stanceBg = 'rgba(255,255,255,0.04)';
+                        let stanceCol = '#cbd5e1';
+                        if (shiftRegime.includes('🟢') || shiftRegime.includes('Long') || shiftRegime.includes('Covering') || fiLongPct >= 60) {
+                            stanceBg = 'rgba(16,185,129,0.1)';
+                            stanceCol = '#34d399';
+                        } else if (shiftRegime.includes('🔴') || shiftRegime.includes('Short') || shiftRegime.includes('Unwinding') || fiLongPct <= 30) {
+                            stanceBg = 'rgba(239,68,68,0.1)';
+                            stanceCol = '#f87171';
+                        }
+
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:0.45rem 0.6rem;text-align:left;font-weight:700;color:#f8fafc;">
+                                    ${participantName}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#34d399;font-weight:600;">
+                                    ${fiLong.toLocaleString()}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#f87171;font-weight:600;">
+                                    ${fiShort.toLocaleString()}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${netCol};">
+                                    ${netSign}${fiNet.toLocaleString()}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:center;">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${pctBg};color:${pctCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${pctCol}33;">
+                                        ${fiLongPct.toFixed(1)}% Long
+                                    </span>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:center;">
+                                    ${deltaStr}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:left;">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:600;font-family:var(--font-mono);">
+                                        ${shiftRegime}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        // Consolidated F&O View
+                        const netVal = p.net_contracts || 0;
+                        const netCol = netVal > 0 ? '#34d399' : (netVal < 0 ? '#f87171' : '#94a3b8');
+                        const netSign = netVal > 0 ? '+' : '';
+
+                        const deltaVal = p.delta_net_contracts !== undefined ? p.delta_net_contracts : null;
+                        let deltaStr = '';
+                        if (deltaVal !== null) {
+                            const dSign = deltaVal >= 0 ? '+' : '';
+                            const dCol = deltaVal >= 0 ? '#34d399' : '#f87171';
+                            deltaStr = `<div style="font-size:0.62rem;color:${dCol};font-weight:600;">Δ ${dSign}${deltaVal.toLocaleString()}</div>`;
+                        }
+
+                        const lsRatio = p.long_short_ratio || 1.0;
+                        let lsCol = '#94a3b8';
+                        let lsBg = 'rgba(255,255,255,0.05)';
+                        if (lsRatio >= 1.25) {
+                            lsCol = '#34d399';
+                            lsBg = 'rgba(16,185,129,0.12)';
+                        } else if (lsRatio <= 0.85) {
+                            lsCol = '#f87171';
+                            lsBg = 'rgba(239,68,68,0.12)';
+                        }
+
+                        const stance = p.stance || 'Balanced';
+                        const shiftRegime = p.shift_regime || stance;
+                        let stanceBg = 'rgba(255,255,255,0.04)';
+                        let stanceCol = '#cbd5e1';
+                        if (shiftRegime.includes('🟢') || shiftRegime.includes('Long') || shiftRegime.includes('Covering')) {
+                            stanceBg = 'rgba(16,185,129,0.1)';
+                            stanceCol = '#34d399';
+                        } else if (shiftRegime.includes('🔴') || shiftRegime.includes('Short') || shiftRegime.includes('Unwinding')) {
+                            stanceBg = 'rgba(239,68,68,0.1)';
+                            stanceCol = '#f87171';
+                        }
+
+                        return `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                                <td style="padding:0.45rem 0.6rem;text-align:left;font-weight:700;color:#f8fafc;">
+                                    ${participantName}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#cbd5e1;">
+                                    <span style="color:#34d399;">${(p.futures_long || 0).toLocaleString()}</span> / <span style="color:#f87171;">${(p.futures_short || 0).toLocaleString()}</span>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#cbd5e1;">
+                                    <span style="color:#34d399;">${(p.calls_long || 0).toLocaleString()}</span> / <span style="color:#f87171;">${(p.calls_short || 0).toLocaleString()}</span>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:#cbd5e1;">
+                                    <span style="color:#34d399;">${(p.puts_long || 0).toLocaleString()}</span> / <span style="color:#f87171;">${(p.puts_short || 0).toLocaleString()}</span>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);font-weight:700;color:${netCol};">
+                                    <div>${netSign}${netVal.toLocaleString()}</div>
+                                    ${deltaStr}
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:center;">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${lsBg};color:${lsCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${lsCol}33;">
+                                        ${lsRatio.toFixed(2)}x (${(p.long_pct || 50).toFixed(0)}% L)
+                                    </span>
+                                </td>
+                                <td style="padding:0.45rem 0.6rem;text-align:left;">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:600;font-family:var(--font-mono);">
+                                        ${shiftRegime}
+                                    </span>
+                                </td>
+                            </tr>
+                        `;
+                    }
                 }).join('');
             }
 
@@ -676,25 +982,22 @@
                     const isToday = idx === 0;
                     const rowBg = isToday ? 'rgba(56,189,248,0.06)' : 'transparent';
 
-                    const fNet = row.fii_net_contracts || 0;
+                    const fNet = row.fii_future_index_net ?? row.fii_net_contracts ?? 0;
                     const fSign = fNet >= 0 ? '+' : '';
                     const fCol = fNet >= 0 ? '#34d399' : '#f87171';
-                    const fRatio = row.fii_long_short_ratio || 1.0;
+                    const fPct = row.fii_future_index_long_pct ?? ((row.fii_long_short_ratio ?? 1) / (1 + (row.fii_long_short_ratio ?? 1)) * 100);
 
-                    const dNet = row.dii_net_contracts || 0;
+                    const dNet = row.dii_future_index_net ?? row.dii_net_contracts ?? 0;
                     const dSign = dNet >= 0 ? '+' : '';
                     const dCol = dNet >= 0 ? '#34d399' : '#f87171';
-                    const dRatio = row.dii_long_short_ratio || 1.0;
 
-                    const pNet = row.pro_net_contracts || 0;
+                    const pNet = row.pro_future_index_net ?? row.pro_net_contracts ?? 0;
                     const pSign = pNet >= 0 ? '+' : '';
                     const pCol = pNet >= 0 ? '#34d399' : '#f87171';
-                    const pRatio = row.pro_long_short_ratio || 1.0;
 
-                    const cNet = row.client_net_contracts || 0;
+                    const cNet = row.client_future_index_net ?? row.client_net_contracts ?? 0;
                     const cSign = cNet >= 0 ? '+' : '';
                     const cCol = cNet >= 0 ? '#34d399' : '#f87171';
-                    const cRatio = row.client_long_short_ratio || 1.0;
 
                     const shiftRegime = row.fii_shift_regime || row.shift_regime || (fNet >= 0 ? '🟢 FII Long Bias' : '🔴 FII Short Hedge');
                     let biasBg = 'rgba(52,211,153,0.12)';
@@ -713,16 +1016,16 @@
                                 ${row.session_label || row.date}
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${fCol};font-weight:600;">
-                                ${fSign}${fNet.toLocaleString()} <span style="font-size:0.62rem;color:#94a3b8;">(${fRatio.toFixed(2)}x)</span>
+                                ${fSign}${fNet.toLocaleString()} <span style="font-size:0.62rem;color:#94a3b8;">(${fPct.toFixed(0)}% L)</span>
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${dCol};font-weight:600;">
-                                ${dSign}${dNet.toLocaleString()} <span style="font-size:0.62rem;color:#94a3b8;">(${dRatio.toFixed(2)}x)</span>
+                                ${dSign}${dNet.toLocaleString()}
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${pCol};font-weight:600;">
-                                ${pSign}${pNet.toLocaleString()} <span style="font-size:0.62rem;color:#94a3b8;">(${pRatio.toFixed(2)}x)</span>
+                                ${pSign}${pNet.toLocaleString()}
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${cCol};font-weight:600;">
-                                ${cSign}${cNet.toLocaleString()} <span style="font-size:0.62rem;color:#94a3b8;">(${cRatio.toFixed(2)}x)</span>
+                                ${cSign}${cNet.toLocaleString()}
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:center;">
                                 <span style="font-size:0.62rem;padding:0.12rem 0.4rem;border-radius:3px;background:${biasBg};color:${biasCol};font-weight:700;font-family:var(--font-mono);">
@@ -736,22 +1039,8 @@
         },
 
         toggleParticipantOiView() {
-            this._isOiHistoryView = !this._isOiHistoryView;
-            const snapContainer = document.getElementById('pulseOiSnapshotContainer');
-            const histContainer = document.getElementById('pulseOiHistoryContainer');
-            const btn = document.getElementById('btnToggleOiView');
-
-            if (snapContainer && histContainer) {
-                if (this._isOiHistoryView) {
-                    snapContainer.style.display = 'none';
-                    histContainer.style.display = 'block';
-                    if (btn) btn.innerHTML = '📊 1D Snapshot View';
-                } else {
-                    snapContainer.style.display = 'block';
-                    histContainer.style.display = 'none';
-                    if (btn) btn.innerHTML = '📅 Past 10 Days Matrix';
-                }
-            }
+            const nextView = this._currentOiView === 'history_matrix' ? 'index_futures' : 'history_matrix';
+            this.setParticipantOiView(nextView);
         },
 
         renderSectors(sectors) {

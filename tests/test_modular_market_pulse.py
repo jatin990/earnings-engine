@@ -123,6 +123,23 @@ def test_api_modular_market_pulse_endpoints(client: TestClient):
     assert data_sent.get("success") is True
     assert "sentiment" in data_sent
 
+    # Test modular participant-oi endpoint
+    r_oi = client.get("/api/v1/market-pulse/participant-oi")
+    assert r_oi.status_code == 200
+    data_oi = r_oi.json()
+    assert data_oi.get("success") is True
+    assert "participant_oi" in data_oi
+    assert "participants" in data_oi["participant_oi"]
+    assert len(data_oi["participant_oi"]["participants"]) == 4
+    assert "contrarian_prediction" in data_oi["participant_oi"]
+
+    # Test modular playbook endpoint
+    r_playbook = client.get("/api/v1/market-pulse/playbook")
+    assert r_playbook.status_code == 200
+    data_pb = r_playbook.json()
+    assert data_pb.get("success") is True
+    assert "playbook" in data_pb
+
     # Test confluence setups
     r_conf = client.get("/api/v1/breakout-radar/confluence?min_level=0&limit=10")
     assert r_conf.status_code == 200

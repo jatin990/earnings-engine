@@ -451,12 +451,18 @@
                             📖 Metric Meaning &amp; Playbook
                         </button>
                     </div>
-                    <div id="pulseOiSessionSub" style="font-size:0.65rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.1rem;">Institutional FII / DII vs Pro Algo Desks vs Retail Positioning Breakdown</div>
+                    <div id="pulseOiSessionSub" style="font-size:0.65rem;color:#94a3b8;font-family:var(--font-mono);margin-top:0.1rem;">Official NSE Clearing Archives (NSCCL) • FII / DII vs Pro Desks vs Retail Positioning</div>
                 </div>
             </div>
-            <div style="display:flex;align-items:center;gap:0.5rem;">
-                <button type="button" id="btnToggleOiView" class="btn-micro" style="padding:0.25rem 0.6rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.marketPulse.toggleParticipantOiView()">
-                    📅 Past 10 Days Matrix
+            <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                <button type="button" id="btnOiViewIndex" class="btn-micro pulse-oi-view-btn active" style="padding:0.22rem 0.55rem;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.marketPulse.setParticipantOiView('index_futures')">
+                    📊 Index Futures (Nifty)
+                </button>
+                <button type="button" id="btnOiViewConsolidated" class="btn-micro pulse-oi-view-btn" style="padding:0.22rem 0.55rem;background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.marketPulse.setParticipantOiView('consolidated_fo')">
+                    💼 Consolidated F&amp;O
+                </button>
+                <button type="button" id="btnOiViewHistory" class="btn-micro pulse-oi-view-btn" style="padding:0.22rem 0.55rem;background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.marketPulse.setParticipantOiView('history_matrix')">
+                    📅 10-Day Matrix
                 </button>
                 <span id="pulseOiRegimeBadge" style="font-size:0.68rem;padding:0.18rem 0.55rem;border-radius:4px;background:rgba(249,115,22,0.15);color:#fb923c;font-family:var(--font-mono);font-weight:700;border:1px solid rgba(249,115,22,0.3);">
                     ⏳ Calculating Derivatives Sentiment...
@@ -464,18 +470,21 @@
             </div>
         </div>
 
+        <!-- Contrarian MM Alert Card (Dynamic) -->
+        <div id="pulseOiContrarianCard" style="display:none;margin-bottom:0.75rem;"></div>
+
         <!-- Latest Snapshot Table -->
         <div id="pulseOiSnapshotContainer" style="overflow-x:auto;border-radius:6px;border:1px solid rgba(255,255,255,0.06);margin-bottom:0.75rem;">
             <table class="results-table" style="width:100%;font-size:0.72rem;border-collapse:collapse;margin:0;">
-                <thead>
+                <thead id="pulseParticipantOiTableHead">
                     <tr style="background:#060a16;">
                         <th style="padding:0.45rem 0.6rem;text-align:left;">Market Participant</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">Futures (L / S)</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">Calls (L / S)</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">Puts (L / S)</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">Net Contracts (Δ1D)</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:center;">Long / Short Ratio</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:left;">Positioning Shift &amp; Regime</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">Index Long</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">Index Short</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">Index Net Contracts</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:center;">Index Long %</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">1D Shift (Δ)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:left;">Smart Money Sentiment &amp; Signal</th>
                     </tr>
                 </thead>
                 <tbody id="pulseParticipantOiTableBody">
@@ -490,11 +499,11 @@
                 <thead>
                     <tr style="background:#060a16;">
                         <th style="padding:0.45rem 0.6rem;text-align:left;">Trading Session</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">🏛️ FII Net (L/S Ratio)</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">🏢 DII Net (L/S Ratio)</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">⚡ PRO Net (L/S Ratio)</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">👤 Retail Net (L/S Ratio)</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:center;">FII Day Shift Regime</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">🏛️ FII Index Net (Long %)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">🏢 DII Index Net (Long %)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">⚡ PRO Index Net (Long %)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">👤 Retail Net (Long %)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:center;">FII Shift &amp; Regime</th>
                     </tr>
                 </thead>
                 <tbody id="pulseParticipantOiHistoryTableBody">
