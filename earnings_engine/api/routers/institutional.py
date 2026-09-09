@@ -136,6 +136,35 @@ async def get_institutional_data_freshness():
         raise HTTPException(status_code=500, detail=f"Error checking freshness: {str(e)}")
 
 
+@router.get("/api/v1/institutional/divergence-data")
+async def get_institutional_divergence_data():
+    """Retrieve full structured dataset for institutional flow divergence visualization."""
+    from pathlib import Path
+    import json
+    data_path = Path("institutional_divergence_data.json")
+    if data_path.exists():
+        try:
+            with open(data_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return {"success": True, **data}
+        except Exception as e:
+            logger.error("Failed to read divergence json: %s", e)
+    return {"success": False, "detail": "Divergence data not generated yet."}
+
+
+@router.get("/institutional-divergence", tags=["UI"])
+async def serve_institutional_divergence_radar():
+    """Serve standalone interactive HTML Institutional Flow Divergence Radar."""
+    from fastapi.responses import HTMLResponse
+    from pathlib import Path
+    html_path = Path("institutional_flow_divergence.html")
+    if html_path.exists():
+        with open(html_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return HTMLResponse(content)
+    raise HTTPException(status_code=404, detail="Institutional Flow Divergence Radar page not found.")
+
+
 @router.post("/api/v1/institutional/recalculate")
 async def trigger_institutional_recalculation(force: bool = Query(False)):
     """Trigger complete batch recalculation and cache population for all stocks in the database."""

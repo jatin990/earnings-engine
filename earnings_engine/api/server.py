@@ -271,6 +271,8 @@ PUBLIC_EXACT_PATHS = {
     "/portal",
     "/join",
     "/login",
+    "/institutional-divergence",
+    "/api/v1/institutional/divergence-data",
     "/api/index.py",
     "/api/index",
     "/api",

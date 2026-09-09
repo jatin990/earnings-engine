@@ -1038,11 +1038,6 @@
             }
         },
 
-        toggleParticipantOiView() {
-            const nextView = this._currentOiView === 'history_matrix' ? 'index_futures' : 'history_matrix';
-            this.setParticipantOiView(nextView);
-        },
-
         renderSectors(sectors) {
             const grid = document.getElementById('pulseSectorsGrid');
             if (!grid) return;
