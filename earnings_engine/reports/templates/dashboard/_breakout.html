@@ -596,9 +596,50 @@
 </div>
 
 <!-- ========================================================================= -->
+<!-- ⚡ MODAL: ON-DEMAND 5-PILLAR STOCK INTELLIGENCE                          -->
+<!-- ========================================================================= -->
+<div id="breakoutStockIntelModal" class="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:9999; align-items:center; justify-content:center; padding:1rem;">
+    <div class="modal-card" style="background:#090d16; border:1px solid rgba(255,255,255,0.15); border-radius:10px; width:100%; max-width:980px; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.95); overflow:hidden;">
+        <!-- Header -->
+        <div id="breakoutStockIntelModalHeader" style="padding:0.85rem 1.15rem; border-bottom:1px solid rgba(255,255,255,0.08); background:#0f172a; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:0.6rem;">
+                <div style="width:32px; height:32px; border-radius:6px; background:#0284c7; color:#ffffff; display:flex; align-items:center; justify-content:center; font-size:1.1rem; font-weight:800;">⚡</div>
+                <div>
+                    <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                        <span id="bkIntelTicker" style="font-size:1.1rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono);">—</span>
+                        <span id="bkIntelCompany" style="font-size:0.82rem; color:#94a3b8; font-weight:500;">—</span>
+                        <span id="bkIntelSector" style="font-size:0.65rem; background:rgba(255,255,255,0.06); color:#cbd5e1; border:1px solid rgba(255,255,255,0.12); padding:0.1rem 0.4rem; border-radius:3px; font-family:var(--font-mono);">—</span>
+                        <span id="bkIntelStrategyBadge" class="badge" style="background:#18181b; color:#c084fc; border:1px solid rgba(168,85,247,0.3); font-size:0.65rem; padding:0.1rem 0.45rem;">—</span>
+                    </div>
+                    <div id="bkIntelPriceSub" style="font-size:0.70rem; color:#64748b; font-family:var(--font-mono); margin-top:0.15rem;">
+                        Live Price & Volatility Squeeze Overview
+                    </div>
+                </div>
+            </div>
+            <button type="button" onclick="app.closeBreakoutStockIntelModal()" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#cbd5e1; border-radius:6px; width:28px; height:28px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.85rem;">✕</button>
+        </div>
+
+        <!-- Body Content -->
+        <div id="breakoutStockIntelModalContent" style="padding:1.15rem; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:1rem;">
+            <!-- Rendered dynamically by app.renderBreakoutStockIntelModal -->
+        </div>
+
+        <!-- Footer -->
+        <div id="breakoutStockIntelModalFooter" style="padding:0.65rem 1.15rem; border-top:1px solid rgba(255,255,255,0.08); background:#05070f; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+            <div id="bkIntelFooterActions" style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+                <!-- Dynamically wired actions -->
+            </div>
+            <button type="button" onclick="app.closeBreakoutStockIntelModal()" class="btn btn-sm" style="background:rgba(255,255,255,0.08); color:#e2e8f0; border:1px solid rgba(255,255,255,0.12); font-size:0.72rem; padding:0.25rem 0.75rem; cursor:pointer;">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
 <!-- 🧠 MODAL: BREAKOUT REASONING & AI NOTES                                   -->
 <!-- ========================================================================= -->
-<div id="breakoutNotesModal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:2000; align-items:center; justify-content:center; padding:1rem;">
+<div id="breakoutNotesModal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:2000; align-items:center; justify-content:center; padding:1rem;">
     <div style="background:#090d16; border:1px solid rgba(255,255,255,0.15); border-radius:10px; max-width:720px; width:100%; max-height:92vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.9); padding:1.25rem; position:relative;">
         <button type="button" onclick="document.getElementById('breakoutNotesModal').style.display='none'" style="position:absolute; top:0.85rem; right:0.85rem; background:transparent; border:none; color:#94a3b8; font-size:1.1rem; cursor:pointer;">✕</button>
         <div id="breakoutNotesModalContent">
@@ -610,7 +651,7 @@
 <!-- ========================================================================= -->
 <!-- 📅 MODAL: BREAKOUT BACKTEST AUDIT REPORT                                  -->
 <!-- ========================================================================= -->
-<div id="breakoutBacktestModal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:2000; align-items:center; justify-content:center; padding:1rem;">
+<div id="breakoutBacktestModal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:2000; align-items:center; justify-content:center; padding:1rem;">
     <div style="background:#090d16; border:1px solid rgba(255,255,255,0.15); border-radius:10px; max-width:850px; width:100%; max-height:92vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.9); padding:1.25rem; position:relative;">
         <button type="button" onclick="document.getElementById('breakoutBacktestModal').style.display='none'" style="position:absolute; top:0.85rem; right:0.85rem; background:transparent; border:none; color:#94a3b8; font-size:1.1rem; cursor:pointer;">✕</button>
         <div id="breakoutBacktestModalContent">
@@ -622,7 +663,7 @@
 <!-- ========================================================================= -->
 <!-- 📜 MODAL: BREAKOUT TRANSITION & LIFECYCLE HISTORY POPUP                  -->
 <!-- ========================================================================= -->
-<div id="breakoutHistoryModal" class="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:9999; align-items:center; justify-content:center; padding:1rem;">
+<div id="breakoutHistoryModal" class="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:9999; align-items:center; justify-content:center; padding:1rem;">
     <div class="modal-card" style="background:#090d16; border:1px solid rgba(255,255,255,0.15); border-radius:10px; width:100%; max-width:760px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.9); overflow:hidden;">
         <!-- Modal Header -->
         <div style="padding:0.85rem 1.15rem; border-bottom:1px solid rgba(255,255,255,0.08); background:#0f172a; display:flex; align-items:center; justify-content:space-between;">
@@ -670,7 +711,7 @@
 <!-- ========================================================================= -->
 <!-- ⏱️ MODAL: MULTI-STRATEGY BREAKOUT SCHEDULE & PARALLEL RUN STUDIO         -->
 <!-- ========================================================================= -->
-<div id="breakoutScheduleModal" class="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:9999; align-items:center; justify-content:center; padding:1rem;">
+<div id="breakoutScheduleModal" class="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:9999; align-items:center; justify-content:center; padding:1rem;">
     <div class="modal-card" style="background:#090d16; border:1px solid rgba(255,255,255,0.15); border-radius:12px; width:100%; max-width:860px; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.9); overflow:hidden;">
         <!-- Header -->
         <div style="padding:0.95rem 1.25rem; border-bottom:1px solid rgba(255,255,255,0.08); background:#0f172a; display:flex; align-items:center; justify-content:space-between;">
@@ -741,28 +782,46 @@
 </div>
 
 <style>
+/* Zero Backdrop Blur & Zero Hover Transition Overrides for Instant Rendering */
+#tab-breakout, #tab-breakout *, #tab-breakout *:hover, #tab-breakout *:active {
+    transition: none !important;
+    -webkit-transition: none !important;
+}
+
+#tab-breakout .modal,
+#tab-breakout .modal-backdrop,
+#breakoutStockIntelModal,
+#breakoutNotesModal,
+#breakoutBacktestModal,
+#breakoutHistoryModal,
+#breakoutScheduleModal {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(0, 0, 0, 0.88) !important;
+}
+
 /* Modern Compact Table Aesthetics & Zebra Striping */
-#breakoutTable, #breakoutTrackedTable {
+#breakoutTable, #breakoutTrackedTable, #breakoutBacktestTable {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
     font-size: 0.72rem;
 }
 
-#breakoutTable tbody tr, #breakoutTrackedTable tbody tr {
-    transition: background 0.15s ease;
+#breakoutTable tbody tr, #breakoutTrackedTable tbody tr, #breakoutBacktestTable tbody tr {
+    transition: none !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-#breakoutTable tbody tr:nth-child(even), #breakoutTrackedTable tbody tr:nth-child(even) {
+#breakoutTable tbody tr:nth-child(even), #breakoutTrackedTable tbody tr:nth-child(even), #breakoutBacktestTable tbody tr:nth-child(even) {
     background: rgba(255, 255, 255, 0.015);
 }
 
-#breakoutTable tbody tr:nth-child(odd), #breakoutTrackedTable tbody tr:nth-child(odd) {
+#breakoutTable tbody tr:nth-child(odd), #breakoutTrackedTable tbody tr:nth-child(odd), #breakoutBacktestTable tbody tr:nth-child(odd) {
     background: #000000;
 }
 
-#breakoutTable tbody tr:hover, #breakoutTrackedTable tbody tr:hover {
+#breakoutTable tbody tr:hover, #breakoutTrackedTable tbody tr:hover, #breakoutBacktestTable tbody tr:hover {
     background: #18181b !important;
 }
 
@@ -781,7 +840,7 @@
 }
 
 /* Compact Table Headers */
-#breakoutTable thead th, #breakoutTrackedTable thead th {
+#breakoutTable thead th, #breakoutTrackedTable thead th, #breakoutBacktestTable thead th {
     position: sticky;
     top: 0;
     z-index: 20;
@@ -796,7 +855,7 @@
 }
 
 /* Table Cells */
-#breakoutTable tbody td, #breakoutTrackedTable tbody td {
+#breakoutTable tbody td, #breakoutTrackedTable tbody td, #breakoutBacktestTable tbody td {
     padding: 0.42rem 0.6rem;
     vertical-align: middle;
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
@@ -807,10 +866,11 @@
     background: transparent;
     color: #94a3b8;
     border: 1px solid transparent;
-    transition: all 0.15s ease;
+    transition: none !important;
 }
 .bk-subtab-btn:hover {
     color: #f8fafc;
+    background: #18181b !important;
 }
 .bk-subtab-btn.bk-subtab-active {
     background: #1e293b !important;
@@ -824,7 +884,7 @@
     background: #020617;
     color: #94a3b8;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: all 0.15s ease;
+    transition: none !important;
     cursor: pointer;
     font-weight: 500;
     border-radius: 4px;
@@ -834,6 +894,7 @@
 }
 .bk-preset-btn:hover, .bk-tracked-preset:hover {
     color: #f8fafc;
+    background: #18181b !important;
     border-color: rgba(255, 255, 255, 0.2);
 }
 .bk-preset-btn.bk-preset-active, .bk-tracked-preset.bk-preset-active {

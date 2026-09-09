@@ -6,6 +6,7 @@ from starlette.testclient import TestClient
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
+from earnings_engine.data.prices import clear_price_df_cache
 from earnings_engine.data.breakout_scanner import (
     evaluate_stock_breakout,
     search_breakout_tickers,
@@ -17,6 +18,7 @@ from earnings_engine.api.server import app
 @pytest.fixture
 def sample_stock_db():
     settings = Settings()
+    clear_price_df_cache()
     conn = get_db_connection(settings)
 
     # Insert sample price history for RELIANCE.NS (100 daily bars)
