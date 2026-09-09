@@ -1356,6 +1356,39 @@ def _migration_029_earnings_fetch_log_schema_alignment(conn: Any) -> None:
     """)
 
 
+def _migration_030_ai_model_telemetry_and_api_calls(conn: sqlite3.Connection) -> None:
+    """Create AI model telemetry & downstream API calls tracking tables."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ai_model_telemetry (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            model_id TEXT NOT NULL,
+            model_name TEXT,
+            created_at TEXT NOT NULL,
+            timestamp REAL NOT NULL,
+            latency_ms REAL NOT NULL,
+            tokens INTEGER,
+            is_local INTEGER DEFAULT 0,
+            success INTEGER DEFAULT 1,
+            error_message TEXT,
+            ticker TEXT
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_model ON ai_model_telemetry(model_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_ts ON ai_model_telemetry(timestamp)")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS downstream_api_calls (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            service TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            timestamp REAL NOT NULL,
+            status_code INTEGER DEFAULT 200
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_api_calls_service ON downstream_api_calls(service)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_api_calls_ts ON downstream_api_calls(timestamp)")
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1387,6 +1420,7 @@ MIGRATIONS: list[Migration] = [
     Migration(27, "027_nse_shareholding_freshness", _migration_027_nse_shareholding_freshness),
     Migration(28, "028_tri_confluence_metrics_cache", _migration_028_tri_confluence_metrics_cache),
     Migration(29, "029_earnings_fetch_log_schema_alignment", _migration_029_earnings_fetch_log_schema_alignment),
+    Migration(30, "030_ai_model_telemetry_and_api_calls", _migration_030_ai_model_telemetry_and_api_calls),
 ]
 
 
@@ -1406,68 +1440,73 @@ def apply_migrations(settings: Settings | None = None, force: bool = False) -> l
         return []
 
     conn = get_db_connection(settings)
-
-    # 1. Ensure migrations ledger exists
-    with conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS schema_migrations (
-                version INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                applied_at TEXT NOT NULL
-            )
-        """)
-        conn.commit()
-
-    # 2. Get set of already applied migration versions
-    with conn:
-        applied_rows = conn.execute("SELECT version FROM schema_migrations").fetchall()
-        applied_versions = {r[0] for r in applied_rows}
-
-        # Auto-baseline: if schema_migrations was just created on an existing database
-        # that already contains core tables (price_history), baseline migrations 1-4
-        if not applied_versions:
-            try:
-                check_row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='price_history'").fetchone()
-                if check_row:
-                    now_str = datetime.now().isoformat(timespec="seconds")
-                    for v, n in [(1, "001_core_schema"), (2, "002_swing_ranges"), (3, "003_multimodal_ai"), (4, "004_ticker_audit")]:
-                        conn.execute("INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)", (v, n, now_str))
-                    conn.commit()
-                    applied_versions.update({1, 2, 3, 4})
-            except Exception:
-                pass
-
     applied_names: list[str] = []
 
-    for migration in MIGRATIONS:
-        if migration.version in applied_versions:
-            continue
-
-        logger.info("Applying database migration %d: %s...", migration.version, migration.name)
-        now_str = datetime.now().isoformat(timespec="seconds")
-        try:
-            with conn:
-                migration.up(conn)
-                conn.execute(
-                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
-                    (migration.version, migration.name, now_str),
+    try:
+        # 1. Ensure migrations ledger exists
+        with conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    applied_at TEXT NOT NULL
                 )
-                conn.commit()
-            applied_names.append(migration.name)
-            logger.info("✅ Migration %s applied successfully.", migration.name)
-        except Exception as e:
-            logger.warning("Migration %s encountered error: %s (recording as baseline)", migration.name, e)
+            """)
+            conn.commit()
+
+        # 2. Get set of already applied migration versions
+        with conn:
+            applied_rows = conn.execute("SELECT version FROM schema_migrations").fetchall()
+            applied_versions = {r[0] for r in applied_rows}
+
+            # Auto-baseline: if schema_migrations was just created on an existing database
+            # that already contains core tables (price_history), baseline migrations 1-4
+            if not applied_versions:
+                try:
+                    check_row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='price_history'").fetchone()
+                    if check_row:
+                        now_str = datetime.now().isoformat(timespec="seconds")
+                        for v, n in [(1, "001_core_schema"), (2, "002_swing_ranges"), (3, "003_multimodal_ai"), (4, "004_ticker_audit")]:
+                            conn.execute("INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)", (v, n, now_str))
+                        conn.commit()
+                        applied_versions.update({1, 2, 3, 4})
+                except Exception:
+                    pass
+
+        for migration in MIGRATIONS:
+            if migration.version in applied_versions:
+                continue
+
+            logger.info("Applying database migration %d: %s...", migration.version, migration.name)
+            now_str = datetime.now().isoformat(timespec="seconds")
             try:
                 with conn:
+                    migration.up(conn)
                     conn.execute(
-                        "INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
                         (migration.version, migration.name, now_str),
                     )
                     conn.commit()
-            except Exception:
-                pass
+                applied_names.append(migration.name)
+                logger.info("✅ Migration %s applied successfully.", migration.name)
+            except Exception as e:
+                logger.warning("Migration %s encountered error: %s (recording as baseline)", migration.name, e)
+                try:
+                    with conn:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                            (migration.version, migration.name, now_str),
+                        )
+                        conn.commit()
+                except Exception:
+                    pass
 
-    if db_key:
-        _APPLIED_DBS.add(db_key)
+        if db_key:
+            _APPLIED_DBS.add(db_key)
 
-    return applied_names
+        return applied_names
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass

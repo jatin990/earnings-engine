@@ -232,13 +232,19 @@ def record_telemetry_async(
             encrypted_payload = encrypt_field(json.dumps(data_dict))
 
             conn = get_db_connection(settings)
-            with conn:
-                _ensure_meta_table(conn)
-                conn.execute(
-                    "INSERT INTO meta_data (payload, created_at) VALUES (?, ?)",
-                    (encrypted_payload, now_str),
-                )
-                conn.commit()
+            try:
+                with conn:
+                    _ensure_meta_table(conn)
+                    conn.execute(
+                        "INSERT INTO meta_data (payload, created_at) VALUES (?, ?)",
+                        (encrypted_payload, now_str),
+                    )
+                    conn.commit()
+            finally:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -252,13 +258,19 @@ def get_telemetry_records(limit: int = 100, settings: Settings | None = None) ->
 
     settings = settings or Settings()
     conn = get_db_connection(settings)
-    with conn:
-        _ensure_meta_table(conn)
-        cursor = conn.execute(
-            "SELECT id, payload, created_at FROM meta_data ORDER BY id DESC LIMIT ?",
-            (limit,),
-        )
-        rows = cursor.fetchall()
+    try:
+        with conn:
+            _ensure_meta_table(conn)
+            cursor = conn.execute(
+                "SELECT id, payload, created_at FROM meta_data ORDER BY id DESC LIMIT ?",
+                (limit,),
+            )
+            rows = cursor.fetchall()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
     records = []
     for r in rows:
@@ -367,10 +379,16 @@ def clear_telemetry_records(settings: Settings | None = None) -> dict[str, Any]:
     """Clear telemetry and metadata records."""
     settings = settings or Settings()
     conn = get_db_connection(settings)
-    with conn:
-        _ensure_meta_table(conn)
-        conn.execute("DELETE FROM meta_data")
-        conn.commit()
+    try:
+        with conn:
+            _ensure_meta_table(conn)
+            conn.execute("DELETE FROM meta_data")
+            conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
     return {"success": True, "message": "Telemetry records cleared"}
 
 

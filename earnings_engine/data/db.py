@@ -432,7 +432,13 @@ def get_db_connection(settings: Settings | None = None, force_remote: bool = Fal
         try:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
-            conn.execute("PRAGMA busy_timeout=10000;")
+            if os.name != "nt":
+                conn.execute("PRAGMA mmap_size=268435456;")
+            else:
+                conn.execute("PRAGMA mmap_size=0;")
+            conn.execute("PRAGMA cache_size=-64000;")
+            conn.execute("PRAGMA temp_store=MEMORY;")
+            conn.execute("PRAGMA busy_timeout=30000;")
         except Exception:
             pass
         return conn
@@ -465,10 +471,13 @@ def get_db_connection(settings: Settings | None = None, force_remote: bool = Fal
     try:
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
-        conn.execute("PRAGMA mmap_size=268435456;")
+        if os.name != "nt":
+            conn.execute("PRAGMA mmap_size=268435456;")
+        else:
+            conn.execute("PRAGMA mmap_size=0;")
         conn.execute("PRAGMA cache_size=-64000;")
         conn.execute("PRAGMA temp_store=MEMORY;")
-        conn.execute("PRAGMA busy_timeout=10000;")
+        conn.execute("PRAGMA busy_timeout=30000;")
     except Exception:
         pass
     return conn

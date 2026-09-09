@@ -336,123 +336,143 @@ class RateLimitTracker:
             pass
 
     def hydrate_from_db(self, force: bool = False) -> None:
-        """Load all historical real model generation latencies and API call counts from SQLite database."""
+        """Load all historical real model generation latencies and API call counts from SQLite database with retry backoff."""
         if self._is_hydrated and not force:
             return
-        try:
-            from earnings_engine.config import Settings
-            from earnings_engine.data.db import get_db_connection
-            settings = Settings()
-            conn = get_db_connection(settings)
 
-            # Ensure ai_model_telemetry table exists
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS ai_model_telemetry (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    model_id TEXT NOT NULL,
-                    model_name TEXT,
-                    created_at TEXT NOT NULL,
-                    timestamp REAL NOT NULL,
-                    latency_ms REAL NOT NULL,
-                    tokens INTEGER,
-                    is_local INTEGER DEFAULT 0,
-                    success INTEGER DEFAULT 1,
-                    error_message TEXT,
-                    ticker TEXT
-                )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_model ON ai_model_telemetry(model_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_ts ON ai_model_telemetry(timestamp)")
+        from earnings_engine.config import Settings
+        from earnings_engine.data.db import get_db_connection
 
-            # Ensure downstream_api_calls table exists
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS downstream_api_calls (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    service TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    timestamp REAL NOT NULL,
-                    status_code INTEGER DEFAULT 200
-                )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_api_calls_service ON downstream_api_calls(service)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_api_calls_ts ON downstream_api_calls(timestamp)")
-            conn.commit()
+        settings = Settings()
+        max_retries = 3
+        last_err = None
 
-            # Backfill from consensus_predictions if telemetry table is empty
-            tel_count = conn.execute("SELECT COUNT(*) FROM ai_model_telemetry").fetchone()[0]
-            if tel_count == 0:
-                try:
-                    import json
-                    from datetime import datetime
-                    cp_rows = conn.execute("SELECT ticker, created_at, models_breakdown_json FROM consensus_predictions").fetchall()
-                    for ticker, created_at, m_json in cp_rows:
-                        try:
-                            models = json.loads(m_json)
-                            try:
-                                dt = datetime.fromisoformat(created_at)
-                                ts = dt.timestamp()
-                            except Exception:
-                                ts = time.time()
-                            for m in models:
-                                lat = m.get("latency_ms")
-                                if lat is not None:
-                                    m_id = m.get("model_id") or m.get("model_name") or "unknown"
-                                    m_name = m.get("model_name")
-                                    is_succ = 1 if not m.get("error") else 0
-                                    conn.execute(
-                                        "INSERT INTO ai_model_telemetry (model_id, model_name, created_at, timestamp, latency_ms, tokens, is_local, success, error_message, ticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                        (m_id, m_name, created_at, ts, float(lat), m.get("tokens"), 1 if m.get("is_local") else 0, is_succ, m.get("error"), ticker)
-                                    )
-                        except Exception:
-                            pass
+        for attempt in range(max_retries):
+            conn = None
+            try:
+                conn = get_db_connection(settings)
+
+                # Ensure tables exist
+                with conn:
+                    conn.execute("""
+                        CREATE TABLE IF NOT EXISTS ai_model_telemetry (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            model_id TEXT NOT NULL,
+                            model_name TEXT,
+                            created_at TEXT NOT NULL,
+                            timestamp REAL NOT NULL,
+                            latency_ms REAL NOT NULL,
+                            tokens INTEGER,
+                            is_local INTEGER DEFAULT 0,
+                            success INTEGER DEFAULT 1,
+                            error_message TEXT,
+                            ticker TEXT
+                        )
+                    """)
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_model ON ai_model_telemetry(model_id)")
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_ts ON ai_model_telemetry(timestamp)")
+
+                    conn.execute("""
+                        CREATE TABLE IF NOT EXISTS downstream_api_calls (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            service TEXT NOT NULL,
+                            created_at TEXT NOT NULL,
+                            timestamp REAL NOT NULL,
+                            status_code INTEGER DEFAULT 200
+                        )
+                    """)
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_api_calls_service ON downstream_api_calls(service)")
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_api_calls_ts ON downstream_api_calls(timestamp)")
                     conn.commit()
-                except Exception as eb:
-                    logger.debug("Telemetry backfill from consensus_predictions skipped: %s", eb)
 
-            # Hydrate in-memory history deques
-            rows = conn.execute("SELECT model_id, model_name, timestamp, latency_ms, tokens, is_local, success FROM ai_model_telemetry ORDER BY timestamp ASC").fetchall()
-            with self._lock:
-                for r in rows:
-                    m_id = str(r[0]).lower().strip()
-                    m_name = str(r[1] or "").lower().strip()
-                    record = {
-                        "timestamp": float(r[2]),
-                        "latency_ms": float(r[3]),
-                        "tokens": r[4],
-                        "is_local": bool(r[5]),
-                        "success": bool(r[6]),
-                    }
-                    if m_id not in self._generation_history:
-                        self._generation_history[m_id] = collections.deque(maxlen=5000)
-                    self._generation_history[m_id].append(record)
+                # Backfill from consensus_predictions if telemetry table is empty
+                tel_count_row = conn.execute("SELECT COUNT(*) FROM ai_model_telemetry").fetchone()
+                tel_count = tel_count_row[0] if tel_count_row else 0
+                if tel_count == 0:
+                    try:
+                        import json
+                        from datetime import datetime as dt_cls
+                        cp_rows = conn.execute("SELECT ticker, created_at, models_breakdown_json FROM consensus_predictions").fetchall()
+                        with conn:
+                            for ticker, created_at, m_json in cp_rows:
+                                try:
+                                    models = json.loads(m_json)
+                                    try:
+                                        dt = dt_cls.fromisoformat(created_at)
+                                        ts = dt.timestamp()
+                                    except Exception:
+                                        ts = time.time()
+                                    for m in models:
+                                        lat = m.get("latency_ms")
+                                        if lat is not None:
+                                            m_id = m.get("model_id") or m.get("model_name") or "unknown"
+                                            m_name = m.get("model_name")
+                                            is_succ = 1 if not m.get("error") else 0
+                                            conn.execute(
+                                                "INSERT INTO ai_model_telemetry (model_id, model_name, created_at, timestamp, latency_ms, tokens, is_local, success, error_message, ticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                                (m_id, m_name, created_at, ts, float(lat), m.get("tokens"), 1 if m.get("is_local") else 0, is_succ, m.get("error"), ticker)
+                                            )
+                                except Exception:
+                                    pass
+                            conn.commit()
+                    except Exception as eb:
+                        logger.debug("Telemetry backfill from consensus_predictions skipped: %s", eb)
 
-                    if m_name and m_name != m_id:
-                        if m_name not in self._generation_history:
-                            self._generation_history[m_name] = collections.deque(maxlen=5000)
-                        self._generation_history[m_name].append(record)
+                # Hydrate in-memory history deques
+                rows = conn.execute("SELECT model_id, model_name, timestamp, latency_ms, tokens, is_local, success FROM ai_model_telemetry ORDER BY timestamp ASC").fetchall()
+                with self._lock:
+                    for r in rows:
+                        m_id = str(r[0]).lower().strip()
+                        m_name = str(r[1] or "").lower().strip()
+                        record = {
+                            "timestamp": float(r[2]),
+                            "latency_ms": float(r[3]),
+                            "tokens": r[4],
+                            "is_local": bool(r[5]),
+                            "success": bool(r[6]),
+                        }
+                        if m_id not in self._generation_history:
+                            self._generation_history[m_id] = collections.deque(maxlen=5000)
+                        self._generation_history[m_id].append(record)
 
-                    if m_id not in self._request_timestamps:
-                        self._request_timestamps[m_id] = collections.deque(maxlen=10000)
-                    self._request_timestamps[m_id].append(float(r[2]))
+                        if m_name and m_name != m_id:
+                            if m_name not in self._generation_history:
+                                self._generation_history[m_name] = collections.deque(maxlen=5000)
+                            self._generation_history[m_name].append(record)
 
-            # Hydrate downstream API call timestamps from past 7 days
-            seven_days_ago = time.time() - 604800
-            call_rows = conn.execute(
-                "SELECT service, timestamp FROM downstream_api_calls WHERE timestamp >= ? ORDER BY timestamp ASC",
-                (seven_days_ago,)
-            ).fetchall()
-            with self._lock:
-                for s_name, s_ts in call_rows:
-                    raw_s_key = str(s_name).lower().strip()
-                    s_key = SERVICE_ALIASES.get(raw_s_key, raw_s_key)
-                    if s_key not in self._request_timestamps:
-                        self._request_timestamps[s_key] = collections.deque(maxlen=10000)
-                    self._request_timestamps[s_key].append(float(s_ts))
+                        if m_id not in self._request_timestamps:
+                            self._request_timestamps[m_id] = collections.deque(maxlen=10000)
+                        self._request_timestamps[m_id].append(float(r[2]))
 
-            self._is_hydrated = True
-            logger.info("Hydrated %d empirical model generation records and %d API calls from DB", len(rows), len(call_rows))
-        except Exception as e:
-            logger.warning("Failed hydrating AI model telemetry from DB: %s", e)
+                # Hydrate downstream API call timestamps from past 7 days
+                seven_days_ago = time.time() - 604800
+                call_rows = conn.execute(
+                    "SELECT service, timestamp FROM downstream_api_calls WHERE timestamp >= ? ORDER BY timestamp ASC",
+                    (seven_days_ago,)
+                ).fetchall()
+                with self._lock:
+                    for s_name, s_ts in call_rows:
+                        raw_s_key = str(s_name).lower().strip()
+                        s_key = SERVICE_ALIASES.get(raw_s_key, raw_s_key)
+                        if s_key not in self._request_timestamps:
+                            self._request_timestamps[s_key] = collections.deque(maxlen=10000)
+                        self._request_timestamps[s_key].append(float(s_ts))
+
+                self._is_hydrated = True
+                logger.info("Hydrated %d empirical model generation records and %d API calls from DB", len(rows), len(call_rows))
+                return
+            except Exception as e:
+                last_err = e
+                time.sleep(0.05 * (2 ** attempt))
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+
+        if last_err is not None:
+            logger.warning("Failed hydrating AI model telemetry from DB after retries: %s", last_err)
 
     def record_request(self, service: str, status_code: int = 200) -> None:
         """Record an outbound request timestamp for the given downstream service or model."""
@@ -466,18 +486,26 @@ class RateLimitTracker:
 
         # Asynchronously persist to downstream_api_calls
         def _persist_call():
+            conn = None
             try:
                 from earnings_engine.config import Settings
                 from earnings_engine.data.db import get_db_connection
                 conn = get_db_connection(Settings())
                 created_at = datetime.now(timezone.utc).isoformat()
-                conn.execute(
-                    "INSERT INTO downstream_api_calls (service, created_at, timestamp, status_code) VALUES (?, ?, ?, ?)",
-                    (service_key, created_at, now, status_code)
-                )
-                conn.commit()
+                with conn:
+                    conn.execute(
+                        "INSERT INTO downstream_api_calls (service, created_at, timestamp, status_code) VALUES (?, ?, ?, ?)",
+                        (service_key, created_at, now, status_code)
+                    )
+                    conn.commit()
             except Exception:
                 pass
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
         threading.Thread(target=_persist_call, daemon=True).start()
 
     def record_generation(
@@ -510,19 +538,27 @@ class RateLimitTracker:
 
         # Persist to ai_model_telemetry table in background thread
         def _persist():
+            conn = None
             try:
                 from earnings_engine.config import Settings
                 from earnings_engine.data.db import get_db_connection
                 conn = get_db_connection(Settings())
                 created_at = datetime.now(timezone.utc).isoformat()
                 m_short = model.split("/")[-1]
-                conn.execute(
-                    "INSERT INTO ai_model_telemetry (model_id, model_name, created_at, timestamp, latency_ms, tokens, is_local, success, error_message, ticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (model, m_short, created_at, now, float(latency_ms), tokens, 1 if is_local else 0, 1 if success else 0, error_message, ticker)
-                )
-                conn.commit()
+                with conn:
+                    conn.execute(
+                        "INSERT INTO ai_model_telemetry (model_id, model_name, created_at, timestamp, latency_ms, tokens, is_local, success, error_message, ticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (model, m_short, created_at, now, float(latency_ms), tokens, 1 if is_local else 0, 1 if success else 0, error_message, ticker)
+                    )
+                    conn.commit()
             except Exception:
                 pass
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
         threading.Thread(target=_persist, daemon=True).start()
 
     def update_openrouter_headers(self, headers: dict[str, Any]) -> None:
@@ -576,7 +612,8 @@ class RateLimitTracker:
 
     def get_models_summary(self) -> list[dict[str, Any]]:
         """Return list of models with quota consumption and empirical multi-horizon generation latency & success rate metrics."""
-        self.hydrate_from_db()
+        if not self._is_hydrated:
+            self.hydrate_from_db()
         now = time.time()
         or_remaining_1m = self._openrouter_headers["remaining"] if self._openrouter_headers["remaining"] is not None else 20
         or_remaining_24h = 200
@@ -937,7 +974,8 @@ class RateLimitTracker:
 
     def get_api_usage_summary(self, settings: Settings | None = None) -> dict[str, Any]:
         """Aggregate total API calls, today's calls (IST), 1h calls, and status for yfinance, nse, jugaad, and AI models."""
-        self.hydrate_from_db()
+        if not self._is_hydrated:
+            self.hydrate_from_db()
         now = time.time()
         ist_offset = timezone(timedelta(hours=5, minutes=30))
         now_ist = datetime.now(ist_offset)
@@ -950,6 +988,7 @@ class RateLimitTracker:
 
         all_time_counts: dict[str, int] = {}
         today_db_counts: dict[str, int] = {}
+        conn = None
         try:
             conn = get_db_connection(settings)
             rows = conn.execute("SELECT service, COUNT(*) FROM downstream_api_calls GROUP BY service").fetchall()
@@ -965,6 +1004,12 @@ class RateLimitTracker:
                 today_db_counts[k] = today_db_counts.get(k, 0) + int(c)
         except Exception as e:
             logger.debug("Failed querying downstream_api_calls counts: %s", e)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
         downstreams: list[dict[str, Any]] = []
         with self._lock:
