@@ -56,6 +56,18 @@ def test_compute_participant_oi_matrix():
         assert "future_index_long_pct" in p
         assert p["long_pct"] + p["short_pct"] == pytest.approx(100.0, rel=1e-1)
 
+        # 1D Day Delta keys & regime classifications
+        assert "delta_future_index_net" in p
+        assert "future_index_delta" in p
+        assert "delta_future_index_long" in p
+        assert "delta_future_index_short" in p
+        assert "delta_future_index_long_pct" in p
+        assert "delta_future_stock_net" in p
+        assert "delta_net_contracts" in p
+        assert "delta_ls_ratio" in p
+        assert "shift_regime" in p
+        assert "oi_regime_badge" in p
+
     # Check contrarian prediction & smart money divergence metadata
     assert "smart_vs_retail_divergence" in oi_data
     assert "divergence_status" in oi_data
@@ -65,6 +77,46 @@ def test_compute_participant_oi_matrix():
     assert "contrarian_prediction" in oi_data
     assert "verdict" in oi_data["contrarian_prediction"]
     assert "trap_score" in oi_data["contrarian_prediction"]
+
+
+def test_participant_oi_day_deltas_and_historical_matrix():
+    """Verify pairwise day-over-day deltas across history_10d and history_30d."""
+    settings = Settings()
+    oi_data = compute_participant_oi_matrix(settings=settings, force_refresh=True)
+
+    assert "history_10d" in oi_data
+    assert "history_30d" in oi_data
+    hist_10d = oi_data["history_10d"]
+    assert isinstance(hist_10d, list)
+    assert len(hist_10d) >= 1
+
+    # Check historical delta computations
+    for i, row in enumerate(hist_10d):
+        assert "date" in row
+        assert "fii_future_index_net" in row
+        assert "dii_future_index_net" in row
+        assert "pro_future_index_net" in row
+        assert "client_future_index_net" in row
+        assert "fii_delta_index_net" in row
+        assert "dii_delta_index_net" in row
+        assert "pro_delta_index_net" in row
+        assert "client_delta_index_net" in row
+        assert "fii_shift_regime" in row
+
+        if i < len(hist_10d) - 1:
+            next_row = hist_10d[i + 1]
+            expected_fii_delta = row["fii_future_index_net"] - next_row["fii_future_index_net"]
+            assert row["fii_delta_index_net"] == expected_fii_delta
+            expected_dii_delta = row["dii_future_index_net"] - next_row["dii_future_index_net"]
+            assert row["dii_delta_index_net"] == expected_dii_delta
+
+    # The oldest baseline day in history_30d has 0 delta and Baseline regime
+    hist_30d = oi_data["history_30d"]
+    assert isinstance(hist_30d, list)
+    assert len(hist_30d) >= 1
+    oldest_row = hist_30d[-1]
+    assert oldest_row["fii_delta_index_net"] == 0
+    assert oldest_row["fii_shift_regime"] == "Baseline"
 
 
 def test_master_market_pulse_includes_participant_oi():

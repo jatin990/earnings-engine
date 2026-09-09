@@ -499,10 +499,10 @@
                 <thead>
                     <tr style="background:#060a16;">
                         <th style="padding:0.45rem 0.6rem;text-align:left;">Trading Session</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">🏛️ FII Index Net (Long %)</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">🏢 DII Index Net (Long %)</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">⚡ PRO Index Net (Long %)</th>
-                        <th style="padding:0.45rem 0.6rem;text-align:right;">👤 Retail Net (Long %)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">🏛️ FII Index Net (1D Δ)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">🏢 DII Index Net (1D Δ)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">⚡ PRO Index Net (1D Δ)</th>
+                        <th style="padding:0.45rem 0.6rem;text-align:right;">👤 Retail Net (1D Δ)</th>
                         <th style="padding:0.45rem 0.6rem;text-align:center;">FII Shift &amp; Regime</th>
                     </tr>
                 </thead>
@@ -520,17 +520,33 @@
 
     <!-- 5. Sector Relative Strength Heatmap -->
     <div class="card" style="padding:1rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);margin-bottom:1rem;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-            <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
-                <span>🔥</span> Key NSE Sectoral Heatmap &amp; Relative Performance
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+            <div style="display:flex;align-items:center;gap:0.4rem;">
+                <span style="font-size:1.1rem;">🔥</span>
+                <div>
+                    <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+                        Key NSE Sectoral Heatmap &amp; Relative Performance
+                        <span class="signal-badge" style="background:rgba(249,115,22,0.15);color:#fb923c;font-size:0.65rem;">Magnitude Saturation</span>
+                    </div>
+                    <div style="font-size:0.65rem;color:#94a3b8;">Multi-timeframe rotation, constituent advance/decline breadth, and gainer/loser leaders</div>
+                </div>
             </div>
-            <div style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">
-                1D / 7D / 30D Returns
+            <div style="display:flex;align-items:center;gap:0.35rem;">
+                <span style="font-size:0.65rem;color:#64748b;font-weight:600;margin-right:0.2rem;">Timeframe:</span>
+                <button type="button" id="btnSectorTf1d" class="btn-micro pulse-sector-tf-btn active" style="padding:0.2rem 0.55rem;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.setSectorTimeframe('1d')">
+                    1D
+                </button>
+                <button type="button" id="btnSectorTf7d" class="btn-micro pulse-sector-tf-btn" style="padding:0.2rem 0.55rem;background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.setSectorTimeframe('7d')">
+                    7D
+                </button>
+                <button type="button" id="btnSectorTf30d" class="btn-micro pulse-sector-tf-btn" style="padding:0.2rem 0.55rem;background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.setSectorTimeframe('30d')">
+                    30D
+                </button>
             </div>
         </div>
 
-        <div id="pulseSectorsGrid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:0.6rem;">
-            <!-- Dynamic Sector Tiles -->
+        <div id="pulseSectorsGrid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:0.75rem;">
+            <!-- Dynamic Sector Heatmap Tiles -->
         </div>
     </div>
 
@@ -541,6 +557,12 @@
                 <span>⚡</span> Breakout Radar Scanner
             </div>
             <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">Screen high-conviction compression breakouts with volume surge.</div>
+        </div>
+        <div class="card" style="padding:0.85rem;background:#0f172a;border:1px solid rgba(16,185,129,0.25);cursor:pointer;transition:transform 0.15s;" onclick="app.switchTab('swing')">
+            <div style="font-size:0.8rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
+                <span>🔄</span> Swing Trading Matrix
+            </div>
+            <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.25rem;">Horizontal trading channels and multi-cycle support floors.</div>
         </div>
         <div class="card" style="padding:0.85rem;background:#0f172a;border:1px solid rgba(168,85,247,0.25);cursor:pointer;transition:transform 0.15s;" onclick="app.switchTab('results')">
             <div style="font-size:0.8rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">

@@ -994,6 +994,20 @@ def sync_nse_participant_oi_data(
     return len(all_inserts)
 
 
+def _classify_oi_regime(d_fi_net: int, d_fi_long: int, d_fi_short: int) -> tuple[str, str, str]:
+    """Classify derivatives positioning shift regime based on index futures day-over-day delta."""
+    if d_fi_net > 0 and d_fi_long >= d_fi_short:
+        return ("Long Build-up", "🟢 Long Build-up", "Aggressive fresh long accumulation in index futures; bullish continuation bias.")
+    elif d_fi_net > 0 and d_fi_short < 0:
+        return ("Short Covering", "⚡ Short Covering", "Bear capitulation / shorts exiting; short squeeze momentum.")
+    elif d_fi_net < 0 and d_fi_short >= d_fi_long:
+        return ("Short Build-up", "🔴 Short Build-up", "Fresh institutional short hedges added in index futures; overhead resistance.")
+    elif d_fi_net < 0 and d_fi_long < 0:
+        return ("Long Unwinding", "⚠️ Long Unwinding", "Longs taking profit / trimming risk; lack of aggressive buying.")
+    else:
+        return ("Neutral / Balanced", "⚪ Neutral", "Balanced positioning shifts with minimal directional skew.")
+
+
 def compute_participant_oi_matrix(settings: Settings | None = None, force_refresh: bool = False) -> dict[str, Any]:
     """Compute authentic Participant Derivatives Open Interest (OI), Index Futures Long/Short positioning,
     Day-over-Day shifts, and quantitative Market Maker vs Retail Contrarian Predictions for Tomorrow.
@@ -1099,9 +1113,6 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
             "participants": p_dict,
         })
 
-    history_7d = history_30d[:7]
-    history_10d = history_30d[:10]
-
     # Calculate Day-over-Day Delta OI metrics for each participant (T vs T-1)
     delta_metrics: dict[str, dict[str, Any]] = {}
     if len(history_30d) >= 2:
@@ -1117,34 +1128,42 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
             d_fi_long_pct = round(t_stat.get("future_index_long_pct", 50.0) - y_stat.get("future_index_long_pct", 50.0), 1)
 
             d_fs_net = t_stat.get("future_stock_net", 0) - y_stat.get("future_stock_net", 0)
+            d_fs_long = t_stat.get("future_stock_long", 0) - y_stat.get("future_stock_long", 0)
+            d_fs_short = t_stat.get("future_stock_short", 0) - y_stat.get("future_stock_short", 0)
+
+            d_call_long = t_stat.get("opt_index_call_long", 0) - y_stat.get("opt_index_call_long", 0)
+            d_call_short = t_stat.get("opt_index_call_short", 0) - y_stat.get("opt_index_call_short", 0)
+            d_put_long = t_stat.get("opt_index_put_long", 0) - y_stat.get("opt_index_put_long", 0)
+            d_put_short = t_stat.get("opt_index_put_short", 0) - y_stat.get("opt_index_put_short", 0)
+
             d_net = t_stat.get("net_contracts", 0) - y_stat.get("net_contracts", 0)
             d_long = t_stat.get("total_long", 0) - y_stat.get("total_long", 0)
             d_short = t_stat.get("total_short", 0) - y_stat.get("total_short", 0)
             d_ls = round(t_stat.get("long_short_ratio", 1.0) - y_stat.get("long_short_ratio", 1.0), 3)
 
-            # Regime classification based on delta positioning in Index Futures
-            if d_fi_net > 0 and d_fi_long >= d_fi_short:
-                regime = "Long Build-up"
-                badge = "🟢 Long Build-up"
-                desc = "Aggressive fresh long accumulation in index futures; bullish continuation bias."
-            elif d_fi_net > 0 and d_fi_short < 0:
-                regime = "Short Covering"
-                badge = "⚡ Short Covering"
-                desc = "Bear capitulation / shorts exiting; short squeeze momentum."
-            elif d_fi_net < 0 and d_fi_short >= d_fi_long:
-                regime = "Short Build-up"
-                badge = "🔴 Short Build-up"
-                desc = "Fresh institutional short hedges added in index futures; overhead resistance."
-            elif d_fi_net < 0 and d_fi_long < 0:
-                regime = "Long Unwinding"
-                badge = "⚠️ Long Unwinding"
-                desc = "Longs taking profit / trimming risk; lack of aggressive buying."
-            else:
-                regime = "Neutral / Balanced"
-                badge = "⚪ Neutral"
-                desc = "Balanced positioning shifts with minimal directional skew."
+            regime, badge, desc = _classify_oi_regime(d_fi_net, d_fi_long, d_fi_short)
 
             delta_metrics[p_code] = {
+                # Canonical standard keys
+                "delta_future_index_net": d_fi_net,
+                "delta_future_index_long": d_fi_long,
+                "delta_future_index_short": d_fi_short,
+                "delta_future_index_long_pct": d_fi_long_pct,
+                "delta_future_stock_net": d_fs_net,
+                "delta_future_stock_long": d_fs_long,
+                "delta_future_stock_short": d_fs_short,
+                "delta_call_long": d_call_long,
+                "delta_call_short": d_call_short,
+                "delta_put_long": d_put_long,
+                "delta_put_short": d_put_short,
+                "delta_net_contracts": d_net,
+                "delta_long_contracts": d_long,
+                "delta_short_contracts": d_short,
+                "delta_ls_ratio": d_ls,
+                "shift_regime": regime,
+                "shift_badge": badge,
+                "shift_desc": desc,
+                # Compatibility aliases
                 "future_index_delta": d_fi_net,
                 "future_index_long_delta": d_fi_long,
                 "future_index_short_delta": d_fi_short,
@@ -1161,6 +1180,24 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
     else:
         for p_code in ["FII", "DII", "PRO", "CLIENT"]:
             delta_metrics[p_code] = {
+                "delta_future_index_net": 0,
+                "delta_future_index_long": 0,
+                "delta_future_index_short": 0,
+                "delta_future_index_long_pct": 0.0,
+                "delta_future_stock_net": 0,
+                "delta_future_stock_long": 0,
+                "delta_future_stock_short": 0,
+                "delta_call_long": 0,
+                "delta_call_short": 0,
+                "delta_put_long": 0,
+                "delta_put_short": 0,
+                "delta_net_contracts": 0,
+                "delta_long_contracts": 0,
+                "delta_short_contracts": 0,
+                "delta_ls_ratio": 0.0,
+                "shift_regime": "Neutral / Balanced",
+                "shift_badge": "⚪ Neutral",
+                "shift_desc": "Balanced positioning baseline.",
                 "future_index_delta": 0,
                 "future_index_long_delta": 0,
                 "future_index_short_delta": 0,
@@ -1174,6 +1211,89 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
                 "oi_regime_badge": "⚪ Neutral",
                 "oi_regime_desc": "Balanced positioning baseline.",
             }
+
+    # Compute Day-over-Day Deltas (T_i vs T_{i+1}) across all historical matrix rows
+    num_hist = len(history_30d)
+    for i in range(num_hist):
+        curr_row = history_30d[i]
+        curr_p = curr_row.get("participants", {})
+        has_next = (i + 1 < num_hist)
+        next_p = history_30d[i + 1].get("participants", {}) if has_next else {}
+
+        row_deltas: dict[str, Any] = {}
+        for p_code in ["FII", "DII", "PRO", "CLIENT"]:
+            c_stat = curr_p.get(p_code, {})
+            n_stat = next_p.get(p_code, {}) if has_next else {}
+
+            if has_next and n_stat:
+                d_fi_net = c_stat.get("future_index_net", 0) - n_stat.get("future_index_net", 0)
+                d_fi_long = c_stat.get("future_index_long", 0) - n_stat.get("future_index_long", 0)
+                d_fi_short = c_stat.get("future_index_short", 0) - n_stat.get("future_index_short", 0)
+                d_fi_long_pct = round(c_stat.get("future_index_long_pct", 50.0) - n_stat.get("future_index_long_pct", 50.0), 1)
+
+                d_fs_net = c_stat.get("future_stock_net", 0) - n_stat.get("future_stock_net", 0)
+                d_net = c_stat.get("net_contracts", 0) - n_stat.get("net_contracts", 0)
+                d_long = c_stat.get("total_long", 0) - n_stat.get("total_long", 0)
+                d_short = c_stat.get("total_short", 0) - n_stat.get("total_short", 0)
+                d_ls = round(c_stat.get("long_short_ratio", 1.0) - n_stat.get("long_short_ratio", 1.0), 3)
+
+                regime, badge, desc = _classify_oi_regime(d_fi_net, d_fi_long, d_fi_short)
+            else:
+                d_fi_net = 0
+                d_fi_long = 0
+                d_fi_short = 0
+                d_fi_long_pct = 0.0
+                d_fs_net = 0
+                d_net = 0
+                d_long = 0
+                d_short = 0
+                d_ls = 0.0
+                regime = "Baseline"
+                badge = "⚪ Baseline"
+                desc = "Initial observation baseline"
+
+            p_delta_bundle = {
+                "delta_future_index_net": d_fi_net,
+                "future_index_delta": d_fi_net,
+                "delta_future_index_long": d_fi_long,
+                "delta_future_index_short": d_fi_short,
+                "delta_future_index_long_pct": d_fi_long_pct,
+                "delta_future_stock_net": d_fs_net,
+                "delta_net_contracts": d_net,
+                "delta_long_contracts": d_long,
+                "delta_short_contracts": d_short,
+                "delta_ls_ratio": d_ls,
+                "shift_regime": regime,
+                "shift_badge": badge,
+                "shift_desc": desc,
+                "oi_regime_badge": badge,
+            }
+            if p_code in curr_p:
+                curr_p[p_code].update(p_delta_bundle)
+            row_deltas[p_code.lower()] = p_delta_bundle
+
+        # Top-level row convenience properties for easy consumption in templates and JS
+        curr_row["fii_delta_index_net"] = row_deltas["fii"]["delta_future_index_net"]
+        curr_row["fii_future_index_delta"] = row_deltas["fii"]["delta_future_index_net"]
+        curr_row["fii_delta_index_long_pct"] = row_deltas["fii"]["delta_future_index_long_pct"]
+        curr_row["fii_delta_net_contracts"] = row_deltas["fii"]["delta_net_contracts"]
+        curr_row["fii_shift_regime"] = row_deltas["fii"]["shift_regime"]
+        curr_row["fii_shift_badge"] = row_deltas["fii"]["shift_badge"]
+
+        curr_row["dii_delta_index_net"] = row_deltas["dii"]["delta_future_index_net"]
+        curr_row["dii_future_index_delta"] = row_deltas["dii"]["delta_future_index_net"]
+        curr_row["dii_shift_badge"] = row_deltas["dii"]["shift_badge"]
+
+        curr_row["pro_delta_index_net"] = row_deltas["pro"]["delta_future_index_net"]
+        curr_row["pro_future_index_delta"] = row_deltas["pro"]["delta_future_index_net"]
+        curr_row["pro_shift_badge"] = row_deltas["pro"]["shift_badge"]
+
+        curr_row["client_delta_index_net"] = row_deltas["client"]["delta_future_index_net"]
+        curr_row["client_future_index_delta"] = row_deltas["client"]["delta_future_index_net"]
+        curr_row["client_shift_badge"] = row_deltas["client"]["shift_badge"]
+
+    history_7d = history_30d[:7]
+    history_10d = history_30d[:10]
 
     # Query latest snapshot and merge delta metrics
     participants_list: list[dict[str, Any]] = []
@@ -1369,6 +1489,12 @@ def compute_participant_oi_matrix(settings: Settings | None = None, force_refres
             "dii_index_net": dii_fi_net,
             "fii_index_net_delta": delta_metrics.get("FII", {}).get("future_index_delta", 0),
             "client_index_net_delta": delta_metrics.get("CLIENT", {}).get("future_index_delta", 0),
+            "pro_index_net_delta": delta_metrics.get("PRO", {}).get("future_index_delta", 0),
+            "dii_index_net_delta": delta_metrics.get("DII", {}).get("future_index_delta", 0),
+            "fii_index_long_pct_delta": delta_metrics.get("FII", {}).get("future_index_long_pct_delta", 0.0),
+            "client_index_long_pct_delta": delta_metrics.get("CLIENT", {}).get("future_index_long_pct_delta", 0.0),
+            "pro_index_long_pct_delta": delta_metrics.get("PRO", {}).get("future_index_long_pct_delta", 0.0),
+            "dii_index_long_pct_delta": delta_metrics.get("DII", {}).get("future_index_long_pct_delta", 0.0),
         },
         "history_7d": history_7d,
         "history_10d": history_10d,

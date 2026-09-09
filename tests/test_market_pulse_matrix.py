@@ -37,6 +37,8 @@ def test_compute_participant_oi_matrix():
         assert "pro_net_contracts" in h
         assert "client_net_contracts" in h
         assert "fii_long_short_ratio" in h
+        assert "fii_delta_index_net" in h
+        assert "fii_shift_regime" in h
 
 
 def test_compute_net_cash_liquidity():

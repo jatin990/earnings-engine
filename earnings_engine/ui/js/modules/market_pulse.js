@@ -12,6 +12,8 @@
         _isFlowHistoryExpanded: false,
         _isOiHistoryView: false,
         _currentOiView: 'index_futures',
+        _currentSectorTimeframe: '1d',
+        _lastSectorsData: null,
         _lastFlowsData: null,
         _lastOiData: null,
         _glossaryData: null,
@@ -813,7 +815,7 @@
                             <th style="padding:0.4rem 0.6rem;text-align:right;">Net Index Contracts</th>
                             <th style="padding:0.4rem 0.6rem;text-align:center;">Index Long %</th>
                             <th style="padding:0.4rem 0.6rem;text-align:center;">1D Shift (Δ)</th>
-                            <th style="padding:0.4rem 0.6rem;text-align:left;">Market Maker Stance</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Shift &amp; Regime</th>
                         </tr>
                     `;
                 } else {
@@ -823,9 +825,9 @@
                             <th style="padding:0.4rem 0.6rem;text-align:right;">Total Futures (L/S)</th>
                             <th style="padding:0.4rem 0.6rem;text-align:right;">Call Options (L/S)</th>
                             <th style="padding:0.4rem 0.6rem;text-align:right;">Put Options (L/S)</th>
-                            <th style="padding:0.4rem 0.6rem;text-align:right;">Consolidated Net F&amp;O</th>
-                            <th style="padding:0.4rem 0.6rem;text-align:center;">Long / Short Ratio</th>
-                            <th style="padding:0.4rem 0.6rem;text-align:left;">Stance</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:right;">Consolidated Net F&amp;O (Δ)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:center;">Long / Short Ratio (Δ)</th>
+                            <th style="padding:0.4rem 0.6rem;text-align:left;">Shift &amp; Regime</th>
                         </tr>
                     `;
                 }
@@ -845,12 +847,21 @@
                         const netCol = fiNet > 0 ? '#34d399' : (fiNet < 0 ? '#f87171' : '#94a3b8');
                         const netSign = fiNet > 0 ? '+' : '';
 
-                        const deltaVal = p.delta_future_index_net ?? p.delta_net_contracts ?? null;
-                        let deltaStr = '<span style="color:#64748b;">-</span>';
-                        if (deltaVal !== null) {
+                        const deltaVal = p.delta_future_index_net ?? p.future_index_delta ?? p.delta_net_contracts ?? null;
+                        let deltaStr = '<span style="color:#64748b;">—</span>';
+                        if (deltaVal !== null && deltaVal !== undefined) {
                             const dSign = deltaVal >= 0 ? '+' : '';
                             const dCol = deltaVal >= 0 ? '#34d399' : '#f87171';
-                            deltaStr = `<span style="color:${dCol};font-weight:700;font-family:var(--font-mono);font-size:0.68rem;">Δ ${dSign}${deltaVal.toLocaleString()}</span>`;
+                            const dArr = deltaVal >= 0 ? '▲' : '▼';
+                            deltaStr = `<span style="font-size:0.68rem;padding:0.12rem 0.45rem;border-radius:4px;background:${dCol}18;color:${dCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${dCol}33;">Δ ${dSign}${deltaVal.toLocaleString()} ${dArr}</span>`;
+                        }
+
+                        const deltaLongPct = p.delta_future_index_long_pct ?? p.future_index_long_pct_delta ?? null;
+                        let deltaPctStr = '';
+                        if (deltaLongPct !== null && deltaLongPct !== undefined) {
+                            const dPctSign = deltaLongPct >= 0 ? '+' : '';
+                            const dPctCol = deltaLongPct >= 0 ? '#34d399' : '#f87171';
+                            deltaPctStr = `<div style="font-size:0.58rem;color:${dPctCol};font-weight:700;font-family:var(--font-mono);margin-top:0.12rem;">Δ ${dPctSign}${deltaLongPct.toFixed(1)}%</div>`;
                         }
 
                         let pctCol = '#94a3b8';
@@ -864,15 +875,26 @@
                         }
 
                         const stance = p.stance || 'Balanced';
-                        const shiftRegime = p.shift_regime || stance;
+                        const shiftRegime = p.shift_regime || p.oi_regime_badge || stance;
                         let stanceBg = 'rgba(255,255,255,0.04)';
                         let stanceCol = '#cbd5e1';
-                        if (shiftRegime.includes('🟢') || shiftRegime.includes('Long') || shiftRegime.includes('Covering') || fiLongPct >= 60) {
-                            stanceBg = 'rgba(16,185,129,0.1)';
+                        let stanceBorder = 'rgba(255,255,255,0.08)';
+                        if (shiftRegime.includes('🟢') || shiftRegime.includes('Long Build') || shiftRegime.includes('Long Add')) {
+                            stanceBg = 'rgba(16,185,129,0.12)';
                             stanceCol = '#34d399';
-                        } else if (shiftRegime.includes('🔴') || shiftRegime.includes('Short') || shiftRegime.includes('Unwinding') || fiLongPct <= 30) {
-                            stanceBg = 'rgba(239,68,68,0.1)';
+                            stanceBorder = 'rgba(16,185,129,0.25)';
+                        } else if (shiftRegime.includes('⚡') || shiftRegime.includes('Covering')) {
+                            stanceBg = 'rgba(56,189,248,0.12)';
+                            stanceCol = '#38bdf8';
+                            stanceBorder = 'rgba(56,189,248,0.25)';
+                        } else if (shiftRegime.includes('🔴') || shiftRegime.includes('Short Build') || shiftRegime.includes('Short Add')) {
+                            stanceBg = 'rgba(239,68,68,0.12)';
                             stanceCol = '#f87171';
+                            stanceBorder = 'rgba(239,68,68,0.25)';
+                        } else if (shiftRegime.includes('⚠️') || shiftRegime.includes('Unwinding')) {
+                            stanceBg = 'rgba(251,146,60,0.12)';
+                            stanceCol = '#fb923c';
+                            stanceBorder = 'rgba(251,146,60,0.25)';
                         }
 
                         return `
@@ -893,12 +915,13 @@
                                     <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${pctBg};color:${pctCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${pctCol}33;">
                                         ${fiLongPct.toFixed(1)}% Long
                                     </span>
+                                    ${deltaPctStr}
                                 </td>
                                 <td style="padding:0.45rem 0.6rem;text-align:center;">
                                     ${deltaStr}
                                 </td>
                                 <td style="padding:0.45rem 0.6rem;text-align:left;">
-                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:600;font-family:var(--font-mono);">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:700;font-family:var(--font-mono);border:1px solid ${stanceBorder};">
                                         ${shiftRegime}
                                     </span>
                                 </td>
@@ -910,12 +933,13 @@
                         const netCol = netVal > 0 ? '#34d399' : (netVal < 0 ? '#f87171' : '#94a3b8');
                         const netSign = netVal > 0 ? '+' : '';
 
-                        const deltaVal = p.delta_net_contracts !== undefined ? p.delta_net_contracts : null;
+                        const deltaVal = p.delta_net_contracts !== undefined ? p.delta_net_contracts : (p.delta_net_contracts_1d !== undefined ? p.delta_net_contracts_1d : null);
                         let deltaStr = '';
-                        if (deltaVal !== null) {
+                        if (deltaVal !== null && deltaVal !== undefined) {
                             const dSign = deltaVal >= 0 ? '+' : '';
                             const dCol = deltaVal >= 0 ? '#34d399' : '#f87171';
-                            deltaStr = `<div style="font-size:0.62rem;color:${dCol};font-weight:600;">Δ ${dSign}${deltaVal.toLocaleString()}</div>`;
+                            const dArr = deltaVal >= 0 ? '▲' : '▼';
+                            deltaStr = `<div style="font-size:0.60rem;color:${dCol};font-weight:700;font-family:var(--font-mono);margin-top:0.12rem;">Δ ${dSign}${deltaVal.toLocaleString()} ${dArr}</div>`;
                         }
 
                         const lsRatio = p.long_short_ratio || 1.0;
@@ -929,16 +953,35 @@
                             lsBg = 'rgba(239,68,68,0.12)';
                         }
 
+                        const deltaLs = p.delta_ls_ratio !== undefined ? p.delta_ls_ratio : null;
+                        let deltaLsStr = '';
+                        if (deltaLs !== null && deltaLs !== undefined) {
+                            const lsSign = deltaLs >= 0 ? '+' : '';
+                            const lsColVal = deltaLs >= 0 ? '#34d399' : '#f87171';
+                            deltaLsStr = `<div style="font-size:0.58rem;color:${lsColVal};font-weight:700;font-family:var(--font-mono);margin-top:0.12rem;">Δ ${lsSign}${deltaLs.toFixed(2)}x</div>`;
+                        }
+
                         const stance = p.stance || 'Balanced';
-                        const shiftRegime = p.shift_regime || stance;
+                        const shiftRegime = p.shift_regime || p.oi_regime_badge || stance;
                         let stanceBg = 'rgba(255,255,255,0.04)';
                         let stanceCol = '#cbd5e1';
-                        if (shiftRegime.includes('🟢') || shiftRegime.includes('Long') || shiftRegime.includes('Covering')) {
-                            stanceBg = 'rgba(16,185,129,0.1)';
+                        let stanceBorder = 'rgba(255,255,255,0.08)';
+                        if (shiftRegime.includes('🟢') || shiftRegime.includes('Long Build') || shiftRegime.includes('Long Add')) {
+                            stanceBg = 'rgba(16,185,129,0.12)';
                             stanceCol = '#34d399';
-                        } else if (shiftRegime.includes('🔴') || shiftRegime.includes('Short') || shiftRegime.includes('Unwinding')) {
-                            stanceBg = 'rgba(239,68,68,0.1)';
+                            stanceBorder = 'rgba(16,185,129,0.25)';
+                        } else if (shiftRegime.includes('⚡') || shiftRegime.includes('Covering')) {
+                            stanceBg = 'rgba(56,189,248,0.12)';
+                            stanceCol = '#38bdf8';
+                            stanceBorder = 'rgba(56,189,248,0.25)';
+                        } else if (shiftRegime.includes('🔴') || shiftRegime.includes('Short Build') || shiftRegime.includes('Short Add')) {
+                            stanceBg = 'rgba(239,68,68,0.12)';
                             stanceCol = '#f87171';
+                            stanceBorder = 'rgba(239,68,68,0.25)';
+                        } else if (shiftRegime.includes('⚠️') || shiftRegime.includes('Unwinding')) {
+                            stanceBg = 'rgba(251,146,60,0.12)';
+                            stanceCol = '#fb923c';
+                            stanceBorder = 'rgba(251,146,60,0.25)';
                         }
 
                         return `
@@ -963,9 +1006,10 @@
                                     <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${lsBg};color:${lsCol};font-weight:800;font-family:var(--font-mono);border:1px solid ${lsCol}33;">
                                         ${lsRatio.toFixed(2)}x (${(p.long_pct || 50).toFixed(0)}% L)
                                     </span>
+                                    ${deltaLsStr}
                                 </td>
                                 <td style="padding:0.45rem 0.6rem;text-align:left;">
-                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:600;font-family:var(--font-mono);">
+                                    <span style="font-size:0.68rem;padding:0.15rem 0.45rem;border-radius:4px;background:${stanceBg};color:${stanceCol};font-weight:700;font-family:var(--font-mono);border:1px solid ${stanceBorder};">
                                         ${shiftRegime}
                                     </span>
                                 </td>
@@ -999,15 +1043,39 @@
                     const cSign = cNet >= 0 ? '+' : '';
                     const cCol = cNet >= 0 ? '#34d399' : '#f87171';
 
-                    const shiftRegime = row.fii_shift_regime || row.shift_regime || (fNet >= 0 ? '🟢 FII Long Bias' : '🔴 FII Short Hedge');
+                    const fmtDelta = (val) => {
+                        if (val === null || val === undefined) return '';
+                        const s = val >= 0 ? '+' : '';
+                        const c = val >= 0 ? '#34d399' : '#f87171';
+                        const arr = val >= 0 ? '▲' : '▼';
+                        return `<div style="font-size:0.58rem;color:${c};font-weight:700;font-family:var(--font-mono);line-height:1.2;">Δ ${s}${val.toLocaleString()} ${arr}</div>`;
+                    };
+
+                    const fDeltaStr = fmtDelta(row.fii_delta_index_net);
+                    const dDeltaStr = fmtDelta(row.dii_delta_index_net);
+                    const pDeltaStr = fmtDelta(row.pro_delta_index_net);
+                    const cDeltaStr = fmtDelta(row.client_delta_index_net);
+
+                    const shiftRegime = row.fii_shift_regime || row.shift_regime || (fNet >= 0 ? '🟢 Long Build-up' : '🔴 Short Build-up');
                     let biasBg = 'rgba(52,211,153,0.12)';
                     let biasCol = '#34d399';
-                    if (shiftRegime.includes('🔴') || shiftRegime.includes('Short') || shiftRegime.includes('Unwinding')) {
+                    let biasBorder = 'rgba(52,211,153,0.25)';
+                    if (shiftRegime.includes('🔴') || shiftRegime.includes('Short Build') || shiftRegime.includes('Short Add')) {
                         biasBg = 'rgba(248,113,113,0.12)';
                         biasCol = '#f87171';
-                    } else if (shiftRegime.includes('🚀') || shiftRegime.includes('Covering')) {
+                        biasBorder = 'rgba(248,113,113,0.25)';
+                    } else if (shiftRegime.includes('⚡') || shiftRegime.includes('Covering')) {
                         biasBg = 'rgba(56,189,248,0.12)';
                         biasCol = '#38bdf8';
+                        biasBorder = 'rgba(56,189,248,0.25)';
+                    } else if (shiftRegime.includes('⚠️') || shiftRegime.includes('Unwinding')) {
+                        biasBg = 'rgba(251,146,60,0.12)';
+                        biasCol = '#fb923c';
+                        biasBorder = 'rgba(251,146,60,0.25)';
+                    } else if (shiftRegime.includes('⚪') || shiftRegime.includes('Neutral') || shiftRegime.includes('Baseline')) {
+                        biasBg = 'rgba(148,163,184,0.12)';
+                        biasCol = '#94a3b8';
+                        biasBorder = 'rgba(148,163,184,0.25)';
                     }
 
                     return `
@@ -1016,19 +1084,23 @@
                                 ${row.session_label || row.date}
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${fCol};font-weight:600;">
-                                ${fSign}${fNet.toLocaleString()} <span style="font-size:0.62rem;color:#94a3b8;">(${fPct.toFixed(0)}% L)</span>
+                                <div>${fSign}${fNet.toLocaleString()} <span style="font-size:0.58rem;color:#94a3b8;">(${fPct.toFixed(0)}% L)</span></div>
+                                ${fDeltaStr}
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${dCol};font-weight:600;">
-                                ${dSign}${dNet.toLocaleString()}
+                                <div>${dSign}${dNet.toLocaleString()}</div>
+                                ${dDeltaStr}
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${pCol};font-weight:600;">
-                                ${pSign}${pNet.toLocaleString()}
+                                <div>${pSign}${pNet.toLocaleString()}</div>
+                                ${pDeltaStr}
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:right;font-family:var(--font-mono);color:${cCol};font-weight:600;">
-                                ${cSign}${cNet.toLocaleString()}
+                                <div>${cSign}${cNet.toLocaleString()}</div>
+                                ${cDeltaStr}
                             </td>
                             <td style="padding:0.45rem 0.6rem;text-align:center;">
-                                <span style="font-size:0.62rem;padding:0.12rem 0.4rem;border-radius:3px;background:${biasBg};color:${biasCol};font-weight:700;font-family:var(--font-mono);">
+                                <span style="font-size:0.62rem;padding:0.15rem 0.45rem;border-radius:4px;background:${biasBg};color:${biasCol};font-weight:700;font-family:var(--font-mono);border:1px solid ${biasBorder};">
                                     ${shiftRegime}
                                 </span>
                             </td>
@@ -1042,35 +1114,160 @@
             const grid = document.getElementById('pulseSectorsGrid');
             if (!grid) return;
 
+            if (sectors && sectors.length) {
+                this._lastSectorsData = sectors;
+            }
+            const currentTf = this._currentSectorTimeframe || '1d';
+
             if (!sectors || !sectors.length) {
-                grid.innerHTML = '<div style="color:#64748b;font-size:0.75rem;">Sector data loading...</div>';
+                grid.innerHTML = '<div style="color:#64748b;font-size:0.75rem;padding:1rem;text-align:center;grid-column:1/-1;">Sector heatmap data loading...</div>';
                 return;
             }
 
             grid.innerHTML = sectors.map(s => {
-                const isPos = s.change_1d >= 0;
-                const col = isPos ? '#34d399' : '#f87171';
-                const sign1d = s.change_1d >= 0 ? '+' : '';
-                const sign7d = s.change_7d >= 0 ? '+' : '';
-                const sign30d = s.change_30d >= 0 ? '+' : '';
+                let returnVal = 0;
+                if (currentTf === '30d') {
+                    returnVal = s.change_30d ?? 0;
+                } else if (currentTf === '7d') {
+                    returnVal = s.change_7d ?? 0;
+                } else {
+                    returnVal = s.change_1d ?? 0;
+                }
+
+                // Magnitude Saturation Color Matrix
+                let bg = 'rgba(255,255,255,0.02)';
+                let border = 'rgba(255,255,255,0.08)';
+                let textCol = '#94a3b8';
+                let badgeBg = 'rgba(255,255,255,0.06)';
+                let badgeBorder = 'rgba(255,255,255,0.1)';
+
+                if (returnVal >= 2.5) {
+                    bg = 'rgba(16, 185, 129, 0.22)';
+                    border = 'rgba(16, 185, 129, 0.60)';
+                    textCol = '#34d399';
+                    badgeBg = 'rgba(16, 185, 129, 0.35)';
+                    badgeBorder = 'rgba(16, 185, 129, 0.50)';
+                } else if (returnVal >= 1.0) {
+                    bg = 'rgba(16, 185, 129, 0.14)';
+                    border = 'rgba(16, 185, 129, 0.40)';
+                    textCol = '#34d399';
+                    badgeBg = 'rgba(16, 185, 129, 0.25)';
+                    badgeBorder = 'rgba(16, 185, 129, 0.40)';
+                } else if (returnVal > 0) {
+                    bg = 'rgba(16, 185, 129, 0.07)';
+                    border = 'rgba(16, 185, 129, 0.22)';
+                    textCol = '#6ee7b7';
+                    badgeBg = 'rgba(16, 185, 129, 0.15)';
+                    badgeBorder = 'rgba(16, 185, 129, 0.30)';
+                } else if (returnVal <= -2.5) {
+                    bg = 'rgba(239, 68, 68, 0.22)';
+                    border = 'rgba(239, 68, 68, 0.60)';
+                    textCol = '#f87171';
+                    badgeBg = 'rgba(239, 68, 68, 0.35)';
+                    badgeBorder = 'rgba(239, 68, 68, 0.50)';
+                } else if (returnVal <= -1.0) {
+                    bg = 'rgba(239, 68, 68, 0.14)';
+                    border = 'rgba(239, 68, 68, 0.40)';
+                    textCol = '#f87171';
+                    badgeBg = 'rgba(239, 68, 68, 0.25)';
+                    badgeBorder = 'rgba(239, 68, 68, 0.40)';
+                } else if (returnVal < 0) {
+                    bg = 'rgba(239, 68, 68, 0.07)';
+                    border = 'rgba(239, 68, 68, 0.22)';
+                    textCol = '#fca5a5';
+                    badgeBg = 'rgba(239, 68, 68, 0.15)';
+                    badgeBorder = 'rgba(239, 68, 68, 0.30)';
+                }
+
+                const signActive = returnVal >= 0 ? '+' : '';
+                const arrow = returnVal >= 0 ? '▲' : '▼';
+
+                const advances = s.advances ?? 0;
+                const declines = s.declines ?? 0;
+                const total = (advances + declines) || s.total_constituents || 10;
+                const advPct = total > 0 ? Math.round((advances / total) * 100) : 50;
+                const decPct = 100 - advPct;
+
+                const s1d = s.change_1d ?? 0;
+                const s7d = s.change_7d ?? 0;
+                const s30d = s.change_30d ?? 0;
+
+                const gainerHtml = s.top_gainer ? `
+                    <span style="font-size:0.60rem;padding:0.1rem 0.3rem;border-radius:3px;background:rgba(16,185,129,0.12);color:#34d399;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48%;">
+                        ▲ ${s.top_gainer}
+                    </span>` : '';
+                const loserHtml = s.top_loser ? `
+                    <span style="font-size:0.60rem;padding:0.1rem 0.3rem;border-radius:3px;background:rgba(239,68,68,0.12);color:#f87171;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48%;">
+                        ▼ ${s.top_loser}
+                    </span>` : '';
 
                 return `
-                    <div style="background:#060a16;border:1px solid rgba(255,255,255,0.06);border-left:3px solid ${col};border-radius:6px;padding:0.55rem 0.75rem;display:flex;flex-direction:column;gap:0.25rem;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <span style="font-size:0.75rem;font-weight:700;color:#f8fafc;">${s.name}</span>
-                            <span style="font-size:0.75rem;font-weight:800;color:${col};font-family:var(--font-mono);">${sign1d}${s.change_1d}%</span>
+                    <div style="background:${bg};border:1px solid ${border};border-radius:7px;padding:0.65rem 0.75rem;display:flex;flex-direction:column;gap:0.35rem;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.4rem;">
+                            <div>
+                                <div style="font-size:0.78rem;font-weight:800;color:#f8fafc;letter-spacing:0.01em;">${s.name}</div>
+                                <div style="font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);">${s.symbol || ''}</div>
+                            </div>
+                            <span style="font-size:0.80rem;font-weight:900;color:${textCol};font-family:var(--font-mono);padding:0.18rem 0.45rem;border-radius:4px;background:${badgeBg};border:1px solid ${badgeBorder};white-space:nowrap;">
+                                ${signActive}${returnVal.toFixed(1)}% ${arrow}
+                            </span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#94a3b8;font-family:var(--font-mono);">
-                            <span>7D: <strong style="color:${s.change_7d >= 0 ? '#34d399' : '#f87171'};">${sign7d}${s.change_7d}%</strong></span>
-                            <span>30D: <strong style="color:${s.change_30d >= 0 ? '#34d399' : '#f87171'};">${sign30d}${s.change_30d}%</strong></span>
+
+                        <!-- Breadth Progress Bar -->
+                        <div style="display:flex;flex-direction:column;gap:0.15rem;margin-top:0.1rem;">
+                            <div style="display:flex;justify-content:space-between;font-size:0.60rem;color:#94a3b8;font-family:var(--font-mono);">
+                                <span style="color:#34d399;font-weight:700;">${advances} ▲</span>
+                                <span style="color:#64748b;font-size:0.58rem;">Breadth</span>
+                                <span style="color:#f87171;font-weight:700;">${declines} ▼</span>
+                            </div>
+                            <div style="height:4px;width:100%;border-radius:2px;background:rgba(255,255,255,0.06);display:flex;overflow:hidden;">
+                                <div style="width:${advPct}%;background:#10b981;height:100%;"></div>
+                                <div style="width:${decPct}%;background:#ef4444;height:100%;"></div>
+                            </div>
                         </div>
+
+                        <!-- Multi-Horizon Strip -->
+                        <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);border-top:1px solid rgba(255,255,255,0.06);padding-top:0.25rem;">
+                            <span style="${currentTf === '1d' ? 'font-weight:800;color:#f8fafc;' : ''}">1D: <strong style="color:${s1d >= 0 ? '#34d399' : '#f87171'};">${s1d >= 0 ? '+' : ''}${s1d}%</strong></span>
+                            <span style="${currentTf === '7d' ? 'font-weight:800;color:#f8fafc;' : ''}">7D: <strong style="color:${s7d >= 0 ? '#34d399' : '#f87171'};">${s7d >= 0 ? '+' : ''}${s7d}%</strong></span>
+                            <span style="${currentTf === '30d' ? 'font-weight:800;color:#f8fafc;' : ''}">30D: <strong style="color:${s30d >= 0 ? '#34d399' : '#f87171'};">${s30d >= 0 ? '+' : ''}${s30d}%</strong></span>
+                        </div>
+
+                        <!-- Leader / Laggard Chips if present -->
+                        ${(gainerHtml || loserHtml) ? `
+                            <div style="display:flex;justify-content:space-between;gap:0.3rem;margin-top:0.05rem;">
+                                ${gainerHtml || '<span></span>'}
+                                ${loserHtml || '<span></span>'}
+                            </div>
+                        ` : ''}
                     </div>
                 `;
             }).join('');
         },
 
+        setSectorTimeframe(tf) {
+            this._currentSectorTimeframe = tf;
+            const buttons = document.querySelectorAll('.pulse-sector-tf-btn');
+            buttons.forEach(btn => {
+                if (btn.getAttribute('data-tf') === tf) {
+                    btn.classList.add('active');
+                    btn.style.background = 'rgba(56,189,248,0.2)';
+                    btn.style.color = '#38bdf8';
+                    btn.style.border = '1px solid rgba(56,189,248,0.4)';
+                } else {
+                    btn.classList.remove('active');
+                    btn.style.background = 'rgba(255,255,255,0.05)';
+                    btn.style.color = '#94a3b8';
+                    btn.style.border = '1px solid rgba(255,255,255,0.08)';
+                }
+            });
+            if (this._lastSectorsData) {
+                this.renderSectors(this._lastSectorsData);
+            }
+        },
+
         // =====================================================================
-        // 📈 Macro Charts Rendering (5-Chart Grid)
+        // 📈 Macro Charts Rendering (5-Chart Grid) with High-DPI & Interactive Tooltips
         // =====================================================================
         renderMacroCharts(charts, participantOi = {}) {
             if (!charts) return;
@@ -1080,12 +1277,14 @@
             if (fgSeries.length) {
                 this.drawSparklineChart('chartFearGreed', fgSeries.map(x => x.score), {
                     color: '#34d399',
-                    gradientFrom: 'rgba(52, 211, 153, 0.25)',
-                    gradientTo: 'rgba(52, 211, 153, 0.0)',
+                    gradientFrom: 'rgba(52, 211, 153, 0.28)',
+                    gradientTo: 'rgba(52, 211, 153, 0.01)',
                     minVal: 0,
                     maxVal: 100,
                     referenceLines: [25, 50, 75],
-                    refLineColors: ['rgba(244,63,94,0.3)', 'rgba(251,191,36,0.3)', 'rgba(16,185,129,0.3)'],
+                    refLineColors: ['rgba(244,63,94,0.35)', 'rgba(251,191,36,0.3)', 'rgba(16,185,129,0.35)'],
+                    dates: fgSeries.map(x => x.date || ''),
+                    valueFormatter: (v) => `${Math.round(v)} / 100`,
                 });
             }
 
@@ -1094,10 +1293,12 @@
             if (vixSeries.length) {
                 this.drawSparklineChart('chartVix', vixSeries.map(x => x.value), {
                     color: '#38bdf8',
-                    gradientFrom: 'rgba(56, 189, 248, 0.25)',
-                    gradientTo: 'rgba(56, 189, 248, 0.0)',
+                    gradientFrom: 'rgba(56, 189, 248, 0.28)',
+                    gradientTo: 'rgba(56, 189, 248, 0.01)',
                     referenceLines: [15, 20],
-                    refLineColors: ['rgba(52,211,153,0.3)', 'rgba(248,113,113,0.3)'],
+                    refLineColors: ['rgba(52,211,153,0.35)', 'rgba(248,113,113,0.35)'],
+                    dates: vixSeries.map(x => x.date || ''),
+                    valueFormatter: (v) => `${v.toFixed(2)}`,
                 });
             }
 
@@ -1106,8 +1307,10 @@
             if (niftySeries.length) {
                 this.drawSparklineChart('chartNifty', niftySeries.map(x => x.value), {
                     color: '#818cf8',
-                    gradientFrom: 'rgba(129, 140, 248, 0.25)',
-                    gradientTo: 'rgba(129, 140, 248, 0.0)',
+                    gradientFrom: 'rgba(129, 140, 248, 0.28)',
+                    gradientTo: 'rgba(129, 140, 248, 0.01)',
+                    dates: niftySeries.map(x => x.date || ''),
+                    valueFormatter: (v) => `${Math.round(v).toLocaleString()}`,
                 });
             }
 
@@ -1121,12 +1324,17 @@
                 const fiiSeries = chronological.map(x => x.fii_net_contracts || 0);
                 const proSeries = chronological.map(x => x.pro_net_contracts || 0);
                 const clientSeries = chronological.map(x => x.client_net_contracts || 0);
+                const dates = chronological.map(x => x.date || x.session_date || '');
 
                 this.drawMultiLineChart('chartParticipantOi', [
                     { name: 'FII', values: fiiSeries, color: '#34d399' },
                     { name: 'PRO', values: proSeries, color: '#818cf8' },
                     { name: 'CLIENT', values: clientSeries, color: '#fb923c' }
-                ], { showZeroLine: true });
+                ], {
+                    showZeroLine: true,
+                    dates: dates,
+                    valueFormatter: (v) => (v >= 0 ? '+' : '') + Math.round(v).toLocaleString(),
+                });
 
                 const latestFii = oiHistory[0]?.fii_net_contracts ?? 0;
                 const fiiBadge = document.getElementById('pulseParticipantOiChartBadge');
@@ -1147,12 +1355,16 @@
             if (oiHistory.length >= 2) {
                 const chronological = [...oiHistory].reverse();
                 const fiiLsSeries = chronological.map(x => x.fii_long_short_ratio || 1.0);
+                const dates = chronological.map(x => x.date || x.session_date || '');
+
                 this.drawSparklineChart('chartFiiLsRatio', fiiLsSeries, {
                     color: '#38bdf8',
-                    gradientFrom: 'rgba(56, 189, 248, 0.25)',
-                    gradientTo: 'rgba(56, 189, 248, 0.0)',
+                    gradientFrom: 'rgba(56, 189, 248, 0.28)',
+                    gradientTo: 'rgba(56, 189, 248, 0.01)',
                     referenceLines: [0.85, 1.0, 1.25],
                     refLineColors: ['rgba(244,63,94,0.4)', 'rgba(251,191,36,0.3)', 'rgba(16,185,129,0.4)'],
+                    dates: dates,
+                    valueFormatter: (v) => `${v.toFixed(2)}x`,
                 });
 
                 const latestLs = oiHistory[0]?.fii_long_short_ratio ?? 1.15;
@@ -1185,144 +1397,59 @@
             if (!canvas || !values || values.length < 2) return;
 
             const rect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : { width: 300, height: 100 };
-            const dpr = window.devicePixelRatio || 1;
-            const w = rect.width || 300;
-            const h = rect.height || 100;
+            const dpr = Math.max(window.devicePixelRatio || 1, 2);
+            const w = Math.round(rect.width || 300);
+            const h = Math.round(rect.height || 100);
 
-            canvas.width = w * dpr;
-            canvas.height = h * dpr;
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(h * dpr);
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+
             const ctx = canvas.getContext('2d');
-            ctx.scale(dpr, dpr);
-
-            ctx.clearRect(0, 0, w, h);
 
             const minVal = options.minVal !== undefined ? options.minVal : Math.min(...values) * 0.98;
             const maxVal = options.maxVal !== undefined ? options.maxVal : Math.max(...values) * 1.02;
-            const valRange = maxVal - minVal || 1.0;
+            const valRange = (maxVal - minVal) || 1.0;
 
-            const padding = 6;
+            const padding = 10;
             const drawW = w - padding * 2;
             const drawH = h - padding * 2;
-
-            // Draw Reference Lines
-            if (options.referenceLines) {
-                options.referenceLines.forEach((ref, idx) => {
-                    if (ref >= minVal && ref <= maxVal) {
-                        const y = padding + drawH - ((ref - minVal) / valRange) * drawH;
-                        ctx.beginPath();
-                        ctx.strokeStyle = (options.refLineColors && options.refLineColors[idx]) || 'rgba(255,255,255,0.1)';
-                        ctx.lineWidth = 1;
-                        ctx.setLineDash([3, 3]);
-                        ctx.moveTo(padding, y);
-                        ctx.lineTo(w - padding, y);
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-                    }
-                });
-            }
 
             // Calculate points
             const points = values.map((v, i) => {
                 const x = padding + (i / (values.length - 1)) * drawW;
                 const y = padding + drawH - ((v - minVal) / valRange) * drawH;
-                return { x, y, v };
+                const date = options.dates && options.dates[i] ? options.dates[i] : '';
+                return { x, y, v, date, index: i };
             });
 
-            // Fill Area Gradient
-            const gradient = ctx.createLinearGradient(0, padding, 0, h - padding);
-            gradient.addColorStop(0, options.gradientFrom || 'rgba(56,189,248,0.25)');
-            gradient.addColorStop(1, options.gradientTo || 'rgba(56,189,248,0.0)');
+            const renderFrame = (hoverPoint = null) => {
+                ctx.save();
+                ctx.scale(dpr, dpr);
+                ctx.clearRect(0, 0, w, h);
 
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-                const prev = points[i - 1];
-                const curr = points[i];
-                const cpX = (prev.x + curr.x) / 2;
-                ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
-            }
-            ctx.lineTo(points[points.length - 1].x, h - padding);
-            ctx.lineTo(points[0].x, h - padding);
-            ctx.closePath();
-            ctx.fillStyle = gradient;
-            ctx.fill();
+                // Draw Reference Corridor Lines
+                if (options.referenceLines) {
+                    options.referenceLines.forEach((ref, idx) => {
+                        if (ref >= minVal && ref <= maxVal) {
+                            const y = padding + drawH - ((ref - minVal) / valRange) * drawH;
+                            ctx.beginPath();
+                            ctx.strokeStyle = (options.refLineColors && options.refLineColors[idx]) || 'rgba(255,255,255,0.12)';
+                            ctx.lineWidth = 1;
+                            ctx.setLineDash([3, 3]);
+                            ctx.moveTo(padding, y);
+                            ctx.lineTo(w - padding, y);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                        }
+                    });
+                }
 
-            // Stroke Line
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-                const prev = points[i - 1];
-                const curr = points[i];
-                const cpX = (prev.x + curr.x) / 2;
-                ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
-            }
-            ctx.strokeStyle = options.color || '#38bdf8';
-            ctx.lineWidth = 2.0;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.stroke();
-
-            // Glowing Last Point
-            const last = points[points.length - 1];
-            ctx.beginPath();
-            ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = options.color || '#38bdf8';
-            ctx.shadowColor = options.color || '#38bdf8';
-            ctx.shadowBlur = 8;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-        },
-
-        drawMultiLineChart(canvasId, datasets, options = {}) {
-            const canvas = document.getElementById(canvasId);
-            if (!canvas || !datasets || !datasets.length) return;
-
-            const rect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : { width: 300, height: 100 };
-            const dpr = window.devicePixelRatio || 1;
-            const w = rect.width || 300;
-            const h = rect.height || 100;
-
-            canvas.width = w * dpr;
-            canvas.height = h * dpr;
-            const ctx = canvas.getContext('2d');
-            ctx.scale(dpr, dpr);
-            ctx.clearRect(0, 0, w, h);
-
-            let allVals = [];
-            datasets.forEach(ds => { allVals = allVals.concat(ds.values || []); });
-            if (allVals.length === 0) return;
-
-            const minVal = Math.min(...allVals);
-            const maxVal = Math.max(...allVals);
-            const valRange = (maxVal - minVal) || 1.0;
-
-            const padding = 6;
-            const drawW = w - padding * 2;
-            const drawH = h - padding * 2;
-
-            // Zero line
-            if (options.showZeroLine && minVal <= 0 && maxVal >= 0) {
-                const zeroY = padding + drawH - ((0 - minVal) / valRange) * drawH;
-                ctx.beginPath();
-                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([2, 2]);
-                ctx.moveTo(padding, zeroY);
-                ctx.lineTo(w - padding, zeroY);
-                ctx.stroke();
-                ctx.setLineDash([]);
-            }
-
-            // Draw each dataset curve
-            datasets.forEach(ds => {
-                const vals = ds.values || [];
-                if (vals.length < 2) return;
-
-                const points = vals.map((v, i) => {
-                    const x = padding + (i / (vals.length - 1)) * drawW;
-                    const y = padding + drawH - ((v - minVal) / valRange) * drawH;
-                    return { x, y, v };
-                });
+                // Fill Area Gradient
+                const gradient = ctx.createLinearGradient(0, padding, 0, h - padding);
+                gradient.addColorStop(0, options.gradientFrom || 'rgba(56,189,248,0.28)');
+                gradient.addColorStop(1, options.gradientTo || 'rgba(56,189,248,0.01)');
 
                 ctx.beginPath();
                 ctx.moveTo(points[0].x, points[0].y);
@@ -1332,19 +1459,283 @@
                     const cpX = (prev.x + curr.x) / 2;
                     ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
                 }
-                ctx.strokeStyle = ds.color || '#38bdf8';
-                ctx.lineWidth = 1.8;
+                ctx.lineTo(points[points.length - 1].x, h - padding);
+                ctx.lineTo(points[0].x, h - padding);
+                ctx.closePath();
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                // Stroke Line
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    const prev = points[i - 1];
+                    const curr = points[i];
+                    const cpX = (prev.x + curr.x) / 2;
+                    ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
+                }
+                ctx.strokeStyle = options.color || '#38bdf8';
+                ctx.lineWidth = 2.0;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
                 ctx.stroke();
 
-                // Terminal dot
-                const last = points[points.length - 1];
-                ctx.beginPath();
-                ctx.arc(last.x, last.y, 3, 0, Math.PI * 2);
-                ctx.fillStyle = ds.color || '#38bdf8';
-                ctx.fill();
+                if (hoverPoint) {
+                    // Vertical Crosshair
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([2, 2]);
+                    ctx.moveTo(hoverPoint.x, padding);
+                    ctx.lineTo(hoverPoint.x, h - padding);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Glowing Hover Dot
+                    ctx.beginPath();
+                    ctx.arc(hoverPoint.x, hoverPoint.y, 4.5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = options.color || '#38bdf8';
+                    ctx.shadowBlur = 10;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = options.color || '#38bdf8';
+                    ctx.stroke();
+
+                    // Micro-HUD Tooltip Pill
+                    const valText = options.valueFormatter ? options.valueFormatter(hoverPoint.v) : hoverPoint.v.toFixed(1);
+                    const hudText = hoverPoint.date ? `${hoverPoint.date} · ${valText}` : `${valText}`;
+                    ctx.font = '600 9px var(--font-mono, monospace)';
+                    const textWidth = ctx.measureText(hudText).width;
+                    const pillW = textWidth + 12;
+                    const pillH = 16;
+                    let pillX = Math.min(Math.max(hoverPoint.x - pillW / 2, padding), w - padding - pillW);
+                    let pillY = hoverPoint.y - 20;
+                    if (pillY < padding) pillY = hoverPoint.y + 8;
+
+                    ctx.fillStyle = 'rgba(10, 15, 29, 0.88)';
+                    ctx.strokeStyle = options.color || '#38bdf8';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.roundRect(pillX, pillY, pillW, pillH, 3);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.fillText(hudText, pillX + 6, pillY + 11);
+                } else {
+                    // Glowing Last Point
+                    const last = points[points.length - 1];
+                    ctx.beginPath();
+                    ctx.arc(last.x, last.y, 3.5, 0, Math.PI * 2);
+                    ctx.fillStyle = options.color || '#38bdf8';
+                    ctx.shadowColor = options.color || '#38bdf8';
+                    ctx.shadowBlur = 8;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+
+                ctx.restore();
+            };
+
+            // Initial render
+            renderFrame();
+
+            // Interactive Crosshair Listeners
+            canvas.onmousemove = (e) => {
+                const cRect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - cRect.left;
+                // Find closest point by x
+                let closest = points[0];
+                let minDist = Math.abs(points[0].x - mouseX);
+                for (let i = 1; i < points.length; i++) {
+                    const dist = Math.abs(points[i].x - mouseX);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closest = points[i];
+                    }
+                }
+                renderFrame(closest);
+            };
+
+            canvas.onmouseleave = () => {
+                renderFrame(null);
+            };
+        },
+
+        drawMultiLineChart(canvasId, datasets, options = {}) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas || !datasets || !datasets.length) return;
+
+            const rect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : { width: 300, height: 100 };
+            const dpr = Math.max(window.devicePixelRatio || 1, 2);
+            const w = Math.round(rect.width || 300);
+            const h = Math.round(rect.height || 100);
+
+            canvas.width = Math.round(w * dpr);
+            canvas.height = Math.round(h * dpr);
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+
+            const ctx = canvas.getContext('2d');
+
+            let allVals = [];
+            datasets.forEach(ds => { allVals = allVals.concat(ds.values || []); });
+            if (allVals.length === 0) return;
+
+            const minVal = Math.min(...allVals);
+            const maxVal = Math.max(...allVals);
+            const valRange = (maxVal - minVal) || 1.0;
+
+            const padding = 10;
+            const drawW = w - padding * 2;
+            const drawH = h - padding * 2;
+
+            const preparedDatasets = datasets.map(ds => {
+                const vals = ds.values || [];
+                const points = vals.map((v, i) => {
+                    const x = padding + (i / (vals.length - 1)) * drawW;
+                    const y = padding + drawH - ((v - minVal) / valRange) * drawH;
+                    const date = options.dates && options.dates[i] ? options.dates[i] : '';
+                    return { x, y, v, date, index: i };
+                });
+                return { ...ds, points };
             });
+
+            const renderFrame = (hoverIndex = null) => {
+                ctx.save();
+                ctx.scale(dpr, dpr);
+                ctx.clearRect(0, 0, w, h);
+
+                // Zero line
+                if (options.showZeroLine && minVal <= 0 && maxVal >= 0) {
+                    const zeroY = padding + drawH - ((0 - minVal) / valRange) * drawH;
+                    ctx.beginPath();
+                    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([2, 2]);
+                    ctx.moveTo(padding, zeroY);
+                    ctx.lineTo(w - padding, zeroY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // Draw each dataset curve
+                preparedDatasets.forEach(ds => {
+                    const points = ds.points;
+                    if (points.length < 2) return;
+
+                    ctx.beginPath();
+                    ctx.moveTo(points[0].x, points[0].y);
+                    for (let i = 1; i < points.length; i++) {
+                        const prev = points[i - 1];
+                        const curr = points[i];
+                        const cpX = (prev.x + curr.x) / 2;
+                        ctx.bezierCurveTo(cpX, prev.y, cpX, curr.y, curr.x, curr.y);
+                    }
+                    ctx.strokeStyle = ds.color || '#38bdf8';
+                    ctx.lineWidth = 1.8;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.stroke();
+
+                    if (hoverIndex === null) {
+                        // Terminal dot
+                        const last = points[points.length - 1];
+                        ctx.beginPath();
+                        ctx.arc(last.x, last.y, 3, 0, Math.PI * 2);
+                        ctx.fillStyle = ds.color || '#38bdf8';
+                        ctx.fill();
+                    }
+                });
+
+                if (hoverIndex !== null) {
+                    const samplePt = preparedDatasets[0]?.points[hoverIndex];
+                    if (samplePt) {
+                        // Crosshair
+                        ctx.beginPath();
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([2, 2]);
+                        ctx.moveTo(samplePt.x, padding);
+                        ctx.lineTo(samplePt.x, h - padding);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+
+                        // Highlight dots
+                        preparedDatasets.forEach(ds => {
+                            const pt = ds.points[hoverIndex];
+                            if (pt) {
+                                ctx.beginPath();
+                                ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+                                ctx.fillStyle = '#ffffff';
+                                ctx.shadowColor = ds.color || '#38bdf8';
+                                ctx.shadowBlur = 8;
+                                ctx.fill();
+                                ctx.shadowBlur = 0;
+                                ctx.lineWidth = 2;
+                                ctx.strokeStyle = ds.color || '#38bdf8';
+                                ctx.stroke();
+                            }
+                        });
+
+                        // Multi-line HUD
+                        const dateStr = samplePt.date || '';
+                        let hudItems = preparedDatasets.map(ds => {
+                            const pt = ds.points[hoverIndex];
+                            const vStr = pt ? (options.valueFormatter ? options.valueFormatter(pt.v) : pt.v.toLocaleString()) : '—';
+                            return `${ds.name}: ${vStr}`;
+                        });
+                        const hudText = (dateStr ? `[${dateStr}] ` : '') + hudItems.join(' · ');
+                        ctx.font = '600 9px var(--font-mono, monospace)';
+                        const textWidth = ctx.measureText(hudText).width;
+                        const pillW = textWidth + 12;
+                        const pillH = 16;
+                        let pillX = Math.min(Math.max(samplePt.x - pillW / 2, padding), w - padding - pillW);
+                        let pillY = padding + 2;
+
+                        ctx.fillStyle = 'rgba(10, 15, 29, 0.90)';
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.roundRect(pillX, pillY, pillW, pillH, 3);
+                        ctx.fill();
+                        ctx.stroke();
+
+                        ctx.fillStyle = '#f8fafc';
+                        ctx.fillText(hudText, pillX + 6, pillY + 11);
+                    }
+                }
+
+                ctx.restore();
+            };
+
+            // Initial render
+            renderFrame();
+
+            // Interactive Crosshair Listeners
+            canvas.onmousemove = (e) => {
+                const cRect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - cRect.left;
+                const samplePoints = preparedDatasets[0]?.points || [];
+                if (!samplePoints.length) return;
+
+                let closestIdx = 0;
+                let minDist = Math.abs(samplePoints[0].x - mouseX);
+                for (let i = 1; i < samplePoints.length; i++) {
+                    const dist = Math.abs(samplePoints[i].x - mouseX);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestIdx = i;
+                    }
+                }
+                renderFrame(closestIdx);
+            };
+
+            canvas.onmouseleave = () => {
+                renderFrame(null);
+            };
         },
 
         // =====================================================================
