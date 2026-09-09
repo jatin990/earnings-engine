@@ -21,7 +21,7 @@
         </div>
 
         <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-            <button type="button" onclick="app.marketPulse.openMetricGlossary()" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.3rem 0.65rem;display:flex;align-items:center;gap:0.35rem;background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-weight:700;">
+            <button type="button" onclick="app.openMetricGlossary()" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.3rem 0.65rem;display:flex;align-items:center;gap:0.35rem;background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-weight:700;">
                 <span>📖</span> Metric Glossary &amp; Playbook
             </button>
             <span id="pulseAsOfTime" style="font-size:0.7rem;color:#64748b;font-family:var(--font-mono);">Updated: just now</span>
@@ -57,7 +57,7 @@
                 <span id="pulsePlaybookConfluencePill" style="font-size:0.70rem;padding:0.2rem 0.55rem;border-radius:4px;background:rgba(99,102,241,0.18);color:#a5b4fc;font-family:var(--font-mono);font-weight:800;border:1px solid rgba(99,102,241,0.35);">
                     Confluence: +28/100
                 </span>
-                <button type="button" onclick="app.marketPulse.openMetricGlossary('participant_oi')" class="btn-micro" style="padding:0.25rem 0.55rem;background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);border-radius:4px;cursor:pointer;font-size:0.68rem;">
+                <button type="button" onclick="app.openMetricGlossary('participant_oi')" class="btn-micro" style="padding:0.25rem 0.55rem;background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);border-radius:4px;cursor:pointer;font-size:0.68rem;">
                     Glossary Guide ℹ️
                 </button>
             </div>
@@ -129,7 +129,7 @@
                 <span style="color:#94a3b8;font-weight:600;">Top Sector Tailwinds:</span>
                 <span id="pulsePlaybookFocusSectors" style="color:#34d399;font-weight:700;font-family:var(--font-mono);">IT (+1.4%), Auto (+0.9%), Private Banks (+0.6%)</span>
             </div>
-            <a href="javascript:void(0)" onclick="app.marketPulse.openMetricGlossary('participant_oi')" style="color:#38bdf8;text-decoration:none;font-weight:700;font-size:0.68rem;">
+            <a href="javascript:void(0)" onclick="app.openMetricGlossary('participant_oi')" style="color:#38bdf8;text-decoration:none;font-weight:700;font-size:0.68rem;">
                 Read Full Institutional Guide ➔
             </a>
         </div>
@@ -338,7 +338,7 @@
                 <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
                     <span>📊</span> NSE Market Breadth &amp; Technical Participation
                 </div>
-                <button type="button" onclick="app.marketPulse.openMetricGlossary('market_breadth')" class="btn-micro" style="padding:0.15rem 0.45rem;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);border-radius:4px;cursor:pointer;font-size:0.65rem;">
+                <button type="button" onclick="app.openMetricGlossary('market_breadth')" class="btn-micro" style="padding:0.15rem 0.45rem;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);border-radius:4px;cursor:pointer;font-size:0.65rem;">
                     Guide ℹ️
                 </button>
             </div>
@@ -383,7 +383,7 @@
                     <span>🏦</span> Institutional Net Cash Liquidity (FII + DII)
                 </div>
                 <div style="display:flex;align-items:center;gap:0.4rem;">
-                    <button type="button" onclick="app.marketPulse.openMetricGlossary('institutional_liquidity')" class="btn-micro" style="padding:0.15rem 0.45rem;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);border-radius:4px;cursor:pointer;font-size:0.65rem;">
+                    <button type="button" onclick="app.openMetricGlossary('institutional_liquidity')" class="btn-micro" style="padding:0.15rem 0.45rem;background:rgba(255,255,255,0.06);color:#94a3b8;border:1px solid rgba(255,255,255,0.1);border-radius:4px;cursor:pointer;font-size:0.65rem;">
                         Guide ℹ️
                     </button>
                     <span id="pulse7dTotalBadge" style="font-size:0.68rem;padding:0.15rem 0.5rem;border-radius:4px;background:rgba(56,189,248,0.12);color:#38bdf8;font-family:var(--font-mono);font-weight:700;border:1px solid rgba(56,189,248,0.25);">
@@ -447,7 +447,7 @@
                 <div>
                     <div style="font-size:0.84rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
                         Participant Derivatives Open Interest (OI) &amp; Long/Short Matrix
-                        <button type="button" onclick="app.marketPulse.openMetricGlossary('participant_oi')" class="btn-micro" style="padding:0.15rem 0.45rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);border-radius:4px;cursor:pointer;font-size:0.65rem;font-weight:700;">
+                        <button type="button" onclick="app.openMetricGlossary('participant_oi')" class="btn-micro" style="padding:0.15rem 0.45rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);border-radius:4px;cursor:pointer;font-size:0.65rem;font-weight:700;">
                             📖 Metric Meaning &amp; Playbook
                         </button>
                     </div>
@@ -455,13 +455,13 @@
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
-                <button type="button" id="btnOiViewIndex" class="btn-micro pulse-oi-view-btn active" style="padding:0.22rem 0.55rem;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.marketPulse.setParticipantOiView('index_futures')">
+                <button type="button" id="btnOiViewIndex" class="btn-micro pulse-oi-view-btn active" style="padding:0.22rem 0.55rem;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.4);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.setParticipantOiView('index_futures')">
                     📊 Index Futures (Nifty)
                 </button>
-                <button type="button" id="btnOiViewConsolidated" class="btn-micro pulse-oi-view-btn" style="padding:0.22rem 0.55rem;background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.marketPulse.setParticipantOiView('consolidated_fo')">
+                <button type="button" id="btnOiViewConsolidated" class="btn-micro pulse-oi-view-btn" style="padding:0.22rem 0.55rem;background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.setParticipantOiView('consolidated_fo')">
                     💼 Consolidated F&amp;O
                 </button>
-                <button type="button" id="btnOiViewHistory" class="btn-micro pulse-oi-view-btn" style="padding:0.22rem 0.55rem;background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.marketPulse.setParticipantOiView('history_matrix')">
+                <button type="button" id="btnOiViewHistory" class="btn-micro pulse-oi-view-btn" style="padding:0.22rem 0.55rem;background:rgba(255,255,255,0.04);color:#94a3b8;border:1px solid rgba(255,255,255,0.08);border-radius:4px;cursor:pointer;font-size:0.68rem;font-weight:700;" onclick="app.setParticipantOiView('history_matrix')">
                     📅 10-Day Matrix
                 </button>
                 <span id="pulseOiRegimeBadge" style="font-size:0.68rem;padding:0.18rem 0.55rem;border-radius:4px;background:rgba(249,115,22,0.15);color:#fb923c;font-family:var(--font-mono);font-weight:700;border:1px solid rgba(249,115,22,0.3);">
@@ -561,7 +561,7 @@
 <!-- ========================================================================= -->
 <!-- 📖 SLIDE-OVER METRIC GLOSSARY & TRADING PLAYBOOK DRAWER / MODAL -->
 <!-- ========================================================================= -->
-<div id="modalPulseGlossary" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);z-index:9999;align-items:center;justify-content:flex-end;" onclick="if(event.target===this)app.marketPulse.closeMetricGlossary()">
+<div id="modalPulseGlossary" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);z-index:9999;align-items:center;justify-content:flex-end;" onclick="if(event.target===this)app.closeMetricGlossary()">
     <div style="width:100%;max-width:720px;height:100%;background:#090e21;border-left:1px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;box-shadow:-8px 0 30px rgba(0,0,0,0.6);animation:slideInRight 0.25s cubic-bezier(0.16,1,0.3,1);">
 
         <!-- Drawer Header -->
@@ -579,36 +579,36 @@
                     </div>
                 </div>
             </div>
-            <button type="button" onclick="app.marketPulse.closeMetricGlossary()" class="btn-micro" style="padding:0.35rem 0.65rem;background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:700;">
+            <button type="button" onclick="app.closeMetricGlossary()" class="btn-micro" style="padding:0.35rem 0.65rem;background:rgba(255,255,255,0.06);color:#cbd5e1;border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:700;">
                 ✕ Close
             </button>
         </div>
 
         <!-- Sticky Category Filter Navigation Tabs -->
         <div style="display:flex;align-items:center;gap:0.4rem;padding:0.6rem 1.4rem;background:#090d1d;border-bottom:1px solid rgba(255,255,255,0.06);overflow-x:auto;">
-            <button type="button" class="btn-micro pulse-glossary-tab active" data-cat="all" onclick="app.marketPulse.filterGlossaryCategory('all')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(56,189,248,0.3);background:rgba(56,189,248,0.15);color:#38bdf8;font-weight:700;font-size:0.70rem;cursor:pointer;">
+            <button type="button" class="btn-micro pulse-glossary-tab active" data-cat="all" onclick="app.filterGlossaryCategory('all')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(56,189,248,0.3);background:rgba(56,189,248,0.15);color:#38bdf8;font-weight:700;font-size:0.70rem;cursor:pointer;">
                 🌐 All Metrics
             </button>
-            <button type="button" class="btn-micro pulse-glossary-tab" data-cat="participant_oi" onclick="app.marketPulse.filterGlossaryCategory('participant_oi')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#94a3b8;font-weight:700;font-size:0.70rem;cursor:pointer;">
+            <button type="button" class="btn-micro pulse-glossary-tab" data-cat="participant_oi" onclick="app.filterGlossaryCategory('participant_oi')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#94a3b8;font-weight:700;font-size:0.70rem;cursor:pointer;">
                 🏛️ Participant OI
             </button>
-            <button type="button" class="btn-micro pulse-glossary-tab" data-cat="volatility_vix" onclick="app.marketPulse.filterGlossaryCategory('volatility_vix')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#94a3b8;font-weight:700;font-size:0.70rem;cursor:pointer;">
+            <button type="button" class="btn-micro pulse-glossary-tab" data-cat="volatility_vix" onclick="app.filterGlossaryCategory('volatility_vix')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#94a3b8;font-weight:700;font-size:0.70rem;cursor:pointer;">
                 ⚡ India VIX Corridor
             </button>
-            <button type="button" class="btn-micro pulse-glossary-tab" data-cat="institutional_liquidity" onclick="app.marketPulse.filterGlossaryCategory('institutional_liquidity')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#94a3b8;font-weight:700;font-size:0.70rem;cursor:pointer;">
+            <button type="button" class="btn-micro pulse-glossary-tab" data-cat="institutional_liquidity" onclick="app.filterGlossaryCategory('institutional_liquidity')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#94a3b8;font-weight:700;font-size:0.70rem;cursor:pointer;">
                 🏦 Cash Liquidity
             </button>
-            <button type="button" class="btn-micro pulse-glossary-tab" data-cat="market_breadth" onclick="app.marketPulse.filterGlossaryCategory('market_breadth')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#94a3b8;font-weight:700;font-size:0.70rem;cursor:pointer;">
+            <button type="button" class="btn-micro pulse-glossary-tab" data-cat="market_breadth" onclick="app.filterGlossaryCategory('market_breadth')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#94a3b8;font-weight:700;font-size:0.70rem;cursor:pointer;">
                 📊 Market Breadth
             </button>
-            <button type="button" class="btn-micro pulse-glossary-tab" data-cat="fear_greed" onclick="app.marketPulse.filterGlossaryCategory('fear_greed')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#94a3b8;font-weight:700;font-size:0.70rem;cursor:pointer;">
+            <button type="button" class="btn-micro pulse-glossary-tab" data-cat="fear_greed" onclick="app.filterGlossaryCategory('fear_greed')" style="padding:0.25rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:#94a3b8;font-weight:700;font-size:0.70rem;cursor:pointer;">
                 🧭 Fear &amp; Greed
             </button>
         </div>
 
         <!-- Search Input Bar -->
         <div style="padding:0.6rem 1.4rem;background:#060a16;border-bottom:1px solid rgba(255,255,255,0.06);">
-            <input type="text" id="pulseGlossarySearchInput" placeholder="🔍 Search metrics, formulas, or trading rules (e.g. Long Build-up, L/S Ratio, VIX 1-Sigma)..." oninput="app.marketPulse.searchGlossary(this.value)" style="width:100%;padding:0.4rem 0.75rem;background:#0b1329;border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#f8fafc;font-size:0.74rem;outline:none;" />
+            <input type="text" id="pulseGlossarySearchInput" placeholder="🔍 Search metrics, formulas, or trading rules (e.g. Long Build-up, L/S Ratio, VIX 1-Sigma)..." oninput="app.searchGlossary(this.value)" style="width:100%;padding:0.4rem 0.75rem;background:#0b1329;border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#f8fafc;font-size:0.74rem;outline:none;" />
         </div>
 
         <!-- Drawer Body (Scrollable Metric Cards) -->
