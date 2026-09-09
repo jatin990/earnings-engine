@@ -113,8 +113,16 @@ CORE_BENCHMARK_UNIVERSE: list[str] = [
 ]
 
 
-def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]:
-    """Retrieve live corporate ownership breakdown from yfinance and local SQLite cache."""
+def fetch_live_corporate_ownership(
+    sym: str = "",
+    conn: Any = None,
+    allow_network: bool = False,
+    ticker: str | None = None,
+    settings: Any = None,
+    **kwargs,
+) -> dict[str, Any]:
+    """Retrieve live corporate ownership breakdown from local SQLite cache or yfinance."""
+    sym = ticker or sym
     promoter_pct: float | None = None
     inst_pct: float | None = None
     shares_out: int | None = None
@@ -122,6 +130,12 @@ def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]
     short_name: str | None = None
 
     # 1. First check local SQLite database for instant resolution
+    if conn is None and settings is not None:
+        try:
+            conn = get_db_connection(settings)
+        except Exception:
+            pass
+
     if conn:
         try:
             row = conn.execute("SELECT name, market_cap FROM tickers WHERE ticker = ?", (sym,)).fetchone()
@@ -133,9 +147,9 @@ def fetch_live_corporate_ownership(sym: str, conn: Any = None) -> dict[str, Any]
         except Exception:
             pass
 
-    # 2. Try yfinance if missing market cap or promoter data, not in testing, and not in serverless environment
+    # 2. Try yfinance only if explicitly permitted, not in testing, and not in serverless environment
     is_serverless = is_server_environment() or os.environ.get("VERCEL") == "1" or os.environ.get("SERVERLESS") == "1"
-    if not os.environ.get("PYTEST_CURRENT_TEST") and not is_serverless and (mcap_cr is None or mcap_cr <= 0):
+    if allow_network and not os.environ.get("PYTEST_CURRENT_TEST") and not is_serverless and (mcap_cr is None or mcap_cr <= 0):
         try:
             from earnings_engine.rate_limits import record_request
             try:
@@ -452,40 +466,45 @@ def init_institutional_db(settings: Settings | None = None, force_refresh: bool 
                 except Exception:
                     pass
         
-        # Check if table has old 2024/2025 quarters or is empty or missing recent_txn_date or un-normalized shareholding or missing block deals
-        old_check = conn.execute("SELECT COUNT(*) FROM shareholding_patterns WHERE quarter LIKE '%FY25%' OR quarter LIKE '%FY24%'").fetchone()[0]
+        # Fast atomic backfill for any legacy records missing recent_txn_date or recent_txn_price
+        try:
+            conn.execute("""
+                UPDATE institutional_holdings
+                SET recent_txn_date = COALESCE(reported_date, '2026-08-15'),
+                    recent_txn_type = CASE
+                        WHEN action LIKE '%BUY%' OR action LIKE '%ACCUMULAT%' THEN 'BUY'
+                        WHEN action LIKE '%TRIM%' OR action LIKE '%SELL%' THEN 'SELL'
+                        ELSE 'HOLD'
+                    END
+                WHERE (recent_txn_date IS NULL OR recent_txn_type IS NULL) AND action != 'HOLD'
+            """)
+            conn.execute("""
+                UPDATE institutional_holdings
+                SET recent_txn_price = COALESCE(recent_buy_price, avg_price, 500.0)
+                WHERE recent_txn_price IS NULL AND action != 'HOLD'
+            """)
+            if hasattr(conn, "commit"):
+                conn.commit()
+        except Exception as e:
+            logger.debug("[INSTITUTIONAL] Backfill migration warning: %s", e)
+
+        # Check if table counts indicate initial bootstrap is required
         count = conn.execute("SELECT COUNT(*) FROM institutional_holdings").fetchone()[0]
-        missing_txn_date = conn.execute("SELECT COUNT(*) FROM institutional_holdings WHERE recent_txn_date IS NULL AND action != 'HOLD'").fetchone()[0]
-        invalid_sums = conn.execute("SELECT COUNT(*) FROM shareholding_patterns WHERE ABS((promoter_pct + fii_pct + dii_mf_pct + public_retail_pct + other_pct) - 100.0) > 0.5").fetchone()[0]
         bd_check = conn.execute("SELECT COUNT(*) FROM institutional_block_deals").fetchone()[0]
-        max_cached_delta = conn.execute("SELECT MAX(inst_addition_pct) FROM institutional_accumulation_cache").fetchone()[0] or 0.0
-        
+        pats_check = conn.execute("SELECT COUNT(*) FROM shareholding_patterns").fetchone()[0]
+        cache_check = conn.execute("SELECT COUNT(*) FROM institutional_accumulation_cache").fetchone()[0]
+
         is_test = bool(os.environ.get("PYTEST_CURRENT_TEST"))
         is_serverless = is_server_environment() or os.environ.get("VERCEL") == "1" or os.environ.get("SERVERLESS") == "1"
-        should_seed = False
-        if not is_test:
-            if is_serverless:
-                # In serverless runtime, only seed if table is completely empty or explicitly forced
-                should_seed = force_refresh or (count == 0 and old_check == 0)
-            else:
-                should_seed = (
-                    force_refresh
-                    or old_check > 0
-                    or count < len(CORE_BENCHMARK_UNIVERSE)
-                    or missing_txn_date > 0
-                    or invalid_sums > 0
-                    or bd_check == 0
-                    or max_cached_delta < 2.0
-                )
-        else:
-            should_seed = force_refresh or (count == 0 and old_check == 0 and missing_txn_date == 0)
+
+        should_seed = force_refresh or count == 0 or bd_check == 0 or pats_check == 0
 
         if should_seed:
-            distinct_tickers = [r[0] for r in conn.execute("SELECT DISTINCT ticker FROM institutional_holdings").fetchall() if r[0]]
-            universe_to_refresh = list(dict.fromkeys(([] if is_test else CORE_BENCHMARK_UNIVERSE) + distinct_tickers))
-            for sym in universe_to_refresh:
+            for sym in CORE_BENCHMARK_UNIVERSE:
                 _ensure_institutional_data_for_ticker(sym, conn)
-            logger.info("[INSTITUTIONAL] Populated dynamic institutional data across %d equities (2026 quarters with txn dates & normalized shareholdings).", len(universe_to_refresh))
+            logger.info("[INSTITUTIONAL] Seeded benchmark institutional data across %d equities.", len(CORE_BENCHMARK_UNIVERSE))
+            _recalculate_metrics_internal(conn, settings)
+        elif cache_check == 0:
             _recalculate_metrics_internal(conn, settings)
 
         _INITIALIZED_DBS.add(db_key)

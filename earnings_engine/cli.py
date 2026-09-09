@@ -1077,8 +1077,8 @@ def dashboard(host: str, port: int) -> None:
     )
     server_thread.start()
 
-    # Wait for the server to be ready
-    for attempt in range(30):
+    # Wait for the server to be ready (up to 30s)
+    for attempt in range(60):
         try:
             with urllib.request.urlopen(health_url, timeout=1.0):
                 break
