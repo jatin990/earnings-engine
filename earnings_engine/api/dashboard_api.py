@@ -797,6 +797,64 @@ def calculate_trading_range_api(
     return res
 
 
+def get_market_live_status(settings: Settings | None = None) -> dict[str, Any]:
+    """Return live NSE market status (Open / Closed / Pre-Market / Post-Market / Weekend)."""
+    from datetime import timedelta, timezone
+
+    now_utc = datetime.now(timezone.utc)
+    # IST = UTC + 5:30
+    ist_offset = timedelta(hours=5, minutes=30)
+    now_ist = now_utc + ist_offset
+
+    weekday = now_ist.weekday()  # 0 = Monday, 6 = Sunday
+    is_weekend = weekday >= 5
+
+    hour = now_ist.hour
+    minute = now_ist.minute
+    time_float = hour + minute / 60.0
+
+    # NSE Trading Hours (IST):
+    # Pre-open: 09:00 - 09:15 (9.00 - 9.25)
+    # Regular: 09:15 - 15:30 (9.25 - 15.50)
+    # Post-close: 15:30 - 16:00 (15.50 - 16.00)
+    if is_weekend:
+        status = "CLOSED"
+        session = "WEEKEND"
+        message = "Market Closed (Weekend)"
+        is_open = False
+    elif 9.25 <= time_float < 15.5:
+        status = "OPEN"
+        session = "REGULAR"
+        message = "Market Open"
+        is_open = True
+    elif 9.0 <= time_float < 9.25:
+        status = "PRE_MARKET"
+        session = "PRE_OPEN"
+        message = "Pre-Market Session"
+        is_open = False
+    elif 15.5 <= time_float < 16.0:
+        status = "POST_MARKET"
+        session = "POST_CLOSE"
+        message = "Post-Market Session"
+        is_open = False
+    else:
+        status = "CLOSED"
+        session = "AFTER_HOURS"
+        message = "Market Closed"
+        is_open = False
+
+    return {
+        "market": "NSE",
+        "status": status,
+        "is_open": is_open,
+        "session": session,
+        "message": message,
+        "ist_time": now_ist.strftime("%Y-%m-%d %H:%M:%S IST"),
+        "utc_time": now_utc.strftime("%Y-%m-%d %H:%M:%SZ"),
+    }
+
+
+
 def get_swing_cycle_history_api(watchlist: str = "ALL", ticker: str = "") -> list[dict[str, Any]]:
     """Return cycle history for a ticker."""
     settings = _settings()

@@ -44,7 +44,7 @@ from earnings_engine.api.routers import (
     zepto,
 )
 from earnings_engine.data.migrations import apply_migrations
-from earnings_engine.logging_utils import get_logger, log_startup_diagnostics
+from earnings_engine.logging_utils import get_logger, log_startup_diagnostics, redact_sensitive_data
 
 logger = get_logger("earnings_engine.api.server")
 
@@ -174,6 +174,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+def create_app() -> FastAPI:
+    """Return the configured singleton FastAPI application instance."""
+    return app
+
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
@@ -190,7 +195,7 @@ app.add_middleware(
 
 @app.middleware("http")
 async def log_and_cancel_api_requests(request: Request, call_next):
-    """Log API latency and register cancellation tokens."""
+    """Log API request/response lifecycle and register cancellation tokens."""
     start_time = time.perf_counter()
     path = request.url.path
     req_id = request.headers.get("x-request-id") or request.query_params.get("request_id")
@@ -217,36 +222,44 @@ async def log_and_cancel_api_requests(request: Request, call_next):
         except Exception:
             pass
 
+    silent_paths = {
+        "/api/v1/config/ratelimits",
+        "/api/v1/earnings/freshness",
+        "/api/v1/watchlist/names",
+        "/api/v1/config/ui-preferences",
+        "/favicon.ico",
+        "/health",
+        "/ping",
+        "/api/index.py",
+        "/api/index",
+    }
+    is_silent = path in silent_paths or path.startswith(("/static", "/ui", "/docs", "/openapi.json"))
+
     query_params = dict(request.query_params)
-    filters_repr = f" filters={query_params}" if query_params else ""
+    sanitized_params = {k: redact_sensitive_data(str(v)) for k, v in query_params.items()} if query_params else {}
+    filters_repr = f"?{urllib.parse.urlencode(sanitized_params)}" if sanitized_params else ""
+    client_ip = request.client.host if request.client else "unknown"
+    req_id_str = f" [{req_id}]" if req_id else ""
+
+    if not is_silent:
+        logger.info("[HTTP:IN] %s %s%s from %s%s", request.method, path, filters_repr, client_ip, req_id_str)
 
     try:
         response = await call_next(request)
         duration_ms = (time.perf_counter() - start_time) * 1000
 
-        silent_paths = {
-            "/api/v1/config/ratelimits",
-            "/api/v1/earnings/freshness",
-            "/api/v1/watchlist/names",
-            "/api/v1/config/ui-preferences",
-            "/favicon.ico",
-            "/health",
-            "/ping",
-            "/api/index.py",
-            "/api/index",
-        }
-        is_silent = path in silent_paths or path.startswith(("/static", "/ui", "/docs", "/openapi.json"))
-
         if not is_silent:
-            logger.info("API [%s] %s%s -> %d (%.1fms)", request.method, path, filters_repr, response.status_code, duration_ms)
+            status_tag = "[HTTP:OUT]" if response.status_code < 400 else "[HTTP:ERR]"
+            logger.info("%s %s %s%s -> %d (%.1fms)%s", status_tag, request.method, path, filters_repr, response.status_code, duration_ms, req_id_str)
         return response
     except (asyncio.CancelledError, Exception) as exc:
         duration_ms = (time.perf_counter() - start_time) * 1000
         if isinstance(exc, asyncio.CancelledError) or (token and token.is_cancelled):
-            logger.info("API [%s] %s%s -> CANCELLED by client (%.1fms)", request.method, path, filters_repr, duration_ms)
+            logger.warning("[HTTP:CANCEL] %s %s%s -> Cancelled by client (%.1fms)%s", request.method, path, filters_repr, duration_ms, req_id_str)
             if token:
                 token.cancel("Request handler cancelled due to client disconnect")
             return Response(status_code=499, content="Client Closed Request")
+        logger.error("[HTTP:ERR] %s %s%s -> 500 Internal Error (%.1fms)%s: %s", request.method, path, filters_repr, duration_ms, req_id_str, exc, exc_info=True)
         raise exc
     finally:
         if req_id:

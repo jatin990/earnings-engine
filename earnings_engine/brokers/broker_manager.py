@@ -71,9 +71,15 @@ class BrokerManager:
         """Authenticate a specific broker with supplied or environment credentials."""
         b = self.get_broker(name)
         if not b:
-            logger.warning("Unknown broker '%s'", name)
+            logger.warning("[BROKER:AUTH] Unknown broker '%s'", name)
             return False
-        return b.authenticate(**credentials)
+        logger.info("[BROKER:AUTH] Attempting authentication for %s...", name)
+        res = b.authenticate(**credentials)
+        if res:
+            logger.info("[BROKER:AUTH] Authentication successful for %s", name)
+        else:
+            logger.warning("[BROKER:AUTH] Authentication failed for %s", name)
+        return res
 
     def get_quote(self, symbol: str, broker_name: str | None = None) -> dict[str, Any]:
         """Fetch live quote from connected broker, falling back to data provider."""
@@ -107,7 +113,7 @@ class BrokerManager:
             from datetime import datetime
             paper_order_id = f"PAPER_{int(datetime.now().timestamp())}_{random.randint(100, 999)}"
             logger.info(
-                "PAPER TRADE EXECUTED: %s %d %s @ %s (strategy=%s, id=%s)",
+                "[BROKER:ORDER] [PAPER] %s %d %s @ %s (strategy=%s, id=%s)",
                 side, quantity, symbol, price or "LTP", strategy_name, paper_order_id,
             )
             return {
@@ -126,12 +132,17 @@ class BrokerManager:
         # 2. Live Broker Execution Mode
         b = self.get_broker(broker_name)
         if not b or not b.is_connected:
+            logger.warning("[BROKER:ORDER] Execution failed: Broker '%s' not connected", broker_name or self.default_broker_name)
             return {
                 "success": False,
                 "mode": "LIVE",
                 "error": f"Broker '{broker_name or self.default_broker_name}' is not connected for live trading.",
             }
 
+        logger.info(
+            "[BROKER:ORDER] [LIVE:%s] %s %d %s @ %s (strategy=%s)",
+            broker_name or self.default_broker_name, side, quantity, symbol, price or "MARKET", strategy_name
+        )
         return b.place_order(
             symbol=symbol,
             side=side,

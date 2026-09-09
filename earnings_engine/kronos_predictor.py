@@ -669,21 +669,30 @@ def predict_portfolio(
     # --- Phase 1: parallel historical-data fetch (I/O-bound) ---
     fetch_workers = max(1, getattr(settings, "kronos_fetch_workers", 8))
     fetched: dict[str, pd.DataFrame] = {}
+    from earnings_engine.logging_utils import BatchProgressLogger
+    progress = BatchProgressLogger(
+        name="kronos_fetch",
+        total=total,
+        unit="stocks",
+        milestones=[25, 50, 75, 100],
+    )
     with ThreadPoolExecutor(max_workers=min(fetch_workers, max(1, total))) as executor:
         futures = {executor.submit(fetch_historical_data, symbol): symbol for symbol in symbols}
         for future in as_completed(futures):
             symbol = futures[future]
             completed += 1
+            progress.update(1)
             try:
                 df = future.result()
                 if df is not None and len(df) >= lookback:
                     fetched[symbol] = df
                 else:
-                    logger.warning("  [SKIP] Failed to fetch enough data for %s", symbol)
+                    logger.debug("  [SKIP] Failed to fetch enough data for %s", symbol)
             except Exception as e:
-                logger.warning("  [SKIP] Fetch failed for %s: %s", symbol, e)
+                logger.debug("  [SKIP] Fetch failed for %s: %s", symbol, e)
             if progress_callback:
                 progress_callback(completed, total, symbol)
+    progress.finish()
 
     if not fetched:
         logger.warning("[DONE] No symbols had sufficient data to predict")

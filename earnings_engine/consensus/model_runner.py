@@ -173,7 +173,7 @@ def _query_omniroute_model(
     sub_display = MODEL_DISPLAY_NAMES.get(sub_model, sub_model.split("/")[-1].replace("-instruct", "").replace(":free", "").title())
     display_name = f"OmniRoute ({sub_display})" if "OmniRoute" not in sub_display else sub_display
 
-    logger.info("[CONSENSUS-OMNIROUTE] Querying %s via %s (model=%s, timeframe=%dd)...", display_name, completions_url, sub_model, timeframe_days)
+    logger.info("[CONSENSUS:OUT] %s -> %s via %s (model=%s, timeframe=%dd)", _ticker, display_name, completions_url, sub_model, timeframe_days)
 
     try:
         from earnings_engine.rate_limits import record_request as _rr
@@ -344,6 +344,7 @@ def _query_local_model(
     timeout: int = 60,
     local_url: str | None = None,
     timeframe_days: int = 14,
+    _ticker: str = "UNKNOWN",
     custom_directives: str | None = None,
     temperature: float = 0.3,
     system_prompt: str | None = None,
@@ -357,9 +358,9 @@ def _query_local_model(
     display_name = f"Local ({local_model})"
     
     base_host = (local_url or os.getenv("LOCAL_LLM_URL") or os.getenv("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
-    
-    logger.info("[CONSENSUS-LOCAL] Querying local model %s (timeframe=%dd) at %s...", local_model, timeframe_days, base_host)
-    
+
+    logger.info("[CONSENSUS:OUT] %s -> local model %s (timeframe=%dd) at %s", _ticker if '_ticker' in locals() else 'UNKNOWN', local_model, timeframe_days, base_host)
+
     v1_url = f"{base_host}/v1/chat/completions" if not base_host.endswith("/v1") else f"{base_host}/chat/completions"
     system_prompt = system_prompt or get_horizon_system_prompt(timeframe_days, custom_directives=custom_directives)
     
@@ -617,7 +618,8 @@ def _query_single_model(
     ):
         return _query_local_model(
             model_id, prompt, timeout=timeout, local_url=local_url,
-            timeframe_days=timeframe_days, custom_directives=custom_directives,
+            timeframe_days=timeframe_days, _ticker=_ticker,
+            custom_directives=custom_directives,
             temperature=temperature, system_prompt=system_prompt,
         )
 
@@ -831,7 +833,7 @@ def run_consensus_models(
 
     t_start = time.perf_counter()
     model_names_str = ", ".join(MODEL_DISPLAY_NAMES.get(m, m.split('/')[-1]) for m in models)
-    logger.info("[CONSENSUS] Dispatching %s to %d models (%s, timeframe=%dd, temp=%.2f)...", ticker, len(models), model_names_str, timeframe, temperature)
+    logger.info("[CONSENSUS:OUT] Dispatching %s to %d models (%s, timeframe=%dd, temp=%.2f)", ticker, len(models), model_names_str, timeframe, temperature)
 
     results: list[dict[str, Any]] = []
 
@@ -861,10 +863,12 @@ def run_consensus_models(
                 result["timeframe_days"] = timeframe
                 results.append(result)
                 dir_or_err = result.get("direction") if "error" not in result else f"ERROR({result.get('error')})"
-                logger.info("[CONSENSUS] [%d/%d completed] %s -> %s (latency: %.2fs)",
-                            len(results), len(models), result["model_name"], dir_or_err, result.get("latency_ms", 0) / 1000.0)
+                tokens_count = result.get("tokens_used", 0)
+                tokens_desc = f", {tokens_count} tokens" if tokens_count else ""
+                logger.info("[CONSENSUS:IN] [%d/%d] %s: %s -> %s (latency: %.2fs%s)",
+                            len(results), len(models), ticker, result["model_name"], dir_or_err, result.get("latency_ms", 0) / 1000.0, tokens_desc)
             except Exception as e:
-                logger.error("[CONSENSUS] %s future error: %s", display_name, e)
+                logger.error("[CONSENSUS:ERR] %s for %s future error: %s", display_name, ticker, e)
                 results.append({
                     "model_name": display_name,
                     "model_id": model_id,
@@ -876,7 +880,7 @@ def run_consensus_models(
 
     total_elapsed = time.perf_counter() - t_start
     successful = sum(1 for r in results if "error" not in r)
-    logger.info("[CONSENSUS] %s: %d/%d models responded successfully in %.2fs. Proceeding to aggregation.", ticker, successful, len(models), total_elapsed)
+    logger.info("[CONSENSUS:DONE] %s: %d/%d models responded successfully in %.2fs. Proceeding to aggregation.", ticker, successful, len(models), total_elapsed)
 
     return results
 

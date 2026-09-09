@@ -242,7 +242,7 @@ def sync_local_to_upstream(settings: Settings | None = None, force_full: bool = 
 
     start_t = time.perf_counter()
     sync_now_iso = datetime.now(timezone.utc).isoformat()
-    logger.info("[TURSO-SYNC] Starting delta sync with Turso Cloud (mode=%s)...", "full" if force_full else "incremental")
+    logger.info("[TURSO:START] Starting delta sync with Turso Cloud (mode=%s)...", "full" if force_full else "incremental")
 
     db_path = str(_cache_path(s))
     s.ensure_dirs()
@@ -418,7 +418,7 @@ def sync_local_to_upstream(settings: Settings | None = None, force_full: bool = 
 
     elapsed = time.perf_counter() - start_t
     logger.info(
-        "[TURSO-SYNC] Delta sync completed in %.2fs. Transferred %d local deltas & %d remote deltas across %d tables.",
+        "[TURSO:DONE] Delta sync completed in %.2fs (pushed: %d, pulled: %d across %d tables)",
         elapsed,
         total_pushed,
         total_pulled,

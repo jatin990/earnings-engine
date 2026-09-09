@@ -291,7 +291,18 @@ class SchedulerEngine:
 
         self._running = True
         self._started_at = datetime.now(timezone.utc)
-        logger.info("[SCHEDULER-ENGINE] Master background scheduler engine started.")
+
+        schedules = get_all_schedules(self._settings)
+        active_jobs = [s for s in schedules if s.get("is_enabled") and s.get("status") != "paused"]
+        active_preview = ", ".join(s.get("job_id", "") for s in active_jobs[:6])
+        if len(active_jobs) > 6:
+            active_preview += f" (+{len(active_jobs) - 6} more)"
+        logger.info(
+            "[SCHEDULER] Master background engine started with %d registered jobs (%d active: %s)",
+            len(schedules),
+            len(active_jobs),
+            active_preview or "none",
+        )
 
         try:
             loop = asyncio.get_running_loop()
@@ -397,6 +408,7 @@ class SchedulerEngine:
                 next_dt = datetime.fromisoformat(next_run_iso.replace("Z", "+00:00"))
                 if now_dt >= next_dt:
                     # Dispatch execution in background thread
+                    logger.info("[SCHEDULER:TICK] Dispatching due job '%s' (scheduled for %s)", job_id, next_run_iso)
                     self.dispatch_job(job_id, settings)
             except Exception as e:
                 logger.debug("[SCHEDULER-ENGINE] Timestamp parse error for %s: %s", job_id, e)
@@ -405,7 +417,7 @@ class SchedulerEngine:
         """Dispatch immediate asynchronous background execution of a job."""
         settings = settings or self._settings or Settings()
         if job_id in self._running_jobs:
-            logger.info("[SCHEDULER-ENGINE] Job '%s' is already running; skipping overlapping trigger.", job_id)
+            logger.info("[SCHEDULER] Job '%s' is already running; skipping overlapping trigger.", job_id)
             return False
 
         t = threading.Thread(
@@ -438,15 +450,22 @@ class SchedulerEngine:
                     import json
                     params = json.loads(params_raw)
 
+            params_desc = f" (params: {params})" if params else ""
+            logger.info("[SCHEDULER:START] Running background job '%s'%s...", job_id, params_desc)
+
             handler = self._job_handlers.get(job_id)
             if handler:
                 summary = handler(settings, params)
             else:
                 summary = f"Job '{job_id}' executed without custom handler."
 
+            elapsed = max(0.01, round(time.perf_counter() - t0, 2))
+            logger.info("[SCHEDULER:DONE] Job '%s' completed in %.2fs -> %s", job_id, elapsed, summary)
+
         except Exception as e:
+            elapsed = max(0.01, round(time.perf_counter() - t0, 2))
             error_msg = str(e)
-            logger.error("[SCHEDULER-ENGINE] Execution error in %s: %s", job_id, e, exc_info=True)
+            logger.error("[SCHEDULER:FAIL] Execution error in '%s' after %.2fs: %s", job_id, elapsed, e, exc_info=True)
             summary = f"Failed with error: {error_msg}"
         finally:
             elapsed = max(0.01, round(time.perf_counter() - t0, 2))

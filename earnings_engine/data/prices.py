@@ -284,19 +284,19 @@ def fetch_prices(
     if hard_refresh:
         start = start_date or (pd.Timestamp.now() - pd.Timedelta(days=365)).strftime("%Y-%m-%d")
         last_cached = None
-        logger.info("[DATA-FETCH] [yfinance] Hard-refreshing 1-year historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
+        logger.debug("[DATA-FETCH] [yfinance] Hard-refreshing 1-year historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
     else:
         start = start_date or settings.history_start
         last_cached = _last_cached_date(sym, settings)
         if last_cached is not None:
             overlap = pd.Timedelta(days=5)
             start = (last_cached - overlap).strftime("%Y-%m-%d")
-            logger.info(
+            logger.debug(
                 "[DATA-FETCH] [yfinance] Downloading price delta for ticker=%s (%s) from=%s (last cached: %s)",
                 sym, fetch_symbol, start, last_cached.date(),
             )
         else:
-            logger.info("[DATA-FETCH] [yfinance] Downloading full historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
+            logger.debug("[DATA-FETCH] [yfinance] Downloading full historical prices for ticker=%s (%s) from=%s", sym, fetch_symbol, start)
 
     from earnings_engine.data.providers.provider_manager import get_data_manager
 
@@ -328,7 +328,7 @@ def fetch_prices(
             df[col] = pd.NA
 
     df = df[COLUMNS].copy()
-    logger.info("[DATA-FETCH] Successfully normalized %d price rows for ticker=%s", len(df), sym)
+    logger.debug("[DATA-FETCH] Successfully normalized %d price rows for ticker=%s", len(df), sym)
     for col in COLUMNS:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["volume"] = df["volume"].astype("Int64")
@@ -444,9 +444,18 @@ def ensure_prices_batch(
 
     if to_fetch:
         from concurrent.futures import ThreadPoolExecutor
+        from earnings_engine.logging_utils import BatchProgressLogger
         logger.info("[PRICES-BATCH] Batch fetching latest prices for %d missing/stale tickers", len(to_fetch))
+        progress = BatchProgressLogger(
+            name="prices_batch",
+            total=len(to_fetch),
+            unit="tickers",
+            milestones=[25, 50, 75, 100],
+        )
         with ThreadPoolExecutor(max_workers=min(max_workers, len(to_fetch))) as executor:
-            list(executor.map(lambda sym: fetch_prices(sym, settings, force=True), to_fetch))
+            for _ in executor.map(lambda sym: fetch_prices(sym, settings, force=True), to_fetch):
+                progress.update(1)
+        progress.finish()
 
     return load_prices_batch(unique_tickers, settings)
 
@@ -589,6 +598,13 @@ def ingest_prices(
 
     fetch_total = len(tickers_to_fetch)
     max_workers = max(1, getattr(settings, "price_fetch_workers", 10))
+    from earnings_engine.logging_utils import BatchProgressLogger
+    progress = BatchProgressLogger(
+        name="prices_ingest",
+        total=fetch_total,
+        unit="tickers",
+        milestones=[20, 40, 60, 80, 100],
+    )
     for i in range(0, fetch_total, batch_size):
         batch = tickers_to_fetch[i:i + batch_size]
         batch_num = i // batch_size + 1
@@ -603,13 +619,13 @@ def ingest_prices(
                 ticker, count = future.result()
                 processed += 1
                 results[ticker] = count
-
-        logger.info("prices ingest batch %s/%s complete: %s/%s tickers processed",
-                    batch_num, total_batches, processed, total)
+                progress.update(1)
 
         # Wait 2 seconds between batches (skip after last batch)
         if i + batch_size < fetch_total:
             time.sleep(2)
+
+    progress.finish()
 
     ok = sum(1 for v in results.values() if v > 0)
     logger.info("prices ingest complete: %s/%s tickers with data", ok, total)

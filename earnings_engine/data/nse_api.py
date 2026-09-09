@@ -18,6 +18,7 @@ the dashboard can surface a friendly message instead of crashing.
 from __future__ import annotations
 
 import logging
+import time
 from datetime import date, timedelta
 from typing import Any
 
@@ -75,21 +76,29 @@ def fetch_result_calendar(
     Returns the raw JSON dict, or ``{"error": ...}`` on failure.
     """
     f, t = _default_range() if from_date is None else (from_date, to_date)
+    url_params = {"from": _fmt(f), "to": _fmt(t), "index": "equities"}
+    logger.info("[NSE:REQ] GET %s (from=%s, to=%s)", NSE_RESULT_CALENDAR, _fmt(f), _fmt(t))
+    t0 = time.perf_counter()
     try:
         resp = _get_session().get(
             NSE_RESULT_CALENDAR,
-            params={"from": _fmt(f), "to": _fmt(t), "index": "equities"},
+            params=url_params,
             timeout=15,
         )
+        elapsed_ms = (time.perf_counter() - t0) * 1000
         try:
             from earnings_engine.rate_limits import record_request
             record_request("nse", status_code=resp.status_code)
         except Exception:
             pass
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        item_count = len(data) if isinstance(data, list) else len(data.get("data", data.get("result", [])))
+        logger.info("[NSE:RESP] Result calendar -> %d items (%.1fms, HTTP %d)", item_count, elapsed_ms, resp.status_code)
+        return data
     except Exception as e:
-        logger.warning("nse_api: result-calendar failed: %s", e)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        logger.warning("[NSE:RESP] Result calendar request failed after %.1fms: %s", elapsed_ms, e)
         return {"error": str(e)}
 
 
@@ -102,21 +111,29 @@ def fetch_event_calendar(
     Returns the raw JSON dict, or ``{"error": ...}`` on failure.
     """
     f, t = _default_range() if from_date is None else (from_date, to_date)
+    url_params = {"from": _fmt(f), "to": _fmt(t), "index": "equities"}
+    logger.info("[NSE:REQ] GET %s (from=%s, to=%s)", NSE_EVENT_CALENDAR, _fmt(f), _fmt(t))
+    t0 = time.perf_counter()
     try:
         resp = _get_session().get(
             NSE_EVENT_CALENDAR,
-            params={"from": _fmt(f), "to": _fmt(t), "index": "equities"},
+            params=url_params,
             timeout=15,
         )
+        elapsed_ms = (time.perf_counter() - t0) * 1000
         try:
             from earnings_engine.rate_limits import record_request
             record_request("nse", status_code=resp.status_code)
         except Exception:
             pass
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        item_count = len(data) if isinstance(data, list) else len(data.get("data", data.get("result", [])))
+        logger.info("[NSE:RESP] Event calendar -> %d items (%.1fms, HTTP %d)", item_count, elapsed_ms, resp.status_code)
+        return data
     except Exception as e:
-        logger.warning("nse_api: event-calendar failed: %s", e)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        logger.warning("[NSE:RESP] Event calendar request failed after %.1fms: %s", elapsed_ms, e)
         return {"error": str(e)}
 
 

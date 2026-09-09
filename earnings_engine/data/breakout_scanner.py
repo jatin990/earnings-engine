@@ -3079,8 +3079,21 @@ def run_multi_strategy_parallel_scan(
             "top_score": top_score,
             "elapsed_seconds": s_elapsed,
         }
+        logger.info(
+            "[BREAKOUT-STRAT] Strategy %s finished in %.2fs -> %d candidates found (top: %s @ %.1f)",
+            meta.get("name", strat_id),
+            s_elapsed,
+            len(strat_candidates),
+            top_ticker or "none",
+            top_score,
+        )
         return strat_id, strat_candidates, stats
 
+    logger.info(
+        "[BREAKOUT-PARALLEL] Initiating multi-strategy scan across %d tickers (%d strategies in parallel)...",
+        len(ticker_list),
+        len(strategies_to_run),
+    )
     # Run all strategies in parallel
     with ThreadPoolExecutor(max_workers=len(strategies_to_run)) as strat_executor:
         parallel_outputs = list(strat_executor.map(_scan_strategy, strategies_to_run))
@@ -3191,13 +3204,25 @@ def run_cold_scan(
         return
 
     from concurrent.futures import ThreadPoolExecutor
+    from earnings_engine.logging_utils import BatchProgressLogger
+
+    progress = BatchProgressLogger(
+        name=f"breakout_{strat_clean.lower()}",
+        total=len(ticker_list),
+        unit="tickers",
+        milestones=[20, 40, 60, 80, 100],
+    )
 
     def _score(ticker: str) -> tuple[str, dict | None]:
         result = _score_single_ticker(ticker, settings, strategy=strat_clean)
         return ticker, result
 
+    scored = []
     with ThreadPoolExecutor(max_workers=8) as executor:
-        scored = list(executor.map(_score, ticker_list))
+        for item in executor.map(_score, ticker_list):
+            scored.append(item)
+            progress.update(1)
+    progress.finish()
 
     promoted_hot = 0
     promoted_warm = 0
