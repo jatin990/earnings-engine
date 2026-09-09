@@ -703,6 +703,5 @@
             alert(`Error untracking ticker: ${err.message}`);
         }
     };
-    };
 
 })(); // end tracked_breakouts IIFE
