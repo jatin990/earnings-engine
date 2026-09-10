@@ -2585,3 +2585,573 @@ def get_stock_buyers_in_period(
             pass
 
 
+def get_stocks_under_institutional_accumulation(
+    window: str = "90d",
+    entity_focus: str = "smart_money",
+    min_cr: float = 5.0,
+    sort_by: str = "score",
+    limit: int = 50,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve equities experiencing aggressive smart money institutional accumulation across rolling time windows.
+
+    Separates catalytic Smart Money (FIIs, Foreign Sovereign Funds, Super Investors, AIFs, and Block Deals)
+    from passive Domestic Absorption (routine retail SIP inflows into mature large-caps).
+
+    Args:
+        window: Lookback horizon ('30d', '90d', '180d', '365d', '1y'). Default '90d'.
+        entity_focus: 'smart_money', 'all', 'fii_only', 'super_investor', 'block_deals'.
+        min_cr: Minimum capital deployed threshold in ₹ Cr. Default 5.0 Cr.
+        sort_by: Ranking key ('score', 'capital', 'dominance', 'return_30d'). Default 'score'.
+        limit: Max stocks to return (1-200). Default 50.
+        settings: Settings instance.
+    """
+    settings = settings or Settings()
+    cache_key = f"smart_money_acc:{window}:{entity_focus}:{min_cr}:{sort_by}:{limit}"
+    cached = _get_inst_cache(cache_key)
+    if cached is not None:
+        return cached
+
+    # Normalize dates
+    start_date, end_date, canonical_q = _normalize_query_dates(from_date=window)
+    desc_parts = []
+    if start_date:
+        desc_parts.append(f"From {start_date}")
+    if end_date:
+        desc_parts.append(f"To {end_date}")
+    if canonical_q:
+        desc_parts.append(f"Quarter {canonical_q}")
+    period_description = " - ".join(desc_parts) if desc_parts else f"Window: {window}"
+
+    window_labels = {
+        "30d": "Last 30 Days (Fast Flow & Breakouts)",
+        "90d": "Last 90 Days (Quarterly Accumulation)",
+        "180d": "Last 180 Days (Deep Structural Accumulation)",
+        "365d": "Last 1 Year (Whale Position Building)",
+        "1y": "Last 1 Year (Whale Position Building)",
+    }
+    window_label = window_labels.get(window.lower(), f"Lookback: {window}")
+
+    conn = get_db_connection(settings)
+    try:
+        from earnings_engine.data.nse_shareholding import classify_institutional_entity
+
+        # 1. Fetch all institutional holdings additions / new buys
+        h_rows = conn.execute(
+            """
+            SELECT h.ticker, h.fund_name, h.fund_type, h.action, h.quarter,
+                   h.holding_value_cr, h.stake_pct, h.change_pct, h.change_shares,
+                   COALESCE(h.recent_buy_price, h.recent_txn_price, h.avg_price, 0.0) AS buy_price,
+                   h.recent_txn_date, h.reported_date
+            FROM institutional_holdings h
+            WHERE (h.action IN ('NEW BUY', 'INCREASE', 'ACCUMULATED') OR h.change_pct > 0 OR h.change_shares > 0)
+              AND h.holding_value_cr > 0
+            """
+        ).fetchall()
+
+        # Aggregation buckets per ticker
+        stocks_acc: dict[str, dict[str, Any]] = defaultdict(lambda: {
+            "fii_cr": 0.0,
+            "fii_count": 0,
+            "super_inv_cr": 0.0,
+            "super_inv_count": 0,
+            "aif_cr": 0.0,
+            "aif_count": 0,
+            "dii_cr": 0.0,
+            "dii_count": 0,
+            "block_deals_cr": 0.0,
+            "block_deals_count": 0,
+            "other_cr": 0.0,
+            "other_count": 0,
+            "buyers": [],
+        })
+
+        for r in h_rows:
+            (
+                sym, fund_name, raw_fund_type, action, h_quarter,
+                holding_val_cr, stake_pct, change_pct, change_shares,
+                buy_price, txn_date, reported_date
+            ) = r
+
+            holding_val_cr = float(holding_val_cr or 0.0)
+            stake_pct = float(stake_pct or 0.0)
+            change_pct = float(change_pct or 0.0)
+            change_shares = int(change_shares or 0)
+            buy_price = float(buy_price or 0.0)
+
+            # Date / quarter matching
+            if start_date:
+                if txn_date and txn_date < start_date:
+                    continue
+                elif not txn_date and canonical_q:
+                    _cq, q_s, q_e = _parse_fiscal_quarter(h_quarter)
+                    if q_e and q_e < start_date:
+                        continue
+            if end_date:
+                if txn_date and txn_date > end_date:
+                    continue
+                elif not txn_date and canonical_q:
+                    _cq, q_s, q_e = _parse_fiscal_quarter(h_quarter)
+                    if q_s and q_s > end_date:
+                        continue
+
+            # Classify entity
+            classified_type = classify_institutional_entity(fund_name)
+            if "MUTUAL FUND" in (raw_fund_type or "").upper() and "MUTUAL FUND" not in classified_type.upper():
+                entity_class = "Mutual Fund (DII)"
+            elif classified_type in ("Institutional Investor (DII/FII)", "Domestic Institutional (DII)") and raw_fund_type:
+                entity_class = raw_fund_type
+            else:
+                entity_class = classified_type
+
+            category = _map_buyer_macro_category(entity_class)
+
+            # Estimate capital deployed (₹ Cr)
+            if change_shares > 0 and buy_price > 0:
+                capital_cr = round((change_shares * buy_price) / 1e7, 2)
+            elif action == "NEW BUY" and (change_pct >= stake_pct or change_pct == 0.0):
+                capital_cr = holding_val_cr
+            elif stake_pct > 0 and change_pct > 0:
+                capital_cr = round((change_pct / stake_pct) * holding_val_cr, 2)
+            else:
+                capital_cr = round(holding_val_cr * 0.2, 2)
+
+            if capital_cr <= 0:
+                continue
+
+            target = stocks_acc[sym]
+            if category == "FII":
+                target["fii_cr"] += capital_cr
+                target["fii_count"] += 1
+            elif category == "Super Investor":
+                target["super_inv_cr"] += capital_cr
+                target["super_inv_count"] += 1
+            elif category == "AIF":
+                target["aif_cr"] += capital_cr
+                target["aif_count"] += 1
+            elif category == "DII":
+                target["dii_cr"] += capital_cr
+                target["dii_count"] += 1
+            else:
+                target["other_cr"] += capital_cr
+                target["other_count"] += 1
+
+            target["buyers"].append({
+                "name": fund_name,
+                "entity_type": entity_class,
+                "category": category,
+                "capital_cr": capital_cr,
+                "source": "Filing",
+                "date": txn_date or reported_date,
+            })
+
+        # 2. Fetch block deal buys within window
+        b_rows = conn.execute(
+            """
+            SELECT ticker, deal_date, client_name, quantity, price, value_cr, pct_equity, exchange
+            FROM institutional_block_deals
+            WHERE deal_type = 'BUY' AND value_cr > 0
+            """
+        ).fetchall()
+
+        for r in b_rows:
+            sym, deal_date, client_name, qty, price, val_cr, pct_eq, exchange = r
+            val_cr = float(val_cr or 0.0)
+
+            # Date matching
+            if start_date and deal_date < start_date:
+                continue
+            if end_date and deal_date > end_date:
+                continue
+            if canonical_q:
+                _cq, q_s, q_e = _parse_fiscal_quarter(canonical_q)
+                if q_s and deal_date < q_s:
+                    continue
+                if q_e and deal_date > q_e:
+                    continue
+
+            classified_type = classify_institutional_entity(client_name)
+            category = _map_buyer_macro_category(classified_type)
+
+            target = stocks_acc[sym]
+            target["block_deals_cr"] += val_cr
+            target["block_deals_count"] += 1
+
+            if category == "FII":
+                target["fii_cr"] += val_cr
+                target["fii_count"] += 1
+            elif category == "Super Investor":
+                target["super_inv_cr"] += val_cr
+                target["super_inv_count"] += 1
+            elif category == "AIF":
+                target["aif_cr"] += val_cr
+                target["aif_count"] += 1
+
+            target["buyers"].append({
+                "name": client_name,
+                "entity_type": classified_type if classified_type != "Other / Entity" else f"Block Buy ({exchange})",
+                "category": category if category != "Other" else "Block Deal",
+                "capital_cr": val_cr,
+                "source": "Block Deal",
+                "date": deal_date,
+            })
+
+        # 3. Load metadata from tickers and institutional_accumulation_cache
+        meta_dict: dict[str, dict[str, Any]] = {}
+        t_rows = conn.execute(
+            """
+            SELECT ticker, name, sector, industry, market_cap
+            FROM tickers
+            """
+        ).fetchall()
+        for tr in t_rows:
+            sym, tname, sec, ind, mcap = tr
+            mcap_cr = round(float(mcap or 0.0) / 1e7, 1) if mcap else 0.0
+            meta_dict[sym] = {
+                "company_name": tname,
+                "sector": sec or "Diversified",
+                "industry": ind or "General",
+                "market_cap_cr": mcap_cr,
+                "cap_category": None,
+                "current_price": None,
+                "change_pct": 0.0,
+                "return_7d_pct": None,
+                "return_30d_pct": None,
+                "return_1y_pct": None,
+            }
+
+        cache_rows = conn.execute(
+            """
+            SELECT ticker, company_name, market_cap_cr, return_7d_pct, return_30d_pct, return_1y_pct
+            FROM institutional_accumulation_cache
+            """
+        ).fetchall()
+        for cr in cache_rows:
+            sym, cname, mcap_cr, r7, r30, r1y = cr
+            if sym not in meta_dict:
+                meta_dict[sym] = {
+                    "company_name": cname,
+                    "sector": "Diversified",
+                    "industry": "General",
+                    "market_cap_cr": float(mcap_cr or 0.0),
+                    "cap_category": None,
+                    "current_price": None,
+                    "change_pct": 0.0,
+                    "return_7d_pct": r7,
+                    "return_30d_pct": r30,
+                    "return_1y_pct": r1y,
+                }
+            else:
+                if cname:
+                    meta_dict[sym]["company_name"] = cname
+                if mcap_cr:
+                    meta_dict[sym]["market_cap_cr"] = float(mcap_cr)
+                meta_dict[sym]["return_7d_pct"] = r7
+                meta_dict[sym]["return_30d_pct"] = r30
+                meta_dict[sym]["return_1y_pct"] = r1y
+
+        # 4. Synthesize, score, classify and filter stocks
+        screened_stocks: list[dict[str, Any]] = []
+
+        for sym, data in stocks_acc.items():
+            fii_cr = round(data["fii_cr"], 2)
+            super_inv_cr = round(data["super_inv_cr"], 2)
+            aif_cr = round(data["aif_cr"], 2)
+            block_deals_cr = round(data["block_deals_cr"], 2)
+            dii_cr = round(data["dii_cr"], 2)
+
+            buyers_list = data["buyers"]
+            if not buyers_list:
+                continue
+
+            sm_cr = 0.0
+            dom_cr = 0.0
+            for b in buyers_list:
+                cat = b.get("category")
+                b_val = float(b.get("capital_cr") or 0.0)
+                if cat in ("FII", "Super Investor", "AIF", "Block Deal"):
+                    sm_cr += b_val
+                elif cat == "DII":
+                    dom_cr += b_val
+                else:
+                    if b.get("source") == "Block Deal":
+                        sm_cr += b_val
+                    else:
+                        dom_cr += b_val
+
+            smart_money_cr = round(sm_cr, 2)
+            domestic_cr = round(dom_cr, 2)
+            total_capital_cr = round(smart_money_cr + domestic_cr, 2)
+
+            if total_capital_cr <= 0:
+                continue
+
+            dominance_pct = round((smart_money_cr / max(total_capital_cr, 0.01)) * 100.0, 1)
+
+            # Filter by entity_focus & min_cr
+            focus_lower = entity_focus.lower()
+            if focus_lower == "smart_money":
+                if smart_money_cr < min_cr:
+                    continue
+            elif focus_lower == "fii_only":
+                if fii_cr < min_cr:
+                    continue
+            elif focus_lower == "super_investor":
+                if super_inv_cr < min_cr:
+                    continue
+            elif focus_lower == "block_deals":
+                if block_deals_cr < min_cr:
+                    continue
+            else:  # "all"
+                if total_capital_cr < min_cr:
+                    continue
+
+            # Metadata enrichment
+            m = meta_dict.get(sym, {})
+            company_name = m.get("company_name") or get_name(sym) or sym
+            sector = m.get("sector") or "Diversified"
+            industry = m.get("industry") or "General"
+            mcap_cr = round(float(m.get("market_cap_cr") or 0.0), 1)
+
+            cap_cat = m.get("cap_category")
+            if not cap_cat or cap_cat == "Unknown":
+                if mcap_cr >= 20000:
+                    cap_cat = "Large Cap"
+                elif mcap_cr >= 5000:
+                    cap_cat = "Mid Cap"
+                elif mcap_cr >= 1000:
+                    cap_cat = "Small Cap"
+                else:
+                    cap_cat = "Micro Cap"
+
+            curr_price = m.get("current_price")
+            ret_7d = m.get("return_7d_pct")
+            ret_30d = m.get("return_30d_pct")
+            ret_1y = m.get("return_1y_pct")
+            chg_pct = m.get("change_pct") or 0.0
+
+            # Signal classification
+            fii_cnt = data["fii_count"]
+            super_cnt = data["super_inv_count"]
+            block_cnt = data["block_deals_count"]
+            aif_cnt = data["aif_count"]
+
+            if dominance_pct >= 60.0 and smart_money_cr >= 15.0:
+                signal_badge = "⭐ High Smart Money Conviction"
+                signal_type = "high_conviction"
+                signal_color = "emerald"
+            elif fii_cr >= 15.0 and (fii_cr >= (0.5 * total_capital_cr)):
+                signal_badge = "🚀 FII Whale Inflow"
+                signal_type = "fii_whale"
+                signal_color = "blue"
+            elif super_inv_cr >= 5.0 or super_cnt >= 1:
+                signal_badge = "👑 Super Investor Entry"
+                signal_type = "super_investor"
+                signal_color = "purple"
+            elif block_deals_cr >= 20.0 or block_cnt >= 2:
+                signal_badge = "⚡ Block Deal Frenzy"
+                signal_type = "block_deals"
+                signal_color = "amber"
+            elif domestic_cr >= 10.0 and dominance_pct < 30.0:
+                signal_badge = "⚠️ Domestic Absorption"
+                signal_type = "domestic_absorption"
+                signal_color = "rose"
+            else:
+                signal_badge = "🟢 Steady Accumulation"
+                signal_type = "steady"
+                signal_color = "green"
+
+            # Quantitative Conviction Score (0-100)
+            score_cap = min(35.0, math.log10(max(1.0, smart_money_cr)) * 12.0) if smart_money_cr > 0 else 0.0
+            score_dom = min(30.0, (dominance_pct / 100.0) * 30.0)
+            score_whale = min(20.0, (fii_cnt * 4.0) + (super_cnt * 6.0) + (block_cnt * 2.5) + (aif_cnt * 3.0))
+
+            mom_30 = max(-10.0, min(30.0, ret_30d or 0.0))
+            mom_7 = max(-5.0, min(15.0, ret_7d or 0.0))
+            score_mom = max(0.0, min(15.0, (mom_30 * 0.3) + (mom_7 * 0.4) + 5.0))
+
+            conviction_score = round(score_cap + score_dom + score_whale + score_mom, 1)
+            if signal_type == "domestic_absorption":
+                conviction_score = min(conviction_score, 40.0)
+            conviction_score = max(0.0, min(100.0, conviction_score))
+
+            # Top 4 distinct buyers sorted by capital
+            grouped_buyers: dict[str, dict[str, Any]] = {}
+            for b in buyers_list:
+                bname = b["name"]
+                if bname not in grouped_buyers:
+                    grouped_buyers[bname] = {
+                        "name": bname,
+                        "entity_type": b["entity_type"],
+                        "category": b["category"],
+                        "capital_cr": 0.0,
+                        "source": b["source"],
+                        "date": b["date"],
+                    }
+                grouped_buyers[bname]["capital_cr"] += float(b["capital_cr"] or 0.0)
+
+            sorted_buyers = sorted(grouped_buyers.values(), key=lambda x: x["capital_cr"], reverse=True)
+            top_buyers = [
+                {
+                    "name": sb["name"],
+                    "entity_type": sb["entity_type"],
+                    "category": sb["category"],
+                    "capital_cr": round(sb["capital_cr"], 2),
+                    "source": sb["source"],
+                    "date": sb["date"],
+                }
+                for sb in sorted_buyers[:4]
+            ]
+
+            top_buyer_names = [b["name"] for b in top_buyers]
+            whale_buyers_summary = [f"{b['name']} ({b['entity_type']})" for b in top_buyers[:3]]
+
+            screened_stocks.append({
+                "ticker": sym,
+                "company_name": company_name,
+                "sector": sector,
+                "industry": industry,
+                "market_cap_cr": mcap_cr,
+                "cap_category": cap_cat,
+                "current_price": curr_price,
+                "change_pct": chg_pct,
+                "return_7d_pct": ret_7d,
+                "return_30d_pct": ret_30d,
+                "return_1y_pct": ret_1y,
+                "smart_money_cr": smart_money_cr,
+                "smart_money_inflow_cr": smart_money_cr,
+                "domestic_cr": domestic_cr,
+                "domestic_inflow_cr": domestic_cr,
+                "domestic_absorption_cr": domestic_cr,
+                "total_capital_cr": total_capital_cr,
+                "total_inflow_cr": total_capital_cr,
+                "smart_money_dominance_pct": dominance_pct,
+                "dominance_pct": dominance_pct,
+                "fii_cr": fii_cr,
+                "fii_count": fii_cnt,
+                "super_inv_cr": super_inv_cr,
+                "super_inv_count": super_cnt,
+                "aif_cr": aif_cr,
+                "aif_count": aif_cnt,
+                "block_deals_cr": block_deals_cr,
+                "block_deals_count": block_cnt,
+                "smart_money_buyers_count": fii_cnt + super_cnt + aif_cnt + block_cnt,
+                "buyers_count": len(grouped_buyers),
+                "top_buyers": top_buyers,
+                "top_buyer_names": top_buyer_names,
+                "whale_buyers_summary": whale_buyers_summary,
+                "whale_buyers": sorted_buyers,
+                "signal_badge": signal_badge,
+                "badge": signal_badge,
+                "accumulation_signal_badge": signal_badge,
+                "signal_type": signal_type,
+                "classification": signal_type,
+                "classification_category": signal_type,
+                "signal_color": signal_color,
+                "conviction_score": conviction_score,
+                "smart_money_conviction_score": conviction_score,
+                "breakdown": {
+                    "fii_cr": fii_cr,
+                    "super_investor_cr": super_inv_cr,
+                    "aif_cr": aif_cr,
+                    "block_deals_cr": block_deals_cr,
+                    "dii_cr": dii_cr,
+                },
+            })
+
+        # 5. Sorting
+        sort_key = sort_by.lower()
+        if sort_key == "capital":
+            screened_stocks.sort(key=lambda s: (s["smart_money_cr"], s["conviction_score"]), reverse=True)
+        elif sort_key == "dominance":
+            screened_stocks.sort(key=lambda s: (s["smart_money_dominance_pct"], s["smart_money_cr"]), reverse=True)
+        elif sort_key == "return_30d":
+            screened_stocks.sort(key=lambda s: (s["return_30d_pct"] if s["return_30d_pct"] is not None else -999.0, s["conviction_score"]), reverse=True)
+        else:  # "score"
+            screened_stocks.sort(key=lambda s: (s["conviction_score"], s["smart_money_cr"]), reverse=True)
+
+        final_stocks = screened_stocks[:limit]
+
+        # 6. Fill missing prices for final stocks from price_history
+        tickers_needing_price = [s["ticker"] for s in final_stocks if not s["current_price"]]
+        if tickers_needing_price:
+            placeholders = ",".join("?" * len(tickers_needing_price))
+            p_rows = conn.execute(
+                f"""
+                SELECT ticker, close FROM (
+                    SELECT ticker, close, ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) as rn
+                    FROM price_history
+                    WHERE ticker IN ({placeholders})
+                ) WHERE rn = 1
+                """,
+                tickers_needing_price,
+            ).fetchall()
+            price_map = {pr[0]: round(float(pr[1]), 2) for pr in p_rows if pr[1] is not None}
+            for s in final_stocks:
+                if not s["current_price"] and s["ticker"] in price_map:
+                    s["current_price"] = price_map[s["ticker"]]
+
+        # 7. Compute Macro Summary
+        total_sm = round(sum(s["smart_money_cr"] for s in screened_stocks), 2)
+        total_dom = round(sum(s["domestic_cr"] for s in screened_stocks), 2)
+        avg_dom = round(sum(s["smart_money_dominance_pct"] for s in screened_stocks) / len(screened_stocks), 1) if screened_stocks else 0.0
+
+        sector_sm: dict[str, float] = defaultdict(float)
+        for s in screened_stocks:
+            sector_sm[s["sector"]] += s["smart_money_cr"]
+        top_sec = max(sector_sm.items(), key=lambda x: x[1])[0] if sector_sm else "Diversified"
+
+        highest_inflow_ticker = screened_stocks[0]["ticker"] if screened_stocks else None
+
+        result = {
+            "success": True,
+            "window": window,
+            "window_label": window_label,
+            "entity_focus": entity_focus,
+            "min_cr": min_cr,
+            "sort_by": sort_by,
+            "count": len(final_stocks),
+            "total_screened": len(screened_stocks),
+            "period_description": period_description,
+            "time_period": {
+                "from_date": start_date,
+                "to_date": end_date,
+                "quarter": canonical_q,
+                "description": period_description,
+            },
+            "macro_summary": {
+                "total_stocks": len(screened_stocks),
+                "total_stocks_tracked": len(screened_stocks),
+                "total_smart_money_cr": total_sm,
+                "total_domestic_cr": total_dom,
+                "total_domestic_absorption_cr": total_dom,
+                "avg_dominance_pct": avg_dom,
+                "avg_smart_money_dominance_pct": avg_dom,
+                "top_sector": top_sec,
+                "highest_inflow_ticker": highest_inflow_ticker,
+                "total_fii_cr": round(sum(s["fii_cr"] for s in screened_stocks), 2),
+                "total_super_inv_cr": round(sum(s["super_inv_cr"] for s in screened_stocks), 2),
+                "total_block_deals_cr": round(sum(s["block_deals_cr"] for s in screened_stocks), 2),
+            },
+            "stocks": final_stocks,
+        }
+
+        _set_inst_cache(cache_key, result, ttl_seconds=120.0)
+        return result
+
+    except Exception as e:
+        logger.exception("Error in get_stocks_under_institutional_accumulation: %s", e)
+        return {
+            "success": False,
+            "detail": f"Error calculating accumulation: {str(e)}",
+            "stocks": [],
+            "macro_summary": {},
+        }
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+

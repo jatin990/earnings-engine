@@ -1,592 +1,1499 @@
-﻿<!-- ========================================================================= -->
-<!-- INSTITUTIONAL FLOWS & SMART MONEY HUB (PAGE 1: EQUITIES | PAGE 2: INVESTORS) -->
-<!-- ========================================================================= -->
-<div id="tab-institutional" class="tab-content" style="width: 100%; max-width: 100%;">
-
-    <!-- Sub-navigation Header: 2 Dedicated Pages -->
-    <div style="margin-bottom:1.25rem;">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.75rem;">
-            <div style="display:flex;align-items:center;gap:0.75rem;">
-                <div style="font-size:1.15rem;font-weight:800;color:#f8fafc;display:flex;align-items:center;gap:0.5rem;letter-spacing:-0.02em;">
-                    Institutional Intelligence & Smart Money
-                </div>
-                <span class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.65rem;padding:0.15rem 0.5rem;">FII / DII & SUPER INVESTORS</span>
-            </div>
-
-            <!-- Page Switcher Tabs -->
-            <div style="display:flex;background:#090d1a;padding:0.25rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);gap:0.25rem;flex-wrap:wrap;">
-                <button type="button" id="btnInstPage-equities" onclick="app.switchInstitutionalPage('equities')" class="btn btn-sm" style="background:#1e293b;color:#ffffff;border:1px solid rgba(255,255,255,0.3);font-weight:700;padding:0.35rem 0.85rem;font-size:0.76rem;">
-                    Equities & Stake Radar
-                </button>
-                <button type="button" id="btnInstPage-top-additions" onclick="app.switchInstitutionalPage('top-additions')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;">
-                    Top Stocks & Massive Additions
-                </button>
-                <button type="button" id="btnInstPage-investors" onclick="app.switchInstitutionalPage('investors')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;">
-                    Smart Money & Portfolios
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========================================================================= -->
-    <!-- PAGE 1: ️ EQUITIES & STAKE RADAR (50-50 SPLIT SCREEN LAYOUT) -->
-    <!-- ========================================================================= -->
-    <div id="instPage-equities" style="display:block;">
-        
-        <!-- Top Toolbar & Legend -->
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem;background:#0f172a;padding:0.65rem 0.9rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
-            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                <!-- Flow Toggle -->
-                <div style="display:flex;background:#020617;padding:0.2rem;border-radius:6px;border:1px solid rgba(255,255,255,0.1);gap:0.2rem;">
-                    <button type="button" id="btnInstFlowToggle-acc" onclick="app.switchEquitiesFlowView('accumulating')" class="btn btn-sm" style="background:#1e293b;color:#ffffff;border:1px solid rgba(16,185,129,0.4);font-weight:700;font-size:0.7rem;padding:0.25rem 0.6rem;">
-                         Stake Increasing
-                    </button>
-                    <button type="button" id="btnInstFlowToggle-dist" onclick="app.switchEquitiesFlowView('distributing')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-size:0.7rem;padding:0.25rem 0.6rem;">
-                         Trimming
-                    </button>
-                </div>
-
-                <!-- Stock Quick Search -->
-                <div style="position:relative;display:flex;align-items:center;">
-                    <input id="instStockSearchInput" type="text" placeholder="Lookup ticker..." onkeydown="if(event.key==='Enter') app.searchInstitutionalStock(this.value)" style="background:#020617;border:1px solid rgba(255,255,255,0.15);color:#f8fafc;font-size:0.72rem;padding:0.25rem 0.5rem 0.25rem 1.6rem;border-radius:5px;width:150px;font-family:var(--font-mono);outline:none;">
-                    <span style="position:absolute;left:0.45rem;font-size:0.7rem;color:#64748b;"></span>
-                    <button type="button" onclick="app.searchInstitutionalStock(document.getElementById('instStockSearchInput').value)" class="btn btn-sm" style="margin-left:0.25rem;padding:0.25rem 0.5rem;font-size:0.7rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">Go</button>
-                </div>
-
-                <!-- Presets chips -->
-                <div style="display:flex;gap:0.25rem;flex-wrap:wrap;">
-                    <button type="button" onclick="app.searchInstitutionalStock('ALLCARGO.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);border:1px solid rgba(255,255,255,0.25);color:#ffffff;">ALLCARGO</button>
-                    <button type="button" onclick="app.searchInstitutionalStock('DIXON.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);color:#ffffff;">DIXON</button>
-                    <button type="button" onclick="app.searchInstitutionalStock('KAYNES.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);color:#ffffff;">KAYNES</button>
-                    <button type="button" onclick="app.searchInstitutionalStock('TRENT.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);color:#a78bfa;">TRENT</button>
-                    <button type="button" onclick="app.searchInstitutionalStock('CDSL.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);color:#ffffff;">CDSL</button>
-                    <button type="button" onclick="app.searchInstitutionalStock('TCS.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);color:#ffffff;">TCS</button>
-                </div>
-            </div>
-
-            <!-- Legend & Layout Toggle -->
-            <div style="display:flex;align-items:center;gap:0.75rem;">
-                <span id="instFreshnessBadge-equities"></span>
-                <div style="font-size:0.66rem;color:#94a3b8;font-family:var(--font-mono);background:rgba(255,255,255,0.03);padding:0.25rem 0.5rem;border-radius:4px;border:1px solid rgba(255,255,255,0.06);">
-                    <strong style="color:#cbd5e1;">SCORE:</strong> 0-100 · <strong style="color:#cbd5e1;">7D/30D:</strong> Momentum · <strong style="color:#cbd5e1;">FUNDS:</strong> Net Count (QoQ) · <strong style="color:#cbd5e1;">STAKE:</strong> Latest Inst %
-                </div>
-                <button type="button" id="btnToggleInstSplit" onclick="app.toggleInstitutionalSplitLayout()" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;color:#cbd5e1;" title="Toggle 50-50 split vs full width">
-                    ◫ 50-50 Split
-                </button>
-            </div>
-        </div>
-
-        <!-- 50-50 Responsive Split Grid Container -->
-        <div id="instEquitiesSplitGrid" style="display:grid;grid-template-columns:minmax(0, 1.05fr) minmax(0, 0.95fr);gap:0.85rem;align-items:start;">
-            
-            <!-- LEFT 50%: Compact Radar Table -->
-            <div id="instSplitLeft" style="min-width:0;">
-                
-                <!-- Accumulation Table (Compact) -->
-                <div id="instEquitiesFlow-accumulating" class="card" style="padding:0;overflow:hidden;border:1px solid rgba(16,185,129,0.25);margin-bottom:1rem;">
-                    <div style="overflow-x:auto;">
-                        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
-                            <thead>
-                                <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.66rem;">
-                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
-                                    <th style="padding:0.45rem 0.5rem;">SCORE</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Buying Funds">FUNDS (QoQ)</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
-                                    <th style="padding:0.45rem 0.4rem;text-align:center;"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="instAccumulatingTableBody">
-                                <tr>
-                                    <td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">
-                                        <div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Loading setups...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <!-- Accumulation Load More Footer -->
-                    <div id="instAccFooterBar" style="padding:0.55rem 0.8rem;background:#0b1329;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-                        <span id="instAccCountBadge" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">Showing 0 setups</span>
-                        <button type="button" id="btnInstLoadMoreAcc" onclick="app.loadMoreInstitutionalEquities('accumulating')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.25rem 0.65rem;background:rgba(16,185,129,0.12);color:#ffffff;border:1px solid rgba(16,185,129,0.35);font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.3rem;">
-                            <span></span> Load More Accumulating (+25)
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Distribution Table (Compact) -->
-                <div id="instEquitiesFlow-distributing" class="card" style="display:none;padding:0;overflow:hidden;border:1px solid rgba(239,68,68,0.25);margin-bottom:1rem;">
-                    <div style="overflow-x:auto;">
-                        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
-                            <thead>
-                                <tr style="background:#180d14;color:#fca5a5;border-bottom:1px solid rgba(239,68,68,0.15);font-family:var(--font-mono);font-size:0.66rem;">
-                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
-                                    <th style="padding:0.45rem 0.5rem;">SCORE</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Selling Funds">FUNDS (QoQ)</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
-                                    <th style="padding:0.45rem 0.4rem;text-align:center;"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="instDistributingTableBody">
-                                <!-- Dynamic rows -->
-                            </tbody>
-                        </table>
-                    </div>
-                    <!-- Distribution Load More Footer -->
-                    <div id="instDistFooterBar" style="padding:0.55rem 0.8rem;background:#180d14;border-top:1px solid rgba(239,68,68,0.18);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-                        <span id="instDistCountBadge" style="font-size:0.68rem;color:#fca5a5;font-family:var(--font-mono);">Showing 0 setups</span>
-                        <button type="button" id="btnInstLoadMoreDist" onclick="app.loadMoreInstitutionalEquities('distributing')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.25rem 0.65rem;background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.3rem;">
-                            <span></span> Load More Distributing (+25)
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- RIGHT 50%: Live Stock Drilldown (Inspect Details) -->
-            <div id="instSplitRight" style="min-width:0;position:sticky;top:0.75rem;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:0.2rem;">
-                
-                <!-- Stock Header Card -->
-                <div id="instStockHeaderCard" class="card" style="padding:0.85rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.15);margin-bottom:0.75rem;">
-                    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.6rem;">
-                        <div>
-                            <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
-                                <span id="instSelectedTicker" style="font-size:1.2rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</span>
-                                <span id="instSelectedCompanyName" style="font-size:0.78rem;color:#a1a1aa;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">--</span>
-                                <span id="instSelectedVerdictBadge" class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.65rem;padding:0.12rem 0.45rem;">--</span>
-                            </div>
-                            <div id="instSelectedStockTimeframe" style="font-size:0.62rem;color:#71717a;margin-top:0.2rem;font-family:var(--font-mono);">
-                                Point-in-Time Intelligence · Synced Live
-                            </div>
-                        </div>
-                        <div style="display:flex;align-items:center;gap:0.35rem;">
-                            <button type="button" onclick="app.openAddToWatchlistModal(document.getElementById('instSelectedTicker')?.innerText?.split(' ')[0] || app.institutionalModule._selectedTicker || 'ALLCARGO.NS')" class="btn btn-sm" style="background:#18181b;color:#ffffff;border:1px solid rgba(255,255,255,0.2);font-size:0.68rem;padding:0.25rem 0.5rem;border-radius:4px;cursor:pointer;">
-                                ⭐ Watchlist
-                            </button>
-                            <a id="instSelectedStockLink" href="#" target="_blank" class="btn btn-sm" style="background:#ffffff;color:#000000;font-weight:700;font-size:0.7rem;padding:0.25rem 0.6rem;text-decoration:none;border-radius:4px;">
-                                Open Full Intel
-                            </a>
-                        </div>
-                    </div>
-
-                    <!-- Stock Trend & Returns Bar -->
-                    <div id="instSelectedStockTrendBar" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));gap:0.4rem;padding:0.45rem 0.6rem;background:#121215;border:1px solid rgba(255,255,255,0.1);border-radius:6px;margin-bottom:0.55rem;align-items:center;">
-                        <div>
-                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Price</div>
-                            <div id="instPriceVal" style="font-size:0.88rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</div>
-                        </div>
-                        <div>
-                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">7D Return</div>
-                            <div id="instRet7dVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
-                        </div>
-                        <div>
-                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">30D Return</div>
-                            <div id="instRet30dVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
-                        </div>
-                        <div>
-                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">1Y Return</div>
-                            <div id="instRet1yVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
-                        </div>
-                        <div>
-                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Market Cap</div>
-                            <div id="instMcapVal" style="font-size:0.82rem;font-weight:700;color:#ffffff;font-family:var(--font-mono);">--</div>
-                        </div>
-                    </div>
-
-                    <!-- Institutional Flow & Stake Metrics -->
-                    <div id="instSelectedScoreText" style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);line-height:1.45;">
-                        <!-- Populated dynamically -->
-                    </div>
-                </div>
-
-                <!-- 1. Shareholding Pattern Trend -->
-                <div class="card" style="padding:0.75rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);margin-bottom:0.75rem;">
-                    <div style="font-size:0.76rem;font-weight:700;color:#f8fafc;margin-bottom:0.45rem;display:flex;align-items:center;gap:0.35rem;">
-                        <span></span> Trailing Shareholding Breakdown & QoQ Deltas
-                    </div>
-                    <div id="instShareholdingPatternContainer" style="overflow-x:auto;">
-                        <!-- Dynamic Table with QoQ Deltas -->
-                    </div>
-                </div>
-
-                <!-- 2. Recent Block & Bulk Deals -->
-                <div class="card" style="padding:0.75rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);margin-bottom:0.75rem;">
-                    <div style="font-size:0.76rem;font-weight:700;color:#f8fafc;margin-bottom:0.45rem;display:flex;align-items:center;gap:0.35rem;">
-                        <span></span> Major Bulk & Block Deals (Volume Footprints)
-                    </div>
-                    <div id="instBlockDealsContainer" style="max-height:160px;overflow-y:auto;">
-                        <!-- Dynamic Block Deals -->
-                    </div>
-                </div>
-
-                <!-- 3. Fund Holdings Table -->
-                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.08);">
-                    <div style="padding:0.55rem 0.8rem;background:#0f172a;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
-                        <div style="font-size:0.76rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
-                            <span></span> Institutional Funds & Whales Holding This Stock
-                        </div>
-                    </div>
-                    <div style="overflow-x:auto;max-height:220px;overflow-y:auto;">
-                        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
-                            <thead>
-                                <tr style="background:#0b1329;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:0.66rem;">
-                                    <th style="padding:0.45rem 0.6rem;">FUND / INVESTOR</th>
-                                    <th style="padding:0.45rem 0.5rem;">TYPE</th>
-                                    <th style="padding:0.45rem 0.5rem;">ACTION</th>
-                                    <th style="padding:0.45rem 0.5rem;">STAKE %</th>
-                                    <th style="padding:0.45rem 0.5rem;">AVG PRICE</th>
-                                    <th style="padding:0.45rem 0.5rem;">RECENT TXN (PRICE & DATE)</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Increase by Percentage">CHG %</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Increase by Amount in Crores">INCREASE (₹ CR)</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Total Amount in Crores">TOTAL VALUE (₹ CR)</th>
-                                    <th style="padding:0.45rem 0.5rem;">DATE</th>
-                                </tr>
-                            </thead>
-                            <tbody id="instStockHoldingsTableBody">
-                                <tr>
-                                    <td colspan="10" style="padding:1.5rem;text-align:center;color:#64748b;">
-                                        Select or search a stock on the left to inspect fund activities.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========================================================================= -->
-    <!-- PAGE 2:  SMART MONEY & INVESTOR PORTFOLIOS -->
-    <!-- ========================================================================= -->
-    <div id="instPage-investors" style="display:none;">
-        
-        <!-- Category Filter Bar -->
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;background:#0f172a;padding:0.85rem 1rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
-            <div>
-                <div style="font-size:0.95rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
-                    <span></span> Smart Money Directory & Fund Portfolios
-                </div>
-                <div style="font-size:0.72rem;color:#94a3b8;margin-top:0.15rem;">Browse leading Mutual Funds (DII), Super Investors (HNI), and Sovereign/Foreign Funds (FII).</div>
-                <span id="instFreshnessBadge-investors" style="margin-top:0.3rem;"></span>
-            </div>
-
-            <!-- Category Pills -->
-            <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
-                <button type="button" id="btnInvCat-ALL" onclick="app.filterInvestors('ALL')" class="btn btn-sm" style="background:#1e293b;color:#ffffff;border:1px solid rgba(56,189,248,0.4);font-weight:700;font-size:0.74rem;">
-                    All Investors
-                </button>
-                <button type="button" id="btnInvCat-MF" onclick="app.filterInvestors('Mutual Fund')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);font-size:0.74rem;">
-                    Mutual Funds (DII)
-                </button>
-                <button type="button" id="btnInvCat-SI" onclick="app.filterInvestors('Super Investor')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);font-size:0.74rem;">
-                    Super Investors (HNI)
-                </button>
-                <button type="button" id="btnInvCat-FII" onclick="app.filterInvestors('Foreign')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);font-size:0.74rem;">
-                    Foreign & Sovereign (FII)
-                </button>
-            </div>
-        </div>
-
-        <!-- Investors Directory Table -->
-        <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.08);margin-bottom:1.5rem;">
-            <div style="overflow-x:auto;">
-                <table style="width:100%;border-collapse:collapse;font-size:0.76rem;text-align:left;">
-                    <thead>
-                        <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.7rem;">
-                            <th style="padding:0.6rem 0.8rem;">INVESTOR / FUND NAME</th>
-                            <th style="padding:0.6rem 0.8rem;">CATEGORY</th>
-                            <th style="padding:0.6rem 0.8rem;">TRACKED HOLDINGS</th>
-                            <th style="padding:0.6rem 0.8rem;">BUYING ACTIONS</th>
-                            <th style="padding:0.6rem 0.8rem;">SELLING ACTIONS</th>
-                            <th style="padding:0.6rem 0.8rem;">30D RETURN</th>
-                            <th style="padding:0.6rem 0.8rem;">1Y RETURN</th>
-                            <th style="padding:0.6rem 0.8rem;">TRACKED VALUE (₹ CR)</th>
-                            <th style="padding:0.6rem 0.8rem;text-align:center;">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody id="instFundsTableBody">
-                        <tr>
-                            <td colspan="9" style="padding:2rem;text-align:center;color:#64748b;">
-                                <div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Loading institutional directory...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <!-- Investors Directory Load More Footer -->
-            <div id="instFundsFooterBar" style="padding:0.65rem 1rem;background:#0b1329;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-                <span id="instFundsCountBadge" style="font-size:0.72rem;color:#94a3b8;font-family:var(--font-mono);">Showing 0 funds & whales</span>
-                <button type="button" id="btnInstLoadMoreFunds" onclick="app.loadMoreInstitutionalFunds()" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.3rem 0.8rem;background:rgba(56,189,248,0.12);color:#ffffff;border:1px solid rgba(56,189,248,0.35);font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.35rem;">
-                    <span></span> Load More Funds & Whales (+25)
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========================================================================= -->
-    <!-- ========================================================================= -->
-    <!-- PAGE 3: TOP STOCKS & MASSIVE HISTORICAL ADDITIONS -->
-    <!-- ========================================================================= -->
-    <div id="instPage-top-additions" style="display:none;">
-
-        <!-- Header & KPI Highlights Bar (Crisp Monochrome) -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:0.75rem;margin-bottom:1rem;">
-            <div class="card" style="padding:0.75rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.18);border-radius:8px;">
-                <div style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);text-transform:uppercase;">Top Additions (>3% Stake Surge)</div>
-                <div id="kpiTopAdditionsCount" style="font-size:1.4rem;font-weight:800;color:#ffffff;margin-top:0.2rem;font-family:var(--font-mono);">0 Setups</div>
-                <div style="font-size:0.68rem;color:#71717a;margin-top:0.1rem;">Latest Filing (Q1 FY27 vs Q4 FY26)</div>
-            </div>
-            <div class="card" style="padding:0.75rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.18);border-radius:8px;">
-                <div style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);text-transform:uppercase;">Top Stake Addition Leader</div>
-                <div id="kpiTopAdditionLeader" style="font-size:1.4rem;font-weight:800;color:#ffffff;margin-top:0.2rem;font-family:var(--font-mono);">--</div>
-                <div id="kpiTopAdditionLeaderSub" style="font-size:0.68rem;color:#71717a;margin-top:0.1rem;">--</div>
-            </div>
-            <div class="card" style="padding:0.75rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.18);border-radius:8px;">
-                <div style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);text-transform:uppercase;">Mega Institutional Inflows</div>
-                <div id="kpiTopAdditionInflowLeader" style="font-size:1.4rem;font-weight:800;color:#ffffff;margin-top:0.2rem;font-family:var(--font-mono);">--</div>
-                <div id="kpiTopAdditionInflowLeaderSub" style="font-size:0.68rem;color:#71717a;margin-top:0.1rem;">--</div>
-            </div>
-            <div class="card" style="padding:0.75rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.18);border-radius:8px;">
-                <div style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);text-transform:uppercase;">Multi-Quarter Historical Surges</div>
-                <div id="kpiHistoricalSurgesCount" style="font-size:1.4rem;font-weight:800;color:#ffffff;margin-top:0.2rem;font-family:var(--font-mono);">0 Surges</div>
-                <div style="font-size:0.68rem;color:#71717a;margin-top:0.1rem;">Across Prior 4 Filings</div>
-            </div>
-        </div>
-
-        <!-- 50-50 Split Screen Layout for Top Additions & Detailed Investigation -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;align-items:start;">
-
-            <!-- LEFT 50%: Tables & Surge Views -->
-            <div style="min-width:0;">
-
-                <!-- TABLE 1: LATEST QUARTER TOP STAKE ADDITIONS -->
-                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;margin-bottom:1rem;">
-                    <div style="padding:0.65rem 0.95rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-                        <div>
-                            <div style="font-size:0.88rem;font-weight:800;color:#ffffff;">Latest Quarter Top Stake Additions (>1.0% Increase)</div>
-                            <div style="font-size:0.68rem;color:#a1a1aa;font-family:var(--font-mono);">Reporting Period: Q1 FY27 vs Q4 FY26</div>
-                        </div>
-                        <span class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.68rem;padding:0.2rem 0.55rem;">
-                            LATEST FILING
-                        </span>
-                    </div>
-
-                    <div style="overflow-x:auto;max-height:360px;overflow-y:auto;">
-                        <table style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
-                            <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.68rem;">
-                                <tr>
-                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Institutional Addition %">INC %</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Increase in Amount">INC (INR CR)</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Total Holding Value">TOTAL (INR CR)</th>
-                                    <th style="padding:0.45rem 0.5rem;">FII / DII</th>
-                                    <th style="padding:0.45rem 0.5rem;">FUNDS</th>
-                                    <th style="padding:0.45rem 0.5rem;">7D / 30D</th>
-                                    <th style="padding:0.45rem 0.4rem;text-align:center;">ACTION</th>
-                                </tr>
-                            </thead>
-                            <tbody id="instTopAdditionsTableBody">
-                                <tr><td colspan="8" style="padding:2rem;text-align:center;color:#71717a;">Loading top additions...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- TABLE 2: HISTORICAL INSTITUTIONAL SURGES WITH SUB-TABS (% vs INR Cr) -->
-                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;">
-                    <div style="padding:0.65rem 0.95rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-                        <div>
-                            <div style="font-size:0.88rem;font-weight:800;color:#ffffff;">Massive Historical Institutional Additions</div>
-                            <div style="font-size:0.68rem;color:#a1a1aa;font-family:var(--font-mono);">Prior Quarters with Mega Accumulation (e.g. Q4 FY26 vs Q3 FY26)</div>
-                        </div>
-                        <div style="display:flex;background:#09090b;padding:0.15rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);gap:0.15rem;">
-                            <button type="button" id="btnSurgeSort-pct" onclick="app.toggleSurgeSort('pct')" class="btn btn-sm" style="background:#ffffff;color:#09090b;border:1px solid #ffffff;font-size:0.65rem;padding:0.2rem 0.5rem;font-weight:700;cursor:pointer;">Top % Surge</button>
-                            <button type="button" id="btnSurgeSort-amt" onclick="app.toggleSurgeSort('amount')" class="btn btn-sm" style="background:transparent;color:#a1a1aa;border:1px solid transparent;font-size:0.65rem;padding:0.2rem 0.5rem;font-weight:500;cursor:pointer;">Top INR Cr Inflow</button>
-                        </div>
-                    </div>
-
-                    <div style="overflow-x:auto;max-height:360px;overflow-y:auto;">
-                        <table style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
-                            <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.68rem;">
-                                <tr>
-                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
-                                    <th style="padding:0.45rem 0.5rem;">COMPARISON</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Quarterly Stake Increase %">INC %</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Increase in Amount">INC (INR CR)</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Total Holding Value">TOTAL (INR CR)</th>
-                                    <th style="padding:0.45rem 0.5rem;">FII / DII</th>
-                                    <th style="padding:0.45rem 0.5rem;">STAKE FLOW</th>
-                                    <th style="padding:0.45rem 0.4rem;text-align:center;">ACTION</th>
-                                </tr>
-                            </thead>
-                            <tbody id="instHistoricalSurgesTableBody">
-                                <tr><td colspan="8" style="padding:2rem;text-align:center;color:#71717a;">Loading historical surges...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- RIGHT 50%: Dedicated Inline Inspection Workbench -->
-            <div id="instTopAdditionsSplitRight" style="min-width:0;position:sticky;top:0.75rem;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:0.2rem;">
-
-                <!-- Stock Header Card -->
-                <div id="instTopSelectedStockHeaderCard" class="card" style="padding:0.85rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.15);margin-bottom:0.75rem;">
-                    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.6rem;">
-                        <div>
-                            <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
-                                <span id="instTopSelectedTicker" style="font-size:1.2rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</span>
-                                <span id="instTopSelectedCompanyName" style="font-size:0.78rem;color:#a1a1aa;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">--</span>
-                                <span id="instTopSelectedVerdictBadge" class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.65rem;padding:0.12rem 0.45rem;">--</span>
-                            </div>
-                            <div id="instTopSelectedStockTimeframe" style="font-size:0.62rem;color:#71717a;margin-top:0.2rem;font-family:var(--font-mono);">
-                                Comparison: Q1 FY27 vs Q4 FY26 · Synced Live
-                            </div>
-                        </div>
-                        <div style="display:flex;align-items:center;gap:0.35rem;">
-                            <a id="instTopSelectedStockLink" href="#" target="_blank" class="btn btn-sm" style="background:#ffffff;color:#000000;font-weight:700;font-size:0.7rem;padding:0.25rem 0.6rem;text-decoration:none;border-radius:4px;">
-                                Open Full Intel
-                            </a>
-                        </div>
-                    </div>
-
-                    <!-- Stock Trend & Returns Bar -->
-                    <div id="instTopSelectedStockTrendBar" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));gap:0.4rem;padding:0.45rem 0.6rem;background:#121215;border:1px solid rgba(255,255,255,0.1);border-radius:6px;margin-bottom:0.55rem;align-items:center;">
-                        <div>
-                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Price</div>
-                            <div id="instTopPriceVal" style="font-size:0.88rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</div>
-                        </div>
-                        <div>
-                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">7D Return</div>
-                            <div id="instTopRet7dVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
-                        </div>
-                        <div>
-                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">30D Return</div>
-                            <div id="instTopRet30dVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
-                        </div>
-                        <div>
-                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">1Y Return</div>
-                            <div id="instTopRet1yVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
-                        </div>
-                        <div>
-                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Market Cap</div>
-                            <div id="instTopMcapVal" style="font-size:0.82rem;font-weight:700;color:#ffffff;font-family:var(--font-mono);">--</div>
-                        </div>
-                    </div>
-
-                    <!-- Institutional Flow & Stake Metrics -->
-                    <div id="instTopSelectedStockSubtitle" style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);line-height:1.45;">
-                        <!-- Populated dynamically -->
-                    </div>
-                </div>
-
-                <!-- Section A: Shareholding Pattern (Last 5 Quarters) -->
-                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;margin-bottom:0.75rem;">
-                    <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
-                        <span>Shareholding Pattern (Last 5 Quarters)</span>
-                        <span style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">Promoter / FII / DII / Public</span>
-                    </div>
-                    <div id="instTopStockQuarterlyTrendContainer" style="padding:0.6rem 0.85rem;overflow-x:auto;">
-                        <div style="color:#71717a;font-size:0.72rem;text-align:center;padding:1rem;">Select any stock from the table to inspect details.</div>
-                    </div>
-                </div>
-
-                <!-- Section B: Funds & Whales Holding this Stock -->
-                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;margin-bottom:0.75rem;">
-                    <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
-                        <span>Institutional Funds & Whales Holding This Stock</span>
-                        <span id="instTopStockFundCountBadge" style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">0 Funds Tracked</span>
-                    </div>
-                    <div style="overflow-x:auto;max-height:220px;overflow-y:auto;">
-                        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
-                            <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.65rem;">
-                                <tr>
-                                    <th style="padding:0.4rem 0.6rem;">INVESTOR / FUND</th>
-                                    <th style="padding:0.4rem 0.5rem;">TYPE</th>
-                                    <th style="padding:0.4rem 0.5rem;">ACTION</th>
-                                    <th style="padding:0.4rem 0.5rem;">STAKE %</th>
-                                    <th style="padding:0.4rem 0.5rem;">AVG PRICE</th>
-                                    <th style="padding:0.4rem 0.5rem;">RECENT TXN</th>
-                                    <th style="padding:0.4rem 0.5rem;">CHG %</th>
-                                    <th style="padding:0.4rem 0.5rem;">INCREASE</th>
-                                    <th style="padding:0.4rem 0.5rem;">TOTAL VALUE</th>
-                                    <th style="padding:0.4rem 0.5rem;">DATE</th>
-                                </tr>
-                            </thead>
-                            <tbody id="instTopStockHoldingsTableBody">
-                                <tr><td colspan="10" style="padding:1.5rem;text-align:center;color:#71717a;">Select a stock to view holding funds.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Section C: Block Deals -->
-                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;">
-                    <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
-                        <span>Recent Block / Bulk Deals (High Conviction)</span>
-                        <span style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">Exchange Filings</span>
-                    </div>
-                    <div id="instTopBlockDealsContainer" style="padding:0.6rem 0.85rem;max-height:200px;overflow-y:auto;">
-                        <div style="color:#71717a;font-size:0.72rem;text-align:center;padding:1rem;">Select a stock to view block deals.</div>
-                    </div>
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-
-    <!-- ========================================================================= -->
-    <!-- FUND PORTFOLIO MODAL (FULL HOLDINGS DRILLDOWN) -->
-    <!-- ========================================================================= -->
-    <div id="instFundModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.5rem;">
-        <div class="card" style="width:100%;max-width:980px;max-height:90vh;background:#09090b;border:1px solid rgba(255,255,255,0.2);display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.7);border-radius:10px;padding:0;overflow:hidden;">
-            
-            <!-- Modal Header -->
-            <div style="padding:1rem 1.25rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:space-between;">
-                <div>
-                    <div style="display:flex;align-items:center;gap:0.6rem;">
-                        <span id="instFundModalTitle" style="font-size:1.15rem;font-weight:800;color:#ffffff;">Fund Portfolio</span>
-                        <span class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.7rem;padding:0.2rem 0.5rem;">INSTITUTIONAL / FUND</span>
-                    </div>
-                    <div id="instFundModalSubtitle" style="font-size:0.72rem;color:#a1a1aa;margin-top:0.25rem;font-family:var(--font-mono);">
-                        Tracked Value: -- · Total Holdings: -- · Quarter: --
-                    </div>
-                </div>
-                <button type="button" onclick="app.closeFundModal()" class="btn btn-sm" style="background:#27272a;color:#ffffff;border:1px solid rgba(255,255,255,0.2);padding:0.35rem 0.75rem;cursor:pointer;border-radius:6px;font-weight:700;font-size:0.85rem;">✕ Close</button>
-            </div>
-
-            <!-- Modal Content Table -->
-            <div style="padding:0;overflow-y:auto;max-height:calc(90vh - 120px);">
-                <table style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
-                    <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.7rem;">
-                        <tr>
-                            <th style="padding:0.5rem 0.75rem;">TICKER</th>
-                            <th style="padding:0.5rem 0.6rem;">COMPANY NAME</th>
-                            <th style="padding:0.5rem 0.6rem;">SECTOR</th>
-                            <th style="padding:0.5rem 0.6rem;">ACTION</th>
-                            <th style="padding:0.5rem 0.6rem;">HOLDING (₹ CR)</th>
-                            <th style="padding:0.5rem 0.6rem;">SHARES</th>
-                            <th style="padding:0.5rem 0.6rem;">STAKE %</th>
-                            <th style="padding:0.5rem 0.6rem;">30D RET</th>
-                            <th style="padding:0.5rem 0.6rem;">1Y RET</th>
-                            <th style="padding:0.5rem 0.6rem;">REPORTED</th>
-                        </tr>
-                    </thead>
-                    <tbody id="instFundModalTableBody">
-                        <tr><td colspan="10" style="padding:2.5rem;text-align:center;color:#71717a;">Loading portfolio positions...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-        </div>
-    </div>
-
+﻿<!-- ========================================================================= -->
+
+<!-- INSTITUTIONAL FLOWS & SMART MONEY HUB (PAGE 1: EQUITIES | PAGE 2: INVESTORS) -->
+
+<!-- ========================================================================= -->
+
+<div id="tab-institutional" class="tab-content" style="width: 100%; max-width: 100%;">
+
+
+
+    <!-- Sub-navigation Header: 2 Dedicated Pages -->
+
+    <div style="margin-bottom:1.25rem;">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.75rem;">
+
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+
+                <div style="font-size:1.15rem;font-weight:800;color:#f8fafc;display:flex;align-items:center;gap:0.5rem;letter-spacing:-0.02em;">
+
+                    Institutional Intelligence & Smart Money
+
+                </div>
+
+                <span class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.65rem;padding:0.15rem 0.5rem;">FII / DII & SUPER INVESTORS</span>
+
+            </div>
+
+
+
+            <!-- Page Switcher Tabs -->
+
+            <div style="display:flex;background:#090d1a;padding:0.25rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);gap:0.25rem;flex-wrap:wrap;">
+
+                <button type="button" id="btnInstPage-equities" onclick="app.switchInstitutionalPage('equities')" class="btn btn-sm" style="background:#1e293b;color:#ffffff;border:1px solid rgba(255,255,255,0.3);font-weight:700;padding:0.35rem 0.85rem;font-size:0.76rem;">
+
+                    Equities & Stake Radar
+
+                </button>
+
+                <button type="button" id="btnInstPage-top-additions" onclick="app.switchInstitutionalPage('top-additions')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;">
+
+                    Top Stocks & Massive Additions
+
+                </button>
+
+                <button type="button" id="btnInstPage-investors" onclick="app.switchInstitutionalPage('investors')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;">
+
+                    Smart Money & Portfolios
+
+                </button>
+
+                <button type="button" id="btnInstPage-smart-money" onclick="app.switchInstitutionalPage('smart-money')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;display:flex;align-items:center;gap:0.35rem;">
+
+                    <span>🎯</span> Smart Money Radar
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- ========================================================================= -->
+
+    <!-- PAGE 1: ️ EQUITIES & STAKE RADAR (50-50 SPLIT SCREEN LAYOUT) -->
+
+    <!-- ========================================================================= -->
+
+    <div id="instPage-equities" style="display:block;">
+
+        
+
+        <!-- Top Toolbar & Legend -->
+
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem;background:#0f172a;padding:0.65rem 0.9rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
+
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+
+                <!-- Flow Toggle -->
+
+                <div style="display:flex;background:#020617;padding:0.2rem;border-radius:6px;border:1px solid rgba(255,255,255,0.1);gap:0.2rem;">
+
+                    <button type="button" id="btnInstFlowToggle-acc" onclick="app.switchEquitiesFlowView('accumulating')" class="btn btn-sm" style="background:#1e293b;color:#ffffff;border:1px solid rgba(16,185,129,0.4);font-weight:700;font-size:0.7rem;padding:0.25rem 0.6rem;">
+
+                         Stake Increasing
+
+                    </button>
+
+                    <button type="button" id="btnInstFlowToggle-dist" onclick="app.switchEquitiesFlowView('distributing')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-size:0.7rem;padding:0.25rem 0.6rem;">
+
+                         Trimming
+
+                    </button>
+
+                </div>
+
+
+
+                <!-- Stock Quick Search -->
+
+                <div style="position:relative;display:flex;align-items:center;">
+
+                    <input id="instStockSearchInput" type="text" placeholder="Lookup ticker..." onkeydown="if(event.key==='Enter') app.searchInstitutionalStock(this.value)" style="background:#020617;border:1px solid rgba(255,255,255,0.15);color:#f8fafc;font-size:0.72rem;padding:0.25rem 0.5rem 0.25rem 1.6rem;border-radius:5px;width:150px;font-family:var(--font-mono);outline:none;">
+
+                    <span style="position:absolute;left:0.45rem;font-size:0.7rem;color:#64748b;"></span>
+
+                    <button type="button" onclick="app.searchInstitutionalStock(document.getElementById('instStockSearchInput').value)" class="btn btn-sm" style="margin-left:0.25rem;padding:0.25rem 0.5rem;font-size:0.7rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">Go</button>
+
+                </div>
+
+
+
+                <!-- Presets chips -->
+
+                <div style="display:flex;gap:0.25rem;flex-wrap:wrap;">
+
+                    <button type="button" onclick="app.searchInstitutionalStock('ALLCARGO.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);border:1px solid rgba(255,255,255,0.25);color:#ffffff;">ALLCARGO</button>
+
+                    <button type="button" onclick="app.searchInstitutionalStock('DIXON.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);color:#ffffff;">DIXON</button>
+
+                    <button type="button" onclick="app.searchInstitutionalStock('KAYNES.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);color:#ffffff;">KAYNES</button>
+
+                    <button type="button" onclick="app.searchInstitutionalStock('TRENT.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);color:#a78bfa;">TRENT</button>
+
+                    <button type="button" onclick="app.searchInstitutionalStock('CDSL.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);color:#ffffff;">CDSL</button>
+
+                    <button type="button" onclick="app.searchInstitutionalStock('TCS.NS')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.45rem;font-family:var(--font-mono);color:#ffffff;">TCS</button>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Legend & Layout Toggle -->
+
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+
+                <span id="instFreshnessBadge-equities"></span>
+
+                <div style="font-size:0.66rem;color:#94a3b8;font-family:var(--font-mono);background:rgba(255,255,255,0.03);padding:0.25rem 0.5rem;border-radius:4px;border:1px solid rgba(255,255,255,0.06);">
+
+                    <strong style="color:#cbd5e1;">SCORE:</strong> 0-100 · <strong style="color:#cbd5e1;">7D/30D:</strong> Momentum · <strong style="color:#cbd5e1;">FUNDS:</strong> Net Count (QoQ) · <strong style="color:#cbd5e1;">STAKE:</strong> Latest Inst %
+
+                </div>
+
+                <button type="button" id="btnToggleInstSplit" onclick="app.toggleInstitutionalSplitLayout()" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.2rem 0.5rem;color:#cbd5e1;" title="Toggle 50-50 split vs full width">
+
+                    ◫ 50-50 Split
+
+                </button>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- 50-50 Responsive Split Grid Container -->
+
+        <div id="instEquitiesSplitGrid" style="display:grid;grid-template-columns:minmax(0, 1.05fr) minmax(0, 0.95fr);gap:0.85rem;align-items:start;">
+
+            
+
+            <!-- LEFT 50%: Compact Radar Table -->
+
+            <div id="instSplitLeft" style="min-width:0;">
+
+                
+
+                <!-- Accumulation Table (Compact) -->
+
+                <div id="instEquitiesFlow-accumulating" class="card" style="padding:0;overflow:hidden;border:1px solid rgba(16,185,129,0.25);margin-bottom:1rem;">
+
+                    <div style="overflow-x:auto;">
+
+                        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
+
+                            <thead>
+
+                                <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.66rem;">
+
+                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">SCORE</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Buying Funds">FUNDS (QoQ)</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
+
+                                    <th style="padding:0.45rem 0.4rem;text-align:center;"></th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody id="instAccumulatingTableBody">
+
+                                <tr>
+
+                                    <td colspan="8" style="padding:2rem;text-align:center;color:#64748b;">
+
+                                        <div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Loading setups...
+
+                                    </td>
+
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                    <!-- Accumulation Load More Footer -->
+
+                    <div id="instAccFooterBar" style="padding:0.55rem 0.8rem;background:#0b1329;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+
+                        <span id="instAccCountBadge" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">Showing 0 setups</span>
+
+                        <button type="button" id="btnInstLoadMoreAcc" onclick="app.loadMoreInstitutionalEquities('accumulating')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.25rem 0.65rem;background:rgba(16,185,129,0.12);color:#ffffff;border:1px solid rgba(16,185,129,0.35);font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.3rem;">
+
+                            <span></span> Load More Accumulating (+25)
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Distribution Table (Compact) -->
+
+                <div id="instEquitiesFlow-distributing" class="card" style="display:none;padding:0;overflow:hidden;border:1px solid rgba(239,68,68,0.25);margin-bottom:1rem;">
+
+                    <div style="overflow-x:auto;">
+
+                        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
+
+                            <thead>
+
+                                <tr style="background:#180d14;color:#fca5a5;border-bottom:1px solid rgba(239,68,68,0.15);font-family:var(--font-mono);font-size:0.66rem;">
+
+                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">SCORE</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="7-Day Price Change">7D</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="30-Day Price Change">30D</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Quarter-over-Quarter (QoQ / ~90-day horizon) Net Selling Funds">FUNDS (QoQ)</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Net Institutional Flow in Crores (QoQ)">NET FLOW</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Total Institutional Stake from Latest Filing">STAKE</th>
+
+                                    <th style="padding:0.45rem 0.4rem;text-align:center;"></th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody id="instDistributingTableBody">
+
+                                <!-- Dynamic rows -->
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                    <!-- Distribution Load More Footer -->
+
+                    <div id="instDistFooterBar" style="padding:0.55rem 0.8rem;background:#180d14;border-top:1px solid rgba(239,68,68,0.18);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+
+                        <span id="instDistCountBadge" style="font-size:0.68rem;color:#fca5a5;font-family:var(--font-mono);">Showing 0 setups</span>
+
+                        <button type="button" id="btnInstLoadMoreDist" onclick="app.loadMoreInstitutionalEquities('distributing')" class="btn btn-secondary btn-sm" style="font-size:0.68rem;padding:0.25rem 0.65rem;background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.35);font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.3rem;">
+
+                            <span></span> Load More Distributing (+25)
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- RIGHT 50%: Live Stock Drilldown (Inspect Details) -->
+
+            <div id="instSplitRight" style="min-width:0;position:sticky;top:0.75rem;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:0.2rem;">
+
+                
+
+                <!-- Stock Header Card -->
+
+                <div id="instStockHeaderCard" class="card" style="padding:0.85rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.15);margin-bottom:0.75rem;">
+
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.6rem;">
+
+                        <div>
+
+                            <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
+
+                                <span id="instSelectedTicker" style="font-size:1.2rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</span>
+
+                                <span id="instSelectedCompanyName" style="font-size:0.78rem;color:#a1a1aa;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">--</span>
+
+                                <span id="instSelectedVerdictBadge" class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.65rem;padding:0.12rem 0.45rem;">--</span>
+
+                            </div>
+
+                            <div id="instSelectedStockTimeframe" style="font-size:0.62rem;color:#71717a;margin-top:0.2rem;font-family:var(--font-mono);">
+
+                                Point-in-Time Intelligence · Synced Live
+
+                            </div>
+
+                        </div>
+
+                        <div style="display:flex;align-items:center;gap:0.35rem;">
+
+                            <button type="button" onclick="app.openAddToWatchlistModal(document.getElementById('instSelectedTicker')?.innerText?.split(' ')[0] || app.institutionalModule._selectedTicker || 'ALLCARGO.NS')" class="btn btn-sm" style="background:#18181b;color:#ffffff;border:1px solid rgba(255,255,255,0.2);font-size:0.68rem;padding:0.25rem 0.5rem;border-radius:4px;cursor:pointer;">
+
+                                ⭐ Watchlist
+
+                            </button>
+
+                            <a id="instSelectedStockLink" href="#" target="_blank" class="btn btn-sm" style="background:#ffffff;color:#000000;font-weight:700;font-size:0.7rem;padding:0.25rem 0.6rem;text-decoration:none;border-radius:4px;">
+
+                                Open Full Intel
+
+                            </a>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Stock Trend & Returns Bar -->
+
+                    <div id="instSelectedStockTrendBar" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));gap:0.4rem;padding:0.45rem 0.6rem;background:#121215;border:1px solid rgba(255,255,255,0.1);border-radius:6px;margin-bottom:0.55rem;align-items:center;">
+
+                        <div>
+
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Price</div>
+
+                            <div id="instPriceVal" style="font-size:0.88rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</div>
+
+                        </div>
+
+                        <div>
+
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">7D Return</div>
+
+                            <div id="instRet7dVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
+
+                        </div>
+
+                        <div>
+
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">30D Return</div>
+
+                            <div id="instRet30dVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
+
+                        </div>
+
+                        <div>
+
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">1Y Return</div>
+
+                            <div id="instRet1yVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
+
+                        </div>
+
+                        <div>
+
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Market Cap</div>
+
+                            <div id="instMcapVal" style="font-size:0.82rem;font-weight:700;color:#ffffff;font-family:var(--font-mono);">--</div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Institutional Flow & Stake Metrics -->
+
+                    <div id="instSelectedScoreText" style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);line-height:1.45;">
+
+                        <!-- Populated dynamically -->
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- 1. Shareholding Pattern Trend -->
+
+                <div class="card" style="padding:0.75rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);margin-bottom:0.75rem;">
+
+                    <div style="font-size:0.76rem;font-weight:700;color:#f8fafc;margin-bottom:0.45rem;display:flex;align-items:center;gap:0.35rem;">
+
+                        <span></span> Trailing Shareholding Breakdown & QoQ Deltas
+
+                    </div>
+
+                    <div id="instShareholdingPatternContainer" style="overflow-x:auto;">
+
+                        <!-- Dynamic Table with QoQ Deltas -->
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- 2. Recent Block & Bulk Deals -->
+
+                <div class="card" style="padding:0.75rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);margin-bottom:0.75rem;">
+
+                    <div style="font-size:0.76rem;font-weight:700;color:#f8fafc;margin-bottom:0.45rem;display:flex;align-items:center;gap:0.35rem;">
+
+                        <span></span> Major Bulk & Block Deals (Volume Footprints)
+
+                    </div>
+
+                    <div id="instBlockDealsContainer" style="max-height:160px;overflow-y:auto;">
+
+                        <!-- Dynamic Block Deals -->
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- 3. Fund Holdings Table -->
+
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.08);">
+
+                    <div style="padding:0.55rem 0.8rem;background:#0f172a;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
+
+                        <div style="font-size:0.76rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
+
+                            <span></span> Institutional Funds & Whales Holding This Stock
+
+                        </div>
+
+                    </div>
+
+                    <div style="overflow-x:auto;max-height:220px;overflow-y:auto;">
+
+                        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
+
+                            <thead>
+
+                                <tr style="background:#0b1329;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:0.66rem;">
+
+                                    <th style="padding:0.45rem 0.6rem;">FUND / INVESTOR</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">TYPE</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">ACTION</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">STAKE %</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">AVG PRICE</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">RECENT TXN (PRICE & DATE)</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Increase by Percentage">CHG %</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Increase by Amount in Crores">INCREASE (₹ CR)</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Total Amount in Crores">TOTAL VALUE (₹ CR)</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">DATE</th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody id="instStockHoldingsTableBody">
+
+                                <tr>
+
+                                    <td colspan="10" style="padding:1.5rem;text-align:center;color:#64748b;">
+
+                                        Select or search a stock on the left to inspect fund activities.
+
+                                    </td>
+
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- ========================================================================= -->
+
+    <!-- PAGE 2:  SMART MONEY & INVESTOR PORTFOLIOS -->
+
+    <!-- ========================================================================= -->
+
+    <div id="instPage-investors" style="display:none;">
+
+        
+
+        <!-- Category Filter Bar -->
+
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;background:#0f172a;padding:0.85rem 1rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
+
+            <div>
+
+                <div style="font-size:0.95rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+
+                    <span></span> Smart Money Directory & Fund Portfolios
+
+                </div>
+
+                <div style="font-size:0.72rem;color:#94a3b8;margin-top:0.15rem;">Browse leading Mutual Funds (DII), Super Investors (HNI), and Sovereign/Foreign Funds (FII).</div>
+
+                <span id="instFreshnessBadge-investors" style="margin-top:0.3rem;"></span>
+
+            </div>
+
+
+
+            <!-- Category Pills -->
+
+            <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
+
+                <button type="button" id="btnInvCat-ALL" onclick="app.filterInvestors('ALL')" class="btn btn-sm" style="background:#1e293b;color:#ffffff;border:1px solid rgba(56,189,248,0.4);font-weight:700;font-size:0.74rem;">
+
+                    All Investors
+
+                </button>
+
+                <button type="button" id="btnInvCat-MF" onclick="app.filterInvestors('Mutual Fund')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);font-size:0.74rem;">
+
+                    Mutual Funds (DII)
+
+                </button>
+
+                <button type="button" id="btnInvCat-SI" onclick="app.filterInvestors('Super Investor')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);font-size:0.74rem;">
+
+                    Super Investors (HNI)
+
+                </button>
+
+                <button type="button" id="btnInvCat-FII" onclick="app.filterInvestors('Foreign')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);font-size:0.74rem;">
+
+                    Foreign & Sovereign (FII)
+
+                </button>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- Investors Directory Table -->
+
+        <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.08);margin-bottom:1.5rem;">
+
+            <div style="overflow-x:auto;">
+
+                <table style="width:100%;border-collapse:collapse;font-size:0.76rem;text-align:left;">
+
+                    <thead>
+
+                        <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.7rem;">
+
+                            <th style="padding:0.6rem 0.8rem;">INVESTOR / FUND NAME</th>
+
+                            <th style="padding:0.6rem 0.8rem;">CATEGORY</th>
+
+                            <th style="padding:0.6rem 0.8rem;">TRACKED HOLDINGS</th>
+
+                            <th style="padding:0.6rem 0.8rem;">BUYING ACTIONS</th>
+
+                            <th style="padding:0.6rem 0.8rem;">SELLING ACTIONS</th>
+
+                            <th style="padding:0.6rem 0.8rem;">30D RETURN</th>
+
+                            <th style="padding:0.6rem 0.8rem;">1Y RETURN</th>
+
+                            <th style="padding:0.6rem 0.8rem;">TRACKED VALUE (₹ CR)</th>
+
+                            <th style="padding:0.6rem 0.8rem;text-align:center;">ACTIONS</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="instFundsTableBody">
+
+                        <tr>
+
+                            <td colspan="9" style="padding:2rem;text-align:center;color:#64748b;">
+
+                                <div style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</div> Loading institutional directory...
+
+                            </td>
+
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+            <!-- Investors Directory Load More Footer -->
+
+            <div id="instFundsFooterBar" style="padding:0.65rem 1rem;background:#0b1329;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+
+                <span id="instFundsCountBadge" style="font-size:0.72rem;color:#94a3b8;font-family:var(--font-mono);">Showing 0 funds & whales</span>
+
+                <button type="button" id="btnInstLoadMoreFunds" onclick="app.loadMoreInstitutionalFunds()" class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:0.3rem 0.8rem;background:rgba(56,189,248,0.12);color:#ffffff;border:1px solid rgba(56,189,248,0.35);font-weight:700;cursor:pointer;display:flex;align-items:center;gap:0.35rem;">
+
+                    <span></span> Load More Funds & Whales (+25)
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- ========================================================================= -->
+
+    <!-- ========================================================================= -->
+
+    <!-- PAGE 3: TOP STOCKS & MASSIVE HISTORICAL ADDITIONS -->
+
+    <!-- ========================================================================= -->
+
+    <div id="instPage-top-additions" style="display:none;">
+
+
+
+        <!-- Header & KPI Highlights Bar (Crisp Monochrome) -->
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:0.75rem;margin-bottom:1rem;">
+
+            <div class="card" style="padding:0.75rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.18);border-radius:8px;">
+
+                <div style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);text-transform:uppercase;">Top Additions (>3% Stake Surge)</div>
+
+                <div id="kpiTopAdditionsCount" style="font-size:1.4rem;font-weight:800;color:#ffffff;margin-top:0.2rem;font-family:var(--font-mono);">0 Setups</div>
+
+                <div style="font-size:0.68rem;color:#71717a;margin-top:0.1rem;">Latest Filing (Q1 FY27 vs Q4 FY26)</div>
+
+            </div>
+
+            <div class="card" style="padding:0.75rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.18);border-radius:8px;">
+
+                <div style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);text-transform:uppercase;">Top Stake Addition Leader</div>
+
+                <div id="kpiTopAdditionLeader" style="font-size:1.4rem;font-weight:800;color:#ffffff;margin-top:0.2rem;font-family:var(--font-mono);">--</div>
+
+                <div id="kpiTopAdditionLeaderSub" style="font-size:0.68rem;color:#71717a;margin-top:0.1rem;">--</div>
+
+            </div>
+
+            <div class="card" style="padding:0.75rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.18);border-radius:8px;">
+
+                <div style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);text-transform:uppercase;">Mega Institutional Inflows</div>
+
+                <div id="kpiTopAdditionInflowLeader" style="font-size:1.4rem;font-weight:800;color:#ffffff;margin-top:0.2rem;font-family:var(--font-mono);">--</div>
+
+                <div id="kpiTopAdditionInflowLeaderSub" style="font-size:0.68rem;color:#71717a;margin-top:0.1rem;">--</div>
+
+            </div>
+
+            <div class="card" style="padding:0.75rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.18);border-radius:8px;">
+
+                <div style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);text-transform:uppercase;">Multi-Quarter Historical Surges</div>
+
+                <div id="kpiHistoricalSurgesCount" style="font-size:1.4rem;font-weight:800;color:#ffffff;margin-top:0.2rem;font-family:var(--font-mono);">0 Surges</div>
+
+                <div style="font-size:0.68rem;color:#71717a;margin-top:0.1rem;">Across Prior 4 Filings</div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- 50-50 Split Screen Layout for Top Additions & Detailed Investigation -->
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;align-items:start;">
+
+
+
+            <!-- LEFT 50%: Tables & Surge Views -->
+
+            <div style="min-width:0;">
+
+
+
+                <!-- TABLE 1: LATEST QUARTER TOP STAKE ADDITIONS -->
+
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;margin-bottom:1rem;">
+
+                    <div style="padding:0.65rem 0.95rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+
+                        <div>
+
+                            <div style="font-size:0.88rem;font-weight:800;color:#ffffff;">Latest Quarter Top Stake Additions (>1.0% Increase)</div>
+
+                            <div style="font-size:0.68rem;color:#a1a1aa;font-family:var(--font-mono);">Reporting Period: Q1 FY27 vs Q4 FY26</div>
+
+                        </div>
+
+                        <span class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.68rem;padding:0.2rem 0.55rem;">
+
+                            LATEST FILING
+
+                        </span>
+
+                    </div>
+
+
+
+                    <div style="overflow-x:auto;max-height:360px;overflow-y:auto;">
+
+                        <table style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
+
+                            <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.68rem;">
+
+                                <tr>
+
+                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Institutional Addition %">INC %</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Increase in Amount">INC (INR CR)</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Total Holding Value">TOTAL (INR CR)</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">FII / DII</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">FUNDS</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">7D / 30D</th>
+
+                                    <th style="padding:0.45rem 0.4rem;text-align:center;">ACTION</th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody id="instTopAdditionsTableBody">
+
+                                <tr><td colspan="8" style="padding:2rem;text-align:center;color:#71717a;">Loading top additions...</td></tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- TABLE 2: HISTORICAL INSTITUTIONAL SURGES WITH SUB-TABS (% vs INR Cr) -->
+
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;">
+
+                    <div style="padding:0.65rem 0.95rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+
+                        <div>
+
+                            <div style="font-size:0.88rem;font-weight:800;color:#ffffff;">Massive Historical Institutional Additions</div>
+
+                            <div style="font-size:0.68rem;color:#a1a1aa;font-family:var(--font-mono);">Prior Quarters with Mega Accumulation (e.g. Q4 FY26 vs Q3 FY26)</div>
+
+                        </div>
+
+                        <div style="display:flex;background:#09090b;padding:0.15rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);gap:0.15rem;">
+
+                            <button type="button" id="btnSurgeSort-pct" onclick="app.toggleSurgeSort('pct')" class="btn btn-sm" style="background:#ffffff;color:#09090b;border:1px solid #ffffff;font-size:0.65rem;padding:0.2rem 0.5rem;font-weight:700;cursor:pointer;">Top % Surge</button>
+
+                            <button type="button" id="btnSurgeSort-amt" onclick="app.toggleSurgeSort('amount')" class="btn btn-sm" style="background:transparent;color:#a1a1aa;border:1px solid transparent;font-size:0.65rem;padding:0.2rem 0.5rem;font-weight:500;cursor:pointer;">Top INR Cr Inflow</button>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div style="overflow-x:auto;max-height:360px;overflow-y:auto;">
+
+                        <table style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
+
+                            <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.68rem;">
+
+                                <tr>
+
+                                    <th style="padding:0.45rem 0.6rem;">TICKER</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">COMPARISON</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Quarterly Stake Increase %">INC %</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Increase in Amount">INC (INR CR)</th>
+
+                                    <th style="padding:0.45rem 0.5rem;" title="Total Holding Value">TOTAL (INR CR)</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">FII / DII</th>
+
+                                    <th style="padding:0.45rem 0.5rem;">STAKE FLOW</th>
+
+                                    <th style="padding:0.45rem 0.4rem;text-align:center;">ACTION</th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody id="instHistoricalSurgesTableBody">
+
+                                <tr><td colspan="8" style="padding:2rem;text-align:center;color:#71717a;">Loading historical surges...</td></tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+
+
+            </div>
+
+
+
+            <!-- RIGHT 50%: Dedicated Inline Inspection Workbench -->
+
+            <div id="instTopAdditionsSplitRight" style="min-width:0;position:sticky;top:0.75rem;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:0.2rem;">
+
+
+
+                <!-- Stock Header Card -->
+
+                <div id="instTopSelectedStockHeaderCard" class="card" style="padding:0.85rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.15);margin-bottom:0.75rem;">
+
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.6rem;">
+
+                        <div>
+
+                            <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
+
+                                <span id="instTopSelectedTicker" style="font-size:1.2rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</span>
+
+                                <span id="instTopSelectedCompanyName" style="font-size:0.78rem;color:#a1a1aa;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">--</span>
+
+                                <span id="instTopSelectedVerdictBadge" class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.65rem;padding:0.12rem 0.45rem;">--</span>
+
+                            </div>
+
+                            <div id="instTopSelectedStockTimeframe" style="font-size:0.62rem;color:#71717a;margin-top:0.2rem;font-family:var(--font-mono);">
+
+                                Comparison: Q1 FY27 vs Q4 FY26 · Synced Live
+
+                            </div>
+
+                        </div>
+
+                        <div style="display:flex;align-items:center;gap:0.35rem;">
+
+                            <a id="instTopSelectedStockLink" href="#" target="_blank" class="btn btn-sm" style="background:#ffffff;color:#000000;font-weight:700;font-size:0.7rem;padding:0.25rem 0.6rem;text-decoration:none;border-radius:4px;">
+
+                                Open Full Intel
+
+                            </a>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Stock Trend & Returns Bar -->
+
+                    <div id="instTopSelectedStockTrendBar" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));gap:0.4rem;padding:0.45rem 0.6rem;background:#121215;border:1px solid rgba(255,255,255,0.1);border-radius:6px;margin-bottom:0.55rem;align-items:center;">
+
+                        <div>
+
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Price</div>
+
+                            <div id="instTopPriceVal" style="font-size:0.88rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</div>
+
+                        </div>
+
+                        <div>
+
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">7D Return</div>
+
+                            <div id="instTopRet7dVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
+
+                        </div>
+
+                        <div>
+
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">30D Return</div>
+
+                            <div id="instTopRet30dVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
+
+                        </div>
+
+                        <div>
+
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">1Y Return</div>
+
+                            <div id="instTopRet1yVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
+
+                        </div>
+
+                        <div>
+
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Market Cap</div>
+
+                            <div id="instTopMcapVal" style="font-size:0.82rem;font-weight:700;color:#ffffff;font-family:var(--font-mono);">--</div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- Institutional Flow & Stake Metrics -->
+
+                    <div id="instTopSelectedStockSubtitle" style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);line-height:1.45;">
+
+                        <!-- Populated dynamically -->
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Section A: Shareholding Pattern (Last 5 Quarters) -->
+
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;margin-bottom:0.75rem;">
+
+                    <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
+
+                        <span>Shareholding Pattern (Last 5 Quarters)</span>
+
+                        <span style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">Promoter / FII / DII / Public</span>
+
+                    </div>
+
+                    <div id="instTopStockQuarterlyTrendContainer" style="padding:0.6rem 0.85rem;overflow-x:auto;">
+
+                        <div style="color:#71717a;font-size:0.72rem;text-align:center;padding:1rem;">Select any stock from the table to inspect details.</div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Section B: Funds & Whales Holding this Stock -->
+
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;margin-bottom:0.75rem;">
+
+                    <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
+
+                        <span>Institutional Funds & Whales Holding This Stock</span>
+
+                        <span id="instTopStockFundCountBadge" style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">0 Funds Tracked</span>
+
+                    </div>
+
+                    <div style="overflow-x:auto;max-height:220px;overflow-y:auto;">
+
+                        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
+
+                            <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.65rem;">
+
+                                <tr>
+
+                                    <th style="padding:0.4rem 0.6rem;">INVESTOR / FUND</th>
+
+                                    <th style="padding:0.4rem 0.5rem;">TYPE</th>
+
+                                    <th style="padding:0.4rem 0.5rem;">ACTION</th>
+
+                                    <th style="padding:0.4rem 0.5rem;">STAKE %</th>
+
+                                    <th style="padding:0.4rem 0.5rem;">AVG PRICE</th>
+
+                                    <th style="padding:0.4rem 0.5rem;">RECENT TXN</th>
+
+                                    <th style="padding:0.4rem 0.5rem;">CHG %</th>
+
+                                    <th style="padding:0.4rem 0.5rem;">INCREASE</th>
+
+                                    <th style="padding:0.4rem 0.5rem;">TOTAL VALUE</th>
+
+                                    <th style="padding:0.4rem 0.5rem;">DATE</th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody id="instTopStockHoldingsTableBody">
+
+                                <tr><td colspan="10" style="padding:1.5rem;text-align:center;color:#71717a;">Select a stock to view holding funds.</td></tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Section C: Block Deals -->
+
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;">
+
+                    <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
+
+                        <span>Recent Block / Bulk Deals (High Conviction)</span>
+
+                        <span style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">Exchange Filings</span>
+
+                    </div>
+
+                    <div id="instTopBlockDealsContainer" style="padding:0.6rem 0.85rem;max-height:200px;overflow-y:auto;">
+
+                        <div style="color:#71717a;font-size:0.72rem;text-align:center;padding:1rem;">Select a stock to view block deals.</div>
+
+                    </div>
+
+                </div>
+
+
+
+            </div>
+
+
+
+        </div>
+
+
+
+    </div>
+
+
+
+    <!-- ========================================================================= -->
+
+    <!-- PAGE 4: 🎯 SMART MONEY ACCUMULATION RADAR (50-50 SPLIT WORKBENCH) -->
+
+    <!-- ========================================================================= -->
+
+    <div id="instPage-smart-money" style="display:none;">
+
+        <!-- Top Controls & Timeframe Selector Bar -->
+        <div style="background:#09090b;border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:0.75rem 1rem;margin-bottom:0.85rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+                
+                <!-- Time Horizon Filter Pills -->
+                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                    <span style="font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;font-family:var(--font-mono);letter-spacing:0.04em;">Lookback Horizon:</span>
+                    <div style="display:flex;background:#18181b;padding:0.2rem;border-radius:6px;border:1px solid rgba(255,255,255,0.1);gap:0.2rem;">
+                        <button type="button" id="btnSmWin-30d" onclick="app.setSmartMoneyWindow('30d')" class="btn btn-sm" style="background:transparent;color:#a1a1aa;border:1px solid transparent;font-size:0.7rem;padding:0.25rem 0.65rem;font-weight:600;">
+                            ⚡ 30D (Fast Flow)
+                        </button>
+                        <button type="button" id="btnSmWin-90d" onclick="app.setSmartMoneyWindow('90d')" class="btn btn-sm" style="background:#ffffff;color:#09090b;border:1px solid #ffffff;font-size:0.7rem;padding:0.25rem 0.65rem;font-weight:700;">
+                            📅 90D (Quarterly)
+                        </button>
+                        <button type="button" id="btnSmWin-180d" onclick="app.setSmartMoneyWindow('180d')" class="btn btn-sm" style="background:transparent;color:#a1a1aa;border:1px solid transparent;font-size:0.7rem;padding:0.25rem 0.65rem;font-weight:600;">
+                            🏛️ 180D (Deep Structural)
+                        </button>
+                        <button type="button" id="btnSmWin-365d" onclick="app.setSmartMoneyWindow('365d')" class="btn btn-sm" style="background:transparent;color:#a1a1aa;border:1px solid transparent;font-size:0.7rem;padding:0.25rem 0.65rem;font-weight:600;">
+                            🐋 1Y (Whale Building)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Entity Focus Dropdown -->
+                <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                    <span style="font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;font-family:var(--font-mono);">Entity Focus:</span>
+                    <select id="instSmEntityFocus" onchange="app.changeSmartMoneyFilter()" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:0.25rem 0.6rem;font-size:0.72rem;outline:none;font-family:var(--font-mono);">
+                        <option value="smart_money" selected>⭐ Smart Money Only (FII + Whales + Blocks)</option>
+                        <option value="all">🌐 All Institutional Activity (Include Domestic)</option>
+                        <option value="fii_only">🌍 FII & Sovereign Wealth Funds Only</option>
+                        <option value="super_investor">👑 Super Investors Only</option>
+                        <option value="block_deals">⚡ Real-Time Block Buys Only</option>
+                    </select>
+                </div>
+
+                <!-- Filter Inputs & Search -->
+                <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                    <div style="display:flex;align-items:center;gap:0.25rem;background:#18181b;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:0.15rem 0.4rem;">
+                        <span style="font-size:0.68rem;color:#71717a;font-family:var(--font-mono);">Min ₹</span>
+                        <input id="instSmMinCrInput" type="number" value="5" min="0" max="5000" step="1" onchange="app.changeSmartMoneyFilter()" style="background:transparent;border:none;color:#ffffff;font-size:0.72rem;width:48px;font-family:var(--font-mono);outline:none;">
+                        <span style="font-size:0.68rem;color:#71717a;font-family:var(--font-mono);">Cr</span>
+                    </div>
+
+                    <select id="instSmSortBy" onchange="app.changeSmartMoneyFilter()" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:0.25rem 0.6rem;font-size:0.72rem;outline:none;font-family:var(--font-mono);">
+                        <option value="score" selected>Sort: Conviction Score</option>
+                        <option value="capital">Sort: Smart Money (₹ Cr)</option>
+                        <option value="dominance">Sort: Dominance %</option>
+                        <option value="return_30d">Sort: 30D Return %</option>
+                    </select>
+
+                    <input id="instSmSearchInput" type="text" placeholder="Filter ticker/name..." onkeyup="app.filterSmartMoneyLocal(this.value)" style="background:#18181b;border:1px solid rgba(255,255,255,0.15);color:#f4f4f5;font-size:0.72rem;padding:0.25rem 0.5rem;border-radius:6px;width:130px;outline:none;font-family:var(--font-mono);">
+
+                    <button type="button" onclick="app.loadSmartMoneyRadar(true)" class="btn btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);font-size:0.7rem;padding:0.25rem 0.6rem;font-weight:600;display:flex;align-items:center;gap:0.3rem;">
+                        <span>↻</span> Refresh
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Macro Radar KPI Cards -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:0.65rem;margin-bottom:0.85rem;">
+            
+            <div class="card" style="padding:0.75rem 0.95rem;background:#09090b;border:1px solid rgba(255,255,255,0.15);">
+                <div style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);display:flex;align-items:center;justify-content:space-between;">
+                    <span>Stocks Under Accumulation</span>
+                    <span>🎯</span>
+                </div>
+                <div id="kpiSmTotalStocks" style="font-size:1.3rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);margin-top:0.25rem;">
+                    -- Setups
+                </div>
+                <div id="kpiSmTotalStocksSub" style="font-size:0.65rem;color:#a1a1aa;margin-top:0.2rem;font-family:var(--font-mono);">
+                    Rolling 90D Window
+                </div>
+            </div>
+
+            <div class="card" style="padding:0.75rem 0.95rem;background:#09090b;border:1px solid rgba(255,255,255,0.15);">
+                <div style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);display:flex;align-items:center;justify-content:space-between;">
+                    <span>Smart Money Deployed</span>
+                    <span>💸</span>
+                </div>
+                <div id="kpiSmTotalCapital" style="font-size:1.3rem;font-weight:800;color:#10b981;font-family:var(--font-mono);margin-top:0.25rem;">
+                    --
+                </div>
+                <div id="kpiSmTotalCapitalSub" style="font-size:0.65rem;color:#a1a1aa;margin-top:0.2rem;font-family:var(--font-mono);">
+                    FII + Sovereign + Whales + Blocks
+                </div>
+            </div>
+
+            <div class="card" style="padding:0.75rem 0.95rem;background:#09090b;border:1px solid rgba(255,255,255,0.15);">
+                <div style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);display:flex;align-items:center;justify-content:space-between;">
+                    <span>Avg Smart Money Dominance</span>
+                    <span>⚖️</span>
+                </div>
+                <div id="kpiSmAvgDominance" style="font-size:1.3rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:0.25rem;">
+                    --%
+                </div>
+                <div id="kpiSmAvgDominanceSub" style="font-size:0.65rem;color:#a1a1aa;margin-top:0.2rem;font-family:var(--font-mono);">
+                    Isolates Passive Domestic Absorption
+                </div>
+            </div>
+
+            <div class="card" style="padding:0.75rem 0.95rem;background:#09090b;border:1px solid rgba(255,255,255,0.15);">
+                <div style="font-size:0.65rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);display:flex;align-items:center;justify-content:space-between;">
+                    <span>Top Conviction Leader</span>
+                    <span>👑</span>
+                </div>
+                <div id="kpiSmTopLeader" style="font-size:1.15rem;font-weight:800;color:#facc15;font-family:var(--font-mono);margin-top:0.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                    --
+                </div>
+                <div id="kpiSmTopLeaderSub" style="font-size:0.65rem;color:#a1a1aa;margin-top:0.2rem;font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                    --
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 50-50 Split Workbench -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;align-items:start;">
+
+            <!-- LEFT 50%: Screened Stocks Under Accumulation Table -->
+            <div style="min-width:0;display:flex;flex-direction:column;gap:0.75rem;">
+                
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;">
+                    <div style="padding:0.65rem 0.95rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                        <div>
+                            <div style="font-size:0.88rem;font-weight:800;color:#ffffff;display:flex;align-items:center;gap:0.4rem;">
+                                <span>🎯</span> Equities Under Smart Money Accumulation
+                            </div>
+                            <div id="instSmTableSubtitle" style="font-size:0.68rem;color:#a1a1aa;font-family:var(--font-mono);">
+                                High-conviction setups filtered by Smart Money Dominance Ratio
+                            </div>
+                        </div>
+                        <div id="instSmCountBadge" class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.65rem;padding:0.15rem 0.45rem;">
+                            0 stocks
+                        </div>
+                    </div>
+
+                    <div style="overflow-x:auto;max-height:calc(100vh - 240px);overflow-y:auto;">
+                        <table id="instSmStocksTable" style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
+                            <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.68rem;">
+                                <tr>
+                                    <th style="padding:0.45rem 0.6rem;">TICKER / CO</th>
+                                    <th style="padding:0.45rem 0.5rem;">PRICE / 30D</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="Smart Money Inflow in ₹ Cr">SMART MONEY</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="Smart Money Dominance vs Total Capital">DOMINANCE</th>
+                                    <th style="padding:0.45rem 0.5rem;">TOP WHALES</th>
+                                    <th style="padding:0.45rem 0.5rem;">CLASSIFICATION</th>
+                                    <th style="padding:0.45rem 0.5rem;" title="Conviction Score (0-100)">SCORE</th>
+                                    <th style="padding:0.45rem 0.4rem;text-align:center;">ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="instSmTableBody">
+                                <tr><td colspan="8" style="padding:2.5rem;text-align:center;color:#71717a;">Loading Smart Money Radar data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT 50%: Dedicated Inline Inspection Workbench -->
+            <div id="instSmSplitRight" style="min-width:0;position:sticky;top:0.75rem;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:0.2rem;">
+
+                <!-- Selected Stock Header Card -->
+                <div id="instSmSelectedStockHeaderCard" class="card" style="padding:0.85rem 1rem;background:#09090b;border:1px solid rgba(255,255,255,0.15);margin-bottom:0.75rem;">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.6rem;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
+                                <span id="instSmSelectedTicker" style="font-size:1.25rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</span>
+                                <span id="instSmSelectedCompanyName" style="font-size:0.8rem;color:#a1a1aa;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">--</span>
+                                <span id="instSmSelectedBadge" class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.65rem;padding:0.12rem 0.45rem;">--</span>
+                            </div>
+                            <div id="instSmSelectedTimeframe" style="font-size:0.65rem;color:#71717a;margin-top:0.25rem;font-family:var(--font-mono);">
+                                Window: 90 Days · Synced Live
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:0.35rem;">
+                            <a id="instSmSelectedStockLink" href="#" target="_blank" class="btn btn-sm" style="background:#ffffff;color:#000000;font-weight:700;font-size:0.7rem;padding:0.25rem 0.6rem;text-decoration:none;border-radius:4px;">
+                                Open Full Intel ↗
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Returns and Market Metrics Strip -->
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));gap:0.4rem;padding:0.45rem 0.6rem;background:#121215;border:1px solid rgba(255,255,255,0.1);border-radius:6px;margin-bottom:0.55rem;align-items:center;">
+                        <div>
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Price</div>
+                            <div id="instSmPriceVal" style="font-size:0.88rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">7D Return</div>
+                            <div id="instSmRet7dVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">30D Return</div>
+                            <div id="instSmRet30dVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">1Y Return</div>
+                            <div id="instSmRet1yVal" style="font-size:0.82rem;font-weight:700;font-family:var(--font-mono);">--</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Market Cap</div>
+                            <div id="instSmMcapVal" style="font-size:0.82rem;font-weight:700;color:#ffffff;font-family:var(--font-mono);">--</div>
+                        </div>
+                    </div>
+
+                    <!-- Flow Subtitle -->
+                    <div id="instSmSelectedSubtitle" style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);line-height:1.45;">
+                        Select any stock from the table to inspect details.
+                    </div>
+                </div>
+
+                <!-- Section A: Smart Money vs Domestic Absorption Inflow Split -->
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;margin-bottom:0.75rem;">
+                    <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
+                        <span>Inflow Decomposition: Smart Money vs. Domestic Absorption</span>
+                        <span id="instSmDominanceRatioBadge" style="font-size:0.65rem;color:#38bdf8;font-family:var(--font-mono);">--% Dominance</span>
+                    </div>
+                    <div style="padding:0.75rem 0.95rem;">
+                        
+                        <!-- Visual Progress Bar -->
+                        <div style="margin-bottom:0.75rem;">
+                            <div style="display:flex;justify-content:space-between;font-size:0.68rem;font-family:var(--font-mono);margin-bottom:0.35rem;">
+                                <span style="color:#10b981;font-weight:700;">Smart Money Inflow (FII/Whales/Blocks)</span>
+                                <span style="color:#f59e0b;font-weight:700;">Domestic Absorption (Mutual Funds)</span>
+                            </div>
+                            <div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:#27272a;border:1px solid rgba(255,255,255,0.1);">
+                                <div id="instSmDominanceBarSm" style="background:#10b981;width:50%;height:100%;transition:width 0.3s ease;"></div>
+                                <div id="instSmDominanceBarDom" style="background:#f59e0b;width:50%;height:100%;transition:width 0.3s ease;"></div>
+                            </div>
+                        </div>
+
+                        <!-- 3 Stat Chips -->
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin-bottom:0.75rem;">
+                            <div style="background:#121215;border:1px solid rgba(16,185,129,0.3);border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
+                                <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Smart Money</div>
+                                <div id="instSmDeployedCr" style="font-size:0.95rem;font-weight:800;color:#10b981;font-family:var(--font-mono);margin-top:0.15rem;">₹0.0 Cr</div>
+                            </div>
+                            <div style="background:#121215;border:1px solid rgba(245,158,11,0.3);border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
+                                <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Domestic Absorp</div>
+                                <div id="instSmDomesticCr" style="font-size:0.95rem;font-weight:800;color:#f59e0b;font-family:var(--font-mono);margin-top:0.15rem;">₹0.0 Cr</div>
+                            </div>
+                            <div style="background:#121215;border:1px solid rgba(56,189,248,0.3);border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
+                                <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Conviction Score</div>
+                                <div id="instSmConvictionVal" style="font-size:0.95rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:0.15rem;">-- / 100</div>
+                            </div>
+                        </div>
+
+                        <!-- Narrative Interpretation Callout -->
+                        <div id="instSmInsightBox" style="background:#18181b;border-left:3px solid #38bdf8;padding:0.55rem 0.75rem;border-radius:4px;font-size:0.72rem;color:#d4d4d8;line-height:1.45;">
+                            Select a stock to view quantitative conviction breakdown.
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Section B: Verified Whale Buyers & Accumulators in Window -->
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;margin-bottom:0.75rem;">
+                    <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
+                        <span>Whale Buyers, Sovereign Funds & Super Investors</span>
+                        <span id="instSmBuyerCountBadge" style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">0 Buyers Logged</span>
+                    </div>
+                    <div style="overflow-x:auto;max-height:260px;overflow-y:auto;">
+                        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
+                            <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.65rem;">
+                                <tr>
+                                    <th style="padding:0.4rem 0.6rem;">BUYER / FUND</th>
+                                    <th style="padding:0.4rem 0.5rem;">ENTITY TYPE</th>
+                                    <th style="padding:0.4rem 0.5rem;">DEPLOYED (₹ CR)</th>
+                                    <th style="padding:0.4rem 0.5rem;">STAKE / SHARES</th>
+                                    <th style="padding:0.4rem 0.5rem;">AVG / BUY PRICE</th>
+                                    <th style="padding:0.4rem 0.5rem;">DATE / FILING</th>
+                                </tr>
+                            </thead>
+                            <tbody id="instSmBuyersTableBody">
+                                <tr><td colspan="6" style="padding:1.5rem;text-align:center;color:#71717a;">Select a stock to inspect verified whale buyers.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section C: Block / Bulk Deals -->
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;">
+                    <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
+                        <span>Exchange Block & Bulk Deals in Period</span>
+                        <span style="font-size:0.65rem;color:#a1a1aa;font-family:var(--font-mono);">High Volume Execution</span>
+                    </div>
+                    <div id="instSmBlockDealsContainer" style="padding:0.6rem 0.85rem;max-height:180px;overflow-y:auto;">
+                        <div style="color:#71717a;font-size:0.72rem;text-align:center;padding:1rem;">Select a stock to view exchange block deals.</div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- ========================================================================= -->
+
+    <!-- FUND PORTFOLIO MODAL (FULL HOLDINGS DRILLDOWN) -->
+
+    <!-- ========================================================================= -->
+
+    <div id="instFundModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.5rem;">
+
+        <div class="card" style="width:100%;max-width:980px;max-height:90vh;background:#09090b;border:1px solid rgba(255,255,255,0.2);display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.7);border-radius:10px;padding:0;overflow:hidden;">
+
+            
+
+            <!-- Modal Header -->
+
+            <div style="padding:1rem 1.25rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:space-between;">
+
+                <div>
+
+                    <div style="display:flex;align-items:center;gap:0.6rem;">
+
+                        <span id="instFundModalTitle" style="font-size:1.15rem;font-weight:800;color:#ffffff;">Fund Portfolio</span>
+
+                        <span class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.7rem;padding:0.2rem 0.5rem;">INSTITUTIONAL / FUND</span>
+
+                    </div>
+
+                    <div id="instFundModalSubtitle" style="font-size:0.72rem;color:#a1a1aa;margin-top:0.25rem;font-family:var(--font-mono);">
+
+                        Tracked Value: -- · Total Holdings: -- · Quarter: --
+
+                    </div>
+
+                </div>
+
+                <button type="button" onclick="app.closeFundModal()" class="btn btn-sm" style="background:#27272a;color:#ffffff;border:1px solid rgba(255,255,255,0.2);padding:0.35rem 0.75rem;cursor:pointer;border-radius:6px;font-weight:700;font-size:0.85rem;">✕ Close</button>
+
+            </div>
+
+
+
+            <!-- Modal Content Table -->
+
+            <div style="padding:0;overflow-y:auto;max-height:calc(90vh - 120px);">
+
+                <table style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
+
+                    <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.7rem;">
+
+                        <tr>
+
+                            <th style="padding:0.5rem 0.75rem;">TICKER</th>
+
+                            <th style="padding:0.5rem 0.6rem;">COMPANY NAME</th>
+
+                            <th style="padding:0.5rem 0.6rem;">SECTOR</th>
+
+                            <th style="padding:0.5rem 0.6rem;">ACTION</th>
+
+                            <th style="padding:0.5rem 0.6rem;">HOLDING (₹ CR)</th>
+
+                            <th style="padding:0.5rem 0.6rem;">SHARES</th>
+
+                            <th style="padding:0.5rem 0.6rem;">STAKE %</th>
+
+                            <th style="padding:0.5rem 0.6rem;">30D RET</th>
+
+                            <th style="padding:0.5rem 0.6rem;">1Y RET</th>
+
+                            <th style="padding:0.5rem 0.6rem;">REPORTED</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="instFundModalTableBody">
+
+                        <tr><td colspan="10" style="padding:2.5rem;text-align:center;color:#71717a;">Loading portfolio positions...</td></tr>
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+
+
+        </div>
+
+    </div>
+
+
+
 </div>

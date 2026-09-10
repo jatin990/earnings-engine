@@ -81,6 +81,32 @@ async def get_top_stake_additions(
         raise HTTPException(status_code=500, detail=f"Error fetching top additions: {str(e)}")
 
 
+@router.get("/api/v1/institutional/recent-accumulation")
+async def get_institutional_recent_accumulation(
+    window: str = Query("90d", description="Lookback window: '30d', '90d', '180d', '365d'"),
+    entity_focus: str = Query("smart_money", description="Entity focus: 'smart_money', 'all', 'fii_only', 'super_investor', 'block_deals'"),
+    min_cr: float = Query(5.0, ge=0.0, description="Minimum capital deployed in ₹ Cr"),
+    sort_by: str = Query("score", description="Sort by: 'score', 'capital', 'dominance', 'return_30d'"),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """Retrieve equities under aggressive smart money accumulation across rolling lookback windows."""
+    try:
+        data = await asyncio.to_thread(
+            inst_mod.get_stocks_under_institutional_accumulation,
+            window=window,
+            entity_focus=entity_focus,
+            min_cr=min_cr,
+            sort_by=sort_by,
+            limit=limit,
+            settings=_settings,
+        )
+        return data
+    except Exception as e:
+        logger.exception("Error in get_institutional_recent_accumulation: %s", e)
+        raise HTTPException(status_code=500, detail=f"Error fetching recent accumulation: {str(e)}")
+
+
+
 @router.get("/api/v1/institutional/funds")
 async def get_top_institutional_funds(
     limit: int = Query(25, ge=1, le=100),
