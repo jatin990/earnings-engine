@@ -1103,10 +1103,11 @@ class InstitutionalVerifier:
         warning_count = sum(1 for f in all_findings if f.severity == "WARNING")
         passed_count = sum(1 for f in all_findings if f.severity == "PASS")
 
-        # Health score calculation (100 base, -15 per critical, -2 per warning)
+        # Health score calculation (blended pass-ratio with bounded deviation penalties)
         if total_checks > 0:
-            penalty = (critical_count * 15.0) + (warning_count * 2.0)
-            health_score = max(0.0, min(100.0, 100.0 - penalty))
+            pass_ratio = passed_count / total_checks
+            penalty = min(35.0, critical_count * 2.0) + min(15.0, warning_count * 0.5)
+            health_score = max(0.0, min(100.0, (pass_ratio * 100.0) - penalty))
         else:
             health_score = 100.0
 
@@ -1120,7 +1121,9 @@ class InstitutionalVerifier:
             cat_warnings = sum(1 for f in cat_findings if f.severity == "WARNING")
             cat_critical = sum(1 for f in cat_findings if f.severity in ("CRITICAL", "CRITICAL_ERROR"))
             if cat_audited > 0:
-                cat_score = max(0.0, min(100.0, 100.0 - (cat_critical * 20.0 + cat_warnings * 4.0)))
+                cat_pass_ratio = cat_passed / cat_audited
+                cat_penalty = min(40.0, cat_critical * 3.0) + min(20.0, cat_warnings * 1.0)
+                cat_score = max(0.0, min(100.0, (cat_pass_ratio * 100.0) - cat_penalty))
             else:
                 cat_score = 100.0
             category_breakdowns[cat] = {

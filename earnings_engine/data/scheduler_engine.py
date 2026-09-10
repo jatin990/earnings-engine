@@ -73,6 +73,7 @@ class SchedulerEngine:
         self._job_handlers["kronos_hot_pool_rescore"] = self._handle_kronos_hot_rescore
         self._job_handlers["kronos_cache_warmup"] = self._handle_kronos_warmup
         self._job_handlers["confluence_radar_sweep"] = self._handle_confluence_sweep
+        self._job_handlers["institutional_integrity_audit"] = self._handle_institutional_integrity_audit
 
     def register_handler(self, job_id: str, handler: Callable[[Settings, dict[str, Any]], str]) -> None:
         """Register or override a custom job handler."""
@@ -208,6 +209,24 @@ class SchedulerEngine:
         count = res.get("tickers_processed", 0)
         dur = res.get("duration_seconds", 0.0)
         return f"Institutional accumulation batch precomputation refreshed for {count} stocks in {dur}s."
+
+    def _handle_institutional_integrity_audit(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.data.institutional_verifier import InstitutionalVerifier
+        verifier = InstitutionalVerifier(settings)
+        auto_repair = bool(params.get("auto_repair", False))
+        purge_synthetic = bool(params.get("purge_synthetic", False))
+        scope = params.get("scope", "ALL")
+        report = verifier.run_comprehensive_audit(
+            scope=scope,
+            purge_synthetic=purge_synthetic,
+            auto_repair=auto_repair,
+            persist_log=True,
+        )
+        return (
+            f"Institutional integrity audit completed: Health {report.overall_health_score:.1f}% "
+            f"({report.status}). {report.total_records_audited:,} records audited, "
+            f"{report.critical_errors} critical errors, {report.warning_checks} warnings."
+        )
 
     def _handle_kronos_hot_rescore(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data.predictions import store_prediction
