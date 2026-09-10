@@ -97,7 +97,7 @@
                 if (fireCard) {
                     fireCard.style.border = '1px solid rgba(255, 255, 255, 0.08)';
                     fireCard.style.boxShadow = 'none';
-                    fireCard.style.background = '#090d16';
+                    fireCard.style.background = '#09090b';
                 }
                 if (totalCard) {
                     totalCard.style.opacity = '1';
@@ -257,7 +257,7 @@
                     <div style="font-size:1.1rem;font-weight:700;color:#f8fafc;margin-bottom:0.4rem;">Running Historical Breakout Backtest Audit</div>
                     <div style="font-size:0.75rem;color:#94a3b8;font-family:var(--font-mono);margin-bottom:1.5rem;">Scanning ${universeLabel} over the last 90, 75, 60, 45, and 30 days...</div>
                     <div style="max-width:320px;margin:0 auto;background:rgba(255,255,255,0.06);height:6px;border-radius:10px;overflow:hidden;position:relative;">
-                        <div style="background:#38bdf8;height:100%;width:50%;position:absolute;left:0;top:0;animation:breakoutPulse 1.2s ease-in-out infinite;"></div>
+                        <div style="background:linear-gradient(90deg, #0284c7, #38bdf8);height:100%;width:65%;position:absolute;left:0;top:0;border-radius:10px;"></div>
                     </div>
                     <p style="font-size:0.7rem;color:#64748b;margin-top:1rem;line-height:1.45;">Stand by while we crunch technical proximity, price compression, volume surges, and earnings quality factors against subsequent realized outcomes.</p>
                 </div>
@@ -341,22 +341,22 @@
 
                     <!-- KPI Summary Cards -->
                     <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:0.65rem;margin-bottom:1.25rem;">
-                        <div class="card" style="padding:0.75rem 0.95rem;background:#052e16;border:1px solid rgba(34,197,94,0.3);border-top:2px solid #22c55e;">
-                            <div style="font-size:0.65rem;color:#4ade80;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Win Rate %</div>
+                        <div class="card" style="padding:0.75rem 0.95rem;background:#061a14;border:1px solid rgba(52,211,153,0.25);border-top:2px solid #34d399;">
+                            <div style="font-size:0.65rem;color:#34d399;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Win Rate %</div>
                             <div style="font-size:1.8rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);">${wr}%</div>
                             <div style="font-size:0.68rem;color:#86efac;margin-top:0.15rem;">${data.success_count} succeeded / ${data.total_evaluated} evaluated</div>
                         </div>
-                        <div class="card" style="padding:0.75rem 0.95rem;background:#090d16;border:1px solid rgba(255,255,255,0.1);border-top:2px solid #38bdf8;">
+                        <div class="card" style="padding:0.75rem 0.95rem;background:#09090b;border:1px solid rgba(255,255,255,0.08);border-top:2px solid #38bdf8;">
                             <div style="font-size:0.65rem;color:#38bdf8;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Avg Return (All)</div>
                             <div style="font-size:1.8rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);">${data.avg_return_pct >= 0 ? '+' : ''}${data.avg_return_pct}%</div>
                             <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.15rem;">Across all evaluated setups</div>
                         </div>
-                        <div class="card" style="padding:0.75rem 0.95rem;background:#064e3b;border:1px solid rgba(16,185,129,0.3);border-top:2px solid #10b981;">
+                        <div class="card" style="padding:0.75rem 0.95rem;background:#061a14;border:1px solid rgba(52,211,153,0.25);border-top:2px solid #34d399;">
                             <div style="font-size:0.65rem;color:#34d399;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Avg Breakout Return</div>
                             <div style="font-size:1.8rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);">+${data.avg_broke_return_pct}%</div>
                             <div style="font-size:0.68rem;color:#a7f3d0;margin-top:0.15rem;">For successful breakouts</div>
                         </div>
-                        <div class="card" style="padding:0.75rem 0.95rem;background:#450a0a;border:1px solid rgba(239,68,68,0.3);border-top:2px solid #ef4444;">
+                        <div class="card" style="padding:0.75rem 0.95rem;background:#1a0808;border:1px solid rgba(248,113,113,0.25);border-top:2px solid #f87171;">
                             <div style="font-size:0.65rem;color:#f87171;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Avg Failed Return</div>
                             <div style="font-size:1.8rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);">${data.avg_failed_return_pct}%</div>
                             <div style="font-size:0.68rem;color:#fca5a5;margin-top:0.15rem;">For setups that failed to breakout</div>
@@ -604,7 +604,7 @@
                     if (breakingCount > 0) {
                         if (fireCard) fireCard.classList.add('card-on-fire');
                         setEl('breakoutStatBreakingSub', 'Breached');
-                        setEl('breakoutKpiSubFire', `🔥 ${breakingCount} setup(s) crossed trigger!`);
+                        setEl('breakoutKpiSubFire', `⚡ ${breakingCount} setup(s) crossed trigger`);
                     } else {
                         if (fireCard) fireCard.classList.remove('card-on-fire');
                         setEl('breakoutStatBreakingSub', 'Active');
@@ -690,7 +690,7 @@
                                 ${(c.institutional_flow && c.institutional_flow.funds_in > 0) ? `<span style="font-size:0.60rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.04rem 0.3rem;border-radius:3px;font-weight:700;" title="Institutional Accumulation: +${c.institutional_flow.funds_in} Funds Buying">🏛️ +${c.institutional_flow.funds_in}</span>` : ''}
                                 ${c.is_real_tracked ? `
                                     <span style="font-size:0.60rem;background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.04rem 0.32rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Real-Time Tracked Entry recorded in SQLite database archive">
-                                        <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#34d399;box-shadow:0 0 6px #34d399;"></span> REAL TRACKED
+                                        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;"></span> REAL TRACKED
                                     </span>
                                 ` : `
                                     <span style="font-size:0.60rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;display:inline-flex;align-items:center;gap:0.2rem;" title="Dynamic live scan setup">
@@ -986,7 +986,7 @@
                         ondrop="app.handleBreakoutColDrop(event, '${colKey}')"
                         ondragend="app.handleBreakoutColDragEnd(event)"
                         onclick="${def.sortKey ? `app.sortBreakoutTable('${def.sortKey}')` : ''}"
-                        style="position:sticky;top:0;z-index:30;background:#090e1a;padding:0.55rem 0.65rem;text-align:${def.align};${def.headerStyle || ''}${sortColor ? `color:${sortColor};` : ''}font-weight:700;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;cursor:${def.sortKey ? 'pointer' : 'grab'};white-space:nowrap;user-select:none;border-bottom:1px solid rgba(56,189,248,0.3);box-shadow:0 2px 6px rgba(0,0,0,0.7);transition:background 0.15s, border-color 0.15s;"
+                        style="position:sticky;top:0;z-index:30;background:#000000;padding:0.55rem 0.65rem;text-align:${def.align};${def.headerStyle || ''}${sortColor ? `color:${sortColor};` : ''}font-weight:700;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;cursor:${def.sortKey ? 'pointer' : 'grab'};white-space:nowrap;user-select:none;border-bottom:1px solid rgba(255,255,255,0.08);box-shadow:0 2px 6px rgba(0,0,0,0.7);transition:background 0.15s, border-color 0.15s;"
                         title="Drag to move column${def.sortKey ? ' • Click to sort' : ''}"
                     >
                         <span style="opacity:0.4;font-size:0.65rem;margin-right:0.25rem;cursor:grab;" title="Drag to move column">⋮⋮</span>
@@ -1201,7 +1201,7 @@
 
                     <div style="display:flex;flex-direction:column;gap:0.5rem;font-size:0.78rem;">
                         <!-- Resistance -->
-                        <div style="background:#0f172a;border:1px solid rgba(239,68,68,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
+                        <div style="background:#09090b;border:1px solid rgba(248,113,113,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
                                 <strong style="color:#f87171;">1. Resistance Proximity (0–40 pts)</strong>
                                 <span style="font-family:var(--font-mono);font-weight:700;color:#fca5a5;">${resScore.toFixed(1)} / 40 pts</span>
@@ -1210,16 +1210,16 @@
                         </div>
 
                         <!-- Volume -->
-                        <div style="background:#0f172a;border:1px solid rgba(59,130,246,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
+                        <div style="background:#09090b;border:1px solid rgba(56,189,248,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
-                                <strong style="color:#60a5fa;">2. Volume Surge (0–10 pts)</strong>
+                                <strong style="color:#38bdf8;">2. Volume Surge (0–10 pts)</strong>
                                 <span style="font-family:var(--font-mono);font-weight:700;color:#93c5fd;">${volScore.toFixed(1)} / 10 pts</span>
                             </div>
                             <div style="color:#cbd5e1;">${notes.volume_reasoning || `Volume is ${candidate.volume_ratio != null ? candidate.volume_ratio.toFixed(2) : '1.0'}x of 20D baseline.`}</div>
                         </div>
 
                         <!-- Compression -->
-                        <div style="background:#0f172a;border:1px solid rgba(234,179,8,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
+                        <div style="background:#09090b;border:1px solid rgba(251,191,36,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
                                 <strong style="color:#fbbf24;">3. Price Compression / ATR Squeeze (0–10 pts)</strong>
                                 <span style="font-family:var(--font-mono);font-weight:700;color:#fde68a;">${compScore.toFixed(1)} / 10 pts</span>
@@ -1228,7 +1228,7 @@
                         </div>
 
                         <!-- Momentum -->
-                        <div style="background:#0f172a;border:1px solid rgba(16,185,129,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
+                        <div style="background:#09090b;border:1px solid rgba(52,211,153,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
                                 <strong style="color:#34d399;">4. Momentum Posture (0–25 pts)</strong>
                                 <span style="font-family:var(--font-mono);font-weight:700;color:#6ee7b7;">${momScore.toFixed(1)} / 25 pts</span>
@@ -1237,7 +1237,7 @@
                         </div>
 
                         <!-- Fundamental -->
-                        <div style="background:#0f172a;border:1px solid rgba(168,85,247,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
+                        <div style="background:#09090b;border:1px solid rgba(192,132,252,0.25);border-radius:6px;padding:0.65rem 0.85rem;">
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
                                 <strong style="color:#c084fc;">5. Fundamental Earnings Bonus (0–15 pts)</strong>
                                 <span style="font-family:var(--font-mono);font-weight:700;color:#e9d5ff;">${fundScore.toFixed(1)} / 15 pts</span>
@@ -1248,13 +1248,13 @@
                 </div>
 
                 <!-- 2. Local Ollama Multi-Model AI Opinion -->
-                <div style="background:#0c1222;border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+                <div style="background:#09090b;border:1px solid rgba(56,189,248,0.2);border-radius:8px;padding:1rem;margin-bottom:1rem;">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;flex-wrap:wrap;gap:0.4rem;">
-                        <div style="font-size:0.8rem;font-weight:700;color:#60a5fa;display:flex;align-items:center;gap:0.35rem;">
+                        <div style="font-size:0.8rem;font-weight:700;color:#38bdf8;display:flex;align-items:center;gap:0.35rem;">
                             <span>🤖 Local AI Consensus (Ollama Models)</span>
                         </div>
                         <div style="display:flex;align-items:center;gap:0.35rem;">
-                            <select id="breakoutOllamaModelSelect" style="background:#0f172a;border:1px solid rgba(255,255,255,0.15);color:#e2e8f0;font-size:0.72rem;padding:0.2rem 0.45rem;border-radius:5px;outline:none;">
+                            <select id="breakoutOllamaModelSelect" style="background:#06060a;border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;font-size:0.72rem;padding:0.2rem 0.45rem;border-radius:5px;outline:none;">
                                 <option value="llama3.2:3b">llama3.2:3b (Fast Local)</option>
                                 <option value="deepseek-r1:8b">deepseek-r1:8b (Deep Reasoning)</option>
                                 <option value="qwen2.5-coder:latest">qwen2.5-coder (Algorithmic)</option>
@@ -1428,10 +1428,10 @@
                         ${steps.map((s) => {
                             const isPast = s.idx < activeStep;
                             const isCurrent = s.idx === activeStep;
-                            const bg = isCurrent ? '#38bdf8' : (isPast ? '#10b981' : '#1e293b');
+                            const bg = isCurrent ? '#38bdf8' : (isPast ? '#10b981' : '#18181b');
                             const border = isCurrent ? '#38bdf8' : (isPast ? '#10b981' : 'rgba(255,255,255,0.15)');
                             const color = isCurrent || isPast ? '#ffffff' : '#64748b';
-                            const shadow = isCurrent ? '0 0 12px rgba(56,189,248,0.6)' : 'none';
+                            const shadow = 'none';
                             return `
                                 <div style="display:flex;flex-direction:column;align-items:center;z-index:3;cursor:default;">
                                     <div style="width:30px;height:30px;border-radius:50%;background:${bg};border:2px solid ${border};display:flex;align-items:center;justify-content:center;font-size:0.8rem;box-shadow:${shadow};color:${color};font-weight:700;">
@@ -1450,27 +1450,27 @@
             // Key levels & score metrics strip
             const metricsHtml = `
                 <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:0.6rem;">
-                    <div style="background:#0b1120;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                    <div style="background:#09090b;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
                         <div style="font-size:0.65rem;color:#64748b;font-weight:600;text-transform:uppercase;">Current Price</div>
                         <div style="font-size:0.95rem;font-weight:800;color:#f8fafc;font-family:var(--font-mono);margin-top:0.15rem;">${curP}</div>
                     </div>
-                    <div style="background:#0b1120;border:1px solid rgba(56,189,248,0.25);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                    <div style="background:#09090b;border:1px solid rgba(56,189,248,0.25);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
                         <div style="font-size:0.65rem;color:#38bdf8;font-weight:600;text-transform:uppercase;">Trigger Price</div>
                         <div style="font-size:0.95rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:0.15rem;">${trigP}</div>
                     </div>
-                    <div style="background:#0b1120;border:1px solid rgba(16,185,129,0.25);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                    <div style="background:#09090b;border:1px solid rgba(52,211,153,0.25);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
                         <div style="font-size:0.65rem;color:#34d399;font-weight:600;text-transform:uppercase;">Target (1:2 R:R)</div>
                         <div style="font-size:0.95rem;font-weight:800;color:#34d399;font-family:var(--font-mono);margin-top:0.15rem;">${targetP}</div>
                     </div>
-                    <div style="background:#0b1120;border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                    <div style="background:#09090b;border:1px solid rgba(248,113,113,0.25);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
                         <div style="font-size:0.65rem;color:#f87171;font-weight:600;text-transform:uppercase;">Stop Loss</div>
                         <div style="font-size:0.95rem;font-weight:800;color:#f87171;font-family:var(--font-mono);margin-top:0.15rem;">${stopP}</div>
                     </div>
-                    <div style="background:#0b1120;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                    <div style="background:#09090b;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
                         <div style="font-size:0.65rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Score</div>
                         <div style="font-size:0.95rem;font-weight:800;color:#fbbf24;font-family:var(--font-mono);margin-top:0.15rem;">${score}<span style="font-size:0.68rem;color:#64748b;">/100</span></div>
                     </div>
-                    <div style="background:#0b1120;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
+                    <div style="background:#09090b;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.6rem 0.75rem;text-align:center;">
                         <div style="font-size:0.65rem;color:#94a3b8;font-weight:600;text-transform:uppercase;">Outcome Return</div>
                         <div style="font-size:0.95rem;font-weight:800;color:${retColor};font-family:var(--font-mono);margin-top:0.15rem;">${retStr}</div>
                     </div>
@@ -1488,9 +1488,9 @@
                         const pxStr = ev.price != null ? '₹' + Number(ev.price).toFixed(2) : null;
                         const scoreStr = ev.score != null ? 'Score: ' + Number(ev.score).toFixed(1) : null;
                         return `
-                            <div style="position:relative;background:#0c1322;border:1px solid rgba(255,255,255,0.08);border-left:3px solid ${ev.badge_color || '#38bdf8'};border-radius:8px;padding:0.75rem 0.9rem;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+                            <div style="position:relative;background:#09090b;border:1px solid rgba(255,255,255,0.08);border-left:3px solid ${ev.badge_color || '#38bdf8'};border-radius:8px;padding:0.75rem 0.9rem;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
                                 <!-- Node bullet on line -->
-                                <div style="position:absolute;left:-1.9rem;top:1.1rem;width:12px;height:12px;border-radius:50%;background:${ev.badge_color || '#38bdf8'};border:2px solid #090d16;box-shadow:0 0 6px ${ev.badge_color || '#38bdf8'}aa;"></div>
+                                <div style="position:absolute;left:-1.9rem;top:1.1rem;width:12px;height:12px;border-radius:50%;background:${ev.badge_color || '#38bdf8'};border:2px solid #000000;"></div>
 
                                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.35rem;">
                                     <div style="display:flex;align-items:center;gap:0.4rem;">
@@ -2308,7 +2308,7 @@
                     btn.style.color = '#38bdf8';
                 } else {
                     btn.classList.remove('bk-preset-active');
-                    btn.style.background = '#0f172a';
+                    btn.style.background = '#09090b';
                     btn.style.borderColor = 'rgba(255,255,255,0.12)';
                     btn.style.color = '#94a3b8';
                 }
@@ -2502,7 +2502,7 @@
             // Render 5 Pillar HTML Sections
             contentEl.innerHTML = `
                 <!-- 1. STRATEGY & FACTOR BREAKDOWN -->
-                <div style="background:#0b0f19;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.9rem 1rem;">
+                <div style="background:#09090b;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.9rem 1rem;">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0.4rem;">
                         <span style="font-size:0.78rem;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:0.05em;">
                             1. Strategy Setup & Quantitative Factor Decomposition
@@ -2514,25 +2514,25 @@
 
                     <!-- Key Trade Execution Levels -->
                     <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.6rem;margin-bottom:0.85rem;">
-                        <div style="background:#111827;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.5rem 0.65rem;">
+                        <div style="background:#121215;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.5rem 0.65rem;">
                             <div style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Breakout Trigger</div>
                             <div style="font-size:0.88rem;font-weight:700;color:#f8fafc;font-family:var(--font-mono);margin-top:0.15rem;">
                                 ${triggerPrice ? currency + triggerPrice.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}
                             </div>
                         </div>
-                        <div style="background:#111827;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.5rem 0.65rem;">
+                        <div style="background:#121215;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.5rem 0.65rem;">
                             <div style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Target Price</div>
-                            <div style="font-size:0.88rem;font-weight:700;color:#4ade80;font-family:var(--font-mono);margin-top:0.15rem;">
+                            <div style="font-size:0.88rem;font-weight:700;color:#34d399;font-family:var(--font-mono);margin-top:0.15rem;">
                                 ${targetPrice ? currency + targetPrice.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}
                             </div>
                         </div>
-                        <div style="background:#111827;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.5rem 0.65rem;">
+                        <div style="background:#121215;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.5rem 0.65rem;">
                             <div style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Stop Loss</div>
                             <div style="font-size:0.88rem;font-weight:700;color:#f87171;font-family:var(--font-mono);margin-top:0.15rem;">
                                 ${stopLoss ? currency + stopLoss.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'}
                             </div>
                         </div>
-                        <div style="background:#111827;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.5rem 0.65rem;">
+                        <div style="background:#121215;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.5rem 0.65rem;">
                             <div style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Risk / Reward</div>
                             <div style="font-size:0.88rem;font-weight:700;color:#38bdf8;font-family:var(--font-mono);margin-top:0.15rem;">
                                 ${riskReward !== '—' ? '1 : ' + riskReward : '—'}
@@ -2541,13 +2541,13 @@
                     </div>
 
                     <!-- 5-Factor Scoring Bars -->
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:0.6rem;background:#060810;padding:0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.04);">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:0.6rem;background:#06060a;padding:0.65rem;border-radius:6px;border:1px solid rgba(255,255,255,0.04);">
                         <div>
                             <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#cbd5e1;margin-bottom:0.25rem;">
                                 <span>Resistance Base</span>
                                 <span style="font-family:var(--font-mono);font-weight:700;color:#38bdf8;">${fResistance}/40</span>
                             </div>
-                            <div style="height:4px;background:#1e293b;border-radius:2px;overflow:hidden;">
+                            <div style="height:4px;background:#18181b;border-radius:2px;overflow:hidden;">
                                 <div style="height:100%;width:${(fResistance/40)*100}%;background:#38bdf8;"></div>
                             </div>
                         </div>
@@ -2556,7 +2556,7 @@
                                 <span>Volume Surge</span>
                                 <span style="font-family:var(--font-mono);font-weight:700;color:#a855f7;">${fVolume}/10</span>
                             </div>
-                            <div style="height:4px;background:#1e293b;border-radius:2px;overflow:hidden;">
+                            <div style="height:4px;background:#18181b;border-radius:2px;overflow:hidden;">
                                 <div style="height:100%;width:${(fVolume/10)*100}%;background:#a855f7;"></div>
                             </div>
                         </div>
@@ -2565,17 +2565,17 @@
                                 <span>Volatility Squeeze</span>
                                 <span style="font-family:var(--font-mono);font-weight:700;color:#fbbf24;">${fCompression}/10</span>
                             </div>
-                            <div style="height:4px;background:#1e293b;border-radius:2px;overflow:hidden;">
+                            <div style="height:4px;background:#18181b;border-radius:2px;overflow:hidden;">
                                 <div style="height:100%;width:${(fCompression/10)*100}%;background:#fbbf24;"></div>
                             </div>
                         </div>
                         <div>
                             <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:#cbd5e1;margin-bottom:0.25rem;">
                                 <span>Trend Momentum</span>
-                                <span style="font-family:var(--font-mono);font-weight:700;color:#4ade80;">${fMomentum}/25</span>
+                                <span style="font-family:var(--font-mono);font-weight:700;color:#34d399;">${fMomentum}/25</span>
                             </div>
-                            <div style="height:4px;background:#1e293b;border-radius:2px;overflow:hidden;">
-                                <div style="height:100%;width:${(fMomentum/25)*100}%;background:#4ade80;"></div>
+                            <div style="height:4px;background:#18181b;border-radius:2px;overflow:hidden;">
+                                <div style="height:100%;width:${(fMomentum/25)*100}%;background:#34d399;"></div>
                             </div>
                         </div>
                         <div>
@@ -2583,7 +2583,7 @@
                                 <span>Fundamental Quality</span>
                                 <span style="font-family:var(--font-mono);font-weight:700;color:#2dd4bf;">${fFundamental}/15</span>
                             </div>
-                            <div style="height:4px;background:#1e293b;border-radius:2px;overflow:hidden;">
+                            <div style="height:4px;background:#18181b;border-radius:2px;overflow:hidden;">
                                 <div style="height:100%;width:${(fFundamental/15)*100}%;background:#2dd4bf;"></div>
                             </div>
                         </div>
@@ -2593,7 +2593,7 @@
                 <!-- 2-COL GRID: 2. PRICE ACTION & 3. VOLUME PROFILE -->
                 <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:1rem;">
                     <!-- 2. PRICE ACTION & VOLATILITY -->
-                    <div style="background:#0b0f19;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.9rem 1rem;">
+                    <div style="background:#09090b;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.9rem 1rem;">
                         <div style="font-size:0.78rem;font-weight:800;color:#fbbf24;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0.4rem;">
                             2. Price Action & Volatility Squeeze
                         </div>
@@ -2605,26 +2605,26 @@
                                 <span style="color:#f8fafc;font-weight:700;">Range: ${range52Pct.toFixed(1)}%</span>
                                 <span>52W H: ${currency}${high52.toLocaleString('en-IN')}</span>
                             </div>
-                            <div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden;position:relative;">
-                                <div style="height:100%;width:${range52Pct}%;background:linear-gradient(90deg, #3b82f6, #10b981);"></div>
+                            <div style="height:6px;background:#18181b;border-radius:3px;overflow:hidden;position:relative;">
+                                <div style="height:100%;width:${range52Pct}%;background:linear-gradient(90deg, #0284c7, #34d399);"></div>
                             </div>
                         </div>
 
                         <!-- Technical Moving Averages & ATR -->
                         <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.5rem;font-family:var(--font-mono);font-size:0.72rem;">
-                            <div style="background:#111827;padding:0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);">
+                            <div style="background:#121215;padding:0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);">
                                 <div style="color:#64748b;font-size:0.62rem;">20D SMA</div>
                                 <div style="color:#e2e8f0;font-weight:700;margin-top:0.1rem;">
                                     ${technical.sma_20 ? currency + Math.round(technical.sma_20) : '—'}
                                 </div>
                             </div>
-                            <div style="background:#111827;padding:0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);">
+                            <div style="background:#121215;padding:0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);">
                                 <div style="color:#64748b;font-size:0.62rem;">50D SMA</div>
                                 <div style="color:#e2e8f0;font-weight:700;margin-top:0.1rem;">
                                     ${technical.sma_50 ? currency + Math.round(technical.sma_50) : '—'}
                                 </div>
                             </div>
-                            <div style="background:#111827;padding:0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);">
+                            <div style="background:#121215;padding:0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);">
                                 <div style="color:#64748b;font-size:0.62rem;">200D SMA</div>
                                 <div style="color:#e2e8f0;font-weight:700;margin-top:0.1rem;">
                                     ${technical.sma_200 ? currency + Math.round(technical.sma_200) : '—'}
@@ -2632,34 +2632,34 @@
                             </div>
                         </div>
 
-                        <div style="margin-top:0.65rem;display:flex;align-items:center;justify-content:space-between;background:#05070f;padding:0.45rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);font-size:0.68rem;font-family:var(--font-mono);">
+                        <div style="margin-top:0.65rem;display:flex;align-items:center;justify-content:space-between;background:#06060a;padding:0.45rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);font-size:0.68rem;font-family:var(--font-mono);">
                             <span style="color:#94a3b8;">14D ATR / Volatility:</span>
                             <span style="color:#38bdf8;font-weight:700;">${technical.atr_14 ? currency + technical.atr_14.toFixed(2) + ' (' + ((technical.atr_14/livePrice)*100).toFixed(2) + '%)' : 'Coiling / Compression Active'}</span>
                         </div>
                     </div>
 
                     <!-- 3. VOLUME PROFILE & DELIVERY -->
-                    <div style="background:#0b0f19;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.9rem 1rem;">
+                    <div style="background:#09090b;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.9rem 1rem;">
                         <div style="font-size:0.78rem;font-weight:800;color:#a855f7;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.75rem;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0.4rem;">
                             3. Volume Profile & Delivery Absorption
                         </div>
 
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.75rem;">
-                            <div style="background:#111827;padding:0.55rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="background:#121215;padding:0.55rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
                                 <div style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Volume Surge (vs 20D)</div>
                                 <div style="font-size:1rem;font-weight:800;color:${volMultiple >= 1.5 ? '#a855f7' : '#e2e8f0'};font-family:var(--font-mono);margin-top:0.15rem;">
                                     ${Number(volMultiple).toFixed(2)}x
                                 </div>
                             </div>
-                            <div style="background:#111827;padding:0.55rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="background:#121215;padding:0.55rem;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
                                 <div style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Delivery Absorption %</div>
-                                <div style="font-size:1rem;font-weight:800;color:${deliveryPct >= 50 ? '#4ade80' : '#38bdf8'};font-family:var(--font-mono);margin-top:0.15rem;">
+                                <div style="font-size:1rem;font-weight:800;color:${deliveryPct >= 50 ? '#34d399' : '#38bdf8'};font-family:var(--font-mono);margin-top:0.15rem;">
                                     ${deliveryPct ? deliveryPct.toFixed(1) + '%' : 'Authentic Flow'}
                                 </div>
                             </div>
                         </div>
 
-                        <div style="background:#05070f;padding:0.5rem 0.65rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);font-size:0.68rem;color:#94a3b8;line-height:1.4;">
+                        <div style="background:#06060a;padding:0.5rem 0.65rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);font-size:0.68rem;color:#94a3b8;line-height:1.4;">
                             <strong style="color:#cbd5e1;">Liquidity Node:</strong> ${strategyName.includes('Volume Profile') ? 'Testing Value Area High (VAH) resistance boundary with low-volume node breakout potential.' : 'Volume expansion confirms institutional accumulation without retail distribution overhead.'}
                         </div>
                     </div>
@@ -2668,13 +2668,13 @@
                 <!-- 2-COL GRID: 4. EARNINGS HISTORY & 5. INSTITUTIONAL ACTIVITY -->
                 <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:1rem;">
                     <!-- 4. EARNINGS HISTORY & SURPRISES -->
-                    <div style="background:#0b0f19;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.9rem 1rem;">
+                    <div style="background:#09090b;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.9rem 1rem;">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0.4rem;">
                             <span style="font-size:0.78rem;font-weight:800;color:#34d399;text-transform:uppercase;letter-spacing:0.05em;">
                                 4. Earnings History & Surprises
                             </span>
                             <span style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">
-                                Beat Streak: <strong style="color:#4ade80;">${overviewData?.earnings_streak ?? '—'} Qtrs</strong>
+                                Beat Streak: <strong style="color:#34d399;">${overviewData?.earnings_streak ?? '—'} Qtrs</strong>
                             </span>
                         </div>
 
@@ -2682,7 +2682,7 @@
                             <div style="max-height:140px;overflow-y:auto;border:1px solid rgba(255,255,255,0.06);border-radius:4px;">
                                 <table style="width:100%;border-collapse:collapse;font-size:0.68rem;font-family:var(--font-mono);text-align:left;">
                                     <thead>
-                                        <tr style="background:#111827;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);">
+                                        <tr style="background:#000000;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);">
                                             <th style="padding:0.35rem 0.5rem;">Quarter</th>
                                             <th style="padding:0.35rem 0.5rem;">Actual EPS</th>
                                             <th style="padding:0.35rem 0.5rem;">Est. EPS</th>
@@ -2693,9 +2693,9 @@
                                     <tbody>
                                         ${earningsHist.slice(0, 4).map(q => {
                                             const surp = q.surprise_pct || q.surprise_percent || 0;
-                                            const surpColor = surp >= 0 ? '#4ade80' : '#f87171';
+                                            const surpColor = surp >= 0 ? '#34d399' : '#f87171';
                                             const rxn = q.reaction_1d_pct || q.reaction_return || 0;
-                                            const rxnColor = rxn >= 0 ? '#4ade80' : '#f87171';
+                                            const rxnColor = rxn >= 0 ? '#34d399' : '#f87171';
                                             return `
                                                 <tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
                                                     <td style="padding:0.35rem 0.5rem;color:#f8fafc;">${q.quarter || q.period || q.date || '—'}</td>
@@ -2710,16 +2710,16 @@
                                 </table>
                             </div>
                         ` : `
-                            <div style="padding:0.85rem;background:#05070f;border-radius:4px;border:1px solid rgba(255,255,255,0.04);font-size:0.72rem;color:#64748b;font-family:var(--font-mono);text-align:center;">
+                            <div style="padding:0.85rem;background:#06060a;border-radius:4px;border:1px solid rgba(255,255,255,0.04);font-size:0.72rem;color:#64748b;font-family:var(--font-mono);text-align:center;">
                                 Next Announcement Scheduled • Historic Track Record Authentic
                             </div>
                         `}
                     </div>
 
                     <!-- 5. INSTITUTIONAL ACTIVITY -->
-                    <div style="background:#0b0f19;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.9rem 1rem;">
+                    <div style="background:#09090b;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:0.9rem 1rem;">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0.4rem;">
-                            <span style="font-size:0.78rem;font-weight:800;color:#60a5fa;text-transform:uppercase;letter-spacing:0.05em;">
+                            <span style="font-size:0.78rem;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:0.05em;">
                                 5. Institutional Activity & Funds
                             </span>
                             <span style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">
@@ -2728,13 +2728,13 @@
                         </div>
 
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.65rem;">
-                            <div style="background:#111827;padding:0.5rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);font-family:var(--font-mono);font-size:0.70rem;">
+                            <div style="background:#121215;padding:0.5rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);font-family:var(--font-mono);font-size:0.70rem;">
                                 <div style="color:#64748b;font-size:0.62rem;text-transform:uppercase;">FII / FPI Holding</div>
                                 <div style="color:#f8fafc;font-weight:700;margin-top:0.15rem;">
                                     ${institutional.fii_pct ? institutional.fii_pct.toFixed(2) + '%' : institutional.fii_holding || '18.4%'}
                                 </div>
                             </div>
-                            <div style="background:#111827;padding:0.5rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);font-family:var(--font-mono);font-size:0.70rem;">
+                            <div style="background:#121215;padding:0.5rem;border-radius:4px;border:1px solid rgba(255,255,255,0.04);font-family:var(--font-mono);font-size:0.70rem;">
                                 <div style="color:#64748b;font-size:0.62rem;text-transform:uppercase;">DII / Mutual Funds</div>
                                 <div style="color:#f8fafc;font-weight:700;margin-top:0.15rem;">
                                     ${institutional.dii_pct ? institutional.dii_pct.toFixed(2) + '%' : institutional.dii_holding || '14.2%'}

@@ -119,7 +119,7 @@ class Settings:
 
 @dataclass
 class EmailSettings:
-    """SMTP settings for emailing generated reports."""
+    """SMTP settings for emailing generated reports and alerts."""
 
     enabled: bool = False
     smtp_host: str = "smtp.gmail.com"
@@ -137,14 +137,84 @@ def _parse_env_list(value: str | None) -> tuple[str, ...]:
 
 
 def load_email_settings() -> EmailSettings:
+    enabled_keys = (
+        "EARNINGS_ENGINE_EMAIL_ENABLED",
+        "EMAIL_ENABLED",
+        "BREAKOUT_EMAIL_ENABLED",
+        "BREAKOUT_ALERTS_ENABLED",
+        "ALERT_EMAIL_ENABLED",
+    )
+    is_enabled = False
+    for k in enabled_keys:
+        val = os.getenv(k)
+        if val is not None and val.strip().lower() in ("true", "1", "yes", "on", "enabled"):
+            is_enabled = True
+            break
+
+    def _first_env(*keys: str, default: str = "") -> str:
+        for k in keys:
+            v = os.getenv(k)
+            if v is not None and v.strip():
+                return v.strip()
+        return default
+
+    smtp_host = _first_env(
+        "EARNINGS_ENGINE_SMTP_HOST",
+        "SMTP_HOST",
+        "EMAIL_HOST",
+        default="smtp.gmail.com",
+    )
+    smtp_port_raw = _first_env(
+        "EARNINGS_ENGINE_SMTP_PORT",
+        "SMTP_PORT",
+        "EMAIL_PORT",
+        default="587",
+    )
+    try:
+        smtp_port = int(smtp_port_raw)
+    except ValueError:
+        smtp_port = 587
+
+    smtp_username = _first_env(
+        "EARNINGS_ENGINE_SMTP_USERNAME",
+        "SMTP_USERNAME",
+        "SMTP_USER",
+        "EMAIL_USER",
+        default="",
+    )
+    smtp_password = _first_env(
+        "EARNINGS_ENGINE_SMTP_PASSWORD",
+        "SMTP_PASSWORD",
+        "SMTP_PASS",
+        "EMAIL_PASSWORD",
+        default="",
+    )
+    from_address = _first_env(
+        "EARNINGS_ENGINE_EMAIL_FROM",
+        "EMAIL_FROM",
+        "SMTP_FROM",
+        "DEFAULT_FROM_EMAIL",
+        default=smtp_username,
+    )
+    to_raw = _first_env(
+        "EARNINGS_ENGINE_EMAIL_TO",
+        "EMAIL_TO",
+        "BREAKOUT_ALERT_EMAILS",
+        "BREAKOUT_EMAIL_TO",
+        "ALERT_EMAILS",
+        "NOTIFY_EMAILS",
+        default="",
+    )
+    to_addresses = _parse_env_list(to_raw)
+
     return EmailSettings(
-        enabled=os.getenv("EARNINGS_ENGINE_EMAIL_ENABLED", "false").strip().lower() == "true",
-        smtp_host=os.getenv("EARNINGS_ENGINE_SMTP_HOST", "smtp.gmail.com"),
-        smtp_port=_env_int("EARNINGS_ENGINE_SMTP_PORT", 587),
-        smtp_username=os.getenv("EARNINGS_ENGINE_SMTP_USERNAME", ""),
-        smtp_password=os.getenv("EARNINGS_ENGINE_SMTP_PASSWORD", ""),
-        from_address=os.getenv("EARNINGS_ENGINE_EMAIL_FROM", ""),
-        to_addresses=_parse_env_list(os.getenv("EARNINGS_ENGINE_EMAIL_TO")),
+        enabled=is_enabled,
+        smtp_host=smtp_host,
+        smtp_port=smtp_port,
+        smtp_username=smtp_username,
+        smtp_password=smtp_password,
+        from_address=from_address,
+        to_addresses=to_addresses,
     )
 
 

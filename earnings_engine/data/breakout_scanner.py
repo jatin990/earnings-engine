@@ -645,16 +645,24 @@ def record_breakout_transition(
     score_after: float | None = None,
     price: float | None = None,
     trigger_price: float | None = None,
+    target_price: float | None = None,
+    stop_loss: float | None = None,
+    risk_reward_ratio: float | None = None,
+    volume_ratio: float | None = None,
     reason: str = "",
     catalyst_impact: str | None = None,
     company_name: str | None = None,
     strategy: str | None = "Classic Technical",
     settings: Settings | None = None,
+    send_email: bool = True,
+    sync_email: bool = False,
 ) -> None:
     """Record an audit trail event explaining why a stock moved in, out, or between breakout tiers.
 
     If the incoming event matches the immediately preceding transition for this ticker and strategy,
     it increments an occurrence counter instead of inserting redundant duplicate rows.
+    When a new breakout transition into HOT or WARM is recorded, automatically dispatches an alert email
+    to the configured notification recipients.
     """
     settings = settings or Settings()
     try:
@@ -690,13 +698,15 @@ def record_breakout_transition(
         )
         last_row = cur.fetchone()
 
-        if (
+        is_duplicate = bool(
             last_row
             and str(last_row[1] or "").upper() == event_type.upper()
             and str(last_row[2] or "").upper() == from_tier.upper()
             and str(last_row[3] or "").upper() == to_tier.upper()
             and str(last_row[4] or "").strip().lower() == strat_name.strip().lower()
-        ):
+        )
+
+        if is_duplicate:
             last_id = last_row[0]
             curr_count = (int(last_row[5]) if last_row[5] is not None else 1) + 1
             conn.execute(
@@ -748,6 +758,58 @@ def record_breakout_transition(
                     now_iso,
                 ),
             )
+
+            # Dispatch breakout notification email for newly recorded breakout setups
+            if send_email and (
+                to_tier.upper() in ("HOT", "WARM")
+                or event_type.upper() in ("PROMOTED_HOT", "ADDED_WARM", "BREAKOUT_TRIGGERED", "BREAKOUT_CONFIRMED")
+            ):
+                try:
+                    p_key = _pool_key(ticker, strat_name)
+                    pool_cand = (
+                        _pool.get("hot", {}).get(p_key, {}).get("result")
+                        or _pool.get("warm", {}).get(p_key, {}).get("result")
+                        or _pool.get("hot", {}).get(ticker, {}).get("result")
+                        or _pool.get("warm", {}).get(ticker, {}).get("result")
+                    )
+
+                    final_target = target_price or (pool_cand.get("target_price") if pool_cand else None)
+                    final_stop = stop_loss or (pool_cand.get("stop_loss") if pool_cand else None)
+                    final_rr = risk_reward_ratio or (pool_cand.get("risk_reward_ratio") if pool_cand else None)
+                    final_vol = volume_ratio or (pool_cand.get("volume_ratio") if pool_cand else None)
+                    final_price = price or (pool_cand.get("current_price") or pool_cand.get("signal_price") if pool_cand else None)
+                    final_trigger = trigger_price or (pool_cand.get("breakout_trigger") if pool_cand else None)
+                    final_score = score_after if score_after is not None else (pool_cand.get("composite_score") if pool_cand else None)
+
+                    if final_price and final_price > 0:
+                        if not final_target:
+                            final_target = round(final_price * 1.08, 2)
+                        if not final_stop:
+                            final_stop = round(final_price * 0.96, 2)
+                        if not final_rr and (final_price - final_stop) > 0:
+                            final_rr = round((final_target - final_price) / (final_price - final_stop), 2)
+
+                    from earnings_engine.emailing import send_breakout_alert_email
+                    send_breakout_alert_email(
+                        ticker=ticker,
+                        company_name=company_name,
+                        strategy=strat_name,
+                        tier=to_tier.upper(),
+                        event_type=event_type,
+                        composite_score=final_score,
+                        current_price=final_price,
+                        trigger_price=final_trigger,
+                        target_price=final_target,
+                        stop_loss=final_stop,
+                        risk_reward_ratio=final_rr,
+                        volume_ratio=final_vol,
+                        reason=reason,
+                        catalyst_impact=catalyst_impact,
+                        sync=sync_email,
+                    )
+                except Exception as mail_err:
+                    logger.debug("[BREAKOUT-ALERT-EMAIL] Failed dispatching breakout alert email for %s: %s", ticker, mail_err)
+
         if hasattr(conn, "commit"):
             conn.commit()
     except Exception as e:
@@ -1435,8 +1497,13 @@ def _promote(ticker: str, result: dict, settings: Settings | None = None) -> Non
                 score_after=new_score,
                 price=cur_p,
                 trigger_price=trig_p,
+                target_price=result.get("target_price"),
+                stop_loss=result.get("stop_loss"),
+                risk_reward_ratio=result.get("risk_reward_ratio"),
+                volume_ratio=vol_r,
                 reason=reason_str,
                 catalyst_impact=cat_headline,
+                company_name=result.get("company_name"),
                 strategy=strat,
                 settings=settings,
             )
@@ -1456,8 +1523,13 @@ def _promote(ticker: str, result: dict, settings: Settings | None = None) -> Non
                     score_after=new_score,
                     price=cur_p,
                     trigger_price=trig_p,
+                    target_price=result.get("target_price"),
+                    stop_loss=result.get("stop_loss"),
+                    risk_reward_ratio=result.get("risk_reward_ratio"),
+                    volume_ratio=vol_r,
                     reason=reason_str,
                     catalyst_impact=cat_headline,
+                    company_name=result.get("company_name"),
                     strategy=strat,
                     settings=settings,
                 )
@@ -3753,12 +3825,60 @@ def set_ticker_tier(
     if target_tier == "hot":
         _pool["hot"][sym] = {"result": result, "consecutive_low": 0}
         _pool["warm"].pop(sym, None)
+        record_breakout_transition(
+            ticker=sym,
+            event_type="PROMOTED_HOT",
+            from_tier="MANUAL",
+            to_tier="HOT",
+            score_after=result.get("composite_score"),
+            price=result.get("current_price") or result.get("signal_price"),
+            trigger_price=result.get("breakout_trigger"),
+            target_price=result.get("target_price"),
+            stop_loss=result.get("stop_loss"),
+            risk_reward_ratio=result.get("risk_reward_ratio"),
+            volume_ratio=result.get("volume_ratio"),
+            reason="Manually assigned to HOT tier",
+            company_name=result.get("company_name"),
+            strategy=result.get("strategy", "Classic Technical"),
+            settings=settings,
+        )
     elif target_tier == "warm":
         _pool["warm"][sym] = {"result": result, "consecutive_low": 0}
         _pool["hot"].pop(sym, None)
+        record_breakout_transition(
+            ticker=sym,
+            event_type="ADDED_WARM",
+            from_tier="MANUAL",
+            to_tier="WARM",
+            score_after=result.get("composite_score"),
+            price=result.get("current_price") or result.get("signal_price"),
+            trigger_price=result.get("breakout_trigger"),
+            target_price=result.get("target_price"),
+            stop_loss=result.get("stop_loss"),
+            risk_reward_ratio=result.get("risk_reward_ratio"),
+            volume_ratio=result.get("volume_ratio"),
+            reason="Manually assigned to WARM tier",
+            company_name=result.get("company_name"),
+            strategy=result.get("strategy", "Classic Technical"),
+            settings=settings,
+        )
     elif target_tier == "cold":
         _pool["hot"].pop(sym, None)
         _pool["warm"].pop(sym, None)
+        record_breakout_transition(
+            ticker=sym,
+            event_type="REMOVED_COLD",
+            from_tier="MANUAL",
+            to_tier="COLD",
+            score_after=result.get("composite_score"),
+            price=result.get("current_price") or result.get("signal_price"),
+            trigger_price=result.get("breakout_trigger"),
+            reason="Manually demoted to COLD tier",
+            company_name=result.get("company_name"),
+            strategy=result.get("strategy", "Classic Technical"),
+            settings=settings,
+            send_email=False,
+        )
     else:
         return {"success": False, "error": f"Invalid tier '{tier}'. Must be 'hot', 'warm', or 'cold'."}
 
