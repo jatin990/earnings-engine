@@ -119,9 +119,9 @@ def test_automation_schedules_init_and_fetch_performance(tmp_path):
 
 
 def test_sync_tables_and_watermark_configuration():
-    """Verify SYNC_TABLES contains 46 tables and watermarks correctly prioritize."""
-    assert len(SYNC_TABLES) == 46
-    assert len(set(SYNC_TABLES)) == 46  # No duplicate table names
+    """Verify SYNC_TABLES contains all registered tables and watermarks correctly prioritize."""
+    assert len(SYNC_TABLES) == 68
+    assert len(set(SYNC_TABLES)) == 68  # No duplicate table names
 
     # Essential missing tables now confirmed in list
     assert "automation_schedules" in SYNC_TABLES

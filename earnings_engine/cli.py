@@ -1643,20 +1643,22 @@ def verify_institutional_cmd(
     click.echo()
 
     # Findings summary
-    if report.findings:
-        crit_count = sum(1 for f in report.findings if f.severity == "CRITICAL")
-        warn_count = sum(1 for f in report.findings if f.severity == "WARNING")
+    bad_findings = [f for f in report.findings if f.severity in ("CRITICAL", "CRITICAL_ERROR", "WARNING")]
+    if bad_findings:
+        crit_count = sum(1 for f in bad_findings if f.severity in ("CRITICAL", "CRITICAL_ERROR"))
+        warn_count = sum(1 for f in bad_findings if f.severity == "WARNING")
         click.secho(f"  ⚠️  AUDIT FINDINGS & DEVIATIONS ({crit_count} Critical, {warn_count} Warnings)", fg="yellow", bold=True)
         click.echo("  " + "-" * 76)
 
-        # Show top 15 findings
-        for f in report.findings[:15]:
-            badge = click.style(f"[{f.severity}]", fg="red" if f.severity == "CRITICAL" else "yellow", bold=True)
+        # Sort so critical errors appear first
+        sorted_findings = sorted(bad_findings, key=lambda x: (0 if x.severity in ("CRITICAL", "CRITICAL_ERROR") else 1))
+        for f in sorted_findings[:15]:
+            badge = click.style(f"[{f.severity}]", fg="red" if f.severity in ("CRITICAL", "CRITICAL_ERROR") else "yellow", bold=True)
             tick = f"{f.ticker}: " if f.ticker else ""
             click.echo(f"  {badge} {tick}{f.check_name}")
             click.echo(f"        {f.details}")
-        if len(report.findings) > 15:
-            click.echo(f"  ... and {len(report.findings) - 15} additional findings logged to institutional_audit_log.")
+        if len(sorted_findings) > 15:
+            click.echo(f"  ... and {len(sorted_findings) - 15} additional findings logged to institutional_audit_log.")
         click.echo()
     else:
         click.secho("  ✅ Zero deviations or integrity issues found. All records mathematically valid & authenticated!", fg="green", bold=True)
