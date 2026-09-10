@@ -1603,6 +1603,143 @@ def prune_data_cmd(price_days: int, earnings_days: int, vacuum: bool) -> None:
     click.echo()
 
 
+def _run_stock_buyers_cli(
+    ticker: str,
+    from_date: str | None,
+    to_date: str | None,
+    quarter: str | None,
+    entity_type: str | None,
+    min_value_cr: float,
+) -> None:
+    from earnings_engine.data.institutional_accumulation import get_stock_buyers_in_period
+
+    settings = Settings()
+    data = get_stock_buyers_in_period(
+        ticker=ticker,
+        from_date=from_date,
+        to_date=to_date,
+        quarter=quarter,
+        entity_type=entity_type,
+        min_value_cr=min_value_cr,
+        settings=settings,
+    )
+
+    if not data.get("success"):
+        click.secho(f"\n[ERROR] {data.get('detail', 'Failed to retrieve buyers.')}\n", fg="red", bold=True)
+        return
+
+    sym = data.get("ticker", ticker)
+    cname = data.get("company_name", sym)
+    tp = data.get("time_period", {})
+    p_desc = tp.get("description") or f"From {tp.get('from_date', 'all')} to {tp.get('to_date', 'present')}"
+    summary = data.get("summary", {})
+    buyers = data.get("buyers", [])
+
+    click.echo()
+    click.secho("=" * 105, fg="cyan", bold=True)
+    click.secho(f"  INSTITUTIONAL & SMART MONEY BUYERS INSPECTOR", fg="cyan", bold=True)
+    click.secho(f"  Stock: {sym} ({cname})  |  Window: {p_desc}", fg="white", bold=True)
+    click.secho("=" * 105, fg="cyan", bold=True)
+
+    # Inflow summary
+    tot_cap = summary.get("total_capital_deployed_cr", 0.0)
+    tot_cnt = summary.get("total_buyers_count", 0)
+    fii_cap = summary.get("fii_capital_deployed_cr", 0.0)
+    fii_cnt = summary.get("fii_buyers_count", 0)
+    dii_cap = summary.get("dii_capital_deployed_cr", 0.0)
+    dii_cnt = summary.get("dii_buyers_count", 0)
+    sup_cap = summary.get("super_investor_capital_deployed_cr", 0.0)
+    sup_cnt = summary.get("super_investor_buyers_count", 0)
+
+    click.echo(f"\n  Summary Metrics:")
+    click.echo(f"    - Total Capital Deployed : {click.style(f'₹{tot_cap:,.2f} Cr', fg='bright_green', bold=True)} across {tot_cnt} institutional entities")
+    click.echo(f"    - FII / Foreign Inflows  : {click.style(f'₹{fii_cap:,.2f} Cr', fg='bright_cyan', bold=True)} ({fii_cnt} funds/institutions)")
+    click.echo(f"    - DII / Mutual Funds     : {click.style(f'₹{dii_cap:,.2f} Cr', fg='bright_yellow', bold=True)} ({dii_cnt} domestic schemes)")
+    click.echo(f"    - Super Investors / HNIs : {click.style(f'₹{sup_cap:,.2f} Cr', fg='bright_magenta', bold=True)} ({sup_cnt} tracked individuals)")
+    click.echo(f"    - Disclosures Reconciled : {summary.get('filings_count', 0)} Regulatory Filings, {summary.get('block_deals_count', 0)} Exchange Block Trades")
+
+    if not buyers:
+        click.secho(f"\n  [INFO] No institutional buyers recorded matching the criteria in {p_desc}.\n", fg="yellow")
+        return
+
+    click.echo(f"\n  Disclosed Buyers Timeline ({len(buyers)} entries, newest first):")
+    click.secho("-" * 105, fg="bright_black")
+    click.secho(
+        f"  {'Date':<11} {'Investor / Fund Name':<38} {'Class':<12} {'Action':<13} {'Deployed (₹Cr)':>14} {'Stake/Delta':>12}",
+        bold=True,
+    )
+    click.secho("-" * 105, fg="bright_black")
+
+    for b in buyers:
+        b_date = b.get("date") or b.get("quarter") or "Recent"
+        name = b.get("investor_name") or "Unknown"
+        if len(name) > 37:
+            name = name[:35] + ".."
+        cat = b.get("category") or "Other"
+        act = b.get("action") or "BUY"
+        cap = b.get("capital_deployed_cr", 0.0)
+        chg = b.get("change_pct", 0.0)
+        stk = b.get("stake_pct", 0.0)
+
+        # Delta display
+        if act == "BLOCK BUY":
+            stk_str = f"{stk:.2f}% eq"
+        elif act == "NEW BUY":
+            stk_str = f"{stk:.2f}% (New)"
+        else:
+            stk_str = f"+{chg:.2f}% ({stk:.2f}%)" if chg > 0 else f"{stk:.2f}%"
+
+        # Styling
+        if cat == "FII":
+            cat_style = click.style(f"{cat:<12}", fg="cyan")
+        elif cat == "DII":
+            cat_style = click.style(f"{cat:<12}", fg="yellow")
+        elif cat == "Super Investor":
+            cat_style = click.style(f"{cat:<12}", fg="magenta")
+        else:
+            cat_style = f"{cat:<12}"
+
+        if "NEW" in act:
+            act_style = click.style(f"{act:<13}", fg="green", bold=True)
+        elif "BLOCK" in act:
+            act_style = click.style(f"{act:<13}", fg="blue", bold=True)
+        else:
+            act_style = click.style(f"{act:<13}", fg="green")
+
+        cap_str = f"₹{cap:,.2f}"
+
+        click.echo(
+            f"  {b_date:<11} {name:<38} {cat_style} {act_style} {cap_str:>14} {stk_str:>12}"
+        )
+
+    click.secho("-" * 105, fg="bright_black")
+    click.echo()
+
+
+@cli.command("buyers")
+@click.argument("ticker", type=str)
+@click.option("--from", "from_date", "-f", type=str, default=None, help="Start date or period (e.g. 'FEB 2026', '2026-02-01', '90d').")
+@click.option("--to", "to_date", "-t", type=str, default=None, help="End date (e.g. '2026-08-31').")
+@click.option("--quarter", "-q", type=str, default=None, help="Fiscal quarter filter (e.g. 'Q4 FY26', 'Q1 FY27').")
+@click.option("--entity", "-e", "entity_type", type=str, default=None, help="Filter by entity type ('FII', 'DII', 'Super Investor').")
+@click.option("--min-cr", "-m", "min_value_cr", type=float, default=0.0, help="Minimum capital deployed in ₹ Cr.")
+def buyers_cmd(ticker: str, from_date: str | None, to_date: str | None, quarter: str | None, entity_type: str | None, min_value_cr: float) -> None:
+    """Inspect which institutions, mutual funds, and super investors bought a stock in a given period."""
+    _run_stock_buyers_cli(ticker, from_date, to_date, quarter, entity_type, min_value_cr)
+
+
+@cli.command("institutional-buyers")
+@click.argument("ticker", type=str)
+@click.option("--from", "from_date", "-f", type=str, default=None, help="Start date or period (e.g. 'FEB 2026', '2026-02-01', '90d').")
+@click.option("--to", "to_date", "-t", type=str, default=None, help="End date (e.g. '2026-08-31').")
+@click.option("--quarter", "-q", type=str, default=None, help="Fiscal quarter filter (e.g. 'Q4 FY26', 'Q1 FY27').")
+@click.option("--entity", "-e", "entity_type", type=str, default=None, help="Filter by entity type ('FII', 'DII', 'Super Investor').")
+@click.option("--min-cr", "-m", "min_value_cr", type=float, default=0.0, help="Minimum capital deployed in ₹ Cr.")
+def institutional_buyers_cmd(ticker: str, from_date: str | None, to_date: str | None, quarter: str | None, entity_type: str | None, min_value_cr: float) -> None:
+    """Inspect institutional and smart money buyers for a stock (alias for 'buyers')."""
+    _run_stock_buyers_cli(ticker, from_date, to_date, quarter, entity_type, min_value_cr)
+
+
 if __name__ == "__main__":
     cli()
 

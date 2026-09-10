@@ -114,6 +114,34 @@ async def get_fund_portfolio(fund_name: str):
         raise HTTPException(status_code=500, detail=f"Error fetching fund portfolio: {str(e)}")
 
 
+@router.get("/api/v1/institutional/stock/{ticker}/buyers")
+@router.get("/api/v1/institutional/buyers/{ticker:path}")
+async def get_stock_buyers(
+    ticker: str,
+    from_date: str | None = Query(None, description="Start date (e.g. '2026-02-01', 'FEB 2026', '90d')"),
+    to_date: str | None = Query(None, description="End date (e.g. '2026-08-31')"),
+    quarter: str | None = Query(None, description="Quarter filter (e.g. 'Q4 FY26', 'Q1 FY27')"),
+    entity_type: str | None = Query(None, description="Entity filter (e.g. 'FII', 'DII', 'Super Investor')"),
+    min_value_cr: float = Query(0.0, ge=0.0, description="Minimum capital deployed in ₹ Cr"),
+):
+    """Retrieve all institutional, fund, and super investor buyers who accumulated the stock in a given period."""
+    try:
+        data = await asyncio.to_thread(
+            inst_mod.get_stock_buyers_in_period,
+            ticker=ticker,
+            from_date=from_date,
+            to_date=to_date,
+            quarter=quarter,
+            entity_type=entity_type,
+            min_value_cr=min_value_cr,
+            settings=_settings,
+        )
+        return data
+    except Exception as e:
+        logger.exception("Error in get_stock_buyers for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Error fetching stock buyers: {str(e)}")
+
+
 @router.get("/api/v1/institutional/stock/{ticker}")
 async def get_stock_institutional_details(ticker: str):
     """Retrieve detailed institutional shareholding breakdown for a specific stock."""

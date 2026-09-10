@@ -851,6 +851,29 @@
             border-color: rgba(56, 189, 248, 0.45);
             color: #ffffff;
         }
+        /* Institutional Period Presets */
+        .btn-preset-chip {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #94a3b8;
+            font-size: 0.70rem;
+            font-weight: 600;
+            padding: 0.2rem 0.55rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-preset-chip:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.25);
+            color: #fff;
+        }
+        .btn-preset-chip.active {
+            background: rgba(56, 189, 248, 0.16);
+            border-color: rgba(56, 189, 248, 0.45);
+            color: #38bdf8;
+            font-weight: 700;
+        }
         /* Trace Modal Tabs */
         .trace-tab-btn {
             background: transparent;
@@ -1373,6 +1396,114 @@
                     <div id="listTopHoldings" style="display:flex;flex-direction:column;gap:0.3rem;">
                         <div style="color:var(--text-tertiary);font-size:0.8rem;">Loading fund holdings...</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- 🔍 SMART MONEY & INSTITUTIONAL BUYERS PERIOD INSPECTOR -->
+            <div style="margin-top:1.4rem;padding-top:1.1rem;border-top:1px solid rgba(255,255,255,0.08);">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.85rem;">
+                    <div>
+                        <div style="font-size:0.92rem;font-weight:800;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+                            <span style="color:#38bdf8;">🔍</span>
+                            <span>Institutional &amp; Smart Money Buyers Inspector</span>
+                            <span style="font-size:0.65rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.15rem 0.45rem;border-radius:4px;font-weight:700;text-transform:uppercase;">Period Analysis</span>
+                        </div>
+                        <div style="font-size:0.72rem;color:#94a3b8;margin-top:0.2rem;">
+                            Inspect which FIIs, DIIs, Mutual Funds, and Super Investors accumulated positions or executed buy block deals in any period.
+                        </div>
+                    </div>
+                    <!-- Quick Presets -->
+                    <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                        <span style="font-size:0.68rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-right:0.2rem;">Presets:</span>
+                        <button type="button" class="btn-preset-chip active" id="chipPresetFeb26" onclick="applyBuyersPreset('FEB 2026')">From Feb 2026</button>
+                        <button type="button" class="btn-preset-chip" id="chipPreset90d" onclick="applyBuyersPreset('90d')">Last 90 Days</button>
+                        <button type="button" class="btn-preset-chip" id="chipPresetQ4" onclick="applyBuyersPresetQuarter('Q4 FY26')">Q4 FY26</button>
+                        <button type="button" class="btn-preset-chip" id="chipPresetQ1" onclick="applyBuyersPresetQuarter('Q1 FY27')">Q1 FY27</button>
+                        <button type="button" class="btn-preset-chip" id="chipPresetAll" onclick="applyBuyersPreset('ALL')">All Records</button>
+                    </div>
+                </div>
+
+                <!-- Filter Controls Form / Bar -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.6rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:0.75rem;align-items:end;margin-bottom:0.9rem;">
+                    <div>
+                        <label style="display:block;font-size:0.65rem;color:#94a3b8;font-weight:700;text-transform:uppercase;margin-bottom:0.25rem;">From Period / Date</label>
+                        <input type="text" id="inputBuyersFrom" placeholder="e.g. FEB 2026, 2026-02-01, 90d" value="FEB 2026" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.12);border-radius:5px;padding:0.35rem 0.55rem;color:#f8fafc;font-size:0.76rem;font-family:var(--font-mono);" />
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.65rem;color:#94a3b8;font-weight:700;text-transform:uppercase;margin-bottom:0.25rem;">To Date (Optional)</label>
+                        <input type="text" id="inputBuyersTo" placeholder="e.g. 2026-08-31" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.12);border-radius:5px;padding:0.35rem 0.55rem;color:#f8fafc;font-size:0.76rem;font-family:var(--font-mono);" />
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.65rem;color:#94a3b8;font-weight:700;text-transform:uppercase;margin-bottom:0.25rem;">Entity Class</label>
+                        <select id="selectBuyersEntity" style="width:100%;background:rgba(15,23,42,0.9);border:1px solid rgba(255,255,255,0.12);border-radius:5px;padding:0.35rem 0.55rem;color:#f8fafc;font-size:0.76rem;">
+                            <option value="">All Institutional Classes</option>
+                            <option value="FII">Foreign Institutional (FII)</option>
+                            <option value="DII">Domestic Mutual Funds (DII)</option>
+                            <option value="Super Investor">Super Investors</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.65rem;color:#94a3b8;font-weight:700;text-transform:uppercase;margin-bottom:0.25rem;">Min Capital (₹ Cr)</label>
+                        <input type="number" id="inputBuyersMinCr" placeholder="0" min="0" step="1" value="0" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.12);border-radius:5px;padding:0.35rem 0.55rem;color:#f8fafc;font-size:0.76rem;font-family:var(--font-mono);" />
+                    </div>
+                    <div>
+                        <button type="button" id="btnInspectBuyers" onclick="fetchStockBuyers(true)" class="btn-section-action primary-subtle" style="width:100%;height:32px;display:flex;align-items:center;justify-content:center;gap:0.35rem;font-weight:800;font-size:0.75rem;">
+                            <span>🔍</span> <span>Inspect Buyers</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Summary Grid -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.65rem;margin-bottom:0.9rem;">
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:0.65rem;text-align:center;">
+                        <div style="font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Total Buyers</div>
+                        <div id="instBuyersCount" style="font-size:1.15rem;font-weight:800;font-family:var(--font-mono);color:#f8fafc;">—</div>
+                        <div id="instBuyersBreakdownCount" style="font-size:0.63rem;color:#64748b;">— filings · — block deals</div>
+                    </div>
+                    <div style="background:rgba(56,189,248,0.03);border:1px solid rgba(56,189,248,0.15);border-radius:8px;padding:0.65rem;text-align:center;">
+                        <div style="font-size:0.62rem;color:#38bdf8;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Total Capital Deployed</div>
+                        <div id="instBuyersCapital" style="font-size:1.15rem;font-weight:800;font-family:var(--font-mono);color:#38bdf8;">₹— Cr</div>
+                        <div style="font-size:0.63rem;color:#64748b;">Cumulative Accumulation</div>
+                    </div>
+                    <div style="background:rgba(56,189,248,0.03);border:1px solid rgba(56,189,248,0.12);border-radius:8px;padding:0.65rem;text-align:center;">
+                        <div style="font-size:0.62rem;color:#7dd3fc;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">FII / Foreign Inflows</div>
+                        <div id="instBuyersFii" style="font-size:1.15rem;font-weight:800;font-family:var(--font-mono);color:#7dd3fc;">₹— Cr</div>
+                        <div id="instBuyersFiiCount" style="font-size:0.63rem;color:#64748b;">— entities</div>
+                    </div>
+                    <div style="background:rgba(16,185,129,0.03);border:1px solid rgba(16,185,129,0.12);border-radius:8px;padding:0.65rem;text-align:center;">
+                        <div style="font-size:0.62rem;color:#34d399;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">DII &amp; Mutual Funds</div>
+                        <div id="instBuyersDii" style="font-size:1.15rem;font-weight:800;font-family:var(--font-mono);color:#34d399;">₹— Cr</div>
+                        <div id="instBuyersDiiCount" style="font-size:0.63rem;color:#64748b;">— entities</div>
+                    </div>
+                    <div style="background:rgba(168,85,247,0.03);border:1px solid rgba(168,85,247,0.12);border-radius:8px;padding:0.65rem;text-align:center;">
+                        <div style="font-size:0.62rem;color:#c084fc;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Super Investors</div>
+                        <div id="instBuyersSuper" style="font-size:1.15rem;font-weight:800;font-family:var(--font-mono);color:#c084fc;">₹— Cr</div>
+                        <div id="instBuyersSuperCount" style="font-size:0.63rem;color:#64748b;">— entities</div>
+                    </div>
+                </div>
+
+                <!-- Active Period Banner -->
+                <div id="instBuyersPeriodBanner" style="display:none;background:rgba(30,41,59,0.6);border-left:3px solid #38bdf8;padding:0.45rem 0.75rem;border-radius:4px;font-size:0.74rem;color:#cbd5e1;margin-bottom:0.75rem;">
+                </div>
+
+                <!-- Chronological Buyers Stream Table -->
+                <div style="overflow-x:auto;">
+                    <table class="clean-table" id="tblBuyersStream" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th style="width:110px;">Date / Filing</th>
+                                <th>Investor / Fund Entity</th>
+                                <th style="width:140px;">Entity Class</th>
+                                <th style="width:130px;">Action / Source</th>
+                                <th style="text-align:right;width:120px;">Capital Deployed</th>
+                                <th style="text-align:right;width:110px;">Stake / Delta</th>
+                                <th style="text-align:right;width:95px;">Buy Price</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tblBuyersBody">
+                            <tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:1.2rem;">Loading institutional buyers...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -2139,6 +2270,7 @@
                     stockState.institutional = data.data;
                     renderInstitutional(stockState.institutional);
                     renderInstantStats(stockState.technical, stockState.institutional, stockState.factor_evaluation, stockState.quote?.current_price || 0, stockState.profile, stockState.quote);
+                    fetchStockBuyers();
                 }
                 showStockToast(data.message || 'Institutional filings & block deals refreshed from source', 'success');
             } catch (err) {
@@ -2264,6 +2396,7 @@
             fetchStockKronosOnly();
             fetchStockEarningsOnly();
             fetchStockInstitutionalOnly();
+            fetchStockBuyers();
             fetchStockCatalystsOnly();
             fetchStockFactorEvaluationOnly();
             fetchStockNotesOnly();
@@ -2600,6 +2733,188 @@
                     }).join('');
                 }
             }
+        }
+
+        function applyBuyersPreset(preset) {
+            const fromInput = document.getElementById('inputBuyersFrom');
+            const toInput = document.getElementById('inputBuyersTo');
+            if (toInput) toInput.value = '';
+            const chips = document.querySelectorAll('.btn-preset-chip');
+            chips.forEach(c => c.classList.remove('active'));
+
+            if (preset === 'FEB 2026') {
+                if (fromInput) fromInput.value = 'FEB 2026';
+                const el = document.getElementById('chipPresetFeb26');
+                if (el) el.classList.add('active');
+            } else if (preset === '90d') {
+                if (fromInput) fromInput.value = '90d';
+                const el = document.getElementById('chipPreset90d');
+                if (el) el.classList.add('active');
+            } else if (preset === 'ALL') {
+                if (fromInput) fromInput.value = '';
+                const el = document.getElementById('chipPresetAll');
+                if (el) el.classList.add('active');
+            }
+            fetchStockBuyers();
+        }
+
+        function applyBuyersPresetQuarter(quarter) {
+            const fromInput = document.getElementById('inputBuyersFrom');
+            const toInput = document.getElementById('inputBuyersTo');
+            if (fromInput) fromInput.value = quarter;
+            if (toInput) toInput.value = '';
+            const chips = document.querySelectorAll('.btn-preset-chip');
+            chips.forEach(c => c.classList.remove('active'));
+
+            if (quarter === 'Q4 FY26') {
+                const el = document.getElementById('chipPresetQ4');
+                if (el) el.classList.add('active');
+            } else if (quarter === 'Q1 FY27') {
+                const el = document.getElementById('chipPresetQ1');
+                if (el) el.classList.add('active');
+            }
+            fetchStockBuyers();
+        }
+
+        async function fetchStockBuyers(isManual = false) {
+            if (!ACTIVE_SYM) return;
+            const fromVal = (document.getElementById('inputBuyersFrom')?.value || '').trim();
+            const toVal = (document.getElementById('inputBuyersTo')?.value || '').trim();
+            const entityVal = (document.getElementById('selectBuyersEntity')?.value || '').trim();
+            const minCrVal = parseFloat(document.getElementById('inputBuyersMinCr')?.value || 0) || 0;
+
+            const tbody = document.getElementById('tblBuyersBody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:1.2rem;"><span class="spinner-border spinner-border-sm" style="margin-right:6px;"></span>Loading institutional &amp; smart money buyers...</td></tr>';
+            }
+
+            try {
+                const params = new URLSearchParams();
+                if (fromVal) params.append('from_date', fromVal);
+                if (toVal) params.append('to_date', toVal);
+                if (entityVal) params.append('entity_type', entityVal);
+                if (minCrVal > 0) params.append('min_value_cr', minCrVal.toString());
+
+                const url = `/api/v1/institutional/stock/${encodeURIComponent(ACTIVE_SYM)}/buyers?${params.toString()}`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                renderStockBuyers(data);
+            } catch (err) {
+                console.warn('Failed to load institutional buyers:', err);
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:1.2rem;">Failed to load institutional buyers for ${ACTIVE_SYM}. (${err.message})</td></tr>`;
+                }
+            }
+        }
+
+        function renderStockBuyers(data) {
+            const el = (id) => document.getElementById(id);
+            if (!data || !data.success) {
+                if (el('tblBuyersBody')) el('tblBuyersBody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:1.2rem;">No institutional buyers data available.</td></tr>';
+                return;
+            }
+
+            const sm = data.summary || {};
+            const totalBuyers = data.total_buyers_count ?? sm.total_buyers_count ?? 0;
+            const totalDeployed = (data.total_capital_deployed_cr ?? sm.total_capital_deployed_cr ?? 0).toLocaleString();
+
+            if (el('instBuyersCount')) el('instBuyersCount').textContent = totalBuyers;
+            if (el('instBuyersBreakdownCount')) el('instBuyersBreakdownCount').textContent = `${sm.filings_count || 0} filings · ${sm.block_deals_count || 0} block deals`;
+            if (el('instBuyersCapital')) el('instBuyersCapital').textContent = `₹${totalDeployed} Cr`;
+
+            if (el('instBuyersFii')) el('instBuyersFii').textContent = `₹${(sm.fii_capital_deployed_cr || 0).toLocaleString()} Cr`;
+            if (el('instBuyersFiiCount')) el('instBuyersFiiCount').textContent = `${sm.fii_buyers_count || 0} entities`;
+
+            if (el('instBuyersDii')) el('instBuyersDii').textContent = `₹${(sm.dii_capital_deployed_cr || 0).toLocaleString()} Cr`;
+            if (el('instBuyersDiiCount')) el('instBuyersDiiCount').textContent = `${sm.dii_buyers_count || 0} entities`;
+
+            if (el('instBuyersSuper')) el('instBuyersSuper').textContent = `₹${(sm.super_investor_capital_deployed_cr || 0).toLocaleString()} Cr`;
+            if (el('instBuyersSuperCount')) el('instBuyersSuperCount').textContent = `${sm.super_investor_buyers_count || 0} entities`;
+
+            const tp = data.time_period || {};
+            const banner = el('instBuyersPeriodBanner');
+            if (banner) {
+                if (tp.description || tp.from_date || tp.to_date) {
+                    banner.style.display = 'block';
+                    banner.innerHTML = `<strong>Active Filter:</strong> ${tp.description || 'Custom Period'} · Range: <span style="font-family:var(--font-mono);">${tp.from_date || 'Start'}</span> to <span style="font-family:var(--font-mono);">${tp.to_date || 'Present'}</span> (${totalBuyers} buyers, ₹${totalDeployed} Cr deployed)`;
+                } else {
+                    banner.style.display = 'none';
+                }
+            }
+
+            const buyers = data.buyers || [];
+            const tbody = el('tblBuyersBody');
+            if (!tbody) return;
+
+            if (buyers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:1.5rem;">No institutional buyers or stake additions found matching the specified timeframe and criteria.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = buyers.map(b => {
+                let entBg = 'rgba(56,189,248,0.1)';
+                let entCol = '#38bdf8';
+                let entBorder = 'rgba(56,189,248,0.25)';
+                const cls = b.entity_class || '';
+                if (cls === 'Foreign Institutional (FII)' || cls.includes('FII') || cls.includes('Foreign')) {
+                    entBg = 'rgba(56,189,248,0.12)'; entCol = '#38bdf8'; entBorder = 'rgba(56,189,248,0.3)';
+                } else if (cls === 'Mutual Fund (DII)' || cls.includes('Mutual Fund') || cls.includes('DII')) {
+                    entBg = 'rgba(168,85,247,0.12)'; entCol = '#c084fc'; entBorder = 'rgba(168,85,247,0.3)';
+                } else if (cls === 'Super Investor') {
+                    entBg = 'rgba(234,179,8,0.12)'; entCol = '#facc15'; entBorder = 'rgba(234,179,8,0.3)';
+                } else if (cls.includes('Insurance')) {
+                    entBg = 'rgba(16,185,129,0.12)'; entCol = '#34d399'; entBorder = 'rgba(16,185,129,0.3)';
+                }
+
+                let actBg = 'rgba(16,185,129,0.12)';
+                let actCol = '#34d399';
+                let actBorder = 'rgba(16,185,129,0.3)';
+                const act = b.action || '';
+                if (act.includes('NEW')) {
+                    actBg = 'rgba(59,130,246,0.15)'; actCol = '#60a5fa'; actBorder = 'rgba(59,130,246,0.35)';
+                } else if (act.includes('BLOCK')) {
+                    actBg = 'rgba(245,158,11,0.15)'; actCol = '#fbbf24'; actBorder = 'rgba(245,158,11,0.35)';
+                }
+
+                const dateStr = b.date || b.reporting_quarter || '—';
+                const subDate = b.source === 'Block Deal' ? 'Exchange Block' : (b.reporting_quarter || 'Filing');
+                const priceStr = (b.price_at_addition || b.execution_price) ? `₹${(b.price_at_addition || b.execution_price).toFixed(2)}` : '—';
+                const capStr = b.capital_deployed_cr > 0 ? `₹${b.capital_deployed_cr.toLocaleString()} Cr` : '—';
+                const stakeStr = b.stake_pct != null ? `${b.stake_pct.toFixed(2)}%` : '—';
+                const deltaStr = (b.change_pct != null && b.change_pct > 0) ? `+${b.change_pct.toFixed(2)}%` : (b.action === 'NEW BUY' ? 'New Stake' : '');
+
+                return `<tr>
+                    <td style="font-family:var(--font-mono);font-size:0.75rem;color:#cbd5e1;">
+                        <div style="font-weight:700;">${dateStr}</div>
+                        <div style="font-size:0.65rem;color:#64748b;">${subDate}</div>
+                    </td>
+                    <td>
+                        <div style="font-weight:700;font-size:0.82rem;color:#f8fafc;">${b.buyer_name || '—'}</div>
+                        <div style="font-size:0.68rem;color:#94a3b8;">${b.raw_entity_type || b.entity_class || ''}</div>
+                    </td>
+                    <td>
+                        <span style="font-size:0.68rem;padding:0.18rem 0.45rem;border-radius:4px;background:${entBg};color:${entCol};border:1px solid ${entBorder};font-weight:700;white-space:nowrap;">
+                            ${cls || 'Institutional'}
+                        </span>
+                    </td>
+                    <td>
+                        <span style="font-size:0.68rem;padding:0.18rem 0.45rem;border-radius:4px;background:${actBg};color:${actCol};border:1px solid ${actBorder};font-weight:700;white-space:nowrap;">
+                            ${act || 'BUY'}
+                        </span>
+                    </td>
+                    <td style="text-align:right;font-family:var(--font-mono);font-size:0.82rem;font-weight:800;color:#10b981;">
+                        ${capStr}
+                    </td>
+                    <td style="text-align:right;font-family:var(--font-mono);font-size:0.78rem;color:#e2e8f0;">
+                        <div>${stakeStr}</div>
+                        ${deltaStr ? `<div style="font-size:0.66rem;color:#34d399;font-weight:700;">${deltaStr}</div>` : ''}
+                    </td>
+                    <td style="text-align:right;font-family:var(--font-mono);font-size:0.78rem;color:#cbd5e1;">
+                        ${priceStr}
+                    </td>
+                </tr>`;
+            }).join('');
         }
 
         function renderTechnicalSection(t, curr, p, q) {
