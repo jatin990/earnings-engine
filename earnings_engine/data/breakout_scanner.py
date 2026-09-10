@@ -296,21 +296,21 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
         seen: set[str] = set()
 
         # 1. Hot pool
-        for key, entry in _pool.get("hot", {}).items():
+        for key, entry in list(_pool.get("hot", {}).items()):
             r = entry.get("result", {})
             if r and key not in seen:
                 seen.add(key)
                 records.append({**r, "tier": "HOT"})
 
         # 2. Warm pool
-        for key, entry in _pool.get("warm", {}).items():
+        for key, entry in list(_pool.get("warm", {}).items()):
             r = entry.get("result", {})
             if r and key not in seen:
                 seen.add(key)
                 records.append({**r, "tier": "WARM"})
 
         # 3. Candidates
-        for r in _pool.get("candidates", []):
+        for r in list(_pool.get("candidates", [])):
             sym = r.get("ticker")
             strat = r.get("strategy") or "CLASSIC_TECHNICAL"
             key = f"{sym}::{strat}"
