@@ -163,9 +163,13 @@ earnings-engine/
 ### 5. FastAPI Routing Precedence
 - In `earnings_engine/api/server.py` and routers, **always define explicit static/literal routes before parameterized routes** (e.g., define `/api/v1/watchlist/quotes` and `/api/v1/watchlist/names` *before* `/api/v1/watchlist/{name}`).
 
-### 6. Database & Storage Layer
+### 6. Database & Storage Layer & Remote DB Sync
 - Primary database is SQLite at `data/cache/prices/prices.sqlite3` (or `earnings_engine.db` in root).
 - Optional Turso Cloud replication via `turso_sync.py` with watermark delta sync when `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` are configured. Always wrap remote database calls with local SQLite fallback.
+- **MANDATORY Remote DB Sync Rule for New Tables**: Whenever ANY new SQLite table or schema entity is added anywhere in the codebase (data scanners, modules, routers, migrations, storage handlers, or cache layers), you MUST:
+  1. Add the table name to `SYNC_TABLES` in `earnings_engine/data/turso_sync.py`.
+  2. If the table has a timestamp or update column (e.g., `updated_at`, `created_at`, `scanned_at`, `date`, `asof_date`, `timestamp`), verify it is present in `WATERMARK_CANDIDATE_COLUMNS` (and `DATE_ONLY_COLUMNS` if formatted as `YYYY-MM-DD`).
+  3. Ensure table creation SQL is valid SQLite/libSQL so bidirectional lossless sync (`INSERT OR IGNORE`) and remote table auto-creation / column self-healing work seamlessly without manual intervention.
 
 ### 7. Ticker Symbol Suffixes & Market Handling
 - NSE Indian equities require the `.NS` suffix (e.g., `TCS.NS`, `RELIANCE.NS`). US equities have no suffix.

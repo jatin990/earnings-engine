@@ -2025,11 +2025,147 @@
 
         _smartMoneySortBy: 'score',
 
+        _smartMoneySortColumn: 'score',
+
+        _smartMoneySortAsc: false,
+
         _smartMoneyStocks: [],
 
         _smartMoneySelectedStock: null,
 
         _smartMoneyRawData: null,
+
+
+
+        sortSmartMoneyTable(col) {
+
+            if (!this._smartMoneyStocks || !this._smartMoneyStocks.length) return;
+
+
+
+            if (this._smartMoneySortColumn === col) {
+
+                this._smartMoneySortAsc = !this._smartMoneySortAsc;
+
+            } else {
+
+                this._smartMoneySortColumn = col;
+
+                this._smartMoneySortAsc = (col === 'ticker'); // default asc for ticker, desc for numbers
+
+            }
+
+
+
+            const asc = this._smartMoneySortAsc;
+
+            const factor = asc ? 1 : -1;
+
+
+
+            this._smartMoneyStocks.sort((a, b) => {
+
+                let vA, vB;
+
+                switch (col) {
+
+                    case 'ticker':
+
+                        return factor * (a.ticker || '').localeCompare(b.ticker || '');
+
+                    case 'price':
+
+                        vA = a.current_price != null ? Number(a.current_price) : 0;
+
+                        vB = b.current_price != null ? Number(b.current_price) : 0;
+
+                        return factor * (vA - vB);
+
+                    case 'capital':
+
+                        vA = Number(a.smart_money_inflow_cr || a.capital_cr || 0);
+
+                        vB = Number(b.smart_money_inflow_cr || b.capital_cr || 0);
+
+                        return factor * (vA - vB);
+
+                    case 'dominance':
+
+                        vA = Number(a.smart_money_dominance_pct != null ? a.smart_money_dominance_pct : (a.dominance_pct || 0));
+
+                        vB = Number(b.smart_money_dominance_pct != null ? b.smart_money_dominance_pct : (b.dominance_pct || 0));
+
+                        return factor * (vA - vB);
+
+                    case 'whales':
+
+                        vA = (a.whale_buyers_summary || a.whale_buyers || []).length;
+
+                        vB = (b.whale_buyers_summary || b.whale_buyers || []).length;
+
+                        return factor * (vA - vB);
+
+                    case 'classification':
+
+                        return factor * (a.accumulation_signal_badge || a.badge || '').localeCompare(b.accumulation_signal_badge || b.badge || '');
+
+                    case 'score':
+
+                    default:
+
+                        vA = Number(a.smart_money_conviction_score != null ? a.smart_money_conviction_score : (a.conviction_score || 0));
+
+                        vB = Number(b.smart_money_conviction_score != null ? b.smart_money_conviction_score : (b.conviction_score || 0));
+
+                        return factor * (vA - vB);
+
+                }
+
+            });
+
+
+
+            // Update UI sort arrow indicators
+
+            ['ticker', 'price', 'capital', 'dominance', 'whales', 'classification', 'score'].forEach(c => {
+
+                const icon = document.getElementById('smSortIcon-' + c);
+
+                if (icon) {
+
+                    if (c === col) {
+
+                        icon.textContent = asc ? '▲' : '▼';
+
+                        icon.style.color = '#38bdf8';
+
+                    } else {
+
+                        icon.textContent = '↕';
+
+                        icon.style.color = '#71717a';
+
+                    }
+
+                }
+
+            });
+
+
+
+            const searchInput = document.getElementById('instSmSearchInput');
+
+            if (searchInput && searchInput.value.trim()) {
+
+                this.filterSmartMoneyLocal(searchInput.value.trim());
+
+            } else {
+
+                this.renderSmartMoneyTable(this._smartMoneyStocks);
+
+            }
+
+        },
 
 
 
@@ -2158,6 +2294,21 @@
                 this._smartMoneyRawData = data;
 
                 this._smartMoneyStocks = data.stocks || [];
+                this._smartMoneySortColumn = 'score';
+                this._smartMoneySortAsc = false;
+
+                ['ticker', 'price', 'capital', 'dominance', 'whales', 'classification', 'score'].forEach(c => {
+                    const icon = document.getElementById('smSortIcon-' + c);
+                    if (icon) {
+                        if (c === 'score') {
+                            icon.textContent = '▼';
+                            icon.style.color = '#38bdf8';
+                        } else {
+                            icon.textContent = '↕';
+                            icon.style.color = '#71717a';
+                        }
+                    }
+                });
 
 
 
@@ -2633,6 +2784,30 @@
 
             if (convVal) convVal.textContent = `${score} / 100`;
 
+            // Update Conviction Score 4-Factor Breakdown
+            const sb = stock.score_breakdown || {};
+            const sbTotal = document.getElementById('instSmScoreBreakdownTotal');
+            const sbCap = document.getElementById('instSmScorePartCap');
+            const sbDom = document.getElementById('instSmScorePartDom');
+            const sbWhale = document.getElementById('instSmScorePartWhale');
+            const sbMom = document.getElementById('instSmScorePartMom');
+            const sbPenalty = document.getElementById('instSmScoreAbsorptionPenalty');
+
+            if (sbTotal) sbTotal.textContent = `${score} / 100`;
+            if (sbCap) sbCap.textContent = `${sb.capital_score != null ? sb.capital_score.toFixed(1) : '--'}/35`;
+            if (sbDom) sbDom.textContent = `${sb.dominance_score != null ? sb.dominance_score.toFixed(1) : '--'}/30`;
+            if (sbWhale) sbWhale.textContent = `${sb.whale_quality_score != null ? sb.whale_quality_score.toFixed(1) : '--'}/20`;
+            if (sbMom) sbMom.textContent = `${sb.momentum_score != null ? sb.momentum_score.toFixed(1) : '--'}/15`;
+
+            if (sbPenalty) {
+                if (sb.absorption_penalty || stock.classification === 'domestic_absorption' || stock.classification_category === 'domestic_absorption') {
+                    sbPenalty.style.display = 'block';
+                    sbPenalty.innerHTML = '⚠️ <b>Absorption Penalty Applied:</b> Domestic Absorption detected. Conviction Score capped at &le; 40.0 pts.';
+                } else {
+                    sbPenalty.style.display = 'none';
+                }
+            }
+
 
 
             if (insightBox) {
@@ -2707,11 +2882,14 @@
 
 
 
+                        const buyerName = b.buyer_name || b.name || b.client_name || 'Anonymous Institution';
+                        const depCr = Number(b.deployed_cr != null ? b.deployed_cr : (b.capital_cr != null ? b.capital_cr : (b.value_cr || 0)));
+
                         return `
 
                             <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
 
-                                <td style="padding:0.4rem 0.6rem;font-weight:700;color:#ffffff;">${b.buyer_name || b.client_name || 'Anonymous Institution'}</td>
+                                <td style="padding:0.4rem 0.6rem;font-weight:700;color:#ffffff;">${buyerName}</td>
 
                                 <td style="padding:0.4rem 0.5rem;">
 
@@ -2719,7 +2897,7 @@
 
                                 </td>
 
-                                <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#10b981;">₹${Number(b.deployed_cr || b.value_cr || 0).toFixed(2)} Cr</td>
+                                <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);font-weight:700;color:#10b981;">₹${depCr.toFixed(2)} Cr</td>
 
                                 <td style="padding:0.4rem 0.5rem;font-family:var(--font-mono);color:#d4d4d8;">${b.stake_pct ? b.stake_pct + '%' : (b.quantity ? Number(b.quantity).toLocaleString() + ' sh' : '—')}</td>
 
@@ -2753,7 +2931,11 @@
 
                 } else {
 
-                    blocksContainer.innerHTML = blockDeals.map(d => `
+                    blocksContainer.innerHTML = blockDeals.map(d => {
+                        const dealBuyer = d.buyer_name || d.name || d.client_name || 'Block Deal Buyer';
+                        const dealCr = Number(d.deployed_cr != null ? d.deployed_cr : (d.capital_cr != null ? d.capital_cr : (d.value_cr || 0)));
+
+                        return `
 
                         <div style="background:#18181b;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:0.35rem 0.55rem;margin-bottom:0.35rem;display:flex;justify-content:space-between;align-items:center;font-size:0.72rem;">
 
@@ -2761,19 +2943,20 @@
 
                                 <span style="font-weight:700;color:#34d399;font-family:var(--font-mono);margin-right:0.35rem;">[BUY]</span>
 
-                                <strong style="color:#ffffff;">${d.buyer_name || d.client_name}</strong>
+                                <strong style="color:#ffffff;">${dealBuyer}</strong>
 
                             </div>
 
                             <div style="font-family:var(--font-mono);color:#a1a1aa;text-align:right;">
 
-                                ${d.quantity ? Number(d.quantity).toLocaleString() + ' shares' : ''} ${d.avg_price ? '@ ₹' + Number(d.avg_price).toFixed(2) : ''} (₹${Number(d.deployed_cr || d.value_cr || 0).toFixed(2)} Cr) | <span style="color:#71717a;">${d.date || d.deal_date || ''}</span>
+                                ${d.quantity ? Number(d.quantity).toLocaleString() + ' shares' : ''} ${d.avg_price ? '@ ₹' + Number(d.avg_price).toFixed(2) : ''} (₹${dealCr.toFixed(2)} Cr) | <span style="color:#71717a;">${d.date || d.deal_date || ''}</span>
 
                             </div>
 
                         </div>
 
-                    `).join('');
+                    `;
+                    }).join('');
 
                 }
 

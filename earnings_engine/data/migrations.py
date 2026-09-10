@@ -1389,6 +1389,78 @@ def _migration_030_ai_model_telemetry_and_api_calls(conn: sqlite3.Connection) ->
     conn.execute("CREATE INDEX IF NOT EXISTS idx_api_calls_ts ON downstream_api_calls(timestamp)")
 
 
+def _migration_031_institutional_verification_and_provenance(conn: Any) -> None:
+    """Create data provenance, audit log, and quarantine tables for institutional intelligence integrity."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS data_provenance_meta (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_type TEXT NOT NULL,
+            entity_key TEXT NOT NULL,
+            source_name TEXT NOT NULL,
+            source_url TEXT,
+            payload_sha256 TEXT NOT NULL,
+            payload_size_bytes INTEGER NOT NULL DEFAULT 0,
+            fetch_timestamp TEXT NOT NULL,
+            verified_timestamp TEXT,
+            is_authentic INTEGER NOT NULL DEFAULT 1,
+            quarantine_reason TEXT,
+            created_at TEXT NOT NULL DEFAULT (DATETIME('now'))
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_provenance_type_key ON data_provenance_meta(record_type, entity_key)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_provenance_sha256 ON data_provenance_meta(payload_sha256)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_provenance_fetch ON data_provenance_meta(fetch_timestamp DESC)")
+    except Exception:
+        pass
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS institutional_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            audit_run_id TEXT NOT NULL,
+            audit_timestamp TEXT NOT NULL,
+            audit_scope TEXT NOT NULL,
+            ticker TEXT,
+            check_category TEXT NOT NULL,
+            check_name TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            status TEXT NOT NULL,
+            expected_value TEXT,
+            actual_value TEXT,
+            deviation_pct REAL,
+            details TEXT,
+            created_at TEXT NOT NULL DEFAULT (DATETIME('now'))
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_audit_run ON institutional_audit_log(audit_run_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_audit_ticker ON institutional_audit_log(ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_audit_category ON institutional_audit_log(check_category)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_audit_severity ON institutional_audit_log(severity)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_audit_ts ON institutional_audit_log(audit_timestamp DESC)")
+    except Exception:
+        pass
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS institutional_quarantine (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_type TEXT NOT NULL,
+            entity_key TEXT NOT NULL,
+            source_name TEXT NOT NULL,
+            rejection_reason TEXT NOT NULL,
+            raw_payload TEXT NOT NULL,
+            quarantined_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+            resolved_at TEXT,
+            resolution_status TEXT DEFAULT 'OPEN'
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_quarantine_key ON institutional_quarantine(record_type, entity_key)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_quarantine_ts ON institutional_quarantine(quarantined_at DESC)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1421,6 +1493,7 @@ MIGRATIONS: list[Migration] = [
     Migration(28, "028_tri_confluence_metrics_cache", _migration_028_tri_confluence_metrics_cache),
     Migration(29, "029_earnings_fetch_log_schema_alignment", _migration_029_earnings_fetch_log_schema_alignment),
     Migration(30, "030_ai_model_telemetry_and_api_calls", _migration_030_ai_model_telemetry_and_api_calls),
+    Migration(31, "031_institutional_verification_and_provenance", _migration_031_institutional_verification_and_provenance),
 ]
 
 

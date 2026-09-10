@@ -2738,11 +2738,23 @@ def get_stocks_under_institutional_accumulation(
 
             target["buyers"].append({
                 "name": fund_name,
+                "buyer_name": fund_name,
+                "client_name": fund_name,
                 "entity_type": entity_class,
                 "category": category,
                 "capital_cr": capital_cr,
+                "deployed_cr": capital_cr,
+                "value_cr": capital_cr,
                 "source": "Filing",
                 "date": txn_date or reported_date,
+                "deal_date": txn_date or reported_date,
+                "filing_date": reported_date or txn_date,
+                "stake_pct": round(float(stake_pct), 2) if stake_pct else None,
+                "change_pct": round(float(change_pct), 2) if change_pct else None,
+                "quantity": int(change_shares) if change_shares else None,
+                "shares": int(change_shares) if change_shares else None,
+                "avg_price": round(float(buy_price), 2) if buy_price else None,
+                "price": round(float(buy_price), 2) if buy_price else None,
             })
 
         # 2. Fetch block deal buys within window
@@ -2789,11 +2801,23 @@ def get_stocks_under_institutional_accumulation(
 
             target["buyers"].append({
                 "name": client_name,
+                "buyer_name": client_name,
+                "client_name": client_name,
                 "entity_type": classified_type if classified_type != "Other / Entity" else f"Block Buy ({exchange})",
                 "category": category if category != "Other" else "Block Deal",
                 "capital_cr": val_cr,
+                "deployed_cr": val_cr,
+                "value_cr": val_cr,
                 "source": "Block Deal",
                 "date": deal_date,
+                "deal_date": deal_date,
+                "filing_date": deal_date,
+                "stake_pct": round(float(pct_eq), 2) if pct_eq else None,
+                "change_pct": None,
+                "quantity": int(qty) if qty else None,
+                "shares": int(qty) if qty else None,
+                "avg_price": round(float(price), 2) if price else None,
+                "price": round(float(price), 2) if price else None,
             })
 
         # 3. Load metadata from tickers and institutional_accumulation_cache
@@ -2970,35 +2994,93 @@ def get_stocks_under_institutional_accumulation(
             mom_7 = max(-5.0, min(15.0, ret_7d or 0.0))
             score_mom = max(0.0, min(15.0, (mom_30 * 0.3) + (mom_7 * 0.4) + 5.0))
 
-            conviction_score = round(score_cap + score_dom + score_whale + score_mom, 1)
+            raw_score = round(score_cap + score_dom + score_whale + score_mom, 1)
+            conviction_score = raw_score
+            is_absorption_capped = False
             if signal_type == "domestic_absorption":
-                conviction_score = min(conviction_score, 40.0)
+                if conviction_score > 40.0:
+                    conviction_score = 40.0
+                    is_absorption_capped = True
             conviction_score = max(0.0, min(100.0, conviction_score))
 
-            # Top 4 distinct buyers sorted by capital
+            score_breakdown = {
+                "capital_score": round(score_cap, 1),
+                "capital_max": 35.0,
+                "dominance_score": round(score_dom, 1),
+                "dominance_max": 30.0,
+                "whale_quality_score": round(score_whale, 1),
+                "whale_quality_max": 20.0,
+                "momentum_score": round(score_mom, 1),
+                "momentum_max": 15.0,
+                "absorption_penalty": is_absorption_capped,
+                "raw_total": raw_score,
+                "final_score": conviction_score,
+            }
+
+            # Top distinct buyers sorted by capital
             grouped_buyers: dict[str, dict[str, Any]] = {}
             for b in buyers_list:
-                bname = b["name"]
+                bname = b.get("name") or b.get("buyer_name") or b.get("client_name") or "Anonymous Institution"
                 if bname not in grouped_buyers:
                     grouped_buyers[bname] = {
                         "name": bname,
-                        "entity_type": b["entity_type"],
-                        "category": b["category"],
+                        "buyer_name": bname,
+                        "client_name": bname,
+                        "entity_type": b.get("entity_type") or "Institution",
+                        "category": b.get("category") or "Smart Money",
                         "capital_cr": 0.0,
-                        "source": b["source"],
-                        "date": b["date"],
+                        "deployed_cr": 0.0,
+                        "value_cr": 0.0,
+                        "source": b.get("source") or "Filing",
+                        "date": b.get("date") or b.get("deal_date") or b.get("filing_date"),
+                        "deal_date": b.get("deal_date") or b.get("date"),
+                        "filing_date": b.get("filing_date") or b.get("date"),
+                        "stake_pct": b.get("stake_pct"),
+                        "change_pct": b.get("change_pct"),
+                        "quantity": b.get("quantity") or b.get("shares"),
+                        "shares": b.get("shares") or b.get("quantity"),
+                        "avg_price": b.get("avg_price") or b.get("price"),
+                        "price": b.get("price") or b.get("avg_price"),
                     }
-                grouped_buyers[bname]["capital_cr"] += float(b["capital_cr"] or 0.0)
+                val = float(b.get("capital_cr") or b.get("deployed_cr") or b.get("value_cr") or 0.0)
+                grouped_buyers[bname]["capital_cr"] += val
+                grouped_buyers[bname]["deployed_cr"] += val
+                grouped_buyers[bname]["value_cr"] += val
+
+                if b.get("stake_pct") is not None and not grouped_buyers[bname].get("stake_pct"):
+                    grouped_buyers[bname]["stake_pct"] = b.get("stake_pct")
+                if b.get("avg_price") is not None and not grouped_buyers[bname].get("avg_price"):
+                    grouped_buyers[bname]["avg_price"] = b.get("avg_price")
+                    grouped_buyers[bname]["price"] = b.get("avg_price")
+                if b.get("quantity") is not None:
+                    grouped_buyers[bname]["quantity"] = (grouped_buyers[bname].get("quantity") or 0) + (b.get("quantity") or 0)
+                    grouped_buyers[bname]["shares"] = grouped_buyers[bname]["quantity"]
+
+            for gb in grouped_buyers.values():
+                gb["capital_cr"] = round(gb["capital_cr"], 2)
+                gb["deployed_cr"] = gb["capital_cr"]
+                gb["value_cr"] = gb["capital_cr"]
 
             sorted_buyers = sorted(grouped_buyers.values(), key=lambda x: x["capital_cr"], reverse=True)
             top_buyers = [
                 {
                     "name": sb["name"],
+                    "buyer_name": sb["name"],
+                    "client_name": sb["name"],
                     "entity_type": sb["entity_type"],
                     "category": sb["category"],
-                    "capital_cr": round(sb["capital_cr"], 2),
+                    "capital_cr": sb["capital_cr"],
+                    "deployed_cr": sb["deployed_cr"],
+                    "value_cr": sb["value_cr"],
                     "source": sb["source"],
                     "date": sb["date"],
+                    "deal_date": sb["deal_date"],
+                    "filing_date": sb["filing_date"],
+                    "stake_pct": sb.get("stake_pct"),
+                    "quantity": sb.get("quantity"),
+                    "shares": sb.get("shares"),
+                    "avg_price": sb.get("avg_price"),
+                    "price": sb.get("price"),
                 }
                 for sb in sorted_buyers[:4]
             ]
@@ -3050,6 +3132,8 @@ def get_stocks_under_institutional_accumulation(
                 "signal_color": signal_color,
                 "conviction_score": conviction_score,
                 "smart_money_conviction_score": conviction_score,
+                "score_breakdown": score_breakdown,
+                "buyers": buyers_list,
                 "breakdown": {
                     "fii_cr": fii_cr,
                     "super_investor_cr": super_inv_cr,

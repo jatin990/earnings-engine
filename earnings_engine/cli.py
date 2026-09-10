@@ -1577,6 +1577,92 @@ def sync_institutional_cmd(force: bool) -> None:
     click.echo()
 
 
+@cli.command("verify-institutional")
+@click.option("--ticker", "-t", multiple=True, help="Specific ticker(s) to verify (e.g., TCS.NS, RELIANCE.NS).")
+@click.option("--scope", "-s", default="ALL", type=click.Choice(["ALL", "MATHEMATICAL", "FRESHNESS", "ANOMALY", "SYNTHETIC_PURGE"], case_sensitive=False), help="Audit scope to execute.")
+@click.option("--purge-synthetic", is_flag=True, help="Quarantine and purge any synthetic or mock placeholder records.")
+@click.option("--repair", is_flag=True, help="Automatically attempt backfills and repairs for missing/stale filings.")
+@click.option("--json", "json_output", is_flag=True, help="Format output as JSON payload.")
+def verify_institutional_cmd(
+    ticker: tuple[str, ...],
+    scope: str,
+    purge_synthetic: bool,
+    repair: bool,
+    json_output: bool,
+) -> None:
+    """Run multi-tier institutional data integrity, mathematical invariant, and provenance verification."""
+    import json as json_lib
+    from earnings_engine.data.institutional_verifier import InstitutionalVerifier
+
+    settings = Settings()
+    tickers_list = list(ticker) if ticker else None
+    verifier = InstitutionalVerifier(settings)
+
+    if not json_output:
+        click.echo("\n" + "=" * 80)
+        click.secho("  🛡️  INSTITUTIONAL DATA INTEGRITY & REAL-SOURCE AUDIT SUITE", fg="cyan", bold=True)
+        click.echo("=" * 80)
+        click.echo(f"  Scope:       {scope.upper()}")
+        click.echo(f"  Tickers:     {', '.join(tickers_list) if tickers_list else 'Full Universe'}")
+        click.echo(f"  Auto-Purge:  {'YES' if purge_synthetic else 'NO'}")
+        click.echo(f"  Auto-Repair: {'YES' if repair else 'NO'}\n")
+
+    report = verifier.run_comprehensive_audit(
+        tickers=tickers_list,
+        scope=scope.upper(),
+        purge_synthetic=purge_synthetic,
+        auto_repair=repair,
+    )
+
+    if json_output:
+        click.echo(json_lib.dumps(report.to_dict(), indent=2))
+        return
+
+    # Formatted terminal display
+    score_color = "green" if report.overall_health_score >= 90 else ("yellow" if report.overall_health_score >= 70 else "red")
+    click.echo(f"  Audit Run ID:     {report.audit_run_id}")
+    click.echo(f"  Audited Records:  {report.total_records_audited:,}")
+    click.echo(f"  Execution Time:   {report.execution_duration_sec:.2f}s")
+    click.echo(f"  Overall Health:   ", nl=False)
+    click.secho(f"{report.overall_health_score:.1f}% ({report.status})", fg=score_color, bold=True)
+    click.echo()
+
+    # Category breakdown table
+    click.secho("  📊 CATEGORY HEALTH BREAKDOWN", fg="white", bold=True)
+    click.echo("  " + "-" * 76)
+    click.echo(f"  {'Category':<24} | {'Score':<8} | {'Audited':<10} | {'Pass':<6} | {'Warn':<6} | {'Crit':<6}")
+    click.echo("  " + "-" * 76)
+    for cat_name, b in report.category_breakdowns.items():
+        cat_color = "green" if b.get("score", 100) >= 90 else ("yellow" if b.get("score", 100) >= 70 else "red")
+        cat_str = click.style(f"{b.get('score', 100.0):.1f}%", fg=cat_color)
+        click.echo(
+            f"  {cat_name:<24} | {cat_str:<17} | {b.get('audited', 0):<10} | "
+            f"{b.get('passed', 0):<6} | {b.get('warnings', 0):<6} | {b.get('critical', 0):<6}"
+        )
+    click.echo("  " + "-" * 76)
+    click.echo()
+
+    # Findings summary
+    if report.findings:
+        crit_count = sum(1 for f in report.findings if f.severity == "CRITICAL")
+        warn_count = sum(1 for f in report.findings if f.severity == "WARNING")
+        click.secho(f"  ⚠️  AUDIT FINDINGS & DEVIATIONS ({crit_count} Critical, {warn_count} Warnings)", fg="yellow", bold=True)
+        click.echo("  " + "-" * 76)
+
+        # Show top 15 findings
+        for f in report.findings[:15]:
+            badge = click.style(f"[{f.severity}]", fg="red" if f.severity == "CRITICAL" else "yellow", bold=True)
+            tick = f"{f.ticker}: " if f.ticker else ""
+            click.echo(f"  {badge} {tick}{f.check_name}")
+            click.echo(f"        {f.details}")
+        if len(report.findings) > 15:
+            click.echo(f"  ... and {len(report.findings) - 15} additional findings logged to institutional_audit_log.")
+        click.echo()
+    else:
+        click.secho("  ✅ Zero deviations or integrity issues found. All records mathematically valid & authenticated!", fg="green", bold=True)
+        click.echo()
+
+
 @cli.command("prune-data")
 @click.option("--price-days", "-p", type=int, default=365, show_default=True, help="Number of days of price history to retain (default: 365 = 1 year).")
 @click.option("--earnings-days", "-e", type=int, default=730, show_default=True, help="Number of days of earnings history to retain (default: 730 = 2 years).")

@@ -40,6 +40,7 @@ SYNC_TABLES = [
     "invite_codes",
     "friend_access",
     "otp_verifications",
+    "ui_preferences",
     # Quantitative Predictions & Market Radar
     "consensus_predictions",
     "breakout_radar",
@@ -48,19 +49,32 @@ SYNC_TABLES = [
     "scanner_candidates",
     "swing_ranges",
     "swing_cycle_history",
+    "swing_radar",
+    "confluence_radar",
     "kronos_predictions",
     "strategy_predictions",
     "strategy_audit_logs",
     "ai_news_predictions",
     "news_catalysts",
+    "news_catalysts_tickers",
+    "news_catalyst_outcomes",
     "quarter_repeater_predictions",
     "tri_confluence_metrics",
     "option_chain_history",
+    "stock_ratings",
+    "stock_rating_snapshots",
+    "trading_agents_reports",
+    "ticker_audit_log",
+    # Macro, Market Pulse & Liquidity
+    "institutional_net_flows",
+    "participant_oi_positioning",
     # Automation Schedules, Logs & Badges
     "sidebar_badge_counters",
     "automation_schedules",
     "automation_schedule_logs",
     "daily_top_gainers",
+    "ai_model_telemetry",
+    "downstream_api_calls",
     # Institutional & Market Universe
     "institutional_holdings",
     "institutional_block_deals",
@@ -81,6 +95,16 @@ SYNC_TABLES = [
     "credit_cards",
     "credit_card_otp_requests",
     "net_worth_snapshots",
+    # Zepto Operations & Store Management
+    "zepto_employees",
+    "zepto_salaries",
+    "zepto_monthly_ratings",
+    "zepto_expenses",
+    "zepto_store_income",
+    "zepto_income_split_settings",
+    "zepto_candidates",
+    "zepto_security_capital",
+    "zepto_staffing_targets",
 ]
 
 
@@ -137,12 +161,14 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "reported_date",
     "deal_date",
     "as_of_date",
+    "asof_date",
     "cycle_start",
     "cycle_end",
     "trade_date",
     "signal_date",
     "fetch_date",
     "date",
+    "timestamp",
 ]
 
 DATE_ONLY_COLUMNS = {
@@ -150,6 +176,7 @@ DATE_ONLY_COLUMNS = {
     "signal_date",
     "deal_date",
     "as_of_date",
+    "asof_date",
     "fetch_date",
     "reported_date",
     "cycle_start",

@@ -27,6 +27,10 @@ import requests
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
+from earnings_engine.data.institutional_verifier import (
+    MathematicalInvariantChecker,
+    record_provenance,
+)
 from earnings_engine.data.prices import fetch_live_quote, load_prices
 from earnings_engine.features.market_sentiment import get_market_sentiment, get_volatility_regime
 
@@ -549,6 +553,30 @@ def sync_real_fii_dii_cash_flows(
 
                     tot_net = round(fii_net + dii_net, 2)
                     stance = "NET INFLOW (BULLISH)" if tot_net > 0 else ("NET OUTFLOW (DEFENSIVE)" if tot_net < 0 else "BALANCED FLOWS")
+
+                    # Validate mathematical invariants before persisting
+                    inv_findings = MathematicalInvariantChecker.validate_daily_cash_flow({
+                        "date": iso_date,
+                        "fii_buy_cr": fii_buy,
+                        "fii_sell_cr": fii_sell,
+                        "fii_net_cr": fii_net,
+                        "dii_buy_cr": dii_buy,
+                        "dii_sell_cr": dii_sell,
+                        "dii_net_cr": dii_net,
+                        "total_net_cr": tot_net,
+                    })
+                    has_critical = any(f.severity == "CRITICAL" for f in inv_findings)
+
+                    record_provenance(
+                        record_type="fii_dii_cash_flow",
+                        entity_key=f"FII_DII:{iso_date}",
+                        source_name="NSE_DAILY_FII_DII",
+                        source_url="https://www.nseindia.com/api/fiidiiTradeReact",
+                        payload=live_data,
+                        is_authentic=not has_critical,
+                        quarantine_reason=inv_findings[0].details if has_critical and inv_findings else None,
+                        conn=conn,
+                    )
 
                     conn.execute("""
                         INSERT OR REPLACE INTO institutional_net_flows (

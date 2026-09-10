@@ -128,3 +128,8 @@ SQLite-backed universe storage (`universes` & `universe_freshness` tables).
 
 ## `data/omniroute_client.py` & `consensus/`
 **Purpose:** Universal AI proxy to OmniRoute gateway supporting Antigravity, local/cloud models, DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, and Mistral-Large with sliding-window rate limiting.
+
+## `data/turso_sync.py` & Mandatory New Table Sync Rule
+**Purpose:** Upstream Turso Cloud and local SQLite lossless bidirectional merge.
+- **Rule**: Whenever any new table is added to SQLite across the project (via migrations, modules, scanners, routers, or storage), it MUST be added to `SYNC_TABLES` and its timestamp/watermark columns registered in `WATERMARK_CANDIDATE_COLUMNS` (and `DATE_ONLY_COLUMNS` if applicable).
+- Supports automatic schema creation and missing column self-healing across both local SQLite and Turso Cloud.

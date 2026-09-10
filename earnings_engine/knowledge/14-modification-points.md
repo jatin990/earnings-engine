@@ -22,3 +22,4 @@
 | Breakout Radar Scanner | `data/breakout_scanner.py` + `backtest/breakout_backtest.py` + `api/routers/breakout.py` |
 | Market Pulse & OI Matrix | `data/market_pulse.py` + `data/option_chain.py` + `api/routers/dashboard.py` |
 | UI Module logic | `ui/js/modules/*.js` + `ui/js/dashboard.js` |
+| Add new SQLite Table / State Entity | Relevant feature module + `data/migrations.py` + **MANDATORY**: Register table in `data/turso_sync.py` (`SYNC_TABLES`, `WATERMARK_CANDIDATE_COLUMNS`) |

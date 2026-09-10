@@ -1242,15 +1242,15 @@
 
                     <div style="overflow-x:auto;max-height:calc(100vh - 240px);overflow-y:auto;">
                         <table id="instSmStocksTable" style="width:100%;border-collapse:collapse;font-size:0.75rem;text-align:left;">
-                            <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.68rem;">
+                            <thead style="position:sticky;top:0;z-index:2;background:#121215;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.15);font-family:var(--font-mono);font-size:0.68rem;user-select:none;">
                                 <tr>
-                                    <th style="padding:0.45rem 0.6rem;">TICKER / CO</th>
-                                    <th style="padding:0.45rem 0.5rem;">PRICE / 30D</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Smart Money Inflow in ₹ Cr">SMART MONEY</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Smart Money Dominance vs Total Capital">DOMINANCE</th>
-                                    <th style="padding:0.45rem 0.5rem;">TOP WHALES</th>
-                                    <th style="padding:0.45rem 0.5rem;">CLASSIFICATION</th>
-                                    <th style="padding:0.45rem 0.5rem;" title="Conviction Score (0-100)">SCORE</th>
+                                    <th onclick="app.sortSmartMoneyTable('ticker')" style="padding:0.45rem 0.6rem;cursor:pointer;" title="Sort by Ticker">TICKER / CO <span id="smSortIcon-ticker" style="color:#71717a;margin-left:2px;">↕</span></th>
+                                    <th onclick="app.sortSmartMoneyTable('price')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by Price / 30D Return">PRICE / 30D <span id="smSortIcon-price" style="color:#71717a;margin-left:2px;">↕</span></th>
+                                    <th onclick="app.sortSmartMoneyTable('capital')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by Smart Money Inflow in ₹ Cr">SMART MONEY <span id="smSortIcon-capital" style="color:#71717a;margin-left:2px;">↕</span></th>
+                                    <th onclick="app.sortSmartMoneyTable('dominance')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by Smart Money Dominance vs Total Capital">DOMINANCE <span id="smSortIcon-dominance" style="color:#71717a;margin-left:2px;">↕</span></th>
+                                    <th onclick="app.sortSmartMoneyTable('whales')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by Number of Whale Buyers">TOP WHALES <span id="smSortIcon-whales" style="color:#71717a;margin-left:2px;">↕</span></th>
+                                    <th onclick="app.sortSmartMoneyTable('classification')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by Accumulation Classification">CLASSIFICATION <span id="smSortIcon-classification" style="color:#71717a;margin-left:2px;">↕</span></th>
+                                    <th onclick="app.sortSmartMoneyTable('score')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by Conviction Score (0-100)">SCORE <span id="smSortIcon-score" style="color:#38bdf8;margin-left:2px;">▼</span></th>
                                     <th style="padding:0.45rem 0.4rem;text-align:center;">ACTION</th>
                                 </tr>
                             </thead>
@@ -1349,6 +1349,47 @@
                             <div style="background:#121215;border:1px solid rgba(56,189,248,0.3);border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
                                 <div style="font-size:0.6rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Conviction Score</div>
                                 <div id="instSmConvictionVal" style="font-size:0.95rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);margin-top:0.15rem;">-- / 100</div>
+                            </div>
+                        </div>
+
+                        <!-- Quantitative Conviction Score Breakdown (0-100) -->
+                        <div id="instSmScoreBreakdownContainer" style="margin-bottom:0.75rem;background:#121215;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.5rem 0.65rem;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;font-size:0.68rem;font-weight:700;color:#f4f4f5;font-family:var(--font-mono);">
+                                <span>📊 Conviction Score Breakdown (0–100)</span>
+                                <span id="instSmScoreBreakdownTotal" style="color:#38bdf8;">-- / 100</span>
+                            </div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;font-size:0.65rem;font-family:var(--font-mono);">
+                                <div style="background:#18181b;padding:0.35rem 0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.05);">
+                                    <div style="color:#71717a;display:flex;justify-content:space-between;">
+                                        <span>Capital Scale</span>
+                                        <span id="instSmScorePartCap" style="color:#10b981;font-weight:700;">--/35</span>
+                                    </div>
+                                    <div style="font-size:0.58rem;color:#52525b;">Log-scaled smart money inflow</div>
+                                </div>
+                                <div style="background:#18181b;padding:0.35rem 0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.05);">
+                                    <div style="color:#71717a;display:flex;justify-content:space-between;">
+                                        <span>Dominance Ratio</span>
+                                        <span id="instSmScorePartDom" style="color:#38bdf8;font-weight:700;">--/30</span>
+                                    </div>
+                                    <div style="font-size:0.58rem;color:#52525b;">Smart money vs total capital</div>
+                                </div>
+                                <div style="background:#18181b;padding:0.35rem 0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.05);">
+                                    <div style="color:#71717a;display:flex;justify-content:space-between;">
+                                        <span>Whale Diversity</span>
+                                        <span id="instSmScorePartWhale" style="color:#c084fc;font-weight:700;">--/20</span>
+                                    </div>
+                                    <div style="font-size:0.58rem;color:#52525b;">FII / Super Inv / Blocks count</div>
+                                </div>
+                                <div style="background:#18181b;padding:0.35rem 0.45rem;border-radius:4px;border:1px solid rgba(255,255,255,0.05);">
+                                    <div style="color:#71717a;display:flex;justify-content:space-between;">
+                                        <span>Price Momentum</span>
+                                        <span id="instSmScorePartMom" style="color:#fbbf24;font-weight:700;">--/15</span>
+                                    </div>
+                                    <div style="font-size:0.58rem;color:#52525b;">7D + 30D return confirmation</div>
+                                </div>
+                            </div>
+                            <div id="instSmScoreAbsorptionPenalty" style="display:none;margin-top:0.4rem;font-size:0.62rem;color:#f87171;background:rgba(239,68,68,0.1);padding:0.25rem 0.4rem;border-radius:3px;border:1px solid rgba(239,68,68,0.25);">
+                                ⚠️ Score capped at 40 max due to Domestic Absorption classification (Dominance &lt; 30%).
                             </div>
                         </div>
 

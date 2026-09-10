@@ -20,6 +20,7 @@ import requests
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
+from earnings_engine.data.institutional_verifier import record_provenance
 
 logger = logging.getLogger("earnings_engine.data.amfi_holdings")
 
@@ -68,6 +69,20 @@ def parse_amfi_nav_feed(settings: Settings | None = None) -> list[dict[str, Any]
     try:
         resp = requests.get(url, headers=_AMFI_HEADERS, timeout=15)
         if resp.status_code == 200:
+            try:
+                conn = get_db_connection(settings or Settings())
+                record_provenance(
+                    record_type="amfi_nav_feed",
+                    entity_key=f"AMFI_NAV:{datetime.now(timezone.utc).strftime('%Y-%m-%d')}",
+                    source_name="AMFI_DAILY_NAV",
+                    source_url=url,
+                    payload=resp.text[:50000],
+                    is_authentic=True,
+                    conn=conn,
+                )
+            except Exception as e:
+                logger.debug("[AMFI] Provenance record notice: %s", e)
+
             lines = resp.text.splitlines()
             current_amc = ""
             for line in lines:

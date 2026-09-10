@@ -21,6 +21,10 @@ import requests
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
+from earnings_engine.data.institutional_verifier import (
+    MathematicalInvariantChecker,
+    record_provenance,
+)
 
 logger = logging.getLogger("earnings_engine.data.nse_shareholding")
 
@@ -481,6 +485,25 @@ def extract_and_persist_stock_shareholding(
 
     holdings, pattern = parse_shareholding_response(filing_data, sym, conn=local_conn)
 
+    # 1. Pre-commit Invariant Validation & Provenance Recording
+    clean_sym = _strip_ns(sym)
+    source_url = f"{NSE_SHAREHOLDING_URL}?index=equities&symbol={clean_sym}"
+    quarter_label = pattern.get("quarter", "Q1 FY27")
+
+    inv_findings = MathematicalInvariantChecker.validate_shareholding_pattern(pattern, holdings)
+    has_critical_error = any(f.severity == "CRITICAL" for f in inv_findings)
+
+    record_provenance(
+        record_type="shareholding_pattern",
+        entity_key=f"{sym}:{quarter_label}",
+        source_name="NSE_XBRL_SHAREHOLDING",
+        source_url=source_url,
+        payload=filing_data,
+        is_authentic=not has_critical_error,
+        quarantine_reason=inv_findings[0].details if has_critical_error and inv_findings else None,
+        conn=local_conn,
+    )
+
     if holdings:
         from earnings_engine.data.amfi_holdings import save_discovered_fund_holdings
         return save_discovered_fund_holdings(holdings, settings=settings, conn=local_conn)
@@ -539,7 +562,26 @@ def ingest_universe_shareholding_patterns(
             if raw_data:
                 holdings, pattern = parse_shareholding_response(raw_data, sym, conn=conn)
 
-                if holdings:
+                # Pre-commit mathematical validation & provenance recording
+                clean_sym = _strip_ns(sym)
+                source_url = f"{NSE_SHAREHOLDING_URL}?index=equities&symbol={clean_sym}"
+                quarter_label = pattern.get("quarter", "Q1 FY27")
+
+                inv_findings = MathematicalInvariantChecker.validate_shareholding_pattern(pattern, holdings)
+                has_critical_error = any(f.severity == "CRITICAL" for f in inv_findings)
+
+                record_provenance(
+                    record_type="shareholding_pattern",
+                    entity_key=f"{sym}:{quarter_label}",
+                    source_name="NSE_XBRL_SHAREHOLDING",
+                    source_url=source_url,
+                    payload=raw_data,
+                    is_authentic=not has_critical_error,
+                    quarantine_reason=inv_findings[0].details if has_critical_error and inv_findings else None,
+                    conn=conn,
+                )
+
+                if holdings and not has_critical_error:
                     saved = save_discovered_fund_holdings(holdings, settings=settings, conn=conn)
                     total_entities_extracted += saved
                     nse_fetched_count += 1

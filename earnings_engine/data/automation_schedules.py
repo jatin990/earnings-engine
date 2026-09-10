@@ -204,6 +204,17 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "params_json": '{"watchlist": "my_watchlist", "device": "cuda:0"}',
         "description": "Pre-computes and caches Kronos AI 14-day sequence price predictions.",
     },
+    {
+        "job_id": "institutional_integrity_audit",
+        "job_name": "🛡️ Institutional Data Integrity & Provenance Audit",
+        "category": "Institutional",
+        "interval_seconds": 14400,
+        "run_after_hours": 1,
+        "market_session": "always",
+        "is_enabled": 1,
+        "params_json": '{"check_stuck": true, "auto_repair": false}',
+        "description": "Comprehensive multi-tier audit verifying 100% mathematical sums, SHA-256 provenance hashes, statutory filing season deadlines, and zero synthetic records.",
+    },
 ]
 
 

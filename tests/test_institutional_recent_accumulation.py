@@ -75,6 +75,15 @@ def test_get_stocks_under_institutional_accumulation_90d_structure():
         assert "badge" in stock
         assert "whale_buyers" in stock
         assert "top_buyer_names" in stock
+        assert "score_breakdown" in stock
+
+        # Score breakdown checks
+        sb = stock["score_breakdown"]
+        assert "capital_score" in sb
+        assert "dominance_score" in sb
+        assert "whale_quality_score" in sb
+        assert "momentum_score" in sb
+        assert "final_score" in sb
 
         # Verification of mathematical relationship
         # Dominance = (smart_money / total_inflow) * 100
