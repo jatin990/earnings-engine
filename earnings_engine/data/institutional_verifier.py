@@ -797,10 +797,19 @@ class AntiFabricationDetector:
         """Detect tickers with identically frozen shareholding patterns across >=4 consecutive quarters."""
         findings: list[AuditFinding] = []
 
-        query = """
-            SELECT ticker, quarter, promoter_pct, fii_pct, dii_mf_pct, public_retail_pct
-            FROM shareholding_patterns
-        """
+        try:
+            cols = [c[1] for c in conn.execute("PRAGMA table_info(shareholding_patterns)").fetchall()]
+        except Exception:
+            return findings
+
+        if not cols:
+            return findings
+
+        pct_cols = [c for c in ["promoter_pct", "fii_pct", "dii_mf_pct", "public_retail_pct", "other_pct"] if c in cols]
+        if not pct_cols:
+            return findings
+
+        query = f"SELECT ticker, quarter, {', '.join(pct_cols)} FROM shareholding_patterns"
         params: list[Any] = []
         if ticker:
             query += " WHERE ticker = ?"
@@ -811,7 +820,7 @@ class AntiFabricationDetector:
         from collections import defaultdict
         ticker_patterns = defaultdict(list)
         for r in rows:
-            ticker_patterns[r[0]].append((r[1], r[2], r[3], r[4], r[5]))
+            ticker_patterns[r[0]].append((r[1], *r[2:]))
 
         stuck_tickers: list[str] = []
         for sym, quarters in ticker_patterns.items():
