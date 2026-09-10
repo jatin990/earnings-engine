@@ -8,6 +8,7 @@ and flags 1st and 2nd post-IPO earnings releases.
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -34,9 +35,17 @@ def fetch_all_nse_equities_cached() -> pd.DataFrame:
         return _EQUITY_LIST_CACHE["data"].copy()
 
     # 1. Try nselib if installed
+    logger.info("[NSELIB:REQ] capital_market.equity_list()")
+    t0 = time.perf_counter()
     try:
+        from earnings_engine.rate_limits import record_request
+        try:
+            record_request("nse")
+        except Exception:
+            pass
         from nselib import capital_market
         df = capital_market.equity_list()
+        elapsed_ms = (time.perf_counter() - t0) * 1000
         df.columns = [c.strip() for c in df.columns]
 
         # Clean columns: SYMBOL, NAME OF COMPANY, SERIES, DATE OF LISTING, FACE VALUE
@@ -47,20 +56,31 @@ def fetch_all_nse_equities_cached() -> pd.DataFrame:
 
         _EQUITY_LIST_CACHE["timestamp"] = now
         _EQUITY_LIST_CACHE["data"] = df
+        logger.info("[NSELIB:RESP] capital_market.equity_list() -> %d equities (%.1fms)", len(df), elapsed_ms)
         return df.copy()
     except Exception as e:
-        logger.debug("[NEW-LISTINGS] nselib not available or failed: %s", e)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        logger.warning("[NSELIB:FAIL] capital_market.equity_list() failed after %.1fms: %s", elapsed_ms, e)
 
     # 2. Direct fallback to official NSE archives CSV (zero binary dependency)
+    url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
+    logger.info("[NSE:REQ] GET %s", url)
+    t0_nse = time.perf_counter()
     try:
         import io
         import requests
-        url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "*/*",
         }
         resp = requests.get(url, headers=headers, timeout=10)
+        elapsed_ms = (time.perf_counter() - t0_nse) * 1000
+        try:
+            from earnings_engine.rate_limits import record_request
+            record_request("nse", status_code=resp.status_code)
+        except Exception:
+            pass
+
         if resp.status_code == 200 and len(resp.content) > 0:
             df = pd.read_csv(io.BytesIO(resp.content))
             df.columns = [c.strip() for c in df.columns]
@@ -71,9 +91,13 @@ def fetch_all_nse_equities_cached() -> pd.DataFrame:
 
             _EQUITY_LIST_CACHE["timestamp"] = now
             _EQUITY_LIST_CACHE["data"] = df
+            logger.info("[NSE:RESP] GET %s -> %d equities (%.1fms, HTTP %d)", url, len(df), elapsed_ms, resp.status_code)
             return df.copy()
+        else:
+            logger.warning("[NSE:FAIL] GET %s returned status %d after %.1fms", url, resp.status_code, elapsed_ms)
     except Exception as e:
-        logger.warning("[NEW-LISTINGS] Failed to fetch equity list from direct NSE archives: %s", e)
+        elapsed_ms = (time.perf_counter() - t0_nse) * 1000
+        logger.warning("[NSE:FAIL] Failed to fetch equity list from direct NSE archives after %.1fms: %s", elapsed_ms, e)
 
     if _EQUITY_LIST_CACHE["data"] is not None:
         return _EQUITY_LIST_CACHE["data"].copy()

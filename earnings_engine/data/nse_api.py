@@ -98,7 +98,7 @@ def fetch_result_calendar(
         return data
     except Exception as e:
         elapsed_ms = (time.perf_counter() - t0) * 1000
-        logger.warning("[NSE:RESP] Result calendar request failed after %.1fms: %s", elapsed_ms, e)
+        logger.warning("[NSE:FAIL] Result calendar request failed after %.1fms: %s", elapsed_ms, e)
         return {"error": str(e)}
 
 
@@ -133,7 +133,7 @@ def fetch_event_calendar(
         return data
     except Exception as e:
         elapsed_ms = (time.perf_counter() - t0) * 1000
-        logger.warning("[NSE:RESP] Event calendar request failed after %.1fms: %s", elapsed_ms, e)
+        logger.warning("[NSE:FAIL] Event calendar request failed after %.1fms: %s", elapsed_ms, e)
         return {"error": str(e)}
 
 

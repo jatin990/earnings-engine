@@ -36,7 +36,7 @@ import asyncio
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import numpy as np
@@ -519,6 +519,10 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             set_badge_counter("breaking_out_stocks", min(hot_breaking, len(_pool.get("hot", {})) or hot_breaking), settings)
         except Exception:
             pass
+        try:
+            prune_breakout_audit_log(days=30, settings=settings)
+        except Exception:
+            pass
     except Exception as e:
         logger.error("[BREAKOUT-DB] Failed persisting breakout setups to DB: %s", e)
 
@@ -687,15 +691,15 @@ def record_breakout_transition(
         elif strat_name.upper() in ("DONCHIAN_TTM_SQUEEZE", "DONCHIAN SQUEEZE"):
             strat_name = "Donchian Squeeze"
 
-        # Check last recorded transition for this ticker
+        # Check last recorded transition for this ticker and strategy
         cur = conn.execute(
             """
             SELECT id, event_type, from_tier, to_tier, strategy, counter
             FROM breakout_audit_log
-            WHERE ticker = ?
+            WHERE ticker = ? AND strategy = ?
             ORDER BY id DESC LIMIT 1
             """,
-            (ticker,),
+            (ticker, strat_name),
         )
         last_row = cur.fetchone()
 
@@ -885,6 +889,66 @@ def get_breakout_audit_log(
     except Exception as e:
         logger.warning("[BREAKOUT-AUDIT] Failed querying audit log: %s", e)
     return logs
+
+
+def get_breakout_audit_log_count(
+    ticker: str | None = None,
+    strategy: str | None = None,
+    settings: Settings | None = None,
+) -> int:
+    """Return total count of breakout movement audit log entries matching filters."""
+    settings = settings or Settings()
+    total = 0
+    try:
+        from earnings_engine.data.migrations import apply_migrations
+        apply_migrations(settings)
+        conn = get_db_connection(settings)
+        wheres: list[str] = []
+        params: list[Any] = []
+        if ticker:
+            sym = ticker.strip().upper()
+            if not (sym.endswith(".NS") or sym.endswith(".BO") or "." in sym):
+                sym = f"{sym}.NS"
+            wheres.append("ticker = ?")
+            params.append(sym)
+        else:
+            wheres.append("UPPER(ticker) NOT LIKE '%TEST%' AND UPPER(ticker) NOT LIKE '%MOCK%' AND UPPER(ticker) NOT LIKE '%DUMMY%'")
+        if strategy and strategy.upper() not in ("ALL", "*"):
+            wheres.append("(UPPER(strategy) = ? OR UPPER(strategy) = ?)")
+            params.extend([strategy.upper(), strategy.replace("_", " ").upper()])
+
+        where_clause = f"WHERE {' AND '.join(wheres)}" if wheres else ""
+        row = conn.execute(f"SELECT COUNT(*) FROM breakout_audit_log {where_clause}", tuple(params)).fetchone()
+        if row and row[0] is not None:
+            total = int(row[0])
+    except Exception as e:
+        logger.warning("[BREAKOUT-AUDIT] Failed counting audit log: %s", e)
+    return total
+
+
+def prune_breakout_audit_log(days: int = 30, settings: Settings | None = None) -> int:
+    """Prune breakout audit log entries older than N days (default 30d)."""
+    settings = settings or Settings()
+    deleted = 0
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff_iso = cutoff.isoformat()
+        conn = get_db_connection(settings)
+        cur = conn.execute(
+            """
+            DELETE FROM breakout_audit_log
+            WHERE replace(created_at, 'T', ' ') < replace(?, 'T', ' ')
+            """,
+            (cutoff_iso,),
+        )
+        deleted = cur.rowcount if cur and cur.rowcount is not None else 0
+        if hasattr(conn, "commit"):
+            conn.commit()
+        if deleted > 0:
+            logger.info("[BREAKOUT-AUDIT] Pruned %d records older than %d days (%s)", deleted, days, cutoff_iso[:10])
+    except Exception as e:
+        logger.warning("[BREAKOUT-AUDIT] Failed pruning audit log: %s", e)
+    return deleted
 
 
 def get_stock_breakout_timeline(
@@ -1163,18 +1227,21 @@ def get_tracked_breakouts(
             params.append(tier.upper())
 
         # 3. Outcome Filtering
-        if outcome and outcome.upper() not in ("ALL", ""):
+        filter_outcome = bool(outcome and outcome.upper() not in ("ALL", ""))
+        if filter_outcome:
             out_up = outcome.upper()
             if out_up in ("STOP_HIT", "STOP_LOSS_HIT"):
-                query_clauses.append("UPPER(outcome) IN ('STOP_HIT', 'STOP_LOSS_HIT')")
+                query_clauses.append("UPPER(outcome) IN ('STOP_HIT', 'STOP_LOSS_HIT', 'ACTIVE', 'PENDING', 'COILING_IN_PROFIT', 'COILING_IN_RANGE')")
             elif out_up in ("SETUP_FAILED", "BREAKOUT_FAILED"):
-                query_clauses.append("UPPER(outcome) IN ('SETUP_FAILED', 'BREAKOUT_FAILED')")
+                query_clauses.append("UPPER(outcome) IN ('SETUP_FAILED', 'BREAKOUT_FAILED', 'ACTIVE', 'PENDING', 'COILING_IN_PROFIT', 'COILING_IN_RANGE')")
             elif out_up in ("TRIGGERED", "BREAKOUT_SUCCEEDED"):
-                query_clauses.append("UPPER(outcome) IN ('TRIGGERED', 'BREAKOUT_SUCCEEDED')")
+                query_clauses.append("UPPER(outcome) IN ('TRIGGERED', 'BREAKOUT_SUCCEEDED', 'ACTIVE', 'PENDING', 'COILING_IN_PROFIT', 'COILING_IN_RANGE')")
+            elif out_up == "TARGET_HIT":
+                query_clauses.append("UPPER(outcome) IN ('TARGET_HIT', 'ACTIVE', 'PENDING', 'COILING_IN_PROFIT', 'COILING_IN_RANGE')")
             elif out_up in ("ACTIVE", "COILING_IN_PROFIT", "COILING_IN_RANGE"):
-                query_clauses.append("UPPER(outcome) IN ('ACTIVE', 'COILING_IN_PROFIT', 'COILING_IN_RANGE')")
+                query_clauses.append("UPPER(outcome) IN ('ACTIVE', 'COILING_IN_PROFIT', 'COILING_IN_RANGE', 'PENDING')")
             else:
-                query_clauses.append("UPPER(outcome) = ?")
+                query_clauses.append("(UPPER(outcome) = ? OR UPPER(outcome) IN ('ACTIVE', 'PENDING'))")
                 params.append(out_up)
 
         # 4. Strategy Filtering
@@ -1380,6 +1447,68 @@ def get_tracked_breakouts(
 
             with ThreadPoolExecutor(max_workers=min(10, len(items))) as pool:
                 list(pool.map(_process_tracked_item, items))
+
+            # Batch persist updated live tracking data back to breakout_tracked_signals
+            try:
+                update_params = []
+                now_iso = datetime.now(timezone.utc).isoformat()
+                for it in items:
+                    item_id = it.get("id")
+                    if not item_id:
+                        continue
+                    update_params.append((
+                        it.get("current_price"),
+                        it.get("current_date"),
+                        it.get("realized_return_pct", 0.0),
+                        it.get("max_gain_pct", 0.0),
+                        1 if it.get("breakout_happened") else 0,
+                        it.get("outcome"),
+                        it.get("outcome_label"),
+                        it.get("outcome_badge"),
+                        it.get("days_elapsed", 0),
+                        now_iso,
+                        item_id,
+                    ))
+                if update_params:
+                    update_sql = """
+                        UPDATE breakout_tracked_signals
+                        SET current_price = ?,
+                            current_date = ?,
+                            realized_return_pct = ?,
+                            max_gain_pct = ?,
+                            breakout_happened = ?,
+                            outcome = ?,
+                            outcome_label = ?,
+                            outcome_badge = ?,
+                            days_elapsed = ?,
+                            updated_at = ?
+                        WHERE id = ?
+                    """
+                    conn.executemany(update_sql, update_params)
+                    if hasattr(conn, "commit"):
+                        conn.commit()
+            except Exception as e:
+                logger.debug("[TRACKED-BREAKOUTS] Batch update error: %s", e)
+
+        # Post-filter items by outcome if requested
+        if filter_outcome:
+            out_up = outcome.upper()
+            filtered_items = []
+            for it in items:
+                it_out = str(it.get("outcome") or "").upper()
+                if out_up in ("STOP_HIT", "STOP_LOSS_HIT") and it_out in ("STOP_HIT", "STOP_LOSS_HIT"):
+                    filtered_items.append(it)
+                elif out_up in ("SETUP_FAILED", "BREAKOUT_FAILED") and it_out in ("SETUP_FAILED", "BREAKOUT_FAILED"):
+                    filtered_items.append(it)
+                elif out_up in ("TRIGGERED", "BREAKOUT_SUCCEEDED") and it_out in ("TRIGGERED", "BREAKOUT_SUCCEEDED"):
+                    filtered_items.append(it)
+                elif out_up == "TARGET_HIT" and it_out == "TARGET_HIT":
+                    filtered_items.append(it)
+                elif out_up in ("ACTIVE", "COILING_IN_PROFIT", "COILING_IN_RANGE") and it_out in ("ACTIVE", "COILING_IN_PROFIT", "COILING_IN_RANGE", "PENDING"):
+                    filtered_items.append(it)
+                elif out_up == it_out:
+                    filtered_items.append(it)
+            items = filtered_items
 
         # 6. Summary metrics calculation
         total_tracked = len(items)

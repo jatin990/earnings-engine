@@ -37,7 +37,8 @@ Object.assign(app, {
                     if (res.ok) {
                         const data = await res.json();
                         const logs = data.logs || [];
-                        if (countBadge) countBadge.textContent = `(${logs.length} events)`;
+                        const totalCount = (data.total_count !== undefined && data.total_count !== null) ? data.total_count : logs.length;
+                        if (countBadge) countBadge.textContent = `(${totalCount.toLocaleString()} events)`;
 
                         if (!logs.length) {
                             listEl.innerHTML = '<div style="text-align:center;color:#64748b;font-size:0.72rem;padding:0.75rem;">No recent tier movement events recorded yet. Transitions will appear automatically during scan cycles.</div>';
@@ -45,16 +46,17 @@ Object.assign(app, {
                         }
 
                         listEl.innerHTML = logs.map(l => {
+                            const isTargetHit = l.event_type === 'TARGET_HIT';
                             const isPromoted = l.event_type === 'PROMOTED_HOT' || l.to_tier === 'HOT';
                             const isAdded = l.event_type === 'ADDED_WARM';
                             const isDemoted = l.event_type === 'DEMOTED_WARM' || l.to_tier === 'WARM';
                             const isRemoved = l.event_type === 'REMOVED_COLD' || l.to_tier === 'COLD';
                             const isOverride = l.event_type === 'MANUAL_OVERRIDE';
 
-                            const bg = isPromoted ? 'rgba(16,185,129,0.12)' : isAdded ? 'rgba(56,189,248,0.12)' : isDemoted ? 'rgba(245,158,11,0.12)' : isRemoved ? 'rgba(239,68,68,0.12)' : 'rgba(148,163,184,0.1)';
-                            const border = isPromoted ? 'rgba(16,185,129,0.3)' : isAdded ? 'rgba(56,189,248,0.3)' : isDemoted ? 'rgba(245,158,11,0.3)' : isRemoved ? 'rgba(239,68,68,0.3)' : 'rgba(148,163,184,0.2)';
-                            const color = isPromoted ? '#34d399' : isAdded ? '#38bdf8' : isDemoted ? '#fbbf24' : isRemoved ? '#f87171' : '#cbd5e1';
-                            const icon = isPromoted ? '🔥 PROMOTED' : isAdded ? '⚡ ADDED' : isDemoted ? '📉 DEMOTED' : isRemoved ? '❌ REMOVED' : '⚙️ OVERRIDE';
+                            const bg = isTargetHit ? 'rgba(16,185,129,0.14)' : isPromoted ? 'rgba(16,185,129,0.12)' : isAdded ? 'rgba(56,189,248,0.12)' : isDemoted ? 'rgba(245,158,11,0.12)' : isRemoved ? 'rgba(239,68,68,0.12)' : 'rgba(148,163,184,0.1)';
+                            const border = isTargetHit ? 'rgba(16,185,129,0.45)' : isPromoted ? 'rgba(16,185,129,0.3)' : isAdded ? 'rgba(56,189,248,0.3)' : isDemoted ? 'rgba(245,158,11,0.3)' : isRemoved ? 'rgba(239,68,68,0.3)' : 'rgba(148,163,184,0.2)';
+                            const color = isTargetHit ? '#10b981' : isPromoted ? '#34d399' : isAdded ? '#38bdf8' : isDemoted ? '#fbbf24' : isRemoved ? '#f87171' : '#cbd5e1';
+                            const icon = isTargetHit ? '🎯 TARGET HIT' : isPromoted ? '🔥 PROMOTED' : isAdded ? '⚡ ADDED' : isDemoted ? '📉 DEMOTED' : isRemoved ? '❌ REMOVED' : '⚙️ OVERRIDE';
 
                             const timeStr = l.created_at ? l.created_at.replace('T', ' ').substring(0, 16) : '';
                             const priceStr = l.price ? `₹${l.price.toFixed(2)}` : '';

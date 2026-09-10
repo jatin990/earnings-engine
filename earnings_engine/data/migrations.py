@@ -1492,6 +1492,71 @@ def _migration_032_institutional_radar_signals(conn: Any) -> None:
         pass
 
 
+def _migration_033_consolidate_breakout_audit_log(conn: Any) -> None:
+    """Consolidate duplicate breakout audit log records and prune entries older than 30 days.
+
+    Groups duplicates by (ticker, strategy, event_type, from_tier, to_tier), summing their counter
+    values, preserving the earliest created_at and the latest updated_at/price/score, and deletes
+    stale redundant transitions caused by multi-strategy scan oscillation.
+    """
+    # 1. Prune records older than 30 days
+    try:
+        conn.execute(
+            "DELETE FROM breakout_audit_log "
+            "WHERE replace(created_at, 'T', ' ') < datetime('now', '-30 days')"
+        )
+    except Exception as e:
+        logger.debug("[MIGRATION-033] Prune old records notice: %s", e)
+
+    # 2. Consolidate duplicate groups into a temporary staging table
+    try:
+        conn.execute(
+            "CREATE TEMP TABLE _breakout_audit_consolidate AS "
+            "SELECT "
+            "    MAX(id) AS keep_id, "
+            "    MIN(created_at) AS earliest_created, "
+            "    MAX(COALESCE(updated_at, created_at)) AS latest_updated, "
+            "    SUM(COALESCE(counter, 1)) AS total_counter "
+            "FROM breakout_audit_log "
+            "GROUP BY ticker, COALESCE(strategy, 'Classic Technical'), event_type, "
+            "         COALESCE(from_tier, ''), COALESCE(to_tier, '') "
+            "HAVING COUNT(*) > 1"
+        )
+
+        # Delete older duplicate rows (keeping only MAX(id) per group)
+        conn.execute(
+            "DELETE FROM breakout_audit_log "
+            "WHERE id NOT IN ("
+            "    SELECT MAX(id) "
+            "    FROM breakout_audit_log "
+            "    GROUP BY ticker, COALESCE(strategy, 'Classic Technical'), event_type, "
+            "             COALESCE(from_tier, ''), COALESCE(to_tier, '')"
+            ")"
+        )
+
+        # Update the kept rows with consolidated counter, created_at, updated_at
+        conn.execute(
+            "UPDATE breakout_audit_log "
+            "SET counter = c.total_counter, "
+            "    created_at = c.earliest_created, "
+            "    updated_at = c.latest_updated "
+            "FROM _breakout_audit_consolidate c "
+            "WHERE breakout_audit_log.id = c.keep_id"
+        )
+        conn.execute("DROP TABLE IF EXISTS _breakout_audit_consolidate")
+    except Exception as e:
+        logger.debug("[MIGRATION-033] Consolidation notice: %s", e)
+
+    # 3. Create high performance composite index for ticker and strategy lookups
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_breakout_audit_ticker_strat "
+            "ON breakout_audit_log (ticker, strategy, id DESC)"
+        )
+    except Exception as e:
+        logger.debug("[MIGRATION-033] Index creation notice: %s", e)
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1526,6 +1591,7 @@ MIGRATIONS: list[Migration] = [
     Migration(30, "030_ai_model_telemetry_and_api_calls", _migration_030_ai_model_telemetry_and_api_calls),
     Migration(31, "031_institutional_verification_and_provenance", _migration_031_institutional_verification_and_provenance),
     Migration(32, "032_institutional_radar_signals", _migration_032_institutional_radar_signals),
+    Migration(33, "033_consolidate_breakout_audit_log", _migration_033_consolidate_breakout_audit_log),
 ]
 
 

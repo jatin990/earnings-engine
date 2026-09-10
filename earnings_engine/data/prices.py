@@ -691,6 +691,8 @@ def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: boo
                     return fast_obj[fb]
         return None
 
+    logger.info("[YF:REQ] fetch_live_quote(%s via %s)", sym, fetch_sym)
+    t0_quote = time.perf_counter()
     try:
         from earnings_engine.rate_limits import record_request
         try:
@@ -728,37 +730,52 @@ def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: boo
         # Direct Yahoo v8 chart endpoint fallback (rate-limit immune)
         if last_p is None or last_p <= 0:
             import urllib.request
+            t0_chart = time.perf_counter()
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{fetch_sym}?interval=1d&range=5d"
+            logger.info("[YF:REQ] Direct chart query: %s", url)
             req = urllib.request.Request(
                 url,
                 headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"}
             )
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                chart_data = json.loads(resp.read().decode())
-                if chart_data and "chart" in chart_data and "result" in chart_data["chart"] and chart_data["chart"]["result"]:
-                    res_obj = chart_data["chart"]["result"][0]
-                    meta = res_obj.get("meta", {})
-                    last_p = meta.get("regularMarketPrice")
-                    prev_c = meta.get("chartPreviousClose")
-                    yr_h = meta.get("fiftyTwoWeekHigh")
-                    yr_l = meta.get("fiftyTwoWeekLow")
-                    indicators = res_obj.get("indicators", {}).get("quote", [{}])[0]
-                    closes = indicators.get("close", [])
-                    opens = indicators.get("open", [])
-                    highs = indicators.get("high", [])
-                    lows = indicators.get("low", [])
-                    vols = indicators.get("volume", [])
-                    if closes:
-                        valid_closes = [c for c in closes if c is not None]
-                        if valid_closes:
-                            last_p = last_p or valid_closes[-1]
-                    if opens and opens[-1] is not None: open_p = opens[-1]
-                    if highs and highs[-1] is not None: day_h = highs[-1]
-                    if lows and lows[-1] is not None: day_l = lows[-1]
-                    if vols and vols[-1] is not None: vol = vols[-1]
+            try:
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    chart_data = json.loads(resp.read().decode())
+                    elapsed_ms_c = (time.perf_counter() - t0_chart) * 1000
+                    logger.info("[YF:RESP] Direct chart query (%s) (%.1fms)", fetch_sym, elapsed_ms_c)
+                    if chart_data and "chart" in chart_data and "result" in chart_data["chart"] and chart_data["chart"]["result"]:
+                        res_obj = chart_data["chart"]["result"][0]
+                        meta = res_obj.get("meta", {})
+                        last_p = meta.get("regularMarketPrice")
+                        prev_c = meta.get("chartPreviousClose")
+                        yr_h = meta.get("fiftyTwoWeekHigh")
+                        yr_l = meta.get("fiftyTwoWeekLow")
+                        indicators = res_obj.get("indicators", {}).get("quote", [{}])[0]
+                        closes = indicators.get("close", [])
+                        opens = indicators.get("open", [])
+                        highs = indicators.get("high", [])
+                        lows = indicators.get("low", [])
+                        vols = indicators.get("volume", [])
+                        if closes:
+                            valid_closes = [c for c in closes if c is not None]
+                            if valid_closes:
+                                last_p = last_p or valid_closes[-1]
+                        if opens and opens[-1] is not None: open_p = opens[-1]
+                        if highs and highs[-1] is not None: day_h = highs[-1]
+                        if lows and lows[-1] is not None: day_l = lows[-1]
+                        if vols and vols[-1] is not None: vol = vols[-1]
+            except Exception as chart_err:
+                elapsed_ms_c = (time.perf_counter() - t0_chart) * 1000
+                logger.warning("[YF:FAIL] Direct chart query (%s) failed after %.1fms: %s", fetch_sym, elapsed_ms_c, chart_err)
+
+        elapsed_ms_q = (time.perf_counter() - t0_quote) * 1000
+        if last_p is not None:
+            logger.info("[YF:RESP] fetch_live_quote(%s) price=%.2f (%.1fms)", sym, last_p, elapsed_ms_q)
+        else:
+            logger.info("[YF:RESP] fetch_live_quote(%s) price=None (%.1fms)", sym, elapsed_ms_q)
 
     except Exception as e:
-        logger.debug("[LIVE-QUOTE] Failed fetching live quote for %s: %s", sym, e)
+        elapsed_ms_q = (time.perf_counter() - t0_quote) * 1000
+        logger.warning("[YF:FAIL] fetch_live_quote(%s) failed after %.1fms: %s", sym, elapsed_ms_q, e)
 
     now_dt = datetime.now()
     is_weekend = now_dt.weekday() >= 5

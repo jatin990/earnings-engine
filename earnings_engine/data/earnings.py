@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -307,15 +308,21 @@ def fetch_earnings(ticker: str, settings: Settings, force: bool = False) -> pd.D
         return load_earnings(ticker, settings)
 
     settings.ensure_dirs()
+    logger.info("[YF:REQ] yf.Ticker(%s).get_earnings_dates(limit=60)", ticker)
+    t0 = time.perf_counter()
     try:
-        logger.info("downloading earnings ticker=%s", ticker)
         try:
             from earnings_engine.rate_limits import record_request
             record_request("yfinance")
         except Exception:
             pass
         raw = yf.Ticker(ticker).get_earnings_dates(limit=60)
-    except Exception:
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        count = len(raw) if raw is not None and isinstance(raw, pd.DataFrame) else 0
+        logger.info("[YF:RESP] get_earnings_dates(%s) -> %d rows (%.1fms)", ticker, count, elapsed_ms)
+    except Exception as e:
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        logger.warning("[YF:FAIL] get_earnings_dates(%s) failed after %.1fms: %s", ticker, elapsed_ms, e)
         raw = None
 
     if raw is None or (isinstance(raw, pd.DataFrame) and raw.empty):
