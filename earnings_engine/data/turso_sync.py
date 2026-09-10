@@ -87,6 +87,7 @@ SYNC_TABLES = [
     "earnings_fetch_log",
     "earnings_month_cache",
     # Institutional Intelligence Integrity, Provenance & Quarantine
+    "institutional_radar_signals",
     "data_provenance_meta",
     "institutional_audit_log",
     "institutional_quarantine",
@@ -172,6 +173,7 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "cycle_end",
     "trade_date",
     "signal_date",
+    "last_seen_date",
     "fetch_date",
     "date",
     "timestamp",
@@ -180,6 +182,7 @@ WATERMARK_CANDIDATE_COLUMNS = [
 DATE_ONLY_COLUMNS = {
     "trade_date",
     "signal_date",
+    "last_seen_date",
     "deal_date",
     "as_of_date",
     "asof_date",

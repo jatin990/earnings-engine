@@ -15,22 +15,22 @@
             --font-mono: 'JetBrains Mono', 'SF Mono', 'Roboto Mono', Menlo, Consolas, Monaco, monospace;
             --font-heading: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
 
-            --bg: #090a0f;
-            --bg-mesh: radial-gradient(ellipse 90% 40% at 50% -10%, rgba(99, 102, 241, 0.07), transparent 70%);
-            --card: #0e1118;
-            --card-elevated: #141722;
+            --bg: #000000;
+            --bg-mesh: radial-gradient(ellipse 90% 40% at 50% -10%, rgba(56, 189, 248, 0.03), transparent 70%);
+            --card: #09090b;
+            --card-elevated: #121215;
             --card-border: rgba(255, 255, 255, 0.08);
-            --card-border-hover: rgba(99, 102, 241, 0.35);
-            --card-glow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            --accent: #4f46e5;
-            --accent-vivid: #6366f1;
-            --accent-glow: rgba(99, 102, 241, 0.25);
-            --cyan: #0ea5e9;
-            --green: #10b981;
-            --red: #f43f5e;
-            --amber: #f59e0b;
-            --purple: #8b5cf6;
-            --purple-dark: #090a0f;
+            --card-border-hover: rgba(255, 255, 255, 0.18);
+            --card-glow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            --accent: #38bdf8;
+            --accent-vivid: #0284c7;
+            --accent-glow: rgba(56, 189, 248, 0.15);
+            --cyan: #38bdf8;
+            --green: #34d399;
+            --red: #f87171;
+            --amber: #fbbf24;
+            --purple: #818cf8;
+            --purple-dark: #06060a;
             --light: #f8fafc;
             --muted: #94a3b8;
             --text-muted: #64748b;
@@ -727,71 +727,29 @@
 
         .results-table tbody tr.row-expanded {
             background: #090d16 !important;
-            border-left: 2px solid #3b82f6;
+            border-left: 2px solid #38bdf8;
         }
 
-        /* 🔥 Flaming Breakout Rows & Fire-Burning Card Animations */
-        @keyframes fireGlowBorder {
-            0% {
-                box-shadow: 0 0 12px rgba(249, 115, 22, 0.45), inset 0 0 8px rgba(239, 68, 68, 0.25);
-                border-color: rgba(249, 115, 22, 0.7);
-            }
-            50% {
-                box-shadow: 0 0 28px rgba(239, 68, 68, 0.8), 0 0 45px rgba(245, 158, 11, 0.45), inset 0 0 18px rgba(251, 146, 60, 0.35);
-                border-color: #f97316;
-            }
-            100% {
-                box-shadow: 0 0 12px rgba(249, 115, 22, 0.45), inset 0 0 8px rgba(239, 68, 68, 0.25);
-                border-color: rgba(249, 115, 22, 0.7);
-            }
-        }
-
-        @keyframes fireRowBurning {
-            0% {
-                background: linear-gradient(90deg, rgba(239, 68, 68, 0.16) 0%, rgba(245, 158, 11, 0.10) 30%, rgba(239, 68, 68, 0.16) 70%, rgba(245, 158, 11, 0.10) 100%) !important;
-                box-shadow: inset 4px 0 0 #f97316, inset -4px 0 0 #f97316, 0 0 16px rgba(249, 115, 22, 0.4);
-            }
-            50% {
-                background: linear-gradient(90deg, rgba(249, 115, 22, 0.26) 0%, rgba(239, 68, 68, 0.18) 30%, rgba(249, 115, 22, 0.26) 70%, rgba(239, 68, 68, 0.18) 100%) !important;
-                box-shadow: inset 5px 0 0 #ef4444, inset -5px 0 0 #ef4444, 0 0 28px rgba(239, 68, 68, 0.65);
-            }
-            100% {
-                background: linear-gradient(90deg, rgba(239, 68, 68, 0.16) 0%, rgba(245, 158, 11, 0.10) 30%, rgba(239, 68, 68, 0.16) 70%, rgba(245, 158, 11, 0.10) 100%) !important;
-                box-shadow: inset 4px 0 0 #f97316, inset -4px 0 0 #f97316, 0 0 16px rgba(249, 115, 22, 0.4);
-            }
-        }
-
-        @keyframes flameFlicker {
-            0%, 100% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 6px #f97316); }
-            25% { transform: scale(1.18) rotate(-4deg); filter: drop-shadow(0 0 10px #ef4444); }
-            50% { transform: scale(1.08) rotate(3deg); filter: drop-shadow(0 0 14px #fbbf24); }
-            75% { transform: scale(1.22) rotate(-2deg); filter: drop-shadow(0 0 10px #f97316); }
-        }
-
+                        /* Subtle Luxury Breakout Row & Active Status Styling (Zero Flicker / Motion-Free) */
         .breakout-row-on-fire {
-            animation: fireRowBurning 2.2s ease-in-out infinite !important;
-            border-top: 1px solid rgba(249, 115, 22, 0.6) !important;
-            border-bottom: 1px solid rgba(239, 68, 68, 0.6) !important;
+            background: rgba(245, 158, 11, 0.04) !important;
+            border-left: 2px solid #d97706 !important;
             position: relative;
             z-index: 1;
         }
 
         .breakout-row-on-fire:hover {
-            background: linear-gradient(90deg, rgba(249, 115, 22, 0.32) 0%, rgba(239, 68, 68, 0.24) 100%) !important;
+            background: rgba(245, 158, 11, 0.08) !important;
         }
 
         .card-on-fire {
-            animation: fireGlowBorder 2s ease-in-out infinite !important;
-            background: linear-gradient(135deg, #180d0d 0%, #1f120c 50%, #150906 100%) !important;
-            border-top: 2px solid #f97316 !important;
-            border-left: 1px solid rgba(249, 115, 22, 0.5) !important;
-            border-right: 1px solid rgba(249, 115, 22, 0.5) !important;
-            border-bottom: 1px solid rgba(239, 68, 68, 0.5) !important;
+            background: #09090b !important;
+            border: 1px solid rgba(245, 158, 11, 0.35) !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
         }
 
         .fire-flame-icon {
             display: inline-block;
-            animation: flameFlicker 1.4s ease-in-out infinite;
         }
 
         /* Monospace Stock Cell */
@@ -1266,19 +1224,19 @@
         .cap-section[open] > summary .chevron { transform: rotate(180deg); }
         .cap-section-body { padding: 0.65rem; }
 
-        .pred-bullish { color: #34d399; font-weight: 700; text-shadow: 0 0 8px rgba(52, 211, 153, 0.4); }
-        .pred-bearish { color: #f87171; font-weight: 700; text-shadow: 0 0 8px rgba(248, 113, 113, 0.4); }
-        .pred-neutral { color: #fbbf24; font-weight: 700; text-shadow: 0 0 8px rgba(251, 191, 36, 0.4); }
+        .pred-bullish { color: #34d399; font-weight: 700; }
+        .pred-bearish { color: #f87171; font-weight: 700; }
+        .pred-neutral { color: #fbbf24; font-weight: 700; }
         .pred-muted { color: #94a3b8; }
 
         .stock-cell a.stock-link { color: #38bdf8; text-decoration: none; cursor: pointer; font-weight: 700; font-family: 'JetBrains Mono', monospace; transition: all 0.15s; }
-        .stock-cell a.stock-link:hover { color: #ffffff; text-shadow: 0 0 10px rgba(56, 189, 248, 0.7); }
+        .stock-cell a.stock-link:hover { color: #ffffff; }
         .ticker-sub { font-size: 0.65rem; color: var(--text-muted); font-weight: 400; }
 
         /* Velvet Modal windows */
         .popup-modal { display: none; position: fixed; inset: 0; z-index: 3000; }
-        .popup-modal .popup-backdrop { position: absolute; inset: 0; background: rgba(9, 10, 15, 0.92); backdrop-filter: blur(16px); }
-        .popup-modal .popup-content { position: relative; max-width: 1100px; width: 95%; margin: 3vh auto; max-height: 90vh; overflow-y: auto; background: #0d0f17; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 1.25rem; padding: 1.75rem; box-shadow: 0 30px 90px rgba(0,0,0,0.95), 0 0 40px rgba(59, 130, 246, 0.15); }
+        .popup-modal .popup-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(16px); }
+        .popup-modal .popup-content { position: relative; max-width: 1100px; width: 95%; margin: 3vh auto; max-height: 90vh; overflow-y: auto; background: #09090b; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 1.25rem; padding: 1.75rem; box-shadow: 0 30px 90px rgba(0,0,0,0.95); }
         .popup-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 1rem; margin-bottom: 1.25rem; }
         .popup-title { font-size: 1.35rem; font-weight: 800; color: #f8fafc; font-family: 'Space Grotesk', sans-serif; }
         .popup-sub { font-size: 0.78rem; color: #94a3b8; }

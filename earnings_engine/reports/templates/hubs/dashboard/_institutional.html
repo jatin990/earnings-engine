@@ -24,87 +24,53 @@
 
                 <span class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.65rem;padding:0.15rem 0.5rem;">FII / DII & SUPER INVESTORS</span>
 
+                <!-- Institutional Data Integrity & Real-Source Verification Badge -->
+                <button type="button" id="btnInstIntegrityModal" onclick="app.openInstitutionalIntegrityModal()" class="btn btn-sm" style="display:inline-flex;align-items:center;gap:0.4rem;background:#121215;border:1px solid rgba(16,185,129,0.35);color:#10b981;font-size:0.72rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:6px;cursor:pointer;transition:all 0.15s ease;" title="Click to view Institutional Data Health, Multi-Cadence Freshness, Invariant Audits & Cryptographic Provenance Ledger">
+                    <span id="instIntegrityIcon">🛡️</span>
+                    <span id="instIntegrityBadgeText">Data Integrity: Optimal (100%)</span>
+                </button>
+
             </div>
-
-
 
             <!-- Page Switcher Tabs -->
-
-            <div style="display:flex;background:#090d1a;padding:0.25rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);gap:0.25rem;flex-wrap:wrap;">
-
-                <button type="button" id="btnInstPage-equities" onclick="app.switchInstitutionalPage('equities')" class="btn btn-sm" style="background:#1e293b;color:#ffffff;border:1px solid rgba(255,255,255,0.3);font-weight:700;padding:0.35rem 0.85rem;font-size:0.76rem;">
-
+            <div style="display:flex;background:#06060a;padding:0.25rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);gap:0.25rem;flex-wrap:wrap;">
+                <button type="button" id="btnInstPage-equities" onclick="app.switchInstitutionalPage('equities')" class="btn btn-sm" style="background:#18181b;color:#ffffff;border:1px solid rgba(255,255,255,0.3);font-weight:700;padding:0.35rem 0.85rem;font-size:0.76rem;">
                     Equities & Stake Radar
-
                 </button>
-
                 <button type="button" id="btnInstPage-top-additions" onclick="app.switchInstitutionalPage('top-additions')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;">
-
                     Top Stocks & Massive Additions
-
                 </button>
-
                 <button type="button" id="btnInstPage-investors" onclick="app.switchInstitutionalPage('investors')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;">
-
                     Smart Money & Portfolios
-
                 </button>
-
                 <button type="button" id="btnInstPage-smart-money" onclick="app.switchInstitutionalPage('smart-money')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;display:flex;align-items:center;gap:0.35rem;">
-
                     <span>🎯</span> Smart Money Radar
-
                 </button>
-
             </div>
-
         </div>
-
     </div>
 
-
-
     <!-- ========================================================================= -->
-
     <!-- PAGE 1: ️ EQUITIES & STAKE RADAR (50-50 SPLIT SCREEN LAYOUT) -->
-
     <!-- ========================================================================= -->
-
     <div id="instPage-equities" style="display:block;">
 
-        
-
         <!-- Top Toolbar & Legend -->
-
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem;background:#0f172a;padding:0.65rem 0.9rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
-
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem;background:#09090b;padding:0.65rem 0.9rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
             <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-
                 <!-- Flow Toggle -->
-
-                <div style="display:flex;background:#020617;padding:0.2rem;border-radius:6px;border:1px solid rgba(255,255,255,0.1);gap:0.2rem;">
-
-                    <button type="button" id="btnInstFlowToggle-acc" onclick="app.switchEquitiesFlowView('accumulating')" class="btn btn-sm" style="background:#1e293b;color:#ffffff;border:1px solid rgba(16,185,129,0.4);font-weight:700;font-size:0.7rem;padding:0.25rem 0.6rem;">
-
+                <div style="display:flex;background:#06060a;padding:0.2rem;border-radius:6px;border:1px solid rgba(255,255,255,0.1);gap:0.2rem;">
+                    <button type="button" id="btnInstFlowToggle-acc" onclick="app.switchEquitiesFlowView('accumulating')" class="btn btn-sm" style="background:#18181b;color:#ffffff;border:1px solid rgba(16,185,129,0.4);font-weight:700;font-size:0.7rem;padding:0.25rem 0.6rem;">
                          Stake Increasing
-
                     </button>
-
                     <button type="button" id="btnInstFlowToggle-dist" onclick="app.switchEquitiesFlowView('distributing')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-size:0.7rem;padding:0.25rem 0.6rem;">
-
                          Trimming
-
                     </button>
-
                 </div>
 
-
-
                 <!-- Stock Quick Search -->
-
                 <div style="position:relative;display:flex;align-items:center;">
-
-                    <input id="instStockSearchInput" type="text" placeholder="Lookup ticker..." onkeydown="if(event.key==='Enter') app.searchInstitutionalStock(this.value)" style="background:#020617;border:1px solid rgba(255,255,255,0.15);color:#f8fafc;font-size:0.72rem;padding:0.25rem 0.5rem 0.25rem 1.6rem;border-radius:5px;width:150px;font-family:var(--font-mono);outline:none;">
+                    <input id="instStockSearchInput" type="text" placeholder="Lookup ticker..." onkeydown="if(event.key==='Enter') app.searchInstitutionalStock(this.value)" style="background:#06060a;border:1px solid rgba(255,255,255,0.15);color:#f8fafc;font-size:0.72rem;padding:0.25rem 0.5rem 0.25rem 1.6rem;border-radius:5px;width:150px;font-family:var(--font-mono);outline:none;">
 
                     <span style="position:absolute;left:0.45rem;font-size:0.7rem;color:#64748b;"></span>
 
@@ -182,7 +148,7 @@
 
                             <thead>
 
-                                <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.66rem;">
+                                <tr style="background:#000000;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.66rem;">
 
                                     <th style="padding:0.45rem 0.6rem;">TICKER</th>
 
@@ -224,7 +190,7 @@
 
                     <!-- Accumulation Load More Footer -->
 
-                    <div id="instAccFooterBar" style="padding:0.55rem 0.8rem;background:#0b1329;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                    <div id="instAccFooterBar" style="padding:0.55rem 0.8rem;background:#06060a;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
 
                         <span id="instAccCountBadge" style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);">Showing 0 setups</span>
 
@@ -416,7 +382,7 @@
 
                 <!-- 1. Shareholding Pattern Trend -->
 
-                <div class="card" style="padding:0.75rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);margin-bottom:0.75rem;">
+                <div class="card" style="padding:0.75rem;background:#09090b;border:1px solid rgba(255,255,255,0.08);margin-bottom:0.75rem;">
 
                     <div style="font-size:0.76rem;font-weight:700;color:#f8fafc;margin-bottom:0.45rem;display:flex;align-items:center;gap:0.35rem;">
 
@@ -436,7 +402,7 @@
 
                 <!-- 2. Recent Block & Bulk Deals -->
 
-                <div class="card" style="padding:0.75rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);margin-bottom:0.75rem;">
+                <div class="card" style="padding:0.75rem;background:#09090b;border:1px solid rgba(255,255,255,0.08);margin-bottom:0.75rem;">
 
                     <div style="font-size:0.76rem;font-weight:700;color:#f8fafc;margin-bottom:0.45rem;display:flex;align-items:center;gap:0.35rem;">
 
@@ -458,7 +424,7 @@
 
                 <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.08);">
 
-                    <div style="padding:0.55rem 0.8rem;background:#0f172a;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
+                    <div style="padding:0.55rem 0.8rem;background:#09090b;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
 
                         <div style="font-size:0.76rem;font-weight:700;color:#f8fafc;display:flex;align-items:center;gap:0.35rem;">
 
@@ -474,7 +440,7 @@
 
                             <thead>
 
-                                <tr style="background:#0b1329;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:0.66rem;">
+                                <tr style="background:#000000;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:0.66rem;">
 
                                     <th style="padding:0.45rem 0.6rem;">FUND / INVESTOR</th>
 
@@ -540,7 +506,7 @@
 
         <!-- Category Filter Bar -->
 
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;background:#0f172a;padding:0.85rem 1rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;background:#09090b;padding:0.85rem 1rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
 
             <div>
 
@@ -562,7 +528,7 @@
 
             <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
 
-                <button type="button" id="btnInvCat-ALL" onclick="app.filterInvestors('ALL')" class="btn btn-sm" style="background:#1e293b;color:#ffffff;border:1px solid rgba(56,189,248,0.4);font-weight:700;font-size:0.74rem;">
+                <button type="button" id="btnInvCat-ALL" onclick="app.filterInvestors('ALL')" class="btn btn-sm" style="background:#18181b;color:#ffffff;border:1px solid rgba(56,189,248,0.4);font-weight:700;font-size:0.74rem;">
 
                     All Investors
 
@@ -602,7 +568,7 @@
 
                     <thead>
 
-                        <tr style="background:#0f172a;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.7rem;">
+                        <tr style="background:#000000;color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1);font-family:var(--font-mono);font-size:0.7rem;">
 
                             <th style="padding:0.6rem 0.8rem;">INVESTOR / FUND NAME</th>
 
@@ -646,7 +612,7 @@
 
             <!-- Investors Directory Load More Footer -->
 
-            <div id="instFundsFooterBar" style="padding:0.65rem 1rem;background:#0b1329;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+            <div id="instFundsFooterBar" style="padding:0.65rem 1rem;background:#06060a;border-top:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
 
                 <span id="instFundsCountBadge" style="font-size:0.72rem;color:#94a3b8;font-family:var(--font-mono);">Showing 0 funds & whales</span>
 
@@ -1137,6 +1103,19 @@
                     </select>
                 </div>
 
+                <!-- Dedicated Filters: New Entrants, Emerging Small/Micro, High EPS Growth -->
+                <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+                    <button type="button" id="instSmNewEntrantsBtn" onclick="app.toggleSmartMoneyNewEntrants()" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.7rem;padding:0.25rem 0.55rem;font-weight:600;display:flex;align-items:center;gap:0.25rem;">
+                        <span>🆕</span> New Entrants (≤14d)
+                    </button>
+                    <button type="button" id="instSmEmergingBtn" onclick="app.toggleSmartMoneyEmerging()" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.7rem;padding:0.25rem 0.55rem;font-weight:600;display:flex;align-items:center;gap:0.25rem;">
+                        <span>🌱</span> Emerging (Small/Micro)
+                    </button>
+                    <button type="button" id="instSmGoodEpsBtn" onclick="app.toggleSmartMoneyGoodEps()" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.7rem;padding:0.25rem 0.55rem;font-weight:600;display:flex;align-items:center;gap:0.25rem;">
+                        <span>🚀</span> EPS Rocket (≥20%)
+                    </button>
+                </div>
+
                 <!-- Filter Inputs & Search -->
                 <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
                     <div style="display:flex;align-items:center;gap:0.25rem;background:#18181b;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:0.15rem 0.4rem;">
@@ -1150,6 +1129,9 @@
                         <option value="capital">Sort: Smart Money (₹ Cr)</option>
                         <option value="dominance">Sort: Dominance %</option>
                         <option value="return_30d">Sort: 30D Return %</option>
+                        <option value="signal_date">Sort: Newest Added (Signal Date)</option>
+                        <option value="return_since_signal">Sort: Return Since Signal</option>
+                        <option value="eps_growth">Sort: Highest YoY EPS Growth</option>
                     </select>
 
                     <input id="instSmSearchInput" type="text" placeholder="Filter ticker/name..." onkeyup="app.filterSmartMoneyLocal(this.value)" style="background:#18181b;border:1px solid rgba(255,255,255,0.15);color:#f4f4f5;font-size:0.72rem;padding:0.25rem 0.5rem;border-radius:6px;width:130px;outline:none;font-family:var(--font-mono);">
@@ -1246,6 +1228,8 @@
                                 <tr>
                                     <th onclick="app.sortSmartMoneyTable('ticker')" style="padding:0.45rem 0.6rem;cursor:pointer;" title="Sort by Ticker">TICKER / CO <span id="smSortIcon-ticker" style="color:#71717a;margin-left:2px;">↕</span></th>
                                     <th onclick="app.sortSmartMoneyTable('price')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by Price / 30D Return">PRICE / 30D <span id="smSortIcon-price" style="color:#71717a;margin-left:2px;">↕</span></th>
+                                    <th onclick="app.sortSmartMoneyTable('signal')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by Signal Date & Return Since Entry">SIGNAL / GAIN <span id="smSortIcon-signal" style="color:#71717a;margin-left:2px;">↕</span></th>
+                                    <th onclick="app.sortSmartMoneyTable('eps')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by YoY Quarterly EPS Growth">EPS YOY <span id="smSortIcon-eps" style="color:#71717a;margin-left:2px;">↕</span></th>
                                     <th onclick="app.sortSmartMoneyTable('capital')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by Smart Money Inflow in ₹ Cr">SMART MONEY <span id="smSortIcon-capital" style="color:#71717a;margin-left:2px;">↕</span></th>
                                     <th onclick="app.sortSmartMoneyTable('dominance')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by Smart Money Dominance vs Total Capital">DOMINANCE <span id="smSortIcon-dominance" style="color:#71717a;margin-left:2px;">↕</span></th>
                                     <th onclick="app.sortSmartMoneyTable('whales')" style="padding:0.45rem 0.5rem;cursor:pointer;" title="Sort by Number of Whale Buyers">TOP WHALES <span id="smSortIcon-whales" style="color:#71717a;margin-left:2px;">↕</span></th>
@@ -1255,7 +1239,7 @@
                                 </tr>
                             </thead>
                             <tbody id="instSmTableBody">
-                                <tr><td colspan="8" style="padding:2.5rem;text-align:center;color:#71717a;">Loading Smart Money Radar data...</td></tr>
+                                <tr><td colspan="10" style="padding:2.5rem;text-align:center;color:#71717a;">Loading Smart Money Radar data...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1313,6 +1297,69 @@
                     <!-- Flow Subtitle -->
                     <div id="instSmSelectedSubtitle" style="font-size:0.7rem;color:#a1a1aa;font-family:var(--font-mono);line-height:1.45;">
                         Select any stock from the table to inspect details.
+                    </div>
+                </div>
+
+                <!-- Section: Signal Tracking & Historical Entry Ledger -->
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;margin-bottom:0.75rem;">
+                    <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
+                        <span style="display:flex;align-items:center;gap:0.35rem;">
+                            <span>📍</span> Signal Tracking & Entry Ledger (Point-in-Time)
+                        </span>
+                        <span id="instSmNewEntrantBadge" class="badge" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.65rem;padding:0.12rem 0.4rem;">
+                            --
+                        </span>
+                    </div>
+                    <div style="padding:0.65rem 0.85rem;display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:0.5rem;align-items:center;">
+                        <div style="background:#121215;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.4rem 0.55rem;">
+                            <div style="font-size:0.58rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Added to Radar</div>
+                            <div id="instSmSignalDateVal" style="font-size:0.8rem;font-weight:700;color:#ffffff;font-family:var(--font-mono);margin-top:0.15rem;">--</div>
+                            <div id="instSmDaysOnRadarVal" style="font-size:0.58rem;color:#a1a1aa;font-family:var(--font-mono);margin-top:0.1rem;">-- days on radar</div>
+                        </div>
+                        <div style="background:#121215;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.4rem 0.55rem;">
+                            <div style="font-size:0.58rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Signal Price</div>
+                            <div id="instSmSignalPriceVal" style="font-size:0.8rem;font-weight:700;color:#38bdf8;font-family:var(--font-mono);margin-top:0.15rem;">₹--</div>
+                            <div style="font-size:0.58rem;color:#71717a;font-family:var(--font-mono);margin-top:0.1rem;">Historical Close</div>
+                        </div>
+                        <div style="background:#121215;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.4rem 0.55rem;">
+                            <div style="font-size:0.58rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Gain Since Entry</div>
+                            <div id="instSmReturnSinceSignalVal" style="font-size:0.88rem;font-weight:800;font-family:var(--font-mono);margin-top:0.15rem;">--</div>
+                            <div id="instSmPeakGainVal" style="font-size:0.58rem;color:#10b981;font-family:var(--font-mono);margin-top:0.1rem;">Peak: --</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Emerging Multi-Baggers & Fundamental EPS Quality -->
+                <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.15);background:#09090b;margin-bottom:0.75rem;">
+                    <div style="padding:0.55rem 0.85rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);font-size:0.75rem;font-weight:700;color:#ffffff;display:flex;align-items:center;justify-content:space-between;">
+                        <span style="display:flex;align-items:center;gap:0.35rem;">
+                            <span>🚀</span> Emerging Fundamentals & EPS Growth (YoY)
+                        </span>
+                        <span id="instSmEmergingBadge" class="badge" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);font-size:0.65rem;padding:0.12rem 0.4rem;">
+                            --
+                        </span>
+                    </div>
+                    <div style="padding:0.65rem 0.85rem;">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:0.5rem;margin-bottom:0.45rem;">
+                            <div style="background:#121215;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.4rem 0.55rem;">
+                                <div style="font-size:0.58rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">EPS YoY Growth</div>
+                                <div id="instSmEpsYoYVal" style="font-size:0.88rem;font-weight:800;font-family:var(--font-mono);margin-top:0.15rem;">--</div>
+                                <div id="instSmEpsActualVal" style="font-size:0.58rem;color:#71717a;font-family:var(--font-mono);margin-top:0.1rem;">Latest EPS: --</div>
+                            </div>
+                            <div style="background:#121215;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.4rem 0.55rem;">
+                                <div style="font-size:0.58rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">P/E Valuation</div>
+                                <div id="instSmPeVal" style="font-size:0.8rem;font-weight:700;color:#ffffff;font-family:var(--font-mono);margin-top:0.15rem;">--</div>
+                                <div style="font-size:0.58rem;color:#71717a;font-family:var(--font-mono);margin-top:0.1rem;">Trailing Multiple</div>
+                            </div>
+                            <div style="background:#121215;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.4rem 0.55rem;">
+                                <div style="font-size:0.58rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);">Earnings Beat Streak</div>
+                                <div id="instSmBeatStreakVal" style="font-size:0.8rem;font-weight:700;color:#10b981;font-family:var(--font-mono);margin-top:0.15rem;">--</div>
+                                <div style="font-size:0.58rem;color:#71717a;font-family:var(--font-mono);margin-top:0.1rem;">Consecutive Beats</div>
+                            </div>
+                        </div>
+                        <div id="instSmEmergingSummaryText" style="font-size:0.68rem;color:#a1a1aa;font-family:var(--font-mono);line-height:1.4;background:#121215;padding:0.4rem 0.6rem;border-radius:4px;border:1px solid rgba(255,255,255,0.05);">
+                            Select a stock to inspect emerging capitalization profile and multi-quarter earnings trajectory.
+                        </div>
                     </div>
                 </div>
 
@@ -1533,6 +1580,235 @@
 
         </div>
 
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- INSTITUTIONAL DATA INTEGRITY & PROVENANCE MODAL -->
+    <!-- ========================================================================= -->
+    <div id="instIntegrityModal" onclick="if(event.target === this) app.closeInstitutionalIntegrityModal()" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.5rem;">
+        <div class="card" style="width:100%;max-width:1100px;max-height:92vh;background:#09090b;border:1px solid rgba(255,255,255,0.2);display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.7);border-radius:10px;padding:0;overflow:hidden;">
+
+            <!-- Modal Header -->
+            <div style="padding:1rem 1.25rem;background:#121215;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+                <div>
+                    <div style="display:flex;align-items:center;gap:0.6rem;">
+                        <span style="font-size:1.15rem;font-weight:800;color:#ffffff;display:flex;align-items:center;gap:0.4rem;">
+                            🛡️ Institutional Data Integrity & Verification Engine
+                        </span>
+                        <span id="instModalHealthStatusBadge" class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.4);font-size:0.7rem;padding:0.2rem 0.55rem;font-weight:700;">
+                            SYSTEM: OPTIMAL (100%)
+                        </span>
+                    </div>
+                    <div style="font-size:0.72rem;color:#a1a1aa;margin-top:0.25rem;font-family:var(--font-mono);">
+                        Cryptographic SHA-256 Provenance · Multi-Cadence Freshness (Daily/Monthly/Quarterly) · Pre-Commit Invariance Audits
+                    </div>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <button type="button" id="btnInstTriggerAudit" onclick="app.triggerIntegrityVerifyAndRepair()" class="btn btn-sm" style="display:flex;align-items:center;gap:0.35rem;background:#18181b;color:#38bdf8;border:1px solid rgba(56,189,248,0.4);font-size:0.75rem;padding:0.35rem 0.75rem;border-radius:6px;cursor:pointer;font-weight:700;">
+                        <span id="instAuditBtnSpinner" style="display:none;" class="animate-spin">🔄</span>
+                        <span id="instAuditBtnText">⚡ Run Audit & Auto-Repair</span>
+                    </button>
+                    <button type="button" onclick="app.closeInstitutionalIntegrityModal()" class="btn btn-sm" style="background:#27272a;color:#ffffff;border:1px solid rgba(255,255,255,0.2);padding:0.35rem 0.75rem;cursor:pointer;border-radius:6px;font-weight:700;font-size:0.85rem;">
+                        ✕ Close
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div style="padding:1.2rem;overflow-y:auto;max-height:calc(92vh - 120px);display:flex;flex-direction:column;gap:1.25rem;">
+
+                <!-- 1. Top KPI Cards & Summary Grid -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:0.75rem;">
+                    <!-- Health Score -->
+                    <div class="card" style="padding:0.85rem 1rem;background:#121215;border:1px solid rgba(255,255,255,0.1);border-radius:8px;">
+                        <div style="font-size:0.68rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);font-weight:600;">Overall Integrity Health</div>
+                        <div style="display:flex;align-items:baseline;gap:0.4rem;margin-top:0.25rem;">
+                            <span id="instKpiHealthScore" style="font-size:1.6rem;font-weight:800;color:#10b981;font-family:var(--font-mono);">100.0%</span>
+                            <span id="instKpiHealthLabel" style="font-size:0.75rem;color:#34d399;font-weight:700;">Zero Faults</span>
+                        </div>
+                        <div style="font-size:0.65rem;color:#a1a1aa;margin-top:0.25rem;">Mathematical & Invariant Compliance</div>
+                    </div>
+
+                    <!-- Total Audited Records -->
+                    <div class="card" style="padding:0.85rem 1rem;background:#121215;border:1px solid rgba(255,255,255,0.1);border-radius:8px;">
+                        <div style="font-size:0.68rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);font-weight:600;">Total Audited Records</div>
+                        <div style="display:flex;align-items:baseline;gap:0.4rem;margin-top:0.25rem;">
+                            <span id="instKpiAuditedCount" style="font-size:1.6rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">--</span>
+                            <span style="font-size:0.75rem;color:#71717a;">records</span>
+                        </div>
+                        <div style="font-size:0.65rem;color:#a1a1aa;margin-top:0.25rem;">Shareholding, Daily Flows & Funds</div>
+                    </div>
+
+                    <!-- Quarantined / Synthetic -->
+                    <div class="card" style="padding:0.85rem 1rem;background:#121215;border:1px solid rgba(255,255,255,0.1);border-radius:8px;">
+                        <div style="font-size:0.68rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);font-weight:600;">Quarantined Records</div>
+                        <div style="display:flex;align-items:baseline;gap:0.4rem;margin-top:0.25rem;">
+                            <span id="instKpiQuarantinedCount" style="font-size:1.6rem;font-weight:800;color:#38bdf8;font-family:var(--font-mono);">0</span>
+                            <span style="font-size:0.75rem;color:#71717a;">isolated</span>
+                        </div>
+                        <div style="font-size:0.65rem;color:#a1a1aa;margin-top:0.25rem;">Synthetic or corrupted data purged</div>
+                    </div>
+
+                    <!-- Open Warnings / Issues -->
+                    <div class="card" style="padding:0.85rem 1rem;background:#121215;border:1px solid rgba(255,255,255,0.1);border-radius:8px;">
+                        <div style="font-size:0.68rem;color:#71717a;text-transform:uppercase;font-family:var(--font-mono);font-weight:600;">Open Warnings</div>
+                        <div style="display:flex;align-items:baseline;gap:0.4rem;margin-top:0.25rem;">
+                            <span id="instKpiWarningsCount" style="font-size:1.6rem;font-weight:800;color:#f59e0b;font-family:var(--font-mono);">0</span>
+                            <span style="font-size:0.75rem;color:#71717a;">unresolved</span>
+                        </div>
+                        <div style="font-size:0.65rem;color:#a1a1aa;margin-top:0.25rem;">Temporal gaps or filing delays</div>
+                    </div>
+                </div>
+
+                <!-- 2. Multi-Cadence Freshness Status Cards -->
+                <div>
+                    <div style="font-size:0.82rem;font-weight:800;color:#f8fafc;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.4rem;">
+                        <span>⏱️ Multi-Cadence Freshness & Regulatory Windows</span>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(310px, 1fr));gap:0.75rem;">
+
+                        <!-- Card 1: Daily Cadence -->
+                        <div class="card" style="padding:0.85rem 1rem;background:#121215;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                                <div style="display:flex;align-items:center;gap:0.4rem;">
+                                    <span style="font-size:0.85rem;">📊</span>
+                                    <span style="font-size:0.8rem;font-weight:800;color:#ffffff;">Daily FII / DII Net Flow</span>
+                                </div>
+                                <span id="instCadenceBadgeDaily" class="badge" style="background:#18181b;color:#10b981;border:1px solid rgba(16,185,129,0.3);font-size:0.65rem;font-family:var(--font-mono);font-weight:700;">HEALTHY</span>
+                            </div>
+                            <div style="font-size:0.72rem;color:#d4d4d8;margin-bottom:0.35rem;" id="instCadenceDetailsDaily">
+                                Verified against NSE trading calendar.
+                            </div>
+                            <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.68rem;color:#71717a;font-family:var(--font-mono);border-top:1px solid rgba(255,255,255,0.06);padding-top:0.35rem;">
+                                <span>Last Verified: <b id="instCadenceDateDaily" style="color:#f4f4f5;">--</b></span>
+                                <span>Cadence: <b>DAILY EOD</b></span>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Monthly Cadence -->
+                        <div class="card" style="padding:0.85rem 1rem;background:#121215;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                                <div style="display:flex;align-items:center;gap:0.4rem;">
+                                    <span style="font-size:0.85rem;">💼</span>
+                                    <span style="font-size:0.8rem;font-weight:800;color:#ffffff;">Monthly AMFI MF Portfolios</span>
+                                </div>
+                                <span id="instCadenceBadgeMonthly" class="badge" style="background:#18181b;color:#10b981;border:1px solid rgba(16,185,129,0.3);font-size:0.65rem;font-family:var(--font-mono);font-weight:700;">HEALTHY</span>
+                            </div>
+                            <div style="font-size:0.72rem;color:#d4d4d8;margin-bottom:0.35rem;" id="instCadenceDetailsMonthly">
+                                Mutual fund holdings within the 45-day fresh threshold.
+                            </div>
+                            <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.68rem;color:#71717a;font-family:var(--font-mono);border-top:1px solid rgba(255,255,255,0.06);padding-top:0.35rem;">
+                                <span>Latest Portfolio: <b id="instCadenceDateMonthly" style="color:#f4f4f5;">--</b></span>
+                                <span>Cadence: <b>MONTHLY T+15</b></span>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Quarterly Cadence -->
+                        <div class="card" style="padding:0.85rem 1rem;background:#121215;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+                                <div style="display:flex;align-items:center;gap:0.4rem;">
+                                    <span style="font-size:0.85rem;">🏛️</span>
+                                    <span style="font-size:0.8rem;font-weight:800;color:#ffffff;">Quarterly NSE Shareholding</span>
+                                </div>
+                                <span id="instCadenceBadgeQuarterly" class="badge" style="background:#18181b;color:#10b981;border:1px solid rgba(16,185,129,0.3);font-size:0.65rem;font-family:var(--font-mono);font-weight:700;">HEALTHY</span>
+                            </div>
+                            <div style="font-size:0.72rem;color:#d4d4d8;margin-bottom:0.35rem;" id="instCadenceDetailsQuarterly">
+                                SEBI Reg 31 filing compliance verified.
+                            </div>
+                            <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.68rem;color:#71717a;font-family:var(--font-mono);border-top:1px solid rgba(255,255,255,0.06);padding-top:0.35rem;">
+                                <span>Target: <b id="instCadenceQuarterTarget" style="color:#f4f4f5;">--</b></span>
+                                <span>Deadline: <b id="instCadenceDeadline" style="color:#f4f4f5;">--</b></span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- 3. Modal View Tabs & Controls -->
+                <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:0.9rem;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem;">
+                        <div style="display:flex;background:#121215;padding:0.25rem;border-radius:6px;border:1px solid rgba(255,255,255,0.1);gap:0.25rem;">
+                            <button type="button" id="btnInstModalTab-findings" onclick="app.switchIntegrityModalTab('findings')" class="btn btn-sm" style="background:#18181b;color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:700;font-size:0.72rem;padding:0.25rem 0.75rem;border-radius:4px;">
+                                📋 Audit Findings & Invariants
+                            </button>
+                            <button type="button" id="btnInstModalTab-provenance" onclick="app.switchIntegrityModalTab('provenance')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-size:0.72rem;padding:0.25rem 0.75rem;border-radius:4px;">
+                                🔐 Cryptographic Provenance Ledger
+                            </button>
+                            <button type="button" id="btnInstModalTab-stock" onclick="app.switchIntegrityModalTab('stock')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-size:0.72rem;padding:0.25rem 0.75rem;border-radius:4px;">
+                                🔍 Single Stock Deep-Audit
+                            </button>
+                        </div>
+
+                        <!-- Single Stock Search (Visible on stock tab or quick lookup) -->
+                        <div id="instModalStockSearchBox" style="display:none;align-items:center;gap:0.4rem;">
+                            <input type="text" id="instModalStockSearchInput" placeholder="Enter ticker (e.g. RELIANCE.NS)..." onkeydown="if(event.key==='Enter') app.inspectStockIntegrity(this.value)" style="background:#18181b;border:1px solid rgba(255,255,255,0.2);color:#ffffff;font-size:0.75rem;padding:0.25rem 0.6rem;border-radius:5px;width:180px;font-family:var(--font-mono);outline:none;">
+                            <button type="button" onclick="app.inspectStockIntegrity(document.getElementById('instModalStockSearchInput').value)" class="btn btn-sm" style="background:#ffffff;color:#09090b;font-weight:700;font-size:0.72rem;padding:0.25rem 0.6rem;border-radius:5px;">Inspect</button>
+                        </div>
+                    </div>
+
+                    <!-- TAB A: Audit Findings & Invariant Ledger Table -->
+                    <div id="instModalView-findings" style="display:block;">
+                        <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.12);background:#121215;">
+                            <div style="overflow-x:auto;max-height:280px;overflow-y:auto;">
+                                <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
+                                    <thead style="position:sticky;top:0;z-index:2;background:#18181b;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.12);font-family:var(--font-mono);font-size:0.68rem;">
+                                        <tr>
+                                            <th style="padding:0.45rem 0.65rem;">CATEGORY</th>
+                                            <th style="padding:0.45rem 0.5rem;">CHECK NAME</th>
+                                            <th style="padding:0.45rem 0.5rem;">SEVERITY</th>
+                                            <th style="padding:0.45rem 0.5rem;">ENTITY / TICKER</th>
+                                            <th style="padding:0.45rem 0.5rem;">PERIOD / DATE</th>
+                                            <th style="padding:0.45rem 0.65rem;">DETAILS & INVARIANCE PROOF</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="instModalFindingsTableBody">
+                                        <tr><td colspan="6" style="padding:2rem;text-align:center;color:#71717a;">Loading audit findings...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB B: Cryptographic Provenance Ledger -->
+                    <div id="instModalView-provenance" style="display:none;">
+                        <div class="card" style="padding:0;overflow:hidden;border:1px solid rgba(255,255,255,0.12);background:#121215;">
+                            <div style="overflow-x:auto;max-height:280px;overflow-y:auto;">
+                                <table style="width:100%;border-collapse:collapse;font-size:0.72rem;text-align:left;">
+                                    <thead style="position:sticky;top:0;z-index:2;background:#18181b;color:#a1a1aa;border-bottom:1px solid rgba(255,255,255,0.12);font-family:var(--font-mono);font-size:0.68rem;">
+                                        <tr>
+                                            <th style="padding:0.45rem 0.65rem;">SOURCE ORIGIN</th>
+                                            <th style="padding:0.45rem 0.5rem;">ENTITY KEY</th>
+                                            <th style="padding:0.45rem 0.5rem;">SHA-256 RESPONSE HASH</th>
+                                            <th style="padding:0.45rem 0.5rem;">SOURCE ENDPOINT / URL</th>
+                                            <th style="padding:0.45rem 0.5rem;">SIZE</th>
+                                            <th style="padding:0.45rem 0.5rem;">INGESTED AT</th>
+                                            <th style="padding:0.45rem 0.5rem;">STATUS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="instModalProvenanceTableBody">
+                                        <tr><td colspan="7" style="padding:2rem;text-align:center;color:#71717a;">Loading cryptographic provenance ledger...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB C: Single Stock Deep-Audit Inspector -->
+                    <div id="instModalView-stock" style="display:none;">
+                        <div id="instModalStockAuditContainer">
+                            <div style="text-align:center;padding:2.5rem;color:#71717a;font-size:0.78rem;">
+                                Enter a ticker above and click <b>Inspect</b> to run pre-commit invariance audits and review its SHA-256 provenance chain.
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
     </div>
 
 

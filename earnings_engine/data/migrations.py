@@ -1461,6 +1461,37 @@ def _migration_031_institutional_verification_and_provenance(conn: Any) -> None:
         pass
 
 
+def _migration_032_institutional_radar_signals(conn: Any) -> None:
+    """Create table for tracking institutional accumulation radar signal dates, entry prices, and performance."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS institutional_radar_signals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ticker TEXT NOT NULL,
+            signal_date TEXT NOT NULL,
+            signal_price REAL NOT NULL,
+            initial_score REAL,
+            initial_window TEXT,
+            initial_dominance REAL,
+            initial_smart_money_cr REAL,
+            current_price REAL,
+            current_return_pct REAL,
+            peak_price REAL,
+            max_gain_pct REAL,
+            last_seen_date TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+            updated_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+            UNIQUE (ticker, signal_date)
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_ticker ON institutional_radar_signals(ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_date ON institutional_radar_signals(signal_date)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_active ON institutional_radar_signals(is_active)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1494,6 +1525,7 @@ MIGRATIONS: list[Migration] = [
     Migration(29, "029_earnings_fetch_log_schema_alignment", _migration_029_earnings_fetch_log_schema_alignment),
     Migration(30, "030_ai_model_telemetry_and_api_calls", _migration_030_ai_model_telemetry_and_api_calls),
     Migration(31, "031_institutional_verification_and_provenance", _migration_031_institutional_verification_and_provenance),
+    Migration(32, "032_institutional_radar_signals", _migration_032_institutional_radar_signals),
 ]
 
 

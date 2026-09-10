@@ -322,8 +322,11 @@ async def get_institutional_recent_accumulation(
     window: str = Query("90d", description="Lookback window: '30d', '90d', '180d', '365d'"),
     entity_focus: str = Query("smart_money", description="Entity focus: 'smart_money', 'all', 'fii_only', 'super_investor', 'block_deals'"),
     min_cr: float = Query(5.0, ge=0.0, description="Minimum capital deployed in ₹ Cr"),
-    sort_by: str = Query("score", description="Sort by: 'score', 'capital', 'dominance', 'return_30d'"),
+    sort_by: str = Query("score", description="Sort by: 'score', 'capital', 'dominance', 'return_30d', 'signal_date', 'return_since_signal', 'eps_growth'"),
     limit: int = Query(50, ge=1, le=200),
+    emerging_only: bool = Query(False, description="Filter Small/Micro cap equities (< ₹15,000 Cr)"),
+    min_eps_growth: float | None = Query(None, description="Minimum quarterly YoY EPS growth %"),
+    new_entrants_only: bool = Query(False, description="Filter stocks added to radar within last 14 days"),
 ):
     """Retrieve equities under aggressive smart money accumulation across rolling lookback windows."""
     try:
@@ -334,6 +337,9 @@ async def get_institutional_recent_accumulation(
             min_cr=min_cr,
             sort_by=sort_by,
             limit=limit,
+            emerging_only=emerging_only,
+            min_eps_growth=min_eps_growth,
+            new_entrants_only=new_entrants_only,
             settings=_settings,
         )
         return data

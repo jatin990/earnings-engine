@@ -15,8 +15,8 @@
             </div>
 
             <!-- Page Switcher Tabs -->
-            <div style="display: flex; background: #090d1a; padding: 0.25rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); gap: 0.25rem; flex-wrap: wrap;">
-                <button type="button" id="btnBreakoutSubtabScanner" onclick="app.switchBreakoutSubtab('scanner')" class="btn btn-sm bk-subtab-btn bk-subtab-active" style="background:#1e293b; color:#ffffff; border:1px solid rgba(255,255,255,0.3); font-weight:700; padding:0.35rem 0.85rem; font-size:0.76rem;">
+            <div style="display: flex; background: #09090b; padding: 0.25rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); gap: 0.25rem; flex-wrap: wrap;">
+                <button type="button" id="btnBreakoutSubtabScanner" onclick="app.switchBreakoutSubtab('scanner')" class="btn btn-sm bk-subtab-btn bk-subtab-active" style="background:#18181b; color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-weight:700; padding:0.35rem 0.85rem; font-size:0.76rem;">
                     Equities & Active Radar
                 </button>
                 <button type="button" id="btnBreakoutSubtabBacktest" onclick="app.switchBreakoutSubtab('backtest')" class="btn btn-sm bk-subtab-btn" style="background:transparent; color:#94a3b8; border:1px solid transparent; font-weight:500; padding:0.35rem 0.85rem; font-size:0.76rem;">
@@ -35,11 +35,11 @@
     <div id="breakoutLiveScannerContainer" class="breakout-subview">
 
         <!-- Top Obsidian Control Toolbar -->
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.75rem; background: #0f172a; padding: 0.55rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.75rem; background: #09090b; padding: 0.55rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
             <!-- Left: Strategy & Universe Pickers -->
             <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                 <!-- Strategy Selector -->
-                <div style="display: flex; align-items: center; gap: 0.35rem; background: #020617; border: 1px solid rgba(255,255,255,0.15); padding: 0.2rem 0.55rem; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 0.35rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.55rem; border-radius: 6px;">
                     <span style="font-size: 0.72rem; color: #a1a1aa;">🎯 Strategy:</span>
                     <select id="breakoutStrategySelect" onchange="app.onBreakoutStrategyChange(this.value)" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.73rem; font-weight: 600; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Breakout Strategy Engine">
                         <option value="ALL" selected>🌟 All Strategies (Aggregated)</option>
@@ -52,7 +52,7 @@
                 </div>
 
                 <!-- Universe Selector (Default: NSE Large Cap) -->
-                <div style="display: flex; align-items: center; gap: 0.35rem; background: #020617; border: 1px solid rgba(255,255,255,0.15); padding: 0.2rem 0.55rem; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 0.35rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.55rem; border-radius: 6px;">
                     <span style="font-size: 0.72rem; color: #a1a1aa;">🏛️ Universe:</span>
                     <select id="breakoutUniverseSelect" onchange="app.onBreakoutUniverseChange(this.value)" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.73rem; font-weight: 600; font-family: var(--font-mono); cursor: pointer; outline: none;">
                         <optgroup label="🚀 Market Cap Segments">
@@ -76,7 +76,7 @@
                 </div>
 
                 <!-- Sort Control -->
-                <div style="display: flex; align-items: center; gap: 0.3rem; background: #020617; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.45rem; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 0.3rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.2rem 0.45rem; border-radius: 6px;">
                     <span style="font-size: 0.70rem; color: #71717a;">Sort:</span>
                     <select id="breakoutSortBy" onchange="app.loadBreakoutRadar()" style="background: transparent; border: none; color: #d4d4d8; font-size: 0.72rem; font-family: var(--font-mono); cursor: pointer; outline: none;">
                         <option value="composite_score">↓ Composite Score</option>
@@ -89,13 +89,13 @@
                 </div>
 
                 <!-- Min Score Filter -->
-                <div style="display: flex; align-items: center; gap: 0.3rem; background: #020617; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.45rem; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 0.3rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.2rem 0.45rem; border-radius: 6px;">
                     <span style="font-size: 0.70rem; color: #71717a;">Min Score:</span>
                     <input id="breakoutMinScore" type="number" min="0" max="100" value="35" onchange="app.loadBreakoutRadar()" style="width: 44px; background: transparent; border: none; color: #f4f4f5; font-size: 0.72rem; font-family: var(--font-mono); text-align: center; outline: none;">
                 </div>
 
                 <!-- Limit Selector -->
-                <div style="display: flex; align-items: center; gap: 0.3rem; background: #020617; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.45rem; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 0.3rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.2rem 0.45rem; border-radius: 6px;">
                     <span style="font-size: 0.70rem; color: #71717a;">Show:</span>
                     <select id="breakoutLimitSelect" onchange="app.loadBreakoutRadar()" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.72rem; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Limit number of candidate rows">
                         <option value="all" selected>All Setups</option>
@@ -131,14 +131,14 @@
                 </button>
 
                 <!-- Parallel 5-Strategy Master Sweep -->
-                <button type="button" id="breakoutParallelScanBtn" onclick="app.triggerAllBreakoutStrategiesParallel()" class="btn btn-sm" style="background:#1e293b; color:#ffffff; border:1px solid rgba(255,255,255,0.3); font-weight:600; font-size:0.72rem; padding:0.25rem 0.75rem; display:flex; align-items:center; gap:0.3rem;" title="Dispatch all 5 quantitative breakout engines concurrently">
+                <button type="button" id="breakoutParallelScanBtn" onclick="app.triggerAllBreakoutStrategiesParallel()" class="btn btn-sm" style="background:#18181b; color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-weight:600; font-size:0.72rem; padding:0.25rem 0.75rem; display:flex; align-items:center; gap:0.3rem;" title="Dispatch all 5 quantitative breakout engines concurrently">
                     <span id="breakoutParallelIcon">⚡</span> Parallel Sweep
                 </button>
             </div>
         </div>
 
         <!-- 🎯 Compact On-Demand Stock Evaluator -->
-        <div style="background: #0b1329; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.65rem 0.9rem; margin-bottom: 0.75rem;">
+        <div style="background: #09090b; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.65rem 0.9rem; margin-bottom: 0.75rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem;">
                 <div style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.78rem; font-weight: 700; color: #f8fafc;">
                     <span>🎯</span> Stock Breakout Evaluator
@@ -157,29 +157,29 @@
                         type="text"
                         placeholder="Evaluate stock (e.g. RELIANCE, TCS, INFY, TATAMOTORS, DIXON)..."
                         autocomplete="off"
-                        style="width: 100%; padding: 0.35rem 1.8rem 0.35rem 0.65rem; background: #020617; border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; color: #f8fafc; font-size: 0.76rem; font-family: var(--font-mono); outline: none;"
+                        style="width: 100%; padding: 0.35rem 1.8rem 0.35rem 0.65rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; color: #f8fafc; font-size: 0.76rem; font-family: var(--font-mono); outline: none;"
                         onfocus="this.style.borderColor='rgba(255,255,255,0.35)'"
-                        onblur="this.style.borderColor='rgba(255,255,255,0.15)'"
+                        onblur="this.style.borderColor='rgba(255,255,255,0.12)'"
                     />
                     <button type="button" id="breakoutClearInputBtn" onclick="app.clearBreakoutEvaluator()" style="display:none; position:absolute; right:0.5rem; top:50%; transform:translateY(-50%); background:transparent; border:none; color:#71717a; font-size:0.75rem; cursor:pointer;">✕</button>
 
                     <!-- Dynamic Autocomplete Dropdown -->
-                    <div id="breakoutAutocompleteDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; margin-top:3px; background:#090d16; border:1px solid rgba(255,255,255,0.2); border-radius:6px; box-shadow:0 12px 28px rgba(0,0,0,0.85); z-index:999; max-height:220px; overflow-y:auto;">
+                    <div id="breakoutAutocompleteDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; margin-top:3px; background:#09090b; border:1px solid rgba(255,255,255,0.12); border-radius:6px; box-shadow:0 12px 28px rgba(0,0,0,0.85); z-index:999; max-height:220px; overflow-y:auto;">
                     </div>
                 </div>
 
-                <button type="button" id="breakoutEvaluateBtn" onclick="app.evaluateCurrentBreakoutInput()" class="btn btn-sm" style="background:#1e293b; color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-weight:700; font-size:0.74rem; padding:0.35rem 0.85rem; display:flex; align-items:center; gap:0.3rem; white-space:nowrap;">
+                <button type="button" id="breakoutEvaluateBtn" onclick="app.evaluateCurrentBreakoutInput()" class="btn btn-sm" style="background:#18181b; color:#ffffff; border:1px solid rgba(255,255,255,0.2); font-weight:700; font-size:0.74rem; padding:0.35rem 0.85rem; display:flex; align-items:center; gap:0.3rem; white-space:nowrap;">
                     <span id="breakoutEvaluateIcon">⚡</span> Evaluate
                 </button>
             </div>
         </div>
 
         <!-- Deep Evaluated Stock Result Container -->
-        <div id="breakoutEvaluatedStockCard" style="display:none; background:#090d16; border:1px solid rgba(255,255,255,0.15); border-radius:8px; padding:0.85rem 1rem; margin-bottom:0.75rem;">
+        <div id="breakoutEvaluatedStockCard" style="display:none; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:0.85rem 1rem; margin-bottom:0.75rem;">
         </div>
 
         <!-- 🔄 Movement & Activity Audit Feed -->
-        <div id="breakoutAuditPanel" style="padding:0.5rem 0.8rem; background:#090d16; border:1px solid rgba(255,255,255,0.08); border-radius:8px; margin-bottom:0.75rem;">
+        <div id="breakoutAuditPanel" style="padding:0.5rem 0.8rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:8px; margin-bottom:0.75rem;">
             <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="app.toggleBreakoutAuditLog()">
                 <div style="display:flex; align-items:center; gap:0.45rem;">
                     <span style="font-size:0.85rem;">🔄</span>
@@ -200,7 +200,7 @@
         </div>
 
         <!-- 📐 Expandable Mathematical Calculation Breakdown Card -->
-        <div id="breakoutExplainerCard" style="display:none; background:#090d16; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:0.85rem 1rem; margin-bottom:0.75rem;">
+        <div id="breakoutExplainerCard" style="display:none; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:0.85rem 1rem; margin-bottom:0.75rem;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem;">
                 <div style="font-weight:700; font-size:0.82rem; color:#f8fafc; display:flex; align-items:center; gap:0.4rem;">
                     <span>📐</span> Mathematical Calculation & Breakout Scoring Engine (0 – 100 Pts)
@@ -241,25 +241,25 @@
         <!-- High-Density OLED KPI Summary Cards -->
         <div id="breakoutKpiCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.45rem; margin-bottom: 0.75rem;">
             <!-- Active Breaking Out Card -->
-            <div id="breakoutCardOnFire" onclick="app.toggleBreakingOutFilter()" class="card cursor-pointer" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(249,115,22,0.35); border-radius:6px; cursor:pointer; user-select:none;" title="Click to filter table to Breaking Out setups only">
-                <div id="breakoutKpiLabelFire" style="font-size:0.60rem; color:#fdba74; text-transform:uppercase; font-weight:700; letter-spacing:0.04em; display:flex; align-items:center; justify-content:space-between;">
-                    <span style="display:flex; align-items:center; gap:0.25rem;"><span style="font-size:0.75rem;">🔥</span> <span id="breakoutKpiTextFire">Breaking Out</span></span>
-                    <span id="breakoutFilterIndicator" style="font-size:0.55rem; background:#18181b; color:#fdba74; border:1px solid rgba(249,115,22,0.4); padding:0.02rem 0.25rem; border-radius:3px; display:none;">ON</span>
+            <div id="breakoutCardOnFire" onclick="app.toggleBreakingOutFilter()" class="card cursor-pointer" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(245,158,11,0.3); border-radius:6px; cursor:pointer; user-select:none;" title="Click to filter table to Breaking Out setups only">
+                <div id="breakoutKpiLabelFire" style="font-size:0.60rem; color:#fbbf24; text-transform:uppercase; font-weight:700; letter-spacing:0.04em; display:flex; align-items:center; justify-content:space-between;">
+                    <span style="display:flex; align-items:center; gap:0.25rem;"><span style="font-size:0.75rem;">⚡</span> <span id="breakoutKpiTextFire">Breaking Out</span></span>
+                    <span id="breakoutFilterIndicator" style="font-size:0.55rem; background:#18181b; color:#fbbf24; border:1px solid rgba(245,158,11,0.3); padding:0.02rem 0.25rem; border-radius:3px; display:none;">ON</span>
                 </div>
                 <div style="font-size:1.15rem; font-weight:800; color:#ffffff; font-family:var(--font-mono); display:flex; align-items:baseline; gap:0.3rem; margin-top:0.15rem;">
                     <span id="breakoutStatBreakingCount">0</span>
-                    <span id="breakoutStatBreakingSub" style="font-size:0.65rem; font-weight:600; color:#fb923c;">Active</span>
+                    <span id="breakoutStatBreakingSub" style="font-size:0.65rem; font-weight:600; color:#f59e0b;">Active</span>
                 </div>
             </div>
 
             <!-- Total Candidates -->
-            <div id="breakoutCardTotal" onclick="app.clearBreakoutFilter()" class="card cursor-pointer" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px; cursor:pointer; user-select:none;" title="Click to show all candidates">
+            <div id="breakoutCardTotal" onclick="app.clearBreakoutFilter()" class="card cursor-pointer" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px; cursor:pointer; user-select:none;" title="Click to show all candidates">
                 <div id="breakoutKpiLabel1" style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Candidates</div>
                 <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="breakoutStatTotal">—</span></div>
             </div>
 
             <!-- Top Score -->
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div id="breakoutKpiLabel2" style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Top Score</div>
                 <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); display:flex; align-items:baseline; gap:0.35rem; margin-top:0.15rem;">
                     <span id="breakoutStatTopScore">—</span>
@@ -268,19 +268,19 @@
             </div>
 
             <!-- Avg Score -->
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div id="breakoutKpiLabel3" style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Avg Score</div>
                 <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="breakoutStatAvg">—</span></div>
             </div>
 
             <!-- Universe Count -->
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div id="breakoutKpiLabel4" style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Universe</div>
                 <div style="font-size:1.15rem; font-weight:800; color:#cbd5e1; font-family:var(--font-mono); margin-top:0.15rem;"><span id="breakoutStatScanned">—</span></div>
             </div>
 
             <!-- Scan Status / As-Of -->
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div id="breakoutKpiLabel5" style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Scan Status</div>
                 <div style="font-size:1.05rem; font-weight:700; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="breakoutStatDuration">—</span></div>
             </div>
@@ -306,7 +306,7 @@
         <div class="table-wrapper breakout-table-wrapper" style="overflow:auto; max-height:calc(100vh - 240px); min-height:360px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:#000000;">
             <table id="breakoutTable" style="width:100%; border-collapse:collapse; font-size:0.72rem;">
                 <thead>
-                    <tr id="breakoutTableHeaderRow" style="background:#0f172a; border-bottom:1px solid rgba(255,255,255,0.1); font-family:var(--font-mono); font-size:0.66rem;">
+                    <tr id="breakoutTableHeaderRow" style="background:#000000; border-bottom:1px solid rgba(255,255,255,0.08); font-family:var(--font-mono); font-size:0.66rem;">
                         <!-- Rendered dynamically by app.renderBreakoutTableHeader() -->
                     </tr>
                 </thead>
@@ -333,7 +333,7 @@
     <div id="breakoutBacktestContainer" class="breakout-subview" style="display:none;">
 
         <!-- Controls & Filters Row -->
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.6rem; margin-bottom:0.75rem; background:#0f172a; padding:0.55rem 0.8rem; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.6rem; margin-bottom:0.75rem; background:#09090b; padding:0.55rem 0.8rem; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
             <div style="display:flex; align-items:center; gap:0.6rem;">
                 <span style="font-size:1.15rem;">📅</span>
                 <div>
@@ -347,22 +347,22 @@
             <!-- Right Controls -->
             <div style="display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap;">
                 <!-- Date Input -->
-                <div style="display:flex; align-items:center; gap:0.35rem; background:#020617; border:1px solid rgba(255,255,255,0.15); padding:0.2rem 0.5rem; border-radius:6px;">
+                <div style="display:flex; align-items:center; gap:0.35rem; background:#06060a; border:1px solid rgba(255,255,255,0.12); padding:0.2rem 0.5rem; border-radius:6px;">
                     <span style="font-size:0.72rem; color:#a1a1aa;">📅 Date:</span>
                     <input type="date" id="breakoutBacktestDateInput" style="background:transparent; border:none; color:#f8fafc; font-size:0.73rem; font-family:var(--font-mono); outline:none; cursor:pointer;" onchange="app.loadBreakoutBacktest()" />
                 </div>
 
                 <!-- Presets -->
                 <div style="display:flex; align-items:center; gap:0.25rem;">
-                    <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="0" onclick="app.setBreakoutBacktestPresetDays(0)" style="background:#020617; border:1px solid rgba(255,255,255,0.12); color:#94a3b8; font-size:0.68rem; padding:0.2rem 0.45rem; border-radius:4px; cursor:pointer;">Today</button>
-                    <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="1" onclick="app.setBreakoutBacktestPresetDays(1)" style="background:#020617; border:1px solid rgba(255,255,255,0.12); color:#94a3b8; font-size:0.68rem; padding:0.2rem 0.45rem; border-radius:4px; cursor:pointer;">Yesterday</button>
-                    <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="7" onclick="app.setBreakoutBacktestPresetDays(7)" style="background:#020617; border:1px solid rgba(255,255,255,0.12); color:#94a3b8; font-size:0.68rem; padding:0.2rem 0.45rem; border-radius:4px; cursor:pointer;">7d Ago</button>
-                    <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="14" onclick="app.setBreakoutBacktestPresetDays(14)" style="background:#020617; border:1px solid rgba(255,255,255,0.12); color:#94a3b8; font-size:0.68rem; padding:0.2rem 0.45rem; border-radius:4px; cursor:pointer;">14d Ago</button>
-                    <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="30" onclick="app.setBreakoutBacktestPresetDays(30)" style="background:#020617; border:1px solid rgba(255,255,255,0.12); color:#94a3b8; font-size:0.68rem; padding:0.2rem 0.45rem; border-radius:4px; cursor:pointer;">30d Ago</button>
+                    <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="0" onclick="app.setBreakoutBacktestPresetDays(0)" style="background:#06060a; border:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.68rem; padding:0.2rem 0.45rem; border-radius:4px; cursor:pointer;">Today</button>
+                    <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="1" onclick="app.setBreakoutBacktestPresetDays(1)" style="background:#06060a; border:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.68rem; padding:0.2rem 0.45rem; border-radius:4px; cursor:pointer;">Yesterday</button>
+                    <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="7" onclick="app.setBreakoutBacktestPresetDays(7)" style="background:#06060a; border:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.68rem; padding:0.2rem 0.45rem; border-radius:4px; cursor:pointer;">7d Ago</button>
+                    <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="14" onclick="app.setBreakoutBacktestPresetDays(14)" style="background:#06060a; border:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.68rem; padding:0.2rem 0.45rem; border-radius:4px; cursor:pointer;">14d Ago</button>
+                    <button type="button" class="btn btn-sm bk-backtest-preset-btn" data-days="30" onclick="app.setBreakoutBacktestPresetDays(30)" style="background:#06060a; border:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.68rem; padding:0.2rem 0.45rem; border-radius:4px; cursor:pointer;">30d Ago</button>
                 </div>
 
                 <!-- Backtest Universe Selector -->
-                <div style="display:flex; align-items:center; gap:0.35rem; background:#020617; border:1px solid rgba(255,255,255,0.15); padding:0.2rem 0.5rem; border-radius:6px;">
+                <div style="display:flex; align-items:center; gap:0.35rem; background:#06060a; border:1px solid rgba(255,255,255,0.12); padding:0.2rem 0.5rem; border-radius:6px;">
                     <span style="font-size:0.72rem; color:#a1a1aa;">🏛️</span>
                     <select id="breakoutBacktestUniverseSelect" onchange="app.loadBreakoutBacktest()" style="background:transparent; border:none; color:#f8fafc; font-size:0.73rem; font-weight:600; font-family:var(--font-mono); cursor:pointer; outline:none;">
                         <option value="nse_large_cap" selected>🏛️ NSE Large Cap</option>
@@ -373,7 +373,7 @@
                 </div>
 
                 <!-- Backtest Action Button -->
-                <button type="button" onclick="app.loadBreakoutBacktest()" class="btn btn-sm" style="background:#1e293b; color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-weight:700; padding:0.3rem 0.75rem; font-size:0.74rem; display:flex; align-items:center; gap:0.3rem;">
+                <button type="button" onclick="app.loadBreakoutBacktest()" class="btn btn-sm" style="background:#18181b; color:#ffffff; border:1px solid rgba(255,255,255,0.2); font-weight:700; padding:0.3rem 0.75rem; font-size:0.74rem; display:flex; align-items:center; gap:0.3rem;">
                     <span>⚡</span> Run Backtest
                 </button>
             </div>
@@ -381,23 +381,23 @@
 
         <!-- Backtest KPI Cards -->
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0.45rem; margin-bottom:0.75rem;">
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700;">Backtest Date</div>
                 <div id="bkBacktestStatDate" style="font-size:1.1rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;">—</div>
             </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700;">Evaluated</div>
                 <div id="bkBacktestStatEvaluated" style="font-size:1.1rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;">0</div>
             </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700;">Breakouts Fired</div>
                 <div id="bkBacktestStatFired" style="font-size:1.1rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;">0</div>
             </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700;">Win Rate</div>
                 <div id="bkBacktestStatWinRate" style="font-size:1.1rem; font-weight:800; color:#34d399; font-family:var(--font-mono); margin-top:0.15rem;">0.0%</div>
             </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700;">Avg Score</div>
                 <div id="bkBacktestStatAvgScore" style="font-size:1.1rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;">—</div>
             </div>
@@ -407,7 +407,7 @@
         <div class="card" style="padding:0; background:#000000; border:1px solid rgba(255,255,255,0.08); overflow-x:auto; border-radius:8px;">
             <table class="table" style="width:100%; border-collapse:collapse; margin:0; font-size:0.72rem;">
                 <thead>
-                    <tr style="background:#0f172a; border-bottom:1px solid rgba(255,255,255,0.1); font-size:0.66rem; color:#94a3b8; text-transform:uppercase; font-family:var(--font-mono);">
+                    <tr style="background:#000000; border-bottom:1px solid rgba(255,255,255,0.08); font-size:0.66rem; color:#94a3b8; text-transform:uppercase; font-family:var(--font-mono);">
                         <th style="padding:0.5rem 0.75rem; text-align:left;">Stock &amp; Quality</th>
                         <th style="padding:0.5rem 0.75rem; text-align:right;">Signal Price</th>
                         <th style="padding:0.5rem 0.75rem; text-align:right;">Trigger Level</th>
@@ -434,7 +434,7 @@
     <div id="breakoutTrackedContainer" class="breakout-subview" style="display:none;">
 
         <!-- Controls & Filters Row -->
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.6rem; margin-bottom:0.75rem; background:#0f172a; padding:0.55rem 0.8rem; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.6rem; margin-bottom:0.75rem; background:#09090b; padding:0.55rem 0.8rem; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
             <div style="display:flex; align-items:center; gap:0.6rem;">
                 <span style="font-size:1.15rem;">📜</span>
                 <div>
@@ -448,7 +448,7 @@
             <!-- Right Controls -->
             <div style="display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap;">
                 <!-- Strategy Filter -->
-                <div style="display:flex; align-items:center; gap:0.3rem; background:#020617; border:1px solid rgba(255,255,255,0.15); padding:0.2rem 0.45rem; border-radius:6px;">
+                <div style="display:flex; align-items:center; gap:0.3rem; background:#06060a; border:1px solid rgba(255,255,255,0.12); padding:0.2rem 0.45rem; border-radius:6px;">
                     <span style="font-size:0.70rem; color:#71717a;">Strategy:</span>
                     <select id="breakoutTrackedStrategyFilter" onchange="app.loadTrackedBreakouts()" style="background:transparent; border:none; color:#f8fafc; font-size:0.72rem; font-family:var(--font-mono); cursor:pointer; outline:none;">
                         <option value="ALL">All Strategies</option>
@@ -461,7 +461,7 @@
                 </div>
 
                 <!-- Tier Filter -->
-                <div style="display:flex; align-items:center; gap:0.3rem; background:#020617; border:1px solid rgba(255,255,255,0.12); padding:0.2rem 0.45rem; border-radius:6px;">
+                <div style="display:flex; align-items:center; gap:0.3rem; background:#06060a; border:1px solid rgba(255,255,255,0.12); padding:0.2rem 0.45rem; border-radius:6px;">
                     <span style="font-size:0.70rem; color:#71717a;">Tier:</span>
                     <select id="breakoutTrackedTierFilter" onchange="app.loadTrackedBreakouts()" style="background:transparent; border:none; color:#d4d4d8; font-size:0.72rem; font-family:var(--font-mono); cursor:pointer; outline:none;">
                         <option value="ALL">All Tiers</option>
@@ -471,7 +471,7 @@
                 </div>
 
                 <!-- Outcome Filter -->
-                <div style="display:flex; align-items:center; gap:0.3rem; background:#020617; border:1px solid rgba(255,255,255,0.12); padding:0.2rem 0.45rem; border-radius:6px;">
+                <div style="display:flex; align-items:center; gap:0.3rem; background:#06060a; border:1px solid rgba(255,255,255,0.12); padding:0.2rem 0.45rem; border-radius:6px;">
                     <span style="font-size:0.70rem; color:#71717a;">Status:</span>
                     <select id="breakoutTrackedOutcomeFilter" onchange="app.loadTrackedBreakouts()" style="background:transparent; border:none; color:#d4d4d8; font-size:0.72rem; font-family:var(--font-mono); cursor:pointer; outline:none;">
                         <option value="ALL">All Outcomes</option>
@@ -484,7 +484,7 @@
                 </div>
 
                 <!-- Sort By -->
-                <div style="display:flex; align-items:center; gap:0.3rem; background:#020617; border:1px solid rgba(255,255,255,0.12); padding:0.2rem 0.45rem; border-radius:6px;">
+                <div style="display:flex; align-items:center; gap:0.3rem; background:#06060a; border:1px solid rgba(255,255,255,0.12); padding:0.2rem 0.45rem; border-radius:6px;">
                     <span style="font-size:0.70rem; color:#71717a;">Sort:</span>
                     <select id="breakoutTrackedSortBy" onchange="app.loadTrackedBreakouts()" style="background:transparent; border:none; color:#d4d4d8; font-size:0.72rem; font-family:var(--font-mono); cursor:pointer; outline:none;">
                         <option value="signal_date">↓ Signal Date (Newest)</option>
@@ -504,7 +504,7 @@
         </div>
 
         <!-- Presets & Date Range Toolbar -->
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; padding:0.45rem 0.75rem; background:#0b1329; border:1px solid rgba(255,255,255,0.08); border-radius:8px; margin-bottom:0.75rem;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; padding:0.45rem 0.75rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:8px; margin-bottom:0.75rem;">
             <!-- Quick Presets -->
             <div style="display:flex; align-items:center; gap:0.3rem; flex-wrap:wrap;">
                 <span style="color:#71717a; font-size:0.70rem; font-weight:700; margin-right:0.2rem;">⏱️ Presets:</span>
@@ -519,10 +519,10 @@
             <!-- Custom Date Range Picker -->
             <div style="display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap;">
                 <span style="font-size:0.70rem; color:#94a3b8; font-weight:600;">📅 Date Range:</span>
-                <input id="breakoutTrackedStartDate" type="date" style="background:#020617; border:1px solid rgba(255,255,255,0.15); border-radius:4px; color:#f8fafc; font-size:0.70rem; padding:0.15rem 0.35rem; font-family:var(--font-mono); outline:none;" />
+                <input id="breakoutTrackedStartDate" type="date" style="background:#06060a; border:1px solid rgba(255,255,255,0.12); border-radius:4px; color:#f8fafc; font-size:0.70rem; padding:0.15rem 0.35rem; font-family:var(--font-mono); outline:none;" />
                 <span style="color:#71717a; font-size:0.70rem;">to</span>
-                <input id="breakoutTrackedEndDate" type="date" style="background:#020617; border:1px solid rgba(255,255,255,0.15); border-radius:4px; color:#f8fafc; font-size:0.70rem; padding:0.15rem 0.35rem; font-family:var(--font-mono); outline:none;" />
-                <button type="button" onclick="app.applyTrackedBreakoutDateRange()" class="btn btn-sm" style="background:#1e293b; color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-weight:700; padding:0.2rem 0.55rem; font-size:0.70rem;">
+                <input id="breakoutTrackedEndDate" type="date" style="background:#06060a; border:1px solid rgba(255,255,255,0.12); border-radius:4px; color:#f8fafc; font-size:0.70rem; padding:0.15rem 0.35rem; font-family:var(--font-mono); outline:none;" />
+                <button type="button" onclick="app.applyTrackedBreakoutDateRange()" class="btn btn-sm" style="background:#18181b; color:#ffffff; border:1px solid rgba(255,255,255,0.2); font-weight:700; padding:0.2rem 0.55rem; font-size:0.70rem;">
                     Apply
                 </button>
                 <button type="button" onclick="app.clearTrackedBreakoutDateRange()" class="btn btn-sm" style="background:transparent; color:#94a3b8; border:1px solid rgba(255,255,255,0.12); padding:0.2rem 0.4rem; font-size:0.70rem;" title="Reset date filters">
@@ -533,26 +533,26 @@
 
         <!-- Tracked Performance Summary Cards -->
         <div id="breakoutTrackedKpiCards" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0.45rem; margin-bottom:0.75rem;">
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Total Tracked</div>
                 <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiTotal">—</span></div>
             </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Win / Target Hit</div>
                 <div style="font-size:1.15rem; font-weight:800; color:#34d399; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiWinRate">—</span></div>
             </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Avg Return</div>
                 <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiAvgReturn">—</span></div>
             </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Top Return</div>
                 <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); display:flex; align-items:baseline; gap:0.3rem; margin-top:0.15rem;">
                     <span id="bkTrackedKpiMaxReturn">—</span>
                     <span id="bkTrackedKpiTopTicker" style="font-size:0.62rem; color:#94a3b8; font-family:var(--font-mono);"></span>
                 </div>
             </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#0f172a; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
+            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
                 <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Fired &amp; Active</div>
                 <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiActiveCount">—</span></div>
             </div>
@@ -562,7 +562,7 @@
         <div class="table-wrapper" style="overflow:auto; max-height:calc(100vh - 270px); min-height:380px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:#000000;">
             <table id="breakoutTrackedTable" style="width:100%; border-collapse:collapse; font-size:0.72rem;">
                 <thead>
-                    <tr style="background:#0f172a; border-bottom:1px solid rgba(255,255,255,0.1); font-family:var(--font-mono); font-size:0.66rem;">
+                    <tr style="background:#000000; border-bottom:1px solid rgba(255,255,255,0.08); font-family:var(--font-mono); font-size:0.66rem;">
                         <th style="padding:0.55rem 0.75rem; text-align:left; color:#94a3b8; font-weight:700;">Stock &amp; Archetype</th>
                         <th style="padding:0.55rem 0.75rem; text-align:left; color:#94a3b8; font-weight:700;">Signal Date &amp; Age</th>
                         <th style="padding:0.55rem 0.55rem; text-align:center; color:#94a3b8; font-weight:700;">Tier</th>
@@ -599,9 +599,9 @@
 <!-- ⚡ MODAL: ON-DEMAND 5-PILLAR STOCK INTELLIGENCE                          -->
 <!-- ========================================================================= -->
 <div id="breakoutStockIntelModal" class="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:9999; align-items:center; justify-content:center; padding:1rem;">
-    <div class="modal-card" style="background:#090d16; border:1px solid rgba(255,255,255,0.15); border-radius:10px; width:100%; max-width:980px; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.95); overflow:hidden;">
+    <div class="modal-card" style="background:#09090b; border:1px solid rgba(255,255,255,0.15); border-radius:10px; width:100%; max-width:980px; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.95); overflow:hidden;">
         <!-- Header -->
-        <div id="breakoutStockIntelModalHeader" style="padding:0.85rem 1.15rem; border-bottom:1px solid rgba(255,255,255,0.08); background:#0f172a; display:flex; align-items:center; justify-content:space-between;">
+        <div id="breakoutStockIntelModalHeader" style="padding:0.85rem 1.15rem; border-bottom:1px solid rgba(255,255,255,0.08); background:#121215; display:flex; align-items:center; justify-content:space-between;">
             <div style="display:flex; align-items:center; gap:0.6rem;">
                 <div style="width:32px; height:32px; border-radius:6px; background:#0284c7; color:#ffffff; display:flex; align-items:center; justify-content:center; font-size:1.1rem; font-weight:800;">⚡</div>
                 <div>
@@ -625,7 +625,7 @@
         </div>
 
         <!-- Footer -->
-        <div id="breakoutStockIntelModalFooter" style="padding:0.65rem 1.15rem; border-top:1px solid rgba(255,255,255,0.08); background:#05070f; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+        <div id="breakoutStockIntelModalFooter" style="padding:0.65rem 1.15rem; border-top:1px solid rgba(255,255,255,0.08); background:#06060a; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
             <div id="bkIntelFooterActions" style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
                 <!-- Dynamically wired actions -->
             </div>
@@ -640,7 +640,7 @@
 <!-- 🧠 MODAL: BREAKOUT REASONING & AI NOTES                                   -->
 <!-- ========================================================================= -->
 <div id="breakoutNotesModal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:2000; align-items:center; justify-content:center; padding:1rem;">
-    <div style="background:#090d16; border:1px solid rgba(255,255,255,0.15); border-radius:10px; max-width:720px; width:100%; max-height:92vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.9); padding:1.25rem; position:relative;">
+    <div style="background:#09090b; border:1px solid rgba(255,255,255,0.15); border-radius:10px; max-width:720px; width:100%; max-height:92vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.9); padding:1.25rem; position:relative;">
         <button type="button" onclick="document.getElementById('breakoutNotesModal').style.display='none'" style="position:absolute; top:0.85rem; right:0.85rem; background:transparent; border:none; color:#94a3b8; font-size:1.1rem; cursor:pointer;">✕</button>
         <div id="breakoutNotesModalContent">
             <!-- Injected via JavaScript -->
@@ -652,7 +652,7 @@
 <!-- 📅 MODAL: BREAKOUT BACKTEST AUDIT REPORT                                  -->
 <!-- ========================================================================= -->
 <div id="breakoutBacktestModal" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:2000; align-items:center; justify-content:center; padding:1rem;">
-    <div style="background:#090d16; border:1px solid rgba(255,255,255,0.15); border-radius:10px; max-width:850px; width:100%; max-height:92vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.9); padding:1.25rem; position:relative;">
+    <div style="background:#09090b; border:1px solid rgba(255,255,255,0.15); border-radius:10px; max-width:850px; width:100%; max-height:92vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.9); padding:1.25rem; position:relative;">
         <button type="button" onclick="document.getElementById('breakoutBacktestModal').style.display='none'" style="position:absolute; top:0.85rem; right:0.85rem; background:transparent; border:none; color:#94a3b8; font-size:1.1rem; cursor:pointer;">✕</button>
         <div id="breakoutBacktestModalContent">
             <!-- Injected via JavaScript -->
@@ -664,9 +664,9 @@
 <!-- 📜 MODAL: BREAKOUT TRANSITION & LIFECYCLE HISTORY POPUP                  -->
 <!-- ========================================================================= -->
 <div id="breakoutHistoryModal" class="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:9999; align-items:center; justify-content:center; padding:1rem;">
-    <div class="modal-card" style="background:#090d16; border:1px solid rgba(255,255,255,0.15); border-radius:10px; width:100%; max-width:760px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.9); overflow:hidden;">
+    <div class="modal-card" style="background:#09090b; border:1px solid rgba(255,255,255,0.15); border-radius:10px; width:100%; max-width:760px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.9); overflow:hidden;">
         <!-- Modal Header -->
-        <div style="padding:0.85rem 1.15rem; border-bottom:1px solid rgba(255,255,255,0.08); background:#0f172a; display:flex; align-items:center; justify-content:space-between;">
+        <div style="padding:0.85rem 1.15rem; border-bottom:1px solid rgba(255,255,255,0.08); background:#121215; display:flex; align-items:center; justify-content:space-between;">
             <div style="display:flex; align-items:center; gap:0.55rem;">
                 <span style="font-size:1.15rem;">📜</span>
                 <div>
@@ -692,9 +692,9 @@
         </div>
 
         <!-- Modal Footer -->
-        <div style="padding:0.65rem 1.15rem; border-top:1px solid rgba(255,255,255,0.08); background:#05070f; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.45rem;">
+        <div style="padding:0.65rem 1.15rem; border-top:1px solid rgba(255,255,255,0.08); background:#06060a; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.45rem;">
             <div style="display:flex; align-items:center; gap:0.35rem;">
-                <button type="button" id="bkHistBtnStockDetail" class="btn btn-sm" style="background:#1e293b; color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-size:0.72rem; padding:0.25rem 0.65rem;">
+                <button type="button" id="bkHistBtnStockDetail" class="btn btn-sm" style="background:#18181b; color:#ffffff; border:1px solid rgba(255,255,255,0.2); font-size:0.72rem; padding:0.25rem 0.65rem;">
                     📈 Stock Detail
                 </button>
                 <button type="button" id="bkHistBtnIntelNote" class="btn btn-sm" style="background:#18181b; color:#d4d4d8; border:1px solid rgba(255,255,255,0.15); font-size:0.72rem; padding:0.25rem 0.65rem;">
@@ -712,9 +712,9 @@
 <!-- ⏱️ MODAL: MULTI-STRATEGY BREAKOUT SCHEDULE & PARALLEL RUN STUDIO         -->
 <!-- ========================================================================= -->
 <div id="breakoutScheduleModal" class="modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:9999; align-items:center; justify-content:center; padding:1rem;">
-    <div class="modal-card" style="background:#090d16; border:1px solid rgba(255,255,255,0.15); border-radius:12px; width:100%; max-width:860px; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.9); overflow:hidden;">
+    <div class="modal-card" style="background:#09090b; border:1px solid rgba(255,255,255,0.15); border-radius:12px; width:100%; max-width:860px; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.9); overflow:hidden;">
         <!-- Header -->
-        <div style="padding:0.95rem 1.25rem; border-bottom:1px solid rgba(255,255,255,0.08); background:#0f172a; display:flex; align-items:center; justify-content:space-between;">
+        <div style="padding:0.95rem 1.25rem; border-bottom:1px solid rgba(255,255,255,0.08); background:#121215; display:flex; align-items:center; justify-content:space-between;">
             <div style="display:flex; align-items:center; gap:0.6rem;">
                 <div style="width:32px; height:32px; border-radius:6px; background:#18181b; border:1px solid rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; font-size:1.1rem;">⏱️</div>
                 <div>
@@ -731,7 +731,7 @@
         <!-- Body -->
         <div style="padding:1.15rem 1.25rem; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:1rem;">
             <!-- Master Action Callout -->
-            <div style="background:#0f172a; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:0.85rem 1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem;">
+            <div style="background:#09090b; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:0.85rem 1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem;">
                 <div style="max-width:540px;">
                     <div style="display:flex; align-items:center; gap:0.45rem; margin-bottom:0.2rem;">
                         <span style="font-size:1.05rem;">🚀</span>
@@ -745,7 +745,7 @@
                         Next automated sweep: <strong>--</strong>
                     </div>
                 </div>
-                <button type="button" id="bkModalParallelTriggerBtn" onclick="app.triggerAllBreakoutStrategiesParallel(true)" class="btn btn-sm" style="padding:0.4rem 0.95rem; font-size:0.78rem; font-weight:700; background:#1e293b; color:#ffffff; border:1px solid rgba(255,255,255,0.3); display:flex; align-items:center; gap:0.35rem;">
+                <button type="button" id="bkModalParallelTriggerBtn" onclick="app.triggerAllBreakoutStrategiesParallel(true)" class="btn btn-sm" style="padding:0.4rem 0.95rem; font-size:0.78rem; font-weight:700; background:#18181b; color:#ffffff; border:1px solid rgba(255,255,255,0.25); display:flex; align-items:center; gap:0.35rem;">
                     <span id="bkModalParallelTriggerIcon">⚡</span> Trigger Sweep
                 </button>
             </div>
@@ -765,7 +765,7 @@
         </div>
 
         <!-- Footer -->
-        <div style="padding:0.65rem 1.25rem; border-top:1px solid rgba(255,255,255,0.08); background:#05070f; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.45rem;">
+        <div style="padding:0.65rem 1.25rem; border-top:1px solid rgba(255,255,255,0.08); background:#06060a; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.45rem;">
             <div style="font-size:0.70rem; color:#64748b;">
                 💡 Changes save automatically to database &amp; scheduler engine.
             </div>
@@ -844,13 +844,13 @@
     position: sticky;
     top: 0;
     z-index: 20;
-    background: #0f172a;
+    background: #000000;
     padding: 0.45rem 0.6rem;
     font-size: 0.65rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     user-select: none;
 }
 
@@ -873,15 +873,15 @@
     background: #18181b !important;
 }
 .bk-subtab-btn.bk-subtab-active {
-    background: #1e293b !important;
+    background: #18181b !important;
     color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
     font-weight: 700;
 }
 
 /* Date preset button states */
 .bk-preset-btn, .bk-tracked-preset {
-    background: #020617;
+    background: #06060a;
     color: #94a3b8;
     border: 1px solid rgba(255, 255, 255, 0.1);
     transition: none !important;
@@ -898,9 +898,9 @@
     border-color: rgba(255, 255, 255, 0.2);
 }
 .bk-preset-btn.bk-preset-active, .bk-tracked-preset.bk-preset-active {
-    background: #1e293b !important;
+    background: #18181b !important;
     color: #ffffff !important;
-    border-color: rgba(255, 255, 255, 0.3) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
     font-weight: 700;
 }
 </style>

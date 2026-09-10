@@ -653,6 +653,7 @@ def record_breakout_transition(
     catalyst_impact: str | None = None,
     company_name: str | None = None,
     strategy: str | None = "Classic Technical",
+    technical_data: dict[str, Any] | None = None,
     settings: Settings | None = None,
     send_email: bool = True,
     sync_email: bool = False,
@@ -790,6 +791,13 @@ def record_breakout_transition(
                             final_rr = round((final_target - final_price) / (final_price - final_stop), 2)
 
                     from earnings_engine.emailing import send_breakout_alert_email
+                    tech_metrics = technical_data
+                    if tech_metrics is None:
+                        try:
+                            tech_metrics = compute_technical_decision_metrics(ticker, settings=settings)
+                        except Exception as tech_err:
+                            logger.debug("[BREAKOUT-ALERT-EMAIL] Failed extracting technical metrics for %s: %s", ticker, tech_err)
+
                     send_breakout_alert_email(
                         ticker=ticker,
                         company_name=company_name,
@@ -805,6 +813,7 @@ def record_breakout_transition(
                         volume_ratio=final_vol,
                         reason=reason,
                         catalyst_impact=catalyst_impact,
+                        technical_data=tech_metrics,
                         sync=sync_email,
                     )
                 except Exception as mail_err:
@@ -2025,6 +2034,182 @@ def _calculate_donchian_ttm_squeeze(closes: pd.Series, highs: pd.Series, lows: p
     kc_width_pct = (kc_width / max(0.01, cur_p)) * 100.0
 
     return squeeze_on, donchian_55_high, mom_osc, bb_width_pct, kc_width_pct
+
+
+# ---------------------------------------------------------------------------
+# Technical Decision Metrics Extraction
+# ---------------------------------------------------------------------------
+
+def compute_technical_decision_metrics(
+    ticker: str,
+    prices_df: pd.DataFrame | None = None,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Compute comprehensive technical decision metrics for email alerts and trading context.
+
+    Extracts:
+    - Moving averages: SMA 20, 50, 200 and percentage distances from current price
+    - Trend Alignment: Bullish Golden Stack, Bullish Alignment, Above 200 SMA, Below 200 SMA
+    - 52-Week Range: High, Low, % from 52W High, % from 52W Low, 20D Range %
+    - Volatility & Squeeze: ATR(14) %, ATR(14) absolute value, John Carter TTM Volatility Squeeze status
+    - Momentum & Flow: RSI(14), 20D Volume Surge Ratio, 30D Return %
+    """
+    settings = settings or Settings()
+    if prices_df is None or prices_df.empty or len(prices_df) < 5:
+        from earnings_engine.data.prices import load_prices
+        sym = ticker.strip().upper()
+        if not (sym.endswith(".NS") or sym.endswith(".BO") or "." in sym):
+            sym = f"{sym}.NS"
+        prices_df = load_prices(sym, settings)
+        if prices_df is None or len(prices_df) < 5:
+            prices_df = load_prices(ticker.strip().upper(), settings)
+
+    if prices_df is None or prices_df.empty or len(prices_df) < 5:
+        return {
+            "sma_20": None, "sma_50": None, "sma_200": None,
+            "dist_sma_20_pct": None, "dist_sma_50_pct": None, "dist_sma_200_pct": None,
+            "trend_alignment": "Unknown",
+            "high_52w": None, "low_52w": None,
+            "dist_52w_high_pct": None, "dist_52w_low_pct": None,
+            "range_20d_pct": None,
+            "atr_14": None, "atr_14_pct": None,
+            "squeeze_on": False,
+            "rsi_14": None,
+            "volume_surge_ratio": None,
+            "ret_30d_pct": None,
+        }
+
+    closes = pd.to_numeric(prices_df["close"], errors="coerce").dropna()
+    if closes.empty:
+        return {
+            "sma_20": None, "sma_50": None, "sma_200": None,
+            "dist_sma_20_pct": None, "dist_sma_50_pct": None, "dist_sma_200_pct": None,
+            "trend_alignment": "Unknown",
+            "high_52w": None, "low_52w": None,
+            "dist_52w_high_pct": None, "dist_52w_low_pct": None,
+            "range_20d_pct": None,
+            "atr_14": None, "atr_14_pct": None,
+            "squeeze_on": False,
+            "rsi_14": None,
+            "volume_surge_ratio": None,
+            "ret_30d_pct": None,
+        }
+
+    highs = pd.to_numeric(prices_df["high"], errors="coerce").dropna() if "high" in prices_df.columns else closes
+    lows = pd.to_numeric(prices_df["low"], errors="coerce").dropna() if "low" in prices_df.columns else closes
+    volumes = pd.to_numeric(prices_df["volume"], errors="coerce").fillna(0) if "volume" in prices_df.columns else pd.Series(0.0, index=closes.index)
+
+    current_price = float(closes.iloc[-1])
+
+    # Moving Averages
+    sma_20 = float(closes.tail(20).mean()) if len(closes) >= 20 else float(closes.mean())
+    sma_50 = float(closes.tail(50).mean()) if len(closes) >= 50 else (float(closes.mean()) if len(closes) >= 20 else None)
+    sma_200 = float(closes.tail(200).mean()) if len(closes) >= 200 else (float(closes.mean()) if len(closes) >= 100 else None)
+
+    dist_sma_20_pct = round(((current_price - sma_20) / sma_20) * 100.0, 2) if sma_20 and sma_20 > 0 else None
+    dist_sma_50_pct = round(((current_price - sma_50) / sma_50) * 100.0, 2) if sma_50 and sma_50 > 0 else None
+    dist_sma_200_pct = round(((current_price - sma_200) / sma_200) * 100.0, 2) if sma_200 and sma_200 > 0 else None
+
+    # Trend Alignment
+    if sma_20 is not None and sma_50 is not None and sma_200 is not None:
+        if current_price >= sma_20 >= sma_50 >= sma_200:
+            trend_alignment = "Bullish Golden Stack (P > 20 > 50 > 200)"
+        elif current_price >= sma_50 >= sma_200:
+            trend_alignment = "Bullish Alignment (P > 50 > 200)"
+        elif current_price >= sma_200:
+            trend_alignment = "Above 200 SMA (Long-Term Bullish)"
+        else:
+            trend_alignment = "Below 200 SMA (Counter-Trend Setup)"
+    elif sma_20 is not None and sma_50 is not None:
+        if current_price >= sma_20 >= sma_50:
+            trend_alignment = "Bullish Alignment (P > 20 > 50)"
+        elif current_price >= sma_50:
+            trend_alignment = "Above 50 SMA"
+        else:
+            trend_alignment = "Below 50 SMA"
+    else:
+        trend_alignment = "Short-Term Up" if current_price >= sma_20 else "Consolidating"
+
+    # 52W & 20D Ranges
+    w52_len = min(len(closes), 252)
+    high_52w = float(highs.tail(w52_len).max())
+    low_52w = float(lows.tail(w52_len).min())
+    dist_52w_high_pct = round(((current_price - high_52w) / high_52w) * 100.0, 2) if high_52w > 0 else 0.0
+    dist_52w_low_pct = round(((current_price - low_52w) / low_52w) * 100.0, 2) if low_52w > 0 else 0.0
+
+    w20_len = min(len(closes), 20)
+    high_20d = float(highs.tail(w20_len).max())
+    low_20d = float(lows.tail(w20_len).min())
+    range_20d_pct = round(((high_20d - low_20d) / max(0.01, current_price)) * 100.0, 2)
+
+    # ATR(14)
+    tr1 = (highs - lows).abs()
+    tr2 = (highs - closes.shift(1)).abs()
+    tr3 = (lows - closes.shift(1)).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr_14 = float(tr.tail(14).mean()) if len(tr) >= 14 else float(tr.mean())
+    atr_14_pct = round((atr_14 / max(0.01, current_price)) * 100.0, 2) if current_price > 0 else 0.0
+
+    # TTM Squeeze
+    squeeze_on = False
+    if len(closes) >= 20:
+        std_20 = float(closes.tail(20).std(ddof=0))
+        bb_upper = sma_20 + 2.0 * std_20
+        bb_lower = sma_20 - 2.0 * std_20
+        atr_20 = float(tr.tail(20).mean()) if len(tr) >= 20 else atr_14
+        kc_upper = sma_20 + 1.5 * atr_20
+        kc_lower = sma_20 - 1.5 * atr_20
+        squeeze_on = bool(bb_upper <= kc_upper and bb_lower >= kc_lower)
+
+    # RSI(14)
+    rsi_14 = None
+    if len(closes) >= 15:
+        delta = closes.diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        avg_gain = gain.tail(14).mean()
+        avg_loss = loss.tail(14).mean()
+        if avg_loss == 0:
+            rsi_14 = 100.0
+        else:
+            rs = avg_gain / avg_loss
+            rsi_14 = round(100.0 - (100.0 / (1.0 + rs)), 1)
+
+    # Volume Surge Ratio
+    volume_surge_ratio = None
+    if len(volumes) >= 5:
+        avg_vol_20 = float(volumes.tail(21).iloc[:-1].mean()) if len(volumes) >= 21 else float(volumes.mean())
+        today_vol = float(volumes.iloc[-1])
+        if avg_vol_20 > 0:
+            volume_surge_ratio = round(today_vol / avg_vol_20, 2)
+
+    # 30D Return %
+    ret_30d_pct = None
+    if len(closes) >= 20:
+        idx_30 = max(0, len(closes) - 31)
+        ret_30d_pct = round(((current_price / float(closes.iloc[idx_30])) - 1.0) * 100.0, 2)
+
+    return {
+        "current_price": round(current_price, 2),
+        "sma_20": round(sma_20, 2) if sma_20 is not None else None,
+        "sma_50": round(sma_50, 2) if sma_50 is not None else None,
+        "sma_200": round(sma_200, 2) if sma_200 is not None else None,
+        "dist_sma_20_pct": dist_sma_20_pct,
+        "dist_sma_50_pct": dist_sma_50_pct,
+        "dist_sma_200_pct": dist_sma_200_pct,
+        "trend_alignment": trend_alignment,
+        "high_52w": round(high_52w, 2),
+        "low_52w": round(low_52w, 2),
+        "dist_52w_high_pct": dist_52w_high_pct,
+        "dist_52w_low_pct": dist_52w_low_pct,
+        "range_20d_pct": range_20d_pct,
+        "atr_14": round(atr_14, 2),
+        "atr_14_pct": atr_14_pct,
+        "squeeze_on": squeeze_on,
+        "rsi_14": rsi_14,
+        "volume_surge_ratio": volume_surge_ratio,
+        "ret_30d_pct": ret_30d_pct,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -162,13 +162,10 @@
             border-radius: 3px;
         }
 
-        /* Animated Pulse for Pending OTP */
-        @keyframes pulseGlow {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.4); }
-            50% { box-shadow: 0 0 0 10px rgba(212, 175, 55, 0); }
-        }
+        /* Static Accent for Pending OTP */
         .otp-pulse {
-            animation: pulseGlow 2s infinite;
+            border-color: rgba(245, 158, 11, 0.4) !important;
+            box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.15);
         }
 
         /* Modal Overlay */

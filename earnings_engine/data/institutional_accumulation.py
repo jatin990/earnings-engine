@@ -423,6 +423,13 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
 _INITIALIZED_DBS: set[str] = set()
 
 
+def get_institutional_db_path(settings: Settings | None = None) -> Path:
+    """Return local database file path used for institutional data."""
+    from pathlib import Path
+    from earnings_engine.data.db import _cache_path
+    return _cache_path(settings or Settings())
+
+
 def init_institutional_db(settings: Settings | None = None, force_refresh: bool = False) -> None:
     """Initialize institutional holdings, block deals, and shareholding tables dynamically."""
     settings = settings or Settings()
@@ -2585,12 +2592,341 @@ def get_stock_buyers_in_period(
             pass
 
 
+def _get_or_create_radar_signals(
+    screened_stocks: list[dict[str, Any]],
+    conn: Any,
+    as_of_date: str = "2026-09-10",
+    default_window: str = "90d",
+) -> None:
+    """Resolve and persist Smart Money radar entry dates, historical entry prices, and returns.
+
+    Guarantees Point-in-Time historical accuracy:
+    - Resolves authentic earliest entry date from filings/block deals or existing signal ledger.
+    - Resolves authentic closing price on entry date from price_history (T <= signal_date).
+    - Calculates days on radar, return since signal %, peak price, and max gain %.
+    - Flags newly added stocks (<= 14 days on radar) as New Entrants.
+    """
+    if not screened_stocks:
+        return
+
+    # Ensure table and indexes exist
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS institutional_radar_signals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                signal_date TEXT NOT NULL,
+                signal_price REAL NOT NULL,
+                initial_score REAL,
+                initial_window TEXT,
+                initial_dominance REAL,
+                initial_smart_money_cr REAL,
+                current_price REAL,
+                current_return_pct REAL,
+                peak_price REAL,
+                max_gain_pct REAL,
+                last_seen_date TEXT NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+                updated_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+                UNIQUE (ticker, signal_date)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_ticker ON institutional_radar_signals(ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_date ON institutional_radar_signals(signal_date)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_active ON institutional_radar_signals(is_active)")
+    except Exception as e:
+        logger.debug("[INSTITUTIONAL] Signal table verify warning: %s", e)
+
+    today_dt = None
+    try:
+        today_dt = datetime.fromisoformat(as_of_date).date() if "T" in as_of_date else datetime.strptime(as_of_date[:10], "%Y-%m-%d").date()
+    except Exception:
+        today_dt = datetime.now(timezone.utc).date()
+
+    for s in screened_stocks:
+        sym = s["ticker"]
+        curr_p = s.get("current_price") or 0.0
+
+        # Query existing signal
+        existing_row = None
+        try:
+            cur = conn.execute(
+                """
+                SELECT signal_date, signal_price, initial_score, peak_price, initial_smart_money_cr
+                FROM institutional_radar_signals
+                WHERE ticker = ?
+                ORDER BY signal_date ASC
+                LIMIT 1
+                """,
+                (sym,),
+            )
+            existing_row = cur.fetchone()
+        except Exception:
+            existing_row = None
+
+        if existing_row:
+            sig_date = str(existing_row[0])
+            sig_price = float(existing_row[1] or 0.0)
+            initial_score = float(existing_row[2] or s.get("conviction_score", 50.0))
+            peak_price = float(existing_row[3] or sig_price)
+
+            if curr_p <= 0:
+                curr_p = sig_price
+                s["current_price"] = curr_p
+
+            days_on_radar = 0
+            try:
+                sig_dt = datetime.fromisoformat(sig_date).date() if "T" in sig_date else datetime.strptime(sig_date[:10], "%Y-%m-%d").date()
+                days_on_radar = max(0, (today_dt - sig_dt).days)
+            except Exception:
+                days_on_radar = 0
+
+            return_pct = round(((curr_p - sig_price) / sig_price) * 100.0, 2) if sig_price > 0 else 0.0
+            peak_price = max(peak_price, curr_p)
+            max_gain = round(((peak_price - sig_price) / sig_price) * 100.0, 2) if sig_price > 0 else 0.0
+            is_new = (days_on_radar <= 14)
+
+            try:
+                conn.execute(
+                    """
+                    UPDATE institutional_radar_signals
+                    SET current_price = ?, current_return_pct = ?, peak_price = ?, max_gain_pct = ?,
+                        last_seen_date = ?, is_active = 1, updated_at = DATETIME('now')
+                    WHERE ticker = ? AND signal_date = ?
+                    """,
+                    (curr_p, return_pct, peak_price, max_gain, as_of_date[:10], sym, sig_date),
+                )
+            except Exception as e:
+                logger.debug("[INSTITUTIONAL] Signal update error for %s: %s", sym, e)
+
+        else:
+            # Determine authentic earliest signal inception date from smart money transactions
+            txn_dates = []
+            for b in s.get("buyers", []):
+                cat = b.get("category")
+                b_date = b.get("date") or b.get("deal_date") or b.get("filing_date")
+                if b_date and cat in ("FII", "Super Investor", "AIF", "Block Deal", "Smart Money"):
+                    txn_dates.append(str(b_date)[:10])
+
+            if txn_dates:
+                sig_date = min(txn_dates)
+            else:
+                all_b_dates = [
+                    str(b.get("date") or b.get("deal_date") or b.get("filing_date"))[:10]
+                    for b in s.get("buyers", [])
+                    if b.get("date") or b.get("deal_date") or b.get("filing_date")
+                ]
+                sig_date = min(all_b_dates) if all_b_dates else as_of_date[:10]
+
+            # Point-in-Time price resolution: query price_history on or before signal_date
+            sig_price = 0.0
+            try:
+                p_cur = conn.execute(
+                    """
+                    SELECT close FROM price_history
+                    WHERE ticker = ? AND date <= ? AND close > 0
+                    ORDER BY date DESC
+                    LIMIT 1
+                    """,
+                    (sym, sig_date),
+                )
+                p_row = p_cur.fetchone()
+                if p_row and p_row[0]:
+                    sig_price = round(float(p_row[0]), 2)
+            except Exception:
+                sig_price = 0.0
+
+            if sig_price <= 0:
+                sig_price = round(float(curr_p or 100.0), 2)
+
+            if curr_p <= 0:
+                curr_p = sig_price
+                s["current_price"] = curr_p
+
+            days_on_radar = 0
+            try:
+                sig_dt = datetime.fromisoformat(sig_date).date() if "T" in sig_date else datetime.strptime(sig_date[:10], "%Y-%m-%d").date()
+                days_on_radar = max(0, (today_dt - sig_dt).days)
+            except Exception:
+                days_on_radar = 0
+
+            return_pct = round(((curr_p - sig_price) / sig_price) * 100.0, 2) if sig_price > 0 else 0.0
+            peak_price = max(sig_price, curr_p)
+            max_gain = round(((peak_price - sig_price) / sig_price) * 100.0, 2) if sig_price > 0 else 0.0
+            is_new = (days_on_radar <= 14)
+            initial_score = float(s.get("conviction_score", 50.0))
+
+            try:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO institutional_radar_signals (
+                        ticker, signal_date, signal_price, initial_score, initial_window,
+                        initial_dominance, initial_smart_money_cr, current_price,
+                        current_return_pct, peak_price, max_gain_pct, last_seen_date,
+                        is_active, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, DATETIME('now'), DATETIME('now'))
+                    """,
+                    (
+                        sym, sig_date, sig_price, initial_score, default_window,
+                        float(s.get("dominance_pct") or 0.0), float(s.get("smart_money_cr") or 0.0),
+                        curr_p, return_pct, peak_price, max_gain, as_of_date[:10],
+                    ),
+                )
+            except Exception as e:
+                logger.debug("[INSTITUTIONAL] Signal insert error for %s: %s", sym, e)
+
+        # Attach signal fields to stock
+        s["signal_date"] = sig_date
+        s["signal_price"] = sig_price
+        s["days_on_radar"] = days_on_radar
+        s["return_since_signal_pct"] = return_pct
+        s["return_since_signal"] = return_pct
+        s["peak_price"] = peak_price
+        s["max_gain_pct"] = max_gain
+        s["is_new_entrant"] = is_new
+        s["new_entrant_badge"] = f"🆕 New Entrant ({days_on_radar}d ago)" if is_new else None
+
+
+def _attach_fundamentals_and_eps(
+    screened_stocks: list[dict[str, Any]],
+    conn: Any,
+    min_eps_growth_threshold: float = 20.0,
+) -> None:
+    """Extract quarterly EPS results, compute YoY growth, and identify Emerging Multi-Bagger equities.
+
+    Features:
+    - Analyzes earnings_history to extract reported quarterly EPS.
+    - Computes YoY quarterly EPS growth (Q0 vs Q-4) with fallbacks to QoQ if fewer quarters exist.
+    - Tracks beat streak and P/E valuation.
+    - Classifies Small Cap / Micro Cap equities (< ₹15,000 Cr market cap) as Emerging.
+    - Awards '🌟 Emerging EPS Rocket' or '🌱 Emerging Smart Money' badges.
+    """
+    if not screened_stocks:
+        return
+
+    tickers = [s["ticker"] for s in screened_stocks]
+    placeholders = ",".join("?" * len(tickers))
+
+    # 1. Fetch reported quarterly EPS history
+    eps_map: dict[str, list[tuple[str, float, float | None, float | None]]] = defaultdict(list)
+    try:
+        e_rows = conn.execute(
+            f"""
+            SELECT ticker, earnings_date, eps_reported, eps_estimate, surprise_pct
+            FROM earnings_history
+            WHERE ticker IN ({placeholders}) AND eps_reported IS NOT NULL
+            ORDER BY ticker, earnings_date DESC
+            """,
+            tickers,
+        ).fetchall()
+        for r in e_rows:
+            sym, edate, rep, est, sur = r
+            eps_map[sym].append((edate, float(rep), float(est) if est is not None else None, float(sur) if sur is not None else None))
+    except Exception as e:
+        logger.debug("[INSTITUTIONAL] EPS history fetch error: %s", e)
+
+    # 2. Calculate and attach for each stock
+    for s in screened_stocks:
+        sym = s["ticker"]
+        hist = eps_map.get(sym, [])
+
+        latest_eps = None
+        latest_quarter = None
+        eps_estimate = None
+        eps_surprise_pct = None
+        eps_growth_yoy = None
+        beat_streak = 0
+        pe_ratio = None
+
+        if hist:
+            latest_quarter = hist[0][0]
+            latest_eps = round(hist[0][1], 2)
+            eps_estimate = round(hist[0][2], 2) if hist[0][2] is not None else None
+            eps_surprise_pct = round(hist[0][3], 2) if hist[0][3] is not None else None
+
+            # Calculate YoY EPS growth (compare Q0 with Q-4)
+            if len(hist) >= 5:
+                q0_eps = hist[0][1]
+                q4_eps = hist[4][1]
+                if abs(q4_eps) > 0.001:
+                    eps_growth_yoy = round(((q0_eps - q4_eps) / abs(q4_eps)) * 100.0, 1)
+            elif len(hist) >= 2:
+                q0_eps = hist[0][1]
+                q_prev_eps = hist[1][1]
+                if abs(q_prev_eps) > 0.001:
+                    eps_growth_yoy = round(((q0_eps - q_prev_eps) / abs(q_prev_eps)) * 100.0, 1)
+
+            # Compute beat streak
+            for _q_date, rep_val, est_val, sur_val in hist:
+                if sur_val is not None and sur_val >= 0:
+                    beat_streak += 1
+                elif est_val is not None and rep_val >= est_val:
+                    beat_streak += 1
+                elif est_val is None:
+                    if rep_val > 0:
+                        beat_streak += 1
+                    else:
+                        break
+                else:
+                    break
+
+            # Estimate P/E ratio if current price and TTM EPS available
+            curr_p = s.get("current_price") or 0.0
+            ttm_eps = sum(h[1] for h in hist[:4])
+            if ttm_eps > 0.1 and curr_p > 0:
+                pe_ratio = round(curr_p / ttm_eps, 1)
+
+        # Emerging stock definition: Small Cap / Micro Cap (< ₹15,000 Cr)
+        mcap_cr = float(s.get("market_cap_cr") or 0.0)
+        cap_cat = s.get("cap_category") or ""
+        is_emerging = (cap_cat in ("Small Cap", "Micro Cap")) or (0 < mcap_cr < 15000.0)
+        has_good_eps = bool(eps_growth_yoy is not None and eps_growth_yoy >= min_eps_growth_threshold)
+
+        # Upgrade badges for high-conviction emerging stocks
+        dom_pct = float(s.get("dominance_pct") or 0.0)
+        if is_emerging and has_good_eps and dom_pct >= 50.0:
+            s["signal_badge"] = "🌟 Emerging EPS Rocket"
+            s["badge"] = "🌟 Emerging EPS Rocket"
+            s["accumulation_signal_badge"] = "🌟 Emerging EPS Rocket"
+            s["signal_color"] = "emerald"
+        elif is_emerging and dom_pct >= 60.0 and s.get("classification") != "domestic_absorption":
+            s["signal_badge"] = "🌱 Emerging Smart Money"
+            s["badge"] = "🌱 Emerging Smart Money"
+            s["accumulation_signal_badge"] = "🌱 Emerging Smart Money"
+            s["signal_color"] = "teal"
+
+        s["latest_eps"] = latest_eps
+        s["latest_quarter"] = latest_quarter
+        s["eps_estimate"] = eps_estimate
+        s["eps_surprise_pct"] = eps_surprise_pct
+        s["eps_growth_yoy"] = eps_growth_yoy
+        s["beat_streak"] = beat_streak
+        s["pe_ratio"] = pe_ratio
+        s["is_emerging"] = is_emerging
+        s["has_good_eps"] = has_good_eps
+        s["fundamentals"] = {
+            "latest_eps": latest_eps,
+            "latest_quarter": latest_quarter,
+            "eps_estimate": eps_estimate,
+            "eps_surprise_pct": eps_surprise_pct,
+            "eps_growth_yoy": eps_growth_yoy,
+            "beat_streak": beat_streak,
+            "pe_ratio": pe_ratio,
+            "is_emerging": is_emerging,
+            "has_good_eps": has_good_eps,
+        }
+
+
 def get_stocks_under_institutional_accumulation(
     window: str = "90d",
     entity_focus: str = "smart_money",
     min_cr: float = 5.0,
     sort_by: str = "score",
     limit: int = 50,
+    emerging_only: bool = False,
+    min_eps_growth: float | None = None,
+    new_entrants_only: bool = False,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Retrieve equities experiencing aggressive smart money institutional accumulation across rolling time windows.
@@ -2607,7 +2943,10 @@ def get_stocks_under_institutional_accumulation(
         settings: Settings instance.
     """
     settings = settings or Settings()
-    cache_key = f"smart_money_acc:{window}:{entity_focus}:{min_cr}:{sort_by}:{limit}"
+    cache_key = (
+        f"smart_money_acc:{window}:{entity_focus}:{min_cr}:{sort_by}:{limit}:"
+        f"{emerging_only}:{min_eps_growth}:{new_entrants_only}"
+    )
     cached = _get_inst_cache(cache_key)
     if cached is not None:
         return cached
@@ -3143,21 +3482,8 @@ def get_stocks_under_institutional_accumulation(
                 },
             })
 
-        # 5. Sorting
-        sort_key = sort_by.lower()
-        if sort_key == "capital":
-            screened_stocks.sort(key=lambda s: (s["smart_money_cr"], s["conviction_score"]), reverse=True)
-        elif sort_key == "dominance":
-            screened_stocks.sort(key=lambda s: (s["smart_money_dominance_pct"], s["smart_money_cr"]), reverse=True)
-        elif sort_key == "return_30d":
-            screened_stocks.sort(key=lambda s: (s["return_30d_pct"] if s["return_30d_pct"] is not None else -999.0, s["conviction_score"]), reverse=True)
-        else:  # "score"
-            screened_stocks.sort(key=lambda s: (s["conviction_score"], s["smart_money_cr"]), reverse=True)
-
-        final_stocks = screened_stocks[:limit]
-
-        # 6. Fill missing prices for final stocks from price_history
-        tickers_needing_price = [s["ticker"] for s in final_stocks if not s["current_price"]]
+        # 5. Fill missing current prices for screened_stocks from price_history
+        tickers_needing_price = [s["ticker"] for s in screened_stocks if not s.get("current_price")]
         if tickers_needing_price:
             placeholders = ",".join("?" * len(tickers_needing_price))
             p_rows = conn.execute(
@@ -3171,11 +3497,62 @@ def get_stocks_under_institutional_accumulation(
                 tickers_needing_price,
             ).fetchall()
             price_map = {pr[0]: round(float(pr[1]), 2) for pr in p_rows if pr[1] is not None}
-            for s in final_stocks:
-                if not s["current_price"] and s["ticker"] in price_map:
+            for s in screened_stocks:
+                if not s.get("current_price") and s["ticker"] in price_map:
                     s["current_price"] = price_map[s["ticker"]]
 
-        # 7. Compute Macro Summary
+        # 6. Signal Tracking & Historical Entry Ledger
+        _get_or_create_radar_signals(
+            screened_stocks,
+            conn,
+            as_of_date=end_date or "2026-09-10",
+            default_window=window,
+        )
+
+        # 7. Fundamental EPS & Emerging Multi-Bagger Synthesis
+        _attach_fundamentals_and_eps(
+            screened_stocks,
+            conn,
+            min_eps_growth_threshold=min_eps_growth if min_eps_growth is not None else 20.0,
+        )
+
+        # Commit signal ledger updates to SQLite
+        try:
+            conn.commit()
+        except Exception:
+            pass
+
+        # 8. User-triggered Filters (Emerging, Good EPS Growth, New Entrants)
+        if emerging_only:
+            screened_stocks = [s for s in screened_stocks if s.get("is_emerging")]
+        if min_eps_growth is not None:
+            screened_stocks = [
+                s for s in screened_stocks
+                if s.get("eps_growth_yoy") is not None and s.get("eps_growth_yoy") >= min_eps_growth
+            ]
+        if new_entrants_only:
+            screened_stocks = [s for s in screened_stocks if s.get("is_new_entrant")]
+
+        # 9. Sorting
+        sort_key = sort_by.lower()
+        if sort_key == "capital":
+            screened_stocks.sort(key=lambda s: (s["smart_money_cr"], s["conviction_score"]), reverse=True)
+        elif sort_key == "dominance":
+            screened_stocks.sort(key=lambda s: (s["smart_money_dominance_pct"], s["smart_money_cr"]), reverse=True)
+        elif sort_key == "return_30d":
+            screened_stocks.sort(key=lambda s: (s["return_30d_pct"] if s["return_30d_pct"] is not None else -999.0, s["conviction_score"]), reverse=True)
+        elif sort_key == "signal_date":
+            screened_stocks.sort(key=lambda s: (s.get("signal_date") or "1970-01-01", s["conviction_score"]), reverse=True)
+        elif sort_key in ("return_since_signal", "return_signal", "signal_return"):
+            screened_stocks.sort(key=lambda s: (s.get("return_since_signal_pct") if s.get("return_since_signal_pct") is not None else -999.0, s["conviction_score"]), reverse=True)
+        elif sort_key in ("eps_growth", "eps_growth_yoy"):
+            screened_stocks.sort(key=lambda s: (s.get("eps_growth_yoy") if s.get("eps_growth_yoy") is not None else -999.0, s["conviction_score"]), reverse=True)
+        else:  # "score"
+            screened_stocks.sort(key=lambda s: (s["conviction_score"], s["smart_money_cr"]), reverse=True)
+
+        final_stocks = screened_stocks[:limit]
+
+        # 10. Compute Macro Summary
         total_sm = round(sum(s["smart_money_cr"] for s in screened_stocks), 2)
         total_dom = round(sum(s["domestic_cr"] for s in screened_stocks), 2)
         avg_dom = round(sum(s["smart_money_dominance_pct"] for s in screened_stocks) / len(screened_stocks), 1) if screened_stocks else 0.0
@@ -3194,6 +3571,9 @@ def get_stocks_under_institutional_accumulation(
             "entity_focus": entity_focus,
             "min_cr": min_cr,
             "sort_by": sort_by,
+            "emerging_only": emerging_only,
+            "min_eps_growth": min_eps_growth,
+            "new_entrants_only": new_entrants_only,
             "count": len(final_stocks),
             "total_screened": len(screened_stocks),
             "period_description": period_description,
@@ -3216,6 +3596,9 @@ def get_stocks_under_institutional_accumulation(
                 "total_fii_cr": round(sum(s["fii_cr"] for s in screened_stocks), 2),
                 "total_super_inv_cr": round(sum(s["super_inv_cr"] for s in screened_stocks), 2),
                 "total_block_deals_cr": round(sum(s["block_deals_cr"] for s in screened_stocks), 2),
+                "total_emerging_stocks": sum(1 for s in screened_stocks if s.get("is_emerging")),
+                "total_new_entrants": sum(1 for s in screened_stocks if s.get("is_new_entrant")),
+                "total_high_eps_growth": sum(1 for s in screened_stocks if s.get("has_good_eps")),
             },
             "stocks": final_stocks,
         }

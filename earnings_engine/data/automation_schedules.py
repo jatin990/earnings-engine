@@ -103,6 +103,17 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "description": "Full universe multi-factor scan discovering fresh compression and momentum setups using Classic 20D/52W model.",
     },
     {
+        "job_id": "breakout_hourly_digest",
+        "job_name": "📬 Breakout Radar Hourly Digest",
+        "category": "Breakout Radar",
+        "interval_seconds": 3600,
+        "run_after_hours": 0,
+        "market_session": "market_hours_only",
+        "is_enabled": 1,
+        "params_json": '{"hours_lookback": 1.0, "sync": false}',
+        "description": "Consolidates coiling and promoted breakout setups across all 5 strategies from the audit log and delivers a structured email digest.",
+    },
+    {
         "job_id": "news_catalyst_harvest",
         "job_name": "📰 News Catalyst Harvester",
         "category": "Market Catalysts",

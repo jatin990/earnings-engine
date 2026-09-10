@@ -1578,7 +1578,7 @@ def sync_institutional_cmd(force: bool) -> None:
 
 
 @cli.command("verify-institutional")
-@click.option("--ticker", "-t", multiple=True, help="Specific ticker(s) to verify (e.g., TCS.NS, RELIANCE.NS).")
+@click.option("--ticker", "--symbol", "-t", multiple=True, help="Specific ticker(s) to verify (e.g., TCS.NS, RELIANCE.NS).")
 @click.option("--scope", "-s", default="ALL", type=click.Choice(["ALL", "MATHEMATICAL", "FRESHNESS", "ANOMALY", "SYNTHETIC_PURGE"], case_sensitive=False), help="Audit scope to execute.")
 @click.option("--purge-synthetic", is_flag=True, help="Quarantine and purge any synthetic or mock placeholder records.")
 @click.option("--repair", is_flag=True, help="Automatically attempt backfills and repairs for missing/stale filings.")

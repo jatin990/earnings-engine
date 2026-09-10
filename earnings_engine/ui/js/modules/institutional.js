@@ -62,7 +62,7 @@
 
                     if (v === this.institutionalActiveView) {
 
-                        btn.style.background = '#1e293b';
+                        btn.style.background = '#18181b';
 
                         btn.style.color = '#38bdf8';
 
@@ -112,7 +112,7 @@
 
             if (btnAcc) {
 
-                btnAcc.style.background = isAcc ? '#1e293b' : 'transparent';
+                btnAcc.style.background = isAcc ? '#18181b' : 'transparent';
 
                 btnAcc.style.color = isAcc ? '#34d399' : '#94a3b8';
 
@@ -124,7 +124,7 @@
 
             if (btnDist) {
 
-                btnDist.style.background = !isAcc ? '#1e293b' : 'transparent';
+                btnDist.style.background = !isAcc ? '#18181b' : 'transparent';
 
                 btnDist.style.color = !isAcc ? '#f87171' : '#94a3b8';
 
@@ -200,7 +200,7 @@
 
                     if (name === p) {
 
-                        btn.style.background = '#1e293b';
+                        btn.style.background = '#18181b';
 
                         btn.style.color = '#38bdf8';
 
@@ -289,6 +289,12 @@
                 this._distLimit = 20;
 
                 this._fundsLimit = 50;
+
+
+
+                // Non-blocking load of institutional data integrity health & provenance status
+
+                this.loadInstitutionalIntegrityStatus();
 
 
 
@@ -886,7 +892,7 @@
 
                     if (cat === category) {
 
-                        btn.style.background = '#1e293b';
+                        btn.style.background = '#18181b';
 
                         btn.style.color = '#38bdf8';
 
@@ -2018,21 +2024,16 @@
         // =========================================================================
 
         _smartMoneyWindow: '90d',
-
         _smartMoneyEntityFocus: 'smart_money',
-
         _smartMoneyMinCr: 5,
-
         _smartMoneySortBy: 'score',
-
         _smartMoneySortColumn: 'score',
-
         _smartMoneySortAsc: false,
-
+        _smartMoneyNewEntrantsOnly: false,
+        _smartMoneyEmergingOnly: false,
+        _smartMoneyGoodEpsOnly: false,
         _smartMoneyStocks: [],
-
         _smartMoneySelectedStock: null,
-
         _smartMoneyRawData: null,
 
 
@@ -2074,11 +2075,18 @@
                         return factor * (a.ticker || '').localeCompare(b.ticker || '');
 
                     case 'price':
-
                         vA = a.current_price != null ? Number(a.current_price) : 0;
-
                         vB = b.current_price != null ? Number(b.current_price) : 0;
+                        return factor * (vA - vB);
 
+                    case 'signal':
+                        vA = a.return_since_signal_pct != null ? Number(a.return_since_signal_pct) : -9999;
+                        vB = b.return_since_signal_pct != null ? Number(b.return_since_signal_pct) : -9999;
+                        return factor * (vA - vB);
+
+                    case 'eps':
+                        vA = a.eps_growth_yoy != null ? Number(a.eps_growth_yoy) : -9999;
+                        vB = b.eps_growth_yoy != null ? Number(b.eps_growth_yoy) : -9999;
                         return factor * (vA - vB);
 
                     case 'capital':
@@ -2127,7 +2135,7 @@
 
             // Update UI sort arrow indicators
 
-            ['ticker', 'price', 'capital', 'dominance', 'whales', 'classification', 'score'].forEach(c => {
+            ['ticker', 'price', 'signal', 'eps', 'capital', 'dominance', 'whales', 'classification', 'score'].forEach(c => {
 
                 const icon = document.getElementById('smSortIcon-' + c);
 
@@ -2229,6 +2237,63 @@
 
         },
 
+        toggleSmartMoneyNewEntrants() {
+            this._smartMoneyNewEntrantsOnly = !this._smartMoneyNewEntrantsOnly;
+            const btn = document.getElementById('instSmNewEntrantsBtn');
+            if (btn) {
+                if (this._smartMoneyNewEntrantsOnly) {
+                    btn.style.background = 'rgba(56,189,248,0.25)';
+                    btn.style.color = '#38bdf8';
+                    btn.style.borderColor = '#38bdf8';
+                    btn.style.fontWeight = '700';
+                } else {
+                    btn.style.background = '#18181b';
+                    btn.style.color = '#a1a1aa';
+                    btn.style.borderColor = 'rgba(255,255,255,0.15)';
+                    btn.style.fontWeight = '500';
+                }
+            }
+            this.loadSmartMoneyRadar(true);
+        },
+
+        toggleSmartMoneyEmerging() {
+            this._smartMoneyEmergingOnly = !this._smartMoneyEmergingOnly;
+            const btn = document.getElementById('instSmEmergingBtn');
+            if (btn) {
+                if (this._smartMoneyEmergingOnly) {
+                    btn.style.background = 'rgba(52,211,153,0.25)';
+                    btn.style.color = '#34d399';
+                    btn.style.borderColor = '#34d399';
+                    btn.style.fontWeight = '700';
+                } else {
+                    btn.style.background = '#18181b';
+                    btn.style.color = '#a1a1aa';
+                    btn.style.borderColor = 'rgba(255,255,255,0.15)';
+                    btn.style.fontWeight = '500';
+                }
+            }
+            this.loadSmartMoneyRadar(true);
+        },
+
+        toggleSmartMoneyGoodEps() {
+            this._smartMoneyGoodEpsOnly = !this._smartMoneyGoodEpsOnly;
+            const btn = document.getElementById('instSmGoodEpsBtn');
+            if (btn) {
+                if (this._smartMoneyGoodEpsOnly) {
+                    btn.style.background = 'rgba(244,63,94,0.25)';
+                    btn.style.color = '#fb7185';
+                    btn.style.borderColor = '#fb7185';
+                    btn.style.fontWeight = '700';
+                } else {
+                    btn.style.background = '#18181b';
+                    btn.style.color = '#a1a1aa';
+                    btn.style.borderColor = 'rgba(255,255,255,0.15)';
+                    btn.style.fontWeight = '500';
+                }
+            }
+            this.loadSmartMoneyRadar(true);
+        },
+
 
 
         filterSmartMoneyLocal(query) {
@@ -2271,7 +2336,7 @@
 
             if (tbody) {
 
-                tbody.innerHTML = '<tr><td colspan="8" style="padding:2.5rem;text-align:center;color:#71717a;"><span class="spinner-border spinner-border-sm" style="margin-right:0.4rem;"></span>Scanning institutional flow databases for smart money accumulation...</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" style="padding:2.5rem;text-align:center;color:#71717a;"><span class="spinner-border spinner-border-sm" style="margin-right:0.4rem;"></span>Scanning institutional flow databases for smart money accumulation...</td></tr>';
 
             }
 
@@ -2279,7 +2344,16 @@
 
             try {
 
-                const url = API_BASE + `/api/v1/institutional/recent-accumulation?window=${encodeURIComponent(this._smartMoneyWindow)}&entity_focus=${encodeURIComponent(this._smartMoneyEntityFocus)}&min_cr=${this._smartMoneyMinCr}&sort_by=${encodeURIComponent(this._smartMoneySortBy)}&limit=60`;
+                let url = API_BASE + `/api/v1/institutional/recent-accumulation?window=${encodeURIComponent(this._smartMoneyWindow)}&entity_focus=${encodeURIComponent(this._smartMoneyEntityFocus)}&min_cr=${this._smartMoneyMinCr}&sort_by=${encodeURIComponent(this._smartMoneySortBy)}&limit=60`;
+                if (this._smartMoneyNewEntrantsOnly) {
+                    url += '&new_entrants_only=true';
+                }
+                if (this._smartMoneyEmergingOnly) {
+                    url += '&emerging_only=true';
+                }
+                if (this._smartMoneyGoodEpsOnly) {
+                    url += '&min_eps_growth=20.0';
+                }
 
                 const res = await fetch(url);
 
@@ -2297,7 +2371,7 @@
                 this._smartMoneySortColumn = 'score';
                 this._smartMoneySortAsc = false;
 
-                ['ticker', 'price', 'capital', 'dominance', 'whales', 'classification', 'score'].forEach(c => {
+                ['ticker', 'price', 'signal', 'eps', 'capital', 'dominance', 'whales', 'classification', 'score'].forEach(c => {
                     const icon = document.getElementById('smSortIcon-' + c);
                     if (icon) {
                         if (c === 'score') {
@@ -2429,167 +2503,119 @@
 
 
                 // Badges
-
                 let sigBg = 'rgba(56,189,248,0.12)';
-
                 let sigCol = '#38bdf8';
-
                 let sigBorder = 'rgba(56,189,248,0.3)';
-
                 if (s.classification_category === 'domestic_absorption') {
-
                     sigBg = 'rgba(239,68,68,0.12)';
-
                     sigCol = '#f87171';
-
                     sigBorder = 'rgba(239,68,68,0.3)';
-
                 } else if (s.classification_category === 'high_conviction_smart_money') {
-
                     sigBg = 'rgba(16,185,129,0.15)';
-
                     sigCol = '#34d399';
-
                     sigBorder = 'rgba(16,185,129,0.4)';
-
                 } else if (s.classification_category === 'fii_whale_inflow') {
-
                     sigBg = 'rgba(99,102,241,0.15)';
-
                     sigCol = '#818cf8';
-
                     sigBorder = 'rgba(99,102,241,0.35)';
-
                 } else if (s.classification_category === 'super_investor_entry') {
-
                     sigBg = 'rgba(245,158,11,0.15)';
-
                     sigCol = '#fbbf24';
-
                     sigBorder = 'rgba(245,158,11,0.35)';
-
                 } else if (s.classification_category === 'block_deal_frenzy') {
-
                     sigBg = 'rgba(168,85,247,0.15)';
-
                     sigCol = '#c084fc';
-
                     sigBorder = 'rgba(168,85,247,0.35)';
-
                 }
 
+                // Signal Date & Entry Return
+                const sigDate = s.signal_date || '—';
+                const sigPrice = s.signal_price != null ? `₹${Number(s.signal_price).toFixed(1)}` : '—';
+                const retSig = s.return_since_signal_pct != null ? s.return_since_signal_pct : 0;
+                const retSigStr = s.return_since_signal_pct != null ? `${retSig >= 0 ? '+' : ''}${retSig.toFixed(1)}%` : '—';
+                const retSigCol = retSig >= 0 ? '#34d399' : '#f87171';
+                const newBadgeHtml = s.is_new_entrant ? '<span style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.4);border-radius:3px;font-size:0.56rem;padding:0.04rem 0.22rem;font-weight:700;margin-left:0.25rem;">NEW</span>' : '';
 
+                // EPS YoY and Streak
+                const epsYoY = s.eps_growth_yoy;
+                const epsYoYStr = epsYoY != null ? `${epsYoY >= 0 ? '+' : ''}${epsYoY.toFixed(1)}%` : '—';
+                let epsCol = '#71717a';
+                let epsIcon = '';
+                if (epsYoY != null) {
+                    if (epsYoY >= 20) { epsCol = '#34d399'; epsIcon = '🚀 '; }
+                    else if (epsYoY > 0) { epsCol = '#38bdf8'; epsIcon = '▲ '; }
+                    else { epsCol = '#f87171'; epsIcon = '▼ '; }
+                }
+                const epsSub = s.beat_streak ? `${s.beat_streak}Q Beat` : (s.pe_ratio != null ? `P/E ${Number(s.pe_ratio).toFixed(1)}` : (s.eps_actual != null ? `EPS ₹${Number(s.eps_actual).toFixed(1)}` : '—'));
 
                 // Score color
-
                 const score = Number(s.smart_money_conviction_score || 0).toFixed(1);
-
                 let scoreCol = '#38bdf8';
-
                 if (s.smart_money_conviction_score >= 80) scoreCol = '#10b981';
-
                 else if (s.smart_money_conviction_score >= 60) scoreCol = '#38bdf8';
-
                 else if (s.smart_money_conviction_score < 40) scoreCol = '#f59e0b';
 
-
-
                 const whales = (s.whale_buyers_summary || []).slice(0, 2);
-
                 const whalesHtml = whales.length ? whales.map(w => `<span style="display:inline-block;background:#18181b;color:#d4d4d8;border:1px solid rgba(255,255,255,0.1);border-radius:3px;padding:0.08rem 0.3rem;font-size:0.62rem;margin-right:0.25rem;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;">${w}</span>`).join('') : '<span style="color:#71717a;font-size:0.65rem;">Exchange Flow</span>';
 
-
-
                 return `
-
                     <tr id="smRow-${cleanTicker}" onclick="app.inspectSmartMoneyStock('${s.ticker}')" style="border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;background:${isSelected ? 'rgba(56,189,248,0.08)' : 'transparent'};transition:background 0.15s;" onmouseover="if(!this.dataset.selected) this.style.background='rgba(255,255,255,0.03)'" onmouseout="if(!this.dataset.selected) this.style.background='transparent'">
-
                         <td style="padding:0.45rem 0.6rem;">
-
                             <div style="font-weight:800;color:#ffffff;font-family:var(--font-mono);font-size:0.8rem;display:flex;align-items:center;gap:0.3rem;">
-
                                 <span>${cleanTicker}</span>
-
                                 <span style="font-size:0.6rem;color:#71717a;font-weight:600;">${s.cap_category || ''}</span>
-
                             </div>
-
                             <div style="font-size:0.65rem;color:#a1a1aa;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-
                                 ${s.company_name || s.ticker}
-
                             </div>
-
                         </td>
-
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
-
                             <div style="font-weight:700;color:#f4f4f5;font-size:0.75rem;">${priceStr}</div>
-
                             <div style="font-size:0.65rem;font-weight:700;color:${ret30Col};">${ret30Str}</div>
-
                         </td>
-
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
-
+                            <div style="display:flex;align-items:center;">
+                                <span style="font-weight:700;color:${retSigCol};font-size:0.75rem;">${retSigStr}</span>
+                                ${newBadgeHtml}
+                            </div>
+                            <div style="font-size:0.62rem;color:#71717a;" title="Signal Date: ${sigDate} @ ${sigPrice}">
+                                ${sigDate} @ ${sigPrice}
+                            </div>
+                        </td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
+                            <div style="font-weight:700;color:${epsCol};font-size:0.75rem;">${epsIcon}${epsYoYStr}</div>
+                            <div style="font-size:0.62rem;color:#71717a;">${epsSub}</div>
+                        </td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
                             <div style="font-weight:800;color:#10b981;font-size:0.78rem;">+₹${smCr} Cr</div>
-
                             <div style="font-size:0.62rem;color:#71717a;">${s.smart_money_buyers_count || 0} Whales</div>
-
                         </td>
-
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
-
                             <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.72rem;font-weight:700;color:#38bdf8;margin-bottom:0.15rem;">
-
                                 <span>${domPct}%</span>
-
                             </div>
-
                             <div style="width:65px;height:4px;background:#27272a;border-radius:2px;overflow:hidden;">
-
                                 <div style="width:${domBarWidth}%;height:100%;background:${s.classification_category === 'domestic_absorption' ? '#f59e0b' : '#38bdf8'};border-radius:2px;"></div>
-
                             </div>
-
                         </td>
-
                         <td style="padding:0.45rem 0.5rem;">
-
                             ${whalesHtml}
-
                         </td>
-
                         <td style="padding:0.45rem 0.5rem;">
-
                             <span class="badge" style="background:${sigBg};color:${sigCol};border:1px solid ${sigBorder};font-size:0.62rem;padding:0.12rem 0.35rem;white-space:nowrap;font-weight:600;">
-
                                 ${s.accumulation_signal_badge || 'Accumulation'}
-
                             </span>
-
                         </td>
-
                         <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">
-
                             <div style="font-weight:800;color:${scoreCol};font-size:0.8rem;">${score}</div>
-
                             <div style="font-size:0.6rem;color:#71717a;">/ 100</div>
-
                         </td>
-
                         <td style="padding:0.45rem 0.4rem;text-align:center;">
-
                             <a href="/stock/${encodeURIComponent(s.ticker)}" target="_blank" onclick="event.stopPropagation();" title="Open Ticker Intel" class="btn btn-sm" style="background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.15);padding:0.15rem 0.35rem;font-size:0.65rem;border-radius:4px;text-decoration:none;">
-
                                 ↗
-
                             </a>
-
                         </td>
-
                     </tr>
-
                 `;
 
             }).join('');
@@ -2740,7 +2766,100 @@
 
             if (mcVal) mcVal.textContent = stock.market_cap_cr ? `₹${Number(stock.market_cap_cr).toLocaleString(undefined, {maximumFractionDigits:0})} Cr` : '—';
 
+            // Populate Signal Tracking & Historical Entry Ledger Card
+            const newEntrantBadge = document.getElementById('instSmNewEntrantBadge');
+            const sigDateVal = document.getElementById('instSmSignalDateVal');
+            const daysOnRadarVal = document.getElementById('instSmDaysOnRadarVal');
+            const sigPriceVal = document.getElementById('instSmSignalPriceVal');
+            const retSigVal = document.getElementById('instSmReturnSinceSignalVal');
+            const peakGainVal = document.getElementById('instSmPeakGainVal');
 
+            if (newEntrantBadge) {
+                if (stock.is_new_entrant) {
+                    newEntrantBadge.textContent = '🆕 New Entrant (≤14d)';
+                    newEntrantBadge.style.background = 'rgba(16,185,129,0.18)';
+                    newEntrantBadge.style.color = '#34d399';
+                    newEntrantBadge.style.borderColor = 'rgba(16,185,129,0.4)';
+                } else {
+                    newEntrantBadge.textContent = 'Veteran Signal';
+                    newEntrantBadge.style.background = '#18181b';
+                    newEntrantBadge.style.color = '#a1a1aa';
+                    newEntrantBadge.style.borderColor = 'rgba(255,255,255,0.15)';
+                }
+            }
+            if (sigDateVal) sigDateVal.textContent = stock.signal_date || '—';
+            if (daysOnRadarVal) daysOnRadarVal.textContent = stock.days_on_radar != null ? `${stock.days_on_radar} days on radar` : '-- days on radar';
+            if (sigPriceVal) sigPriceVal.textContent = stock.signal_price != null ? `₹${Number(stock.signal_price).toFixed(2)}` : '₹--';
+            if (retSigVal) {
+                const r = stock.return_since_signal_pct != null ? stock.return_since_signal_pct : 0;
+                retSigVal.textContent = stock.return_since_signal_pct != null ? `${r >= 0 ? '+' : ''}${r.toFixed(1)}%` : '--';
+                retSigVal.style.color = r >= 0 ? '#34d399' : '#f87171';
+            }
+            if (peakGainVal) {
+                const maxG = stock.max_gain_pct != null ? stock.max_gain_pct : (stock.return_since_signal_pct != null ? stock.return_since_signal_pct : 0);
+                const peakP = stock.peak_price != null ? stock.peak_price : stock.current_price;
+                peakGainVal.textContent = peakP != null ? `Peak: +${Number(maxG).toFixed(1)}% (₹${Number(peakP).toFixed(1)})` : 'Peak: --';
+            }
+
+            // Populate Emerging Fundamentals & EPS Growth Card
+            const emergingBadge = document.getElementById('instSmEmergingBadge');
+            const epsYoYVal = document.getElementById('instSmEpsYoYVal');
+            const epsActualVal = document.getElementById('instSmEpsActualVal');
+            const peVal = document.getElementById('instSmPeVal');
+            const beatStreakVal = document.getElementById('instSmBeatStreakVal');
+            const emergingSummary = document.getElementById('instSmEmergingSummaryText');
+
+            if (emergingBadge) {
+                if (stock.is_emerging && stock.has_good_eps) {
+                    emergingBadge.textContent = '🌟 Emerging EPS Rocket';
+                    emergingBadge.style.background = 'rgba(245,158,11,0.18)';
+                    emergingBadge.style.color = '#fbbf24';
+                    emergingBadge.style.borderColor = 'rgba(245,158,11,0.45)';
+                } else if (stock.is_emerging) {
+                    emergingBadge.textContent = '🌱 Small/Micro Cap';
+                    emergingBadge.style.background = 'rgba(56,189,248,0.15)';
+                    emergingBadge.style.color = '#38bdf8';
+                    emergingBadge.style.borderColor = 'rgba(56,189,248,0.35)';
+                } else {
+                    emergingBadge.textContent = stock.cap_category || 'Mid/Large Cap';
+                    emergingBadge.style.background = '#18181b';
+                    emergingBadge.style.color = '#a1a1aa';
+                    emergingBadge.style.borderColor = 'rgba(255,255,255,0.15)';
+                }
+            }
+
+            if (epsYoYVal) {
+                const y = stock.eps_growth_yoy;
+                epsYoYVal.textContent = y != null ? `${y >= 0 ? '+' : ''}${y.toFixed(1)}%` : 'N/A';
+                if (y != null && y >= 20) epsYoYVal.style.color = '#34d399';
+                else if (y != null && y > 0) epsYoYVal.style.color = '#38bdf8';
+                else if (y != null && y < 0) epsYoYVal.style.color = '#f87171';
+                else epsYoYVal.style.color = '#a1a1aa';
+            }
+
+            if (epsActualVal) {
+                epsActualVal.textContent = stock.eps_actual != null ? `Latest EPS: ₹${Number(stock.eps_actual).toFixed(2)}` : 'Latest EPS: —';
+            }
+            if (peVal) {
+                peVal.textContent = stock.pe_ratio != null ? `${Number(stock.pe_ratio).toFixed(1)}x` : '—';
+            }
+            if (beatStreakVal) {
+                beatStreakVal.textContent = stock.beat_streak != null ? `${stock.beat_streak}Q Consecutive` : '—';
+            }
+            if (emergingSummary) {
+                const capStr = stock.market_cap_cr ? `₹${Number(stock.market_cap_cr).toLocaleString(undefined, {maximumFractionDigits:0})} Cr` : 'N/A';
+                const isEmerg = stock.is_emerging;
+                const hasGood = stock.has_good_eps;
+                if (isEmerg && hasGood) {
+                    emergingSummary.innerHTML = `<span style="color:#fbbf24;font-weight:700;">🌟 High-Conviction Emerging Growth:</span> Small/Micro Cap (${capStr}) experiencing smart money accumulation with robust +${Number(stock.eps_growth_yoy).toFixed(1)}% YoY EPS expansion.`;
+                } else if (isEmerg) {
+                    emergingSummary.innerHTML = `<span style="color:#38bdf8;font-weight:700;">🌱 Emerging Equities:</span> Small/Micro Cap (${capStr}) institutional accumulation target. Watch upcoming quarterly earnings for fundamental confirmation.`;
+                } else if (hasGood) {
+                    emergingSummary.innerHTML = `<span style="color:#34d399;font-weight:700;">🚀 Strong EPS Growth:</span> Delivering +${Number(stock.eps_growth_yoy).toFixed(1)}% YoY EPS expansion across ${stock.cap_category || 'established'} scale (${capStr}).`;
+                } else {
+                    emergingSummary.innerHTML = `Standard institutional accumulation profile across ${stock.cap_category || 'equity'} tier (${capStr}).`;
+                }
+            }
 
             // Update Inflow Decomposition & Dominance
 
@@ -2957,11 +3076,395 @@
 
                     `;
                     }).join('');
-
                 }
+            }
+        },
 
+        // =========================================================================
+        // 🛡️ Institutional Data Integrity & Verification Subsystem
+        // =========================================================================
+        institutionalIntegrityData: null,
+
+        async loadInstitutionalIntegrityStatus() {
+            try {
+                const res = await fetch(API_BASE + '/api/v1/institutional/integrity');
+                if (!res.ok) return;
+                const data = await res.json();
+                this.institutionalIntegrityData = data;
+                this.renderInstitutionalIntegrityBadge(data);
+                this.renderInstitutionalIntegrityModal(data);
+            } catch (err) {
+                console.warn('[INSTITUTIONAL:INTEGRITY] Failed to fetch integrity status:', err);
+            }
+        },
+
+        renderInstitutionalIntegrityBadge(data) {
+            const badgeBtn = document.getElementById('btnInstIntegrityModal');
+            const badgeText = document.getElementById('instIntegrityBadgeText');
+            const icon = document.getElementById('instIntegrityIcon');
+            if (!badgeBtn || !badgeText) return;
+
+            const score = data.health_score != null ? data.health_score : 100;
+
+            if (score >= 95) {
+                badgeBtn.style.borderColor = 'rgba(16,185,129,0.35)';
+                badgeBtn.style.color = '#10b981';
+                if (icon) icon.textContent = '🛡️';
+                badgeText.textContent = `Data Integrity: Optimal (${score}%)`;
+            } else if (score >= 80) {
+                badgeBtn.style.borderColor = 'rgba(245,158,11,0.35)';
+                badgeBtn.style.color = '#f59e0b';
+                if (icon) icon.textContent = '⚠️';
+                badgeText.textContent = `Data Integrity: Warnings (${score}%)`;
+            } else {
+                badgeBtn.style.borderColor = 'rgba(239,68,68,0.35)';
+                badgeBtn.style.color = '#ef4444';
+                if (icon) icon.textContent = '🚨';
+                badgeText.textContent = `Data Integrity: Degraded (${score}%)`;
+            }
+        },
+
+        openInstitutionalIntegrityModal() {
+            const modal = document.getElementById('instIntegrityModal');
+            if (modal) {
+                modal.style.display = 'flex';
+                this.loadInstitutionalIntegrityStatus();
+            }
+        },
+
+        closeInstitutionalIntegrityModal() {
+            const modal = document.getElementById('instIntegrityModal');
+            if (modal) modal.style.display = 'none';
+        },
+
+        switchIntegrityModalTab(tab) {
+            const tabs = ['findings', 'provenance', 'stock'];
+            tabs.forEach(t => {
+                const btn = document.getElementById('btnInstModalTab-' + t);
+                const view = document.getElementById('instModalView-' + t);
+                const isActive = (t === tab);
+                if (view) view.style.display = isActive ? 'block' : 'none';
+                if (btn) {
+                    if (isActive) {
+                        btn.style.background = '#18181b';
+                        btn.style.color = '#38bdf8';
+                        btn.style.borderColor = 'rgba(56,189,248,0.4)';
+                        btn.style.fontWeight = '700';
+                    } else {
+                        btn.style.background = 'transparent';
+                        btn.style.color = '#94a3b8';
+                        btn.style.borderColor = 'transparent';
+                        btn.style.fontWeight = '500';
+                    }
+                }
+            });
+
+            const searchBox = document.getElementById('instModalStockSearchBox');
+            if (searchBox) {
+                searchBox.style.display = (tab === 'stock') ? 'flex' : 'none';
+            }
+        },
+
+        renderInstitutionalIntegrityModal(data) {
+            if (!data) return;
+
+            // KPI 1: Health Score
+            const kpiScore = document.getElementById('instKpiHealthScore');
+            const kpiScoreLbl = document.getElementById('instKpiHealthLabel');
+            const statusBadge = document.getElementById('instModalHealthStatusBadge');
+            const score = data.health_score != null ? data.health_score : 100;
+            const status = data.status || 'OPTIMAL';
+
+            if (kpiScore) {
+                kpiScore.textContent = `${score}%`;
+                kpiScore.style.color = score >= 95 ? '#10b981' : (score >= 80 ? '#f59e0b' : '#ef4444');
+            }
+            if (kpiScoreLbl) {
+                kpiScoreLbl.textContent = score >= 95 ? 'Zero Faults' : `${status} status`;
+                kpiScoreLbl.style.color = score >= 95 ? '#34d399' : (score >= 80 ? '#fbbf24' : '#f87171');
+            }
+            if (statusBadge) {
+                statusBadge.textContent = `SYSTEM: ${status} (${score}%)`;
+                statusBadge.style.color = score >= 95 ? '#10b981' : (score >= 80 ? '#f59e0b' : '#ef4444');
+                statusBadge.style.borderColor = score >= 95 ? 'rgba(16,185,129,0.4)' : (score >= 80 ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)');
             }
 
+            // KPI 2: Total Audited Records
+            const kpiAudited = document.getElementById('instKpiAuditedCount');
+            if (kpiAudited) {
+                kpiAudited.textContent = Number(data.total_audited_records || 0).toLocaleString();
+            }
+
+            // KPI 3: Quarantined
+            const kpiQuarantined = document.getElementById('instKpiQuarantinedCount');
+            if (kpiQuarantined) {
+                kpiQuarantined.textContent = Number(data.quarantined_records || 0).toLocaleString();
+            }
+
+            // KPI 4: Warnings
+            const kpiWarnings = document.getElementById('instKpiWarningsCount');
+            if (kpiWarnings) {
+                const totalWarn = (data.open_issues_count || 0) + (data.anomalies_detected || 0);
+                kpiWarnings.textContent = totalWarn.toString();
+            }
+
+            // Cadence Statuses
+            const cadences = data.cadences || {};
+
+            // Daily Cadence
+            const daily = cadences.daily_fii_dii || {};
+            const dailyBadge = document.getElementById('instCadenceBadgeDaily');
+            const dailyDetails = document.getElementById('instCadenceDetailsDaily');
+            const dailyDate = document.getElementById('instCadenceDateDaily');
+            if (dailyBadge) {
+                dailyBadge.textContent = daily.status || 'HEALTHY';
+                dailyBadge.style.color = (daily.status === 'HEALTHY' || daily.status === 'PASS') ? '#10b981' : '#f59e0b';
+            }
+            if (dailyDetails) {
+                dailyDetails.textContent = daily.message || (daily.missing_trading_days && daily.missing_trading_days.length ? `Missing dates: ${daily.missing_trading_days.join(', ')}` : 'All recent trading sessions verified.');
+            }
+            if (dailyDate) {
+                dailyDate.textContent = daily.latest_trading_date_on_record || '--';
+            }
+
+            // Monthly Cadence
+            const monthly = cadences.monthly_amfi_portfolios || {};
+            const monthlyBadge = document.getElementById('instCadenceBadgeMonthly');
+            const monthlyDetails = document.getElementById('instCadenceDetailsMonthly');
+            const monthlyDate = document.getElementById('instCadenceDateMonthly');
+            if (monthlyBadge) {
+                monthlyBadge.textContent = monthly.status || 'HEALTHY';
+                monthlyBadge.style.color = (monthly.status === 'HEALTHY' || monthly.status === 'PASS') ? '#10b981' : '#f59e0b';
+            }
+            if (monthlyDetails) {
+                monthlyDetails.textContent = monthly.message || `Disclosures fresh within ${monthly.days_since_latest || 0} days.`;
+            }
+            if (monthlyDate) {
+                monthlyDate.textContent = monthly.latest_portfolio_date || '--';
+            }
+
+            // Quarterly Cadence
+            const quarterly = cadences.quarterly_nse_shareholding || {};
+            const quarterlyBadge = document.getElementById('instCadenceBadgeQuarterly');
+            const quarterlyDetails = document.getElementById('instCadenceDetailsQuarterly');
+            const quarterlyTarget = document.getElementById('instCadenceQuarterTarget');
+            const quarterlyDeadline = document.getElementById('instCadenceDeadline');
+            if (quarterlyBadge) {
+                quarterlyBadge.textContent = quarterly.status || 'HEALTHY';
+                quarterlyBadge.style.color = (quarterly.status === 'HEALTHY' || quarterly.status === 'PASS') ? '#10b981' : '#f59e0b';
+            }
+            if (quarterlyDetails) {
+                quarterlyDetails.textContent = quarterly.is_filing_season ? 'Active SEBI Reg 31 filing season underway.' : 'Statutory filing season closed.';
+            }
+            if (quarterlyTarget) {
+                quarterlyTarget.textContent = quarterly.current_filing_quarter || '--';
+            }
+            if (quarterlyDeadline) {
+                quarterlyDeadline.textContent = quarterly.statutory_deadline || '--';
+            }
+
+            // Render Findings Table
+            this.renderIntegrityFindingsTable(data.recent_findings || []);
+
+            // Render Provenance Table
+            this.renderIntegrityProvenanceTable(data.provenance_ledger || []);
+        },
+
+        renderIntegrityFindingsTable(findings) {
+            const tbody = document.getElementById('instModalFindingsTableBody');
+            if (!tbody) return;
+
+            if (!findings || !findings.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="padding:2rem;text-align:center;color:#10b981;font-weight:600;">✓ Zero invariant violations or integrity warnings found. All checks passed.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = findings.map(f => {
+                let sevBg = 'rgba(16,185,129,0.15)';
+                let sevCol = '#10b981';
+                if (f.severity === 'WARNING') {
+                    sevBg = 'rgba(245,158,11,0.15)';
+                    sevCol = '#f59e0b';
+                } else if (f.severity === 'CRITICAL_ERROR' || f.severity === 'ERROR') {
+                    sevBg = 'rgba(239,68,68,0.15)';
+                    sevCol = '#ef4444';
+                } else if (f.severity === 'INFO') {
+                    sevBg = 'rgba(56,189,248,0.15)';
+                    sevCol = '#38bdf8';
+                }
+
+                const ticker = f.ticker ? `<span style="font-weight:700;color:#ffffff;cursor:pointer;" onclick="app.inspectStockIntegrity('${f.ticker}')">${f.ticker.replace('.NS','')}</span>` : '<span style="color:#71717a;">SYSTEM</span>';
+                const period = f.period_or_date || '—';
+                const details = f.details || f.message || JSON.stringify(f.details_json || {});
+
+                return `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                        <td style="padding:0.45rem 0.65rem;font-family:var(--font-mono);color:#94a3b8;font-size:0.68rem;">${f.check_category}</td>
+                        <td style="padding:0.45rem 0.5rem;font-weight:700;color:#f8fafc;">${f.check_name}</td>
+                        <td style="padding:0.45rem 0.5rem;">
+                            <span class="badge" style="background:${sevBg};color:${sevCol};border:1px solid ${sevCol}40;font-size:0.62rem;padding:0.1rem 0.35rem;font-weight:700;">${f.severity}</span>
+                        </td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);">${ticker}</td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#d4d4d8;">${period}</td>
+                        <td style="padding:0.45rem 0.65rem;color:#cbd5e1;font-size:0.7rem;line-height:1.35;">${details}</td>
+                    </tr>
+                `;
+            }).join('');
+        },
+
+        renderIntegrityProvenanceTable(records) {
+            const tbody = document.getElementById('instModalProvenanceTableBody');
+            if (!tbody) return;
+
+            if (!records || !records.length) {
+                tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:#71717a;">No cryptographic provenance entries logged yet. Provenance hashes are recorded on real-source ingestion.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = records.map(r => {
+                const shortHash = (r.response_hash || '').substring(0, 16) + '...';
+                const shortUrl = (r.source_url || '').length > 35 ? (r.source_url.substring(0, 32) + '...') : (r.source_url || '—');
+                const sizeStr = r.payload_size_bytes ? `${(r.payload_size_bytes / 1024).toFixed(1)} KB` : '—';
+                const timeStr = r.ingested_at ? r.ingested_at.substring(0, 19).replace('T', ' ') : '—';
+                const statusCol = r.status === 'AUTHENTIC' ? '#10b981' : (r.status === 'VERIFIED' ? '#38bdf8' : '#f59e0b');
+
+                return `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                        <td style="padding:0.45rem 0.65rem;font-weight:700;color:#ffffff;font-size:0.68rem;">${r.source_name}</td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#f4f4f5;font-size:0.7rem;">${r.entity_key}</td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#38bdf8;font-size:0.65rem;" title="${r.response_hash}">${shortHash}</td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#71717a;font-size:0.65rem;" title="${r.source_url}">${shortUrl}</td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#a1a1aa;font-size:0.68rem;">${sizeStr}</td>
+                        <td style="padding:0.45rem 0.5rem;font-family:var(--font-mono);color:#94a3b8;font-size:0.65rem;">${timeStr}</td>
+                        <td style="padding:0.45rem 0.5rem;">
+                            <span class="badge" style="background:${statusCol}20;color:${statusCol};border:1px solid ${statusCol}50;font-size:0.6rem;padding:0.1rem 0.35rem;font-weight:700;">${r.status}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        },
+
+        async inspectStockIntegrity(tickerInput) {
+            const ticker = (tickerInput || '').trim().toUpperCase();
+            if (!ticker) return;
+
+            this.switchIntegrityModalTab('stock');
+            const searchInput = document.getElementById('instModalStockSearchInput');
+            if (searchInput) searchInput.value = ticker;
+
+            const container = document.getElementById('instModalStockAuditContainer');
+            if (!container) return;
+
+            container.innerHTML = '<div style="text-align:center;padding:2.5rem;color:#38bdf8;font-size:0.8rem;">Running cryptographic provenance inspection and pre-commit invariant audit for <b>' + ticker + '</b>...</div>';
+
+            try {
+                const res = await fetch(API_BASE + `/api/v1/institutional/integrity/${encodeURIComponent(ticker)}`);
+                if (!res.ok) {
+                    container.innerHTML = `<div style="text-align:center;padding:2rem;color:#ef4444;font-size:0.8rem;">Failed to fetch audit data for ${ticker}: HTTP ${res.status}</div>`;
+                    return;
+                }
+                const data = await res.json();
+                this.renderStockIntegrityInspector(data, container);
+            } catch (err) {
+                container.innerHTML = `<div style="text-align:center;padding:2rem;color:#ef4444;font-size:0.8rem;">Inspection error: ${err.message}</div>`;
+            }
+        },
+
+        renderStockIntegrityInspector(data, container) {
+            const sh = data.latest_shareholding || {};
+            const inv = data.invariant_verification || {};
+            const prov = data.provenance_records || [];
+            const findings = data.audit_findings || [];
+            const score = data.health_score != null ? data.health_score : 100;
+            const scoreCol = score >= 95 ? '#10b981' : (score >= 80 ? '#f59e0b' : '#ef4444');
+
+            container.innerHTML = `
+                <div style="display:flex;flex-direction:column;gap:1rem;">
+                    <!-- Stock Summary Banner -->
+                    <div class="card" style="padding:1rem;background:#121215;border:1px solid rgba(255,255,255,0.12);border-radius:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:0.5rem;">
+                                <span style="font-size:1.2rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">${data.ticker}</span>
+                                <span class="badge" style="background:${scoreCol}20;color:${scoreCol};border:1px solid ${scoreCol}50;font-size:0.7rem;padding:0.15rem 0.5rem;font-weight:700;">
+                                    INTEGRITY SCORE: ${score}% (${data.status})
+                                </span>
+                            </div>
+                            <div style="font-size:0.72rem;color:#a1a1aa;margin-top:0.2rem;">
+                                Latest Quarter on Record: <b style="color:#ffffff;">${sh.quarter || 'N/A'}</b> · Total Invariant Checks Passed: <b style="color:${inv.valid_invariants ? '#10b981' : '#ef4444'};">${inv.valid_invariants ? 'YES' : 'NO'}</b>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:1.5rem;font-family:var(--font-mono);font-size:0.72rem;text-align:right;">
+                            <div><span style="color:#71717a;">Promoter:</span> <b style="color:#ffffff;">${sh.promoter_pct || 0}%</b></div>
+                            <div><span style="color:#71717a;">FII:</span> <b style="color:#ffffff;">${sh.fii_pct || 0}%</b></div>
+                            <div><span style="color:#71717a;">DII:</span> <b style="color:#ffffff;">${sh.dii_mf_pct || 0}%</b></div>
+                            <div><span style="color:#71717a;">Public:</span> <b style="color:#ffffff;">${sh.public_retail_pct || 0}%</b></div>
+                            <div><span style="color:#71717a;">Sum:</span> <b style="color:${inv.valid_invariants ? '#10b981' : '#ef4444'};">${inv.sum_pct != null ? inv.sum_pct.toFixed(2) : '--'}%</b></div>
+                        </div>
+                    </div>
+
+                    <!-- Provenance Ledger for Stock -->
+                    <div class="card" style="padding:0.85rem;background:#121215;border:1px solid rgba(255,255,255,0.1);border-radius:8px;">
+                        <div style="font-size:0.78rem;font-weight:700;color:#ffffff;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.4rem;">
+                            <span>🔐 Cryptographic Provenance Chain for ${data.ticker}</span>
+                            <span class="badge" style="background:#18181b;color:#38bdf8;font-size:0.65rem;">${prov.length} hashes</span>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;font-size:0.7rem;text-align:left;">
+                                <thead style="background:#18181b;color:#a1a1aa;font-family:var(--font-mono);">
+                                    <tr>
+                                        <th style="padding:0.4rem 0.5rem;">SOURCE</th>
+                                        <th style="padding:0.4rem 0.5rem;">ENTITY KEY</th>
+                                        <th style="padding:0.4rem 0.5rem;">SHA-256 HASH</th>
+                                        <th style="padding:0.4rem 0.5rem;">ENDPOINT</th>
+                                        <th style="padding:0.4rem 0.5rem;">INGESTED AT</th>
+                                        <th style="padding:0.4rem 0.5rem;">STATUS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${!prov.length ? '<tr><td colspan="6" style="padding:1.5rem;text-align:center;color:#71717a;">No cryptographic provenance records found for this ticker.</td></tr>' :
+                                    prov.map(p => `
+                                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding:0.35rem 0.5rem;color:#ffffff;font-weight:700;">${p.source_name}</td>
+                                            <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);">${p.entity_key}</td>
+                                            <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);color:#38bdf8;" title="${p.response_hash}">${(p.response_hash || '').substring(0, 18)}...</td>
+                                            <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);color:#71717a;">${p.source_url || '—'}</td>
+                                            <td style="padding:0.35rem 0.5rem;font-family:var(--font-mono);color:#94a3b8;">${(p.ingested_at || '').substring(0, 19).replace('T', ' ')}</td>
+                                            <td style="padding:0.35rem 0.5rem;"><span class="badge" style="background:#10b98120;color:#10b981;font-size:0.6rem;padding:0.1rem 0.35rem;">${p.status}</span></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        },
+
+        async triggerIntegrityVerifyAndRepair() {
+            const btn = document.getElementById('btnInstTriggerAudit');
+            const spinner = document.getElementById('instAuditBtnSpinner');
+            const text = document.getElementById('instAuditBtnText');
+
+            if (btn) btn.disabled = true;
+            if (spinner) spinner.style.display = 'inline-block';
+            if (text) text.textContent = 'Auditing & Auto-Repairing...';
+
+            try {
+                const res = await fetch(API_BASE + '/api/v1/institutional/verify-and-repair', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ repair: true })
+                });
+                if (res.ok) {
+                    await this.loadInstitutionalIntegrityStatus();
+                }
+            } catch (err) {
+                console.error('[INSTITUTIONAL:INTEGRITY] Auto-repair failed:', err);
+            } finally {
+                if (btn) btn.disabled = false;
+                if (spinner) spinner.style.display = 'none';
+                if (text) text.textContent = '⚡ Run Audit & Auto-Repair';
+            }
         },
 
     });

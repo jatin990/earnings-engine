@@ -63,6 +63,7 @@ class SchedulerEngine:
         self._job_handlers["breakout_hot_rescore"] = self._handle_breakout_hot
         self._job_handlers["breakout_warm_rescore"] = self._handle_breakout_warm
         self._job_handlers["breakout_cold_scan"] = self._handle_breakout_cold
+        self._job_handlers["breakout_hourly_digest"] = self._handle_breakout_hourly_digest
         self._job_handlers["swing_hot_rescore"] = self._handle_swing_hot
         self._job_handlers["swing_warm_rescore"] = self._handle_swing_warm
         self._job_handlers["swing_cold_scan"] = self._handle_swing_cold
@@ -163,6 +164,19 @@ class SchedulerEngine:
             return self._handle_breakout_all_parallel(settings, params)
         breakout_scanner_mod.run_cold_scan(settings, universe=universe, min_score=min_score, strategy=strategy)
         return f"Breakout scan ({strategy}) completed for {universe} (min score: {min_score})."
+
+    def _handle_breakout_hourly_digest(self, settings: Settings, params: dict[str, Any]) -> str:
+        from earnings_engine.emailing import send_hourly_breakout_digest_email
+        hours_lookback = float(params.get("hours_lookback", 1.0))
+        sync = bool(params.get("sync", False))
+        dispatched = send_hourly_breakout_digest_email(
+            hours_lookback=hours_lookback,
+            app_settings=settings,
+            sync=sync,
+        )
+        if dispatched:
+            return f"Hourly breakout digest email compiled and dispatched (lookback: {hours_lookback}h)."
+        return f"Hourly breakout digest checked (lookback: {hours_lookback}h) - no new transitions or email disabled."
 
     def _handle_swing_hot(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data import swing_scanner as swing_scanner_mod
