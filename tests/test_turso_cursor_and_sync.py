@@ -120,8 +120,8 @@ def test_automation_schedules_init_and_fetch_performance(tmp_path):
 
 def test_sync_tables_and_watermark_configuration():
     """Verify SYNC_TABLES contains all registered tables and watermarks correctly prioritize."""
-    assert len(SYNC_TABLES) == 68
-    assert len(set(SYNC_TABLES)) == 68  # No duplicate table names
+    assert len(SYNC_TABLES) == 71
+    assert len(set(SYNC_TABLES)) == 71  # No duplicate table names
 
     # Essential missing tables now confirmed in list
     assert "automation_schedules" in SYNC_TABLES
@@ -143,11 +143,16 @@ def test_sync_tables_and_watermark_configuration():
     assert "nse_shareholding_freshness" in SYNC_TABLES
     assert "earnings_fetch_log" in SYNC_TABLES
     assert "earnings_month_cache" in SYNC_TABLES
+    assert "data_provenance_meta" in SYNC_TABLES
+    assert "institutional_audit_log" in SYNC_TABLES
+    assert "institutional_quarantine" in SYNC_TABLES
 
     # Test watermark selection priority
     assert _get_watermark_column(["id", "name", "updated_at", "created_at"]) == "updated_at"
     assert _get_watermark_column(["id", "ticker", "scanned_at"]) == "scanned_at"
     assert _get_watermark_column(["id", "deal_date", "client_name"]) == "deal_date"
+    assert _get_watermark_column(["id", "audit_timestamp", "details"]) == "audit_timestamp"
+    assert _get_watermark_column(["id", "quarantined_at", "rejection_reason"]) == "quarantined_at"
     assert _get_watermark_column(["id", "non_timestamp"]) is None
 
     # Test DATE_ONLY_COLUMNS detection

@@ -86,6 +86,10 @@ SYNC_TABLES = [
     "universe_freshness",
     "earnings_fetch_log",
     "earnings_month_cache",
+    # Institutional Intelligence Integrity, Provenance & Quarantine
+    "data_provenance_meta",
+    "institutional_audit_log",
+    "institutional_quarantine",
     # Personal Finance & Lifestyle
     "trips",
     "trip_activities",
@@ -151,6 +155,8 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "detected_at",
     "fetched_at",
     "audited_at",
+    "audit_timestamp",
+    "quarantined_at",
     "calculated_at",
     "started_at",
     "run_at",

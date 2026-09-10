@@ -41,6 +41,9 @@ class ProvenanceRecord:
     is_authentic: bool = True
     quarantine_reason: str | None = None
 
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
 
 @dataclass
 class AuditFinding:
@@ -55,6 +58,9 @@ class AuditFinding:
     deviation_pct: float | None = None
     details: str | None = None
     details_json: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass

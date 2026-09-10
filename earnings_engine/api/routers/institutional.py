@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from earnings_engine.api.dependencies import _settings
 from earnings_engine.data import institutional_accumulation as inst_mod
@@ -13,6 +15,240 @@ from earnings_engine.logging_utils import get_logger
 logger = get_logger("earnings_engine.api.routers.institutional")
 
 router = APIRouter(tags=["Institutional Accumulation & Funds"])
+
+
+class InstitutionalVerifyRequest(BaseModel):
+    scope: str = "ALL"
+    ticker: str | None = None
+    purge_synthetic: bool = False
+    auto_repair: bool = False
+
+
+@router.get("/api/v1/institutional/integrity")
+async def get_institutional_integrity_health(
+    scope: str = Query("ALL", description="Audit scope: 'ALL', 'FRESHNESS', 'MATHEMATICAL', 'PROVENANCE', 'ANOMALY'"),
+    include_findings: bool = Query(True, description="Include recent audit findings"),
+    limit: int = Query(25, ge=1, le=100, description="Max recent findings to return"),
+):
+    """Retrieve system-wide institutional data health score, cadence freshness statuses, and audit ledger telemetry."""
+    try:
+        def _get_summary() -> dict[str, Any]:
+            from earnings_engine.data.institutional_verifier import InstitutionalVerifier
+            verifier = InstitutionalVerifier(_settings)
+            summary = verifier.get_integrity_status_summary()
+
+            conn = verifier._get_connection()
+            q_row = conn.execute("SELECT COUNT(*) FROM institutional_quarantine").fetchone()
+            summary["quarantined_records_count"] = q_row[0] if q_row else 0
+
+            if include_findings:
+                findings_rows = conn.execute(
+                    """
+                    SELECT id, audit_run_id, audit_timestamp, audit_scope, ticker,
+                           check_category, check_name, severity, status,
+                           expected_value, actual_value, deviation_pct, details
+                    FROM institutional_audit_log
+                    ORDER BY id DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+                summary["recent_findings"] = [
+                    {
+                        "id": r[0],
+                        "audit_run_id": r[1],
+                        "audit_timestamp": r[2],
+                        "audit_scope": r[3],
+                        "ticker": r[4],
+                        "check_category": r[5],
+                        "check_name": r[6],
+                        "severity": r[7],
+                        "status": r[8],
+                        "expected_value": r[9],
+                        "actual_value": r[10],
+                        "deviation_pct": r[11],
+                        "details": r[12],
+                    }
+                    for r in findings_rows
+                ]
+            return summary
+
+        data = await asyncio.to_thread(_get_summary)
+        return {"success": True, **data}
+    except Exception as e:
+        logger.exception("Error in get_institutional_integrity_health: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve integrity health: {str(e)}")
+
+
+@router.post("/api/v1/institutional/verify-and-repair")
+async def trigger_institutional_verify_and_repair(
+    request: InstitutionalVerifyRequest | None = None,
+    scope: str | None = Query(None),
+    ticker: str | None = Query(None),
+    purge_synthetic: bool | None = Query(None),
+    auto_repair: bool | None = Query(None),
+):
+    """Trigger on-demand institutional verification, invariant audit, and auto-repair/quarantine."""
+    req = request or InstitutionalVerifyRequest()
+    req_scope = scope or req.scope
+    req_ticker = ticker or req.ticker
+    req_purge = purge_synthetic if purge_synthetic is not None else req.purge_synthetic
+    req_repair = auto_repair if auto_repair is not None else req.auto_repair
+
+    try:
+        def _run_audit() -> dict[str, Any]:
+            from earnings_engine.data.institutional_verifier import InstitutionalVerifier
+            verifier = InstitutionalVerifier(_settings)
+            tickers = [req_ticker] if req_ticker else None
+            report = verifier.run_comprehensive_audit(
+                tickers=tickers,
+                scope=req_scope,
+                purge_synthetic=req_purge,
+                auto_repair=req_repair,
+                persist_log=True,
+            )
+            return report.to_dict()
+
+        result = await asyncio.to_thread(_run_audit)
+        return {"success": True, "report": result}
+    except Exception as e:
+        logger.exception("Error in trigger_institutional_verify_and_repair: %s", e)
+        raise HTTPException(status_code=500, detail=f"Institutional verify & repair failed: {str(e)}")
+
+
+@router.get("/api/v1/institutional/integrity/{ticker:path}")
+async def get_stock_institutional_integrity(ticker: str):
+    """Retrieve stock-specific data provenance, audit trail, cryptographic payload hashes, and mathematical checks."""
+    try:
+        def _get_ticker_integrity() -> dict[str, Any]:
+            from earnings_engine.data.institutional_verifier import InstitutionalVerifier, MathematicalInvariantChecker
+            verifier = InstitutionalVerifier(_settings)
+            trail = verifier.get_ticker_provenance_trail(ticker)
+
+            conn = verifier._get_connection()
+            sym = ticker if ticker.endswith(".NS") else f"{ticker}.NS"
+            base_sym = ticker.replace(".NS", "")
+
+            # Fetch latest shareholding pattern for mathematical validation
+            shp_row = conn.execute(
+                """
+                SELECT quarter, promoter_pct, fii_pct, dii_mf_pct, public_retail_pct, other_pct, updated_at
+                FROM shareholding_patterns
+                WHERE ticker = ? OR ticker = ?
+                ORDER BY quarter DESC
+                LIMIT 1
+                """,
+                (sym, base_sym),
+            ).fetchone()
+
+            shp_math_findings = []
+            shp_info = None
+            if shp_row:
+                q, p_pct, f_pct, d_pct, pub_pct, oth_pct, upd_at = shp_row
+                shp_info = {
+                    "quarter": q,
+                    "promoter_pct": float(p_pct or 0.0),
+                    "fii_pct": float(f_pct or 0.0),
+                    "dii_pct": float(d_pct or 0.0),
+                    "public_pct": float(pub_pct or 0.0),
+                    "others_pct": float(oth_pct or 0.0),
+                    "pledged_pct": 0.0,
+                    "updated_at": upd_at,
+                    "sum_pct": round(
+                        float(p_pct or 0.0)
+                        + float(f_pct or 0.0)
+                        + float(d_pct or 0.0)
+                        + float(pub_pct or 0.0)
+                        + float(oth_pct or 0.0),
+                        2,
+                    ),
+                }
+                findings = MathematicalInvariantChecker.verify_shareholding_pattern(
+                    ticker=sym,
+                    quarter=q,
+                    promoter_pct=float(p_pct or 0.0),
+                    fii_pct=float(f_pct or 0.0),
+                    dii_pct=float(d_pct or 0.0),
+                    public_pct=float(pub_pct or 0.0),
+                    others_pct=float(oth_pct or 0.0),
+                    pledged_pct=0.0,
+                )
+                shp_math_findings = [f.to_dict() for f in findings]
+
+            # Fetch recent audit logs for this ticker
+            audit_rows = conn.execute(
+                """
+                SELECT id, audit_run_id, audit_timestamp, check_category, check_name,
+                       severity, status, expected_value, actual_value, deviation_pct, details
+                FROM institutional_audit_log
+                WHERE ticker = ? OR ticker = ?
+                ORDER BY id DESC
+                LIMIT 20
+                """,
+                (sym, base_sym),
+            ).fetchall()
+            audit_logs = [
+                {
+                    "id": r[0],
+                    "audit_run_id": r[1],
+                    "audit_timestamp": r[2],
+                    "check_category": r[3],
+                    "check_name": r[4],
+                    "severity": r[5],
+                    "status": r[6],
+                    "expected_value": r[7],
+                    "actual_value": r[8],
+                    "deviation_pct": r[9],
+                    "details": r[10],
+                }
+                for r in audit_rows
+            ]
+
+            # Fetch quarantine records if any
+            quar_rows = conn.execute(
+                """
+                SELECT id, record_type, entity_key, source_name, rejection_reason, quarantined_at
+                FROM institutional_quarantine
+                WHERE entity_key LIKE ? OR entity_key LIKE ?
+                ORDER BY id DESC
+                LIMIT 10
+                """,
+                (f"{sym}%", f"{base_sym}%"),
+            ).fetchall()
+            quarantine_records = [
+                {
+                    "id": r[0],
+                    "record_type": r[1],
+                    "entity_key": r[2],
+                    "source_name": r[3],
+                    "rejection_reason": r[4],
+                    "quarantined_at": r[5],
+                }
+                for r in quar_rows
+            ]
+
+            # Stock health score calculation
+            crit_count = sum(1 for a in audit_logs if a["severity"] in ("CRITICAL", "CRITICAL_ERROR"))
+            warn_count = sum(1 for a in audit_logs if a["severity"] == "WARNING")
+            stock_health = max(0.0, min(100.0, 100.0 - (crit_count * 20.0) - (warn_count * 5.0)))
+
+            return {
+                "ticker": sym,
+                "health_score": stock_health,
+                "status": "OPTIMAL" if stock_health >= 90.0 else ("WARNING" if stock_health >= 70.0 else "CRITICAL"),
+                "provenance_trail": trail,
+                "provenance_count": len(trail),
+                "latest_shareholding": shp_info,
+                "mathematical_findings": shp_math_findings,
+                "audit_logs": audit_logs,
+                "quarantine_records": quarantine_records,
+            }
+
+        data = await asyncio.to_thread(_get_ticker_integrity)
+        return {"success": True, **data}
+    except Exception as e:
+        logger.exception("Error in get_stock_institutional_integrity for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve stock integrity: {str(e)}")
 
 
 @router.get("/api/v1/institutional/summary")

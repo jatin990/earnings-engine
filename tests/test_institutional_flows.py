@@ -180,3 +180,36 @@ def test_top_stake_additions_endpoint(client):
     assert "total_institutional_stake_pct" in top1
     assert top1["inst_addition_pct"] >= 3.0
 
+
+def test_institutional_integrity_endpoints(client):
+    """Verify integrity health summary, ticker provenance/audit, and verify-and-repair endpoints."""
+    # 1. System-wide integrity health summary
+    res1 = client.get("/api/v1/institutional/integrity")
+    assert res1.status_code == 200
+    data1 = res1.json()
+    assert data1["success"] is True
+    assert "health_score" in data1
+    assert "status" in data1
+    assert "cadences" in data1
+    assert "recent_findings" in data1
+
+    # 2. Stock-specific integrity provenance and audit trail
+    res2 = client.get("/api/v1/institutional/integrity/TCS.NS")
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["success"] is True
+    assert data2["ticker"] == "TCS.NS"
+    assert "health_score" in data2
+    assert "status" in data2
+    assert "provenance_trail" in data2
+    assert "mathematical_findings" in data2
+
+    # 3. Trigger on-demand verify and repair
+    res3 = client.post("/api/v1/institutional/verify-and-repair", json={"scope": "MATHEMATICAL", "auto_repair": False})
+    assert res3.status_code == 200
+    data3 = res3.json()
+    assert data3["success"] is True
+    assert "report" in data3
+    assert "health_score" in data3["report"]
+
+
