@@ -205,8 +205,10 @@ Object.assign(app, {
                 const hidden = body.style.display === 'none';
                 body.style.display = hidden ? '' : 'none';
                 toggle.textContent = hidden ? '▼' : '▶';
-            
-    
-        }
-});
+            }
+    });
+
+    try {
+        app._restoreBdControls?.();
+    } catch (e) {}
 })(); // end buy_dip IIFE

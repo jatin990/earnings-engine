@@ -185,8 +185,10 @@ Object.assign(app, {
                     this.patStocksSortDir = 'asc';
                 }
                 this.renderPatStocksTable();
-            
-    
-        }
-});
+            }
+    });
+
+    try {
+        app._restorePatternsControls?.();
+    } catch (e) {}
 })(); // end patterns IIFE

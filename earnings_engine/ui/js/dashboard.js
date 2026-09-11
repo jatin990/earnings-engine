@@ -558,8 +558,8 @@ const API_BASE = window.location.origin;
                 this.initCustomizer();
                 this.bindKeyboardShortcuts();
                 this._bindWatchlistSelectionPersistence();
-                this._restoreBdControls();
-                this._restorePatternsControls();
+                this._restoreBdControls?.();
+                this._restorePatternsControls?.();
 
                 // Defer non-critical background data fetches so initial Market Pulse load is instant and non-blocking
                 setTimeout(() => {
@@ -1126,6 +1126,16 @@ const API_BASE = window.location.origin;
                         if (typeof this.loadRecentAdditions === 'function') {
                             this.loadRecentAdditions();
                         }
+                    }
+                }
+                if (name === 'buydip') {
+                    if (typeof this._restoreBdControls === 'function') {
+                        this._restoreBdControls();
+                    }
+                }
+                if (name === 'patterns') {
+                    if (typeof this._restorePatternsControls === 'function') {
+                        this._restorePatternsControls();
                     }
                 }
                 this.applyRoleRestrictions();
