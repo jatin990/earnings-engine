@@ -150,6 +150,7 @@ def _get_table_columns(conn: Any, table_name: str) -> list[str]:
 WATERMARK_CANDIDATE_COLUMNS = [
     "updated_at",
     "last_updated",
+    "refreshed_at",
     "scanned_at",
     "created_at",
     "published_at",
@@ -163,6 +164,7 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "run_at",
     "predicted_at",
     "added_at",
+    "attached_at",
     "last_login_at",
     "cached_at",
     "reported_date",

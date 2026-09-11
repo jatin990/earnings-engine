@@ -150,6 +150,8 @@ def test_sync_tables_and_watermark_configuration():
 
     # Test watermark selection priority
     assert _get_watermark_column(["id", "name", "updated_at", "created_at"]) == "updated_at"
+    assert _get_watermark_column(["id", "ticker", "refreshed_at"]) == "refreshed_at"
+    assert _get_watermark_column(["group_id", "trip_id", "attached_at"]) == "attached_at"
     assert _get_watermark_column(["id", "ticker", "scanned_at"]) == "scanned_at"
     assert _get_watermark_column(["id", "deal_date", "client_name"]) == "deal_date"
     assert _get_watermark_column(["id", "audit_timestamp", "details"]) == "audit_timestamp"
