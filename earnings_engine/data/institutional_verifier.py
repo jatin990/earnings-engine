@@ -450,6 +450,94 @@ class MathematicalInvariantChecker:
 
         return findings
 
+    @classmethod
+    def validate_daily_cash_flow(cls, payload: dict[str, Any]) -> list[AuditFinding]:
+        """Validate daily FII/DII cash flow payload dictionary against mathematical invariants and bounds."""
+        trade_date = str(payload.get("date") or payload.get("trade_date") or "")
+        fii_buy = float(payload.get("fii_buy_cr") or 0.0)
+        fii_sell = float(payload.get("fii_sell_cr") or 0.0)
+        fii_net = float(payload.get("fii_net_cr") or 0.0)
+        dii_buy = float(payload.get("dii_buy_cr") or 0.0)
+        dii_sell = float(payload.get("dii_sell_cr") or 0.0)
+        dii_net = float(payload.get("dii_net_cr") or 0.0)
+        total_net = float(payload.get("total_net_cr") or 0.0)
+
+        findings: list[AuditFinding] = []
+
+        # Gross bounds check: buy and sell values must be non-negative
+        for name, val in [("fii_buy_cr", fii_buy), ("fii_sell_cr", fii_sell), ("dii_buy_cr", dii_buy), ("dii_sell_cr", dii_sell)]:
+            if val < 0.0:
+                findings.append(AuditFinding(
+                    check_category="MATHEMATICAL",
+                    check_name="DAILY_FLOW_BOUNDS_CHECK",
+                    severity="CRITICAL_ERROR",
+                    status="FAILED",
+                    period_or_date=trade_date,
+                    expected_value=f"{name} >= 0.0",
+                    actual_value=f"{name}={val:.2f}",
+                    details=f"Gross turnover component {name} cannot be negative ({val:.2f} Cr).",
+                ))
+
+        arithmetic_findings = cls.verify_daily_flow_consistency(
+            trade_date=trade_date,
+            fii_buy_cr=fii_buy,
+            fii_sell_cr=fii_sell,
+            fii_net_cr=fii_net,
+            dii_buy_cr=dii_buy,
+            dii_sell_cr=dii_sell,
+            dii_net_cr=dii_net,
+            total_net_cr=total_net,
+        )
+        findings.extend(arithmetic_findings)
+        return findings
+
+    @classmethod
+    def validate_shareholding_pattern(
+        cls,
+        pattern: dict[str, Any],
+        holdings: list[dict[str, Any]] | None = None,
+    ) -> list[AuditFinding]:
+        """Validate quarterly shareholding pattern dictionary and optional individual fund holdings."""
+        ticker = str(pattern.get("ticker") or "")
+        quarter = str(pattern.get("quarter") or "")
+        promoter_pct = float(pattern.get("promoter_pct") or 0.0)
+        fii_pct = float(pattern.get("fii_pct") or 0.0)
+        dii_pct = float(pattern.get("dii_pct") or pattern.get("dii_mf_pct") or 0.0)
+        public_pct = float(pattern.get("public_pct") or pattern.get("public_retail_pct") or 0.0)
+        others_pct = float(pattern.get("others_pct") or pattern.get("other_pct") or 0.0)
+        pledged_pct = float(pattern.get("pledged_pct") or 0.0)
+
+        findings = cls.verify_shareholding_pattern(
+            ticker=ticker,
+            quarter=quarter,
+            promoter_pct=promoter_pct,
+            fii_pct=fii_pct,
+            dii_pct=dii_pct,
+            public_pct=public_pct,
+            others_pct=others_pct,
+            pledged_pct=pledged_pct,
+        )
+        if holdings:
+            fii_holdings = [h for h in holdings if "FII" in str(h.get("fund_name", "")).upper() or h.get("category") == "FII"]
+            if fii_holdings:
+                findings.extend(cls.reconcile_individual_holders(
+                    ticker=ticker,
+                    quarter=quarter,
+                    category_name="FII",
+                    category_total_pct=fii_pct,
+                    individual_holdings=fii_holdings,
+                ))
+            dii_holdings = [h for h in holdings if "DII" in str(h.get("fund_name", "")).upper() or h.get("category") == "DII" or "MUTUAL" in str(h.get("fund_name", "")).upper()]
+            if dii_holdings:
+                findings.extend(cls.reconcile_individual_holders(
+                    ticker=ticker,
+                    quarter=quarter,
+                    category_name="DII",
+                    category_total_pct=dii_pct,
+                    individual_holdings=dii_holdings,
+                ))
+        return findings
+
     @staticmethod
     def verify_bulk_block_deal(
         ticker: str,

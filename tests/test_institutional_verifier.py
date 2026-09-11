@@ -173,6 +173,44 @@ def test_daily_cash_flow_balance_fail():
     assert fii_math.severity == "CRITICAL_ERROR"
 
 
+def test_validate_daily_cash_flow_dict():
+    """Verify dictionary-level daily cash flow validation and bounds checking."""
+    valid_payload = {
+        "date": "2026-09-10",
+        "fii_buy_cr": 11882.95,
+        "fii_sell_cr": 12321.19,
+        "fii_net_cr": -438.24,
+        "dii_buy_cr": 13326.33,
+        "dii_sell_cr": 12300.48,
+        "dii_net_cr": 1025.85,
+        "total_net_cr": 587.61,
+    }
+    findings = MathematicalInvariantChecker.validate_daily_cash_flow(valid_payload)
+    assert len(findings) == 1
+    assert findings[0].severity == "PASS"
+
+    # Test negative turnover bounds failure
+    invalid_bounds = dict(valid_payload)
+    invalid_bounds["fii_buy_cr"] = -100.0
+    bad_findings = MathematicalInvariantChecker.validate_daily_cash_flow(invalid_bounds)
+    assert any(f.check_name == "DAILY_FLOW_BOUNDS_CHECK" for f in bad_findings)
+
+
+def test_validate_shareholding_pattern_dict():
+    """Verify dictionary-level shareholding pattern validation."""
+    valid_pattern = {
+        "ticker": "RELIANCE.NS",
+        "quarter": "Q4 FY26",
+        "promoter_pct": 50.30,
+        "fii_pct": 21.50,
+        "dii_pct": 16.20,
+        "public_pct": 11.50,
+        "others_pct": 0.50,
+    }
+    findings = MathematicalInvariantChecker.validate_shareholding_pattern(valid_pattern)
+    assert any(f.check_name == "SHAREHOLDING_100_PCT_SUM_INVARIANT" and f.severity == "PASS" for f in findings)
+
+
 def test_deal_trade_bounds():
     """Verify deal quantity and price bounds."""
     # Negative price

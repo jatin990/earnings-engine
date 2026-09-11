@@ -31,7 +31,7 @@ from earnings_engine.data.institutional_verifier import (
     MathematicalInvariantChecker,
     record_provenance,
 )
-from earnings_engine.data.prices import fetch_live_quote, load_prices
+from earnings_engine.data.prices import fetch_batch_live_quotes, fetch_live_quote, load_prices
 from earnings_engine.features.market_sentiment import get_market_sentiment, get_volatility_regime
 
 logger = logging.getLogger(__name__)
@@ -96,6 +96,14 @@ def compute_indices_quotes(settings: Settings | None = None, force_refresh: bool
     except Exception:
         pass
 
+    # Batch-fetch live quotes for all benchmark symbols in a single vectorized call
+    all_symbols = [idx["symbol"] for idx in INDICES_CONFIG]
+    batch_quotes: dict[str, dict[str, Any]] = {}
+    try:
+        batch_quotes = fetch_batch_live_quotes(all_symbols, settings=settings, sync_db=False, force=force_refresh)
+    except Exception as e:
+        logger.debug("[MARKET_PULSE] Batch index quote fetch failed, falling back to individual calls: %s", e)
+
     for idx in INDICES_CONFIG:
         sym = idx["symbol"]
         name = idx["name"]
@@ -128,8 +136,10 @@ def compute_indices_quotes(settings: Settings | None = None, force_refresh: bool
                         if c_30 > 0:
                             chg_30d = round(((curr_p - c_30) / c_30) * 100.0, 2)
 
-            # Check live quote override if available
-            q = fetch_live_quote(sym, settings=settings, sync_db=False)
+            # Check live quote override if available from batch fetch (with single fallback)
+            q = batch_quotes.get(sym) or {}
+            if not q.get("current_price"):
+                q = fetch_live_quote(sym, settings=settings, sync_db=False)
             if q.get("current_price"):
                 curr_p = float(q["current_price"])
                 if q.get("day_change") is not None:
@@ -565,7 +575,7 @@ def sync_real_fii_dii_cash_flows(
                         "dii_net_cr": dii_net,
                         "total_net_cr": tot_net,
                     })
-                    has_critical = any(f.severity == "CRITICAL" for f in inv_findings)
+                    has_critical = any(f.severity in ("CRITICAL", "CRITICAL_ERROR") for f in inv_findings)
 
                     record_provenance(
                         record_type="fii_dii_cash_flow",
@@ -592,7 +602,7 @@ def sync_real_fii_dii_cash_flows(
                     inserted_count += 1
                     logger.info("[FII-DII-SYNC] Ingested live NSE settlement for %s: FII Net = %.2f Cr, DII Net = %.2f Cr", iso_date, fii_net, dii_net)
     except Exception as e:
-        logger.debug("[FII-DII-SYNC] Live NSE endpoint notice: %s", e)
+        logger.warning("[FII-DII-SYNC] Live NSE endpoint sync error: %s", e, exc_info=True)
 
     return inserted_count
 
