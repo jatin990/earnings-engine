@@ -1401,8 +1401,9 @@ def get_tracked_breakouts(
                             if days_elapsed >= 14:
                                 # 14-day post-signal settled trajectory
                                 w14_df = post_df.head(14)
+                                w14_subsequent = w14_df.iloc[1:] if len(w14_df) > 1 else pd.DataFrame()
                                 w14_high = float(pd.to_numeric(w14_df["high"], errors="coerce").dropna().max()) if "high" in w14_df and not w14_df.empty else cur_p
-                                w14_low = float(pd.to_numeric(w14_df["low"], errors="coerce").dropna().min()) if "low" in w14_df and not w14_df.empty else cur_p
+                                w14_sub_low = float(pd.to_numeric(w14_subsequent["low"], errors="coerce").dropna().min()) if not w14_subsequent.empty and "low" in w14_subsequent else None
                                 w14_close = float(pd.to_numeric(w14_df["close"], errors="coerce").dropna().iloc[-1]) if "close" in w14_df and not w14_df.empty else cur_p
 
                                 item_d["post_high"] = w14_high
@@ -1420,7 +1421,7 @@ def get_tracked_breakouts(
                                     item_d["outcome_badge"] = "TARGET_HIT"
                                     item_d["breakout_happened"] = True
                                     item_d["what_happened_summary"] = f"🎯 Reached upside target ₹{target_p:,.2f} within 14-day horizon (+{item_d.get('max_gain_pct',0):.1f}% peak)."
-                                elif stop_p and w14_low <= stop_p:
+                                elif stop_p and ((w14_sub_low is not None and w14_sub_low <= stop_p) or w14_close <= stop_p):
                                     item_d["outcome"] = "STOP_HIT"
                                     item_d["outcome_label"] = "Stop Hit 🛑 (14D)"
                                     item_d["outcome_badge"] = "STOP_HIT"
@@ -1440,8 +1441,9 @@ def get_tracked_breakouts(
                                     item_d["what_happened_summary"] = f"⚠️ Breakout pulled back to ₹{w14_close:,.2f} by day 14."
                             else:
                                 # Recently broken out (< 14 days) -> LIVE tracking!
+                                post_subsequent = post_df.iloc[1:] if len(post_df) > 1 else pd.DataFrame()
                                 post_high = float(pd.to_numeric(post_df["high"], errors="coerce").dropna().max()) if "high" in post_df and not post_df.empty else cur_p
-                                post_low = float(pd.to_numeric(post_df["low"], errors="coerce").dropna().min()) if "low" in post_df and not post_df.empty else cur_p
+                                post_sub_low = float(pd.to_numeric(post_subsequent["low"], errors="coerce").dropna().min()) if not post_subsequent.empty and "low" in post_subsequent else None
 
                                 item_d["post_high"] = post_high
                                 item_d["peak_price"] = post_high
@@ -1458,7 +1460,7 @@ def get_tracked_breakouts(
                                     item_d["outcome_badge"] = "TARGET_HIT"
                                     item_d["breakout_happened"] = True
                                     item_d["what_happened_summary"] = f"🎯 Hit target ₹{target_p:,.2f} on Day {days_elapsed}/14 (+{item_d.get('max_gain_pct',0):.1f}% peak)."
-                                elif stop_p and (cur_p <= stop_p or post_low <= stop_p):
+                                elif stop_p and (cur_p <= stop_p or (post_sub_low is not None and post_sub_low <= stop_p)):
                                     item_d["outcome"] = "STOP_HIT"
                                     item_d["outcome_label"] = f"Stop Hit 🛑 (Live D{days_elapsed})"
                                     item_d["outcome_badge"] = "STOP_HIT"

@@ -227,3 +227,50 @@ def test_delete_tracked_breakout_api(app_client):
         cleanup_conn.execute("DELETE FROM breakout_tracked_signals WHERE ticker = 'TEST_DEL_TICKER.NS'")
         cleanup_conn.commit()
         cleanup_conn.close()
+
+
+def test_signal_day_intraday_low_does_not_trigger_false_stop_hit(monkeypatch):
+    """Verify that a morning low on the signal day itself before breaking out does not falsely trigger STOP_HIT."""
+    import pandas as pd
+    settings = Settings()
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    conn = get_db_connection(settings)
+    cur = conn.execute(
+        """
+        INSERT INTO breakout_tracked_signals (
+            ticker, company_name, industry, tier, signal_date,
+            signal_price, current_price, breakout_trigger, target_price, stop_loss,
+            composite_score, setup_archetype, outcome, breakout_happened, scanned_at, created_at, updated_at
+        ) VALUES (
+            'SAMPLE_INTRA_SWING.NS', 'Test False Stop Co', 'Equities', 'HOT', ?,
+            100.0, 100.0, 100.0, 120.0, 90.0, 75.0, 'Classic Technical', 'ACTIVE', 1,
+            ?, ?, ?
+        )
+        """,
+        (today_str, today_str, today_str, today_str),
+    )
+    test_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    try:
+        mock_df = pd.DataFrame(
+            [{"open": 85.0, "high": 100.0, "low": 80.0, "close": 100.0, "volume": 50000}],
+            index=pd.to_datetime([today_str]),
+        )
+        from earnings_engine.data import prices
+        monkeypatch.setattr(prices, "fetch_prices", lambda sym, settings, force=False: mock_df)
+
+        res = get_tracked_breakouts(days=7, settings=settings)
+        assert res["success"] is True
+        target_item = next((item for item in res["items"] if item["id"] == test_id), None)
+        assert target_item is not None
+
+        assert target_item["outcome"] == "TRIGGERED"
+        assert "Stop Hit" not in target_item["outcome_label"]
+        assert "Live Active" in target_item["outcome_label"]
+    finally:
+        clean_conn = get_db_connection(settings)
+        clean_conn.execute("DELETE FROM breakout_tracked_signals WHERE id = ?", (test_id,))
+        clean_conn.commit()
+        clean_conn.close()

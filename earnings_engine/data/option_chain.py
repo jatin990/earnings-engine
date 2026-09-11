@@ -237,10 +237,13 @@ def _calculate_option_metrics_from_records(
 
     for r in records:
         strike = float(r.get("strikePrice") or r.get("strike_price") or 0)
-        c_oi = float(r.get("CE_openInterest") or r.get("call_oi") or 0)
-        p_oi = float(r.get("PE_openInterest") or r.get("put_oi") or 0)
-        c_vol = float(r.get("CE_totalTradedVolume") or r.get("call_vol") or 0)
-        p_vol = float(r.get("PE_totalTradedVolume") or r.get("put_vol") or 0)
+        ce = r.get("CE") if isinstance(r.get("CE"), dict) else {}
+        pe = r.get("PE") if isinstance(r.get("PE"), dict) else {}
+
+        c_oi = float(r.get("CE_openInterest") or ce.get("openInterest") or r.get("call_oi") or 0)
+        p_oi = float(r.get("PE_openInterest") or pe.get("openInterest") or r.get("put_oi") or 0)
+        c_vol = float(r.get("CE_totalTradedVolume") or ce.get("totalTradedVolume") or r.get("call_vol") or 0)
+        p_vol = float(r.get("PE_totalTradedVolume") or pe.get("totalTradedVolume") or r.get("put_vol") or 0)
 
         call_oi += c_oi
         put_oi += p_oi
@@ -269,8 +272,16 @@ def _calculate_option_metrics_from_records(
 
     # Identify key S/R strikes
     sdf = pd.DataFrame(strikes_data) if strikes_data else pd.DataFrame()
-    high_call_strike = float(sdf.loc[sdf["call_oi"].idxmax()]["strike"]) if not sdf.empty and "call_oi" in sdf else None
-    high_put_strike = float(sdf.loc[sdf["put_oi"].idxmax()]["strike"]) if not sdf.empty and "put_oi" in sdf else None
+    high_call_strike = (
+        float(sdf.loc[sdf["call_oi"].idxmax()]["strike"])
+        if not sdf.empty and "call_oi" in sdf.columns and sdf["call_oi"].max() > 0
+        else None
+    )
+    high_put_strike = (
+        float(sdf.loc[sdf["put_oi"].idxmax()]["strike"])
+        if not sdf.empty and "put_oi" in sdf.columns and sdf["put_oi"].max() > 0
+        else None
+    )
 
     return {
         "symbol": symbol,

@@ -59,3 +59,34 @@ def test_calculate_option_metrics_from_records():
     assert res["sentiment"] == "BULLISH"
     assert res["resistance_strike"] == 2500.0
     assert res["support_strike"] == 2500.0
+
+
+def test_calculate_option_metrics_from_nested_records():
+    """Verify metrics calculation when records contain nested CE/PE dicts (from jugaad-data / official NSE)."""
+    nested_records = [
+        {
+            "strikePrice": 1200.0,
+            "CE": {"openInterest": 1000, "totalTradedVolume": 200},
+            "PE": {"openInterest": 500, "totalTradedVolume": 100},
+        },
+        {
+            "strikePrice": 1250.0,
+            "CE": {"openInterest": 3000, "totalTradedVolume": 800},
+            "PE": {"openInterest": 4000, "totalTradedVolume": 1200},
+        },
+        {
+            "strikePrice": 1300.0,
+            "CE": {"openInterest": 5000, "totalTradedVolume": 1500},
+            "PE": {"openInterest": 1000, "totalTradedVolume": 300},
+        },
+    ]
+    res = _calculate_option_metrics_from_records("INFY", nested_records, spot_price=1250.0)
+    assert res["status"] == "LIVE"
+    assert res["call_oi_total"] == 9000
+    assert res["put_oi_total"] == 5500
+    # PCR(OI) = 5500 / 9000 = 0.61 <= 0.8 -> BEARISH
+    assert res["pcr_oi"] == 0.61
+    assert res["sentiment"] == "BEARISH"
+    assert res["resistance_strike"] == 1300.0
+    assert res["support_strike"] == 1250.0
+

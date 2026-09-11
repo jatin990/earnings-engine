@@ -10,6 +10,7 @@ Provides direct access to official NSE archives without requiring API keys:
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from datetime import datetime, timedelta
 from typing import Any
@@ -19,6 +20,25 @@ import pandas as pd
 from earnings_engine.data.providers.base import DataProvider
 
 logger = logging.getLogger("earnings_engine.data.providers.nse")
+
+
+_nselive_lock = threading.Lock()
+_nselive_client: Any | None = None
+
+
+def _get_nselive_client() -> Any:
+    """Return a shared NSELive instance to reuse session cookies across option chain calls."""
+    global _nselive_client
+    if _nselive_client is None:
+        with _nselive_lock:
+            if _nselive_client is None:
+                try:
+                    from jugaad_data.nse import NSELive
+                    _nselive_client = NSELive()
+                except Exception as e:
+                    logger.warning("[NSE:CLIENT_INIT_FAIL] Failed initializing jugaad_data NSELive: %s", e)
+                    return None
+    return _nselive_client
 
 
 class NSEDirectProvider(DataProvider):
@@ -294,7 +314,46 @@ class NSEDirectProvider(DataProvider):
                 "provider": "nse_direct",
             }
 
-        logger.info("[NSELIB:REQ] derivatives.nse_live_option_chain(%s)", clean_symbol)
+        # 1. Primary: Query via jugaad-data NSELive (maintains primed cookies & modern headers)
+        t0 = time.perf_counter()
+        nse = _get_nselive_client()
+        if nse is not None:
+            try:
+                from earnings_engine.rate_limits import record_request
+                try:
+                    record_request("nse")
+                except Exception:
+                    pass
+
+                # Handle indices vs equities
+                is_index = clean_symbol in ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY") or clean_symbol.startswith("NIFTY")
+                if is_index:
+                    raw_chain = nse.index_option_chain(clean_symbol)
+                else:
+                    raw_chain = nse.equities_option_chain(clean_symbol)
+
+                records = raw_chain.get("filtered", {}).get("data") or raw_chain.get("records", {}).get("data", [])
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                if records:
+                    logger.info("[NSE:RESP] option_chain(%s) -> %d strikes (%.1fms)", clean_symbol, len(records), elapsed_ms)
+                    return {
+                        "symbol": clean_symbol,
+                        "records_count": len(records),
+                        "data": records,
+                        "provider": "jugaad_data_live",
+                    }
+                else:
+                    logger.info("[NSE:RESP] option_chain(%s) -> 0 strikes (%.1fms)", clean_symbol, elapsed_ms)
+            except Exception as e:
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                logger.warning("[JUGAAD:FAIL] option_chain(%s) failed after %.1fms: %s", clean_symbol, elapsed_ms, e)
+                # Reset cached client on network / session failure
+                global _nselive_client
+                with _nselive_lock:
+                    _nselive_client = None
+
+        # 2. Secondary fallback: nselib derivatives if available
+        logger.debug("[NSELIB:REQ] derivatives.nse_live_option_chain(%s)", clean_symbol)
         t0 = time.perf_counter()
         try:
             from earnings_engine.rate_limits import record_request
@@ -303,29 +362,21 @@ class NSEDirectProvider(DataProvider):
             except Exception:
                 pass
             import nselib
-            from nselib import capital_market
+            from nselib import derivatives
 
-            # Query nselib derivatives/options if available
-            try:
-                from nselib import derivatives
-                oc = derivatives.nse_live_option_chain(clean_symbol)
-                elapsed_ms = (time.perf_counter() - t0) * 1000
-                if oc is not None and not oc.empty:
-                    logger.info("[NSELIB:RESP] nse_live_option_chain(%s) -> %d strikes (%.1fms)", clean_symbol, len(oc), elapsed_ms)
-                    return {
-                        "symbol": clean_symbol,
-                        "records_count": len(oc),
-                        "data": oc.to_dict(orient="records"),
-                        "provider": "nselib_derivatives",
-                    }
-                else:
-                    logger.info("[NSELIB:RESP] nse_live_option_chain(%s) -> 0 strikes (%.1fms)", clean_symbol, elapsed_ms)
-            except Exception as e:
-                elapsed_ms = (time.perf_counter() - t0) * 1000
-                logger.warning("[NSELIB:FAIL] nse_live_option_chain(%s) failed after %.1fms: %s", clean_symbol, elapsed_ms, e)
+            oc = derivatives.nse_live_option_chain(clean_symbol)
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+            if oc is not None and not oc.empty:
+                logger.info("[NSELIB:RESP] nse_live_option_chain(%s) -> %d strikes (%.1fms)", clean_symbol, len(oc), elapsed_ms)
+                return {
+                    "symbol": clean_symbol,
+                    "records_count": len(oc),
+                    "data": oc.to_dict(orient="records"),
+                    "provider": "nselib_derivatives",
+                }
         except Exception as e:
             elapsed_ms = (time.perf_counter() - t0) * 1000
-            logger.warning("[NSELIB:FAIL] Option chain fetch failed for %s after %.1fms: %s", clean_symbol, elapsed_ms, e)
+            logger.debug("[NSELIB:FAIL] nse_live_option_chain(%s) failed after %.1fms: %s", clean_symbol, elapsed_ms, e)
 
         return {
             "symbol": clean_symbol,
