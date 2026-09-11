@@ -1,0 +1,61 @@
+import pytest
+from earnings_engine.config import Settings
+from earnings_engine.data.option_chain import analyze_option_chain, _calculate_max_pain, _calculate_option_metrics_from_records
+
+
+@pytest.fixture
+def test_settings(tmp_path):
+    s = Settings()
+    s.data_dirs = {"prices": tmp_path / "prices", "earnings": tmp_path / "earnings"}
+    s.ensure_dirs()
+    return s
+
+
+def test_non_fno_ticker_fast_bypass(monkeypatch, test_settings):
+    """Ensure cash-only / non-F&O equities immediately return NOT_FNO status with zero network requests."""
+    # If any network provider or fetcher is called, raise an error
+    from earnings_engine.data.providers import provider_manager
+
+    def _unexpected_provider(*args, **kwargs):
+        raise AssertionError("Network provider should NEVER be queried for non-F&O tickers!")
+
+    monkeypatch.setattr(provider_manager, "get_data_manager", _unexpected_provider)
+
+    res = analyze_option_chain("SOUTHWEST.NS", spot_price=150.0, settings=test_settings)
+    assert res["status"] == "NOT_FNO"
+    assert res["symbol"] == "SOUTHWEST"
+    assert res["pcr_oi"] is None
+    assert res["pcr_volume"] is None
+    assert res["max_pain_strike"] is None
+    assert res["call_oi_total"] == 0
+    assert res["put_oi_total"] == 0
+    assert "NOT_FNO_ELIGIBLE" in res["signals"]
+
+
+def test_calculate_max_pain():
+    """Verify max pain calculation algorithm."""
+    strikes_data = [
+        {"strike": 100.0, "call_oi": 1000, "put_oi": 100},
+        {"strike": 105.0, "call_oi": 500, "put_oi": 500},
+        {"strike": 110.0, "call_oi": 100, "put_oi": 1000},
+    ]
+    max_pain = _calculate_max_pain(strikes_data)
+    assert max_pain == 105.0
+
+
+def test_calculate_option_metrics_from_records():
+    """Verify metrics calculation and sentiment classification from real records."""
+    records = [
+        {"strikePrice": 2400.0, "CE_openInterest": 10000, "PE_openInterest": 5000, "CE_totalTradedVolume": 2000, "PE_totalTradedVolume": 1000},
+        {"strikePrice": 2500.0, "CE_openInterest": 20000, "PE_openInterest": 25000, "CE_totalTradedVolume": 5000, "PE_totalTradedVolume": 6000},
+        {"strikePrice": 2600.0, "CE_openInterest": 5000, "PE_openInterest": 20000, "CE_totalTradedVolume": 1000, "PE_totalTradedVolume": 4000},
+    ]
+    res = _calculate_option_metrics_from_records("RELIANCE", records, spot_price=2500.0)
+    assert res["status"] == "LIVE"
+    assert res["call_oi_total"] == 35000
+    assert res["put_oi_total"] == 50000
+    # PCR(OI) = 50000 / 35000 = 1.43 >= 1.2 -> BULLISH
+    assert res["pcr_oi"] == 1.43
+    assert res["sentiment"] == "BULLISH"
+    assert res["resistance_strike"] == 2500.0
+    assert res["support_strike"] == 2500.0

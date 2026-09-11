@@ -1628,6 +1628,21 @@ def _migration_034_institutional_query_indexes(conn: Any) -> None:
         logger.debug("[MIGRATION-034] Index idx_inst_radar_signals_perf notice: %s", e)
 
 
+def _migration_035_purge_non_fno_fo_call_wall(conn: Any) -> None:
+    """Purge invalid non-F&O entries from breakout_radar and breakout_tracked_signals for NSE_FO_CALL_WALL strategy."""
+    from earnings_engine.data.universe import is_fno_eligible
+
+    for tbl in ["breakout_radar", "breakout_tracked_signals"]:
+        try:
+            cur = conn.execute(f"SELECT DISTINCT ticker FROM {tbl} WHERE strategy = 'NSE_FO_CALL_WALL'")
+            tickers = [r[0] for r in cur.fetchall() if r and r[0]]
+            for t in tickers:
+                if not is_fno_eligible(t):
+                    conn.execute(f"DELETE FROM {tbl} WHERE ticker = ? AND strategy = 'NSE_FO_CALL_WALL'", (t,))
+        except Exception as e:
+            logger.debug("[MIGRATION-035] Notice for table %s: %s", tbl, e)
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1664,6 +1679,7 @@ MIGRATIONS: list[Migration] = [
     Migration(32, "032_institutional_radar_signals", _migration_032_institutional_radar_signals),
     Migration(33, "033_consolidate_breakout_audit_log", _migration_033_consolidate_breakout_audit_log),
     Migration(34, "034_institutional_query_indexes", _migration_034_institutional_query_indexes),
+    Migration(35, "035_purge_non_fno_fo_call_wall", _migration_035_purge_non_fno_fo_call_wall),
 ]
 
 

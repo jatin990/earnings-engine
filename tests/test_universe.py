@@ -200,3 +200,30 @@ def test_groww_benchmark_indices(u_settings):
     small_cap = load_universe("NSE_SMALL_CAP", settings=u_settings)
     assert len(small_cap) >= 70
 
+
+def test_fno_eligibility_and_universe(u_settings):
+    """Test F&O universe loading and eligibility validation."""
+    from earnings_engine.data.universe import is_fno_eligible, load_nse_fno
+
+    # Canonical F&O equities & indices
+    assert is_fno_eligible("RELIANCE.NS") is True
+    assert is_fno_eligible("reliance") is True
+    assert is_fno_eligible("TCS.NS") is True
+    assert is_fno_eligible("INFY") is True
+    assert is_fno_eligible("NIFTY") is True
+    assert is_fno_eligible("BANKNIFTY") is True
+
+    # Cash equities not in F&O
+    assert is_fno_eligible("SOUTHWEST.NS") is False
+    assert is_fno_eligible("VISL.NS") is False
+    assert is_fno_eligible("3BBLACKBIO.NS") is False
+    assert is_fno_eligible("EDELWEISS.NS") is False
+    assert is_fno_eligible("UNKNOWN_TICKER.NS") is False
+
+    # Universe loading
+    fno_tickers = load_nse_fno(settings=u_settings)
+    assert len(fno_tickers) >= 200
+    assert "RELIANCE.NS" in fno_tickers
+    assert "TCS.NS" in fno_tickers
+    assert "SOUTHWEST.NS" not in fno_tickers
+

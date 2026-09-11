@@ -44,6 +44,7 @@ import pandas as pd
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
+from earnings_engine.data.universe import is_fno_eligible
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.breakout_scanner")
@@ -583,6 +584,16 @@ def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
 
             clean_sym = ticker.upper().strip()
             if "TEST" in clean_sym or "MOCK" in clean_sym or "DUMMY" in clean_sym:
+                continue
+
+            # Anti-Fabrication & Guardrail: NSE_FO_CALL_WALL candidates MUST be F&O eligible
+            if strat == "NSE_FO_CALL_WALL" and not is_fno_eligible(clean_sym):
+                logger.warning("[BREAKOUT-DB] Purging non-F&O candidate %s with strategy %s from breakout_radar", clean_sym, strat)
+                try:
+                    conn.execute("DELETE FROM breakout_radar WHERE ticker = ? AND (strategy = ? OR strategy IS NULL)", (ticker, strat))
+                    conn.commit()
+                except Exception:
+                    pass
                 continue
 
             data["strategy"] = strat
@@ -1627,6 +1638,9 @@ def _promote(ticker: str, result: dict, settings: Settings | None = None) -> Non
     """Place a ticker into the correct tier based on its score and audit the transition."""
     settings = settings or Settings()
     strat = (result.get("strategy") or "CLASSIC_TECHNICAL").upper().strip()
+    if strat == "NSE_FO_CALL_WALL" and not is_fno_eligible(ticker):
+        logger.debug("[BREAKOUT:FNO_BYPASS] Skipping promotion of %s for NSE_FO_CALL_WALL; not F&O eligible", ticker)
+        return
     result["strategy"] = strat
     key = _pool_key(ticker, strat)
     new_score = result.get("composite_score", 0)
@@ -1710,18 +1724,20 @@ def _demote_hot(ticker: str, settings: Settings | None = None) -> None:
     if not entry:
         return
     entry["consecutive_low"] += 1
-    if entry["consecutive_low"] >= 2:
-        result = entry["result"]
+    result = entry.get("result", {})
+    parts = key.split("::")
+    t_clean = result.get("ticker", parts[0])
+    strat = result.get("strategy") or (parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL")
+    is_invalid_fno = strat == "NSE_FO_CALL_WALL" and not is_fno_eligible(t_clean)
+
+    if entry["consecutive_low"] >= 2 or is_invalid_fno:
         score = result.get("composite_score", 0)
         cur_p = result.get("current_price") or result.get("signal_price")
         trig_p = result.get("breakout_trigger")
-        parts = key.split("::")
-        t_clean = result.get("ticker", parts[0])
-        strat = result.get("strategy") or (parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL")
         del _pool["hot"][key]
 
-        # Maybe keep in warm if score still qualifies
-        if score >= WARM_THRESHOLD:
+        # Maybe keep in warm if score still qualifies (unless non-F&O on F&O strategy)
+        if score >= WARM_THRESHOLD and not is_invalid_fno:
             _pool["warm"][key] = {"result": result, "consecutive_low": 0}
             record_breakout_transition(
                 ticker=t_clean,
@@ -1738,6 +1754,11 @@ def _demote_hot(ticker: str, settings: Settings | None = None) -> None:
             )
             logger.debug("[BREAKOUT] %s demoted Hot → Warm (score %.1f)", key, score)
         else:
+            reason = (
+                f"Removed non-F&O ticker {t_clean} from NSE_FO_CALL_WALL strategy"
+                if is_invalid_fno
+                else f"Removed from Breakout Radar: Score fell to {score:.1f} below minimum setup criteria"
+            )
             record_breakout_transition(
                 ticker=t_clean,
                 event_type="REMOVED_COLD",
@@ -1747,15 +1768,22 @@ def _demote_hot(ticker: str, settings: Settings | None = None) -> None:
                 score_after=score,
                 price=cur_p,
                 trigger_price=trig_p,
-                reason=f"Removed from Breakout Radar: Score fell to {score:.1f} below minimum setup criteria",
+                reason=reason,
                 strategy=strat,
                 settings=settings,
             )
             logger.debug("[BREAKOUT] %s demoted Hot → Cold (score %.1f)", key, score)
+            try:
+                conn = get_db_connection(settings)
+                conn.execute("DELETE FROM breakout_radar WHERE ticker = ? AND (strategy = ? OR strategy IS NULL)", (t_clean, strat))
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                logger.debug("[BREAKOUT-DB] Error removing cold ticker %s from breakout_radar: %s", t_clean, e)
 
 
 def _demote_warm(ticker: str, settings: Settings | None = None) -> None:
-    """Demote a Warm ticker: increment consecutive_low, remove after 2 strikes with audit log."""
+    """Demote a Warm ticker: increment consecutive_low, remove after 2 strikes (or immediate if non-F&O)."""
     settings = settings or Settings()
     key = ticker if "::" in ticker else _pool_key(ticker)
     entry = _pool["warm"].get(key)
@@ -1768,14 +1796,21 @@ def _demote_warm(ticker: str, settings: Settings | None = None) -> None:
     if not entry:
         return
     entry["consecutive_low"] += 1
-    if entry["consecutive_low"] >= 2:
-        result = entry["result"]
+    result = entry.get("result", {})
+    parts = key.split("::")
+    t_clean = result.get("ticker", parts[0])
+    strat = result.get("strategy") or (parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL")
+    is_invalid_fno = strat == "NSE_FO_CALL_WALL" and not is_fno_eligible(t_clean)
+
+    if entry["consecutive_low"] >= 2 or is_invalid_fno:
         score = result.get("composite_score", 0)
         cur_p = result.get("current_price") or result.get("signal_price")
         trig_p = result.get("breakout_trigger")
-        parts = key.split("::")
-        t_clean = result.get("ticker", parts[0])
-        strat = result.get("strategy") or (parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL")
+        reason = (
+            f"Removed non-F&O ticker {t_clean} from NSE_FO_CALL_WALL strategy"
+            if is_invalid_fno
+            else f"Removed from Warm Pool: Score dropped to {score:.1f} (< {WARM_DEMOTION_THRESHOLD}) for 2 consecutive cycles"
+        )
         record_breakout_transition(
             ticker=t_clean,
             event_type="REMOVED_COLD",
@@ -1785,12 +1820,19 @@ def _demote_warm(ticker: str, settings: Settings | None = None) -> None:
             score_after=score,
             price=cur_p,
             trigger_price=trig_p,
-            reason=f"Removed from Warm Pool: Score dropped to {score:.1f} (< {WARM_DEMOTION_THRESHOLD}) for 2 consecutive cycles",
+            reason=reason,
             strategy=strat,
             settings=settings,
         )
         logger.debug("[BREAKOUT] %s demoted Warm → Cold (score %.1f)", key, score)
         del _pool["warm"][key]
+        try:
+            conn = get_db_connection(settings)
+            conn.execute("DELETE FROM breakout_radar WHERE ticker = ? AND (strategy = ? OR strategy IS NULL)", (t_clean, strat))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.debug("[BREAKOUT-DB] Error removing cold ticker %s from breakout_radar: %s", t_clean, e)
 
 
 def get_tracked_ticker_set(settings: Settings | None = None) -> set[str]:
@@ -2547,6 +2589,22 @@ def _score_fo_call_wall(
     """Strategy 3: NSE F&O Option Chain Call OI Wall & Gamma Squeeze."""
     signal_price = float(closes.iloc[-1])
 
+    # Guardrail: Non-F&O equities have no derivatives or option chain
+    if not is_fno_eligible(ticker):
+        subscores = {
+            "resistance_score": 0.0,
+            "volume_score": 0.0,
+            "compression_score": 0.0,
+            "momentum_score": 0.0,
+            "fundamental_score": 0.0,
+        }
+        notes = {
+            "setup_archetype": "Non-F&O Cash Equity",
+            "strategy_id": "NSE_FO_CALL_WALL",
+            "formula_summary": f"Ticker {ticker} is not NSE F&O eligible. F&O Call Wall strategy skipped.",
+        }
+        return 0.0, signal_price, signal_price, signal_price, subscores, "Non-F&O Stock", notes
+
     # 1. Option Chain Derivatives Integration
     call_oi_strike = signal_price * 1.04
     pcr_oi = 1.05
@@ -2555,9 +2613,9 @@ def _score_fo_call_wall(
     try:
         from earnings_engine.data.option_chain import analyze_option_chain
         opt = analyze_option_chain(ticker, spot_price=signal_price, settings=settings)
-        if opt:
-            call_oi_strike = opt.get("highest_call_oi_strike") or (signal_price * 1.04)
-            pcr_oi = opt.get("pcr_oi") or 1.0
+        if opt and opt.get("status") != "NOT_FNO":
+            call_oi_strike = opt.get("resistance_strike") or opt.get("highest_call_oi_strike") or (signal_price * 1.04)
+            pcr_oi = opt.get("pcr_oi") if opt.get("pcr_oi") is not None else 1.0
             max_pain = opt.get("max_pain_strike") or (signal_price * 0.97)
             sentiment = opt.get("sentiment") or "BULLISH"
     except Exception:
@@ -2835,6 +2893,10 @@ def score_breakout(
     strategy_clean = (strategy or "CLASSIC_TECHNICAL").upper().strip()
     if strategy_clean not in BREAKOUT_STRATEGIES:
         strategy_clean = "CLASSIC_TECHNICAL"
+
+    if strategy_clean == "NSE_FO_CALL_WALL" and not is_fno_eligible(ticker):
+        logger.debug("[BREAKOUT:FNO_BYPASS] Skipping %s for NSE_FO_CALL_WALL; not F&O eligible", ticker)
+        return None
 
     strat_meta = BREAKOUT_STRATEGIES[strategy_clean]
 
@@ -3224,6 +3286,10 @@ def _score_single_ticker(
     macro_info: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Load prices, metrics, news catalysts, and score a single ticker. Returns result dict or None."""
+    strategy_clean = (strategy or "CLASSIC_TECHNICAL").upper().strip()
+    if strategy_clean == "NSE_FO_CALL_WALL" and not is_fno_eligible(ticker):
+        return None
+
     try:
         from earnings_engine.data.prices import load_prices, load_price_metrics, fetch_live_quote
 
@@ -3499,8 +3565,11 @@ def run_multi_strategy_parallel_scan(
                 macro_info=macro_info,
             )
 
+        strat_clean = strat_id.upper().strip()
+        strat_tickers = [t for t in ticker_list if is_fno_eligible(t)] if strat_clean == "NSE_FO_CALL_WALL" else ticker_list
+
         with ThreadPoolExecutor(max_workers=max_workers_per_strat) as executor:
-            scored_list = list(executor.map(_score_one, ticker_list))
+            scored_list = list(executor.map(_score_one, strat_tickers))
 
         for res in scored_list:
             if res and (res.get("composite_score") or 0) >= (min_score or 30.0):
@@ -3636,6 +3705,8 @@ def run_cold_scan(
     record_job_start(job_id, settings)
 
     ticker_list = _resolve_universe_tickers(settings, universe)
+    if strat_clean == "NSE_FO_CALL_WALL":
+        ticker_list = [t for t in ticker_list if is_fno_eligible(t)]
     if not ticker_list:
         logger.info("[BREAKOUT-COLD] No tickers found to scan for %s.", strat_clean)
         _pool["status"] = "done"
@@ -3939,6 +4010,8 @@ def run_breakout_scan(
     from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
 
     ticker_list = _resolve_universe_tickers(settings, universe)
+    if strategy_clean == "NSE_FO_CALL_WALL":
+        ticker_list = [t for t in ticker_list if is_fno_eligible(t)]
     if not ticker_list:
         return []
 

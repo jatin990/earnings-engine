@@ -96,6 +96,62 @@ _SEED_US_TOP = [
     "CME", "VRTX", "ON", "ROKU", "PANW", "SBUX", "SQ", "UBER", "MELI",
 ]
 
+_SEED_NSE_FNO = [
+    # Major Indices
+    "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI",
+    # Official Underlying Equities
+    "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", "ADANIPORTS",
+    "ADANIPOWER", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP",
+    "ASHOKLEY", "ASIANPAINT", "ASTRAL", "ATHERENERG", "AUBANK", "AUROPHARMA", "AXISBANK",
+    "BAJAJ-AUTO", "BAJAJFINSV", "BAJAJHLDNG", "BAJFINANCE", "BANDHANBNK", "BANKBARODA",
+    "BANKINDIA", "BDL", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL", "BIOCON", "BLUESTARCO",
+    "BOSCHLTD", "BPCL", "BRITANNIA", "BSE", "CAMS", "CANBK", "CANFINHOME", "CDSL", "CGPOWER",
+    "CHAMBLFERT", "CHOLAFIN", "CIPLA", "COALINDIA", "COCHINSHIP", "COFORGE", "COLPAL",
+    "CONCOR", "COROMANDEL", "CROMPTON", "CUMMINSIND", "DABUR", "DEEPAKNTR", "DELHIVERY",
+    "DIVISLAB", "DIXON", "DLF", "DMART", "DRREDDY", "EICHERMOT", "ESCORTS", "ETERNAL",
+    "EXIDEIND", "FEDERALBNK", "FORCEMOT", "FORTIS", "GAIL", "GLENMARK", "GMRAIRPORT",
+    "GNFC", "GODFRYPHLP", "GODREJCP", "GODREJPROP", "GRANULES", "GRASIM", "GUJGASLTD",
+    "GVT&D", "HAL", "HAVELLS", "HCLTECH", "HDFCAMC", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO",
+    "HINDALCO", "HINDCOPPER", "HINDPETRO", "HINDUNILVR", "HINDZINC", "HYUNDAI", "ICICIBANK",
+    "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB", "IEX", "INDHOTEL", "INDIANB", "INDIGO",
+    "INDUSINDBK", "INDUSTOWER", "INFY", "INOXWIND", "IOC", "IREDA", "IRFC", "ITC",
+    "JINDALSTEL", "JIOFIN", "JSWENERGY", "JSWSTEEL", "JUBLFOOD", "KALYANKJIL", "KAYNES",
+    "KEI", "KFINTECH", "KOTAKBANK", "KPITTECH", "LAURUSLABS", "LICHSGFIN", "LICI", "LODHA",
+    "LT", "LTF", "LTIM", "LTM", "LUPIN", "M&M", "M&MFIN", "MAHABANK", "MANAPPURAM",
+    "MANKIND", "MARICO", "MARUTI", "MAXHEALTH", "MAZDOCK", "MCX", "METROPOLIS", "MFSL",
+    "MOTHERSON", "MOTILALOFS", "MPHASIS", "MUTHOOTFIN", "NAM-INDIA", "NATIONALUM", "NAUKRI",
+    "NBCC", "NESTLEIND", "NHPC", "NMDC", "NTPC", "NYKAA", "OBEROIRLTY", "OFSS", "OIL",
+    "ONGC", "PAGEIND", "PATANJALI", "PAYTM", "PEL", "PERSISTENT", "PETRONET", "PFC",
+    "PGEL", "PHOENIXLTD", "PIDILITIND", "PIIND", "PNB", "PNBHOUSING", "POLICYBZR",
+    "POLYCAB", "POWERGRID", "POWERINDIA", "PREMIERENE", "PRESTIGE", "PVRINOX", "RADICO",
+    "RBLBANK", "REC", "RECLTD", "RELIANCE", "RVNL", "SAGILITY", "SAIL", "SBICARD",
+    "SBILIFE", "SBIN", "SHREECEM", "SHRIRAMFIN", "SIEMENS", "SOLARINDS", "SONACOMS",
+    "SRF", "SUNPHARMA", "SUNTV", "SUPREMEIND", "SUZLON", "SWIGGY", "SYNGENE", "TATACHEM",
+    "TATACOMM", "TATACONSUM", "TATAELXSI", "TATAMOTORS", "TATAPOWER", "TATASTEEL", "TCS",
+    "TECHM", "TIINDIA", "TITAN", "TMPV", "TORNTPHARM", "TRENT", "TVSMOTOR", "UBL",
+    "ULTRACEMCO", "UNIONBANK", "UNITDSPR", "UNOMINDA", "UPL", "VBL", "VEDL", "VMM",
+    "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZEEL", "ZYDUSLIFE"
+]
+
+_FNO_NORMALIZED_SET: set[str] = set()
+
+
+def is_fno_eligible(ticker: str) -> bool:
+    """Check if a ticker or symbol is eligible for NSE Derivatives (F&O).
+
+    Fast in-memory lookup (<0.01ms). Normalizes ticker symbol (removes .NS suffix,
+    converts to uppercase, trims whitespace).
+    """
+    if not ticker:
+        return False
+    clean = str(ticker).upper().strip()
+    if clean.endswith(".NS"):
+        clean = clean[:-3]
+    global _FNO_NORMALIZED_SET
+    if not _FNO_NORMALIZED_SET:
+        _FNO_NORMALIZED_SET = {s.upper().replace(".NS", "").strip() for s in _SEED_NSE_FNO}
+    return clean in _FNO_NORMALIZED_SET
+
 
 # ---------------------------------------------------------------------------
 # SQLite connection & schema
@@ -366,6 +422,9 @@ def get_universe(name: str, settings: Settings | None = None) -> list[str]:
         return list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100))
     elif clean_name in ("nifty_500", "nifty500", "nse_500"):
         return list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100 + _SEED_NIFTY_SMALLCAP_100))
+    elif clean_name in ("nse_fno", "fno", "nifty_fno"):
+        indices = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI"}
+        return [f"{s}.NS" if s not in indices else s for s in _SEED_NSE_FNO]
     elif clean_name in ("us_top", "us", "us_50"):
         return list(_SEED_US_TOP)
 
@@ -494,6 +553,17 @@ UNIVERSE_METADATA: dict[str, dict[str, Any]] = {
         "explanation": "Includes benchmark NIFTY 50 blue-chip market leaders across banking, IT, energy, consumer, auto, and pharma.",
         "selection_criteria": "Official 50 constituents of the Nifty 50 Index.",
     },
+    "nse_fno": {
+        "name": "nse_fno",
+        "display_name": "⚡ NSE F&O (Derivatives Universe)",
+        "market": "IN",
+        "type": "universe",
+        "is_builtin": True,
+        "is_under_100": False,
+        "summary": "Eligible underlying equities and major indices traded on the NSE Futures & Options (F&O) segment.",
+        "explanation": "Deeply liquid derivatives universe with live option chains, open interest, PCR, and strike walls.",
+        "selection_criteria": "Official underlying securities in NSE F&O segment.",
+    },
 }
 
 
@@ -501,7 +571,7 @@ def get_universe_details(settings: Settings | None = None) -> list[dict[str, Any
     """Return all built-in universes with their full ticker lists, metadata, and explanations."""
     universe_names = [
         "nse_top", "nifty_50", "nifty_next_50", "nifty_100", "nifty_200", "nifty_500",
-        "nse_mid_cap", "nse_small_cap", "nse_large_cap", "nse_all", "us_top"
+        "nse_mid_cap", "nse_small_cap", "nse_large_cap", "nse_fno", "nse_all", "us_top"
     ]
     # Also inspect any other universes in SQLite
     for u in list_universes(settings):
@@ -693,6 +763,42 @@ def load_nse_large_cap(force_refresh: bool = False, settings: Settings | None = 
         return get_universe("NSE_LARGE_CAP", settings)
 
 
+def load_nse_fno(force_refresh: bool = False, settings: Settings | None = None) -> list[str]:
+    """Load official NSE F&O underlying universe with .NS ticker suffixes for equities."""
+    global _FNO_NORMALIZED_SET
+    settings = settings or Settings()
+    if not force_refresh and is_universe_fresh("NSE_FNO", NSE_ALL_MAX_AGE_DAYS, settings):
+        tickers = get_universe("NSE_FNO", settings)
+        if tickers:
+            if not _FNO_NORMALIZED_SET:
+                _FNO_NORMALIZED_SET = {s.upper().replace(".NS", "").strip() for s in _SEED_NSE_FNO}
+            _FNO_NORMALIZED_SET.update(t.upper().replace(".NS", "").strip() for t in tickers)
+            return tickers
+
+    logger.info("refreshing NSE_FNO derivatives universe")
+    try:
+        from nselib import derivatives
+        df = derivatives.live_most_active_underlying()
+        if df is not None and not df.empty and "symbol" in df.columns:
+            raw_syms = df["symbol"].dropna().astype(str).str.strip().str.upper().unique().tolist()
+            if raw_syms:
+                if not _FNO_NORMALIZED_SET:
+                    _FNO_NORMALIZED_SET = {s.upper().replace(".NS", "").strip() for s in _SEED_NSE_FNO}
+                _FNO_NORMALIZED_SET.update(raw_syms)
+                indices = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI"}
+                fno_tickers = [f"{s}.NS" if s not in indices else s for s in raw_syms]
+                store_universe("NSE_FNO", fno_tickers, settings)
+                logger.info("NSE_FNO refreshed with %d symbols", len(fno_tickers))
+                return fno_tickers
+    except Exception as e:
+        logger.warning("Dynamic NSE F&O underlying fetch failed: %s; falling back to seed universe", e)
+
+    indices = {"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50", "NIFTYFPI"}
+    seed_formatted = [f"{s}.NS" if s not in indices else s for s in _SEED_NSE_FNO]
+    store_universe("NSE_FNO", seed_formatted, settings)
+    return seed_formatted
+
+
 # ---------------------------------------------------------------------------
 # Public Load APIs
 # ---------------------------------------------------------------------------
@@ -725,6 +831,8 @@ def load_universe(market: str, settings: Settings | None = None) -> list[str]:
         res = get_universe("nifty_200", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100))
     elif market_key in {"NIFTY_500", "NSE_500"}:
         res = get_universe("nifty_500", settings) or list(dict.fromkeys(_SEED_NIFTY_50 + _SEED_NIFTY_NEXT_50 + _SEED_NIFTY_MIDCAP_100 + _SEED_NIFTY_SMALLCAP_100))
+    elif market_key in {"NSE_FNO", "FNO", "NIFTY_FNO"}:
+        res = load_nse_fno(settings=settings)
     elif market_key in {"US", "US_TOP", "US_50"}:
         res = get_universe("US", settings) or get_universe("us_top", settings) or list(_SEED_US_TOP)
     elif market_key == "NSE_ALL":

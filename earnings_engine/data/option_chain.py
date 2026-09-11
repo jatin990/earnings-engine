@@ -18,6 +18,7 @@ import pandas as pd
 
 from earnings_engine.config import Settings
 from earnings_engine.data.providers.provider_manager import get_data_manager
+from earnings_engine.data.universe import is_fno_eligible
 
 logger = logging.getLogger("earnings_engine.data.option_chain")
 
@@ -162,7 +163,6 @@ def analyze_option_chain(
       - highest_put_oi_strike: Major support strike
     """
     clean_symbol = symbol.upper().replace(".NS", "")
-    spot_price = _resolve_spot_price(clean_symbol, spot_price, settings)
 
     # Fast return from TTL cache
     now = pd.Timestamp.now().timestamp()
@@ -170,6 +170,29 @@ def analyze_option_chain(
         cached_time, cached_res = _OPTION_CHAIN_CACHE[clean_symbol]
         if (now - cached_time) < _CACHE_TTL_SECONDS:
             return cached_res
+
+    # Anti-Fabrication & Latency Guard: Non-F&O cash equities have no derivatives
+    if not is_fno_eligible(clean_symbol):
+        res = {
+            "symbol": clean_symbol,
+            "status": "NOT_FNO",
+            "pcr_oi": None,
+            "pcr_volume": None,
+            "max_pain_strike": None,
+            "sentiment": "NEUTRAL",
+            "call_oi_total": 0,
+            "put_oi_total": 0,
+            "resistance_strike": None,
+            "support_strike": None,
+            "records_count": 0,
+            "strikes": [],
+            "signals": ["NOT_FNO_ELIGIBLE"],
+            "spot_price": spot_price,
+        }
+        _OPTION_CHAIN_CACHE[clean_symbol] = (now, res)
+        return res
+
+    spot_price = _resolve_spot_price(clean_symbol, spot_price, settings)
 
     # If known non-F&O equity, return fast baseline without hammering network
     if clean_symbol in _NON_FNO_SYMBOLS:

@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "github": {
+    "autoJobCancellation": true
+  },
   "functions": {
     "api/index.py": {
       "maxDuration": 60,

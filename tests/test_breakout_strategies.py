@@ -127,6 +127,10 @@ def test_score_fo_call_wall(sample_prices_df):
     assert "calculation_notes" in res
     assert res["calculation_notes"]["strategy_id"] == "NSE_FO_CALL_WALL"
 
+    # Non-F&O cash equity must be immediately rejected with None / cold
+    res_non_fno = score_breakout("SOUTHWEST.NS", sample_prices_df, strategy="NSE_FO_CALL_WALL", settings=settings)
+    assert res_non_fno is None
+
 
 def test_score_volume_profile_vah(sample_prices_df):
     """Test Volume Profile VAH & POC compression scoring algorithm via score_breakout."""

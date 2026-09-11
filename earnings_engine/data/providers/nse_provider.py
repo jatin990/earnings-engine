@@ -284,6 +284,16 @@ class NSEDirectProvider(DataProvider):
     def fetch_option_chain(self, symbol: str, expiry_date: str | None = None) -> dict[str, Any]:
         """Fetch real-time / archival Option Chain data for an equity or index."""
         clean_symbol = symbol.upper().replace(".NS", "")
+        from earnings_engine.data.universe import is_fno_eligible
+        if not is_fno_eligible(clean_symbol):
+            logger.debug("[NSE:FNO_BYPASS] Symbol %s is not F&O eligible; skipping option chain network request", clean_symbol)
+            return {
+                "symbol": clean_symbol,
+                "records_count": 0,
+                "data": [],
+                "provider": "nse_direct",
+            }
+
         logger.info("[NSELIB:REQ] derivatives.nse_live_option_chain(%s)", clean_symbol)
         t0 = time.perf_counter()
         try:
