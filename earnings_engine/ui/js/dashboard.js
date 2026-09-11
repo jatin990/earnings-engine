@@ -11,6 +11,300 @@ const API_BASE = window.location.origin;
             sortKey: 'earnings_date',
             sortDir: 'asc',
 
+            _loadedScripts: new Set(),
+            _scriptPromises: {},
+            TAB_MODULES: {
+                'home': [],
+                'results': ['/static/js/modules/recalculate.js'],
+                'monthfilter': ['/static/js/modules/consensus.js', '/static/js/modules/swing_range.js', '/static/js/modules/month_filter.js'],
+                'scanner': ['/static/js/modules/consensus.js', '/static/js/modules/scanner.js'],
+                'catalysts': ['/static/js/modules/schedules.js', '/static/js/modules/catalysts.js', '/static/js/modules/catalyst_consensus.js'],
+                'premarket': ['/static/js/modules/premarket.js'],
+                'gainers': ['/static/js/modules/consensus.js', '/static/js/modules/gainers.js'],
+                'breakout': ['/static/js/modules/consensus.js', '/static/js/modules/schedules.js', '/static/js/modules/swing_range.js', '/static/js/modules/breakout_audit.js', '/static/js/modules/tracked_breakouts.js', '/static/js/modules/stock_rating.js', '/static/js/modules/stock_note.js', '/static/js/modules/breakout_radar.js'],
+                'institutional': ['/static/js/modules/institutional.js'],
+                'tri-confluence': ['/static/js/modules/tri_confluence.js'],
+                'repeaters': ['/static/js/modules/repeaters.js'],
+                'new-additions': ['/static/js/modules/new_additions.js'],
+                'swing': ['/static/js/modules/swing_range.js', '/static/js/modules/swing.js'],
+                'kronos': ['/static/js/modules/consensus.js'],
+                'consensus': ['/static/js/modules/consensus.js'],
+                'buydip': ['/static/js/modules/buy_dip.js'],
+                'playground': ['/static/js/modules/schedules.js', '/static/js/modules/playground.js'],
+                'watchlist': ['/static/js/modules/swing_range.js', '/static/js/modules/watchlist_modal.js', '/static/js/modules/watchlist.js'],
+                'backtest': ['/static/js/modules/backtest.js'],
+                'coverage': ['/static/js/modules/coverage.js'],
+                'industries': ['/static/js/modules/industries.js'],
+                'patterns': ['/static/js/modules/consensus.js', '/static/js/modules/patterns.js']
+            },
+
+            loadScript(src) {
+                if (!src) return Promise.resolve();
+                const cleanSrc = src.split('?')[0];
+                if (this._loadedScripts && this._loadedScripts.has(cleanSrc)) {
+                    return Promise.resolve();
+                }
+                if (this._scriptPromises && this._scriptPromises[cleanSrc]) {
+                    return this._scriptPromises[cleanSrc];
+                }
+                const version = '20260828_v23_modular';
+                const versionedSrc = cleanSrc + (cleanSrc.includes('?') ? '&' : '?') + 'v=' + version;
+
+                const p = new Promise((resolve, reject) => {
+                    const existing = document.querySelector(`script[src*="${cleanSrc}"]`);
+                    if (existing) {
+                        this._loadedScripts.add(cleanSrc);
+                        resolve();
+                        return;
+                    }
+                    const s = document.createElement('script');
+                    s.src = versionedSrc;
+                    s.async = true;
+                    s.onload = () => {
+                        this._loadedScripts.add(cleanSrc);
+                        delete this._scriptPromises[cleanSrc];
+                        resolve();
+                    };
+                    s.onerror = (err) => {
+                        delete this._scriptPromises[cleanSrc];
+                        console.error(`[dynamic-loader] Failed to load script: ${versionedSrc}`, err);
+                        reject(err);
+                    };
+                    document.head.appendChild(s);
+                });
+
+                if (!this._scriptPromises) this._scriptPromises = {};
+                this._scriptPromises[cleanSrc] = p;
+                return p;
+            },
+
+            async loadTabModules(tabName) {
+                const modules = (this.TAB_MODULES && this.TAB_MODULES[tabName]) || [];
+                for (const mod of modules) {
+                    try {
+                        await this.loadScript(mod);
+                    } catch (e) {
+                        console.warn(`[dynamic-loader] Error loading module ${mod} for tab ${tabName}:`, e);
+                    }
+                }
+            },
+
+            async openPageGuideModal(tabName) {
+                await this.loadScript('/static/js/modules/page_guide.js');
+                if (typeof app.openPageGuideModal === 'function') {
+                    app.openPageGuideModal(tabName);
+                }
+            },
+            closePageGuideModal() {
+                const modal = document.getElementById('pageGuideModal');
+                if (modal) modal.style.display = 'none';
+            },
+            async openSwingRangeModal(watchlist, ticker) {
+                await this.loadScript('/static/js/modules/swing_range.js');
+                if (typeof app.openSwingRangeModal === 'function') {
+                    return app.openSwingRangeModal(watchlist, ticker);
+                }
+            },
+            async openStockRatingModal(ticker) {
+                await this.loadScript('/static/js/modules/stock_rating.js');
+                if (typeof app.openStockRatingModal === 'function') {
+                    return app.openStockRatingModal(ticker);
+                }
+            },
+            async openStockNote(ticker, event) {
+                await this.loadScript('/static/js/modules/stock_note.js');
+                if (typeof app.openStockNote === 'function') {
+                    return app.openStockNote(ticker, event);
+                }
+            },
+            closeStockNote() {
+                const modal = document.getElementById('stockIntelligenceNoteModal');
+                if (modal) modal.style.display = 'none';
+            },
+            async openAddToWatchlistModal(ticker, price) {
+                await this.loadScript('/static/js/modules/watchlist_modal.js');
+                if (typeof app.openAddToWatchlistModal === 'function') {
+                    return app.openAddToWatchlistModal(ticker, price);
+                }
+            },
+            closeAddToWatchlistModal() {
+                const modal = document.getElementById('addToWatchlistModal');
+                if (modal) modal.style.display = 'none';
+            },
+            async openTradingAgentsWarRoom(ticker, event) {
+                await this.loadScript('/static/js/modules/consensus.js');
+                if (typeof app.openTradingAgentsWarRoom === 'function') {
+                    return app.openTradingAgentsWarRoom(ticker, event);
+                }
+            },
+            async openAiDetails(market, ticker, e) {
+                await this.loadScript('/static/js/modules/consensus.js');
+                await this.loadScript('/static/js/modules/swing_range.js');
+                await this.loadScript('/static/js/modules/month_filter.js');
+                if (typeof app.openAiDetails === 'function') {
+                    return app.openAiDetails(market, ticker, e);
+                }
+            },
+
+            async loadOverview() {
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/dashboard/overview');
+                    const data = await res.json();
+                    if (typeof this.renderDatasetSummary === 'function') this.renderDatasetSummary(data.dataset);
+                    if (typeof this.renderRefreshStatus === 'function') this.renderRefreshStatus(data.refresh_status);
+                } catch (e) {
+                    console.error('Error loading overview:', e);
+                }
+            },
+            renderDatasetSummary(ds) {
+                const el = document.getElementById('resultsDatasetSummary');
+                if (!el) return;
+                if (!ds || !ds.available) {
+                    el.innerHTML = '<div class="card" style="margin:0">⚠️ Event dataset not available. Run <code>earnings-engine build-dataset</code> first.</div>';
+                    return;
+                }
+                el.innerHTML = [
+                    '<div class="metric"><span>Dataset Rows</span><strong>' + ds.rows + '</strong></div>',
+                    '<div class="metric"><span>Tickers</span><strong>' + ds.tickers + '</strong></div>',
+                    '<div class="metric"><span>Up-Label Rate</span><strong>' + (ds.up_label_rate !== null ? (ds.up_label_rate * 100).toFixed(1) + '%' : 'N/A') + '</strong></div>',
+                    '<div class="metric"><span>Date Range</span><strong>' + (ds.date_range ? ds.date_range.min + ' → ' + ds.date_range.max : 'N/A') + '</strong></div>'
+                ].join('');
+            },
+            renderRefreshStatus(status) {
+                const el = document.getElementById('lastRefreshed');
+                if (!el) return;
+                if (!status || Object.keys(status).length === 0) {
+                    el.textContent = 'Last refreshed: Never';
+                    return;
+                }
+                let parts = Object.entries(status).map(([k, v]) => {
+                    const time = v.last_refresh ? v.last_refresh.split(' ')[1] : '?';
+                    return k + ': ' + time + ' (' + v.rows + ')';
+                });
+                el.textContent = 'Last refreshed — ' + parts.join(' · ');
+            },
+            maybeShowKronosPrompt() {
+                const el = document.getElementById('kronosWidgets');
+                if (!el) return;
+                if (!el.innerHTML.trim()) {
+                    el.innerHTML = '<div class="card" style="grid-column:1/-1;margin:0">' +
+                        '<p style="margin:0 0 0.5rem 0;">Select a watchlist below, then click ▶ Run Predictions to load forecasts.</p>' +
+                        '<p style="margin:0;color:var(--muted);font-size:0.8rem;">Kronos does not fetch anything by default — pick one of your managed watchlists to get started.</p>' +
+                        '</div>';
+                }
+            },
+            async loadConsensusCache() {
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/consensus/latest?limit=500');
+                    const data = await res.json();
+                    if (data && data.predictions) {
+                        data.predictions.forEach(p => {
+                            if (p.ticker) {
+                                this.consensusMap[p.ticker.toUpperCase()] = p;
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Failed to load consensus cache:', e);
+                }
+            },
+            async loadTradingAgentsCache() {
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/trading-agents/all?limit=500');
+                    const data = await res.json();
+                    if (data && data.reports) {
+                        data.reports.forEach(r => {
+                            if (r.ticker) {
+                                (this.tradingAgentsMap = this.tradingAgentsMap || {})[r.ticker.toUpperCase()] = r;
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.warn('Failed to load TradingAgents cache:', e);
+                }
+            },
+            renderConsensusBadge(ticker, market) {
+                if (!ticker) return '—';
+                const sym = String(ticker).trim().toUpperCase();
+                const pred = (this.consensusMap || {})[sym];
+                const safeMarket = (market || this.currentMarket || 'ALL').replace(/'/g, "\\'");
+                const safeSym = sym.replace(/'/g, "\\'");
+                const domId = 'consensus-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
+
+                if (pred && pred.consensus_direction) {
+                    const dir = (pred.consensus_direction || 'NEUTRAL').toUpperCase();
+                    const isBull = dir.includes('BULL');
+                    const isBear = dir.includes('BEAR');
+                    const color = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
+                    const bg = isBull ? 'rgba(16,185,129,0.18)' : isBear ? 'rgba(239,68,68,0.18)' : 'rgba(251,191,36,0.18)';
+                    const border = isBull ? 'rgba(16,185,129,0.35)' : isBear ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)';
+
+                    const retPct = pred.consensus_return_pct != null ? pred.consensus_return_pct : (pred.expected_move_pct != null ? pred.expected_move_pct : null);
+                    const retStr = retPct != null ? ((retPct > 0 ? '+' : '') + Number(retPct).toFixed(1) + '%') : '';
+                    const strength = pred.consensus_strength != null ? Math.round(pred.consensus_strength) + '%' : '';
+                    const agreeRatio = pred.agreement_ratio != null ? Math.round(pred.agreement_ratio * 100) : (pred.agreement_rate ? Math.round(pred.agreement_rate * 100) : null);
+                    const action = pred.consensus_recommended_action || (isBull ? 'BUY' : isBear ? 'SELL' : 'HOLD');
+
+                    const titleText = 'DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral: ' + dir + (retStr ? ' (' + retStr + ')' : '') +
+                        (agreeRatio ? ' · ' + agreeRatio + '% Agreement' : '') +
+                        (strength ? ' · ' + strength + ' Strength' : '') +
+                        (action ? ' · Stance: ' + action : '') +
+                        ' (Click to view full price action & 5-pillar targets)';
+
+                    return '<div id="' + domId + '" style="display:inline-flex;align-items:center;gap:0.35rem;white-space:nowrap;">' +
+                        '<span class="signal-badge" style="background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';font-size:0.72rem;padding:0.18rem 0.5rem;font-weight:700;cursor:pointer;white-space:nowrap;" onclick="event.stopPropagation(); app.openAiDetails(\'' + safeMarket + '\', \'' + safeSym + '\', event)" title="' + titleText.replace(/"/g, '&quot;') + '">' +
+                        '🤖 ' + dir + (retStr ? ' ' + retStr : '') +
+                        '</span>' +
+                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(99,102,241,0.18);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);border-radius:0.3rem;" title="Re-run 4-Model AI Consensus for ' + safeSym + '">⚡</button>' +
+                        '</div>';
+                } else {
+                    return '<div id="' + domId + '" style="white-space:nowrap;">' +
+                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runConsensusForTicker(\'' + safeSym + '\', this)" style="padding:0.18rem 0.45rem;font-size:0.7rem;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);border-radius:0.3rem;font-weight:600;white-space:nowrap;" title="Run DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral 4-Model consensus for ' + safeSym + '">⚡ AI Consensus</button>' +
+                        '</div>';
+                }
+            },
+            renderTradingAgentsBadge(ticker, market) {
+                if (!ticker) return '—';
+                const sym = String(ticker).trim().toUpperCase();
+                const rep = (this.tradingAgentsMap || {})[sym];
+                const safeSym = sym.replace(/'/g, "\\'");
+                const domId = 'trading-agents-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
+
+                if (rep && rep.action) {
+                    const act = (rep.action || 'HOLD').toUpperCase();
+                    const isBull = act.includes('BUY');
+                    const isBear = act.includes('SELL');
+                    const color = isBull ? '#34d399' : isBear ? '#f87171' : '#fbbf24';
+                    const bg = isBull ? 'rgba(16,185,129,0.18)' : isBear ? 'rgba(239,68,68,0.18)' : 'rgba(251,191,36,0.18)';
+                    const border = isBull ? 'rgba(16,185,129,0.35)' : isBear ? 'rgba(239,68,68,0.35)' : 'rgba(251,191,36,0.35)';
+                    const score = rep.conviction_score || 50;
+                    const rrr = rep.risk_reward_ratio ? ` · ${Number(rep.risk_reward_ratio).toFixed(1)}R` : '';
+
+                    return '<div id="' + domId + '" style="display:inline-flex;align-items:center;gap:0.3rem;white-space:nowrap;">' +
+                        '<span class="signal-badge" style="background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';font-size:0.70rem;padding:0.15rem 0.45rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.25rem;" onclick="event.stopPropagation(); app.openTradingAgentsWarRoom(\'' + safeSym + '\', event)" title="TradingAgents 7-Agent Synthesis: ' + act + ' (' + score + '% Conviction' + rrr + ') · Click for 7-Agent War Room">' +
+                        '🏛️ ' + act + ' (' + score + '%)' +
+                        '</span>' +
+                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runTradingAgentsWorkflow(\'' + safeSym + '\', this)" style="padding:0.12rem 0.35rem;font-size:0.68rem;background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;" title="Re-run 7-Agent Trading Team for ' + safeSym + '">⚡</button>' +
+                        '</div>';
+                } else {
+                    return '<div id="' + domId + '" style="white-space:nowrap;">' +
+                        '<button type="button" class="btn btn-sm" onclick="event.stopPropagation(); app.runTradingAgentsWorkflow(\'' + safeSym + '\', this)" style="padding:0.16rem 0.42rem;font-size:0.68rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);border-radius:0.3rem;font-weight:600;white-space:nowrap;" title="Run 7-Agent Trading Team (TauricResearch) for ' + safeSym + '">🏛️ TradingAgents</button>' +
+                        '</div>';
+                }
+            },
+            async runConsensusForTicker(ticker, btn) {
+                await this.loadScript('/static/js/modules/consensus.js');
+                if (typeof app.runConsensusForTicker === 'function') {
+                    return app.runConsensusForTicker(ticker, btn);
+                }
+            },
+            async runTradingAgentsWorkflow(ticker, btn) {
+                await this.loadScript('/static/js/modules/consensus.js');
+                if (typeof app.runTradingAgentsWorkflow === 'function') {
+                    return app.runTradingAgentsWorkflow(ticker, btn);
+                }
+            },
+
             // ---------- Watchlist tab (multi-list manager) ----------
             // ---------- Watchlist tab (multi-list manager & OHLCV list view) ----------
         // [watchlist] -> extracted to modules/watchlist.js
@@ -266,15 +560,20 @@ const API_BASE = window.location.origin;
                 this._bindWatchlistSelectionPersistence();
                 this._restoreBdControls();
                 this._restorePatternsControls();
-                this.populateWatchlistDropdowns();
-                this.loadOverview();
-                this.loadConsensusCache();
-                if (typeof this.loadTradingAgentsCache === 'function') {
-                    this.loadTradingAgentsCache();
-                }
+
+                // Defer non-critical background data fetches so initial Market Pulse load is instant and non-blocking
+                setTimeout(() => {
+                    this.populateWatchlistDropdowns();
+                    this.loadOverview();
+                    this.loadConsensusCache();
+                    if (typeof this.loadTradingAgentsCache === 'function') {
+                        this.loadTradingAgentsCache();
+                    }
+                    this.updateWatchlistFreshnessPill(localStorage.getItem('selectedGlobalWatchlist') || '');
+                    this.initGlobalPriceRefresh?.();
+                }, 1200);
+
                 this.updateTopRateLimitPill();
-                this.updateWatchlistFreshnessPill(localStorage.getItem('selectedGlobalWatchlist') || '');
-                this.initGlobalPriceRefresh?.();
                 setInterval(() => {
                     this.updateTopRateLimitPill();
                 }, 30000);
@@ -619,7 +918,7 @@ const API_BASE = window.location.origin;
                 return false;
             },
 
-            switchTab(name, updateUrl = true, isInitialLoad = false) {
+            async switchTab(name, updateUrl = true, isInitialLoad = false) {
                 name = (name || 'home').toLowerCase().replace('#', '').replace('tab=', '');
                 const validTabs = ['home', 'results', 'monthfilter', 'scanner', 'catalysts', 'premarket', 'gainers', 'breakout', 'institutional', 'tri-confluence', 'repeaters', 'new-additions', 'swing', 'watchlist', 'kronos', 'consensus', 'coverage', 'industries', 'patterns', 'buydip', 'backtest', 'playground'];
                 if (!validTabs.includes(name)) name = 'home';
@@ -731,6 +1030,9 @@ const API_BASE = window.location.origin;
                         targetSel.value = gWl;
                     }
                 }
+
+                // Dynamically load on-demand modules required for this tab
+                await this.loadTabModules(name);
 
                 // Lazy-initialize client UI components on first visit without firing heavy backend scans
                 if (name === 'home') {
@@ -1722,12 +2024,11 @@ const API_BASE = window.location.origin;
         // [institutional] -> extracted to modules/institutional.js
         });
 
-        // Safe boot sequence: ensures all 33 modular script tags have loaded & attached to window.app
+        // Safe boot sequence: ensures all modular script tags have loaded & attached to window.app
         function bootApp() {
             if (typeof app.init === 'function' && !app._initialized) {
                 app._initialized = true;
                 try { app.init(); } catch (e) { console.warn('[dashboard] app.init error:', e); }
-                try { app.updateResultsMonthSummaryCards(); } catch (e) { console.warn('[dashboard] Month summary fetch error:', e); }
             }
         }
 

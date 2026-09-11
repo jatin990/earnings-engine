@@ -72,9 +72,13 @@ app.updateSidebarBadges = async function() {
             }
         };
 
-    // Auto-refresh sidebar badges every 45 seconds
+    // Auto-refresh sidebar badges every 45 seconds (deferred initial load to prevent boot contention)
     try {
-        app.updateSidebarBadges();
+        setTimeout(() => {
+            if (typeof app.updateSidebarBadges === 'function') {
+                app.updateSidebarBadges();
+            }
+        }, 1500);
         setInterval(() => {
             if (typeof app.updateSidebarBadges === 'function') {
                 app.updateSidebarBadges();

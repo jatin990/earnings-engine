@@ -6,9 +6,14 @@ import json
 import sqlite3
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, time as dt_time, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None  # type: ignore
 
 import pandas as pd
 import yfinance as yf
@@ -675,18 +680,271 @@ def ingest_prices(
     return results
 
 
-def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: bool = True) -> dict[str, Any]:
+def _get_market_session_status(ticker: str) -> dict[str, Any]:
+    """Determine market session status (open, closed, weekend, pre/post market) for a ticker.
+
+    NSE equities/indices (.NS, ^NSE*, ^CNX*, ^INDIAVIX) use Asia/Kolkata (IST: 09:15-15:30).
+    US equities and other assets use America/New_York (EST/EDT: 09:30-16:00).
+    """
+    sym = (ticker or "").strip().upper()
+    is_india = sym.endswith(".NS") or sym.startswith(("^NSE", "^CNX", "^INDIAVIX"))
+
+    tz = None
+    if ZoneInfo is not None:
+        try:
+            tz = ZoneInfo("Asia/Kolkata" if is_india else "America/New_York")
+        except Exception:
+            tz = None
+    if tz is None:
+        if is_india:
+            tz = timezone(timedelta(hours=5, minutes=30))
+        else:
+            tz = timezone(timedelta(hours=-4))  # Approximate US Eastern (EDT)
+
+    now_local = datetime.now(tz)
+    weekday = now_local.weekday()  # Monday = 0, Sunday = 6
+    is_weekend = weekday >= 5
+
+    open_time = dt_time(9, 15) if is_india else dt_time(9, 30)
+    close_time = dt_time(15, 30) if is_india else dt_time(16, 0)
+    current_time = now_local.time()
+    market_date = now_local.strftime("%Y-%m-%d")
+
+    is_open = False
+    is_pre_market = False
+    is_post_market = False
+
+    if not is_weekend:
+        if current_time < open_time:
+            is_pre_market = True
+        elif current_time > close_time:
+            is_post_market = True
+        else:
+            is_open = True
+
+    return {
+        "is_open": is_open,
+        "is_weekend": is_weekend,
+        "is_pre_market": is_pre_market,
+        "is_post_market": is_post_market,
+        "market_date": market_date,
+        "now_local": now_local,
+        "open_time": open_time,
+        "close_time": close_time,
+    }
+
+
+def _get_cached_quotes_batch(
+    tickers: list[str],
+    settings: Settings,
+    batch_chunk_size: int = 100,
+) -> dict[str, dict[str, Any]]:
+    """Batch retrieve the latest 2-day price action and 52W metrics from SQLite price_history and tickers.
+
+    Uses an optimized window CTE query bounded to 252 bars per ticker.
+    Chunks requested tickers into chunks of 100 to prevent SQLite variable limits.
+    Returns a dict mapping canonical ticker -> aggregated record dictionary.
+    """
+    if not tickers:
+        return {}
+
+    unique_syms = list(dict.fromkeys([canonical_symbol(t) for t in tickers if t]))
+    results: dict[str, dict[str, Any]] = {}
+
+    try:
+        with _connect(settings) as conn:
+            conn.row_factory = sqlite3.Row
+            for i in range(0, len(unique_syms), batch_chunk_size):
+                chunk = unique_syms[i : i + batch_chunk_size]
+                placeholders = ", ".join(["?"] * len(chunk))
+                sql = f"""
+                    WITH ranked AS (
+                        SELECT ticker, date, open, high, low, close, volume,
+                               ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) as rn
+                        FROM price_history
+                        WHERE ticker IN ({placeholders})
+                    ),
+                    filtered AS (
+                        SELECT * FROM ranked WHERE rn <= 252
+                    )
+                    SELECT
+                        f.ticker,
+                        MAX(CASE WHEN f.rn = 1 THEN f.close END) AS cur_close,
+                        MAX(CASE WHEN f.rn = 1 THEN f.open END) AS cur_open,
+                        MAX(CASE WHEN f.rn = 1 THEN f.high END) AS cur_high,
+                        MAX(CASE WHEN f.rn = 1 THEN f.low END) AS cur_low,
+                        MAX(CASE WHEN f.rn = 1 THEN f.volume END) AS cur_vol,
+                        MAX(CASE WHEN f.rn = 1 THEN f.date END) AS cur_date,
+                        MAX(CASE WHEN f.rn = 2 THEN f.close END) AS prev_close,
+                        MAX(f.high) AS w52_high,
+                        MIN(f.low) AS w52_low,
+                        AVG(f.volume) AS avg_vol,
+                        t.market_cap,
+                        t.prices_fetched_at
+                    FROM filtered f
+                    LEFT JOIN tickers t ON f.ticker = t.ticker
+                    GROUP BY f.ticker
+                """
+                rows = conn.execute(sql, chunk).fetchall()
+                for r in rows:
+                    rec = dict(r)
+                    results[rec["ticker"]] = rec
+    except Exception as e:
+        logger.warning("[CACHE:FAIL] _get_cached_quotes_batch failed: %s", e)
+
+    return results
+
+
+def _is_cached_quote_fresh(
+    cached_record: dict[str, Any],
+    session: dict[str, Any],
+    ttl_minutes: int = 5,
+) -> bool:
+    """Evaluate whether a cached quote record can be served without network re-fetch.
+
+    Rules:
+    - Must have a valid cur_close > 0.
+    - If weekend: Fresh if we have settled price history (cur_close > 0).
+    - If post-market: Fresh if today's market date is settled (cur_date == market_date),
+      OR if prices_fetched_at occurred after market close today.
+      If today's market close has not been fetched yet, it's stale (needs 1 fetch to settle).
+    - If pre-market: Fresh if we have settled price history from recent days (cur_date within 4 days).
+    - If market is open: Fresh ONLY if prices_fetched_at is within ttl_minutes.
+    """
+    cur_close = cached_record.get("cur_close")
+    if cur_close is None or float(cur_close) <= 0:
+        return False
+
+    is_open = session.get("is_open", False)
+    is_weekend = session.get("is_weekend", False)
+    is_post = session.get("is_post_market", False)
+    is_pre = session.get("is_pre_market", False)
+    market_date = session.get("market_date", "")
+    cur_date = cached_record.get("cur_date") or ""
+
+    fetched_at_str = cached_record.get("prices_fetched_at")
+    fetched_at_dt: datetime | None = None
+    if fetched_at_str:
+        try:
+            fetched_at_dt = datetime.fromisoformat(fetched_at_str.replace("Z", "+00:00"))
+        except Exception:
+            fetched_at_dt = None
+
+    if is_weekend:
+        return True
+
+    if is_post:
+        if cur_date == market_date:
+            return True
+        close_time = session.get("close_time")
+        if fetched_at_dt and close_time:
+            try:
+                if fetched_at_dt.strftime("%Y-%m-%d") == market_date and fetched_at_dt.time() >= close_time:
+                    return True
+            except Exception:
+                pass
+        return False
+
+    if is_pre:
+        if cur_date:
+            try:
+                cd = datetime.strptime(cur_date, "%Y-%m-%d").date()
+                md = datetime.strptime(market_date, "%Y-%m-%d").date()
+                if (md - cd).days <= 4:
+                    return True
+            except Exception:
+                pass
+        return False
+
+    if is_open:
+        if not fetched_at_dt:
+            return False
+        now_dt = datetime.now(fetched_at_dt.tzinfo) if fetched_at_dt.tzinfo else datetime.now()
+        age_seconds = (now_dt - fetched_at_dt).total_seconds()
+        return -5 <= age_seconds <= (ttl_minutes * 60)
+
+    return True
+
+
+def _build_quote_from_cached_record(
+    sym: str,
+    record: dict[str, Any],
+    session: dict[str, Any],
+) -> dict[str, Any]:
+    """Transform an aggregated SQLite record into the standard 18-key quote dict."""
+    last_p = record.get("cur_close")
+    prev_c = record.get("prev_close")
+    open_p = record.get("cur_open")
+    day_h = record.get("cur_high")
+    day_l = record.get("cur_low")
+    yr_h = record.get("w52_high")
+    yr_l = record.get("w52_low")
+    vol = record.get("cur_vol")
+    avg_vol = record.get("avg_vol")
+    mcap = record.get("market_cap")
+
+    quote: dict[str, Any] = {
+        "ticker": sym,
+        "current_price": round(float(last_p), 2) if last_p is not None else None,
+        "previous_close": round(float(prev_c), 2) if prev_c is not None and prev_c > 0 else None,
+        "day_change": None,
+        "day_change_pct": None,
+        "day_open": round(float(open_p), 2) if open_p is not None else None,
+        "day_high": round(float(day_h), 2) if day_h is not None else None,
+        "day_low": round(float(day_l), 2) if day_l is not None else None,
+        "week_52_high": round(float(yr_h), 2) if yr_h is not None else None,
+        "week_52_low": round(float(yr_l), 2) if yr_l is not None else None,
+        "volume": int(vol) if vol is not None else None,
+        "avg_volume": int(avg_vol) if avg_vol is not None else None,
+        "market_cap": float(mcap) if mcap is not None else None,
+        "currency": "INR" if sym.endswith(".NS") else "USD",
+        "is_live": bool(session.get("is_open", False)),
+        "last_updated": record.get("prices_fetched_at") or datetime.now().isoformat(),
+        "pct_from_52w_high": None,
+        "pct_from_52w_low": None,
+    }
+
+    if quote["current_price"] is not None and quote["previous_close"] is not None:
+        quote["day_change"] = round(float(quote["current_price"] - quote["previous_close"]), 2)
+        quote["day_change_pct"] = round(float((quote["current_price"] / quote["previous_close"] - 1.0) * 100.0), 2)
+
+    if quote["current_price"] is not None and quote["week_52_high"] and quote["week_52_high"] > 0:
+        quote["pct_from_52w_high"] = round((quote["current_price"] / quote["week_52_high"] - 1.0) * 100.0, 2)
+    if quote["current_price"] is not None and quote["week_52_low"] and quote["week_52_low"] > 0:
+        quote["pct_from_52w_low"] = round((quote["current_price"] / quote["week_52_low"] - 1.0) * 100.0, 2)
+
+    return quote
+
+
+def fetch_live_quote(
+    ticker: str,
+    settings: Settings | None = None,
+    sync_db: bool = True,
+    force: bool = False,
+    ttl_minutes: int = 5,
+) -> dict[str, Any]:
     """Fetch authoritative live real-time market quote for a single ticker.
 
-    Uses yfinance fast_info attribute access with fallbacks to intraday / daily
-    history bars. If sync_db=True and a valid price is obtained, upserts today's
-    live bar into price_history and updates tickers.market_cap so that all
-    downstream technical analysis (RSI, EMAs, 52W range, swing channels, and
-    AI consensus prompts) immediately run on real-time data.
+    Uses DB-first TTL caching (default 5 minutes, market-session aware) to prevent
+    redundant outbound network requests and conserve downstream API rate limits.
+    If force=True, or if cached data is missing or stale, queries Yahoo Finance fast_info
+    attribute access with fallbacks to intraday / daily history bars.
+    If sync_db=True and a valid price is obtained, upserts today's live bar into
+    price_history and updates tickers.market_cap and prices_fetched_at.
     """
     settings = settings or Settings()
     sym = ticker.strip().upper()
     fetch_sym = KNOWN_TICKER_ALIASES.get(sym, sym)
+    canonical = canonical_symbol(sym)
+    session = _get_market_session_status(sym)
+
+    # 1. DB-First Freshness Check (serve immediately if fresh in SQLite)
+    if not force:
+        cached_records = _get_cached_quotes_batch([canonical], settings=settings)
+        record = cached_records.get(canonical) or cached_records.get(sym)
+        if record and _is_cached_quote_fresh(record, session, ttl_minutes=ttl_minutes):
+            logger.debug("[QUOTE:CACHE-HIT] %s served from SQLite (market_open=%s)", sym, session["is_open"])
+            return _build_quote_from_cached_record(sym, record, session)
 
     quote: dict[str, Any] = {
         "ticker": sym,
@@ -705,6 +963,8 @@ def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: boo
         "currency": "INR" if sym.endswith(".NS") else "USD",
         "is_live": False,
         "last_updated": datetime.now().isoformat(),
+        "pct_from_52w_high": None,
+        "pct_from_52w_low": None,
     }
 
     last_p: float | None = None
@@ -734,7 +994,7 @@ def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: boo
                     return fast_obj[fb]
         return None
 
-    logger.info("[YF:REQ] fetch_live_quote(%s via %s)", sym, fetch_sym)
+    logger.info("[YF:REQ] fetch_live_quote(%s via %s, force=%s)", sym, fetch_sym, force)
     t0_quote = time.perf_counter()
     try:
         from earnings_engine.rate_limits import record_request
@@ -820,8 +1080,7 @@ def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: boo
         elapsed_ms_q = (time.perf_counter() - t0_quote) * 1000
         logger.warning("[YF:FAIL] fetch_live_quote(%s) failed after %.1fms: %s", sym, elapsed_ms_q, e)
 
-    now_dt = datetime.now()
-    is_weekend = now_dt.weekday() >= 5
+    is_weekend = session.get("is_weekend", False)
 
     # If yfinance returned identical last_p and prev_c on weekends, or data is missing, anchor to settled trading history
     if last_p is None or prev_c is None or (is_weekend and prev_c is not None and abs(last_p - prev_c) < 0.001):
@@ -840,7 +1099,7 @@ def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: boo
 
     if last_p is not None and last_p > 0:
         quote["current_price"] = round(float(last_p), 2)
-        quote["is_live"] = False if is_weekend else True
+        quote["is_live"] = bool(session.get("is_open", False))
         if prev_c is not None and prev_c > 0:
             quote["previous_close"] = round(float(prev_c), 2)
             quote["day_change"] = round(float(last_p - prev_c), 2)
@@ -896,6 +1155,18 @@ def fetch_live_quote(ticker: str, settings: Settings | None = None, sync_db: boo
                 _mark_fetched(sym, settings)
             except Exception as e:
                 logger.debug("[LIVE-QUOTE] SQLite sync failed for %s: %s", sym, e)
+        elif sync_db and is_weekend:
+            try:
+                if mcap is not None:
+                    with _connect(settings) as conn:
+                        conn.execute(
+                            "UPDATE tickers SET market_cap = COALESCE(?, market_cap), market_cap_updated_at = ?, last_updated = ? WHERE ticker = ?",
+                            (mcap, datetime.now().isoformat(), datetime.now().isoformat(), sym),
+                        )
+                        conn.commit()
+                _mark_fetched(sym, settings)
+            except Exception as e:
+                logger.debug("[LIVE-QUOTE] SQLite weekend sync failed for %s: %s", sym, e)
 
     return quote
 
@@ -905,11 +1176,15 @@ def fetch_batch_live_quotes(
     settings: Settings | None = None,
     sync_db: bool = True,
     max_workers: int = 10,
+    force: bool = False,
+    ttl_minutes: int = 5,
 ) -> dict[str, dict[str, Any]]:
     """Fetch live real-time market quotes for multiple tickers in parallel batches.
 
-    Leverages a ThreadPoolExecutor over fast_info to resolve 50-100 live quotes
-    concurrently in ~500ms to 1.5s total without sequential HTTP blocking.
+    Uses DB-first TTL caching: queries SQLite price_history and tickers in a single
+    batch query. Fresh tickers within TTL (or settled on weekends/post-market) are
+    served immediately (<10ms). Only stale or missing tickers dispatch concurrent
+    network calls via ThreadPoolExecutor.
     """
     settings = settings or Settings()
     if not tickers:
@@ -917,15 +1192,48 @@ def fetch_batch_live_quotes(
 
     unique_tickers = list(dict.fromkeys([t.strip().upper() for t in tickers if t]))
     results: dict[str, dict[str, Any]] = {}
+    stale_tickers: list[str] = []
 
-    from concurrent.futures import ThreadPoolExecutor
+    if not force:
+        cached_records = _get_cached_quotes_batch(unique_tickers, settings=settings)
+        for t in unique_tickers:
+            sym = canonical_symbol(t)
+            record = cached_records.get(sym) or cached_records.get(t)
+            session = _get_market_session_status(sym)
+            if record and _is_cached_quote_fresh(record, session, ttl_minutes=ttl_minutes):
+                results[t] = _build_quote_from_cached_record(t, record, session)
+            else:
+                stale_tickers.append(t)
+    else:
+        stale_tickers = list(unique_tickers)
 
-    def _worker(t: str) -> tuple[str, dict[str, Any]]:
-        return t, fetch_live_quote(t, settings=settings, sync_db=sync_db)
+    if stale_tickers:
+        logger.info(
+            "[BATCH-QUOTES] Cache: %d fresh served from SQLite, %d stale to fetch via network",
+            len(results),
+            len(stale_tickers),
+        )
+        from concurrent.futures import ThreadPoolExecutor
 
-    with ThreadPoolExecutor(max_workers=min(max_workers, len(unique_tickers))) as executor:
-        for t, q in executor.map(_worker, unique_tickers):
-            results[t] = q
+        def _worker(t: str) -> tuple[str, dict[str, Any]]:
+            return t, fetch_live_quote(
+                t, settings=settings, sync_db=sync_db, force=True, ttl_minutes=ttl_minutes
+            )
+
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(stale_tickers))) as executor:
+            for t, q in executor.map(_worker, stale_tickers):
+                results[t] = q
+    else:
+        logger.debug(
+            "[BATCH-QUOTES] All %d tickers served directly from SQLite cache (0 network requests)",
+            len(unique_tickers),
+        )
+
+    for orig in tickers:
+        if orig and orig.strip():
+            orig_upper = orig.strip().upper()
+            if orig_upper in results and orig not in results:
+                results[orig] = results[orig_upper]
 
     return results
 

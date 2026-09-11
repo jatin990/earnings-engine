@@ -41,6 +41,7 @@ import pandas as pd
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
+from earnings_engine.data import swing_ranges as swing_ranges_mod
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.swing_scanner")
