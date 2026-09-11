@@ -21,10 +21,10 @@ logger = logging.getLogger("earnings_engine.consensus.model_runner")
 
 # Default curated model suite (Routed exclusively via OmniRoute Gateway)
 DEFAULT_MODELS = [
-    "omniroute/deepseek/deepseek-r1",
-    "omniroute/meta-llama/llama-3.3-70b-instruct",
-    "omniroute/qwen/qwen-2.5-72b-instruct",
-    "omniroute/google/gemini-2.0-flash-001",
+    "omniroute/antigravity",
+    "omniroute/antigravity/gemini-3.7-flash-medium",
+    "omniroute/antigravity/claude-sonnet-4-6",
+    "omniroute/antigravity/gemini-3.8-flash-tiered",
 ]
 
 # Model display names mapping
@@ -138,6 +138,16 @@ MODEL_DISPLAY_NAMES: dict[str, str] = {
     "omniroute/ai-news-engine": "OmniRoute-AI",
     "omniroute": "OmniRoute-AI",
     "omnirouter": "OmniRoute-AI",
+    "antigravity": "Antigravity (OmniRoute)",
+    "antigravity/gemini-3.7-flash-medium": "Gemini 3.7 Flash",
+    "antigravity/gemini-3.8-flash-tiered": "Gemini 3.8 Flash Tiered",
+    "antigravity/claude-sonnet-4-6": "Claude Sonnet 4.6",
+    "antigravity/claude-opus-4-6-thinking": "Claude Opus 4.6 Thinking",
+    "omniroute/antigravity": "OmniRoute (Antigravity)",
+    "omniroute/antigravity/gemini-3.7-flash-medium": "OmniRoute (Gemini 3.7 Flash)",
+    "omniroute/antigravity/gemini-3.8-flash-tiered": "OmniRoute (Gemini 3.8 Flash Tiered)",
+    "omniroute/antigravity/claude-sonnet-4-6": "OmniRoute (Claude Sonnet 4.6)",
+    "omniroute/antigravity/claude-opus-4-6-thinking": "OmniRoute (Claude Opus 4.6)",
 }
 
 
@@ -174,7 +184,7 @@ def _query_omniroute_model(
     # Strip prefix e.g. "omniroute/anthropic/claude-3.5-sonnet" -> "anthropic/claude-3.5-sonnet"
     sub_model = model_id.replace("omniroute/", "").replace("omnirouter/", "").strip()
     if not sub_model or sub_model in ("omniroute", "omnirouter"):
-        sub_model = "deepseek/deepseek-r1"
+        sub_model = os.getenv("OMNIROUTE_MODEL") or "antigravity"
 
     sub_display = MODEL_DISPLAY_NAMES.get(sub_model, sub_model.split("/")[-1].replace("-instruct", "").replace(":free", "").title())
     display_name = f"OmniRoute ({sub_display})" if "OmniRoute" not in sub_display else sub_display
@@ -194,6 +204,7 @@ def _query_omniroute_model(
     total_tokens = 0
     success = False
     active_sub_model = sub_model
+    effective_timeout = max(int(timeout or 25), 20)
 
     from earnings_engine.data.omniroute_client import HIGH_AVAILABILITY_MODELS
 
@@ -202,7 +213,7 @@ def _query_omniroute_model(
         clean_ha = ha.replace("omniroute/", "").replace("omnirouter/", "").strip()
         if clean_ha not in models_to_try:
             models_to_try.append(clean_ha)
-    models_to_try = models_to_try[:3]
+    models_to_try = models_to_try[:4]
 
     # Try sending chat completion request to OmniRoute gateway across candidate models
     for candidate_model in models_to_try:
@@ -226,7 +237,7 @@ def _query_omniroute_model(
                     "temperature": temperature,
                     "max_tokens": 1400,
                 },
-                timeout=timeout,
+                timeout=effective_timeout,
             )
             if resp.status_code == 200:
                 data = resp.json()
@@ -245,8 +256,9 @@ def _query_omniroute_model(
                     break
             else:
                 is_provider_failure = (
-                    resp.status_code in (503, 502, 504, 429)
+                    resp.status_code in (503, 502, 504, 429, 401, 400)
                     or "all target providers failed" in resp.text.lower()
+                    or "no active credentials" in resp.text.lower()
                 )
                 if is_provider_failure:
                     logger.warning(

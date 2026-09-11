@@ -213,5 +213,5 @@ def test_omniroute_cascade_on_503_provider_failure():
         assert res["direction"] == "BULLISH"
         assert res["impact_score"] == 80
         assert res["target_price"] == 3100.0
-        assert "openai/gpt-4o-mini" in res["ai_model"]
+        assert any(m in res["ai_model"] for m in ("antigravity", "openai/gpt-4o-mini"))
 

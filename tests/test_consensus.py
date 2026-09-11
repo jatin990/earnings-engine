@@ -362,7 +362,7 @@ def test_query_omniroute_model_cascades_on_503():
         assert res["direction"] == "BULLISH"
         assert res["confidence_pct"] == 82
         assert res["target_price"] == 1050.0
-        assert res["sub_model"] in ["openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "google/gemini-2.0-flash-001"]
+        assert res["sub_model"] in ["antigravity", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "google/gemini-2.0-flash-001"]
 
 
 

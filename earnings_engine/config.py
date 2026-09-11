@@ -99,10 +99,10 @@ class Settings:
         default_factory=lambda: (os.getenv("OMNIROUTE_API_KEY") or os.getenv("OMNI_API_KEY") or "").strip()
     )
     omniroute_model: str = field(
-        default_factory=lambda: os.getenv("OMNIROUTE_MODEL") or "deepseek/deepseek-r1"
+        default_factory=lambda: os.getenv("OMNIROUTE_MODEL") or "antigravity"
     )
     omniroute_timeout: int = field(
-        default_factory=lambda: _env_int("OMNIROUTE_TIMEOUT", 15)
+        default_factory=lambda: _env_int("OMNIROUTE_TIMEOUT", 25)
     )
     omniroute_fallback_url: str = field(
         default_factory=lambda: os.getenv("OMNIROUTE_FALLBACK_URL") or "http://localhost:20128/v1"
