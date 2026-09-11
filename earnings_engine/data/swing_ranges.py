@@ -14,48 +14,57 @@ from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path
 
 
+_INITIALIZED_DBS: set[str] = set()
+
+
 def _connect(settings: Settings) -> Any:
     settings.ensure_dirs()
     conn = get_db_connection(settings)
-    if not is_turso_enabled():
-        try:
-            conn.execute("PRAGMA journal_mode = WAL;")
-            conn.execute("PRAGMA busy_timeout = 10000;")
-        except Exception:
-            pass
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS swing_ranges (
-            watchlist      TEXT NOT NULL,
-            ticker         TEXT NOT NULL,
-            lower_bound    REAL,
-            upper_bound    REAL,
-            source         TEXT NOT NULL, -- 'auto' | 'user'
-            cycles         INTEGER,
-            avg_cycle_days REAL,
-            last_updated   TEXT NOT NULL,
-            PRIMARY KEY (watchlist, ticker)
+    try:
+        db_key = str(_cache_path(settings))
+    except Exception:
+        db_key = str(getattr(settings, "db_path", ""))
+    if db_key not in _INITIALIZED_DBS:
+        if not is_turso_enabled():
+            try:
+                conn.execute("PRAGMA journal_mode = WAL;")
+                conn.execute("PRAGMA busy_timeout = 10000;")
+            except Exception:
+                pass
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS swing_ranges (
+                watchlist      TEXT NOT NULL,
+                ticker         TEXT NOT NULL,
+                lower_bound    REAL,
+                upper_bound    REAL,
+                source         TEXT NOT NULL, -- 'auto' | 'user'
+                cycles         INTEGER,
+                avg_cycle_days REAL,
+                last_updated   TEXT NOT NULL,
+                PRIMARY KEY (watchlist, ticker)
+            )
+            """
         )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS swing_cycle_history (
-            watchlist     TEXT NOT NULL,
-            ticker        TEXT NOT NULL,
-            cycle_idx     INTEGER NOT NULL,
-            cycle_start   TEXT NOT NULL,
-            cycle_end     TEXT NOT NULL,
-            duration_days REAL,
-            lower_bound   REAL,
-            upper_bound   REAL,
-            PRIMARY KEY (watchlist, ticker, cycle_idx)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS swing_cycle_history (
+                watchlist     TEXT NOT NULL,
+                ticker        TEXT NOT NULL,
+                cycle_idx     INTEGER NOT NULL,
+                cycle_start   TEXT NOT NULL,
+                cycle_end     TEXT NOT NULL,
+                duration_days REAL,
+                lower_bound   REAL,
+                upper_bound   REAL,
+                PRIMARY KEY (watchlist, ticker, cycle_idx)
+            )
+            """
         )
-        """
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_swing_ranges_wl ON swing_ranges(watchlist);")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_swing_cycle_hist ON swing_cycle_history(watchlist, ticker);")
-    conn.commit()
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_swing_ranges_wl ON swing_ranges(watchlist);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_swing_cycle_hist ON swing_cycle_history(watchlist, ticker);")
+        conn.commit()
+        _INITIALIZED_DBS.add(db_key)
     return conn
 
 
@@ -82,6 +91,45 @@ def get_swing_range(watchlist: str, ticker: str, settings: Settings | None = Non
         "avg_cycle_days": row[4],
         "last_updated": row[5],
     }
+
+
+def get_swing_ranges_batch(
+    watchlist: str,
+    tickers: list[str],
+    settings: Settings | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Return the current swing ranges for multiple tickers in a watchlist in a single batch query."""
+    if not tickers:
+        return {}
+    settings = settings or Settings()
+    cleaned = [t.strip().upper() for t in tickers if t and t.strip()]
+    unique_tickers = list(dict.fromkeys(cleaned))
+    result: dict[str, dict[str, Any]] = {}
+
+    CHUNK_SIZE = 200
+    with _connect(settings) as conn:
+        for i in range(0, len(unique_tickers), CHUNK_SIZE):
+            chunk = unique_tickers[i : i + CHUNK_SIZE]
+            placeholders = ",".join("?" for _ in chunk)
+            query = (
+                "SELECT ticker, lower_bound, upper_bound, source, cycles, avg_cycle_days, last_updated "
+                f"FROM swing_ranges WHERE watchlist = ? AND ticker IN ({placeholders})"
+            )
+            params = [watchlist, *chunk]
+            rows = conn.execute(query, params).fetchall()
+            for r in rows:
+                sym = r[0]
+                result[sym] = {
+                    "watchlist": watchlist,
+                    "ticker": sym,
+                    "lower_bound": r[1],
+                    "upper_bound": r[2],
+                    "source": r[3],
+                    "cycles": r[4],
+                    "avg_cycle_days": r[5],
+                    "last_updated": r[6],
+                }
+    return result
 
 
 def set_user_range(

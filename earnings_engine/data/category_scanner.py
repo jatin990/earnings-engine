@@ -145,9 +145,16 @@ SCANNER_CATEGORIES: dict[str, dict[str, Any]] = {
 }
 
 
+_SCANNER_DB_INITIALIZED: set[str] = set()
+
+
 def _connect_scanner_db(settings: Settings) -> sqlite3.Connection:
     """Connect to SQLite database and ensure scanner tables & indices exist."""
     conn = _connect(settings)
+    db_key = str(getattr(settings, "sqlite_db_path", "default"))
+    if db_key in _SCANNER_DB_INITIALIZED:
+        return conn
+
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS scanner_candidates (
@@ -225,6 +232,7 @@ def _connect_scanner_db(settings: Settings) -> sqlite3.Connection:
         "CREATE INDEX IF NOT EXISTS idx_scanner_scanned_at ON scanner_candidates(scanned_at DESC)"
     )
     conn.commit()
+    _SCANNER_DB_INITIALIZED.add(db_key)
     return conn
 
 
@@ -635,11 +643,42 @@ def compute_and_save_scanner_universe(
             logger.warning("[SCANNER-WORKER] Error sweeping category %s: %s", cat_id, e)
 
     # 3. Persist to SQLite Database
-    with _connect_scanner_db(settings) as conn:
-        with conn:
-            # Upsert fresh candidates
-            for c in all_candidates:
-                conn.execute(
+    if all_candidates:
+        insert_rows = [
+            (
+                universe_or_watchlist,
+                c.get("category_id"),
+                c.get("category_name"),
+                c.get("category_badge"),
+                c.get("ticker"),
+                c.get("stock_name"),
+                c.get("signal_date"),
+                c.get("signal_price"),
+                c.get("current_price"),
+                c.get("return_pct"),
+                c.get("volume_multiple"),
+                c.get("trigger_level"),
+                c.get("target_price"),
+                c.get("stop_loss"),
+                c.get("confidence_score"),
+                c.get("severity"),
+                c.get("outcome"),
+                c.get("outcome_label"),
+                c.get("outcome_badge"),
+                c.get("expected_horizon"),
+                c.get("volatility_est"),
+                c.get("headline"),
+                c.get("catalyst_summary"),
+                c.get("why_it_matches"),
+                c.get("published_at"),
+                c.get("link"),
+                now_iso,
+            )
+            for c in all_candidates
+        ]
+        with _connect_scanner_db(settings) as conn:
+            with conn:
+                conn.executemany(
                     """
                     INSERT INTO scanner_candidates (
                         universe, category_id, category_name, category_badge, ticker, stock_name,
@@ -673,35 +712,7 @@ def compute_and_save_scanner_universe(
                         link = excluded.link,
                         scanned_at = excluded.scanned_at
                     """,
-                    (
-                        universe_or_watchlist,
-                        c.get("category_id"),
-                        c.get("category_name"),
-                        c.get("category_badge"),
-                        c.get("ticker"),
-                        c.get("stock_name"),
-                        c.get("signal_date"),
-                        c.get("signal_price"),
-                        c.get("current_price"),
-                        c.get("return_pct"),
-                        c.get("volume_multiple"),
-                        c.get("trigger_level"),
-                        c.get("target_price"),
-                        c.get("stop_loss"),
-                        c.get("confidence_score"),
-                        c.get("severity"),
-                        c.get("outcome"),
-                        c.get("outcome_label"),
-                        c.get("outcome_badge"),
-                        c.get("expected_horizon"),
-                        c.get("volatility_est"),
-                        c.get("headline"),
-                        c.get("catalyst_summary"),
-                        c.get("why_it_matches"),
-                        c.get("published_at"),
-                        c.get("link"),
-                        now_iso,
-                    ),
+                    insert_rows,
                 )
 
     logger.info(

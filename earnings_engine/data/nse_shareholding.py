@@ -170,6 +170,46 @@ def is_shareholding_fresh(
         return False
 
 
+def get_fresh_shareholdings_batch(
+    tickers: list[str],
+    max_age_days: float = 1.0,
+    settings: Settings | None = None,
+    conn: Any = None,
+) -> set[str]:
+    """Check batch of tickers for recently fetched shareholding data."""
+    if not tickers:
+        return set()
+    settings = settings or Settings()
+    local_conn = conn or get_db_connection(settings)
+
+    clean_tickers = [t if (t.endswith(".NS") or t.endswith(".BO") or "." in t) else f"{t}.NS" for t in tickers]
+    now_dt = datetime.now(timezone.utc)
+    fresh_set: set[str] = set()
+
+    chunk_size = 200
+    for i in range(0, len(clean_tickers), chunk_size):
+        chunk = clean_tickers[i : i + chunk_size]
+        ph = ",".join("?" for _ in chunk)
+        try:
+            rows = local_conn.execute(
+                f"SELECT ticker, fetched_at FROM nse_shareholding_freshness WHERE ticker IN ({ph}) AND fetched_at IS NOT NULL",
+                chunk,
+            ).fetchall()
+            for sym, fetched_at_str in rows:
+                try:
+                    dt = datetime.fromisoformat(fetched_at_str.replace("Z", "+00:00"))
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    if (now_dt - dt).total_seconds() < max_age_days * 86400:
+                        fresh_set.add(sym)
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.debug("[NSE-SHP] get_fresh_shareholdings_batch notice: %s", e)
+
+    return fresh_set
+
+
 def mark_shareholding_fetched(
     ticker: str,
     entities_count: int = 0,
@@ -270,6 +310,7 @@ def parse_shareholding_response(
     curr_price = 500.0
     mcap_cr = 5000.0
     shares_out = 10000000
+    existing_stk_map: dict[str, float] = {}
     if conn:
         try:
             p_row = conn.execute(
@@ -287,6 +328,14 @@ def parse_shareholding_response(
                 mcap_cr = float(t_row[0])
                 if curr_price > 0:
                     shares_out = int((mcap_cr * 1e7) / curr_price)
+
+            p_rows = conn.execute(
+                "SELECT fund_name, stake_pct FROM institutional_holdings WHERE ticker = ? ORDER BY id ASC",
+                (sym,),
+            ).fetchall()
+            for fn, sp in p_rows:
+                if fn and sp is not None:
+                    existing_stk_map[fn] = float(sp)
         except Exception:
             pass
 
@@ -371,17 +420,7 @@ def parse_shareholding_response(
 
                 f_type = classify_institutional_entity(h_name)
 
-                prev_stk = None
-                if conn:
-                    try:
-                        p_rec = conn.execute(
-                            "SELECT stake_pct FROM institutional_holdings WHERE ticker = ? AND fund_name = ? ORDER BY id DESC LIMIT 1",
-                            (sym, h_name),
-                        ).fetchone()
-                        if p_rec:
-                            prev_stk = float(p_rec[0])
-                    except Exception:
-                        pass
+                prev_stk = existing_stk_map.get(h_name)
 
                 act = "HOLD"
                 chg_p = 0.0
@@ -546,9 +585,14 @@ def ingest_universe_shareholding_patterns(
     from earnings_engine.data.amfi_holdings import save_discovered_fund_holdings
     from earnings_engine.data.institutional_accumulation import _ensure_institutional_data_for_ticker
 
+    fresh_tickers: set[str] = set()
+    if not force:
+        fresh_tickers = get_fresh_shareholdings_batch(tickers, max_age_days=1.0, settings=settings, conn=conn)
+
     for idx, sym in enumerate(tickers):
         try:
-            if not force and is_shareholding_fresh(sym, max_age_days=1, settings=settings, conn=conn):
+            clean_sym = sym if (sym.endswith(".NS") or sym.endswith(".BO") or "." in sym) else f"{sym}.NS"
+            if not force and clean_sym in fresh_tickers:
                 success_count += 1
                 if progress_callback:
                     progress_callback(idx + 1, len(tickers), sym)

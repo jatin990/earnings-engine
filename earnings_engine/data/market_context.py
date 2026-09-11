@@ -570,83 +570,108 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
     metrics_map: dict[str, dict[str, Any]] = {}
     earnings_map: dict[str, pd.DataFrame] = {}
     prices_map: dict[str, pd.DataFrame] = {}
+    earnings_count_map: dict[str, int] = {}
+    sr_map: dict[str, dict[str, Any]] = {}
 
     try:
         from earnings_engine.data.db import get_db_connection
         from collections import defaultdict
-        conn = get_db_connection(settings)
-        placeholders = ", ".join(["?"] * len(tickers))
-        
-        # 1. Unified Ticker Master (Names, Market Caps, Metrics in 1 query)
         import json
-        try:
-            ticker_master_rows = conn.execute(
-                f"SELECT ticker, name, market_cap, metrics FROM tickers WHERE ticker IN ({placeholders})",
-                tickers,
-            ).fetchall()
-            for r in ticker_master_rows:
-                sym = r[0]
-                if r[1]:
-                    names_map[sym] = r[1]
-                if r[2] is not None and not force:
-                    all_market_caps[sym] = float(r[2])
-                if r[3] and not force:
-                    try:
-                        metrics_map[sym] = json.loads(r[3]) if isinstance(r[3], str) else r[3]
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-                    
-        # 3. Earnings History (last 2 years)
-        cutoff_e_date = (pd.Timestamp.now() - pd.Timedelta(days=730)).strftime("%Y-%m-%d")
-        e_rows = conn.execute(
-            f"SELECT ticker, earnings_date, eps_estimate, eps_reported, surprise_pct FROM earnings_history WHERE ticker IN ({placeholders}) AND earnings_date >= ? ORDER BY ticker, earnings_date",
-            tickers + [cutoff_e_date],
-        ).fetchall()
+        conn = get_db_connection(settings)
         e_by_ticker = defaultdict(list)
-        for r in e_rows:
-            e_by_ticker[r[0]].append((r[1], r[2], r[3], r[4]))
+        p_by_ticker = defaultdict(list)
+        cutoff_e_date = (pd.Timestamp.now() - pd.Timedelta(days=730)).strftime("%Y-%m-%d")
+        cutoff_p_date = (pd.Timestamp.now() - pd.Timedelta(days=450)).strftime("%Y-%m-%d")
+        chunk_size = 200
+
+        for i in range(0, len(tickers), chunk_size):
+            chunk = tickers[i : i + chunk_size]
+            placeholders = ", ".join(["?"] * len(chunk))
+
+            # 1. Unified Ticker Master (Names, Market Caps, Metrics in 1 query)
+            try:
+                ticker_master_rows = conn.execute(
+                    f"SELECT ticker, name, market_cap, metrics FROM tickers WHERE ticker IN ({placeholders})",
+                    chunk,
+                ).fetchall()
+                for r in ticker_master_rows:
+                    sym = r[0]
+                    if r[1]:
+                        names_map[sym] = r[1]
+                    if r[2] is not None and not force:
+                        all_market_caps[sym] = float(r[2])
+                    if r[3] and not force:
+                        try:
+                            metrics_map[sym] = json.loads(r[3]) if isinstance(r[3], str) else r[3]
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+            # 2. Earnings Counts (lifetime total for result sequence)
+            try:
+                cnt_rows = conn.execute(
+                    f"SELECT ticker, COUNT(earnings_date) FROM earnings_history WHERE ticker IN ({placeholders}) GROUP BY ticker",
+                    chunk,
+                ).fetchall()
+                for r in cnt_rows:
+                    earnings_count_map[r[0]] = r[1]
+            except Exception:
+                pass
+
+            # 3. Earnings History (last 2 years)
+            try:
+                e_rows = conn.execute(
+                    f"SELECT ticker, earnings_date, eps_estimate, eps_reported, surprise_pct FROM earnings_history WHERE ticker IN ({placeholders}) AND earnings_date >= ? ORDER BY ticker, earnings_date",
+                    chunk + [cutoff_e_date],
+                ).fetchall()
+                for r in e_rows:
+                    e_by_ticker[r[0]].append((r[1], r[2], r[3], r[4]))
+            except Exception:
+                pass
+
+            # 4. Price History (last ~450 days)
+            try:
+                p_rows = conn.execute(
+                    f"SELECT ticker, date, open, high, low, close, volume FROM price_history WHERE ticker IN ({placeholders}) AND date >= ? ORDER BY ticker, date",
+                    chunk + [cutoff_p_date],
+                ).fetchall()
+                for r in p_rows:
+                    p_by_ticker[r[0]].append((r[1], r[2], r[3], r[4], r[5], r[6]))
+            except Exception:
+                pass
+
+            # 5. Stored Swing Ranges
+            try:
+                sr_rows = conn.execute(
+                    f"SELECT ticker, lower_bound, upper_bound, source, cycles, avg_cycle_days, last_updated FROM swing_ranges WHERE ticker IN ({placeholders})",
+                    chunk,
+                ).fetchall()
+                for r in sr_rows:
+                    sr_map[r[0]] = {
+                        "watchlist": "ALL",
+                        "ticker": r[0],
+                        "lower_bound": r[1],
+                        "upper_bound": r[2],
+                        "source": r[3],
+                        "cycles": r[4],
+                        "avg_cycle_days": r[5],
+                        "last_updated": r[6],
+                    }
+            except Exception:
+                pass
+
         for t, r_list in e_by_ticker.items():
             f = pd.DataFrame(r_list, columns=["earnings_date", "eps_estimate", "eps_reported", "surprise_pct"])
             f["earnings_date"] = pd.to_datetime(f["earnings_date"])
             earnings_map[t] = f
 
-        # 4. Price History (last ~450 days)
-        cutoff_p_date = (pd.Timestamp.now() - pd.Timedelta(days=450)).strftime("%Y-%m-%d")
-        p_rows = conn.execute(
-            f"SELECT ticker, date, open, high, low, close, volume FROM price_history WHERE ticker IN ({placeholders}) AND date >= ? ORDER BY ticker, date",
-            tickers + [cutoff_p_date],
-        ).fetchall()
-        p_by_ticker = defaultdict(list)
-        for r in p_rows:
-            p_by_ticker[r[0]].append((r[1], r[2], r[3], r[4], r[5], r[6]))
         for t, r_list in p_by_ticker.items():
             f = pd.DataFrame(r_list, columns=["date", "open", "high", "low", "close", "volume"]).set_index("date")
             f.index = pd.to_datetime(f.index)
             prices_map[t] = f
-
-        # 5. Stored Swing Ranges
-        sr_rows = conn.execute(
-            f"SELECT ticker, lower_bound, upper_bound, source, cycles, avg_cycle_days, last_updated FROM swing_ranges WHERE ticker IN ({placeholders})",
-            tickers,
-        ).fetchall()
-        sr_map = {
-            r[0]: {
-                "watchlist": "ALL",
-                "ticker": r[0],
-                "lower_bound": r[1],
-                "upper_bound": r[2],
-                "source": r[3],
-                "cycles": r[4],
-                "avg_cycle_days": r[5],
-                "last_updated": r[6],
-            }
-            for r in sr_rows
-        }
     except Exception:
-        sr_map = {}
+        pass
 
     # If force=True or if any tickers have missing prices, batch-fetch live quotes in parallel
     missing_or_forced = [t for t in tickers if force or t not in prices_map or prices_map[t].empty]
@@ -1028,7 +1053,11 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
 
             # Calculate result sequence for new listing / debut earnings tracking
             from earnings_engine.data.new_listings import compute_ticker_result_sequence
-            seq_info = compute_ticker_result_sequence(ticker, settings=settings)
+            seq_info = compute_ticker_result_sequence(
+                ticker,
+                settings=settings,
+                past_events_count=earnings_count_map.get(ticker, 0),
+            )
 
             rows.append({
                 "ticker": ticker,

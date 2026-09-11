@@ -37,12 +37,24 @@ def settle_pending_predictions(
     pending_list = storage.get_pending_predictions(settings=settings, before_date=today_str)
     logger.info("[SETTLEMENT] Found %d pending consensus predictions due on or before %s", len(pending_list), today_str)
 
+    # Batch preload price history for all involved tickers
+    unique_tickers = list({pred["ticker"] for pred in pending_list if pred.get("ticker")})
+    price_dfs = {}
+    if unique_tickers:
+        try:
+            import pandas as pd
+            from earnings_engine.data.prices import load_prices_batch
+            price_dfs = load_prices_batch(unique_tickers, settings)
+        except Exception as err:
+            logger.debug("[SETTLEMENT] Batch price load warning: %s", err)
+
     settled_count = 0
     success_count = 0
     partial_count = 0
     failure_count = 0
     invalidated_count = 0
     settled_items: list[dict[str, Any]] = []
+    settlements_to_update: list[tuple[int, dict[str, Any]]] = []
 
     for pred in pending_list:
         try:
@@ -53,8 +65,23 @@ def settle_pending_predictions(
             consensus_dir = str(pred.get("consensus_direction", "NEUTRAL")).upper()
             target_return = float(pred.get("consensus_return_pct", 0.0))
 
-            # Fetch the actual closing price on/near evaluation_date
-            actual_price = _fetch_settlement_price(ticker, eval_date, settings)
+            # Fetch the actual closing price on/near evaluation_date from preloaded DF first
+            actual_price: float | None = None
+            pdf = price_dfs.get(ticker)
+            if pdf is not None and not pdf.empty:
+                try:
+                    eval_ts = pd.Timestamp(eval_date)
+                    after_slice = pdf.loc[pdf.index >= eval_ts]
+                    if not after_slice.empty and pd.notna(after_slice.iloc[0]["close"]) and float(after_slice.iloc[0]["close"]) > 0:
+                        actual_price = float(after_slice.iloc[0]["close"])
+                    elif pd.notna(pdf.iloc[-1]["close"]) and float(pdf.iloc[-1]["close"]) > 0:
+                        actual_price = float(pdf.iloc[-1]["close"])
+                except Exception:
+                    actual_price = None
+
+            if actual_price is None or actual_price <= 0:
+                actual_price = _fetch_settlement_price(ticker, eval_date, settings)
+
             if actual_price is None or actual_price <= 0:
                 logger.warning("[SETTLEMENT] Could not resolve exit price for %s on %s (pred_id=%d)", ticker, eval_date, pred_id)
                 continue
@@ -94,7 +121,7 @@ def settle_pending_predictions(
                 except Exception as diag_err:
                     logger.error("[SETTLEMENT] Post-mortem diagnosis failed for pred_id=%d: %s", pred_id, diag_err)
 
-            storage.update_settlement(pred_id, settlement_data, settings=settings)
+            settlements_to_update.append((pred_id, settlement_data))
             settled_count += 1
 
             if status == "SUCCESS":
@@ -116,6 +143,9 @@ def settle_pending_predictions(
 
         except Exception as e:
             logger.error("[SETTLEMENT] Error settling prediction %s: %s", pred.get("id"), e)
+
+    if settlements_to_update:
+        storage.update_settlements_batch(settlements_to_update, settings=settings)
 
     return {
         "as_of_date": today_str,

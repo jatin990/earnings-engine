@@ -26,7 +26,7 @@ from earnings_engine.data.breakout_scanner import (
     score_breakout,
     _resolve_universe_tickers,
 )
-from earnings_engine.data.prices import load_prices
+from earnings_engine.data.prices import load_prices, load_prices_batch
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.backtest.breakout_backtest")
@@ -180,12 +180,15 @@ def run_breakout_backtest(
             universe=cfg.universe,
         )
 
-    # 1. Preload Price History
+    # 1. Preload Price History in batch
     all_prices: dict[str, pd.DataFrame] = {}
     all_dates: set[str] = set()
 
+    batch_prices = load_prices_batch(ticker_list, settings)
     for sym in ticker_list:
-        df = load_prices(sym, settings)
+        df = batch_prices.get(sym)
+        if df is None or df.empty:
+            df = load_prices(sym, settings)
         if df is not None and not df.empty and len(df) >= 40:
             df = df.sort_index()
             all_prices[sym] = df

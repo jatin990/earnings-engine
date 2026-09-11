@@ -268,6 +268,74 @@ def _get_ticker_returns(sym: str, conn: Any) -> tuple[float | None, float | None
         return None, None, None
 
 
+def _get_ticker_returns_batch(
+    symbols: list[str],
+    conn: Any = None,
+    settings: Settings | None = None,
+) -> dict[str, tuple[float | None, float | None, float | None]]:
+    """Compute (ret_7d, ret_30d, ret_1y) for multiple tickers in batch with caching."""
+    now = time.time()
+    results: dict[str, tuple[float | None, float | None, float | None]] = {}
+    missing: list[str] = []
+
+    for sym in symbols:
+        if not sym:
+            continue
+        clean_sym = sym.strip().upper()
+        target_sym = clean_sym if (clean_sym.endswith(".NS") or clean_sym.endswith(".BO") or "." in clean_sym) else f"{clean_sym}.NS"
+        if target_sym in _TICKER_RETURNS_MEMO:
+            exp, val = _TICKER_RETURNS_MEMO[target_sym]
+            if now < exp:
+                results[sym] = val
+                results[target_sym] = val
+                continue
+        missing.append(target_sym)
+
+    if missing:
+        from earnings_engine.data.prices import load_prices_batch
+        settings = settings or Settings()
+        unique_missing = list(set(missing))
+        dfs = load_prices_batch(unique_missing, settings=settings, days=400)
+        for target_sym in unique_missing:
+            df = dfs.get(target_sym)
+            if df is None or df.empty or "close" not in df.columns or len(df) < 2:
+                if conn:
+                    res = _get_ticker_returns(target_sym, conn)
+                else:
+                    res = (None, None, None)
+            else:
+                closes = df["close"].dropna().values
+                latest_close = float(closes[-1])
+                if latest_close <= 0 or len(closes) < 2:
+                    res = (None, None, None)
+                else:
+                    idx_7d = max(0, len(closes) - 1 - min(5, len(closes) - 1))
+                    prior_7d = float(closes[idx_7d])
+                    ret_7d = round(((latest_close - prior_7d) / prior_7d) * 100.0, 2) if prior_7d > 0 else None
+
+                    idx_30d = max(0, len(closes) - 1 - min(21, len(closes) - 1))
+                    prior_30d = float(closes[idx_30d])
+                    ret_30d = round(((latest_close - prior_30d) / prior_30d) * 100.0, 2) if prior_30d > 0 else None
+
+                    idx_1y = max(0, len(closes) - 1 - min(252, len(closes) - 1))
+                    prior_1y = float(closes[idx_1y])
+                    ret_1y = round(((latest_close - prior_1y) / prior_1y) * 100.0, 2) if prior_1y > 0 else None
+
+                    res = (ret_7d, ret_30d, ret_1y)
+            _TICKER_RETURNS_MEMO[target_sym] = (now + 600.0, res)
+            results[target_sym] = res
+
+    for sym in symbols:
+        if not sym:
+            continue
+        clean_sym = sym.strip().upper()
+        target_sym = clean_sym if (clean_sym.endswith(".NS") or clean_sym.endswith(".BO") or "." in clean_sym) else f"{clean_sym}.NS"
+        if sym not in results and target_sym in results:
+            results[sym] = results[target_sym]
+
+    return results
+
+
 def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
     """Persist institutional flow data grounded strictly in live corporate ownership & price history."""
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -304,17 +372,19 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
             ("Q3 FY26", promoter_val, round(fii_val * 0.75, 2), round(dii_val * 0.75, 2)),
             ("Q2 FY26", promoter_val, round(fii_val * 0.65, 2), round(dii_val * 0.65, 2)),
         ]
+        q_rows = []
         for q_name, p_val, f_val, d_val in quarters:
             rem_val = round(max(0.0, 100.0 - (p_val + f_val + d_val)), 2)
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO shareholding_patterns (
-                    ticker, quarter, promoter_pct, fii_pct, dii_mf_pct,
-                    public_retail_pct, other_pct, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (sym, q_name, p_val, f_val, d_val, rem_val, 0.0, now_iso),
-            )
+            q_rows.append((sym, q_name, p_val, f_val, d_val, rem_val, 0.0, now_iso))
+        conn.executemany(
+            """
+            INSERT OR REPLACE INTO shareholding_patterns (
+                ticker, quarter, promoter_pct, fii_pct, dii_mf_pct,
+                public_retail_pct, other_pct, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            q_rows,
+        )
 
     # If institutional_holdings has no records for this ticker, seed discovered institutional holders
     h_count = conn.execute("SELECT COUNT(*) FROM institutional_holdings WHERE ticker = ?", (sym,)).fetchone()[0]
@@ -377,6 +447,7 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
                 (ins_name, "Insurance Company (DII)", "HOLD", 0.25, 0.25, "2026-07-30", "HOLD"),
             ]
 
+        h_rows = []
         for fname, ftype, fact, f_weight, f_prev_w, f_date, f_txn_t in fund_specs:
             stk_p = round(max(0.05, (inst_val * f_weight * 0.1)), 2)
             prev_stk_p = round(max(0.0, (inst_val * f_prev_w * 0.1)), 2) if fact != "NEW BUY" else 0.0
@@ -386,8 +457,15 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
             inc_c = round(val_c * (chg_p / stk_p), 2) if (stk_p > 0 and chg_p > 0) else 0.0
             avg_p = round(curr_price * 0.92, 2)
             txn_p = round(curr_price * 0.98, 2)
+            h_rows.append((
+                sym, fname, ftype, "Q1 FY27", sh_held, stk_p,
+                val_c, prev_stk_p, fact, 0, chg_p,
+                avg_p, txn_p, txn_p, f_date,
+                f_txn_t, "2026-07-18", now_iso, inc_c, val_c,
+            ))
 
-            conn.execute(
+        if h_rows:
+            conn.executemany(
                 """
                 INSERT OR REPLACE INTO institutional_holdings (
                     ticker, fund_name, fund_type, quarter, shares_held, stake_pct,
@@ -396,12 +474,7 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
                     recent_txn_type, reported_date, created_at, increase_amount_cr, total_amount_cr
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (
-                    sym, fname, ftype, "Q1 FY27", sh_held, stk_p,
-                    val_c, prev_stk_p, fact, 0, chg_p,
-                    avg_p, txn_p, txn_p, f_date,
-                    f_txn_t, "2026-07-18", now_iso, inc_c, val_c,
-                ),
+                h_rows,
             )
 
     # Ensure block deals exist for this ticker
@@ -1619,25 +1692,44 @@ def get_all_funds_activity(limit: int = 50, settings: Settings | None = None) ->
             r[0]: (r[1], r[2]) for r in cached_ret_rows if r[0]
         }
 
+        # Batch fetch all holdings for these funds to avoid N+1 queries
+        from collections import defaultdict
+        fnames = [r[0] for r in rows if r[0]]
+        fund_holdings: dict[str, list[tuple[str, float]]] = defaultdict(list)
+        all_tickers: set[str] = set()
+
+        if fnames:
+            for i in range(0, len(fnames), 200):
+                chunk = fnames[i : i + 200]
+                placeholders = ",".join("?" for _ in chunk)
+                h_rows = conn.execute(
+                    f"SELECT fund_name, ticker, holding_value_cr FROM institutional_holdings WHERE fund_name IN ({placeholders})",
+                    chunk,
+                ).fetchall()
+                for fn, sym, val in h_rows:
+                    if sym:
+                        fund_holdings[fn].append((sym, float(val or 1.0)))
+                        all_tickers.add(sym)
+
+        # Batch fetch returns for any missing tickers
+        missing_tickers = [sym for sym in all_tickers if sym not in ticker_returns]
+        if missing_tickers:
+            batch_ret = _get_ticker_returns_batch(missing_tickers, conn, settings)
+            for sym, (r7, r30, r1y) in batch_ret.items():
+                ticker_returns[sym] = (r30, r1y)
+
         funds: list[dict[str, Any]] = []
         for r in rows:
             fname = r[0]
-            holdings = conn.execute(
-                "SELECT ticker, holding_value_cr FROM institutional_holdings WHERE fund_name = ?",
-                (fname,),
-            ).fetchall()
+            holdings = fund_holdings.get(fname, [])
 
             total_val_30 = 0.0
             sum_ret_30 = 0.0
             total_val_1y = 0.0
             sum_ret_1y = 0.0
 
-            for sym, val in holdings:
-                v = float(val or 1.0)
+            for sym, v in holdings:
                 r30, r1y = ticker_returns.get(sym, (None, None))
-                if r30 is None and r1y is None:
-                    _, r30, r1y = _get_ticker_returns(sym, conn)
-                    ticker_returns[sym] = (r30, r1y)
                 if r30 is not None:
                     sum_ret_30 += v * r30
                     total_val_30 += v
@@ -1691,7 +1783,11 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
             (fund_name.strip(),),
         ).fetchall()
 
-        from earnings_engine.data.names import get_name
+        from earnings_engine.data.names import get_names_batch
+        tickers = [r[0] for r in rows if r[0]]
+        names_map = get_names_batch(tickers, settings)
+        returns_map = _get_ticker_returns_batch(tickers, conn, settings)
+
         holdings: list[dict[str, Any]] = []
         for r in rows:
             sym = r[0]
@@ -1703,15 +1799,15 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
 
             est_base_price = round((val_cr * 1e7) / shares, 2) if shares > 0 and val_cr > 0 else 100.0
             avg_p = round(float(r[7]), 2) if r[7] is not None and float(r[7]) > 0 else round(est_base_price * 0.90, 2)
-            
+
             # Strict logic for transaction and buy prices
             raw_buy = r[8] if is_buy else None
             recent_buy_p = round(float(raw_buy), 2) if raw_buy is not None and float(raw_buy) > 0 else (round(est_base_price * 0.96, 2) if is_buy else None)
-            
+
             raw_txn_p = r[9]
             raw_txn_d = r[10]
             raw_txn_t = r[11] or ("BUY" if is_buy else ("TRIM" if is_trim else "HOLD"))
-            
+
             if is_buy:
                 txn_p = round(float(raw_txn_p), 2) if raw_txn_p is not None and float(raw_txn_p) > 0 else (recent_buy_p or round(est_base_price * 0.96, 2))
                 txn_d = raw_txn_d or "2026-07-12"
@@ -1722,7 +1818,8 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
                 txn_p = None
                 txn_d = None
 
-            _, r30, r1y = _get_ticker_returns(sym, conn)
+            ret_tuple = returns_map.get(sym, (None, None, None))
+            r30, r1y = ret_tuple[1], ret_tuple[2]
 
             # 3 Distinct Financial Metrics per Holding in reverse portfolio lookup
             chg_pct = round(float(r[6] or 0.0), 2)
@@ -1738,7 +1835,7 @@ def get_fund_portfolio_activity(fund_name: str, settings: Settings | None = None
 
             holdings.append({
                 "ticker": sym,
-                "company_name": get_name(sym) or sym.replace(".NS", ""),
+                "company_name": names_map.get(sym) or sym.replace(".NS", ""),
                 "quarter": r[1],
                 "shares_held": shares,
                 "stake_pct": stk_pct,

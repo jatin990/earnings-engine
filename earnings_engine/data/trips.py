@@ -23,10 +23,16 @@ from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.trips")
 
+_TRIPS_DBS_INITIALIZED: set[str] = set()
+
 
 def init_trips_db(settings: Settings | None = None) -> None:
     """Ensure trips, groups, members, and trip-group mapping tables exist."""
     settings = settings or Settings()
+    db_key = str(getattr(settings, "database_url", "") or "default")
+    if db_key in _TRIPS_DBS_INITIALIZED:
+        return
+
     conn = get_db_connection(settings)
     with conn:
         # 1. Base Trips table (if not already created)
@@ -108,6 +114,8 @@ def init_trips_db(settings: Settings | None = None) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_group_members_code ON trip_group_members(passcode)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_group_trips_grp ON trip_group_trips(group_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_group_trips_trp ON trip_group_trips(trip_id)")
+
+    _TRIPS_DBS_INITIALIZED.add(db_key)
 
 
 def find_existing_friend_passcode(email: str, settings: Settings | None = None) -> tuple[str | None, str | None]:
@@ -343,19 +351,19 @@ def remove_group_member(group_id: str, email_or_id: str, settings: Settings | No
 
 def attach_trips_to_group(group_id: str, trip_ids: list[str], settings: Settings | None = None) -> int:
     """Attach one or more trips to a group."""
+    if not trip_ids:
+        return 0
     settings = settings or Settings()
     init_trips_db(settings)
     now_str = datetime.now(timezone.utc).isoformat()
     conn = get_db_connection(settings)
-    count = 0
     with conn:
-        for tid in trip_ids:
-            conn.execute(
-                "INSERT OR IGNORE INTO trip_group_trips (group_id, trip_id, attached_at) VALUES (?, ?, ?)",
-                (group_id, tid, now_str),
-            )
-            count += 1
-    return count
+        rows = [(group_id, tid, now_str) for tid in trip_ids]
+        conn.executemany(
+            "INSERT OR IGNORE INTO trip_group_trips (group_id, trip_id, attached_at) VALUES (?, ?, ?)",
+            rows,
+        )
+    return len(trip_ids)
 
 
 def detach_trip_from_group(group_id: str, trip_id: str, settings: Settings | None = None) -> bool:
@@ -389,51 +397,56 @@ def get_trip_groups(
         if not groups_rows:
             return []
 
+        group_ids = [gr[0] for gr in groups_rows]
+        members_by_group: dict[str, list[dict[str, Any]]] = {gid: [] for gid in group_ids}
+        trips_by_group: dict[str, list[dict[str, Any]]] = {gid: [] for gid in group_ids}
+
+        chunk_size = 200
+        for i in range(0, len(group_ids), chunk_size):
+            chunk = group_ids[i : i + chunk_size]
+            placeholders = ",".join("?" for _ in chunk)
+
+            # Pre-fetch all members for groups in this chunk
+            m_rows = conn.execute(f"""
+                SELECT group_id, id, name, email, passcode, role, added_at
+                FROM trip_group_members
+                WHERE group_id IN ({placeholders})
+                ORDER BY added_at ASC
+            """, chunk).fetchall()
+            for m in m_rows:
+                members_by_group.setdefault(m[0], []).append({
+                    "id": m[1],
+                    "name": m[2],
+                    "email": m[3],
+                    "passcode": m[4],
+                    "role": m[5],
+                    "added_at": m[6],
+                })
+
+            # Pre-fetch all attached trips for groups in this chunk
+            t_rows = conn.execute(f"""
+                SELECT gt.group_id, t.id, t.title, t.destination, t.start_date, t.end_date, t.status, t.cover_image
+                FROM trip_group_trips gt
+                JOIN trips t ON gt.trip_id = t.id
+                WHERE gt.group_id IN ({placeholders})
+                ORDER BY t.start_date ASC
+            """, chunk).fetchall()
+            for t in t_rows:
+                trips_by_group.setdefault(t[0], []).append({
+                    "id": t[1],
+                    "title": t[2],
+                    "destination": t[3],
+                    "start_date": t[4],
+                    "end_date": t[5],
+                    "status": t[6],
+                    "cover_image": t[7] or "japan",
+                })
+
         all_groups = []
         for gr in groups_rows:
             gid, gname, gdesc, gcol, gico, gcode, gcreated, gby = gr
-
-            # Fetch members
-            members_rows = conn.execute("""
-                SELECT id, name, email, passcode, role, added_at
-                FROM trip_group_members
-                WHERE group_id = ?
-                ORDER BY added_at ASC
-            """, (gid,)).fetchall()
-
-            members = [
-                {
-                    "id": m[0],
-                    "name": m[1],
-                    "email": m[2],
-                    "passcode": m[3],
-                    "role": m[4],
-                    "added_at": m[5],
-                }
-                for m in members_rows
-            ]
-
-            # Fetch attached trip IDs
-            trips_rows = conn.execute("""
-                SELECT t.id, t.title, t.destination, t.start_date, t.end_date, t.status, t.cover_image
-                FROM trip_group_trips gt
-                JOIN trips t ON gt.trip_id = t.id
-                WHERE gt.group_id = ?
-                ORDER BY t.start_date ASC
-            """, (gid,)).fetchall()
-
-            attached_trips = [
-                {
-                    "id": t[0],
-                    "title": t[1],
-                    "destination": t[2],
-                    "start_date": t[3],
-                    "end_date": t[4],
-                    "status": t[5],
-                    "cover_image": t[6] or "japan",
-                }
-                for t in trips_rows
-            ]
+            members = members_by_group.get(gid, [])
+            attached_trips = trips_by_group.get(gid, [])
 
             # Check if this group is accessible to the user
             is_member = False

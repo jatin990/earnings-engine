@@ -176,7 +176,11 @@ def _build_swing_channel(ticker: str, settings: Settings) -> dict[str, Any]:
         return {}
 
 
-def _build_earnings_context(ticker: str, settings: Settings) -> dict[str, Any]:
+def _build_earnings_context(
+    ticker: str,
+    settings: Settings,
+    preloaded_prices: pd.DataFrame | None = None,
+) -> dict[str, Any]:
     """Get earnings history, days to next, and post-earnings moves."""
     result: dict[str, Any] = {}
     try:
@@ -213,21 +217,41 @@ def _build_earnings_context(ticker: str, settings: Settings) -> dict[str, Any]:
                 except (ValueError, TypeError):
                     continue
 
-            # Post-earnings 7D moves from price history
+            # Post-earnings 7D moves from price history (using in-memory slice where available)
             post_moves = []
+            earliest_date = min((r[0][:10] for r in rows[:3]), default=None)
+            pdf = preloaded_prices
+            if pdf is None and earliest_date:
+                try:
+                    from earnings_engine.data.prices import load_prices
+                    pdf = load_prices(ticker, settings, since_date=earliest_date)
+                except Exception:
+                    pdf = None
+
             for r in rows[:3]:
                 try:
                     ed = r[0][:10]
-                    price_rows = conn.execute(
-                        "SELECT close FROM price_history WHERE ticker = ? AND date >= ? ORDER BY date LIMIT 8",
-                        (ticker, ed),
-                    ).fetchall()
-                    if len(price_rows) >= 2:
-                        base = float(price_rows[0][0])
-                        end = float(price_rows[-1][0])
-                        if base > 0:
-                            move = (end / base - 1) * 100
-                            post_moves.append({"date": ed, "move_pct": round(move, 2)})
+                    if pdf is not None and not pdf.empty:
+                        ed_ts = pd.Timestamp(ed)
+                        sub = pdf.loc[pdf.index >= ed_ts]
+                        if len(sub) >= 2:
+                            base = float(sub.iloc[0]["close"])
+                            end_slice = sub.head(8)
+                            end = float(end_slice.iloc[-1]["close"])
+                            if base > 0:
+                                move = (end / base - 1) * 100
+                                post_moves.append({"date": ed, "move_pct": round(move, 2)})
+                    else:
+                        price_rows = conn.execute(
+                            "SELECT close FROM price_history WHERE ticker = ? AND date >= ? ORDER BY date LIMIT 8",
+                            (ticker, ed),
+                        ).fetchall()
+                        if len(price_rows) >= 2:
+                            base = float(price_rows[0][0])
+                            end = float(price_rows[-1][0])
+                            if base > 0:
+                                move = (end / base - 1) * 100
+                                post_moves.append({"date": ed, "move_pct": round(move, 2)})
                 except Exception:
                     continue
             if post_moves:

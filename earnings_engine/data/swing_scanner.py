@@ -614,8 +614,18 @@ def run_hot_rescore(settings: Settings) -> None:
     t0 = time.time()
     demote: list[str] = []
 
+    hot_symbols = list(_pool["hot"].keys())
+    from earnings_engine.data.prices import load_prices_batch
+    prices_map = load_prices_batch(hot_symbols, settings, days=120)
+    ranges_map = swing_ranges_mod.get_swing_ranges_batch("ALL", hot_symbols, settings)
+
     for sym, entry in list(_pool["hot"].items()):
-        res = evaluate_stock_swing(sym, settings)
+        res = evaluate_stock_swing(
+            sym,
+            settings,
+            prices_df=prices_map.get(sym),
+            stored_range=ranges_map.get(sym),
+        )
         if res is None:
             continue
 
@@ -658,8 +668,18 @@ def run_warm_rescore(settings: Settings) -> None:
     promote: list[str] = []
     drop: list[str] = []
 
+    warm_symbols = list(_pool["warm"].keys())
+    from earnings_engine.data.prices import load_prices_batch
+    prices_map = load_prices_batch(warm_symbols, settings, days=120)
+    ranges_map = swing_ranges_mod.get_swing_ranges_batch("ALL", warm_symbols, settings)
+
     for sym, entry in list(_pool["warm"].items()):
-        res = evaluate_stock_swing(sym, settings)
+        res = evaluate_stock_swing(
+            sym,
+            settings,
+            prices_df=prices_map.get(sym),
+            stored_range=ranges_map.get(sym),
+        )
         if res is None:
             continue
 
@@ -745,6 +765,14 @@ def run_cold_scan(
         except Exception:
             stored_ranges = {}
 
+        # Batch load prices
+        try:
+            from earnings_engine.data.prices import load_prices_batch
+            prices_map = load_prices_batch(tickers, settings, days=120)
+        except Exception as e:
+            logger.warning("[SWING-SCANNER] Failed batch loading prices: %s", e)
+            prices_map = {}
+
         hot_candidates: dict[str, dict] = {}
         warm_candidates: dict[str, dict] = {}
         scanned_count = 0
@@ -754,6 +782,7 @@ def run_cold_scan(
             res = evaluate_stock_swing(
                 ticker=ticker,
                 settings=settings,
+                prices_df=prices_map.get(ticker),
                 stored_range=stored_ranges.get(ticker),
                 earnings_date=upcoming_map.get(ticker),
             )

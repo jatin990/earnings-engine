@@ -23,11 +23,13 @@ from typing import Any
 
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
+from earnings_engine.data.prices import load_prices_batch
 
 logger = logging.getLogger(__name__)
 
 # In-memory TTL Cache (3-minute TTL for lightning-fast sub-millisecond API responses)
 _CONFLUENCE_CACHE: dict[str, tuple[float, Any]] = {}
+_TABLE_INITIALIZED: bool = False
 
 
 def _get_cache(key: str) -> Any | None:
@@ -51,6 +53,9 @@ def clear_tri_confluence_cache() -> None:
 
 def _ensure_table(conn: Any) -> None:
     """Ensure the persistent tri_confluence_metrics SQLite table exists."""
+    global _TABLE_INITIALIZED
+    if _TABLE_INITIALIZED:
+        return
     try:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS tri_confluence_metrics (
@@ -91,6 +96,7 @@ def _ensure_table(conn: Any) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tri_conf_grade ON tri_confluence_metrics (grade)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tri_conf_market ON tri_confluence_metrics (market)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tri_conf_updated ON tri_confluence_metrics (updated_at DESC)")
+        _TABLE_INITIALIZED = True
     except Exception as e:
         logger.debug("Failed ensuring tri_confluence_metrics table: %s", e)
 
@@ -481,6 +487,7 @@ def compute_ticker_tri_confluence(
     conn: Any = None,
     force_recompute: bool = False,
     store_to_db: bool = True,
+    pre_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Construct multi-quarter time series and calculate tri-factor synergy metrics for a single ticker.
@@ -506,86 +513,100 @@ def compute_ticker_tri_confluence(
     mcap_cr = 5000.0
     curr_price = 500.0
 
-    try:
-        t_row = local_conn.execute(
-            "SELECT name, sector, industry, market_cap FROM tickers WHERE ticker = ? OR ticker = ?",
-            (target_sym, clean_sym),
-        ).fetchone()
-        if t_row:
-            company_name = t_row[0] or company_name
-            sector = t_row[1] or sector
-            industry = t_row[2] or industry
-            if t_row[3] and float(t_row[3]) > 0:
-                mcap_cr = round(float(t_row[3]) / 1e7, 1)
-    except Exception as e:
-        logger.debug("Ticker info fetch notice: %s", e)
+    t_row = None
+    if pre_data and "ticker_row" in pre_data:
+        t_row = pre_data["ticker_row"]
+    else:
+        try:
+            t_row = local_conn.execute(
+                "SELECT name, sector, industry, market_cap FROM tickers WHERE ticker = ? OR ticker = ?",
+                (target_sym, clean_sym),
+            ).fetchone()
+        except Exception as e:
+            logger.debug("Ticker info fetch notice: %s", e)
+
+    if t_row:
+        company_name = t_row[0] or company_name
+        sector = t_row[1] or sector
+        industry = t_row[2] or industry
+        if t_row[3] and float(t_row[3]) > 0:
+            mcap_cr = round(float(t_row[3]) / 1e7, 1)
 
     # 2. Fetch quarterly shareholding patterns (support both dii_mf_pct and dii_pct column names)
     sh_rows: list[Any] = []
-    try:
-        sh_rows = local_conn.execute(
-            """
-            SELECT quarter, fii_pct, dii_mf_pct, promoter_pct, public_retail_pct
-            FROM shareholding_patterns
-            WHERE ticker = ? OR ticker = ?
-            ORDER BY quarter ASC
-            """,
-            (target_sym, clean_sym),
-        ).fetchall()
-    except Exception:
+    if pre_data and "sh_rows" in pre_data:
+        sh_rows = pre_data["sh_rows"]
+    else:
         try:
             sh_rows = local_conn.execute(
                 """
-                SELECT quarter, fii_pct, dii_pct, promoter_pct, public_pct
+                SELECT quarter, fii_pct, dii_mf_pct, promoter_pct, public_retail_pct
                 FROM shareholding_patterns
                 WHERE ticker = ? OR ticker = ?
                 ORDER BY quarter ASC
                 """,
                 (target_sym, clean_sym),
             ).fetchall()
-        except Exception as e:
-            logger.debug("Shareholding patterns query notice for %s: %s", target_sym, e)
+        except Exception:
+            try:
+                sh_rows = local_conn.execute(
+                    """
+                    SELECT quarter, fii_pct, dii_pct, promoter_pct, public_pct
+                    FROM shareholding_patterns
+                    WHERE ticker = ? OR ticker = ?
+                    ORDER BY quarter ASC
+                    """,
+                    (target_sym, clean_sym),
+                ).fetchall()
+            except Exception as e:
+                logger.debug("Shareholding patterns query notice for %s: %s", target_sym, e)
 
     # 3. Fetch earnings history events (support both eps_estimate and estimated_eps schemas)
     eh_rows: list[Any] = []
-    try:
-        eh_rows = local_conn.execute(
-            """
-            SELECT earnings_date, eps_estimate, eps_reported, surprise_pct
-            FROM earnings_history
-            WHERE (ticker = ? OR ticker = ?) AND (eps_reported IS NOT NULL OR surprise_pct IS NOT NULL)
-            ORDER BY earnings_date ASC
-            """,
-            (target_sym, clean_sym),
-        ).fetchall()
-    except Exception:
+    if pre_data and "eh_rows" in pre_data:
+        eh_rows = pre_data["eh_rows"]
+    else:
         try:
             eh_rows = local_conn.execute(
                 """
-                SELECT earnings_date, estimated_eps, reported_eps, surprise_pct
+                SELECT earnings_date, eps_estimate, eps_reported, surprise_pct
                 FROM earnings_history
-                WHERE (ticker = ? OR ticker = ?) AND (reported_eps IS NOT NULL OR surprise_pct IS NOT NULL)
+                WHERE (ticker = ? OR ticker = ?) AND (eps_reported IS NOT NULL OR surprise_pct IS NOT NULL)
                 ORDER BY earnings_date ASC
                 """,
                 (target_sym, clean_sym),
             ).fetchall()
-        except Exception as e:
-            logger.debug("Earnings history query notice for %s: %s", target_sym, e)
+        except Exception:
+            try:
+                eh_rows = local_conn.execute(
+                    """
+                    SELECT earnings_date, estimated_eps, reported_eps, surprise_pct
+                    FROM earnings_history
+                    WHERE (ticker = ? OR ticker = ?) AND (reported_eps IS NOT NULL OR surprise_pct IS NOT NULL)
+                    ORDER BY earnings_date ASC
+                    """,
+                    (target_sym, clean_sym),
+                ).fetchall()
+            except Exception as e:
+                logger.debug("Earnings history query notice for %s: %s", target_sym, e)
 
     # 4. Fetch daily price history for reaction / quarterly returns
     price_rows: list[Any] = []
-    try:
-        price_rows = local_conn.execute(
-            """
-            SELECT date, close
-            FROM price_history
-            WHERE ticker = ? OR ticker = ?
-            ORDER BY date ASC
-            """,
-            (target_sym, clean_sym),
-        ).fetchall()
-    except Exception as e:
-        logger.debug("Price history query notice for %s: %s", target_sym, e)
+    if pre_data and "price_rows" in pre_data:
+        price_rows = pre_data["price_rows"]
+    else:
+        try:
+            price_rows = local_conn.execute(
+                """
+                SELECT date, close
+                FROM price_history
+                WHERE ticker = ? OR ticker = ?
+                ORDER BY date ASC
+                """,
+                (target_sym, clean_sym),
+            ).fetchall()
+        except Exception as e:
+            logger.debug("Price history query notice for %s: %s", target_sym, e)
 
     price_map: dict[str, float] = {r[0][:10]: float(r[1]) for r in price_rows if r[0] and r[1]}
     sorted_dates = sorted(price_map.keys())
@@ -822,27 +843,30 @@ def compute_ticker_tri_confluence(
 
     # 5. Fetch Top Institutional Holders for drill-down modal
     top_holders: list[dict[str, Any]] = []
-    try:
-        h_rows = local_conn.execute(
-            """
-            SELECT fund_name, fund_type, stake_pct, holding_value_cr, action, change_pct
-            FROM institutional_holdings
-            WHERE ticker = ? OR ticker = ?
-            ORDER BY stake_pct DESC LIMIT 6
-            """,
-            (target_sym, clean_sym),
-        ).fetchall()
-        for hr in h_rows:
-            top_holders.append({
-                "fund_name": hr[0],
-                "fund_type": hr[1] or "Mutual Fund",
-                "stake_pct": round(float(hr[2] or 0.0), 2),
-                "holding_value_cr": round(float(hr[3] or 0.0), 1),
-                "action": hr[4] or "HOLD",
-                "change_pct": round(float(hr[5] or 0.0), 2),
-            })
-    except Exception as e:
-        logger.debug("Holdings detail fetch notice: %s", e)
+    if pre_data and "top_holders" in pre_data:
+        top_holders = pre_data["top_holders"]
+    else:
+        try:
+            h_rows = local_conn.execute(
+                """
+                SELECT fund_name, fund_type, stake_pct, holding_value_cr, action, change_pct
+                FROM institutional_holdings
+                WHERE ticker = ? OR ticker = ?
+                ORDER BY stake_pct DESC LIMIT 6
+                """,
+                (target_sym, clean_sym),
+            ).fetchall()
+            for hr in h_rows:
+                top_holders.append({
+                    "fund_name": hr[0],
+                    "fund_type": hr[1] or "Mutual Fund",
+                    "stake_pct": round(float(hr[2] or 0.0), 2),
+                    "holding_value_cr": round(float(hr[3] or 0.0), 1),
+                    "action": hr[4] or "HOLD",
+                    "change_pct": round(float(hr[5] or 0.0), 2),
+                })
+        except Exception as e:
+            logger.debug("Holdings detail fetch notice: %s", e)
 
     # Key quantitative insights bullets
     insights = [
@@ -945,18 +969,164 @@ def sync_tri_confluence_db(
         ]
 
     calculated_records: list[dict[str, Any]] = []
-    for sym in ticker_list:
+    CHUNK_SIZE = 200
+    for i in range(0, len(ticker_list), CHUNK_SIZE):
+        chunk = ticker_list[i : i + CHUNK_SIZE]
+        all_syms: set[str] = set()
+        for sym in chunk:
+            c = sym.strip().upper()
+            t = c if (c.endswith(".NS") or c.endswith(".BO") or "." in c) else f"{c}.NS"
+            all_syms.add(sym)
+            all_syms.add(c)
+            all_syms.add(t)
+        sym_list = list(all_syms)
+        placeholders = ",".join("?" for _ in sym_list)
+
+        # 1. Tickers metadata
+        ticker_map: dict[str, Any] = {}
         try:
-            item = compute_ticker_tri_confluence(
-                sym,
-                settings=settings,
-                conn=local_conn,
-                force_recompute=True,
-                store_to_db=False,
-            )
-            calculated_records.append(item)
+            t_rows = local_conn.execute(
+                f"SELECT ticker, name, sector, industry, market_cap FROM tickers WHERE ticker IN ({placeholders})",
+                sym_list,
+            ).fetchall()
+            for r in t_rows:
+                ticker_map[r[0]] = (r[1], r[2], r[3], r[4])
         except Exception as e:
-            logger.debug("Error computing during bulk sync for %s: %s", sym, e)
+            logger.debug("Batch tickers fetch notice: %s", e)
+
+        # 2. Shareholding patterns
+        sh_map: dict[str, list[Any]] = {s: [] for s in sym_list}
+        try:
+            rows = local_conn.execute(
+                f"""
+                SELECT ticker, quarter, fii_pct, dii_mf_pct, promoter_pct, public_retail_pct
+                FROM shareholding_patterns
+                WHERE ticker IN ({placeholders})
+                ORDER BY quarter ASC
+                """,
+                sym_list,
+            ).fetchall()
+            for r in rows:
+                sh_map.setdefault(r[0], []).append(r[1:])
+        except Exception:
+            try:
+                rows = local_conn.execute(
+                    f"""
+                    SELECT ticker, quarter, fii_pct, dii_pct, promoter_pct, public_pct
+                    FROM shareholding_patterns
+                    WHERE ticker IN ({placeholders})
+                    ORDER BY quarter ASC
+                    """,
+                    sym_list,
+                ).fetchall()
+                for r in rows:
+                    sh_map.setdefault(r[0], []).append(r[1:])
+            except Exception as e:
+                logger.debug("Batch shareholding patterns notice: %s", e)
+
+        # 3. Earnings history
+        eh_map: dict[str, list[Any]] = {s: [] for s in sym_list}
+        try:
+            rows = local_conn.execute(
+                f"""
+                SELECT ticker, earnings_date, eps_estimate, eps_reported, surprise_pct
+                FROM earnings_history
+                WHERE ticker IN ({placeholders}) AND (eps_reported IS NOT NULL OR surprise_pct IS NOT NULL)
+                ORDER BY earnings_date ASC
+                """,
+                sym_list,
+            ).fetchall()
+            for r in rows:
+                eh_map.setdefault(r[0], []).append(r[1:])
+        except Exception:
+            try:
+                rows = local_conn.execute(
+                    f"""
+                    SELECT ticker, earnings_date, estimated_eps, reported_eps, surprise_pct
+                    FROM earnings_history
+                    WHERE ticker IN ({placeholders}) AND (reported_eps IS NOT NULL OR surprise_pct IS NOT NULL)
+                    ORDER BY earnings_date ASC
+                    """,
+                    sym_list,
+                ).fetchall()
+                for r in rows:
+                    eh_map.setdefault(r[0], []).append(r[1:])
+            except Exception as e:
+                logger.debug("Batch earnings history notice: %s", e)
+
+        # 4. Price history
+        price_map_batch: dict[str, list[Any]] = {s: [] for s in sym_list}
+        try:
+            p_rows = local_conn.execute(
+                f"""
+                SELECT ticker, date, close
+                FROM price_history
+                WHERE ticker IN ({placeholders})
+                ORDER BY date ASC
+                """,
+                sym_list,
+            ).fetchall()
+            for r in p_rows:
+                price_map_batch.setdefault(r[0], []).append((r[1], r[2]))
+        except Exception as e:
+            logger.debug("Batch price history notice: %s", e)
+
+        # 5. Top holders
+        holders_map: dict[str, list[dict[str, Any]]] = {s: [] for s in sym_list}
+        try:
+            h_rows = local_conn.execute(
+                f"""
+                SELECT ticker, fund_name, fund_type, stake_pct, holding_value_cr, action, change_pct
+                FROM institutional_holdings
+                WHERE ticker IN ({placeholders})
+                ORDER BY stake_pct DESC
+                """,
+                sym_list,
+            ).fetchall()
+            for hr in h_rows:
+                sym_key = hr[0]
+                if len(holders_map.get(sym_key, [])) < 6:
+                    holders_map.setdefault(sym_key, []).append({
+                        "fund_name": hr[1],
+                        "fund_type": hr[2] or "Mutual Fund",
+                        "stake_pct": round(float(hr[3] or 0.0), 2),
+                        "holding_value_cr": round(float(hr[4] or 0.0), 1),
+                        "action": hr[5] or "HOLD",
+                        "change_pct": round(float(hr[6] or 0.0), 2),
+                    })
+        except Exception as e:
+            logger.debug("Batch holdings detail notice: %s", e)
+
+        # Now compute for each sym in chunk using pre-fetched data
+        for sym in chunk:
+            c = sym.strip().upper()
+            t = c if (c.endswith(".NS") or c.endswith(".BO") or "." in c) else f"{c}.NS"
+            t_row = ticker_map.get(t) or ticker_map.get(c) or ticker_map.get(sym)
+            sh_rows = sh_map.get(t) or sh_map.get(c) or sh_map.get(sym) or []
+            eh_rows = eh_map.get(t) or eh_map.get(c) or eh_map.get(sym) or []
+            price_rows = price_map_batch.get(t) or price_map_batch.get(c) or price_map_batch.get(sym) or []
+            top_holders = holders_map.get(t) or holders_map.get(c) or holders_map.get(sym) or []
+
+            pre_data = {
+                "ticker_row": t_row,
+                "sh_rows": sh_rows,
+                "eh_rows": eh_rows,
+                "price_rows": price_rows,
+                "top_holders": top_holders,
+            }
+
+            try:
+                item = compute_ticker_tri_confluence(
+                    sym,
+                    settings=settings,
+                    conn=local_conn,
+                    force_recompute=True,
+                    store_to_db=False,
+                    pre_data=pre_data,
+                )
+                calculated_records.append(item)
+            except Exception as e:
+                logger.debug("Error computing during bulk sync for %s: %s", sym, e)
 
     if calculated_records:
         bulk_store_tri_confluence(calculated_records, conn=local_conn, settings=settings)

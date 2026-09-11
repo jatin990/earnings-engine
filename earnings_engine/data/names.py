@@ -69,6 +69,53 @@ def get_name(ticker: str, settings: Settings | None = None) -> str | None:
         return None
 
 
+def get_names_batch(tickers: list[str], settings: Settings | None = None) -> dict[str, str]:
+    """Return stored display names for multiple tickers in batch."""
+    if not tickers:
+        return {}
+    settings = settings or Settings()
+    result: dict[str, str] = {}
+    missing: list[str] = []
+
+    for t in tickers:
+        if not t:
+            continue
+        clean_sym = t.strip().upper()
+        if clean_sym in _NAME_CACHE:
+            result[t] = _NAME_CACHE[clean_sym]
+            result[clean_sym] = _NAME_CACHE[clean_sym]
+        else:
+            missing.append(clean_sym)
+
+    if missing:
+        unique_missing = list(set(missing))
+        try:
+            with _connect(settings) as conn:
+                chunk_size = 300
+                for i in range(0, len(unique_missing), chunk_size):
+                    chunk = unique_missing[i : i + chunk_size]
+                    placeholders = ",".join("?" for _ in chunk)
+                    rows = conn.execute(
+                        f"SELECT ticker, name FROM tickers WHERE ticker IN ({placeholders}) AND name IS NOT NULL",
+                        chunk,
+                    ).fetchall()
+                    for sym, nm in rows:
+                        if nm:
+                            _NAME_CACHE[sym] = nm
+                            result[sym] = nm
+        except Exception as e:
+            logger.debug("get_names_batch failed: %s", e)
+
+    for t in tickers:
+        if not t:
+            continue
+        clean_sym = t.strip().upper()
+        if t not in result and clean_sym in result:
+            result[t] = result[clean_sym]
+
+    return result
+
+
 def store_name(
     ticker: str,
     name: str,
@@ -76,16 +123,38 @@ def store_name(
     settings: Settings | None = None,
 ) -> str | None:
     """Persist a display name for a ticker in unified tickers master table."""
+    res = store_names_batch([(ticker, name)], source=source, settings=settings)
+    return res.get(ticker.strip().upper())
+
+
+def store_names_batch(
+    ticker_name_pairs: list[tuple[str, str]],
+    source: str = "yfinance",
+    settings: Settings | None = None,
+) -> dict[str, str]:
+    """Persist display names for multiple tickers in batch using executemany."""
+    if not ticker_name_pairs:
+        return {}
     settings = settings or Settings()
-    ticker = ticker.strip().upper()
-    name = (name or "").strip()
-    if not ticker or not name:
-        return None
-    _NAME_CACHE[ticker] = name
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    valid_pairs: list[tuple[str, str, str]] = []
+    saved: dict[str, str] = {}
+    for ticker, name in ticker_name_pairs:
+        sym = (ticker or "").strip().upper()
+        nm = (name or "").strip()
+        if not sym or not nm:
+            continue
+        _NAME_CACHE[sym] = nm
+        saved[sym] = nm
+        valid_pairs.append((sym, nm, now_str))
+
+    if not valid_pairs:
+        return {}
+
     try:
         with _connect(settings) as conn:
-            conn.execute(
+            conn.executemany(
                 """
                 INSERT INTO tickers (ticker, name, last_updated)
                 VALUES (?, ?, ?)
@@ -93,13 +162,13 @@ def store_name(
                     name = COALESCE(excluded.name, tickers.name),
                     last_updated = excluded.last_updated
                 """,
-                (ticker, name, now_str),
+                valid_pairs,
             )
             conn.commit()
-    except Exception as e:  # never break downstream enrichment on a name write
-        logger.warning("store_name failed ticker=%s: %s", ticker, e)
-        return None
-    return name
+    except Exception as e:
+        logger.warning("store_names_batch failed: %s", e)
+
+    return saved
 
 
 def ensure_names(
@@ -126,24 +195,32 @@ def ensure_names(
     else:
         try:
             with _connect(settings) as conn:
-                rows = conn.execute("SELECT ticker FROM tickers WHERE name IS NOT NULL").fetchall()
-            known = {r[0] for r in rows}
+                known = set()
+                chunk_size = 300
+                for i in range(0, len(tickers), chunk_size):
+                    chunk = tickers[i : i + chunk_size]
+                    ph = ",".join("?" for _ in chunk)
+                    r_rows = conn.execute(
+                        f"SELECT ticker FROM tickers WHERE ticker IN ({ph}) AND name IS NOT NULL",
+                        chunk,
+                    ).fetchall()
+                    for r in r_rows:
+                        known.add(r[0])
             missing = [t for t in tickers if t not in known]
         except Exception:
             missing = tickers
 
     # US / fallback names come cheaply (symbol-as-name) — store immediately.
-    for t in missing:
-        if market_of(t) != "IN":
-            store_name(t, t, source="symbol", settings=settings)
+    us_pairs = [(t, t) for t in missing if market_of(t) != "IN"]
+    if us_pairs:
+        store_names_batch(us_pairs, source="symbol", settings=settings)
 
     nse_missing = [t for t in missing if market_of(t) == "IN"]
     if not nse_missing:
         return
     if _seeded:
         # Already tried nsetools this process; skip the (slow) network call.
-        for t in nse_missing:
-            store_name(t, t, source="symbol", settings=settings)
+        store_names_batch([(t, t) for t in nse_missing], source="symbol", settings=settings)
         return
     _seeded = True
 
@@ -156,13 +233,13 @@ def ensure_names(
         logger.warning("names: nsetools index unavailable: %s", e)
         nse_map = {}
 
+    nse_pairs: list[tuple[str, str]] = []
     for t in nse_missing:
         sym = t[:-3] if t.endswith((".NS", ".BO")) else t
         name = nse_map.get(sym) if nse_map else None
-        if name:
-            store_name(t, name, source="nsetools", settings=settings)
-        else:
-            store_name(t, t, source="symbol", settings=settings)
+        nse_pairs.append((t, name or t))
+    if nse_pairs:
+        store_names_batch(nse_pairs, source="nsetools" if nse_map else "symbol", settings=settings)
 
 
 def search(q: str, limit: int = 20, settings: Settings | None = None) -> list[dict[str, Any]]:

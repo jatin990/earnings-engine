@@ -141,34 +141,33 @@ def save_prediction_cache(
     date_str: str | None = None,
     settings: Settings | None = None,
 ) -> None:
-    """Persist daily predictions cache directly into SQLite."""
+    """Persist daily predictions cache directly into SQLite using batch execution."""
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    conn = _connect(settings)
-    with conn:
-        for ticker, payload in (kronos_map or {}).items():
-            payload_json = json.dumps(payload, default=str)
-            conn.execute(
+    entries: list[tuple[str, str, str, str, str]] = []
+    for ticker, payload in (kronos_map or {}).items():
+        payload_json = json.dumps(payload, default=str)
+        entries.append((date_str, "kronos", ticker, payload_json, now_str))
+
+    for ticker, payload in (gbm_map or {}).items():
+        payload_json = json.dumps(payload, default=str)
+        entries.append((date_str, "gbm", ticker, payload_json, now_str))
+
+    if entries:
+        conn = _connect(settings)
+        with conn:
+            conn.executemany(
                 """
                 INSERT OR REPLACE INTO daily_prediction_cache
                 (cache_date, model_type, ticker, payload, updated_at)
-                VALUES (?, 'kronos', ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (date_str, ticker, payload_json, now_str),
+                entries,
             )
-        for ticker, payload in (gbm_map or {}).items():
-            payload_json = json.dumps(payload, default=str)
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO daily_prediction_cache
-                (cache_date, model_type, ticker, payload, updated_at)
-                VALUES (?, 'gbm', ?, ?, ?)
-                """,
-                (date_str, ticker, payload_json, now_str),
-            )
-    conn.close()
+        conn.close()
+
     logger.info(
         "[PRED-CACHE] Saved %d kronos + %d gbm predictions to SQLite (%s)",
         len(kronos_map or {}),

@@ -14,6 +14,11 @@ def test_news_injection_calculates_on_last_close(tmp_path, monkeypatch):
     settings.data_dirs = {"prices": tmp_path / "prices", "earnings": tmp_path / "earnings"}
     settings.ensure_dirs()
 
+    now_utc = datetime.now(timezone.utc)
+    d_prev = (now_utc - timedelta(days=1)).strftime("%Y-%m-%d")
+    d_curr = now_utc.strftime("%Y-%m-%d")
+    recent_utc = (now_utc - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+
     # Initialize tables and seed price history for RELIANCE.NS in isolated test tmp_path
     with _connect(settings) as conn:
         conn.execute("""
@@ -28,12 +33,11 @@ def test_news_injection_calculates_on_last_close(tmp_path, monkeypatch):
                 PRIMARY KEY (ticker, date)
             )
         """)
-        # Seed price for 2026-08-27 and 2026-08-28
-        conn.execute("INSERT OR REPLACE INTO price_history VALUES ('RELIANCE.NS', '2026-08-27', 2980.0, 3010.0, 2975.0, 3000.0, 500000)")
-        conn.execute("INSERT OR REPLACE INTO price_history VALUES ('RELIANCE.NS', '2026-08-28', 3010.0, 3060.0, 3005.0, 3045.0, 750000)")
+        # Seed price for d_prev and d_curr
+        conn.execute(f"INSERT OR REPLACE INTO price_history VALUES ('RELIANCE.NS', '{d_prev}', 2980.0, 3010.0, 2975.0, 3000.0, 500000)")
+        conn.execute(f"INSERT OR REPLACE INTO price_history VALUES ('RELIANCE.NS', '{d_curr}', 3010.0, 3060.0, 3005.0, 3045.0, 750000)")
         conn.commit()
 
-    recent_utc = "2026-08-28 04:00:00"
     raw_item = [{
         "ticker": "RELIANCE.NS",
         "title": "Reliance Industries bags Rs 5,000 crore solar project contract - Economic Times",
@@ -46,9 +50,9 @@ def test_news_injection_calculates_on_last_close(tmp_path, monkeypatch):
     assert len(verified) == 1
     rec = verified[0]
 
-    # Ground truth: on 2026-08-28 morning (04:00), last close was 2026-08-27 at ₹3000.00
+    # Ground truth: on recent_utc morning/afternoon, last close was d_prev at ₹3000.00
     assert rec["signal_price"] == 3000.0
-    assert rec["signal_date"] == "2026-08-27"
+    assert rec["signal_date"] == d_prev
     assert rec["current_price"] == 3045.0
     assert rec["price_change_pct"] == round(((3045.0 - 3000.0) / 3000.0) * 100.0, 2)
 
@@ -62,6 +66,6 @@ def test_news_injection_calculates_on_last_close(tmp_path, monkeypatch):
         row = conn.execute("SELECT * FROM news_catalysts WHERE ticker = 'RELIANCE.NS' AND title LIKE '%solar project%'").fetchone()
         assert row is not None
         assert row["signal_price"] == 3000.0
-        assert row["signal_date"] == "2026-08-27"
+        assert row["signal_date"] == d_prev
         assert row["current_price"] == 3045.0
         assert row["price_change_pct"] == 1.5

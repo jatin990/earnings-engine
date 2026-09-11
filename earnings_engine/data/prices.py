@@ -545,6 +545,49 @@ def load_price_metrics(ticker: str, settings: Settings, as_of_date: str | None =
     return json.loads(row[0]) if isinstance(row[0], str) else row[0]
 
 
+def load_price_metrics_batch(
+    tickers: list[str],
+    settings: Settings,
+    as_of_date: str | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Load previously persisted metrics for multiple tickers in a batched database query."""
+    if not tickers:
+        return {}
+
+    cleaned = [t.strip().upper() for t in tickers if t and t.strip()]
+    unique_tickers = list(dict.fromkeys(cleaned))
+    result: dict[str, dict[str, Any]] = {}
+
+    CHUNK_SIZE = 200
+    with _connect(settings) as connection:
+        for i in range(0, len(unique_tickers), CHUNK_SIZE):
+            chunk = unique_tickers[i : i + CHUNK_SIZE]
+            placeholders = ",".join("?" for _ in chunk)
+            if as_of_date:
+                query = (
+                    f"SELECT ticker, metrics FROM tickers "
+                    f"WHERE ticker IN ({placeholders}) AND metrics_as_of_date = ? AND metrics IS NOT NULL"
+                )
+                params = [*chunk, as_of_date]
+            else:
+                query = (
+                    f"SELECT ticker, metrics FROM tickers "
+                    f"WHERE ticker IN ({placeholders}) AND metrics IS NOT NULL"
+                )
+                params = chunk
+            rows = connection.execute(query, params).fetchall()
+            for r in rows:
+                sym = r[0]
+                m_raw = r[1]
+                if m_raw:
+                    try:
+                        m_val = json.loads(m_raw) if isinstance(m_raw, str) else m_raw
+                        result[sym] = m_val
+                    except Exception:
+                        pass
+    return result
+
+
 def _fetch_prices_for_ticker(args: tuple[str, Settings, bool, bool, str | None]) -> tuple[str, int]:
     """Fetch prices for a single ticker. Returns (ticker, row_count)."""
     ticker, settings, force, hard_refresh, start_date = args

@@ -115,6 +115,12 @@ def test_news_injection_stores_omnirouter_ai_analysis(tmp_path):
     settings.data_dirs = {"prices": tmp_path / "prices", "earnings": tmp_path / "earnings"}
     settings.ensure_dirs()
 
+    from datetime import datetime, timezone, timedelta
+    now_utc = datetime.now(timezone.utc)
+    d_prev = (now_utc - timedelta(days=1)).strftime("%Y-%m-%d")
+    d_curr = now_utc.strftime("%Y-%m-%d")
+    pub_time = (now_utc - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+
     with _connect(settings) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS price_history (
@@ -128,15 +134,15 @@ def test_news_injection_stores_omnirouter_ai_analysis(tmp_path):
                 PRIMARY KEY (ticker, date)
             )
         """)
-        conn.execute("INSERT OR REPLACE INTO price_history VALUES ('PERSISTENT.NS', '2026-08-27', 5640.0, 5679.5, 5597.0, 5654.0, 191424)")
-        conn.execute("INSERT OR REPLACE INTO price_history VALUES ('PERSISTENT.NS', '2026-08-28', 5677.0, 5910.0, 5677.0, 5875.0, 957631)")
+        conn.execute(f"INSERT OR REPLACE INTO price_history VALUES ('PERSISTENT.NS', '{d_prev}', 5640.0, 5679.5, 5597.0, 5654.0, 191424)")
+        conn.execute(f"INSERT OR REPLACE INTO price_history VALUES ('PERSISTENT.NS', '{d_curr}', 5677.0, 5910.0, 5677.0, 5875.0, 957631)")
         conn.commit()
 
     raw_items = [{
         "ticker": "PERSISTENT.NS",
         "title": "Persistent Systems expands digital engineering pact with US healthcare giant - Moneycontrol",
         "summary": "Strategic multi-year cloud transformation partnership expansion",
-        "published_at": "2026-08-28 02:00:00",
+        "published_at": pub_time,
         "publisher": "Moneycontrol",
     }]
 

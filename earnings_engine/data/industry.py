@@ -22,35 +22,68 @@ logger = get_logger("earnings_engine.data.industry")
 INDUSTRY_MAX_AGE_DAYS = 30
 
 
+_MIGRATIONS_APPLIED: set[str] = set()
+
+
 def _connect(settings: Settings) -> Any:
     """Connect to the shared database and ensure all schema tables exist."""
     settings.ensure_dirs()
-    from earnings_engine.data.migrations import apply_migrations
-    apply_migrations(settings)
+    try:
+        db_key = str(_cache_path(settings))
+    except Exception:
+        db_key = str(getattr(settings, "db_path", "") or getattr(settings, "database_url", "") or "default")
+    if db_key not in _MIGRATIONS_APPLIED:
+        from earnings_engine.data.migrations import apply_migrations
+        apply_migrations(settings)
+        _MIGRATIONS_APPLIED.add(db_key)
     connection = get_db_connection(settings)
     return connection
 
 
 def _is_fresh(ticker: str, settings: Settings) -> bool:
     """Check if industry classification is fresh in SQLite for the given ticker."""
+    fresh_set = get_fresh_industry_tickers([ticker], settings)
+    return ticker.strip().upper() in fresh_set
+
+
+def get_fresh_industry_tickers(tickers: list[str], settings: Settings) -> set[str]:
+    """Check which tickers have fresh industry classification in SQLite in batch."""
+    if not tickers:
+        return set()
+
+    cleaned = [t.strip().upper() for t in tickers if t and t.strip()]
+    unique_tickers = list(dict.fromkeys(cleaned))
+    fresh: set[str] = set()
+    now = pd.Timestamp.now()
+
+    chunk_size = 200
     with _connect(settings) as connection:
-        row = connection.execute(
-            "SELECT last_updated FROM tickers WHERE ticker = ? AND industry IS NOT NULL",
-            (ticker,),
-        ).fetchone()
-    if not row or not row[0]:
-        return False
-    fetched_at = pd.Timestamp(row[0])
-    age_days = (pd.Timestamp.now() - fetched_at).total_seconds() / 86400
-    return age_days <= INDUSTRY_MAX_AGE_DAYS
+        for i in range(0, len(unique_tickers), chunk_size):
+            chunk = unique_tickers[i : i + chunk_size]
+            placeholders = ",".join("?" for _ in chunk)
+            rows = connection.execute(
+                f"SELECT ticker, last_updated FROM tickers "
+                f"WHERE ticker IN ({placeholders}) AND industry IS NOT NULL",
+                chunk,
+            ).fetchall()
+            for r in rows:
+                if r[1]:
+                    fetched_at = pd.Timestamp(r[1])
+                    age_days = (now - fetched_at).total_seconds() / 86400
+                    if age_days <= INDUSTRY_MAX_AGE_DAYS:
+                        fresh.add(r[0].strip().upper())
+
+    return fresh
 
 
-def _store(ticker: str, industry: str | None, sector: str | None, settings: Settings) -> None:
-    """Store (or refresh) the industry classification for a ticker."""
+def _store_batch(items: list[tuple[str, str | None, str | None]], settings: Settings) -> None:
+    """Store (or refresh) the industry classification for multiple tickers in batch."""
+    if not items:
+        return
     now = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+    params = [(ticker, ind, sec, now) for ticker, ind, sec in items]
     with _connect(settings) as connection:
-        # Upsert into unified tickers master table
-        connection.execute(
+        connection.executemany(
             """
             INSERT INTO tickers (ticker, industry, sector, last_updated)
             VALUES (?, ?, ?, ?)
@@ -59,9 +92,15 @@ def _store(ticker: str, industry: str | None, sector: str | None, settings: Sett
                 sector = excluded.sector,
                 last_updated = excluded.last_updated
             """,
-            (ticker, industry, sector, now),
+            params,
         )
-        connection.commit()
+        if hasattr(connection, "commit"):
+            connection.commit()
+
+
+def _store(ticker: str, industry: str | None, sector: str | None, settings: Settings) -> None:
+    """Store (or refresh) the industry classification for a ticker."""
+    _store_batch([(ticker, industry, sector)], settings)
 
 
 def _fetch_for_ticker(ticker: str) -> tuple[str, str | None, str | None]:
@@ -146,11 +185,13 @@ def ingest_industries(tickers: list[str], settings: Settings, force: bool = Fals
     batch_size = 50
     processed = 0
 
-    # Filter out tickers with fresh cache (when not forcing)
+    # Filter out tickers with fresh cache in batch (when not forcing)
     tickers_to_fetch: list[str] = []
     cached_hits = 0
+    fresh_set = set() if force else get_fresh_industry_tickers(tickers, settings)
     for ticker in tickers:
-        if not force and _is_fresh(ticker, settings):
+        sym = ticker.strip().upper()
+        if sym in fresh_set:
             cached_hits += 1
             results[ticker] = 1
             processed += 1
@@ -170,6 +211,7 @@ def ingest_industries(tickers: list[str], settings: Settings, force: bool = Fals
         batch_num = i // batch_size + 1
         total_batches = (fetch_total + batch_size - 1) // batch_size
 
+        batch_to_store: list[tuple[str, str | None, str | None]] = []
         with ThreadPoolExecutor(max_workers=10) as executor:
             future_to_ticker = {
                 executor.submit(_fetch_for_ticker, ticker): ticker for ticker in batch
@@ -178,10 +220,13 @@ def ingest_industries(tickers: list[str], settings: Settings, force: bool = Fals
                 ticker, industry, sector = future.result()
                 processed += 1
                 if industry or sector:
-                    _store(ticker, industry, sector, settings)
+                    batch_to_store.append((ticker, industry, sector))
                     results[ticker] = 1
                 else:
                     results[ticker] = 0
+
+        if batch_to_store:
+            _store_batch(batch_to_store, settings)
 
         logger.info("industry ingest batch %s/%s complete: %s/%s tickers processed",
                     batch_num, total_batches, processed, total)

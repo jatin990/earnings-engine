@@ -107,6 +107,10 @@ MODEL_DISPLAY_NAMES: dict[str, str] = {
     "mistralai/mistral-large": "Mistral-Large",
     "mistralai/mistral-large-2411": "Mistral-Large",
     "mistralai/mistral-large-2407": "Mistral-Large",
+    "anthropic/claude-3.5-sonnet": "Claude 3.5 Sonnet",
+    "openai/gpt-4o-mini": "GPT-4o Mini",
+    "openai/gpt-4o": "GPT-4o",
+    "google/gemini-2.0-flash": "Gemini-2.0-Flash",
     "google/gemini-2.0-flash-001": "Gemini-2.0-Flash",
     "google/gemma-4-31b-it:free": "Gemma-4-31B",
     "google/gemma-4-31b-it": "Gemma-4-31B",
@@ -124,6 +128,8 @@ MODEL_DISPLAY_NAMES: dict[str, str] = {
     "omniroute/deepseek/deepseek-r1": "OmniRoute (DeepSeek-R1)",
     "omniroute/anthropic/claude-3.5-sonnet": "OmniRoute (Claude 3.5 Sonnet)",
     "omniroute/openai/gpt-4o": "OmniRoute (GPT-4o)",
+    "omniroute/openai/gpt-4o-mini": "OmniRoute (GPT-4o Mini)",
+    "omniroute/mistralai/mistral-large": "OmniRoute (Mistral Large)",
     "omniroute/google/gemini-2.5-pro": "OmniRoute (Gemini 2.5 Pro)",
     "omniroute/qwen/qwen-2.5-72b-instruct": "OmniRoute (Qwen 2.5 72B)",
     "omniroute/meta-llama/llama-3.3-70b-instruct": "OmniRoute (Llama 3.3 70B)",
@@ -187,45 +193,78 @@ def _query_omniroute_model(
     reasoning_text = ""
     total_tokens = 0
     success = False
+    active_sub_model = sub_model
 
-    # Try sending chat completion request to OmniRoute gateway
-    try:
-        headers = {
-            "Content-Type": "application/json",
-            "X-Title": "Earnings Engine Consensus",
-        }
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
+    from earnings_engine.data.omniroute_client import HIGH_AVAILABILITY_MODELS
 
-        resp = requests.post(
-            completions_url,
-            headers=headers,
-            json={
-                "model": sub_model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": temperature,
-                "max_tokens": 1400,
-            },
-            timeout=timeout,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            total_tokens = data.get("usage", {}).get("total_tokens", 0)
-            choice = (data.get("choices") or [{}])[0]
-            msg = choice.get("message") or {}
-            content_str = msg.get("content") or ""
-            reasoning_text = msg.get("reasoning") or ""
-            if reasoning_text and reasoning_text not in content_str:
-                resp_text = f"<think>\n{reasoning_text}\n</think>\n\n{content_str}".strip()
+    models_to_try = [sub_model]
+    for ha in HIGH_AVAILABILITY_MODELS:
+        clean_ha = ha.replace("omniroute/", "").replace("omnirouter/", "").strip()
+        if clean_ha not in models_to_try:
+            models_to_try.append(clean_ha)
+    models_to_try = models_to_try[:3]
+
+    # Try sending chat completion request to OmniRoute gateway across candidate models
+    for candidate_model in models_to_try:
+        try:
+            headers = {
+                "Content-Type": "application/json",
+                "X-Title": "Earnings Engine Consensus",
+            }
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+
+            resp = requests.post(
+                completions_url,
+                headers=headers,
+                json={
+                    "model": candidate_model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": temperature,
+                    "max_tokens": 1400,
+                },
+                timeout=timeout,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                total_tokens = data.get("usage", {}).get("total_tokens", 0)
+                choice = (data.get("choices") or [{}])[0]
+                msg = choice.get("message") or {}
+                content_str = msg.get("content") or ""
+                reasoning_text = msg.get("reasoning") or ""
+                if reasoning_text and reasoning_text not in content_str:
+                    resp_text = f"<think>\n{reasoning_text}\n</think>\n\n{content_str}".strip()
+                else:
+                    resp_text = (content_str or reasoning_text or "").strip()
+                if resp_text:
+                    success = True
+                    active_sub_model = candidate_model
+                    break
             else:
-                resp_text = (content_str or reasoning_text or "").strip()
-            if resp_text:
-                success = True
-    except Exception as e:
-        logger.debug("[CONSENSUS-OMNIROUTE] Gateway connection failed: %s. Using heuristic analysis.", e)
+                is_provider_failure = (
+                    resp.status_code in (503, 502, 504, 429)
+                    or "all target providers failed" in resp.text.lower()
+                )
+                if is_provider_failure:
+                    logger.warning(
+                        "[CONSENSUS-OMNIROUTE] Upstream provider failure for model %s (HTTP %d: %s). Cascading to high-availability alternative...",
+                        candidate_model,
+                        resp.status_code,
+                        resp.text[:120],
+                    )
+                else:
+                    logger.debug("[CONSENSUS-OMNIROUTE] Model %s failed with HTTP %d: %s", candidate_model, resp.status_code, resp.text[:120])
+                continue
+        except Exception as e:
+            logger.debug("[CONSENSUS-OMNIROUTE] Candidate model %s request failed: %s", candidate_model, e)
+            continue
+
+    sub_model = active_sub_model
+    sub_display = MODEL_DISPLAY_NAMES.get(sub_model, sub_model.split("/")[-1].replace("-instruct", "").replace(":free", "").title())
+    display_name = f"OmniRoute ({sub_display})" if "OmniRoute" not in sub_display else sub_display
 
     elapsed_ms = (time.perf_counter() - start) * 1000
 

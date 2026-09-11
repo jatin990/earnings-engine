@@ -29,10 +29,21 @@ OMNIROUTE_PROBE_PORTS = [20128, 20129, 8080, 3000]
 _OMNIROUTE_AUTH_FAILURE_CACHE: dict[str, float] = {}
 
 DEFAULT_OMNIROUTE_MODELS = [
+    "openai/gpt-4o-mini",
+    "meta-llama/llama-3.3-70b-instruct",
     "google/gemini-2.0-flash",
+    "mistralai/mistral-large",
+    "anthropic/claude-3.5-sonnet",
     "auto/best-fast",
 ]
 DEFAULT_OMNIROUTER_MODELS = DEFAULT_OMNIROUTE_MODELS
+
+# Dedicated High-Availability Models for repetitive high-throughput tasks
+HIGH_AVAILABILITY_MODELS: list[str] = [
+    "openai/gpt-4o-mini",
+    "meta-llama/llama-3.3-70b-instruct",
+    "google/gemini-2.0-flash",
+]
 
 # Catalog of reasoning and production models with categorization for UI & API selection
 OMNIROUTE_MODEL_CATALOG: list[dict[str, Any]] = [
@@ -57,7 +68,32 @@ OMNIROUTE_MODEL_CATALOG: list[dict[str, Any]] = [
         "name": "🏛️ Llama 3.3 70B (Institutional & Macro)",
         "tier": "INSTITUTIONAL",
         "provider": "Meta AI",
-        "description": "Broad macroeconomic synthesis, industry competitive positioning, and fund flow conviction analysis.",
+        "recommended": True,
+        "description": "Broad macroeconomic synthesis, industry competitive positioning, and fund flow conviction analysis. High-availability institutional grade.",
+    },
+    {
+        "id": "mistralai/mistral-large",
+        "name": "🌪️ Mistral Large (Frontier Reasoning & Compliance)",
+        "tier": "INSTITUTIONAL",
+        "provider": "Mistral AI",
+        "recommended": True,
+        "description": "Frontier quantitative reasoning, regulatory filing compliance parsing, and complex macro-financial thesis generation.",
+    },
+    {
+        "id": "anthropic/claude-3.5-sonnet",
+        "name": "🎯 Claude 3.5 Sonnet (Institutional Thesis)",
+        "tier": "INSTITUTIONAL",
+        "provider": "Anthropic",
+        "recommended": True,
+        "description": "High-conviction qualitative thesis generation, corporate governance risk auditing, and clean trade setups.",
+    },
+    {
+        "id": "openai/gpt-4o-mini",
+        "name": "⚡ GPT-4o-Mini (High-Availability & Repetitive Tasks)",
+        "tier": "FAST",
+        "provider": "OpenAI",
+        "recommended": True,
+        "description": "Sub-second low-latency inference, ultra-high availability, and cost-effective execution for continuous streaming repetitive tasks.",
     },
     {
         "id": "google/gemini-2.5-pro",
@@ -67,17 +103,11 @@ OMNIROUTE_MODEL_CATALOG: list[dict[str, Any]] = [
         "description": "State-of-the-art multimodal reasoning, high-precision numeric extraction, and forward guidance reconciliation.",
     },
     {
-        "id": "anthropic/claude-3.5-sonnet",
-        "name": "🎯 Claude 3.5 Sonnet (Institutional Thesis)",
-        "tier": "INSTITUTIONAL",
-        "provider": "Anthropic",
-        "description": "High-conviction qualitative thesis generation, corporate governance risk auditing, and clean trade setups.",
-    },
-    {
         "id": "google/gemini-2.0-flash",
         "name": "🚀 Gemini 2.0 Flash (Ultra Fast)",
         "tier": "FAST",
         "provider": "Google",
+        "recommended": True,
         "description": "Sub-second low-latency catalyst screening and fast structured extraction.",
     },
     {
@@ -542,13 +572,13 @@ class OmniRouteClient:
 
         effective_timeout = min(timeout or 3.5, 4.0)
         chosen_model = model or preferred_model or item.get("model") or item.get("preferred_model")
-        configured_model = chosen_model or os.getenv("OMNIROUTE_MODEL") or self.settings.omniroute_model or "google/gemini-2.0-flash"
-        
+        configured_model = chosen_model or os.getenv("OMNIROUTE_MODEL") or self.settings.omniroute_model or "openai/gpt-4o-mini"
+
         models_to_try = [configured_model]
-        for m in DEFAULT_OMNIROUTER_MODELS:
+        for m in HIGH_AVAILABILITY_MODELS:
             if m not in models_to_try:
                 models_to_try.append(m)
-        models_to_try = models_to_try[:2]  # Cap at max 2 models to prevent cascading timeout storms
+        models_to_try = models_to_try[:3]  # Allow primary + high-availability fallback cascade
 
         prompt = self.format_prompt(item)
         headers = {

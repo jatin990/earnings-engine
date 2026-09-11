@@ -170,3 +170,48 @@ def test_omniroute_api_status_endpoint(client):
         assert data["success"] is True
         assert data["gateway"] == "diegosouzapw/OmniRoute"
         assert data["status"] == "online"
+
+
+def test_omniroute_cascade_on_503_provider_failure():
+    """Verify that when a model encounters a 503 All target providers failed error, it cascades to a high-availability model."""
+    omni = OmniRouteClient()
+    item = {
+        "ticker": "RELIANCE.NS",
+        "stock_name": "Reliance Industries",
+        "title": "Reliance expanding refinery capacity",
+        "summary": "Capacity addition planned over next 2 years.",
+        "signal_price": 2900.0,
+        "current_price": 2920.0,
+    }
+
+    fail_resp = MagicMock()
+    fail_resp.status_code = 503
+    fail_resp.text = '{"error": {"message": "All target providers failed."}}'
+
+    success_payload = {
+        "direction": "BULLISH",
+        "impact_score": 80,
+        "impact_level": "HIGH",
+        "expected_horizon": "📅 1-3 Days",
+        "volatility_est": "±2% to ±4%",
+        "trading_takeaway": "Capex driven growth.",
+        "target_price": 3100.0,
+        "stop_loss": 2850.0,
+        "confidence_pct": 85,
+    }
+    succ_resp = MagicMock()
+    succ_resp.status_code = 200
+    succ_resp.json.return_value = {
+        "choices": [{"message": {"content": json.dumps(success_payload)}}],
+        "usage": {"total_tokens": 300},
+    }
+
+    with patch("requests.post", side_effect=[fail_resp, succ_resp]), \
+         patch.object(omni, "get_completions_url", return_value="http://localhost:20128/v1/chat/completions"), \
+         patch.object(omni, "get_api_key", return_value="test_key"):
+        res = omni.analyze_catalyst(item, preferred_model="deepseek/deepseek-r1")
+        assert res["direction"] == "BULLISH"
+        assert res["impact_score"] == 80
+        assert res["target_price"] == 3100.0
+        assert "openai/gpt-4o-mini" in res["ai_model"]
+

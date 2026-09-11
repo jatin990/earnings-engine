@@ -205,20 +205,27 @@ def get_recent_nse_additions(
     return items
 
 
-def compute_ticker_result_sequence(ticker: str, settings: Settings | None = None) -> dict[str, Any]:
+def compute_ticker_result_sequence(
+    ticker: str,
+    settings: Settings | None = None,
+    past_events_count: int | None = None,
+) -> dict[str, Any]:
     """Compute whether an upcoming earnings announcement is a company's 1st, 2nd, or 3rd public result."""
-    settings = settings or Settings()
     sym = ticker.strip().upper()
 
-    try:
-        conn = get_db_connection(settings)
-        row = conn.execute(
-            "SELECT COUNT(earnings_date) FROM earnings_history WHERE ticker = ?",
-            (sym,),
-        ).fetchone()
-        past_events = row[0] if row else 0
-    except Exception:
-        past_events = 0
+    if past_events_count is not None:
+        past_events = past_events_count
+    else:
+        settings = settings or Settings()
+        try:
+            conn = get_db_connection(settings)
+            row = conn.execute(
+                "SELECT COUNT(earnings_date) FROM earnings_history WHERE ticker = ?",
+                (sym,),
+            ).fetchone()
+            past_events = row[0] if row else 0
+        except Exception:
+            past_events = 0
 
     if past_events == 0:
         return {

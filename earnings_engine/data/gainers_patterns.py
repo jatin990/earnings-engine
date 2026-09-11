@@ -102,36 +102,45 @@ PATTERN_ARCHETYPES: dict[str, dict[str, Any]] = {
 }
 
 
+_INITIALIZED_DBS: set[str] = set()
+
+
 def _connect_gainers_db(settings: Settings) -> sqlite3.Connection:
     conn = _connect(settings)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS daily_top_gainers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            trade_date TEXT NOT NULL,
-            universe TEXT NOT NULL,
-            rank INTEGER NOT NULL,
-            ticker TEXT NOT NULL,
-            stock_name TEXT,
-            return_pct REAL NOT NULL,
-            close_price REAL NOT NULL,
-            open_price REAL,
-            high_price REAL,
-            low_price REAL,
-            volume REAL,
-            volume_multiple REAL,
-            is_52w_high INTEGER,
-            dist_from_52w_high_pct REAL,
-            primary_driver TEXT,
-            driver_explanation TEXT,
-            pattern_archetype TEXT,
-            pattern_name TEXT,
-            created_at TEXT NOT NULL,
-            UNIQUE(trade_date, universe, ticker)
+    try:
+        db_key = str(_cache_path(settings))
+    except Exception:
+        db_key = str(getattr(settings, "db_path", ""))
+    if db_key not in _INITIALIZED_DBS:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS daily_top_gainers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trade_date TEXT NOT NULL,
+                universe TEXT NOT NULL,
+                rank INTEGER NOT NULL,
+                ticker TEXT NOT NULL,
+                stock_name TEXT,
+                return_pct REAL NOT NULL,
+                close_price REAL NOT NULL,
+                open_price REAL,
+                high_price REAL,
+                low_price REAL,
+                volume REAL,
+                volume_multiple REAL,
+                is_52w_high INTEGER,
+                dist_from_52w_high_pct REAL,
+                primary_driver TEXT,
+                driver_explanation TEXT,
+                pattern_archetype TEXT,
+                pattern_name TEXT,
+                created_at TEXT NOT NULL,
+                UNIQUE(trade_date, universe, ticker)
+            )
+            """
         )
-        """
-    )
-    conn.commit()
+        conn.commit()
+        _INITIALIZED_DBS.add(db_key)
     return conn
 
 
@@ -427,43 +436,56 @@ def get_daily_top_gainers(
     results: list[dict[str, Any]] = []
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
-    with _connect_gainers_db(settings) as conn:
-        for rank, telem in enumerate(top_items, 1):
-            t = telem["ticker"]
-            name = get_name(t, settings) or t
+    from earnings_engine.data.catalysts_news import get_recent_catalysts_batch
+    top_tickers = [telem["ticker"] for telem in top_items]
+    catalysts_by_ticker = get_recent_catalysts_batch(top_tickers, limit_per_ticker=3, settings=settings)
 
-            # Fetch recent news for attribution
-            from earnings_engine.data.catalysts_news import get_short_term_catalysts
-            recent_news = get_short_term_catalysts(search_query=t, limit=3, settings=settings)
+    insert_rows = []
+    for rank, telem in enumerate(top_items, 1):
+        t = telem["ticker"]
+        name = get_name(t, settings) or t
 
-            driver, exp, archetype_key = attribute_surge_driver(telem, recent_news)
-            archetype_info = PATTERN_ARCHETYPES.get(archetype_key, PATTERN_ARCHETYPES["SQUEEZE_VOLUME_EXPLOSION"])
+        recent_news = catalysts_by_ticker.get(t, [])
+        driver, exp, archetype_key = attribute_surge_driver(telem, recent_news)
+        archetype_info = PATTERN_ARCHETYPES.get(archetype_key, PATTERN_ARCHETYPES["SQUEEZE_VOLUME_EXPLOSION"])
 
-            row_dict = {
-                "trade_date": trade_date,
-                "universe": universe_or_watchlist,
-                "rank": rank,
-                "ticker": t,
-                "stock_name": name,
-                "return_pct": telem["return_pct"],
-                "close_price": telem["close"],
-                "open_price": telem["open"],
-                "high_price": telem["high"],
-                "low_price": telem["low"],
-                "volume": telem["volume"],
-                "volume_multiple": telem["volume_multiple"],
-                "is_52w_high": telem["is_52w_high"],
-                "dist_from_52w_high_pct": telem["dist_52w"],
-                "primary_driver": driver,
-                "driver_explanation": exp,
-                "pattern_archetype": archetype_key,
-                "pattern_name": archetype_info["name"],
-                "created_at": now_str,
-            }
-            results.append(row_dict)
+        row_dict = {
+            "trade_date": trade_date,
+            "universe": universe_or_watchlist,
+            "rank": rank,
+            "ticker": t,
+            "stock_name": name,
+            "return_pct": telem["return_pct"],
+            "close_price": telem["close"],
+            "open_price": telem["open"],
+            "high_price": telem["high"],
+            "low_price": telem["low"],
+            "volume": telem["volume"],
+            "volume_multiple": telem["volume_multiple"],
+            "is_52w_high": telem["is_52w_high"],
+            "dist_from_52w_high_pct": telem["dist_52w"],
+            "primary_driver": driver,
+            "driver_explanation": exp,
+            "pattern_archetype": archetype_key,
+            "pattern_name": archetype_info["name"],
+            "created_at": now_str,
+        }
+        results.append(row_dict)
 
-            try:
-                conn.execute(
+        insert_rows.append((
+            row_dict["trade_date"], row_dict["universe"], row_dict["rank"],
+            row_dict["ticker"], row_dict["stock_name"], row_dict["return_pct"],
+            row_dict["close_price"], row_dict["open_price"], row_dict["high_price"],
+            row_dict["low_price"], row_dict["volume"], row_dict["volume_multiple"],
+            row_dict["is_52w_high"], row_dict["dist_from_52w_high_pct"],
+            row_dict["primary_driver"], row_dict["driver_explanation"],
+            row_dict["pattern_archetype"], row_dict["pattern_name"], row_dict["created_at"],
+        ))
+
+    if insert_rows:
+        try:
+            with _connect_gainers_db(settings) as conn:
+                conn.executemany(
                     """
                     INSERT OR REPLACE INTO daily_top_gainers (
                         trade_date, universe, rank, ticker, stock_name, return_pct,
@@ -473,20 +495,11 @@ def get_daily_top_gainers(
                         pattern_name, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        row_dict["trade_date"], row_dict["universe"], row_dict["rank"],
-                        row_dict["ticker"], row_dict["stock_name"], row_dict["return_pct"],
-                        row_dict["close_price"], row_dict["open_price"], row_dict["high_price"],
-                        row_dict["low_price"], row_dict["volume"], row_dict["volume_multiple"],
-                        row_dict["is_52w_high"], row_dict["dist_from_52w_high_pct"],
-                        row_dict["primary_driver"], row_dict["driver_explanation"],
-                        row_dict["pattern_archetype"], row_dict["pattern_name"], row_dict["created_at"],
-                    )
+                    insert_rows,
                 )
-            except Exception as e:
-                logger.debug("Failed caching gainer: %s", e)
-
-        conn.commit()
+                conn.commit()
+        except Exception as e:
+            logger.debug("Failed bulk caching gainers: %s", e)
 
     return results
 
@@ -525,11 +538,12 @@ def scan_upcoming_breakout_setups(
     if not tickers:
         tickers = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS", "BHARTIARTL.NS", "SBIN.NS", "LT.NS", "PCJEWELLER.NS", "FORCEMOT.NS", "JIOFIN.NS"]
 
+    prices_by_ticker = load_prices_batch(tickers, settings=settings, days=400)
     candidates: list[dict[str, Any]] = []
     for t in tickers:
         try:
-            df = load_prices(t, settings=settings)
-            if df.empty or len(df) < 15:
+            df = prices_by_ticker.get(t)
+            if df is None or df.empty or len(df) < 15:
                 continue
             telem = compute_stock_daily_telemetry(t, df)
             if not telem:

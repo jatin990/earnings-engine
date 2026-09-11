@@ -70,7 +70,6 @@ def load_recent_results(
     """
     if not tickers:
         return []
-    placeholders = ",".join("?" for _ in tickers)
 
     with _earnings_connect(settings) as connection:
         cols = {row[1] for row in connection.execute("PRAGMA table_info(earnings_history)").fetchall()}
@@ -91,31 +90,38 @@ def load_recent_results(
         else:
             declared_filter = "1=1"
 
-        if start_date or end_date:
-            conds = [f"ticker IN ({placeholders})", declared_filter]
-            params: list[Any] = list(tickers)
-            if start_date:
-                conds.append("earnings_date >= ?")
-                params.append(start_date)
-            if end_date:
-                conds.append("earnings_date <= ?")
-                params.append(end_date)
-            where = " AND ".join(conds)
-            query = (
-                "SELECT DISTINCT ticker, earnings_date FROM earnings_history "
-                f"WHERE {where}"
-            )
-        else:
-            dates = _eligible_dates(now)
-            date_placeholders = ",".join("?" for _ in dates)
-            query = (
-                "SELECT DISTINCT ticker, earnings_date FROM earnings_history "
-                f"WHERE ticker IN ({placeholders}) AND earnings_date IN ({date_placeholders}) AND {declared_filter}"
-            )
-            params = tickers + dates
+        all_rows: list[tuple[str, str]] = []
+        chunk_size = 200
+        for i in range(0, len(tickers), chunk_size):
+            t_chunk = tickers[i : i + chunk_size]
+            placeholders = ",".join("?" for _ in t_chunk)
 
-        rows = connection.execute(query, params).fetchall()
-    return [(t, pd.Timestamp(d)) for t, d in rows]
+            if start_date or end_date:
+                conds = [f"ticker IN ({placeholders})", declared_filter]
+                params: list[Any] = list(t_chunk)
+                if start_date:
+                    conds.append("earnings_date >= ?")
+                    params.append(start_date)
+                if end_date:
+                    conds.append("earnings_date <= ?")
+                    params.append(end_date)
+                where = " AND ".join(conds)
+                query = (
+                    "SELECT DISTINCT ticker, earnings_date FROM earnings_history "
+                    f"WHERE {where}"
+                )
+            else:
+                dates = _eligible_dates(now)
+                date_placeholders = ",".join("?" for _ in dates)
+                query = (
+                    "SELECT DISTINCT ticker, earnings_date FROM earnings_history "
+                    f"WHERE ticker IN ({placeholders}) AND earnings_date IN ({date_placeholders}) AND {declared_filter}"
+                )
+                params = list(t_chunk) + dates
+
+            all_rows.extend(connection.execute(query, params).fetchall())
+
+    return [(t, pd.Timestamp(d)) for t, d in all_rows]
 
 
 
@@ -483,19 +489,33 @@ def compute_earnings_verdicts(events: list[tuple[str, pd.Timestamp]], price_map:
     if not events:
         return {}
 
-    # Load surprise / EPS fields for each (ticker, date) from the earnings table.
+    # Load surprise / EPS fields for each (ticker, date) from the earnings table in batched queries.
     surprise_map: dict[tuple[str, str], dict[str, Any]] = {}
+    unique_tickers = list({t for t, _ in events})
+    db_map: dict[tuple[str, str], dict[str, Any]] = {}
     with _earnings_connect(settings) as con:
-        for ticker, edate in events:
-            row = con.execute(
-                "SELECT surprise_pct, eps_reported, eps_estimate FROM earnings_history "
-                "WHERE ticker = ? AND earnings_date = ? LIMIT 1",
-                (ticker, edate.strftime("%Y-%m-%d")),
-            ).fetchone()
-            surprise_map[(ticker, edate.strftime("%Y-%m-%d"))] = (
-                {"surprise_pct": row[0], "eps_reported": row[1], "eps_estimate": row[2]}
-                if row else {"surprise_pct": None, "eps_reported": None, "eps_estimate": None}
-            )
+        chunk_size = 200
+        for i in range(0, len(unique_tickers), chunk_size):
+            chunk = unique_tickers[i : i + chunk_size]
+            placeholders = ",".join("?" for _ in chunk)
+            rows = con.execute(
+                f"SELECT ticker, earnings_date, surprise_pct, eps_reported, eps_estimate "
+                f"FROM earnings_history WHERE ticker IN ({placeholders})",
+                chunk,
+            ).fetchall()
+            for r in rows:
+                db_map[(r[0], str(r[1])[:10])] = {
+                    "surprise_pct": r[2],
+                    "eps_reported": r[3],
+                    "eps_estimate": r[4],
+                }
+
+    for ticker, edate in events:
+        edate_str = edate.strftime("%Y-%m-%d")
+        surprise_map[(ticker, edate_str)] = db_map.get(
+            (ticker, edate_str),
+            {"surprise_pct": None, "eps_reported": None, "eps_estimate": None},
+        )
 
     industry_map = get_industry_map([t for t, _ in events], settings)
 

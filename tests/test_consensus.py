@@ -331,3 +331,38 @@ def test_consensus_single_model_merges_breakdown(monkeypatch, mock_model_results
     assert r1["confidence_pct"] == 92
 
 
+def test_query_omniroute_model_cascades_on_503():
+    """Verify _query_omniroute_model cascades to high-availability models on 503 error."""
+    from unittest.mock import MagicMock, patch
+    from earnings_engine.consensus.model_runner import _query_omniroute_model
+
+    fail_resp = MagicMock()
+    fail_resp.status_code = 503
+    fail_resp.text = '{"error": "All target providers failed."}'
+
+    succ_payload = {
+        "direction": "BULLISH",
+        "confidence_pct": 82,
+        "target_return_pct": 5.0,
+        "target_price": 1050.0,
+        "support_level": 980.0,
+        "resistance_level": 1080.0,
+        "stop_loss_price": 960.0,
+        "risk_reward_ratio": 2.5,
+    }
+    succ_resp = MagicMock()
+    succ_resp.status_code = 200
+    succ_resp.json.return_value = {
+        "choices": [{"message": {"content": json.dumps(succ_payload)}}],
+        "usage": {"total_tokens": 250},
+    }
+
+    with patch("requests.post", side_effect=[fail_resp, succ_resp]):
+        res = _query_omniroute_model("omniroute/deepseek/deepseek-r1", "Test prompt", _ticker="TEST.NS")
+        assert res["direction"] == "BULLISH"
+        assert res["confidence_pct"] == 82
+        assert res["target_price"] == 1050.0
+        assert res["sub_model"] in ["openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "google/gemini-2.0-flash-001"]
+
+
+

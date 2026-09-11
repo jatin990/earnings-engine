@@ -22,7 +22,7 @@ import pandas as pd
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.news_sentiment import get_ticker_news_and_sentiment
-from earnings_engine.data.prices import load_price_metrics, load_prices
+from earnings_engine.data.prices import load_price_metrics, load_price_metrics_batch, load_prices
 from earnings_engine.data.universe import load_universe
 from earnings_engine.data.watchlists import all_watchlists, get_watchlist
 
@@ -142,6 +142,67 @@ def get_cached_repeater_prediction(ticker: str, settings: Settings | None = None
     except Exception as e:
         logger.debug("[REPEATERS] Could not load cached prediction for %s: %s", ticker, e)
         return None
+
+
+def get_cached_repeater_predictions_batch(
+    tickers: list[str],
+    settings: Settings | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Retrieve the latest cached AI forward predictions for multiple tickers in batch."""
+    if not tickers:
+        return {}
+    settings = settings or Settings()
+    cleaned = [t.strip().upper() for t in tickers if t and t.strip()]
+    unique_tickers = list(dict.fromkeys(cleaned))
+    result: dict[str, dict[str, Any]] = {}
+
+    CHUNK_SIZE = 200
+    try:
+        conn = get_db_connection(settings)
+        for i in range(0, len(unique_tickers), CHUNK_SIZE):
+            chunk = unique_tickers[i : i + CHUNK_SIZE]
+            placeholders = ",".join("?" for _ in chunk)
+            query = (
+                "SELECT ticker, run_at, as_of_quarter, last_eps_surprise, last_week_high_pct, "
+                "last_quality_score, beat_streak, industry_buzz_tag, ai_repeat_verdict, "
+                "repeat_probability_pct, confidence_pct, expected_price_bias, growth_drivers_json, "
+                "risk_factors_json, thesis, news_summary, days_to_next_earnings, next_earnings_date, payload_json "
+                f"FROM quarter_repeater_predictions WHERE ticker IN ({placeholders}) ORDER BY run_at DESC"
+            )
+            rows = conn.execute(query, chunk).fetchall()
+            for row in rows:
+                sym = str(row[0]).strip().upper()
+                if sym in result:
+                    continue  # Already have latest due to ORDER BY run_at DESC
+                try:
+                    result[sym] = {
+                        "ticker": row[0],
+                        "run_at": row[1],
+                        "as_of_quarter": row[2],
+                        "last_eps_surprise": row[3],
+                        "last_week_high_pct": row[4],
+                        "last_quality_score": row[5],
+                        "beat_streak": row[6],
+                        "industry_buzz_tag": row[7],
+                        "ai_repeat_verdict": row[8],
+                        "repeat_probability_pct": row[9],
+                        "confidence_pct": row[10],
+                        "expected_price_bias": row[11],
+                        "growth_drivers": json.loads(row[12]) if row[12] else [],
+                        "risk_factors": json.loads(row[13]) if row[13] else [],
+                        "thesis": row[14],
+                        "news_summary": row[15],
+                        "days_to_next_earnings": row[16],
+                        "next_earnings_date": row[17],
+                        "payload": json.loads(row[18]) if row[18] else {},
+                    }
+                except Exception:
+                    pass
+        conn.close()
+    except Exception as e:
+        logger.debug("[REPEATERS] Could not batch load cached predictions: %s", e)
+
+    return result
 
 
 def store_repeater_prediction(ticker: str, data: dict[str, Any], settings: Settings | None = None) -> None:
@@ -277,11 +338,15 @@ def scan_quarter_repeaters(
         except Exception:
             pass
 
-    candidates: list[dict[str, Any]] = []
+    sorted_tickers = sorted(tickers)
+    metrics_by_ticker = load_price_metrics_batch(sorted_tickers, settings) if sorted_tickers else {}
 
-    for ticker in sorted(tickers):
+    pre_candidates: list[dict[str, Any]] = []
+
+    for ticker in sorted_tickers:
         try:
-            metrics = load_price_metrics(ticker, settings) or {}
+            sym_key = ticker.strip().upper()
+            metrics = metrics_by_ticker.get(sym_key) or metrics_by_ticker.get(ticker) or {}
             if not metrics:
                 continue
 
@@ -330,9 +395,6 @@ def scan_quarter_repeaters(
                 except Exception:
                     pass
 
-            # Load cached AI forecast if available
-            cached_ai = get_cached_repeater_prediction(ticker, settings)
-
             # Build repeater composite conviction score
             base_score = 50.0
             if surp_val is not None:
@@ -343,8 +405,9 @@ def scan_quarter_repeaters(
                 base_score += streak * 5.0
             conviction_score = round(min(98.0, base_score), 1)
 
-            candidates.append({
+            pre_candidates.append({
                 "ticker": ticker,
+                "sym_key": sym_key,
                 "company_name": company_name,
                 "industry": industry or "—",
                 "sector": sector or "—",
@@ -365,10 +428,20 @@ def scan_quarter_repeaters(
                 "market_cap_cr": metrics.get("market_cap_cr"),
                 "thirty_day_return_pct": metrics.get("thirty_day_return_pct"),
                 "pct_from_52w_high": metrics.get("pct_from_52w_high"),
-                "ai_forecast": cached_ai,
             })
         except Exception as e:
             logger.debug("[REPEATERS] Error processing ticker %s: %s", ticker, e)
+
+    # Batch load cached AI predictions for pre-candidates
+    candidate_tickers = [c["ticker"] for c in pre_candidates]
+    predictions_map = get_cached_repeater_predictions_batch(candidate_tickers, settings) if candidate_tickers else {}
+
+    candidates: list[dict[str, Any]] = []
+    for c in pre_candidates:
+        sym_key = c.pop("sym_key")
+        ticker = c["ticker"]
+        c["ai_forecast"] = predictions_map.get(sym_key) or predictions_map.get(ticker)
+        candidates.append(c)
 
     # Sort candidates by composite conviction score descending
     candidates.sort(key=lambda x: x["conviction_score"], reverse=True)

@@ -24,6 +24,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "interval_seconds": 1800,
         "run_after_hours": 0,
         "market_session": "market_hours_only",
+        "is_enabled": 0,
         "params_json": '{"universe": "NSE_ALL", "strategy": "ALL", "min_score": 30}',
         "description": "Parallel background sweep executing all 5 quantitative, delivery, derivatives, and volume profile breakout strategies simultaneously across the market universe.",
     },
@@ -180,6 +181,7 @@ DEFAULT_SCHEDULES: list[dict[str, Any]] = [
         "interval_seconds": 3600,
         "run_after_hours": 0,
         "market_session": "market_hours_only",
+        "is_enabled": 0,
         "params_json": '{"universe": "ALL", "min_score": 20}',
         "description": "Hourly universe sweep discovering fresh support/resistance horizontal trading bands.",
     },
@@ -294,7 +296,19 @@ def init_automation_schedules(settings: Settings | None = None, force: bool = Fa
         # 3. Reset any stuck 'running' status back to 'active' on server startup (single query)
         conn.execute("UPDATE automation_schedules SET status = 'active' WHERE status = 'running'")
 
-        # 4. Batch update overdue next_run_at timestamps in memory and execute single batch
+        # 4. Synchronize default disabled state for unrun default schedules in existing databases
+        try:
+            disabled_default_ids = [s["job_id"] for s in DEFAULT_SCHEDULES if s.get("is_enabled") == 0]
+            if disabled_default_ids:
+                placeholders = ",".join("?" for _ in disabled_default_ids)
+                conn.execute(
+                    f"UPDATE automation_schedules SET is_enabled = 0, status = 'paused' WHERE job_id IN ({placeholders}) AND total_runs = 0 AND is_enabled = 1",
+                    disabled_default_ids,
+                )
+        except Exception:
+            pass
+
+        # 5. Batch update overdue next_run_at timestamps in memory and execute single batch
         try:
             overdue_rows = conn.execute(
                 "SELECT job_id, interval_seconds, next_run_at FROM automation_schedules WHERE is_enabled = 1"

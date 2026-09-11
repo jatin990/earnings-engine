@@ -1003,55 +1003,65 @@ class InstitutionalVerifier:
 
             # 3. Category Breakdown Reconciliations for Top Tickers
             top_tickers = tickers or [r[0] for r in shp_rows[:50]]
-            for sym in top_tickers[:30]:
+            eval_tickers = list(dict.fromkeys(top_tickers[:30]))
+            if eval_tickers:
+                ph = ",".join("?" for _ in eval_tickers)
                 h_rows = conn.execute(
-                    """
-                    SELECT fund_name, fund_type, quarter, stake_pct
+                    f"""
+                    SELECT ticker, fund_name, fund_type, quarter, stake_pct
                     FROM institutional_holdings
-                    WHERE ticker = ?
+                    WHERE ticker IN ({ph})
                     ORDER BY quarter DESC
                     """,
-                    (sym,),
+                    eval_tickers,
                 ).fetchall()
 
-                if h_rows:
-                    q_groups: dict[str, list[dict[str, Any]]] = {}
-                    for h in h_rows:
-                        q = h[2]
-                        if q not in q_groups:
-                            q_groups[q] = []
-                        q_groups[q].append({"fund_name": h[0], "fund_type": h[1], "stake_pct": h[3]})
+                # Group holdings by (ticker, quarter)
+                ticker_q_holders: dict[tuple[str, str], list[dict[str, Any]]] = {}
+                for sym, fname, ftype, q, st_pct in h_rows:
+                    key = (sym, q)
+                    if key not in ticker_q_holders:
+                        ticker_q_holders[key] = []
+                    ticker_q_holders[key].append({"fund_name": fname, "fund_type": ftype, "stake_pct": st_pct})
 
-                    for q, holders in q_groups.items():
-                        pat = conn.execute(
-                            "SELECT fii_pct, dii_mf_pct FROM shareholding_patterns WHERE ticker = ? AND quarter = ?",
-                            (sym, q),
-                        ).fetchone()
-                        if pat:
-                            fii_tot, dii_tot = pat
-                            fii_holders = [h for h in holders if "FII" in h.get("fund_type", "")]
-                            dii_holders = [h for h in holders if "DII" in h.get("fund_type", "") or "Mutual Fund" in h.get("fund_type", "")]
+                # Batch query shareholding patterns for all eval_tickers
+                shp_pat_rows = conn.execute(
+                    f"""
+                    SELECT ticker, quarter, fii_pct, dii_mf_pct
+                    FROM shareholding_patterns
+                    WHERE ticker IN ({ph})
+                    """,
+                    eval_tickers,
+                ).fetchall()
+                pat_map = {(r[0], r[1]): (r[2], r[3]) for r in shp_pat_rows}
 
-                            if fii_holders:
-                                all_findings.extend(
-                                    MathematicalInvariantChecker.reconcile_individual_holders(
-                                        ticker=sym,
-                                        quarter=q,
-                                        category_name="FII",
-                                        category_total_pct=fii_tot,
-                                        individual_holdings=fii_holders,
-                                    )
+                for (sym, q), holders in ticker_q_holders.items():
+                    pat = pat_map.get((sym, q))
+                    if pat:
+                        fii_tot, dii_tot = pat
+                        fii_holders = [h for h in holders if "FII" in h.get("fund_type", "")]
+                        dii_holders = [h for h in holders if "DII" in h.get("fund_type", "") or "Mutual Fund" in h.get("fund_type", "")]
+
+                        if fii_holders:
+                            all_findings.extend(
+                                MathematicalInvariantChecker.reconcile_individual_holders(
+                                    ticker=sym,
+                                    quarter=q,
+                                    category_name="FII",
+                                    category_total_pct=fii_tot,
+                                    individual_holdings=fii_holders,
                                 )
-                            if dii_holders:
-                                all_findings.extend(
-                                    MathematicalInvariantChecker.reconcile_individual_holders(
-                                        ticker=sym,
-                                        quarter=q,
-                                        category_name="DII",
-                                        category_total_pct=dii_tot,
-                                        individual_holdings=dii_holders,
-                                    )
+                            )
+                        if dii_holders:
+                            all_findings.extend(
+                                MathematicalInvariantChecker.reconcile_individual_holders(
+                                    ticker=sym,
+                                    quarter=q,
+                                    category_name="DII",
+                                    category_total_pct=dii_tot,
+                                    individual_holdings=dii_holders,
                                 )
+                            )
 
             # 4. Daily Flow Arithmetic Consistency
             flow_rows = conn.execute(
@@ -1210,34 +1220,41 @@ class InstitutionalVerifier:
 
     def _persist_audit_log(self, report: AuditSummaryReport, conn: Any) -> None:
         """Save audit findings into the persistent institutional_audit_log table."""
-        for f in report.findings:
-            try:
-                conn.execute(
-                    """
-                    INSERT INTO institutional_audit_log (
-                        audit_run_id, audit_timestamp, audit_scope, ticker,
-                        check_category, check_name, severity, status,
-                        expected_value, actual_value, deviation_pct, details, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        report.audit_run_id,
-                        report.audit_timestamp,
-                        report.audit_scope,
-                        f.ticker,
-                        f.check_category,
-                        f.check_name,
-                        f.severity,
-                        f.status,
-                        f.expected_value,
-                        f.actual_value,
-                        f.deviation_pct,
-                        f.details,
-                        report.audit_timestamp,
-                    ),
-                )
-            except Exception as e:
-                logger.debug("[VERIFIER] Audit log write notice: %s", e)
+        if not report.findings:
+            return
+        log_rows = [
+            (
+                report.audit_run_id,
+                report.audit_timestamp,
+                report.audit_scope,
+                f.ticker,
+                f.check_category,
+                f.check_name,
+                f.severity,
+                f.status,
+                f.expected_value,
+                f.actual_value,
+                f.deviation_pct,
+                f.details,
+                report.audit_timestamp,
+            )
+            for f in report.findings
+        ]
+        try:
+            conn.executemany(
+                """
+                INSERT INTO institutional_audit_log (
+                    audit_run_id, audit_timestamp, audit_scope, ticker,
+                    check_category, check_name, severity, status,
+                    expected_value, actual_value, deviation_pct, details, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                log_rows,
+            )
+            if hasattr(conn, "commit"):
+                conn.commit()
+        except Exception as e:
+            logger.debug("[VERIFIER] Audit log write notice: %s", e)
 
     def quarantine_and_purge_synthetic_records(self) -> int:
         """Scan and move all synthetic / mock placeholder records into institutional_quarantine."""
@@ -1253,6 +1270,9 @@ class InstitutionalVerifier:
             """
         ).fetchall()
 
+        quarantine_rows: list[tuple[Any, ...]] = []
+        purged_ids: list[int] = []
+
         for r in rows:
             h_id, sym, f_name, f_type, q, st_pct, val_cr = r
             f_lower = (f_name or "").lower()
@@ -1266,23 +1286,36 @@ class InstitutionalVerifier:
                     "stake_pct": st_pct,
                     "holding_value_cr": val_cr,
                 })
-                conn.execute(
+                quarantine_rows.append((
+                    "institutional_holdings",
+                    f"{sym}:{f_name}:{q}",
+                    "SYNTHETIC_CLEANER",
+                    f"Matched prohibited synthetic keyword in fund name '{f_name}'",
+                    raw_payload,
+                    now_iso,
+                ))
+                purged_ids.append(h_id)
+
+        if quarantine_rows:
+            try:
+                conn.executemany(
                     """
                     INSERT INTO institutional_quarantine (
                         record_type, entity_key, source_name, rejection_reason, raw_payload, quarantined_at
                     ) VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (
-                        "institutional_holdings",
-                        f"{sym}:{f_name}:{q}",
-                        "SYNTHETIC_CLEANER",
-                        f"Matched prohibited synthetic keyword in fund name '{f_name}'",
-                        raw_payload,
-                        now_iso,
-                    ),
+                    quarantine_rows,
                 )
-                conn.execute("DELETE FROM institutional_holdings WHERE id = ?", (h_id,))
-                purged_count += 1
+                chunk_size = 200
+                for i in range(0, len(purged_ids), chunk_size):
+                    chunk = purged_ids[i : i + chunk_size]
+                    ph = ",".join("?" for _ in chunk)
+                    conn.execute(f"DELETE FROM institutional_holdings WHERE id IN ({ph})", chunk)
+                if hasattr(conn, "commit"):
+                    conn.commit()
+                purged_count = len(purged_ids)
+            except Exception as e:
+                logger.warning("[VERIFIER] Quarantine/purge batch error: %s", e)
 
         if purged_count > 0:
             logger.info("[VERIFIER] Quarantined and purged %d synthetic records from institutional_holdings.", purged_count)

@@ -17,6 +17,9 @@ from earnings_engine.data.db import get_db_connection, is_turso_enabled
 
 logger = logging.getLogger("earnings_engine.consensus.storage")
 
+_CONSENSUS_DBS_INITIALIZED: set[str] = set()
+
+
 def _ensure_table(conn: Any) -> None:
     """Create the consensus_predictions table if it doesn't exist, and migrate columns."""
 
@@ -100,7 +103,10 @@ def _connect(settings: Settings) -> Any:
             pass
         if hasattr(conn, "row_factory"):
             conn.row_factory = sqlite3.Row
-    _ensure_table(conn)
+    db_key = str(getattr(settings, "database_url", "") or "default")
+    if db_key not in _CONSENSUS_DBS_INITIALIZED:
+        _ensure_table(conn)
+        _CONSENSUS_DBS_INITIALIZED.add(db_key)
     return conn
 
 
@@ -233,16 +239,41 @@ def get_pending_predictions(settings: Settings | None = None, before_date: str |
     return [_row_to_dict(r) for r in rows]
 
 
-def update_settlement(
-    prediction_id: int,
-    settlement_data: dict[str, Any],
+def update_settlements_batch(
+    settlements: list[tuple[int, dict[str, Any]]],
     settings: Settings | None = None,
-) -> bool:
-    """Update a prediction row with settlement results."""
+) -> int:
+    """Update multiple prediction rows with settlement results in batch.
+
+    Args:
+        settlements: List of (prediction_id, settlement_data) pairs.
+        settings: Optional Settings instance.
+
+    Returns:
+        Number of updated rows.
+    """
+    if not settlements:
+        return 0
+
     settings = settings or Settings()
     conn = _connect(settings)
 
-    cursor = conn.execute(
+    params = [
+        (
+            data.get("settlement_status", "SUCCESS"),
+            data.get("settled_at"),
+            data.get("actual_exit_price"),
+            data.get("actual_return_pct"),
+            data.get("is_direction_correct"),
+            data.get("failure_category"),
+            data.get("failure_reason_summary"),
+            data.get("failure_post_mortem"),
+            pred_id,
+        )
+        for pred_id, data in settlements
+    ]
+
+    cursor = conn.executemany(
         """
         UPDATE consensus_predictions
         SET settlement_status = ?,
@@ -255,25 +286,23 @@ def update_settlement(
             failure_post_mortem = ?
         WHERE id = ?
         """,
-        (
-            settlement_data.get("settlement_status", "SUCCESS"),
-            settlement_data.get("settled_at"),
-            settlement_data.get("actual_exit_price"),
-            settlement_data.get("actual_return_pct"),
-            settlement_data.get("is_direction_correct"),
-            settlement_data.get("failure_category"),
-            settlement_data.get("failure_reason_summary"),
-            settlement_data.get("failure_post_mortem"),
-            prediction_id,
-        ),
+        params,
     )
     conn.commit()
-    updated = cursor.rowcount > 0
+    count = cursor.rowcount if cursor.rowcount is not None and cursor.rowcount >= 0 else len(params)
     conn.close()
 
-    logger.info("[CONSENSUS-DB] Updated settlement for prediction #%d (status=%s, correct=%s)",
-                prediction_id, settlement_data.get("settlement_status"), settlement_data.get("is_direction_correct"))
-    return updated
+    logger.info("[CONSENSUS-DB] Batch updated settlements for %d predictions", len(settlements))
+    return count
+
+
+def update_settlement(
+    prediction_id: int,
+    settlement_data: dict[str, Any],
+    settings: Settings | None = None,
+) -> bool:
+    """Update a prediction row with settlement results."""
+    return update_settlements_batch([(prediction_id, settlement_data)], settings=settings) > 0
 
 
 def get_accuracy_stats(settings: Settings | None = None) -> dict[str, Any]:

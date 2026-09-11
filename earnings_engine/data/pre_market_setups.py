@@ -21,7 +21,7 @@ from earnings_engine.data.catalysts_news import (
     is_headline_current,
     CATALYST_RULES,
 )
-from earnings_engine.data.names import get_name
+from earnings_engine.data.names import get_name, get_names_batch
 
 logger = logging.getLogger(__name__)
 
@@ -344,6 +344,9 @@ def get_premarket_setups(
         settings=settings,
     )
 
+    candidate_tickers = list({c.get("ticker") for c in raw_catalysts if c.get("ticker")})
+    names_map = get_names_batch(candidate_tickers, settings) if candidate_tickers else {}
+
     setups: list[dict[str, Any]] = []
 
     for c in raw_catalysts:
@@ -373,7 +376,7 @@ def get_premarket_setups(
         title = c.get("title") or ""
         summary = c.get("summary") or ""
         ticker = c.get("ticker") or ""
-        stock_name = c.get("stock_name") or get_name(ticker) or ticker.replace(".NS", "")
+        stock_name = c.get("stock_name") or names_map.get(ticker) or get_name(ticker) or ticker.replace(".NS", "")
 
         if search_query:
             sq = search_query.strip().lower()
@@ -487,102 +490,96 @@ def get_historical_premarket_outcomes(
         except Exception as e:
             logger.debug("[PREMARKET-OUTCOMES] Batch prices fetch warning: %s", e)
 
-    with _connect(settings) as conn:
-        conn.row_factory = sqlite3.Row
+    names_map = get_names_batch(candidate_tickers, settings) if candidate_tickers else {}
+    from earnings_engine.data.prices import load_prices_batch
+    price_dfs = load_prices_batch(candidate_tickers, settings, days=max(days_lookback + 14, 30)) if candidate_tickers else {}
 
-        verified_items: list[dict[str, Any]] = []
+    verified_items: list[dict[str, Any]] = []
 
-        for c in raw_catalysts:
-            pub_at = c.get("published_at") or ""
-            is_match, session_phase, timing_desc = is_in_overnight_window(pub_at, window_mode="all_recent")
-            if not is_match:
+    for c in raw_catalysts:
+        pub_at = c.get("published_at") or ""
+        is_match, session_phase, timing_desc = is_in_overnight_window(pub_at, window_mode="all_recent")
+        if not is_match:
+            continue
+
+        impact_score = float(c.get("impact_score") or 50.0)
+        if impact_score < min_impact:
+            continue
+
+        direction = (c.get("direction") or "NEUTRAL").upper()
+        if direction_filter != "ALL" and direction != direction_filter.upper():
+            continue
+
+        category = c.get("category") or "Miscellaneous Corporate Disclosures"
+        if category_filter != "ALL" and category != category_filter:
+            continue
+
+        title = c.get("title") or ""
+        summary = c.get("summary") or ""
+        ticker = c.get("ticker") or ""
+        stock_name = c.get("stock_name") or names_map.get(ticker) or get_name(ticker) or ticker.replace(".NS", "")
+
+        if search_query:
+            sq = search_query.strip().lower()
+            if sq not in title.lower() and sq not in summary.lower() and sq not in ticker.lower() and sq not in stock_name.lower():
                 continue
 
-            impact_score = float(c.get("impact_score") or 50.0)
-            if impact_score < min_impact:
+        ist_dt, _ = parse_to_ist(pub_at)
+        if not ist_dt or not ticker:
+            continue
+
+        pub_date = ist_dt.strftime("%Y-%m-%d")
+        time_float = ist_dt.hour + (ist_dt.minute / 60.0)
+
+        # Determine temporal target trading session:
+        # - If published post-close (>= 15:15 IST), trade session is strictly the NEXT market day (date > pub_date)
+        # - If published pre-market (<= 09:15 IST), trade session is on or after pub_date (date >= pub_date)
+        # - Intraday news during 09:15-15:15 IST is not an overnight pre-market setup
+        if time_float >= 15.25:
+            date_mode = "gt"
+        elif time_float <= 9.25:
+            date_mode = "gte"
+        else:
+            continue
+
+        # In-memory slice from preloaded price history
+        pdf = price_dfs.get(ticker)
+        if pdf is None or pdf.empty:
+            continue
+
+        pub_ts = pd.Timestamp(pub_date)
+        if date_mode == "gt":
+            target_slice = pdf.loc[pdf.index > pub_ts]
+        else:
+            target_slice = pdf.loc[pdf.index >= pub_ts]
+
+        if target_slice.empty:
+            continue
+
+        day_candle = target_slice.iloc[0]
+        candle_date_ts = target_slice.index[0]
+        candle_date = candle_date_ts.strftime("%Y-%m-%d")
+        open_p = float(day_candle["open"]) if pd.notna(day_candle["open"]) else None
+        high_p = float(day_candle["high"]) if pd.notna(day_candle["high"]) else None
+        low_p = float(day_candle["low"]) if pd.notna(day_candle["low"]) else None
+        close_p = float(day_candle["close"]) if pd.notna(day_candle["close"]) else None
+
+        # Look up base T-1 close price before candle_date
+        prev_slice = pdf.loc[(pdf.index < candle_date_ts) & (pdf["close"] > 0)]
+        if prev_slice.empty:
+            continue
+
+        prev_row = prev_slice.iloc[-1]
+        prev_close = float(prev_row["close"])
+        prev_date_ts = prev_slice.index[-1]
+
+        # Trading day gap sanity check: reject if previous close is > 7 calendar days stale even after delta fetch
+        try:
+            if (candle_date_ts.date() - prev_date_ts.date()).days > 7:
+                logger.debug("[PREMARKET-OUTCOMES] Rejecting %s due to stale baseline price (%s vs %s)", ticker, prev_date_ts.date(), candle_date)
                 continue
-
-            direction = (c.get("direction") or "NEUTRAL").upper()
-            if direction_filter != "ALL" and direction != direction_filter.upper():
-                continue
-
-            category = c.get("category") or "Miscellaneous Corporate Disclosures"
-            if category_filter != "ALL" and category != category_filter:
-                continue
-
-            title = c.get("title") or ""
-            summary = c.get("summary") or ""
-            ticker = c.get("ticker") or ""
-            stock_name = c.get("stock_name") or get_name(ticker) or ticker.replace(".NS", "")
-
-            if search_query:
-                sq = search_query.strip().lower()
-                if sq not in title.lower() and sq not in summary.lower() and sq not in ticker.lower() and sq not in stock_name.lower():
-                    continue
-
-            ist_dt, _ = parse_to_ist(pub_at)
-            if not ist_dt or not ticker:
-                continue
-
-            pub_date = ist_dt.strftime("%Y-%m-%d")
-            time_float = ist_dt.hour + (ist_dt.minute / 60.0)
-
-            # Determine temporal target trading session:
-            # - If published post-close (>= 15:15 IST), trade session is strictly the NEXT market day (date > pub_date)
-            # - If published pre-market (<= 09:15 IST), trade session is on or after pub_date (date >= pub_date)
-            # - Intraday news during 09:15-15:15 IST is not an overnight pre-market setup
-            if time_float >= 15.25:
-                date_filter = "date > ?"
-            elif time_float <= 9.25:
-                date_filter = "date >= ?"
-            else:
-                continue
-
-            # Query the target trade day T candle on or after target session date
-            candle_rows = conn.execute(
-                f"""
-                SELECT date, open, high, low, close, volume 
-                FROM price_history 
-                WHERE ticker = ? AND {date_filter} 
-                ORDER BY date ASC LIMIT 2
-                """,
-                (ticker, pub_date),
-            ).fetchall()
-
-            if not candle_rows:
-                continue
-
-            day_candle = candle_rows[0]
-            candle_date = day_candle["date"]
-            open_p = float(day_candle["open"]) if day_candle["open"] is not None else None
-            high_p = float(day_candle["high"]) if day_candle["high"] is not None else None
-            low_p = float(day_candle["low"]) if day_candle["low"] is not None else None
-            close_p = float(day_candle["close"]) if day_candle["close"] is not None else None
-
-            # Look up base T-1 close price before candle_date
-            prev_row = conn.execute(
-                """
-                SELECT close, date FROM price_history 
-                WHERE ticker = ? AND date < ? AND close > 0
-                ORDER BY date DESC LIMIT 1
-                """,
-                (ticker, candle_date),
-            ).fetchone()
-
-            if not prev_row or prev_row[0] is None or float(prev_row[0]) <= 0:
-                continue
-
-            # Trading day gap sanity check: reject if previous close is > 7 calendar days stale even after delta fetch
-            try:
-                d_candle = datetime.strptime(str(candle_date)[:10], "%Y-%m-%d").date()
-                d_prev = datetime.strptime(str(prev_row[1])[:10], "%Y-%m-%d").date()
-                if (d_candle - d_prev).days > 7:
-                    logger.debug("[PREMARKET-OUTCOMES] Rejecting %s due to stale baseline price (%s vs %s)", ticker, prev_row[1], candle_date)
-                    continue
-            except Exception:
-                pass
-
-            prev_close = float(prev_row[0])
+        except Exception:
+            pass
 
             # Self-healing & outlier protection against corrupted candle bars
             if close_p is None or close_p <= 0:

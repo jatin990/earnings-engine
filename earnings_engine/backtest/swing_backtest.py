@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from earnings_engine.config import Settings
-from earnings_engine.data.prices import load_prices
+from earnings_engine.data.prices import load_prices, load_prices_batch
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.backtest.swing_backtest")
@@ -175,10 +175,13 @@ def run_swing_backtest(
     cfg = cfg or SwingBacktestConfig()
     settings = settings or Settings()
 
-    # --- Load & prepare price data ----------------------------------------
+    # --- Load & prepare price data in batch ---------------------------------
     frames: list[pd.DataFrame] = []
+    batch_prices = load_prices_batch(tickers, settings)
     for ticker in tickers:
-        raw = load_prices(ticker, settings)
+        raw = batch_prices.get(ticker)
+        if raw is None or raw.empty:
+            raw = load_prices(ticker, settings)
         if raw is None or raw.empty:
             logger.debug("no price data for %s — skipping", ticker)
             continue

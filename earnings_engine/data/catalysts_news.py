@@ -187,166 +187,175 @@ URGENCY_BOOSTERS = {
 }
 
 
+_INITIALIZED_DBS: set[str] = set()
+
+
 def _connect(settings: Settings) -> Any:
     settings.ensure_dirs()
     conn = get_db_connection(settings)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS news_catalysts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ticker TEXT NOT NULL,
-            stock_name TEXT,
-            title TEXT NOT NULL,
-            publisher TEXT,
-            link TEXT,
-            published_at TEXT NOT NULL,
-            summary TEXT,
-            impact_score INTEGER NOT NULL,
-            impact_level TEXT NOT NULL,
-            category TEXT NOT NULL,
-            direction TEXT NOT NULL,
-            expected_horizon TEXT NOT NULL,
-            volatility_est TEXT NOT NULL,
-            why_it_matters TEXT,
-            source TEXT,
-            created_at TEXT NOT NULL,
-            verification_status TEXT DEFAULT 'VERIFIED',
-            verification_flags TEXT DEFAULT '[]',
-            verified_numbers TEXT DEFAULT '{}',
-            entity_confidence REAL DEFAULT 0.85,
-            canonical_hash TEXT,
-            signal_price REAL,
-            signal_date TEXT,
-            current_price REAL,
-            price_change_pct REAL,
-            ai_analysis TEXT,
-            ai_takeaway TEXT,
-            ai_direction TEXT,
-            ai_target REAL,
-            ai_stop_loss REAL,
-            ai_model TEXT,
-            ai_analyzed_at TEXT,
-            financial_projections TEXT DEFAULT '{}',
-            sentiment TEXT DEFAULT 'NEUTRAL',
-            temporal_originality TEXT DEFAULT 'NEW_PUBLICATION',
-            is_republication INTEGER DEFAULT 0,
-            originality_rationale TEXT DEFAULT '',
-            affected_tickers TEXT DEFAULT '[]',
-            UNIQUE(ticker, title)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_news_catalysts_ticker_impact
-        ON news_catalysts (ticker, impact_score DESC, published_at DESC)
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS news_catalysts_tickers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            catalyst_id INTEGER NOT NULL,
-            ticker TEXT NOT NULL,
-            impact_type TEXT DEFAULT 'PRIMARY',
-            created_at TEXT,
-            UNIQUE(catalyst_id, ticker)
-        )
-        """
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_nct_ticker ON news_catalysts_tickers (ticker)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_nct_catalyst_id ON news_catalysts_tickers (catalyst_id)")
-
     try:
-        existing_cols = set()
-        for r in conn.execute("PRAGMA table_info(news_catalysts)").fetchall():
-            if hasattr(r, "get"):
-                c = r.get("name")
-            elif isinstance(r, (tuple, list)) and len(r) > 1:
-                c = r[1]
-            elif hasattr(r, "keys") and "name" in r.keys():
-                c = r["name"]
-            else:
-                c = None
-            if c:
-                existing_cols.add(c)
-
-        for col_name, col_type in [
-            ("verification_status", "TEXT DEFAULT 'VERIFIED'"),
-            ("verification_flags", "TEXT DEFAULT '[]'"),
-            ("verified_numbers", "TEXT DEFAULT '{}'"),
-            ("entity_confidence", "REAL DEFAULT 0.85"),
-            ("canonical_hash", "TEXT"),
-            ("signal_price", "REAL"),
-            ("signal_date", "TEXT"),
-            ("current_price", "REAL"),
-            ("price_change_pct", "REAL"),
-            ("ai_analysis", "TEXT"),
-            ("ai_takeaway", "TEXT"),
-            ("ai_direction", "TEXT"),
-            ("ai_target", "REAL"),
-            ("ai_stop_loss", "REAL"),
-            ("ai_model", "TEXT"),
-            ("ai_analyzed_at", "TEXT"),
-            ("financial_projections", "TEXT DEFAULT '{}'"),
-            ("sentiment", "TEXT DEFAULT 'NEUTRAL'"),
-            ("temporal_originality", "TEXT DEFAULT 'NEW_PUBLICATION'"),
-            ("is_republication", "INTEGER DEFAULT 0"),
-            ("originality_rationale", "TEXT DEFAULT ''"),
-            ("affected_tickers", "TEXT DEFAULT '[]'"),
-        ]:
-            if not existing_cols or col_name not in existing_cols:
-                try:
-                    conn.execute(f"ALTER TABLE news_catalysts ADD COLUMN {col_name} {col_type}")
-                except Exception:
-                    pass
+        db_key = str(_cache_path(settings))
     except Exception:
-        pass
-    # Self-healing: Ensure any raw RFC date strings with comma are converted to standard ISO YYYY-MM-DD HH:MM:SS
-    try:
-        raw_rows = conn.execute("SELECT id, published_at FROM news_catalysts WHERE published_at LIKE '%,%'").fetchall()
-        if raw_rows:
-            from earnings_engine.data.news_sentiment import _parse_iso_pubdate
-            for r in raw_rows:
-                iso_d = _parse_iso_pubdate(r[1])
-                conn.execute("UPDATE news_catalysts SET published_at = ? WHERE id = ?", (iso_d, r[0]))
-    except Exception:
-        pass
+        db_key = str(getattr(settings, "db_path", ""))
+    if db_key not in _INITIALIZED_DBS:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS news_catalysts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                stock_name TEXT,
+                title TEXT NOT NULL,
+                publisher TEXT,
+                link TEXT,
+                published_at TEXT NOT NULL,
+                summary TEXT,
+                impact_score INTEGER NOT NULL,
+                impact_level TEXT NOT NULL,
+                category TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                expected_horizon TEXT NOT NULL,
+                volatility_est TEXT NOT NULL,
+                why_it_matters TEXT,
+                source TEXT,
+                created_at TEXT NOT NULL,
+                verification_status TEXT DEFAULT 'VERIFIED',
+                verification_flags TEXT DEFAULT '[]',
+                verified_numbers TEXT DEFAULT '{}',
+                entity_confidence REAL DEFAULT 0.85,
+                canonical_hash TEXT,
+                signal_price REAL,
+                signal_date TEXT,
+                current_price REAL,
+                price_change_pct REAL,
+                ai_analysis TEXT,
+                ai_takeaway TEXT,
+                ai_direction TEXT,
+                ai_target REAL,
+                ai_stop_loss REAL,
+                ai_model TEXT,
+                ai_analyzed_at TEXT,
+                financial_projections TEXT DEFAULT '{}',
+                sentiment TEXT DEFAULT 'NEUTRAL',
+                temporal_originality TEXT DEFAULT 'NEW_PUBLICATION',
+                is_republication INTEGER DEFAULT 0,
+                originality_rationale TEXT DEFAULT '',
+                affected_tickers TEXT DEFAULT '[]',
+                UNIQUE(ticker, title)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_news_catalysts_ticker_impact
+            ON news_catalysts (ticker, impact_score DESC, published_at DESC)
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS news_catalysts_tickers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                catalyst_id INTEGER NOT NULL,
+                ticker TEXT NOT NULL,
+                impact_type TEXT DEFAULT 'PRIMARY',
+                created_at TEXT,
+                UNIQUE(catalyst_id, ticker)
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_nct_ticker ON news_catalysts_tickers (ticker)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_nct_catalyst_id ON news_catalysts_tickers (catalyst_id)")
 
-    # Self-healing: Correct any misattributed Apollo Tyres headlines from APOLLO.NS to APOLLOTYRE.NS
-    try:
-        conn.execute(
-            """
-            DELETE FROM news_catalysts
-            WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
-            AND title IN (SELECT title FROM news_catalysts WHERE ticker = 'APOLLOTYRE.NS')
-            """
-        )
-        conn.execute(
-            """
-            UPDATE news_catalysts
-            SET ticker = 'APOLLOTYRE.NS', stock_name = 'Apollo Tyres'
-            WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
-            """
-        )
-        conn.execute(
-            """
-            DELETE FROM news_catalyst_outcomes
-            WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
-            AND title IN (SELECT title FROM news_catalyst_outcomes WHERE ticker = 'APOLLOTYRE.NS')
-            """
-        )
-        conn.execute(
-            """
-            UPDATE news_catalyst_outcomes
-            SET ticker = 'APOLLOTYRE.NS', stock_name = 'Apollo Tyres'
-            WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
-            """
-        )
-    except Exception:
-        pass
+        try:
+            existing_cols = set()
+            for r in conn.execute("PRAGMA table_info(news_catalysts)").fetchall():
+                if hasattr(r, "get"):
+                    c = r.get("name")
+                elif isinstance(r, (tuple, list)) and len(r) > 1:
+                    c = r[1]
+                elif hasattr(r, "keys") and "name" in r.keys():
+                    c = r["name"]
+                else:
+                    c = None
+                if c:
+                    existing_cols.add(c)
 
-    conn.commit()
+            for col_name, col_type in [
+                ("verification_status", "TEXT DEFAULT 'VERIFIED'"),
+                ("verification_flags", "TEXT DEFAULT '[]'"),
+                ("verified_numbers", "TEXT DEFAULT '{}'"),
+                ("entity_confidence", "REAL DEFAULT 0.85"),
+                ("canonical_hash", "TEXT"),
+                ("signal_price", "REAL"),
+                ("signal_date", "TEXT"),
+                ("current_price", "REAL"),
+                ("price_change_pct", "REAL"),
+                ("ai_analysis", "TEXT"),
+                ("ai_takeaway", "TEXT"),
+                ("ai_direction", "TEXT"),
+                ("ai_target", "REAL"),
+                ("ai_stop_loss", "REAL"),
+                ("ai_model", "TEXT"),
+                ("ai_analyzed_at", "TEXT"),
+                ("financial_projections", "TEXT DEFAULT '{}'"),
+                ("sentiment", "TEXT DEFAULT 'NEUTRAL'"),
+                ("temporal_originality", "TEXT DEFAULT 'NEW_PUBLICATION'"),
+                ("is_republication", "INTEGER DEFAULT 0"),
+                ("originality_rationale", "TEXT DEFAULT ''"),
+                ("affected_tickers", "TEXT DEFAULT '[]'"),
+            ]:
+                if not existing_cols or col_name not in existing_cols:
+                    try:
+                        conn.execute(f"ALTER TABLE news_catalysts ADD COLUMN {col_name} {col_type}")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        # Self-healing: Ensure any raw RFC date strings with comma are converted to standard ISO YYYY-MM-DD HH:MM:SS
+        try:
+            raw_rows = conn.execute("SELECT id, published_at FROM news_catalysts WHERE published_at LIKE '%,%'").fetchall()
+            if raw_rows:
+                from earnings_engine.data.news_sentiment import _parse_iso_pubdate
+                for r in raw_rows:
+                    iso_d = _parse_iso_pubdate(r[1])
+                    conn.execute("UPDATE news_catalysts SET published_at = ? WHERE id = ?", (iso_d, r[0]))
+        except Exception:
+            pass
+
+        # Self-healing: Correct any misattributed Apollo Tyres headlines from APOLLO.NS to APOLLOTYRE.NS
+        try:
+            conn.execute(
+                """
+                DELETE FROM news_catalysts
+                WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
+                AND title IN (SELECT title FROM news_catalysts WHERE ticker = 'APOLLOTYRE.NS')
+                """
+            )
+            conn.execute(
+                """
+                UPDATE news_catalysts
+                SET ticker = 'APOLLOTYRE.NS', stock_name = 'Apollo Tyres'
+                WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
+                """
+            )
+            conn.execute(
+                """
+                DELETE FROM news_catalyst_outcomes
+                WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
+                AND title IN (SELECT title FROM news_catalyst_outcomes WHERE ticker = 'APOLLOTYRE.NS')
+                """
+            )
+            conn.execute(
+                """
+                UPDATE news_catalyst_outcomes
+                SET ticker = 'APOLLOTYRE.NS', stock_name = 'Apollo Tyres'
+                WHERE ticker = 'APOLLO.NS' AND (LOWER(title) LIKE '%apollo tyre%' OR LOWER(summary) LIKE '%apollo tyre%')
+                """
+            )
+        except Exception:
+            pass
+
+        conn.commit()
+        _INITIALIZED_DBS.add(db_key)
     return conn
 
 
@@ -549,6 +558,69 @@ def is_headline_current(title: str, summary: str = "", published_at: str = "") -
     return True
 
 
+def get_recent_catalysts(
+    ticker: str,
+    limit: int = 3,
+    settings: Settings | None = None,
+) -> list[dict[str, Any]]:
+    """Return recent cached catalysts for a ticker without triggering network requests."""
+    settings = settings or Settings()
+    ticker = ticker.strip().upper()
+    try:
+        with _connect(settings) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM news_catalysts
+                WHERE ticker = ? AND published_at >= datetime('now', '-14 days')
+                ORDER BY impact_score DESC, published_at DESC
+                LIMIT ?
+                """,
+                (ticker, limit),
+            ).fetchall()
+            return [dict(r) for r in rows]
+    except Exception as e:
+        logger.debug("[CATALYSTS] Failed to retrieve recent catalysts for %s: %s", ticker, e)
+        return []
+
+
+def get_recent_catalysts_batch(
+    tickers: list[str],
+    limit_per_ticker: int = 3,
+    settings: Settings | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    """Return recent cached catalysts for multiple tickers in batched queries."""
+    if not tickers:
+        return {}
+    settings = settings or Settings()
+    cleaned = [t.strip().upper() for t in tickers if t and t.strip()]
+    unique_tickers = list(dict.fromkeys(cleaned))
+    result: dict[str, list[dict[str, Any]]] = {t: [] for t in unique_tickers}
+
+    CHUNK_SIZE = 200
+    try:
+        with _connect(settings) as conn:
+            conn.row_factory = sqlite3.Row
+            for i in range(0, len(unique_tickers), CHUNK_SIZE):
+                chunk = unique_tickers[i : i + CHUNK_SIZE]
+                placeholders = ",".join("?" for _ in chunk)
+                query = f"""
+                    SELECT * FROM news_catalysts
+                    WHERE ticker IN ({placeholders}) AND published_at >= datetime('now', '-14 days')
+                    ORDER BY impact_score DESC, published_at DESC
+                """
+                rows = conn.execute(query, chunk).fetchall()
+                for r in rows:
+                    row_dict = dict(r)
+                    sym = row_dict.get("ticker")
+                    if sym and sym in result:
+                        if len(result[sym]) < limit_per_ticker:
+                            result[sym].append(row_dict)
+    except Exception as e:
+        logger.debug("[CATALYSTS] Failed to retrieve batched recent catalysts: %s", e)
+    return result
+
+
 def fetch_ticker_catalysts(
     ticker: str,
     limit: int = 8,
@@ -707,7 +779,7 @@ def get_short_term_catalysts(
         if valid:
             tickers = list({v["ticker"] for v in valid if v.get("ticker")})
             if tickers:
-                from earnings_engine.data.prices import fetch_batch_live_quotes, get_latest_cached_prices
+                from earnings_engine.data.prices import fetch_batch_live_quotes, get_latest_cached_prices, load_prices_batch
 
                 # Fetch real-time live quotes in parallel with graceful fallback
                 live_quotes: dict[str, Any] = {}
@@ -717,6 +789,11 @@ def get_short_term_catalysts(
                     logger.debug("[CATALYSTS] fetch_batch_live_quotes failed: %s", e)
 
                 latest_cached = get_latest_cached_prices(tickers, settings=settings)
+                price_dfs = {}
+                try:
+                    price_dfs = load_prices_batch(tickers, settings=settings, days=max(days + 14, 30))
+                except Exception as e:
+                    logger.debug("[CATALYSTS] load_prices_batch failed: %s", e)
                 today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
                 for v in valid:
@@ -751,36 +828,66 @@ def get_short_term_catalysts(
 
                     if t and pub_d:
                         try:
-                            # If published today or after market open, anchor to prior session close
-                            if pub_d >= today_str:
-                                sig_row = conn.execute(
-                                    "SELECT close, date FROM price_history WHERE ticker = ? AND date < ? AND close > 0 ORDER BY date DESC LIMIT 1",
-                                    (t, pub_d),
-                                ).fetchone()
-                                if not sig_row:
+                            # In-memory slice from batched prices if available
+                            pdf = price_dfs.get(t) if price_dfs else None
+                            sig_val = None
+                            sig_dt_val = None
+                            if pdf is not None and not pdf.empty:
+                                pub_ts = pd.Timestamp(pub_d)
+                                if pub_d >= today_str:
+                                    sub_df = pdf.loc[pdf.index < pub_ts]
+                                    if sub_df.empty or not (sub_df["close"] > 0).any():
+                                        sub_df = pdf.loc[pdf.index <= pub_ts]
+                                else:
+                                    sub_df = pdf.loc[pdf.index <= pub_ts]
+                                pos = sub_df[sub_df["close"] > 0]
+                                if not pos.empty:
+                                    sig_val = float(pos.iloc[-1]["close"])
+                                    sig_dt_val = pos.index[-1].strftime("%Y-%m-%d")
+
+                            if sig_val is not None:
+                                try:
+                                    d_pub = datetime.strptime(pub_d[:10], "%Y-%m-%d").date()
+                                    d_sig = datetime.strptime(str(sig_dt_val)[:10], "%Y-%m-%d").date()
+                                    if (d_pub - d_sig).days <= 14:
+                                        if sig_price is None or (cur_price and abs(sig_price - cur_price) < 1e-4 and (d_pub - d_sig).days >= 0):
+                                            sig_price = sig_val
+                                            sig_date = sig_dt_val
+                                except Exception:
+                                    if sig_price is None:
+                                        sig_price = sig_val
+                                        sig_date = sig_dt_val
+                            else:
+                                # Fallback to single SQL lookup if not found in batch cache
+                                if pub_d >= today_str:
+                                    sig_row = conn.execute(
+                                        "SELECT close, date FROM price_history WHERE ticker = ? AND date < ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                                        (t, pub_d),
+                                    ).fetchone()
+                                    if not sig_row:
+                                        sig_row = conn.execute(
+                                            "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                                            (t, pub_d),
+                                        ).fetchone()
+                                else:
                                     sig_row = conn.execute(
                                         "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
                                         (t, pub_d),
                                     ).fetchone()
-                            else:
-                                sig_row = conn.execute(
-                                    "SELECT close, date FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
-                                    (t, pub_d),
-                                ).fetchone()
 
-                            if sig_row and sig_row[0] is not None:
-                                try:
-                                    d_pub = datetime.strptime(pub_d[:10], "%Y-%m-%d").date()
-                                    d_sig = datetime.strptime(str(sig_row[1])[:10], "%Y-%m-%d").date()
-                                    if (d_pub - d_sig).days <= 14:
-                                        # Prefer the anchor query if missing or if existing was identical to current price
-                                        if sig_price is None or (cur_price and abs(sig_price - cur_price) < 1e-4 and (d_pub - d_sig).days >= 0):
+                                if sig_row and sig_row[0] is not None:
+                                    try:
+                                        d_pub = datetime.strptime(pub_d[:10], "%Y-%m-%d").date()
+                                        d_sig = datetime.strptime(str(sig_row[1])[:10], "%Y-%m-%d").date()
+                                        if (d_pub - d_sig).days <= 14:
+                                            # Prefer the anchor query if missing or if existing was identical to current price
+                                            if sig_price is None or (cur_price and abs(sig_price - cur_price) < 1e-4 and (d_pub - d_sig).days >= 0):
+                                                sig_price = float(sig_row[0])
+                                                sig_date = sig_row[1]
+                                    except Exception:
+                                        if sig_price is None:
                                             sig_price = float(sig_row[0])
                                             sig_date = sig_row[1]
-                                except Exception:
-                                    if sig_price is None:
-                                        sig_price = float(sig_row[0])
-                                        sig_date = sig_row[1]
                         except Exception as e:
                             logger.debug("[CATALYSTS] sig_price query error for %s: %s", t, e)
 

@@ -124,6 +124,27 @@ def save_discovered_fund_holdings(
     now_iso = datetime.now(timezone.utc).isoformat()
     inserted = 0
 
+    # Pre-fetch existing record IDs in batch using chunked IN queries
+    tickers_in_batch = list({
+        (h.get("ticker", "").strip().upper() if (h.get("ticker", "").strip().upper().endswith(".NS") or h.get("ticker", "").strip().upper().endswith(".BO") or "." in h.get("ticker", "").strip().upper()) else f"{h.get('ticker', '').strip().upper()}.NS")
+        for h in holdings if h.get("ticker")
+    })
+    existing_map: dict[tuple[str, str, str], int] = {}
+    if tickers_in_batch:
+        chunk_size = 200
+        for i in range(0, len(tickers_in_batch), chunk_size):
+            chunk = tickers_in_batch[i : i + chunk_size]
+            placeholders = ",".join("?" for _ in chunk)
+            ex_rows = local_conn.execute(
+                f"SELECT id, ticker, fund_name, quarter FROM institutional_holdings WHERE ticker IN ({placeholders})",
+                chunk,
+            ).fetchall()
+            for r in ex_rows:
+                existing_map[(r[1], r[2], r[3])] = r[0]
+
+    update_rows: list[tuple[Any, ...]] = []
+    insert_rows: list[tuple[Any, ...]] = []
+
     for h in holdings:
         ticker = h.get("ticker", "").strip().upper()
         if not ticker:
@@ -153,49 +174,55 @@ def save_discovered_fund_holdings(
         inc_amt_cr = round(float(h.get("increase_amount_cr", 0.0) or 0.0), 2)
         tot_amt_cr = val_cr if val_cr > 0 else round(float(h.get("total_amount_cr", 0.0) or 0.0), 2)
 
-        existing = local_conn.execute(
-            "SELECT id FROM institutional_holdings WHERE ticker = ? AND fund_name = ? AND quarter = ?",
-            (ticker, fund_name, quarter),
-        ).fetchone()
+        key = (ticker, fund_name, quarter)
+        existing_id = existing_map.get(key)
 
-        if existing:
-            local_conn.execute(
-                """
-                UPDATE institutional_holdings SET
-                    fund_type = ?, shares_held = ?, stake_pct = ?, holding_value_cr = ?,
-                    prev_stake_pct = ?, action = ?, change_shares = ?, change_pct = ?,
-                    avg_price = ?, recent_buy_price = ?, recent_txn_price = ?,
-                    recent_txn_date = ?, recent_txn_type = ?, reported_date = ?,
-                    increase_amount_cr = ?, total_amount_cr = ?
-                WHERE id = ?
-                """,
-                (
-                    fund_type, shares, stake_pct, val_cr,
-                    prev_stake, action, change_shares, change_pct,
-                    avg_price, recent_buy, recent_txn_p,
-                    recent_txn_d, recent_txn_t, rep_date,
-                    inc_amt_cr, tot_amt_cr,
-                    existing[0],
-                ),
-            )
+        if existing_id is not None:
+            update_rows.append((
+                fund_type, shares, stake_pct, val_cr,
+                prev_stake, action, change_shares, change_pct,
+                avg_price, recent_buy, recent_txn_p,
+                recent_txn_d, recent_txn_t, rep_date,
+                inc_amt_cr, tot_amt_cr,
+                existing_id,
+            ))
         else:
-            local_conn.execute(
-                """
-                INSERT INTO institutional_holdings (
-                    ticker, fund_name, fund_type, quarter, shares_held, stake_pct,
-                    holding_value_cr, prev_stake_pct, action, change_shares, change_pct,
-                    avg_price, recent_buy_price, recent_txn_price, recent_txn_date,
-                    recent_txn_type, reported_date, created_at, increase_amount_cr, total_amount_cr
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    ticker, fund_name, fund_type, quarter, shares, stake_pct,
-                    val_cr, prev_stake, action, change_shares, change_pct,
-                    avg_price, recent_buy, recent_txn_p, recent_txn_d,
-                    recent_txn_t, rep_date, now_iso, inc_amt_cr, tot_amt_cr,
-                ),
-            )
+            insert_rows.append((
+                ticker, fund_name, fund_type, quarter, shares, stake_pct,
+                val_cr, prev_stake, action, change_shares, change_pct,
+                avg_price, recent_buy, recent_txn_p, recent_txn_d,
+                recent_txn_t, rep_date, now_iso, inc_amt_cr, tot_amt_cr,
+            ))
+            # Mark a sentinel ID so subsequent identical items in the same batch update or don't duplicate
+            existing_map[key] = -1
         inserted += 1
+
+    if update_rows:
+        local_conn.executemany(
+            """
+            UPDATE institutional_holdings SET
+                fund_type = ?, shares_held = ?, stake_pct = ?, holding_value_cr = ?,
+                prev_stake_pct = ?, action = ?, change_shares = ?, change_pct = ?,
+                avg_price = ?, recent_buy_price = ?, recent_txn_price = ?,
+                recent_txn_date = ?, recent_txn_type = ?, reported_date = ?,
+                increase_amount_cr = ?, total_amount_cr = ?
+            WHERE id = ?
+            """,
+            update_rows,
+        )
+
+    if insert_rows:
+        local_conn.executemany(
+            """
+            INSERT INTO institutional_holdings (
+                ticker, fund_name, fund_type, quarter, shares_held, stake_pct,
+                holding_value_cr, prev_stake_pct, action, change_shares, change_pct,
+                avg_price, recent_buy_price, recent_txn_price, recent_txn_date,
+                recent_txn_type, reported_date, created_at, increase_amount_cr, total_amount_cr
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            insert_rows,
+        )
 
     if hasattr(local_conn, "commit"):
         local_conn.commit()
