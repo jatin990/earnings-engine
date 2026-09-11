@@ -146,8 +146,11 @@ def test_harmonized_indices_and_sector_returns():
 
 def test_sidebar_badges_real_counts():
     """Verify sidebar badges endpoint returns realistic, accurate counts."""
+    import asyncio
+    from earnings_engine.api.routers.system import get_sidebar_badges_endpoint
+
     settings = Settings()
-    _hydrate_badge_counters_from_db(settings)
+    _hydrate_badge_counters_from_db(settings, force=True)
     counters = get_badge_counters(settings)
 
     assert "breaking_out_stocks" in counters
@@ -159,3 +162,17 @@ def test_sidebar_badges_real_counts():
     assert isinstance(counters["breaking_out_stocks"], int)
     assert isinstance(counters["high_impact_news_70"], int)
     assert isinstance(counters["premarket_high_impact_70"], int)
+    assert isinstance(counters["active_gainers"], int)
+
+    # Breakout count should reflect actively triggered setups (never the full 700+ universe)
+    assert counters["breaking_out_stocks"] < 50
+
+    # Verify endpoint output schema
+    res = asyncio.run(get_sidebar_badges_endpoint())
+    assert res["success"] is True
+    assert res["breakouts_count"] == counters["breaking_out_stocks"]
+    assert res["active_breakouts"] == counters["breaking_out_stocks"]
+    assert res["breaking_out_stocks"] == counters["breaking_out_stocks"]
+    assert res["catalysts_count"] == counters["high_impact_news_70"]
+    assert res["premarket_count"] == counters["premarket_high_impact_70"]
+    assert res["gainers_count"] == counters["active_gainers"]

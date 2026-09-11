@@ -95,7 +95,7 @@ def test_multi_strategy_parallel_scan_execution(monkeypatch):
     """Verify run_multi_strategy_parallel_scan runs across all 5 strategies concurrently."""
     import earnings_engine.data.breakout_scanner as bks_mod
 
-    def _mock_score(ticker, settings, strategy="CLASSIC_TECHNICAL", use_live_quote=True):
+    def _mock_score(ticker, settings, strategy="CLASSIC_TECHNICAL", use_live_quote=True, **kwargs):
         return {
             "ticker": ticker,
             "strategy": strategy,

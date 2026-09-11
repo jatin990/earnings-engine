@@ -515,8 +515,20 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
         logger.debug("[BREAKOUT-DB] Persisted %d candidates to breakout_radar and %d breached setups to breakout_tracked_signals.", len(rows_to_insert), len(rows_for_tracked))
         try:
             from earnings_engine.api.routers.system import set_badge_counter
-            hot_breaking = len({r[0] for r in rows_to_insert if len(r) > 5 and (str(r[2]).upper() == "HOT" or (float(r[5] or 0) >= 70.0))})
-            set_badge_counter("breaking_out_stocks", min(hot_breaking, len(_pool.get("hot", {})) or hot_breaking), settings)
+            # Only count setups that have actively triggered or broken out
+            hot_breaking = len({
+                r[0] for r in rows_to_insert
+                if len(r) > 23 and (
+                    str(r[23]).upper() in ("TRIGGERED", "TARGET_HIT", "BREAKOUT_SUCCEEDED")
+                    or bool(r[22])
+                )
+            })
+            if hot_breaking == 0 and rows_for_tracked:
+                hot_breaking = len({
+                    r[0] for r in rows_for_tracked
+                    if len(r) > 23 and str(r[23]).upper() in ("TRIGGERED", "TARGET_HIT", "BREAKOUT_SUCCEEDED")
+                })
+            set_badge_counter("breaking_out_stocks", hot_breaking, settings)
         except Exception:
             pass
         try:
@@ -596,10 +608,15 @@ def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
             _pool["last_scan_at"] = datetime.now(timezone.utc).isoformat()
         logger.info("[BREAKOUT-DB] Loaded %d hot and %d warm candidates from database.", hot_count, warm_count)
 
-        # Trigger background live quote sync for all hot and active setups so prices & dates are fresh
+        # Trigger background live quote sync for all hot and active setups so prices & dates are fresh during market hours
         import threading
         def _sync_hot_pool_quotes():
             try:
+                import time
+                from earnings_engine.data.market_context import is_market_open
+                if not is_market_open(time.time()):
+                    logger.debug("[BREAKOUT-DB] Skipping hot pool live quote sync: market is closed.")
+                    return
                 hot_tickers = list({k.split("::")[0] for k in _pool.get("hot", {}).keys() if k})
                 if hot_tickers:
                     from earnings_engine.data.prices import fetch_batch_live_quotes
@@ -611,8 +628,14 @@ def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
 
         try:
             from earnings_engine.api.routers.system import set_badge_counter
-            unique_hot_tickers = len({k.split("::")[0] for k in _pool.get("hot", {}).keys()})
-            set_badge_counter("breaking_out_stocks", unique_hot_tickers, settings)
+            active_breaking = len({
+                c.get("ticker") for c in _pool.get("candidates", [])
+                if c.get("ticker") and (
+                    str(c.get("outcome", "")).upper() in ("TRIGGERED", "TARGET_HIT", "BREAKOUT_SUCCEEDED")
+                    or bool(c.get("breakout_happened"))
+                )
+            })
+            set_badge_counter("breaking_out_stocks", active_breaking, settings)
         except Exception:
             pass
         return True
@@ -3195,18 +3218,24 @@ def _score_single_ticker(
     asof_date: str | None = None,
     use_live_quote: bool = False,
     strategy: str = "CLASSIC_TECHNICAL",
+    prices_df: pd.DataFrame | None = None,
+    metrics: dict[str, Any] | None = None,
+    catalysts: list[dict[str, Any]] | None = None,
+    macro_info: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Load prices, metrics, news catalysts, and score a single ticker. Returns result dict or None."""
     try:
         from earnings_engine.data.prices import load_prices, load_price_metrics, fetch_live_quote
 
-        prices_df = load_prices(ticker, settings)
+        if prices_df is None:
+            prices_df = load_prices(ticker, settings)
         if prices_df is None or prices_df.empty:
             return None
 
         # 1. Live Price integration for Hot stocks / on-demand re-eval
         if use_live_quote and not asof_date:
             try:
+                prices_df = prices_df.copy()
                 live_q = fetch_live_quote(ticker, settings, sync_db=True)
                 if live_q and live_q.get("current_price"):
                     live_price = float(live_q["current_price"])
@@ -3232,7 +3261,8 @@ def _score_single_ticker(
             except Exception as e:
                 logger.debug("[BREAKOUT-LIVE] Live quote fetch skipped for %s: %s", ticker, e)
 
-        metrics = load_price_metrics(ticker, settings) or {}
+        if metrics is None:
+            metrics = load_price_metrics(ticker, settings) or {}
         quality_scores: list[float | None] = []
         for key in ("q1_earnings_score", "q2_earnings_score", "q3_earnings_score"):
             v = metrics.get(key)
@@ -3253,10 +3283,13 @@ def _score_single_ticker(
             # 2. News Catalyst Integration from pooled news database
             if not asof_date:
                 try:
-                    from earnings_engine.data.catalysts_news import get_recent_catalysts
-                    catalysts = get_recent_catalysts(ticker, limit=3, settings=settings)
-                    if catalysts:
-                        top_cat = catalysts[0]
+                    if catalysts is None:
+                        from earnings_engine.data.catalysts_news import get_recent_catalysts
+                        cats = get_recent_catalysts(ticker, limit=3, settings=settings)
+                    else:
+                        cats = catalysts
+                    if cats:
+                        top_cat = cats[0]
                         direction = str(top_cat.get("direction") or "NEUTRAL").upper()
                         impact = float(top_cat.get("impact_score") or 50)
                         title = str(top_cat.get("title") or "")
@@ -3288,12 +3321,15 @@ def _score_single_ticker(
             # 3. Macro Market Conditions & Volatility Regime Weighting
             if not asof_date:
                 try:
-                    from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
-                    macro_info = compute_market_regime_multiplier(settings)
-                    b_mult = float(macro_info.get("breakout_multiplier", 1.0))
-                    m_score = float(macro_info.get("macro_score", 8.0))
-                    m_pill = str(macro_info.get("macro_pill", "🟡 Neutral"))
-                    m_bias = str(macro_info.get("macro_bias", "RANGEBOUND_NEUTRAL"))
+                    if macro_info is None:
+                        from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
+                        macro_data = compute_market_regime_multiplier(settings)
+                    else:
+                        macro_data = macro_info
+                    b_mult = float(macro_data.get("breakout_multiplier", 1.0))
+                    m_score = float(macro_data.get("macro_score", 8.0))
+                    m_pill = str(macro_data.get("macro_pill", "🟡 Neutral"))
+                    m_bias = str(macro_data.get("macro_bias", "RANGEBOUND_NEUTRAL"))
 
                     # Apply macro multiplier to composite score
                     raw_score = float(result.get("composite_score", 0.0))
@@ -3307,8 +3343,8 @@ def _score_single_ticker(
                         "score": m_score,
                         "delta": macro_delta,
                         "pill": m_pill,
-                        "fear_greed_score": macro_info.get("fear_greed_score"),
-                        "vix_level": macro_info.get("vix_level"),
+                        "fear_greed_score": macro_data.get("fear_greed_score"),
+                        "vix_level": macro_data.get("vix_level"),
                     }
                     if macro_delta != 0.0:
                         tag = "Tailwind" if macro_delta > 0 else "Headwind"
@@ -3431,6 +3467,19 @@ def run_multi_strategy_parallel_scan(
         return {"success": False, "message": summary_msg, "strategies": {}, "total_candidates": 0}
 
     from concurrent.futures import ThreadPoolExecutor
+    from earnings_engine.data.prices import load_prices_batch, load_price_metrics_batch
+    from earnings_engine.data.catalysts_news import get_recent_catalysts_batch
+    from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
+
+    # Bulk pre-load prices, metrics, catalysts, and macro conditions across all tickers
+    prices_map = load_prices_batch(ticker_list, settings=settings)
+    metrics_map = load_price_metrics_batch(ticker_list, settings=settings)
+    catalysts_map = get_recent_catalysts_batch(ticker_list, limit_per_ticker=3, settings=settings)
+    macro_info = None
+    try:
+        macro_info = compute_market_regime_multiplier(settings)
+    except Exception as e:
+        logger.debug("[BREAKOUT-MACRO] Macro precompute warning: %s", e)
 
     strategy_results: dict[str, Any] = {}
 
@@ -3440,7 +3489,15 @@ def run_multi_strategy_parallel_scan(
         strat_candidates: list[dict[str, Any]] = []
 
         def _score_one(t: str) -> dict[str, Any] | None:
-            return _score_single_ticker(t, settings, strategy=strat_id)
+            return _score_single_ticker(
+                t,
+                settings,
+                strategy=strat_id,
+                prices_df=prices_map.get(t),
+                metrics=metrics_map.get(t),
+                catalysts=catalysts_map.get(t),
+                macro_info=macro_info,
+            )
 
         with ThreadPoolExecutor(max_workers=max_workers_per_strat) as executor:
             scored_list = list(executor.map(_score_one, ticker_list))
@@ -3591,6 +3648,19 @@ def run_cold_scan(
 
     from concurrent.futures import ThreadPoolExecutor
     from earnings_engine.logging_utils import BatchProgressLogger
+    from earnings_engine.data.prices import load_prices_batch, load_price_metrics_batch
+    from earnings_engine.data.catalysts_news import get_recent_catalysts_batch
+    from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
+
+    # Bulk pre-load prices, metrics, catalysts, and macro conditions across all tickers
+    prices_map = load_prices_batch(ticker_list, settings=settings)
+    metrics_map = load_price_metrics_batch(ticker_list, settings=settings)
+    catalysts_map = get_recent_catalysts_batch(ticker_list, limit_per_ticker=3, settings=settings)
+    macro_info = None
+    try:
+        macro_info = compute_market_regime_multiplier(settings)
+    except Exception as e:
+        logger.debug("[BREAKOUT-MACRO] Macro precompute warning: %s", e)
 
     progress = BatchProgressLogger(
         name=f"breakout_{strat_clean.lower()}",
@@ -3600,7 +3670,15 @@ def run_cold_scan(
     )
 
     def _score(ticker: str) -> tuple[str, dict | None]:
-        result = _score_single_ticker(ticker, settings, strategy=strat_clean)
+        result = _score_single_ticker(
+            ticker,
+            settings,
+            strategy=strat_clean,
+            prices_df=prices_map.get(ticker),
+            metrics=metrics_map.get(ticker),
+            catalysts=catalysts_map.get(ticker),
+            macro_info=macro_info,
+        )
         return ticker, result
 
     scored = []
@@ -3666,7 +3744,9 @@ def run_warm_rescore(settings: Settings) -> None:
     from earnings_engine.data.automation_schedules import record_job_start, record_job_finish
     record_job_start("breakout_warm_rescore", settings)
 
-    from earnings_engine.data.prices import fetch_batch_live_quotes
+    from earnings_engine.data.prices import fetch_batch_live_quotes, load_prices_batch, load_price_metrics_batch
+    from earnings_engine.data.catalysts_news import get_recent_catalysts_batch
+    from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
     from concurrent.futures import ThreadPoolExecutor
 
     # 1. Extract tickers for live quote batch fetch
@@ -3676,12 +3756,30 @@ def run_warm_rescore(settings: Settings) -> None:
     except Exception as e:
         logger.debug("[BREAKOUT-WARM] Batch live quote fetch warning: %s", e)
 
+    prices_map = load_prices_batch(tickers_to_fetch, settings=settings)
+    metrics_map = load_price_metrics_batch(tickers_to_fetch, settings=settings)
+    catalysts_map = get_recent_catalysts_batch(tickers_to_fetch, limit_per_ticker=3, settings=settings)
+    macro_info = None
+    try:
+        macro_info = compute_market_regime_multiplier(settings)
+    except Exception as e:
+        logger.debug("[BREAKOUT-WARM] Macro precompute warning: %s", e)
+
     # 2. Rescore warm tickers per strategy
     def _score(key: str) -> tuple[str, dict | None]:
         parts = key.split("::")
         ticker = parts[0]
         strat = parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL"
-        return key, _score_single_ticker(ticker, settings, strategy=strat, use_live_quote=False)
+        return key, _score_single_ticker(
+            ticker,
+            settings,
+            strategy=strat,
+            use_live_quote=False,
+            prices_df=prices_map.get(ticker),
+            metrics=metrics_map.get(ticker),
+            catalysts=catalysts_map.get(ticker),
+            macro_info=macro_info,
+        )
 
     with ThreadPoolExecutor(max_workers=6) as executor:
         scored = list(executor.map(_score, warm_keys))
@@ -3744,12 +3842,34 @@ def run_hot_rescore(settings: Settings) -> None:
     except Exception as e:
         logger.debug("[BREAKOUT-HOT] Batch live quote fetch warning: %s", e)
 
+    from earnings_engine.data.prices import load_prices_batch, load_price_metrics_batch
+    from earnings_engine.data.catalysts_news import get_recent_catalysts_batch
+    from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
+
+    prices_map = load_prices_batch(tickers_to_fetch, settings=settings)
+    metrics_map = load_price_metrics_batch(tickers_to_fetch, settings=settings)
+    catalysts_map = get_recent_catalysts_batch(tickers_to_fetch, limit_per_ticker=3, settings=settings)
+    macro_info = None
+    try:
+        macro_info = compute_market_regime_multiplier(settings)
+    except Exception as e:
+        logger.debug("[BREAKOUT-HOT] Macro precompute warning: %s", e)
+
     # 2. Rescore hot tickers with freshest prices
     def _score(key: str) -> tuple[str, dict | None]:
         parts = key.split("::")
         ticker = parts[0]
         strat = parts[1] if len(parts) > 1 else "CLASSIC_TECHNICAL"
-        return key, _score_single_ticker(ticker, settings, strategy=strat, use_live_quote=False)
+        return key, _score_single_ticker(
+            ticker,
+            settings,
+            strategy=strat,
+            use_live_quote=False,
+            prices_df=prices_map.get(ticker),
+            metrics=metrics_map.get(ticker),
+            catalysts=catalysts_map.get(ticker),
+            macro_info=macro_info,
+        )
 
     with ThreadPoolExecutor(max_workers=6) as executor:
         scored = list(executor.map(_score, hot_keys))
@@ -3814,6 +3934,9 @@ def run_breakout_scan(
         return list(_pool["candidates"])
 
     from concurrent.futures import ThreadPoolExecutor
+    from earnings_engine.data.prices import load_prices_batch, load_price_metrics_batch
+    from earnings_engine.data.catalysts_news import get_recent_catalysts_batch
+    from earnings_engine.data.cross_strategy import compute_market_regime_multiplier
 
     ticker_list = _resolve_universe_tickers(settings, universe)
     if not ticker_list:
@@ -3821,8 +3944,26 @@ def run_breakout_scan(
 
     t0 = time.perf_counter()
 
+    prices_map = load_prices_batch(ticker_list, settings=settings)
+    metrics_map = load_price_metrics_batch(ticker_list, settings=settings)
+    catalysts_map = get_recent_catalysts_batch(ticker_list, limit_per_ticker=3, settings=settings)
+    macro_info = None
+    try:
+        macro_info = compute_market_regime_multiplier(settings)
+    except Exception as e:
+        logger.debug("[BREAKOUT-SCAN] Macro precompute warning: %s", e)
+
     def _score(ticker: str) -> dict | None:
-        return _score_single_ticker(ticker, settings, asof_date=asof_date, strategy=strategy_clean)
+        return _score_single_ticker(
+            ticker,
+            settings,
+            asof_date=asof_date,
+            strategy=strategy_clean,
+            prices_df=prices_map.get(ticker),
+            metrics=metrics_map.get(ticker),
+            catalysts=catalysts_map.get(ticker),
+            macro_info=macro_info,
+        )
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         scored = list(executor.map(_score, ticker_list))

@@ -16,6 +16,7 @@ from earnings_engine.api.dependencies import (
     _resolve_session,
     _settings,
 )
+from earnings_engine.config import Settings
 from earnings_engine.api import config_api
 from earnings_engine.data.db import get_db_connection
 from earnings_engine.data.error_ledger import (
@@ -66,7 +67,7 @@ _BADGES_STATE: dict[str, Any] = {
 }
 
 
-def _hydrate_badge_counters_from_db(settings: Settings) -> None:
+def _hydrate_badge_counters_from_db(settings: Settings, force: bool = False) -> None:
     """Hydrate in-memory badge counters from the dedicated sidebar_badge_counters table."""
     global _BADGES_STATE
     conn = None
@@ -90,42 +91,55 @@ def _hydrate_badge_counters_from_db(settings: Settings) -> None:
             k, v = str(row[0]), int(row[1] or 0)
             _BADGES_STATE[k] = v
 
-        # If any key is missing, compute dynamically from DB
+        # If any key is missing or force or breaking_out_stocks is abnormally inflated (> 100), compute dynamically from DB
         needed_keys = ["breaking_out_stocks", "high_impact_news_70", "premarket_high_impact_70", "active_gainers"]
         missing = [k for k in needed_keys if k not in _BADGES_STATE or _BADGES_STATE[k] is None]
-        
-        if missing or not rows:
+        is_inflated = int(_BADGES_STATE.get("breaking_out_stocks", 0)) > 100
+
+        if missing or not rows or force or is_inflated:
             # 1. High impact news count (> 70% impact)
-            row_news = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_score >= 70 AND published_at >= datetime('now', '-7 days')").fetchone()
-            news_count = int(row_news[0]) if row_news and row_news[0] is not None else 0
-            if news_count == 0:
-                row_news_all = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_score >= 70").fetchone()
-                news_count = int(row_news_all[0]) if row_news_all and row_news_all[0] is not None else 0
+            try:
+                row_news = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_score >= 70 AND published_at >= datetime('now', '-7 days')").fetchone()
+                news_count = int(row_news[0]) if row_news and row_news[0] is not None else 0
+                if news_count == 0:
+                    row_news_all = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_score >= 70").fetchone()
+                    news_count = int(row_news_all[0]) if row_news_all and row_news_all[0] is not None else 0
+            except Exception:
+                news_count = 0
 
             # 2. Pre-market high impact setups (> 70% impact)
-            row_pm = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_score >= 70 AND (is_overnight = 1 OR published_at >= datetime('now', '-48 hours'))").fetchone()
-            pm_count = int(row_pm[0]) if row_pm and row_pm[0] is not None else 0
+            try:
+                row_pm = conn.execute("SELECT COUNT(*) FROM news_catalysts WHERE impact_score >= 70 AND published_at >= datetime('now', '-48 hours')").fetchone()
+                pm_count = int(row_pm[0]) if row_pm and row_pm[0] is not None else 0
+            except Exception:
+                pm_count = 0
             if pm_count == 0:
                 pm_count = min(news_count, 4)
 
-            # 3. Active Breakout Count (High conviction HOT setups, distinct tickers)
-            row_bo_active = conn.execute(
-                "SELECT COUNT(DISTINCT ticker) FROM breakout_radar WHERE tier = 'HOT' AND composite_score >= 70.0"
-            ).fetchone()
-            bo_count = int(row_bo_active[0]) if row_bo_active and row_bo_active[0] is not None else 0
-            if bo_count == 0:
-                row_tracked = conn.execute("SELECT COUNT(DISTINCT ticker) FROM breakout_tracked_signals WHERE outcome IN ('ACTIVE', 'PENDING')").fetchone()
-                bo_count = int(row_tracked[0]) if row_tracked and row_tracked[0] is not None else 0
-            if bo_count == 0:
-                row_hot = conn.execute("SELECT COUNT(DISTINCT ticker) FROM breakout_radar WHERE tier = 'HOT'").fetchone()
-                bo_count = min(int(row_hot[0]) if row_hot and row_hot[0] is not None else 0, 30)
+            # 3. Active Breakout Count (Actively triggered / breaking out setups, distinct tickers)
+            try:
+                row_bo_active = conn.execute(
+                    "SELECT COUNT(DISTINCT ticker) FROM breakout_tracked_signals WHERE outcome IN ('TRIGGERED', 'TARGET_HIT', 'BREAKOUT_SUCCEEDED')"
+                ).fetchone()
+                bo_count = int(row_bo_active[0]) if row_bo_active and row_bo_active[0] is not None else 0
+                if bo_count == 0:
+                    row_fallback = conn.execute(
+                        "SELECT COUNT(DISTINCT ticker) FROM breakout_radar WHERE outcome IN ('TRIGGERED', 'TARGET_HIT', 'BREAKOUT_SUCCEEDED') OR breakout_happened = 1"
+                    ).fetchone()
+                    bo_count = int(row_fallback[0]) if row_fallback and row_fallback[0] is not None else 0
+            except Exception:
+                bo_count = 0
 
             # 4. Top Gainers
             try:
-                row_gainers = conn.execute("SELECT COUNT(*) FROM daily_top_gainers WHERE scan_date = (SELECT MAX(scan_date) FROM daily_top_gainers)").fetchone()
+                row_gainers = conn.execute("SELECT COUNT(*) FROM daily_top_gainers WHERE trade_date = (SELECT MAX(trade_date) FROM daily_top_gainers)").fetchone()
                 gainers_count = int(row_gainers[0]) if row_gainers and row_gainers[0] is not None else 0
             except Exception:
-                gainers_count = 0
+                try:
+                    row_gainers = conn.execute("SELECT COUNT(*) FROM daily_top_gainers WHERE scan_date = (SELECT MAX(scan_date) FROM daily_top_gainers)").fetchone()
+                    gainers_count = int(row_gainers[0]) if row_gainers and row_gainers[0] is not None else 0
+                except Exception:
+                    gainers_count = 0
 
             _BADGES_STATE["breaking_out_stocks"] = bo_count
             _BADGES_STATE["high_impact_news_70"] = news_count
