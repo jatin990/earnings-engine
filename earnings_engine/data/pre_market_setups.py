@@ -13,6 +13,8 @@ import sqlite3
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
+import pandas as pd
+
 from earnings_engine.config import Settings
 from earnings_engine.data.catalysts_news import (
     _connect,
