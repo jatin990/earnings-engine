@@ -812,11 +812,15 @@
                            </div>`
                         : '';
 
+                    const sigDate = c.signal_date || c.entry_date || '';
+                    const sigTime = c.signal_time ? (c.signal_time.length > 10 ? c.signal_time.substring(11, 16) : c.signal_time) : '';
+                    const sigDateTimeLabel = sigDate ? (sigTime ? `${sigDate} ${sigTime}` : sigDate) : 'Signal';
+
                     return `
                     <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
                         <div style="font-weight:700;color:#93c5fd;">${ctx.sigPriceStr}</div>
                         ${subLateHtml}
-                        <div style="font-size:0.62rem;color:#64748b;margin-top:1px;" title="Signal detection date">📅 ${c.signal_date || c.entry_date || 'Signal'}</div>
+                        <div style="font-size:0.62rem;color:#64748b;margin-top:1px;" title="Signal detection exact date & time">📅 ${sigDateTimeLabel}</div>
                     </td>
                     `;
                 }
@@ -828,14 +832,52 @@
                 align: 'right',
                 headerStyle: 'color:#e2e8f0;',
                 render: (c, ctx) => {
-                    const asOfDate = c.current_date || c.asof_date || ctx.asofDate || '';
-                    const timeStr = c.scanned_at ? new Date(c.scanned_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
-                    const asOfLabel = asOfDate ? `as of ${asOfDate}` : (timeStr ? `as of ${timeStr}` : 'Today');
+                    const rawTs = c.quote_timestamp || c.current_price_time || c.current_date || c.asof_date || ctx.asofDate || '';
+                    let asOfLabel = rawTs;
+                    if (rawTs) {
+                        if (rawTs.includes('T') || (rawTs.includes(' ') && rawTs.length > 10)) {
+                            try {
+                                const d = new Date(rawTs);
+                                if (!isNaN(d.getTime())) {
+                                    asOfLabel = `${d.toISOString().slice(0, 10)} ${d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+                                }
+                            } catch (e) {}
+                        }
+                    } else if (c.scanned_at) {
+                        try {
+                            asOfLabel = new Date(c.scanned_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                        } catch (e) {}
+                    }
+                    if (!asOfLabel) asOfLabel = 'Today';
+
+                    const delayStatus = (c.price_delay_status || (c.is_live ? 'LIVE' : 'DELAYED')).toUpperCase();
+                    let delayBg = 'rgba(59,130,246,0.15)';
+                    let delayColor = '#60a5fa';
+                    let delayBorder = 'rgba(59,130,246,0.3)';
+                    if (delayStatus === 'LIVE') {
+                        delayBg = 'rgba(16,185,129,0.18)';
+                        delayColor = '#34d399';
+                        delayBorder = 'rgba(16,185,129,0.4)';
+                    } else if (delayStatus === 'MARKET CLOSED') {
+                        delayBg = 'rgba(148,163,184,0.15)';
+                        delayColor = '#94a3b8';
+                        delayBorder = 'rgba(148,163,184,0.3)';
+                    } else if (delayStatus === 'STALE') {
+                        delayBg = 'rgba(239,68,68,0.18)';
+                        delayColor = '#f87171';
+                        delayBorder = 'rgba(239,68,68,0.4)';
+                    } else if (delayStatus === 'DELAYED') {
+                        delayBg = 'rgba(245,158,11,0.15)';
+                        delayColor = '#fbbf24';
+                        delayBorder = 'rgba(245,158,11,0.35)';
+                    }
+
                     return `
                     <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
                         <div style="font-weight:800;color:${ctx.curPriceColor};font-size:0.80rem;">${ctx.curPriceStr}</div>
-                        <div style="font-size:0.60rem;color:#94a3b8;font-weight:500;margin-top:1px;" title="Price as of date/time">🕒 ${asOfLabel}</div>
-                        <div style="margin-top:0.12rem;">
+                        <div style="font-size:0.59rem;color:#94a3b8;font-weight:500;margin-top:1px;" title="Quote Timestamp">🕒 ${asOfLabel}</div>
+                        <div style="margin-top:0.18rem;display:flex;gap:0.25rem;justify-content:flex-end;align-items:center;">
+                            <span style="background:${delayBg};border:1px solid ${delayBorder};color:${delayColor};font-size:0.55rem;font-weight:800;padding:0.04rem 0.28rem;border-radius:3px;letter-spacing:0.02em;" title="Quote Freshness Status">${delayStatus}</span>
                             <span class="signal-badge" style="background:${ctx.curPriceBadgeBg};border:1px solid ${ctx.curPriceBadgeBorder};color:${ctx.curPriceBadgeText};font-size:0.60rem;font-weight:700;padding:0.06rem 0.32rem;border-radius:3px;display:inline-block;">${ctx.curPriceBadgeLabel}</span>
                         </div>
                     </td>

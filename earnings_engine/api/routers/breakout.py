@@ -91,6 +91,9 @@ async def get_breakout_radar_endpoint(
                                 cur_p = float(lq["current_price"])
                                 c["current_price"] = cur_p
                                 c["is_live"] = lq.get("is_live", True)
+                                c["quote_timestamp"] = lq.get("quote_timestamp") or lq.get("last_updated")
+                                c["price_delay_status"] = lq.get("price_delay_status") or ("LIVE" if lq.get("is_live") else "MARKET CLOSED")
+                                c["is_price_stale"] = bool(lq.get("is_price_stale", False))
                                 if lq.get("day_change_pct") is not None:
                                     c["day_change_pct"] = lq["day_change_pct"]
                                 if lq.get("day_change") is not None:
@@ -102,6 +105,7 @@ async def get_breakout_radar_endpoint(
                                 if lq.get("volume") is not None:
                                     c["volume"] = lq["volume"]
                                 c["current_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                                c["current_price_time"] = c["quote_timestamp"]
                                 sig_p = c.get("predicted_value") or c.get("signal_price")
                                 if sig_p and sig_p > 0:
                                     c["realized_return_pct"] = round(((cur_p - sig_p) / sig_p) * 100, 2)
@@ -124,6 +128,10 @@ async def get_breakout_radar_endpoint(
                                     cur_p = float(lp["close"])
                                     c["current_price"] = cur_p
                                     c["current_date"] = lp.get("date") or c.get("current_date")
+                                    c["quote_timestamp"] = lp.get("date") or c.get("current_date")
+                                    c["current_price_time"] = c["quote_timestamp"]
+                                    c["price_delay_status"] = c.get("price_delay_status") or "DELAYED"
+                                    c["is_price_stale"] = c.get("is_price_stale", False)
                                     sig_p = c.get("predicted_value") or c.get("signal_price")
                                     if sig_p and sig_p > 0:
                                         c["realized_return_pct"] = round(((cur_p - sig_p) / sig_p) * 100, 2)
@@ -135,6 +143,15 @@ async def get_breakout_radar_endpoint(
 
         # Compute prediction signals & color-coding for all candidates
         for c in candidates:
+            sig_date = c.get("asof_date") or c.get("detection_date") or c.get("signal_date")
+            c["signal_date"] = sig_date
+            c["signal_time"] = c.get("signal_time") or c.get("detected_at") or c.get("created_at") or (f"{sig_date} 09:15" if sig_date else None)
+            c["signal_datetime"] = c.get("signal_datetime") or c.get("detected_at") or c.get("created_at") or sig_date
+            if not c.get("current_price_time"):
+                c["current_price_time"] = c.get("quote_timestamp") or c.get("current_date") or c.get("last_updated")
+            if not c.get("price_delay_status"):
+                c["price_delay_status"] = "LIVE" if c.get("is_live") else "DELAYED"
+
             cur_p = c.get("current_price")
             trig_p = c.get("breakout_trigger")
             target_p = c.get("target_price")

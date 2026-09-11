@@ -226,8 +226,12 @@
                     industry: item.industry,
                     current_price: item.current_price,
                     current_date: item.current_date,
+                    quote_timestamp: item.quote_timestamp || item.current_price_time,
+                    price_delay_status: item.price_delay_status,
+                    is_price_stale: item.is_price_stale,
                     setups: [],
                     latest_signal_date: item.signal_date,
+                    latest_signal_time: item.signal_time,
                     min_signal_price: item.signal_price,
                     max_signal_price: item.signal_price,
                     min_trigger: item.breakout_trigger,
@@ -259,10 +263,14 @@
             if (item.company_name && (!g.company_name || g.company_name === g.ticker)) g.company_name = item.company_name;
             if (item.industry && item.industry !== '—') g.industry = item.industry;
             if (item.current_price != null) g.current_price = item.current_price;
+            if (item.quote_timestamp) g.quote_timestamp = item.quote_timestamp;
+            if (item.price_delay_status) g.price_delay_status = item.price_delay_status;
+            if (item.is_price_stale != null) g.is_price_stale = item.is_price_stale;
 
             // Date tracking
             if (item.signal_date && (!g.latest_signal_date || item.signal_date > g.latest_signal_date)) {
                 g.latest_signal_date = item.signal_date;
+                g.latest_signal_time = item.signal_time;
                 g.latest_return_pct = item.realized_return_pct;
                 g.days_elapsed = item.days_elapsed != null ? item.days_elapsed : 0;
             }
@@ -353,6 +361,8 @@
             const tierBg = tier === 'HOT' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)';
 
             const sigDate = g.latest_signal_date || '—';
+            const sigTime = g.latest_signal_time ? (g.latest_signal_time.length > 10 ? g.latest_signal_time.substring(11, 16) : g.latest_signal_time) : '';
+            const sigDateLabel = sigDate !== '—' && sigTime ? `${sigDate} ${sigTime}` : sigDate;
             const daysElapsed = g.days_elapsed != null ? g.days_elapsed : 0;
             const isLiveRecent = g.has_live_recent || daysElapsed < 14;
 
@@ -379,6 +389,44 @@
                 ? (g.min_stop === g.max_stop ? `₹${Number(g.min_stop).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : `₹${Number(g.min_stop).toFixed(0)} - ₹${Number(g.max_stop).toFixed(0)}`)
                 : '—';
             const curP = g.current_price != null ? `₹${Number(g.current_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+
+            // Quote Timestamp & Staleness Formatting for parent row
+            const rawQuoteTs = g.quote_timestamp || g.current_date || '';
+            let quoteTsLabel = rawQuoteTs;
+            if (rawQuoteTs) {
+                if (rawQuoteTs.includes('T') || (rawQuoteTs.includes(' ') && rawQuoteTs.length > 10)) {
+                    try {
+                        const qd = new Date(rawQuoteTs);
+                        if (!isNaN(qd.getTime())) {
+                            quoteTsLabel = `${qd.toISOString().slice(0, 10)} ${qd.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+                        }
+                    } catch (e) {}
+                }
+            } else {
+                quoteTsLabel = isLiveRecent ? 'Live Quote' : '14D Close';
+            }
+
+            const pDelayStatus = (g.price_delay_status || (isLiveRecent ? 'LIVE' : 'DELAYED')).toUpperCase();
+            let pDelayBg = 'rgba(59,130,246,0.15)';
+            let pDelayColor = '#60a5fa';
+            let pDelayBorder = 'rgba(59,130,246,0.3)';
+            if (pDelayStatus === 'LIVE') {
+                pDelayBg = 'rgba(16,185,129,0.18)';
+                pDelayColor = '#34d399';
+                pDelayBorder = 'rgba(16,185,129,0.4)';
+            } else if (pDelayStatus === 'MARKET CLOSED') {
+                pDelayBg = 'rgba(148,163,184,0.15)';
+                pDelayColor = '#94a3b8';
+                pDelayBorder = 'rgba(148,163,184,0.3)';
+            } else if (pDelayStatus === 'STALE') {
+                pDelayBg = 'rgba(239,68,68,0.18)';
+                pDelayColor = '#f87171';
+                pDelayBorder = 'rgba(239,68,68,0.4)';
+            } else if (pDelayStatus === 'DELAYED') {
+                pDelayBg = 'rgba(245,158,11,0.15)';
+                pDelayColor = '#fbbf24';
+                pDelayBorder = 'rgba(245,158,11,0.35)';
+            }
 
             // Return styling
             const ret = g.latest_return_pct;
@@ -431,6 +479,8 @@
                 const sId = s.id;
                 const sStratBadge = formatStrategyBadge(s.strategy, s.setup_archetype);
                 const sDate = s.signal_date || '—';
+                const sTime = s.signal_time ? (s.signal_time.length > 10 ? s.signal_time.substring(11, 16) : s.signal_time) : '';
+                const sDateLabel = sDate !== '—' && sTime ? `${sDate} ${sTime}` : sDate;
                 const sSigP = s.signal_price != null ? `₹${Number(s.signal_price).toFixed(2)}` : '—';
                 const sIdeal = s.ideal_entry_price != null ? Number(s.ideal_entry_price) : (s.data?.calculation_notes?.ideal_entry_price != null ? Number(s.data.calculation_notes.ideal_entry_price) : null);
                 const sIsLate = Boolean(s.is_late || (sIdeal != null && s.signal_price > sIdeal * 1.002));
@@ -442,6 +492,38 @@
                 const sTargetP = s.target_price != null ? `₹${Number(s.target_price).toFixed(2)}` : '—';
                 const sStopP = s.stop_loss != null ? `₹${Number(s.stop_loss).toFixed(2)}` : '—';
                 const sCurP = s.current_price != null ? `₹${Number(s.current_price).toFixed(2)}` : '—';
+
+                const sRawTs = s.quote_timestamp || s.current_price_time || s.current_date || '';
+                let sQuoteTs = sRawTs;
+                if (sRawTs && (sRawTs.includes('T') || (sRawTs.includes(' ') && sRawTs.length > 10))) {
+                    try {
+                        const sqd = new Date(sRawTs);
+                        if (!isNaN(sqd.getTime())) {
+                            sQuoteTs = `${sqd.toISOString().slice(0, 10)} ${sqd.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+                        }
+                    } catch (e) {}
+                }
+                const sStatus = (s.price_delay_status || (isLiveRecent ? 'LIVE' : 'DELAYED')).toUpperCase();
+                let sStatusBg = 'rgba(59,130,246,0.15)';
+                let sStatusColor = '#60a5fa';
+                let sStatusBorder = 'rgba(59,130,246,0.3)';
+                if (sStatus === 'LIVE') {
+                    sStatusBg = 'rgba(16,185,129,0.18)';
+                    sStatusColor = '#34d399';
+                    sStatusBorder = 'rgba(16,185,129,0.4)';
+                } else if (sStatus === 'MARKET CLOSED') {
+                    sStatusBg = 'rgba(148,163,184,0.15)';
+                    sStatusColor = '#94a3b8';
+                    sStatusBorder = 'rgba(148,163,184,0.3)';
+                } else if (sStatus === 'STALE') {
+                    sStatusBg = 'rgba(239,68,68,0.18)';
+                    sStatusColor = '#f87171';
+                    sStatusBorder = 'rgba(239,68,68,0.4)';
+                } else if (sStatus === 'DELAYED') {
+                    sStatusBg = 'rgba(245,158,11,0.15)';
+                    sStatusColor = '#fbbf24';
+                    sStatusBorder = 'rgba(245,158,11,0.35)';
+                }
 
                 const sRet = s.realized_return_pct;
                 const sRetColor = sRet > 0 ? '#34d399' : (sRet < 0 ? '#f87171' : '#94a3b8');
@@ -458,12 +540,16 @@
                     <tr style="border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(2,6,23,0.6);transition:background 0.15s;" onmouseenter="this.style.background='rgba(30,41,59,0.5)'" onmouseleave="this.style.background='rgba(2,6,23,0.6)'">
                         <td style="padding:0.4rem 0.5rem;font-size:0.68rem;color:#64748b;font-weight:700;font-variant-numeric:tabular-nums;">#${sId}</td>
                         <td style="padding:0.4rem 0.5rem;font-size:0.72rem;white-space:nowrap;">${sStratBadge}</td>
-                        <td style="padding:0.4rem 0.5rem;font-size:0.72rem;color:#cbd5e1;font-variant-numeric:tabular-nums;">${sDate}</td>
+                        <td style="padding:0.4rem 0.5rem;font-size:0.72rem;color:#cbd5e1;font-variant-numeric:tabular-nums;">${sDateLabel}</td>
                         <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.72rem;color:#94a3b8;font-variant-numeric:tabular-nums;">${sSigP}${sLateSub}</td>
                         <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.72rem;color:#fbbf24;font-weight:600;font-variant-numeric:tabular-nums;">${sTrigP}</td>
                         <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.72rem;color:#34d399;font-weight:600;font-variant-numeric:tabular-nums;">${sTargetP}</td>
                         <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.72rem;color:#f87171;font-variant-numeric:tabular-nums;">${sStopP}</td>
-                        <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.72rem;color:#f8fafc;font-weight:700;font-variant-numeric:tabular-nums;">${sCurP}</td>
+                        <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.72rem;color:#f8fafc;font-weight:700;font-variant-numeric:tabular-nums;">
+                            <div>${sCurP}</div>
+                            <div style="font-size:0.55rem;color:#94a3b8;font-weight:400;margin-top:1px;">${sQuoteTs ? `🕒 ${sQuoteTs}` : ''}</div>
+                            <div style="margin-top:0.1rem;"><span style="background:${sStatusBg};border:1px solid ${sStatusBorder};color:${sStatusColor};font-size:0.52rem;font-weight:800;padding:0.02rem 0.25rem;border-radius:2px;">${sStatus}</span></div>
+                        </td>
                         <td style="padding:0.4rem 0.5rem;text-align:right;">
                             <span style="font-size:0.70rem;font-weight:700;color:${sRetColor};background:${sRetBg};padding:0.08rem 0.35rem;border-radius:3px;font-variant-numeric:tabular-nums;">${sRetFormatted}</span>
                         </td>
@@ -501,7 +587,7 @@
 
                     <!-- Latest Signal Date & Age -->
                     <td style="padding:0.55rem 0.65rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
-                        <div style="font-weight:600;color:#e2e8f0;font-size:0.75rem;font-variant-numeric:tabular-nums;">${sigDate}</div>
+                        <div style="font-weight:600;color:#e2e8f0;font-size:0.75rem;font-variant-numeric:tabular-nums;">${sigDateLabel}</div>
                         <div style="font-size:0.62rem;color:#64748b;margin-top:1px;">${isLiveRecent ? '🟢 Live Active' : '14D Settled'}</div>
                     </td>
 
@@ -533,7 +619,10 @@
                     <!-- Current Price -->
                     <td style="padding:0.55rem 0.65rem;text-align:right;border-right:1px solid rgba(255,255,255,0.03);">
                         <div style="font-weight:800;color:#f8fafc;font-size:0.82rem;font-variant-numeric:tabular-nums;">${curP}</div>
-                        <div style="font-size:0.58rem;color:${isLiveRecent ? '#34d399' : '#64748b'};margin-top:1px;font-weight:600;">${isLiveRecent ? 'Live Quote' : '14D Close'}</div>
+                        <div style="font-size:0.58rem;color:#94a3b8;margin-top:1px;font-weight:500;" title="Quote Timestamp">🕒 ${quoteTsLabel}</div>
+                        <div style="margin-top:0.12rem;">
+                            <span style="background:${pDelayBg};border:1px solid ${pDelayBorder};color:${pDelayColor};font-size:0.55rem;font-weight:800;padding:0.04rem 0.28rem;border-radius:3px;letter-spacing:0.02em;">${pDelayStatus}</span>
+                        </div>
                     </td>
 
                     <!-- Return % -->

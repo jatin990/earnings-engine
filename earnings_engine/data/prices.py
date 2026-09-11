@@ -866,6 +866,46 @@ def _is_cached_quote_fresh(
     return True
 
 
+def calculate_quote_staleness(
+    fetched_at_str: str | None,
+    session: dict[str, Any],
+    live_threshold_minutes: int = 15,
+    delayed_threshold_minutes: int = 120,
+) -> tuple[str, bool]:
+    """Calculate market-aware price delay status and staleness flag.
+
+    Returns:
+        tuple[str, bool]: (price_delay_status, is_price_stale)
+        status is one of: "LIVE", "DELAYED", "STALE", "MARKET CLOSED"
+    """
+    is_open = bool(session.get("is_open", False))
+    is_weekend = bool(session.get("is_weekend", False))
+
+    if is_weekend:
+        return "MARKET CLOSED", False
+
+    if not is_open:
+        return "MARKET CLOSED", False
+
+    if not fetched_at_str:
+        return "STALE", True
+
+    try:
+        clean_str = fetched_at_str.replace("Z", "+00:00")
+        fetched_dt = datetime.fromisoformat(clean_str)
+        now_dt = datetime.now(fetched_dt.tzinfo) if fetched_dt.tzinfo else datetime.now()
+        age_seconds = (now_dt - fetched_dt).total_seconds()
+
+        if age_seconds <= live_threshold_minutes * 60:
+            return "LIVE", False
+        elif age_seconds <= delayed_threshold_minutes * 60:
+            return "DELAYED", False
+        else:
+            return "STALE", True
+    except Exception:
+        return "DELAYED", False
+
+
 def _build_quote_from_cached_record(
     sym: str,
     record: dict[str, Any],
@@ -882,6 +922,10 @@ def _build_quote_from_cached_record(
     vol = record.get("cur_vol")
     avg_vol = record.get("avg_vol")
     mcap = record.get("market_cap")
+    fetched_at = record.get("prices_fetched_at")
+    last_updated = fetched_at or datetime.now().isoformat()
+
+    price_delay_status, is_price_stale = calculate_quote_staleness(fetched_at, session)
 
     quote: dict[str, Any] = {
         "ticker": sym,
@@ -899,7 +943,10 @@ def _build_quote_from_cached_record(
         "market_cap": float(mcap) if mcap is not None else None,
         "currency": "INR" if sym.endswith(".NS") else "USD",
         "is_live": bool(session.get("is_open", False)),
-        "last_updated": record.get("prices_fetched_at") or datetime.now().isoformat(),
+        "last_updated": last_updated,
+        "quote_timestamp": last_updated,
+        "price_delay_status": price_delay_status,
+        "is_price_stale": is_price_stale,
         "pct_from_52w_high": None,
         "pct_from_52w_low": None,
     }
@@ -1111,6 +1158,12 @@ def fetch_live_quote(
     if last_p is not None and last_p > 0:
         quote["current_price"] = round(float(last_p), 2)
         quote["is_live"] = bool(session.get("is_open", False))
+        now_iso = datetime.now().isoformat()
+        quote["last_updated"] = now_iso
+        quote["quote_timestamp"] = now_iso
+        price_delay_status, is_price_stale = calculate_quote_staleness(now_iso, session)
+        quote["price_delay_status"] = price_delay_status
+        quote["is_price_stale"] = is_price_stale
         if prev_c is not None and prev_c > 0:
             quote["previous_close"] = round(float(prev_c), 2)
             quote["day_change"] = round(float(last_p - prev_c), 2)
@@ -1349,6 +1402,8 @@ def _fetch_yfinance_batch_quotes(
             if last_p is None or last_p <= 0:
                 continue
 
+            price_delay_status, is_price_stale = calculate_quote_staleness(now_iso, session)
+
             quote: dict[str, Any] = {
                 "ticker": ret_sym,
                 "current_price": round(float(last_p), 2),
@@ -1366,6 +1421,9 @@ def _fetch_yfinance_batch_quotes(
                 "currency": currency,
                 "is_live": bool(session.get("is_open", False)),
                 "last_updated": now_iso,
+                "quote_timestamp": now_iso,
+                "price_delay_status": price_delay_status,
+                "is_price_stale": is_price_stale,
                 "pct_from_52w_high": None,
                 "pct_from_52w_low": None,
             }

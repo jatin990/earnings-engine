@@ -1402,8 +1402,15 @@ def get_tracked_breakouts(
         # 5. Always process 14-day outcome vs live recent breakout data
         if items:
             from concurrent.futures import ThreadPoolExecutor
-            from earnings_engine.data.prices import fetch_prices
+            from earnings_engine.data.prices import fetch_prices, fetch_batch_live_quotes
             import pandas as pd
+
+            tracked_syms = [it.get("ticker") for it in items if it.get("ticker")]
+            live_quotes_map: dict[str, dict[str, Any]] = {}
+            try:
+                live_quotes_map = fetch_batch_live_quotes(tracked_syms, settings=settings, sync_db=True)
+            except Exception as lq_err:
+                logger.debug("[TRACKED-BREAKOUTS] Batch live quote fetch error: %s", lq_err)
 
             def _process_tracked_item(item_d: dict[str, Any]) -> None:
                 t = item_d.get("ticker")
@@ -1413,6 +1420,22 @@ def get_tracked_breakouts(
                 stop_p = item_d.get("stop_loss")
                 sig_date = item_d.get("signal_date")
 
+                # Ensure timestamps and staleness attributes are initialized
+                item_d["signal_time"] = item_d.get("signal_time") or item_d.get("created_at") or (f"{sig_date} 09:15" if sig_date else None)
+                item_d["signal_datetime"] = item_d.get("signal_datetime") or item_d.get("created_at") or sig_date
+
+                lq = live_quotes_map.get(t) if live_quotes_map else None
+                if lq:
+                    item_d["quote_timestamp"] = lq.get("quote_timestamp") or lq.get("last_updated")
+                    item_d["current_price_time"] = item_d["quote_timestamp"]
+                    item_d["price_delay_status"] = lq.get("price_delay_status") or ("LIVE" if lq.get("is_live") else "DELAYED")
+                    item_d["is_price_stale"] = bool(lq.get("is_price_stale", False))
+                else:
+                    item_d["quote_timestamp"] = item_d.get("current_date") or item_d.get("updated_at")
+                    item_d["current_price_time"] = item_d["quote_timestamp"]
+                    item_d["price_delay_status"] = "DELAYED"
+                    item_d["is_price_stale"] = False
+
                 if not t or "TEST" in t.upper() or "MOCK" in t.upper() or "DUMMY" in t.upper():
                     return
                 try:
@@ -1421,6 +1444,8 @@ def get_tracked_breakouts(
                         closes = pd.to_numeric(df["close"], errors="coerce").dropna()
                         if not closes.empty:
                             cur_p = round(float(closes.iloc[-1]), 2)
+                            if lq and lq.get("current_price"):
+                                cur_p = float(lq["current_price"])
                             item_d["current_price"] = cur_p
                             item_d["current_date"] = str(df.index[-1])[:10]
 
