@@ -1436,26 +1436,54 @@ class InstitutionalVerifier:
         unique_funds_count = mf_row[1] if mf_row else 0
         latest_mf_date = mf_row[2] if mf_row else None
 
-        # Check recent audit findings
-        recent_audit = conn.execute(
-            """
-            SELECT severity, COUNT(*)
-            FROM institutional_audit_log
-            WHERE audit_timestamp >= datetime('now', '-7 days')
-            GROUP BY severity
-            """
-        ).fetchall()
+        # Check recent audit findings: scope to the latest audit run if available, else past 7 days
+        latest_run_row = conn.execute(
+            "SELECT audit_run_id FROM institutional_audit_log ORDER BY audit_timestamp DESC, id DESC LIMIT 1"
+        ).fetchone()
+        latest_run_id = latest_run_row[0] if latest_run_row else None
+
+        if latest_run_id:
+            recent_audit = conn.execute(
+                """
+                SELECT severity, COUNT(*)
+                FROM institutional_audit_log
+                WHERE audit_run_id = ?
+                GROUP BY severity
+                """,
+                (latest_run_id,),
+            ).fetchall()
+        else:
+            recent_audit = conn.execute(
+                """
+                SELECT severity, COUNT(*)
+                FROM institutional_audit_log
+                WHERE audit_timestamp >= datetime('now', '-7 days')
+                GROUP BY severity
+                """
+            ).fetchall()
         severity_counts = dict(recent_audit)
         critical_errors = severity_counts.get("CRITICAL_ERROR", 0)
         warnings = severity_counts.get("WARNING", 0)
+        passed_count = severity_counts.get("PASS", 0)
+        audited_count = critical_errors + warnings + passed_count
 
-        health_score = max(0.0, min(100.0, 100.0 - (critical_errors * 15.0) - (warnings * 2.0)))
+        # Score bounded to pass ratio with capped penalties, matching run_full_audit
+        if audited_count > 0:
+            pass_ratio = passed_count / audited_count
+            base_score = pass_ratio * 100.0
+            crit_penalty = min(35.0, critical_errors * 2.0)
+            warn_penalty = min(15.0, warnings * 0.5)
+            health_score = max(0.0, min(100.0, base_score - crit_penalty - warn_penalty))
+        else:
+            health_score = 100.0
 
         return {
             "health_score": round(health_score, 1),
             "status": "OPTIMAL" if health_score >= 90.0 else ("WARNING" if health_score >= 70.0 else "CRITICAL"),
             "provenance_records_count": prov_count,
             "last_verified_at": latest_fetch,
+            "audited_checks_count": audited_count,
+            "latest_audit_run_id": latest_run_id,
             "cadences": {
                 "daily_fii_dii": {
                     "cadence": "DAILY_EOD",

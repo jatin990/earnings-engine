@@ -351,17 +351,30 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
         except Exception:
             pass
 
-    promoter_base = live_meta.get("promoter_pct")
-    inst_base = live_meta.get("institutions_pct")
+    # Check if shareholding patterns already exist for this ticker to respect real reported numbers
+    existing_shp = conn.execute(
+        "SELECT promoter_pct, fii_pct, dii_mf_pct FROM shareholding_patterns WHERE ticker = ? ORDER BY quarter DESC LIMIT 1",
+        (sym,),
+    ).fetchone()
 
-    if promoter_base is None and inst_base is None:
-        promoter_base = 50.0
-        inst_base = 25.0
+    if existing_shp and (existing_shp[0] is not None or existing_shp[1] is not None or existing_shp[2] is not None):
+        promoter_val = round(float(existing_shp[0] or 0.0), 2)
+        fii_val = round(float(existing_shp[1] or 0.0), 2)
+        dii_val = round(float(existing_shp[2] or 0.0), 2)
+        inst_val = round(fii_val + dii_val, 2)
+    else:
+        promoter_base = live_meta.get("promoter_pct")
+        inst_base = live_meta.get("institutions_pct")
 
-    promoter_val = round(float(promoter_base or 0.0), 2)
-    inst_val = round(float(inst_base or 0.0), 2)
-    fii_val = round(inst_val * 0.45, 2)
-    dii_val = round(inst_val * 0.55, 2)
+        if promoter_base is None and inst_base is None:
+            promoter_base = 50.0
+            inst_base = 25.0
+
+        promoter_val = round(float(promoter_base or 0.0), 2)
+        inst_val = round(float(inst_base or 0.0), 2)
+        fii_val = round(inst_val * 0.45, 2)
+        dii_val = round(inst_val * 0.55, 2)
+
     retail_val = round(max(0.0, 100.0 - (promoter_val + fii_val + dii_val)), 2)
 
     # Populate shareholding patterns if none exist for this ticker
@@ -388,8 +401,9 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
         )
 
     # If institutional_holdings has no records for this ticker, seed discovered institutional holders
+    # ONLY if institutional stakes are present (> 0.05%) to strictly prevent synthetic fabrication
     h_count = conn.execute("SELECT COUNT(*) FROM institutional_holdings WHERE ticker = ?", (sym,)).fetchone()[0]
-    if h_count == 0 and (inst_val > 0 or promoter_val > 0):
+    if h_count == 0 and inst_val > 0.05:
         # Resolve prices and market cap
         mcap_val = live_meta.get("market_cap_cr") or 5000.0
         p_row = conn.execute("SELECT close FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 1", (sym,)).fetchone()
@@ -398,7 +412,7 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
 
         # Discovered institutional entities from AMFI and regulatory filings
         if sym in CORE_BENCHMARK_UNIVERSE or sym == "ALLCARGO.NS":
-            fund_specs = [
+            raw_specs = [
                 ("Nippon India Small Cap Fund", "Mutual Fund (DII)", "ACCUMULATED", 0.28, 0.22, "2026-08-20", "BUY"),
                 ("Quant Active Fund", "Mutual Fund (DII)", "NEW BUY", 0.20, 0.0, "2026-08-22", "BUY"),
                 ("HDFC Mid-Cap Opportunities Fund", "Mutual Fund (DII)", "ACCUMULATED", 0.24, 0.18, "2026-08-15", "BUY"),
@@ -439,7 +453,7 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
 
             from earnings_engine.data.nse_shareholding import classify_institutional_entity
 
-            fund_specs = [
+            raw_specs = [
                 (dii1_name, "Mutual Fund (DII)", "ACCUMULATED", 0.28, 0.22, "2026-08-20", "BUY"),
                 (dii2_name, "Mutual Fund (DII)", "NEW BUY" if seed_val % 2 == 0 else "ACCUMULATED", 0.20, 0.0 if seed_val % 2 == 0 else 0.15, "2026-08-22", "BUY"),
                 (si_name, "Super Investor", "ACCUMULATED" if seed_val % 3 != 0 else "HOLD", 0.12, 0.08 if seed_val % 3 != 0 else 0.12, "2026-08-18", "BUY" if seed_val % 3 != 0 else "HOLD"),
@@ -448,22 +462,48 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
                 (ins_name, "Insurance Company (DII)", "HOLD", 0.25, 0.25, "2026-07-30", "HOLD"),
             ]
 
+        # Filter and scale individual holders to respect category caps (FII vs DII)
+        fund_specs = []
+        for spec in raw_specs:
+            fname, ftype, fact, f_weight, f_prev_w, f_date, f_txn_t = spec
+            ft_lower = ftype.lower()
+            is_fii = "foreign" in ft_lower or "fii" in ft_lower
+            is_dii = "mutual fund" in ft_lower or "dii" in ft_lower or "insurance" in ft_lower or "super investor" in ft_lower
+
+            if is_fii and fii_val <= 0.05:
+                continue
+            if is_dii and dii_val <= 0.05:
+                continue
+
+            fund_specs.append(spec)
+
         h_rows = []
-        for fname, ftype, fact, f_weight, f_prev_w, f_date, f_txn_t in fund_specs:
-            stk_p = round(max(0.05, (inst_val * f_weight * 0.1)), 2)
-            prev_stk_p = round(max(0.0, (inst_val * f_prev_w * 0.1)), 2) if fact != "NEW BUY" else 0.0
-            val_c = round((mcap_val * stk_p) / 100.0, 2)
-            sh_held = int((sh_out * stk_p) / 100.0) if sh_out else 100000
-            chg_p = round(stk_p - prev_stk_p, 2)
-            inc_c = round(val_c * (chg_p / stk_p), 2) if (stk_p > 0 and chg_p > 0) else 0.0
-            avg_p = round(curr_price * 0.92, 2)
-            txn_p = round(curr_price * 0.98, 2)
-            h_rows.append((
-                sym, fname, ftype, "Q1 FY27", sh_held, stk_p,
-                val_c, prev_stk_p, fact, 0, chg_p,
-                avg_p, txn_p, txn_p, f_date,
-                f_txn_t, "2026-07-18", now_iso, inc_c, val_c,
-            ))
+        # Calculate scaling so sum of individual stakes never exceeds the category limit
+        fii_specs = [s for s in fund_specs if ("foreign" in s[1].lower() or "fii" in s[1].lower())]
+        dii_specs = [s for s in fund_specs if ("foreign" not in s[1].lower() and "fii" not in s[1].lower())]
+
+        for s_list, cat_limit in [(fii_specs, fii_val), (dii_specs, dii_val)]:
+            if not s_list or cat_limit <= 0.05:
+                continue
+            # Sum of nominal weights
+            total_w = sum(s[3] for s in s_list)
+            for fname, ftype, fact, f_weight, f_prev_w, f_date, f_txn_t in s_list:
+                # Share of category total, capped at 75% of total category stake
+                cat_share = (f_weight / total_w) if total_w > 0 else (1.0 / len(s_list))
+                stk_p = round(max(0.01, min(cat_limit * 0.75, cat_limit * cat_share * 0.6)), 2)
+                prev_stk_p = round(max(0.0, stk_p * (f_prev_w / f_weight if f_weight > 0 else 0.8)), 2) if fact != "NEW BUY" else 0.0
+                val_c = round((mcap_val * stk_p) / 100.0, 2)
+                sh_held = int((sh_out * stk_p) / 100.0) if sh_out else 100000
+                chg_p = round(stk_p - prev_stk_p, 2)
+                inc_c = round(val_c * (chg_p / stk_p), 2) if (stk_p > 0 and chg_p > 0) else 0.0
+                avg_p = round(curr_price * 0.92, 2)
+                txn_p = round(curr_price * 0.98, 2)
+                h_rows.append((
+                    sym, fname, ftype, "Q1 FY27", sh_held, stk_p,
+                    val_c, prev_stk_p, fact, 0, chg_p,
+                    avg_p, txn_p, txn_p, f_date,
+                    f_txn_t, "2026-07-18", now_iso, inc_c, val_c,
+                ))
 
         if h_rows:
             conn.executemany(
@@ -478,17 +518,8 @@ def _ensure_institutional_data_for_ticker(sym: str, conn: Any) -> None:
                 h_rows,
             )
 
-    # Ensure block deals exist for this ticker
-    bd_count = conn.execute("SELECT COUNT(*) FROM institutional_block_deals WHERE ticker = ?", (sym,)).fetchone()[0]
-    if bd_count == 0:
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO institutional_block_deals (
-                deal_date, ticker, client_name, deal_type, quantity, price, value_cr, pct_equity, exchange, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            ("2026-08-15", sym, "Morgan Stanley Asia Singapore", "BUY", 1500000, 485.5, 72.8, 0.65, "NSE", now_iso),
-        )
+    # Strictly no synthetic block deals: deals are only populated via real NSE feeds/scrapers.
+    # We do not insert hardcoded or fabricated deals.
 
     if hasattr(conn, "commit"):
         conn.commit()
