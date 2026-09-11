@@ -29,6 +29,10 @@ OMNIROUTE_PROBE_PORTS = [20128, 20129, 8080, 3000]
 _OMNIROUTE_AUTH_FAILURE_CACHE: dict[str, float] = {}
 
 DEFAULT_OMNIROUTE_MODELS = [
+    "antigravity",
+    "antigravity/gemini-3.7-flash-medium",
+    "antigravity/gemini-3.8-flash-tiered",
+    "antigravity/claude-sonnet-4-6",
     "openai/gpt-4o-mini",
     "meta-llama/llama-3.3-70b-instruct",
     "google/gemini-2.0-flash",
@@ -40,6 +44,9 @@ DEFAULT_OMNIROUTER_MODELS = DEFAULT_OMNIROUTE_MODELS
 
 # Dedicated High-Availability Models for repetitive high-throughput tasks
 HIGH_AVAILABILITY_MODELS: list[str] = [
+    "antigravity",
+    "antigravity/gemini-3.7-flash-medium",
+    "antigravity/gemini-3.8-flash-tiered",
     "openai/gpt-4o-mini",
     "meta-llama/llama-3.3-70b-instruct",
     "google/gemini-2.0-flash",
@@ -47,6 +54,38 @@ HIGH_AVAILABILITY_MODELS: list[str] = [
 
 # Catalog of reasoning and production models with categorization for UI & API selection
 OMNIROUTE_MODEL_CATALOG: list[dict[str, Any]] = [
+    {
+        "id": "antigravity",
+        "name": "⚡ Antigravity (OmniRoute Tiered Combo)",
+        "tier": "FAST",
+        "provider": "Antigravity",
+        "recommended": True,
+        "description": "Unified Antigravity multi-account high-throughput combo routing to Gemini 3.8 Flash Tiered with zero token rate limit bottlenecks.",
+    },
+    {
+        "id": "antigravity/gemini-3.7-flash-medium",
+        "name": "✨ Gemini 3.7 Flash Medium (Antigravity)",
+        "tier": "FAST",
+        "provider": "Google DeepMind / Antigravity",
+        "recommended": True,
+        "description": "Balanced latency and deep quantitative reasoning with medium thinking capacity.",
+    },
+    {
+        "id": "antigravity/gemini-3.8-flash-tiered",
+        "name": "🚀 Gemini 3.8 Flash Tiered (Antigravity)",
+        "tier": "FAST",
+        "provider": "Google DeepMind / Antigravity",
+        "recommended": True,
+        "description": "Latest Gemini 3.8 Flash architecture with tiered quota rotation.",
+    },
+    {
+        "id": "antigravity/claude-sonnet-4-6",
+        "name": "🎯 Claude Sonnet 4.6 (Antigravity)",
+        "tier": "INSTITUTIONAL",
+        "provider": "Anthropic / Antigravity",
+        "recommended": True,
+        "description": "Frontier institutional thesis generation and corporate governance risk assessment via Antigravity OAuth.",
+    },
     {
         "id": "deepseek/deepseek-r1",
         "name": "🧠 DeepSeek-R1 (Deep Chain-of-Thought)",
@@ -570,15 +609,15 @@ class OmniRouteClient:
             logger.info("[OMNIROUTE] Gateway offline; using deterministic analysis for %s", item.get("ticker"))
             return self.fallback_heuristic_analysis(item)
 
-        effective_timeout = min(timeout or 3.5, 4.0)
+        effective_timeout = max(float(timeout or self.settings.omniroute_timeout or 25), 15.0)
         chosen_model = model or preferred_model or item.get("model") or item.get("preferred_model")
-        configured_model = chosen_model or os.getenv("OMNIROUTE_MODEL") or self.settings.omniroute_model or "openai/gpt-4o-mini"
+        configured_model = chosen_model or os.getenv("OMNIROUTE_MODEL") or self.settings.omniroute_model or "antigravity"
 
         models_to_try = [configured_model]
         for m in HIGH_AVAILABILITY_MODELS:
             if m not in models_to_try:
                 models_to_try.append(m)
-        models_to_try = models_to_try[:3]  # Allow primary + high-availability fallback cascade
+        models_to_try = models_to_try[:4]  # Allow primary + high-availability fallback cascade
 
         prompt = self.format_prompt(item)
         headers = {
@@ -618,6 +657,14 @@ class OmniRouteClient:
 
                 # If unauthorized/invalid credentials or gateway not configured, fail fast immediately
                 if resp.status_code in (401, 403):
+                    is_missing_provider = "no active credentials for provider" in resp.text.lower()
+                    if is_missing_provider:
+                        logger.warning(
+                            "[OMNIROUTE] Upstream provider credentials missing for model %s: %s. Cascading to next candidate...",
+                            model_name,
+                            resp.text[:120],
+                        )
+                        continue
                     _OMNIROUTE_AUTH_FAILURE_CACHE[completions_url] = time.time()
                     logger.warning("[OMNIROUTE] Gateway auth error (%d) for model %s: %s. Failing fast to deterministic heuristics.", resp.status_code, model_name, resp.text[:150])
                     break
