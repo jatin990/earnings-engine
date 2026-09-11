@@ -26,18 +26,19 @@ Always run within the virtual environment:
 ```
 
 ### Running Tests
+Always favor targeted test execution during development to avoid slow full-suite runs:
 ```bash
-# Run all tests (ignoring tests/manual)
-pytest
-
-# Run a specific test file
+# Run a specific test file (recommended default for development)
 pytest tests/test_predict.py
 
-# Run a single test function
+# Run a single test function (fastest verification loop)
 pytest tests/test_predict.py -k "test_predict_upcoming_runs"
 
 # Run with verbose output
 pytest -v tests/test_stock_api.py
+
+# Run full test suite (only for final pre-release / full regression pass)
+pytest
 ```
 
 ### Running the API & Dashboard
@@ -174,3 +175,11 @@ earnings-engine/
 ### 7. Ticker Symbol Suffixes & Market Handling
 - NSE Indian equities require the `.NS` suffix (e.g., `TCS.NS`, `RELIANCE.NS`). US equities have no suffix.
 - Use `market_of(ticker)` from `earnings_engine.config` to resolve market type (`"IN"` vs `"US"`).
+
+### 8. Agent Performance & Workflow Efficiency
+Empirical timing profiles across agent sessions show ~70% of wall-clock time is network turn-latency and ~20% is heavy sub-processes (such as full-suite pytest or slow integration tests). Follow these operational rules to maximize throughput:
+- **Batch Independent Tool Calls**: Always issue independent file reads, content searches (`Grep`), file listings (`Glob`), or checks concurrently in a single response turn rather than serializing them across multiple 3–4s round-trips.
+- **Targeted Test Runs Over Full Suites**: During iterative development and verification, run only the targeted test file or function under modification (`pytest tests/<test_file>.py -k "<test_func>"`). Never trigger the full test suite or slow integration/E2E test suites (e.g., `tests/test_stock_detail_e2e.py`) unless explicitly requested or performing final pre-release validation.
+- **Context Hygiene & Output Bounding**: Keep tool outputs bounded (use `head_limit`, specific `grep` patterns, line slices with `offset`/`limit` in `Read`). Avoid printing massive raw logs, full directory dumps, or large payloads into context, which inflates prefill latency and degrades prompt caching.
+- **Session Compaction & Clean Turn Cycles**: For multi-stage or prolonged tasks, proactively compact or reset context when switching phases. Plan operations comprehensively to minimize iterative micro-turn churn.
+
