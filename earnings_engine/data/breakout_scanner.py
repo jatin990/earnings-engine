@@ -2430,13 +2430,18 @@ def _score_classic_technical(
 
     window = min(len(closes), 252)
     resistance_high = float(high_series.tail(window).max())
+    prior_resistance = float(high_series.iloc[:-1].tail(window).max()) if len(high_series) > 1 else resistance_high
 
     atr_pct_val = atr_pct if (atr_pct is not None and not np.isnan(atr_pct)) else 2.0
     atr_val = signal_price * (atr_pct_val / 100.0)
-    if resistance_high <= signal_price:
+    if round(resistance_high, 2) <= round(signal_price, 2) or signal_price >= round(prior_resistance, 2):
         breakout_trigger = round(signal_price + max(signal_price * 0.0075, 0.5 * atr_val), 2)
+        ideal_entry_price = round(prior_resistance, 2)
     else:
         breakout_trigger = round(resistance_high, 2)
+        ideal_entry_price = round(resistance_high, 2)
+    is_late = bool(ideal_entry_price and signal_price > ideal_entry_price * 1.002)
+    entry_delay_pct = round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
 
     target_price = round(max(breakout_trigger * 1.08, breakout_trigger + 2.0 * atr_val), 2)
     stop_loss = round(min(signal_price * 0.95, signal_price - 1.5 * atr_val), 2)
@@ -2469,6 +2474,9 @@ def _score_classic_technical(
         "momentum_reasoning": f"Momentum posture is '{momentum_signal}' ({mom_score:.1f}/15 pts)",
         "fundamental_reasoning": f"Historical EPS quality score avg {avg_quality:.1f}/9 ({fund_score:.1f}/20 pts)",
         "formula_summary": f"Score {composite}/100 = Res({res_score:.0f}) + Vol({vol_score:.0f}) + Squeeze({comp_score:.0f}) + Mom({mom_score:.0f}) + Fund({fund_score:.0f})",
+        "ideal_entry_price": ideal_entry_price,
+        "is_late": is_late,
+        "entry_delay_pct": entry_delay_pct,
     }
     return composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes
 
@@ -2526,6 +2534,7 @@ def _score_nse_delivery_absorption(
     atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
     atr_val = signal_price * (atr_pct / 100.0)
 
+    ideal_entry_price = round(delivery_resistance, 2)
     if delivery_resistance <= signal_price:
         recent_high = float(high_series.tail(20).max()) if len(high_series) >= 5 else signal_price
         if recent_high > signal_price:
@@ -2534,6 +2543,8 @@ def _score_nse_delivery_absorption(
             delivery_trigger = round(signal_price + max(signal_price * 0.008, 0.75 * atr_val), 2)
     else:
         delivery_trigger = round(delivery_resistance, 2)
+    is_late = bool(ideal_entry_price and signal_price > ideal_entry_price * 1.002)
+    entry_delay_pct = round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
 
     pct_from_deliv = ((signal_price - delivery_trigger) / delivery_trigger) * 100
     if pct_from_deliv >= -1.0:
@@ -2576,6 +2587,9 @@ def _score_nse_delivery_absorption(
         "momentum_reasoning": f"Institutional flow: {funds_in} funds accumulating (₹{net_flow:+.1f} Cr net, {inst_score:.1f}/25 pts)",
         "fundamental_reasoning": f"Quarterly beat streak quality {avg_quality:.1f}/9 ({fund_score_norm:.1f}/20 pts)",
         "formula_summary": f"Score {composite}/100 = DelivVol({deliv_score:.0f}) + InstFlow({inst_score:.0f}) + DelivRes({deliv_res_score:.0f}) + Fund({fund_score_norm:.0f})",
+        "ideal_entry_price": ideal_entry_price,
+        "is_late": is_late,
+        "entry_delay_pct": entry_delay_pct,
     }
     return composite, delivery_trigger, target_price, stop_loss, subscores, archetype, notes
 
@@ -2624,8 +2638,12 @@ def _score_fo_call_wall(
         pass
 
     call_oi_strike = round(float(call_oi_strike), 2)
+    orig_call_wall = call_oi_strike
     if call_oi_strike <= signal_price:
         call_oi_strike = round(signal_price * 1.025, 2)
+    ideal_entry_price = orig_call_wall
+    is_late = bool(ideal_entry_price and signal_price > ideal_entry_price * 1.002)
+    entry_delay_pct = round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
     dist_to_call_wall = ((call_oi_strike - signal_price) / signal_price) * 100
 
     # 1. Call OI Wall Proximity (0-35)
@@ -2680,6 +2698,9 @@ def _score_fo_call_wall(
         "momentum_reasoning": f"Put-Call Ratio (PCR OI) is {pcr_oi:.2f} ({pcr_score:.1f}/25 pts)",
         "fundamental_reasoning": f"Underlying technical trend is {mom_sig} ({trend_score:.1f}/20 pts)",
         "formula_summary": f"Score {composite}/100 = CallOIWall({wall_score:.0f}) + PCR({pcr_score:.0f}) + Unwind({unwind_score:.0f}) + Trend({trend_score:.0f})",
+        "ideal_entry_price": ideal_entry_price,
+        "is_late": is_late,
+        "entry_delay_pct": entry_delay_pct,
     }
     return composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes
 
@@ -2731,10 +2752,13 @@ def _score_volume_profile_vah(
     composite = round(vah_score + lvn_score + poc_score + rel_vol_score, 1)
 
     va_height = max(signal_price * 0.05, vah - poc)
+    ideal_entry_price = round(float(vah), 2)
     if vah <= signal_price:
         breakout_trigger = round(signal_price + max(signal_price * 0.008, va_height * 0.25), 2)
     else:
         breakout_trigger = round(vah, 2)
+    is_late = bool(ideal_entry_price and signal_price > ideal_entry_price * 1.002)
+    entry_delay_pct = round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
 
     target_price = round(breakout_trigger + va_height * 1.5, 2)
     stop_loss = round(min(signal_price * 0.95, poc), 2)
@@ -2758,6 +2782,9 @@ def _score_volume_profile_vah(
         "momentum_reasoning": f"Traded volume surge {vol_ratio:.2f}× baseline ({rel_vol_score:.1f}/15 pts)",
         "fundamental_reasoning": "Volume Profile price-acceptance structure confirmed across 63 sessions",
         "formula_summary": f"Score {composite}/100 = VAH({vah_score:.0f}) + LVNVacuum({lvn_score:.0f}) + POC({poc_score:.0f}) + RelVol({rel_vol_score:.0f})",
+        "ideal_entry_price": ideal_entry_price,
+        "is_late": is_late,
+        "entry_delay_pct": entry_delay_pct,
     }
     return composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes
 
@@ -2811,10 +2838,15 @@ def _score_donchian_squeeze(
     atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
     atr_val = signal_price * (atr_pct / 100.0)
 
-    if donchian_55 <= signal_price:
+    prior_donchian = float(high_series.iloc[:-1].tail(55).max()) if len(high_series) > 1 else donchian_55
+    if round(donchian_55, 2) <= round(signal_price, 2) or signal_price >= round(prior_donchian, 2):
         breakout_trigger = round(signal_price + max(signal_price * 0.008, 0.75 * atr_val), 2)
+        ideal_entry_price = round(prior_donchian, 2)
     else:
         breakout_trigger = round(donchian_55, 2)
+        ideal_entry_price = round(donchian_55, 2)
+    is_late = bool(ideal_entry_price and signal_price > ideal_entry_price * 1.002)
+    entry_delay_pct = round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
 
     target_price = round(breakout_trigger + 3.0 * atr_val, 2)
     sma_20 = float(closes.tail(20).mean())
@@ -2839,6 +2871,9 @@ def _score_donchian_squeeze(
         "momentum_reasoning": f"Momentum slope oscillator is {mom_osc:+.1f}% vs 20 SMA ({mom_score:.1f}/20 pts)",
         "fundamental_reasoning": f"Trailing trend stop loss mapped to 20-Day SMA at ₹{sma_20:,.2f}",
         "formula_summary": f"Score {composite}/100 = TTMSqueeze({squeeze_score:.0f}) + Donchian55({donchian_score:.0f}) + MomOsc({mom_score:.0f}) + Vol({vol_score:.0f})",
+        "ideal_entry_price": ideal_entry_price,
+        "is_late": is_late,
+        "entry_delay_pct": entry_delay_pct,
     }
     return composite, breakout_trigger, target_price, stop_loss, subscores, archetype, notes
 
@@ -3055,12 +3090,19 @@ def score_breakout(
     daily_range = closes.pct_change().abs()
     atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
 
+    ideal_entry_price = notes.get("ideal_entry_price") or breakout_trigger
+    is_late = bool(notes.get("is_late") or (ideal_entry_price and signal_price > ideal_entry_price * 1.002))
+    entry_delay_pct = notes.get("entry_delay_pct") if notes.get("entry_delay_pct") is not None else (round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0)
+
     return {
         "ticker": ticker,
         "signal_date": signal_date,
         "signal_price": round(signal_price, 2),
         "predicted_value": round(signal_price, 2),
         "breakout_trigger": breakout_trigger,
+        "ideal_entry_price": ideal_entry_price,
+        "is_late": is_late,
+        "entry_delay_pct": entry_delay_pct,
         "target_price": target_price,
         "stop_loss": stop_loss,
         "risk_reward_ratio": risk_reward_ratio,

@@ -708,12 +708,27 @@
                 sortKey: 'predicted_value',
                 align: 'right',
                 headerStyle: 'color:#60a5fa;',
-                render: (c, ctx) => `
+                render: (c, ctx) => {
+                    const idealEntry = c.ideal_entry_price != null ? Number(c.ideal_entry_price) : (c.calculation_notes?.ideal_entry_price != null ? Number(c.calculation_notes.ideal_entry_price) : null);
+                    const sigVal = c.signal_price != null ? Number(c.signal_price) : (c.predicted_value != null ? Number(c.predicted_value) : (c.current_price != null ? Number(c.current_price) : null));
+                    const isLate = Boolean(c.is_late || (idealEntry != null && sigVal != null && sigVal > idealEntry * 1.002));
+                    const delayPct = c.entry_delay_pct != null ? Number(c.entry_delay_pct) : (idealEntry != null && sigVal != null ? ((sigVal - idealEntry) / idealEntry * 100) : 0);
+
+                    const subLateHtml = (isLate && idealEntry != null)
+                        ? `<div style="font-size:0.62rem;color:#f59e0b;margin-top:2px;line-height:1.2;" title="Late Detection: Signal was detected after breakout occurred. Ideal strategy entry was ₹${idealEntry.toFixed(2)} (+${delayPct.toFixed(1)}% earlier)">
+                             <sub>⚡ Ideal: ₹${idealEntry.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</sub>
+                             <sub style="color:${delayPct > 5 ? '#f87171' : '#fbbf24'};font-weight:700;">(+${delayPct.toFixed(1)}% late)</sub>
+                           </div>`
+                        : '';
+
+                    return `
                     <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
                         <div style="font-weight:700;color:#93c5fd;">${ctx.sigPriceStr}</div>
+                        ${subLateHtml}
                         <div style="font-size:0.62rem;color:#64748b;margin-top:1px;" title="Signal detection date">📅 ${c.signal_date || c.entry_date || 'Signal'}</div>
                     </td>
-                `
+                    `;
+                }
             },
             current_price: {
                 id: 'current_price',
@@ -742,12 +757,22 @@
                 sortKey: 'breakout_trigger',
                 align: 'right',
                 headerStyle: 'color:#fbbf24;',
-                render: (c, ctx) => `
+                render: (c, ctx) => {
+                    const idealEntry = c.ideal_entry_price != null ? Number(c.ideal_entry_price) : (c.calculation_notes?.ideal_entry_price != null ? Number(c.calculation_notes.ideal_entry_price) : null);
+                    const trigVal = c.breakout_trigger != null ? Number(c.breakout_trigger) : null;
+                    const isLate = Boolean(c.is_late || (idealEntry != null && trigVal != null && idealEntry < trigVal * 0.998));
+                    const baseSub = (isLate && idealEntry != null && Number(idealEntry).toFixed(2) !== Number(c.breakout_trigger).toFixed(2))
+                        ? `<div style="font-size:0.59rem;color:#94a3b8;margin-top:1px;"><sub>Base Res: ₹${idealEntry.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</sub></div>`
+                        : '';
+
+                    return `
                     <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
                         <div style="font-weight:700;color:#fde047;">${ctx.triggerStr}</div>
+                        ${baseSub}
                         <div style="font-size:0.62rem;margin-top:1px;">${ctx.gapPct}</div>
                     </td>
-                `
+                    `;
+                }
             },
             target_stop: {
                 id: 'target_stop',
@@ -1188,7 +1213,7 @@
                                 <span style="font-size:0.72rem;background:rgba(234,179,8,0.2);color:#fbbf24;padding:0.15rem 0.45rem;border-radius:4px;">${archetype}</span>
                                 <span style="font-size:0.75rem;background:rgba(59,130,246,0.2);color:#60a5fa;padding:0.15rem 0.45rem;border-radius:4px;font-family:var(--font-mono);">Score ${score}/100</span>
                             </div>
-                            <div style="font-size:0.76rem;color:#94a3b8;">${candidate.company_name || ticker} &middot; Signal Price: ₹${candidate.signal_price || candidate.current_price || '—'}</div>
+                            <div style="font-size:0.76rem;color:#94a3b8;">${candidate.company_name || ticker} &middot; Signal Price: ₹${candidate.signal_price || candidate.current_price || '—'}${candidate.ideal_entry_price ? ` &middot; <span style="color:#f59e0b;font-weight:600;">⚡ Ideal Strategy Entry: ₹${Number(candidate.ideal_entry_price).toFixed(2)} ${candidate.is_late ? `(+${Number(candidate.entry_delay_pct).toFixed(1)}% late)` : ''}</span>` : ''}</div>
                         </div>
                     </div>
                 </div>

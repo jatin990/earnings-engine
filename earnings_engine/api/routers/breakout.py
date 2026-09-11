@@ -143,6 +143,25 @@ async def get_breakout_radar_endpoint(
                 is_breaking = True
             c["is_breaking_out"] = is_breaking
 
+            # Extract or normalize ideal_entry_price and late delay metrics
+            notes = c.get("calculation_notes") or {}
+            ideal_p = c.get("ideal_entry_price") or notes.get("ideal_entry_price")
+            if ideal_p is None:
+                trig = c.get("breakout_trigger")
+                cur = c.get("current_price") or c.get("signal_price")
+                if trig and cur and cur >= trig * 1.002:
+                    ideal_p = trig
+            if ideal_p:
+                ideal_p = round(float(ideal_p), 2)
+                c["ideal_entry_price"] = ideal_p
+                sig_p = c.get("signal_price") or c.get("predicted_value") or c.get("current_price")
+                if sig_p and sig_p > ideal_p * 1.002:
+                    c["is_late"] = True
+                    c["entry_delay_pct"] = round(((sig_p - ideal_p) / ideal_p) * 100, 1)
+                else:
+                    c["is_late"] = False
+                    c["entry_delay_pct"] = 0.0
+
             if cur_p is not None:
                 if target_p is not None and cur_p >= target_p:
                     c["prediction_signal"] = "TARGET_HIT"

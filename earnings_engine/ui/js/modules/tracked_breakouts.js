@@ -432,6 +432,12 @@
                 const sStratBadge = formatStrategyBadge(s.strategy, s.setup_archetype);
                 const sDate = s.signal_date || '—';
                 const sSigP = s.signal_price != null ? `₹${Number(s.signal_price).toFixed(2)}` : '—';
+                const sIdeal = s.ideal_entry_price != null ? Number(s.ideal_entry_price) : (s.data?.calculation_notes?.ideal_entry_price != null ? Number(s.data.calculation_notes.ideal_entry_price) : null);
+                const sIsLate = Boolean(s.is_late || (sIdeal != null && s.signal_price > sIdeal * 1.002));
+                const sDelay = s.entry_delay_pct != null ? Number(s.entry_delay_pct) : (sIdeal ? ((s.signal_price - sIdeal) / sIdeal * 100) : 0);
+                const sLateSub = (sIsLate && sIdeal != null)
+                    ? `<div style="font-size:0.58rem;color:#f59e0b;margin-top:1px;"><sub>Ideal: ₹${sIdeal.toFixed(2)}</sub></div>`
+                    : '';
                 const sTrigP = s.breakout_trigger != null ? `₹${Number(s.breakout_trigger).toFixed(2)}` : '—';
                 const sTargetP = s.target_price != null ? `₹${Number(s.target_price).toFixed(2)}` : '—';
                 const sStopP = s.stop_loss != null ? `₹${Number(s.stop_loss).toFixed(2)}` : '—';
@@ -453,7 +459,7 @@
                         <td style="padding:0.4rem 0.5rem;font-size:0.68rem;color:#64748b;font-weight:700;font-variant-numeric:tabular-nums;">#${sId}</td>
                         <td style="padding:0.4rem 0.5rem;font-size:0.72rem;white-space:nowrap;">${sStratBadge}</td>
                         <td style="padding:0.4rem 0.5rem;font-size:0.72rem;color:#cbd5e1;font-variant-numeric:tabular-nums;">${sDate}</td>
-                        <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.72rem;color:#94a3b8;font-variant-numeric:tabular-nums;">${sSigP}</td>
+                        <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.72rem;color:#94a3b8;font-variant-numeric:tabular-nums;">${sSigP}${sLateSub}</td>
                         <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.72rem;color:#fbbf24;font-weight:600;font-variant-numeric:tabular-nums;">${sTrigP}</td>
                         <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.72rem;color:#34d399;font-weight:600;font-variant-numeric:tabular-nums;">${sTargetP}</td>
                         <td style="padding:0.4rem 0.5rem;text-align:right;font-size:0.72rem;color:#f87171;font-variant-numeric:tabular-nums;">${sStopP}</td>
