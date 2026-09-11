@@ -25,7 +25,7 @@ from earnings_engine.config import Settings
 try:
     import torch
     TORCH_AVAILABLE = True
-except ImportError:
+except (ImportError, OSError):
     torch = None  # type: ignore
     TORCH_AVAILABLE = False
 

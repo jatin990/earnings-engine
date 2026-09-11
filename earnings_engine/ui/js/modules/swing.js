@@ -284,8 +284,7 @@
 
     // Export module
     window.SwingModule = swingModule;
-    if (window.app) {
-        Object.assign(window.app, swingModule);
-    }
+    window.app = window.app || {};
+    Object.assign(window.app, swingModule);
 })();
 

@@ -170,7 +170,6 @@
 
     // Export module
     window.NewAdditionsModule = newAdditionsModule;
-    if (window.app) {
-        Object.assign(window.app, newAdditionsModule);
-    }
+    window.app = window.app || {};
+    Object.assign(window.app, newAdditionsModule);
 })();

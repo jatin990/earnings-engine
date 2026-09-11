@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 # In-memory TTL Cache (3-minute TTL for high-throughput responses)
 _INST_CACHE: dict[str, tuple[float, Any]] = {}
+_RADAR_TABLE_INITIALIZED: bool = False
 
 
 def calculate_institutional_score(
@@ -2703,70 +2704,163 @@ def _get_or_create_radar_signals(
     - Calculates days on radar, return since signal %, peak price, and max gain %.
     - Flags newly added stocks (<= 14 days on radar) as New Entrants.
     """
+    global _RADAR_TABLE_INITIALIZED
     if not screened_stocks:
         return
 
-    # Ensure table and indexes exist
-    try:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS institutional_radar_signals (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticker TEXT NOT NULL,
-                signal_date TEXT NOT NULL,
-                signal_price REAL NOT NULL,
-                initial_score REAL,
-                initial_window TEXT,
-                initial_dominance REAL,
-                initial_smart_money_cr REAL,
-                current_price REAL,
-                current_return_pct REAL,
-                peak_price REAL,
-                max_gain_pct REAL,
-                last_seen_date TEXT NOT NULL,
-                is_active INTEGER DEFAULT 1,
-                created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
-                updated_at TEXT NOT NULL DEFAULT (DATETIME('now')),
-                UNIQUE (ticker, signal_date)
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_ticker ON institutional_radar_signals(ticker)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_date ON institutional_radar_signals(signal_date)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_active ON institutional_radar_signals(is_active)")
-    except Exception as e:
-        logger.debug("[INSTITUTIONAL] Signal table verify warning: %s", e)
+    # Ensure table and indexes exist (only once per process lifetime)
+    if not _RADAR_TABLE_INITIALIZED:
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS institutional_radar_signals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ticker TEXT NOT NULL,
+                    signal_date TEXT NOT NULL,
+                    signal_price REAL NOT NULL,
+                    initial_score REAL,
+                    initial_window TEXT,
+                    initial_dominance REAL,
+                    initial_smart_money_cr REAL,
+                    current_price REAL,
+                    current_return_pct REAL,
+                    peak_price REAL,
+                    max_gain_pct REAL,
+                    last_seen_date TEXT NOT NULL,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+                    updated_at TEXT NOT NULL DEFAULT (DATETIME('now')),
+                    UNIQUE (ticker, signal_date)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_ticker ON institutional_radar_signals(ticker)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_date ON institutional_radar_signals(signal_date)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_signals_active ON institutional_radar_signals(is_active)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_radar_signals_perf ON institutional_radar_signals(ticker, signal_date)")
+            _RADAR_TABLE_INITIALIZED = True
+        except Exception as e:
+            logger.debug("[INSTITUTIONAL] Signal table verify warning: %s", e)
 
     today_dt = None
     try:
         today_dt = datetime.fromisoformat(as_of_date).date() if "T" in as_of_date else datetime.strptime(as_of_date[:10], "%Y-%m-%d").date()
     except Exception:
         today_dt = datetime.now(timezone.utc).date()
+    today_str = today_dt.strftime("%Y-%m-%d")
+
+    # 1. Batch query existing signals across all screened tickers in 1 roundtrip
+    tickers = list({s["ticker"] for s in screened_stocks if s.get("ticker")})
+    existing_signals: dict[str, tuple[str, float, float, float, float]] = {}
+    if tickers:
+        try:
+            placeholders = ",".join("?" for _ in tickers)
+            cur = conn.execute(
+                f"""
+                SELECT ticker, signal_date, signal_price, initial_score, peak_price, initial_smart_money_cr
+                FROM institutional_radar_signals
+                WHERE ticker IN ({placeholders})
+                ORDER BY ticker, signal_date ASC
+                """,
+                tickers,
+            )
+            for row in cur.fetchall():
+                sym_k = row[0]
+                if sym_k not in existing_signals:
+                    existing_signals[sym_k] = (
+                        str(row[1]),
+                        float(row[2] or 0.0),
+                        float(row[3] or 50.0),
+                        float(row[4] or row[2] or 0.0),
+                        float(row[5] or 0.0),
+                    )
+        except Exception as e:
+            logger.debug("[INSTITUTIONAL] Batch radar signals lookup notice: %s", e)
+
+    # 2. Identify new signals needing Point-in-Time historical price lookup
+    price_lookup_targets: list[tuple[str, str]] = []
+    new_signal_metadata: dict[str, tuple[str, float]] = {}  # sym -> (sig_date, initial_score)
+
+    for s in screened_stocks:
+        sym = s["ticker"]
+        if sym in existing_signals:
+            continue
+
+        txn_dates = []
+        for b in s.get("buyers", []):
+            cat = b.get("category")
+            b_date = b.get("date") or b.get("deal_date") or b.get("filing_date")
+            if b_date and cat in ("FII", "Super Investor", "AIF", "Block Deal", "Smart Money"):
+                txn_dates.append(str(b_date)[:10])
+
+        if txn_dates:
+            sig_date = min(txn_dates)
+        else:
+            all_b_dates = [
+                str(b.get("date") or b.get("deal_date") or b.get("filing_date"))[:10]
+                for b in s.get("buyers", [])
+                if b.get("date") or b.get("deal_date") or b.get("filing_date")
+            ]
+            sig_date = min(all_b_dates) if all_b_dates else today_str
+
+        # If signal date is today or later, signal price is today's price (no historical lookup needed)
+        if sig_date >= today_str:
+            sig_date = today_str
+
+        initial_score = float(s.get("conviction_score", 50.0))
+        new_signal_metadata[sym] = (sig_date, initial_score)
+
+        if sig_date < today_str:
+            price_lookup_targets.append((sym, sig_date))
+
+    # 3. Batch resolve historical prices using CTE window function (1 query instead of N)
+    historical_prices: dict[str, float] = {}
+    if price_lookup_targets:
+        try:
+            # Deduplicate targets by ticker
+            dedup_targets = list({t[0]: t for t in price_lookup_targets}.values())
+            values_clause = ", ".join("(?, ?)" for _ in dedup_targets)
+            params: list[Any] = []
+            for sym_t, dt_t in dedup_targets:
+                params.extend([sym_t, dt_t])
+            query = f"""
+                WITH targets(sym, target_date) AS (
+                    VALUES {values_clause}
+                ),
+                ranked_prices AS (
+                    SELECT p.ticker, p.close,
+                           ROW_NUMBER() OVER (PARTITION BY t.sym ORDER BY p.date DESC) as rn
+                    FROM targets t
+                    JOIN price_history p ON p.ticker = t.sym AND p.date <= t.target_date AND p.close > 0
+                )
+                SELECT ticker, close FROM ranked_prices WHERE rn = 1
+            """
+            p_cur = conn.execute(query, params)
+            for p_row in p_cur.fetchall():
+                if p_row and p_row[1]:
+                    historical_prices[p_row[0]] = round(float(p_row[1]), 2)
+        except Exception as e:
+            logger.debug("[INSTITUTIONAL] CTE batch price lookup notice, falling back: %s", e)
+            for sym_t, dt_t in price_lookup_targets:
+                try:
+                    p_cur = conn.execute(
+                        "SELECT close FROM price_history WHERE ticker = ? AND date <= ? AND close > 0 ORDER BY date DESC LIMIT 1",
+                        (sym_t, dt_t),
+                    )
+                    p_row = p_cur.fetchone()
+                    if p_row and p_row[0]:
+                        historical_prices[sym_t] = round(float(p_row[0]), 2)
+                except Exception:
+                    pass
+
+    # 4. Prepare batch updates and batch inserts
+    updates_batch: list[tuple[Any, ...]] = []
+    inserts_batch: list[tuple[Any, ...]] = []
 
     for s in screened_stocks:
         sym = s["ticker"]
         curr_p = s.get("current_price") or 0.0
 
-        # Query existing signal
-        existing_row = None
-        try:
-            cur = conn.execute(
-                """
-                SELECT signal_date, signal_price, initial_score, peak_price, initial_smart_money_cr
-                FROM institutional_radar_signals
-                WHERE ticker = ?
-                ORDER BY signal_date ASC
-                LIMIT 1
-                """,
-                (sym,),
-            )
-            existing_row = cur.fetchone()
-        except Exception:
-            existing_row = None
-
-        if existing_row:
-            sig_date = str(existing_row[0])
-            sig_price = float(existing_row[1] or 0.0)
-            initial_score = float(existing_row[2] or s.get("conviction_score", 50.0))
-            peak_price = float(existing_row[3] or sig_price)
+        if sym in existing_signals:
+            sig_date, sig_price, initial_score, peak_price, initial_smart_money_cr = existing_signals[sym]
 
             if curr_p <= 0:
                 curr_p = sig_price
@@ -2784,94 +2878,41 @@ def _get_or_create_radar_signals(
             max_gain = round(((peak_price - sig_price) / sig_price) * 100.0, 2) if sig_price > 0 else 0.0
             is_new = (days_on_radar <= 14)
 
-            try:
-                conn.execute(
-                    """
-                    UPDATE institutional_radar_signals
-                    SET current_price = ?, current_return_pct = ?, peak_price = ?, max_gain_pct = ?,
-                        last_seen_date = ?, is_active = 1, updated_at = DATETIME('now')
-                    WHERE ticker = ? AND signal_date = ?
-                    """,
-                    (curr_p, return_pct, peak_price, max_gain, as_of_date[:10], sym, sig_date),
-                )
-            except Exception as e:
-                logger.debug("[INSTITUTIONAL] Signal update error for %s: %s", sym, e)
-
+            updates_batch.append((
+                curr_p, return_pct, peak_price, max_gain, today_str, sym, sig_date
+            ))
         else:
-            # Determine authentic earliest signal inception date from smart money transactions
-            txn_dates = []
-            for b in s.get("buyers", []):
-                cat = b.get("category")
-                b_date = b.get("date") or b.get("deal_date") or b.get("filing_date")
-                if b_date and cat in ("FII", "Super Investor", "AIF", "Block Deal", "Smart Money"):
-                    txn_dates.append(str(b_date)[:10])
+            sig_date, initial_score = new_signal_metadata.get(sym, (today_str, float(s.get("conviction_score", 50.0))))
 
-            if txn_dates:
-                sig_date = min(txn_dates)
-            else:
-                all_b_dates = [
-                    str(b.get("date") or b.get("deal_date") or b.get("filing_date"))[:10]
-                    for b in s.get("buyers", [])
-                    if b.get("date") or b.get("deal_date") or b.get("filing_date")
-                ]
-                sig_date = min(all_b_dates) if all_b_dates else as_of_date[:10]
-
-            # Point-in-Time price resolution: query price_history on or before signal_date
-            sig_price = 0.0
-            try:
-                p_cur = conn.execute(
-                    """
-                    SELECT close FROM price_history
-                    WHERE ticker = ? AND date <= ? AND close > 0
-                    ORDER BY date DESC
-                    LIMIT 1
-                    """,
-                    (sym, sig_date),
-                )
-                p_row = p_cur.fetchone()
-                if p_row and p_row[0]:
-                    sig_price = round(float(p_row[0]), 2)
-            except Exception:
-                sig_price = 0.0
-
-            if sig_price <= 0:
+            if sig_date >= today_str:
+                sig_date = today_str
                 sig_price = round(float(curr_p or 100.0), 2)
+                days_on_radar = 0
+            else:
+                sig_price = historical_prices.get(sym, 0.0)
+                if sig_price <= 0:
+                    sig_price = round(float(curr_p or 100.0), 2)
+                days_on_radar = 0
+                try:
+                    sig_dt = datetime.fromisoformat(sig_date).date() if "T" in sig_date else datetime.strptime(sig_date[:10], "%Y-%m-%d").date()
+                    days_on_radar = max(0, (today_dt - sig_dt).days)
+                except Exception:
+                    days_on_radar = 0
 
             if curr_p <= 0:
                 curr_p = sig_price
                 s["current_price"] = curr_p
 
-            days_on_radar = 0
-            try:
-                sig_dt = datetime.fromisoformat(sig_date).date() if "T" in sig_date else datetime.strptime(sig_date[:10], "%Y-%m-%d").date()
-                days_on_radar = max(0, (today_dt - sig_dt).days)
-            except Exception:
-                days_on_radar = 0
-
             return_pct = round(((curr_p - sig_price) / sig_price) * 100.0, 2) if sig_price > 0 else 0.0
             peak_price = max(sig_price, curr_p)
             max_gain = round(((peak_price - sig_price) / sig_price) * 100.0, 2) if sig_price > 0 else 0.0
             is_new = (days_on_radar <= 14)
-            initial_score = float(s.get("conviction_score", 50.0))
 
-            try:
-                conn.execute(
-                    """
-                    INSERT OR IGNORE INTO institutional_radar_signals (
-                        ticker, signal_date, signal_price, initial_score, initial_window,
-                        initial_dominance, initial_smart_money_cr, current_price,
-                        current_return_pct, peak_price, max_gain_pct, last_seen_date,
-                        is_active, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, DATETIME('now'), DATETIME('now'))
-                    """,
-                    (
-                        sym, sig_date, sig_price, initial_score, default_window,
-                        float(s.get("dominance_pct") or 0.0), float(s.get("smart_money_cr") or 0.0),
-                        curr_p, return_pct, peak_price, max_gain, as_of_date[:10],
-                    ),
-                )
-            except Exception as e:
-                logger.debug("[INSTITUTIONAL] Signal insert error for %s: %s", sym, e)
+            inserts_batch.append((
+                sym, sig_date, sig_price, initial_score, default_window,
+                float(s.get("dominance_pct") or 0.0), float(s.get("smart_money_cr") or 0.0),
+                curr_p, return_pct, peak_price, max_gain, today_str
+            ))
 
         # Attach signal fields to stock
         s["signal_date"] = sig_date
@@ -2883,6 +2924,37 @@ def _get_or_create_radar_signals(
         s["max_gain_pct"] = max_gain
         s["is_new_entrant"] = is_new
         s["new_entrant_badge"] = f"🆕 New Entrant ({days_on_radar}d ago)" if is_new else None
+
+    # 5. Execute batched updates and inserts
+    if updates_batch:
+        try:
+            conn.executemany(
+                """
+                UPDATE institutional_radar_signals
+                SET current_price = ?, current_return_pct = ?, peak_price = ?, max_gain_pct = ?,
+                    last_seen_date = ?, is_active = 1, updated_at = DATETIME('now')
+                WHERE ticker = ? AND signal_date = ?
+                """,
+                updates_batch,
+            )
+        except Exception as e:
+            logger.debug("[INSTITUTIONAL] Batch signal update error: %s", e)
+
+    if inserts_batch:
+        try:
+            conn.executemany(
+                """
+                INSERT OR IGNORE INTO institutional_radar_signals (
+                    ticker, signal_date, signal_price, initial_score, initial_window,
+                    initial_dominance, initial_smart_money_cr, current_price,
+                    current_return_pct, peak_price, max_gain_pct, last_seen_date,
+                    is_active, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, DATETIME('now'), DATETIME('now'))
+                """,
+                inserts_batch,
+            )
+        except Exception as e:
+            logger.debug("[INSTITUTIONAL] Batch signal insert error: %s", e)
 
 
 def _attach_fundamentals_and_eps(

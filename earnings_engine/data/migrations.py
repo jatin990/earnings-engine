@@ -1557,6 +1557,77 @@ def _migration_033_consolidate_breakout_audit_log(conn: Any) -> None:
         logger.debug("[MIGRATION-033] Index creation notice: %s", e)
 
 
+def _migration_034_institutional_query_indexes(conn: Any) -> None:
+    """Create composite indexes for high-throughput institutional accumulation radar queries."""
+    # 1. Institutional block deals composite indexes
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_block_deals_td "
+            "ON institutional_block_deals (ticker, deal_date DESC)"
+        )
+    except Exception as e:
+        logger.debug("[MIGRATION-034] Index idx_block_deals_td notice: %s", e)
+
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_inst_block_deals_perf "
+            "ON institutional_block_deals (deal_type, value_cr, deal_date)"
+        )
+    except Exception as e:
+        logger.debug("[MIGRATION-034] Index idx_inst_block_deals_perf notice: %s", e)
+
+    # 2. Institutional holdings composite indexes
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_inst_holdings_tq "
+            "ON institutional_holdings (ticker, quarter)"
+        )
+    except Exception as e:
+        logger.debug("[MIGRATION-034] Index idx_inst_holdings_tq notice: %s", e)
+
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_inst_holdings_qr "
+            "ON institutional_holdings (quarter, reported_date)"
+        )
+    except Exception as e:
+        logger.debug("[MIGRATION-034] Index idx_inst_holdings_qr notice: %s", e)
+
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_inst_holdings_perf "
+            "ON institutional_holdings (action, holding_value_cr)"
+        )
+    except Exception as e:
+        logger.debug("[MIGRATION-034] Index idx_inst_holdings_perf notice: %s", e)
+
+    # 3. Shareholding patterns composite indexes
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_shareholding_tq "
+            "ON shareholding_patterns (ticker, quarter)"
+        )
+    except Exception as e:
+        logger.debug("[MIGRATION-034] Index idx_shareholding_tq notice: %s", e)
+
+    # 4. Institutional radar signals composite indexes
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_radar_signals_ts "
+            "ON institutional_radar_signals (ticker, signal_date)"
+        )
+    except Exception as e:
+        logger.debug("[MIGRATION-034] Index idx_radar_signals_ts notice: %s", e)
+
+    try:
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_inst_radar_signals_perf "
+            "ON institutional_radar_signals (ticker, signal_date)"
+        )
+    except Exception as e:
+        logger.debug("[MIGRATION-034] Index idx_inst_radar_signals_perf notice: %s", e)
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1592,6 +1663,7 @@ MIGRATIONS: list[Migration] = [
     Migration(31, "031_institutional_verification_and_provenance", _migration_031_institutional_verification_and_provenance),
     Migration(32, "032_institutional_radar_signals", _migration_032_institutional_radar_signals),
     Migration(33, "033_consolidate_breakout_audit_log", _migration_033_consolidate_breakout_audit_log),
+    Migration(34, "034_institutional_query_indexes", _migration_034_institutional_query_indexes),
 ]
 
 
