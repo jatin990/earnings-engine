@@ -234,7 +234,14 @@ async def log_and_cancel_api_requests(request: Request, call_next):
         "/api/index.py",
         "/api/index",
     }
-    is_silent = path in silent_paths or path.startswith(("/static", "/ui", "/docs", "/openapi.json"))
+    # Paths that should only be logged if duration exceeds a threshold (in ms) or on error
+    slow_only_paths = {
+        "/api/v1/sidebar/badges": 5000.0,
+        "/api/v1/system/sidebar-badges": 5000.0,
+    }
+    min_log_duration_ms = slow_only_paths.get(path)
+    is_slow_only = min_log_duration_ms is not None
+    is_silent = path in silent_paths or path.startswith(("/static", "/ui", "/docs", "/openapi.json")) or is_slow_only
 
     query_params = dict(request.query_params)
     sanitized_params = {k: redact_sensitive_data(str(v)) for k, v in query_params.items()} if query_params else {}
@@ -249,9 +256,18 @@ async def log_and_cancel_api_requests(request: Request, call_next):
         response = await call_next(request)
         duration_ms = (time.perf_counter() - start_time) * 1000
 
+        should_log_out = False
         if not is_silent:
+            should_log_out = True
+        elif is_slow_only and (duration_ms >= min_log_duration_ms or response.status_code >= 400):
+            should_log_out = True
+
+        if should_log_out:
             status_tag = "[HTTP:OUT]" if response.status_code < 400 else "[HTTP:ERR]"
-            logger.info("%s %s %s%s -> %d (%.1fms)%s", status_tag, request.method, path, filters_repr, response.status_code, duration_ms, req_id_str)
+            if is_slow_only and duration_ms >= min_log_duration_ms:
+                logger.warning("[HTTP:SLOW] %s %s%s -> %d (%.1fms >= %.0fs threshold)%s", request.method, path, filters_repr, response.status_code, duration_ms, min_log_duration_ms / 1000, req_id_str)
+            else:
+                logger.info("%s %s %s%s -> %d (%.1fms)%s", status_tag, request.method, path, filters_repr, response.status_code, duration_ms, req_id_str)
         return response
     except (asyncio.CancelledError, Exception) as exc:
         duration_ms = (time.perf_counter() - start_time) * 1000
