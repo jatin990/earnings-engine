@@ -33,6 +33,7 @@ async def get_breakout_radar_endpoint(
     asof_date: str | None = Query(None, description="Point-in-time scan date in YYYY-MM-DD format"),
     live: bool = Query(False, description="Force live real-time price fetching for candidates"),
     real_tracked_only: bool = Query(False, description="Filter to show ONLY real-time tracked entries persisted in database archive"),
+    tier: str | None = Query("HOT", description="Filter pool tier (HOT, WARM, ALL)"),
 ):
     """Return breakout candidates from the background scanner or point-in-time historical backtest."""
     import pandas as pd
@@ -43,6 +44,7 @@ async def get_breakout_radar_endpoint(
             settings=_settings,
             asof_date=asof_date,
             strategy=strategy,
+            tier=tier,
         )
         if candidates is None:
             candidates = []
@@ -57,6 +59,11 @@ async def get_breakout_radar_endpoint(
         # Apply real_tracked_only filter if requested
         if real_tracked_only:
             candidates = [c for c in candidates if bool(c.get("is_real_tracked"))]
+
+        # Apply pool tier filter (defaults to HOT to show only top-tier setups)
+        if tier and tier.upper() != "ALL":
+            target_tier = tier.upper().strip()
+            candidates = [c for c in candidates if (c.get("tier") or "HOT").upper() == target_tier]
 
         # Synchronize candidate prices: auto-fetch live quotes for hot pool & candidate setups
         if candidates and not asof_date:

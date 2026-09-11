@@ -61,7 +61,7 @@
             const filterIndicator = document.getElementById('breakoutFilterIndicator');
             const breakingSub = document.getElementById('breakoutStatBreakingSub');
 
-            let list = app._breakoutData || [];
+            let list = (app._breakoutData || []).filter(c => !c.tier || c.tier.toUpperCase() === 'HOT');
             const breakingCount = list.filter(app.isItemBreaking).length;
 
             if (app._breakoutRealTrackedOnly) {
@@ -530,7 +530,7 @@
             }
 
             try {
-                const params = new URLSearchParams({ universe: universe, strategy: strategy, sort_by: sortBy, min_score: minScore, limit: 100 });
+                const params = new URLSearchParams({ universe: universe, strategy: strategy, sort_by: sortBy, min_score: minScore, limit: 100, tier: 'HOT' });
                 if (asofDate) {
                     params.set('asof_date', asofDate);
                 }
@@ -635,14 +635,14 @@
                             const d = new Date(status.last_scan_at);
                             lastScanEl.textContent = `${uniLabel} • Live Pool (${d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })})`;
                         } catch {
-                            lastScanEl.textContent = `${uniLabel} • Active Setup Pool`;
+                            lastScanEl.textContent = `${uniLabel} • Hot Breakout Pool`;
                         }
                     } else if (total > 0) {
-                        lastScanEl.textContent = `${uniLabel} • Active Setup Pool (${total} setups)`;
+                        lastScanEl.textContent = `${uniLabel} • Hot Breakout Pool (${total} setups)`;
                     } else if (status.status === 'running') {
                         lastScanEl.textContent = `${uniLabel} • Scanning now…`;
                     } else {
-                        lastScanEl.textContent = `${uniLabel} • Active Setup Pool`;
+                        lastScanEl.textContent = `${uniLabel} • Hot Breakout Pool`;
                     }
                 }
 
@@ -682,6 +682,7 @@
                             </div>
                             <div style="font-size:0.67rem;color:#94a3b8;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.company_name || ctx.ticker}">${ctx.company}</div>
                             <div style="margin-top:0.1rem;display:flex;gap:0.25rem;flex-wrap:wrap;align-items:center;">
+                                <span style="font-size:0.60rem;background:rgba(239,68,68,0.18);color:#f87171;border:1px solid rgba(239,68,68,0.35);padding:0.04rem 0.32rem;border-radius:3px;font-weight:800;" title="Tier: Elite Hot Breakout Pool">🔥 HOT</span>
                                 <span style="font-size:0.60rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;">${ctx.archetype}</span>
                                 ${c.strategy ? `<span style="font-size:0.60rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-weight:700;" title="Strategy Model: ${c.strategy}">🎯 ${String(c.strategy).replace(/_/g, ' ')}</span>` : ''}
                                 <button type="button" onclick="app.openBreakoutHistoryModal('${ctx.ticker}', event)" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-size:0.60rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.2rem;" title="View Transition Lifecycle & Notes Timeline (Warm ➔ Hot ➔ Breakout)">

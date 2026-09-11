@@ -52,13 +52,13 @@ logger = get_logger("earnings_engine.data.breakout_scanner")
 # ---------------------------------------------------------------------------
 # Configuration (overridable via environment variables)
 # ---------------------------------------------------------------------------
-BREAKOUT_MIN_SCORE: int = int(os.environ.get("BREAKOUT_MIN_SCORE", "35"))
+BREAKOUT_MIN_SCORE: int = int(os.environ.get("BREAKOUT_MIN_SCORE", "40"))
 BREAKOUT_MAX_CANDIDATES: int = int(os.environ.get("BREAKOUT_MAX_CANDIDATES", "100"))
 
-# Tier thresholds
-HOT_THRESHOLD: int = int(os.environ.get("BREAKOUT_HOT_THRESHOLD", "50"))
+# Tier thresholds (Tightened for elite momentum setups)
+HOT_THRESHOLD: int = int(os.environ.get("BREAKOUT_HOT_THRESHOLD", "60"))
 WARM_THRESHOLD: int = int(os.environ.get("BREAKOUT_WARM_THRESHOLD", "25"))
-HOT_DEMOTION_THRESHOLD: int = int(os.environ.get("BREAKOUT_HOT_DEMOTION", "25"))
+HOT_DEMOTION_THRESHOLD: int = int(os.environ.get("BREAKOUT_HOT_DEMOTION", "45"))
 WARM_DEMOTION_THRESHOLD: int = int(os.environ.get("BREAKOUT_WARM_DEMOTION", "15"))
 
 # Scan intervals (minutes)
@@ -208,8 +208,9 @@ def _rebuild_candidates() -> None:
             if r:
                 merged[key] = r
 
+    # Sort Hot setups to the top with highest composite score
     candidates = [r for r in merged.values() if r.get("composite_score", 0) >= BREAKOUT_MIN_SCORE]
-    candidates.sort(key=lambda x: x.get("composite_score", 0), reverse=True)
+    candidates.sort(key=lambda x: (1 if (x.get("tier") or "").upper() == "HOT" else 0, x.get("composite_score", 0)), reverse=True)
     _pool["candidates"] = candidates
 
     # Group into per-strategy candidate pools from all qualifying setups
@@ -662,15 +663,44 @@ def load_breakout_pool_from_db(settings: Settings | None = None) -> bool:
 
 
 def _should_be_hot(result: dict) -> bool:
-    """Check if a scored result qualifies for the Hot pool."""
-    if result.get("composite_score", 0) >= HOT_THRESHOLD:
-        return True
+    """Check if a scored result qualifies for the Hot pool.
+
+    Tightened criteria: Only the best-of-the-best momentum setups qualify:
+    1. Mandatory Momentum:
+       - momentum_score >= 15 (price > 20D SMA and positive 30D return)
+       - momentum_signal cannot be 'None', 'Weak', or 'Insufficient'
+    2. Striking Distance or Active Breakout:
+       - pct_from_high >= -4.0% (within 4% of 52W/swing resistance), OR
+       - breakout_fired / breakout_happened is True
+    3. Volume Expansion:
+       - volume_ratio >= 1.25x, OR volume_score >= 10.0
+    4. Conviction:
+       - composite_score >= HOT_THRESHOLD (default 60), OR
+       - Explosive Ignition: volume_ratio >= 2.0x, momentum_score >= 18, and composite_score >= 50
+    """
+    composite = result.get("composite_score", 0)
+    mom_score = result.get("momentum_score", 0)
+    mom_signal = str(result.get("momentum_signal", "")).strip().capitalize()
     pct = result.get("pct_from_high")
-    if pct is not None and pct >= -5:
-        return True
     vol = result.get("volume_ratio")
-    if vol is not None and vol >= 1.5:
+    vol_score = result.get("volume_score", 0)
+    breakout_fired = bool(result.get("breakout_fired") or result.get("breakout_happened"))
+
+    # Strict momentum disqualifier: zero/negative or weak momentum cannot enter Hot pool
+    if mom_score < 15 or mom_signal in ("None", "Weak", "Insufficient", ""):
+        return False
+
+    is_near_resistance = (pct is not None and pct >= -4.0) or breakout_fired
+    has_volume_expansion = (vol is not None and vol >= 1.25) or vol_score >= 10.0
+
+    # Path A: Elite conviction + verified momentum + near resistance
+    if composite >= HOT_THRESHOLD and is_near_resistance:
         return True
+
+    # Path B: Explosive volume breakout ignition with strong momentum
+    if vol is not None and vol >= 2.0 and mom_score >= 18 and is_near_resistance and composite >= 50:
+        return True
+
     return False
 
 
@@ -1866,6 +1896,7 @@ def get_cached_scan_results(
     settings: Settings | None = None,
     asof_date: str | None = None,
     strategy: str = "CLASSIC_TECHNICAL",
+    tier: str | None = "HOT",
 ) -> list[dict[str, Any]]:
     """Return breakout candidates, optionally filtered by universe, point-in-time as-of date, and strategy."""
     settings = settings or Settings()
@@ -1950,6 +1981,10 @@ def get_cached_scan_results(
         c["tracked_badge"] = "🟢 Real Tracked" if is_tracked else "📊 Dynamic Scan"
         c["tracking_status"] = "REAL_TIME_TRACKED" if is_tracked else "DYNAMIC_SCAN"
 
+    if tier and tier.upper() != "ALL":
+        target_tier = tier.upper().strip()
+        candidates = [c for c in candidates if (c.get("tier") or "HOT").upper() == target_tier]
+
     if not universe or universe.lower() in ("all", "any", "global", "monitored"):
         return candidates
 
@@ -1976,7 +2011,7 @@ def get_cached_scan_results(
 
         if uni_tickers:
             uni_normalized = {t.upper() for t in uni_tickers}
-            return [c for c in candidates if c.get("ticker", "").upper() in uni_normalized]
+            candidates = [c for c in candidates if c.get("ticker", "").upper() in uni_normalized]
     except Exception as e:
         logger.debug("[BREAKOUT] Error filtering by universe %s: %s", universe, e)
 
@@ -3144,6 +3179,15 @@ def score_breakout(
         "volume_ratio": round(vol_ratio, 2),
         "atr_pct": round(atr_pct, 2),
         "momentum_signal": "Strong" if subscores["momentum_score"] >= 15 else "Moderate",
+        "tier": "HOT" if _should_be_hot({
+            "composite_score": composite,
+            "momentum_score": subscores["momentum_score"],
+            "momentum_signal": "Strong" if subscores["momentum_score"] >= 15 else "Moderate",
+            "pct_from_high": round(pct_from_high, 2),
+            "volume_ratio": round(vol_ratio, 2),
+            "volume_score": subscores["volume_score"],
+            "breakout_fired": breakout_fired,
+        }) else ("WARM" if composite >= WARM_THRESHOLD else "COLD"),
         "avg_quality_score": 8.0,
         "data_points": len(closes),
         "scanned_at": datetime.now(timezone.utc).isoformat(),
@@ -4002,14 +4046,10 @@ def run_hot_rescore(settings: Settings) -> None:
         new_score = result.get("composite_score", 0)
         if _should_be_hot(result):
             _pool["hot"][key] = {"result": result, "consecutive_low": 0}
-        elif new_score < HOT_DEMOTION_THRESHOLD:
-            if key in _pool["hot"]:
-                _pool["hot"][key]["result"] = result
-                _demote_hot(key, settings=settings)
         else:
             if key in _pool["hot"]:
                 _pool["hot"][key]["result"] = result
-                _pool["hot"][key]["consecutive_low"] = 0
+                _demote_hot(key, settings=settings)
 
     _rebuild_candidates()
     save_breakout_pool_to_db(settings)
@@ -4332,9 +4372,9 @@ def evaluate_stock_breakout(
 
     # Setup Conviction Tier
     comp_score = scored.get("composite_score", 0)
-    if comp_score >= HOT_THRESHOLD:
+    if _should_be_hot(scored):
         tier = "HOT"
-        tier_label = "🔥 High Conviction Setup"
+        tier_label = "🔥 Hot Momentum Setup"
         tier_badge = "emerald"
     elif comp_score >= WARM_THRESHOLD:
         tier = "WARM"
