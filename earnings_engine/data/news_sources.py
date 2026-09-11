@@ -57,6 +57,16 @@ LIVEMINT_FEEDS = [
     ("https://www.livemint.com/rss/companies", "LiveMint Companies"),
 ]
 
+BUSINESS_STANDARD_FEEDS = [
+    ("https://www.business-standard.com/rss/markets-106.rss", "Business Standard Markets"),
+    ("https://www.business-standard.com/rss/companies-101.rss", "Business Standard Companies"),
+]
+
+HINDU_BUSINESSLINE_FEEDS = [
+    ("https://www.thehindubusinessline.com/markets/feeder/default.rss", "Hindu BusinessLine Markets"),
+    ("https://www.thehindubusinessline.com/companies/feeder/default.rss", "Hindu BusinessLine Companies"),
+]
+
 NDTV_FEEDS = [
     ("https://feeds.feedburner.com/ndtvprofit-latest", "NDTV Profit"),
 ]
@@ -118,6 +128,21 @@ def _parse_rss_date(pub_date_str: str | None) -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _find_child(node: ET.Element, tags: list[str]) -> ET.Element | None:
+    """Find first matching child tag using explicit 'is not None' checks.
+
+    In Python's xml.etree.ElementTree, `bool(element)` evaluates to False if the
+    element has no sub-children (len(element) == 0), causing `a or b` chains to fail
+    on leaf nodes like <title>Text</title>. Explicitly checking `child is not None`
+    preserves leaf nodes correctly.
+    """
+    for tag in tags:
+        child = node.find(tag)
+        if child is not None:
+            return child
+    return None
+
+
 def _fetch_rss_feed(url: str, publisher_name: str, timeout: float = 6.0) -> list[dict[str, Any]]:
     """Fetch and parse a generic RSS XML feed."""
     items: list[dict[str, Any]] = []
@@ -134,20 +159,36 @@ def _fetch_rss_feed(url: str, publisher_name: str, timeout: float = 6.0) -> list
             item_nodes = root.findall(".//{http://www.w3.org/2005/Atom}entry")
 
         for node in item_nodes:
-            title_node = node.find("title") or node.find("{http://www.w3.org/2005/Atom}title")
+            title_node = _find_child(node, ["title", "{http://www.w3.org/2005/Atom}title"])
             title = _clean_html_text(title_node.text or "") if title_node is not None else ""
             if not title or len(title) < 8:
                 continue
 
-            link_node = node.find("link") or node.find("{http://www.w3.org/2005/Atom}link")
+            link_node = _find_child(node, ["link", "{http://www.w3.org/2005/Atom}link"])
             link = ""
             if link_node is not None:
                 link = link_node.attrib.get("href", "") or (link_node.text or "")
 
-            desc_node = node.find("description") or node.find("summary") or node.find("{http://www.w3.org/2005/Atom}summary")
+            desc_node = _find_child(
+                node,
+                [
+                    "description",
+                    "summary",
+                    "{http://www.w3.org/2005/Atom}summary",
+                    "{http://www.w3.org/2005/Atom}content",
+                ],
+            )
             summary = _clean_html_text(desc_node.text or "") if desc_node is not None else ""
 
-            pub_node = node.find("pubDate") or node.find("published") or node.find("{http://www.w3.org/2005/Atom}published") or node.find("{http://www.w3.org/2005/Atom}updated")
+            pub_node = _find_child(
+                node,
+                [
+                    "pubDate",
+                    "published",
+                    "{http://www.w3.org/2005/Atom}published",
+                    "{http://www.w3.org/2005/Atom}updated",
+                ],
+            )
             pub_date_str = pub_node.text if pub_node is not None else None
             pub_iso = _parse_rss_date(pub_date_str)
 
@@ -191,6 +232,24 @@ def fetch_livemint_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
     """Fetch recent headlines across LiveMint RSS feeds."""
     results: list[dict[str, Any]] = []
     for feed_url, pub_name in LIVEMINT_FEEDS:
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        results.extend(items)
+    return results
+
+
+def fetch_business_standard_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
+    """Fetch recent headlines across Business Standard RSS feeds."""
+    results: list[dict[str, Any]] = []
+    for feed_url, pub_name in BUSINESS_STANDARD_FEEDS:
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        results.extend(items)
+    return results
+
+
+def fetch_hindu_businessline_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
+    """Fetch recent headlines across Hindu BusinessLine RSS feeds."""
+    results: list[dict[str, Any]] = []
+    for feed_url, pub_name in HINDU_BUSINESSLINE_FEEDS:
         items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
         results.extend(items)
     return results
@@ -245,6 +304,8 @@ def fetch_bse_filings(lookback_days: int = 1, timeout: float = 6.0) -> list[dict
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw_text = resp.read().decode("utf-8", errors="ignore")
         data = json.loads(raw_text)
+        if not isinstance(data, dict):
+            return []
         ann_table = data.get("Table") or data.get("Table1") or []
         if isinstance(ann_table, list):
             for row in ann_table:
@@ -346,6 +407,8 @@ def fetch_all_broadband_news(timeout: float = 7.0) -> list[dict[str, Any]]:
         ("MoneyControl", lambda: fetch_moneycontrol_rss(timeout=timeout)),
         ("EconomicTimes", lambda: fetch_et_markets_rss(timeout=timeout)),
         ("LiveMint", lambda: fetch_livemint_rss(timeout=timeout)),
+        ("BusinessStandard", lambda: fetch_business_standard_rss(timeout=timeout)),
+        ("HinduBusinessLine", lambda: fetch_hindu_businessline_rss(timeout=timeout)),
         ("NDTVProfit", lambda: fetch_ndtv_profit_rss(timeout=timeout)),
         ("GoogleNewsBroadband", lambda: fetch_google_news_broadband(timeout=timeout)),
         ("BSEFilings", lambda: fetch_bse_filings(lookback_days=1, timeout=timeout)),

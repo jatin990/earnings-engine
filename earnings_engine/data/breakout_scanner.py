@@ -220,7 +220,7 @@ def _rebuild_candidates() -> None:
             if (c.get("strategy") or "CLASSIC_TECHNICAL").upper() == strat_id
             and (c.get("composite_score") or 0) >= BREAKOUT_MIN_SCORE
         ]
-        s_cands.sort(key=lambda x: x.get("composite_score", 0), reverse=True)
+        s_cands.sort(key=lambda x: (1 if (x.get("tier") or "").upper() == "HOT" else 0, x.get("composite_score", 0)), reverse=True)
         strat_pools[strat_id] = {
             "candidates": s_cands[:BREAKOUT_MAX_CANDIDATES],
             "last_scan_at": _pool.get("last_scan_at"),
@@ -1896,7 +1896,7 @@ def get_cached_scan_results(
     settings: Settings | None = None,
     asof_date: str | None = None,
     strategy: str = "CLASSIC_TECHNICAL",
-    tier: str | None = "HOT",
+    tier: str | None = "ALL",
 ) -> list[dict[str, Any]]:
     """Return breakout candidates, optionally filtered by universe, point-in-time as-of date, and strategy."""
     settings = settings or Settings()

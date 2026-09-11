@@ -196,13 +196,12 @@ class SchedulerEngine:
         return f"Full swing channel sweep completed for {universe} (min score: {min_score})."
 
     def _handle_news_harvest(self, settings: Settings, params: dict[str, Any]) -> str:
-        from earnings_engine.data.catalysts_news import scan_watchlist_catalysts
-        watchlist = params.get("watchlist") or params.get("universe") or "my_watchlist"
-        limit = int(params.get("limit", 10))
-        res = scan_watchlist_catalysts(watchlist, limit, False, settings)
-        fetched = res.get("catalysts_fetched", 0)
-        tickers = res.get("scanned_tickers", 0)
-        return f"Harvested {fetched} headlines across {tickers} stocks in '{watchlist}'."
+        from earnings_engine.data.catalysts_news import harvest_broadband_news
+        res = harvest_broadband_news(settings=settings, run_ai=False)
+        return (
+            f"Broadband news harvest: {res.get('raw_fetched', 0)} headlines fetched "
+            f"({res.get('saved_count', 0)} verified & saved in {res.get('elapsed_seconds', 0.0)}s)."
+        )
 
     def _handle_category_sweep(self, settings: Settings, params: dict[str, Any]) -> str:
         from earnings_engine.data.category_scanner import compute_and_save_scanner_universe

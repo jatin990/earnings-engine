@@ -1091,8 +1091,8 @@ async def news_catalyst_harvest_loop(settings: Settings | None = None) -> None:
             record_job_start("news_catalyst_harvest", settings)
             t0 = time.perf_counter()
 
-            # 1. Harvest broadband market-wide feeds & exchange announcements
-            bb_res = await loop.run_in_executor(None, harvest_broadband_news, settings, True)
+            # 1. Harvest broadband market-wide feeds & exchange announcements (zero-token background execution)
+            bb_res = await loop.run_in_executor(None, harvest_broadband_news, settings, False)
 
             # 2. Harvest for key watchlist tickers
             res = await loop.run_in_executor(None, scan_watchlist_catalysts, "my_watchlist", 3, False, settings)
