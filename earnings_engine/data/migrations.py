@@ -1643,6 +1643,41 @@ def _migration_035_purge_non_fno_fo_call_wall(conn: Any) -> None:
             logger.debug("[MIGRATION-035] Notice for table %s: %s", tbl, e)
 
 
+def _migration_036_sync_breakout_radar_signal_columns(conn: Any) -> None:
+    """Sync stale breakout_radar signal columns (signal_date, signal_price, etc.) from candidate data_json payload."""
+    try:
+        cur = conn.execute("SELECT ticker, strategy, data_json FROM breakout_radar WHERE data_json IS NOT NULL AND data_json != ''")
+        rows = cur.fetchall()
+        for ticker, strategy, data_json_str in rows:
+            try:
+                import json
+                d = json.loads(data_json_str)
+                if not isinstance(d, dict):
+                    continue
+                s_date = d.get("signal_date")
+                s_price = d.get("signal_price")
+                pred_val = d.get("predicted_value")
+                trigger = d.get("breakout_trigger")
+                target = d.get("target_price")
+                sl = d.get("stop_loss")
+
+                if s_date:
+                    conn.execute("""
+                        UPDATE breakout_radar
+                        SET signal_date = ?,
+                            signal_price = COALESCE(?, signal_price),
+                            predicted_value = COALESCE(?, predicted_value),
+                            breakout_trigger = COALESCE(?, breakout_trigger),
+                            target_price = COALESCE(?, target_price),
+                            stop_loss = COALESCE(?, stop_loss)
+                        WHERE ticker = ? AND strategy = ?
+                    """, (s_date, s_price, pred_val, trigger, target, sl, ticker, strategy))
+            except Exception as row_err:
+                logger.debug("[MIGRATION-036] Row update notice for %s %s: %s", ticker, strategy, row_err)
+    except Exception as e:
+        logger.debug("[MIGRATION-036] Execution notice: %s", e)
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1680,6 +1715,7 @@ MIGRATIONS: list[Migration] = [
     Migration(33, "033_consolidate_breakout_audit_log", _migration_033_consolidate_breakout_audit_log),
     Migration(34, "034_institutional_query_indexes", _migration_034_institutional_query_indexes),
     Migration(35, "035_purge_non_fno_fo_call_wall", _migration_035_purge_non_fno_fo_call_wall),
+    Migration(36, "036_sync_breakout_radar_signal_columns", _migration_036_sync_breakout_radar_signal_columns),
 ]
 
 

@@ -146,6 +146,9 @@ def get_option_chain_history(symbol: str, limit: int = 30, settings: Settings | 
 def analyze_option_chain(
     symbol: str,
     spot_price: float | None = None,
+    expiry_date: str | None = None,
+    strike_range: int | None = 20,
+    force_refresh: bool = False,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Retrieve and analyze Option Chain metrics for an equity or index.
@@ -159,15 +162,21 @@ def analyze_option_chain(
       - sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL'
       - call_oi_total: Total Call Open Interest
       - put_oi_total: Total Put Open Interest
-      - highest_call_oi_strike: Major resistance strike
-      - highest_put_oi_strike: Major support strike
+      - resistance_strike: Major resistance strike (highest Call OI)
+      - support_strike: Major support strike (highest Put OI)
+      - spot_price: Spot underlying price
+      - expiries: List of available expiry date strings
+      - selected_expiry: Active expiry date
+      - strikes: Formatted list of strike dictionaries for table & chart
+      - status: 'LIVE' | 'ARCHIVED' | 'NOT_FNO' | 'OFFLINE'
     """
     clean_symbol = symbol.upper().replace(".NS", "")
+    cache_key = f"{clean_symbol}:{expiry_date or 'default'}:{strike_range or 'all'}"
 
-    # Fast return from TTL cache
+    # Fast return from TTL cache unless force_refresh requested
     now = pd.Timestamp.now().timestamp()
-    if clean_symbol in _OPTION_CHAIN_CACHE:
-        cached_time, cached_res = _OPTION_CHAIN_CACHE[clean_symbol]
+    if not force_refresh and cache_key in _OPTION_CHAIN_CACHE:
+        cached_time, cached_res = _OPTION_CHAIN_CACHE[cache_key]
         if (now - cached_time) < _CACHE_TTL_SECONDS:
             return cached_res
 
@@ -176,6 +185,7 @@ def analyze_option_chain(
         res = {
             "symbol": clean_symbol,
             "status": "NOT_FNO",
+            "message": f"{clean_symbol} is not eligible for NSE Equity Derivatives (F&O). Cash market only.",
             "pcr_oi": None,
             "pcr_volume": None,
             "max_pain_strike": None,
@@ -185,38 +195,100 @@ def analyze_option_chain(
             "resistance_strike": None,
             "support_strike": None,
             "records_count": 0,
+            "expiries": [],
+            "selected_expiry": None,
             "strikes": [],
             "signals": ["NOT_FNO_ELIGIBLE"],
             "spot_price": spot_price,
         }
-        _OPTION_CHAIN_CACHE[clean_symbol] = (now, res)
+        _OPTION_CHAIN_CACHE[cache_key] = (now, res)
         return res
 
     spot_price = _resolve_spot_price(clean_symbol, spot_price, settings)
 
-    # If known non-F&O equity, return fast baseline without hammering network
-    if clean_symbol in _NON_FNO_SYMBOLS:
-        res = _compute_baseline_option_metrics(clean_symbol, spot_price)
-        _OPTION_CHAIN_CACHE[clean_symbol] = (now, res)
-        return res
-
-    logger.debug("[OPTION-CHAIN] Analyzing Option Chain derivatives data for symbol=%s (spot=%s)...", clean_symbol, spot_price)
+    logger.debug("[OPTION-CHAIN] Fetching Option Chain for symbol=%s (expiry=%s, spot=%s)...", clean_symbol, expiry_date, spot_price)
     mgr = get_data_manager(settings)
-    raw_chain = mgr.fetch_option_chain(clean_symbol)
+    raw_chain = mgr.fetch_option_chain(clean_symbol, expiry_date=expiry_date)
 
     records = raw_chain.get("data", [])
+    expiries = raw_chain.get("expiries", [])
+    selected_expiry = raw_chain.get("selected_expiry")
+    raw_spot = raw_chain.get("underlying_value")
+    if raw_spot and float(raw_spot) > 0:
+        spot_price = float(raw_spot)
+
     if not records:
-        _NON_FNO_SYMBOLS.add(clean_symbol)
-        logger.debug("[OPTION-CHAIN] Real-time Option Chain records empty for %s; computing baseline derivatives metrics", clean_symbol)
-        res = _compute_baseline_option_metrics(clean_symbol, spot_price)
-        _OPTION_CHAIN_CACHE[clean_symbol] = (now, res)
+        logger.info("[OPTION-CHAIN] Real-time Option Chain empty for %s. Checking historical snapshots...", clean_symbol)
+        history = get_option_chain_history(clean_symbol, limit=1, settings=settings)
+        if history:
+            last_snap = history[0]
+            res = {
+                "symbol": clean_symbol,
+                "status": "ARCHIVED",
+                "message": f"NSE live option chain unavailable (market closed/offline). Displaying last recorded snapshot from {last_snap.get('as_of_date')}.",
+                "spot_price": last_snap.get("spot_price") or spot_price,
+                "pcr_oi": last_snap.get("pcr_oi"),
+                "pcr_volume": last_snap.get("pcr_volume"),
+                "max_pain_strike": last_snap.get("max_pain_strike"),
+                "sentiment": last_snap.get("sentiment") or "NEUTRAL",
+                "call_oi_total": last_snap.get("call_oi_total") or 0,
+                "put_oi_total": last_snap.get("put_oi_total") or 0,
+                "resistance_strike": last_snap.get("resistance_strike"),
+                "support_strike": last_snap.get("support_strike"),
+                "records_count": 0,
+                "expiries": expiries,
+                "selected_expiry": selected_expiry,
+                "strikes": [],
+                "as_of_date": last_snap.get("as_of_date"),
+                "signals": ["ARCHIVED_SNAPSHOT"],
+            }
+            _OPTION_CHAIN_CACHE[cache_key] = (now, res)
+            return res
+
+        # No live records and no archived snapshot available
+        res = {
+            "symbol": clean_symbol,
+            "status": "OFFLINE",
+            "message": "Live NSE option chain unreachable and no archival snapshot found for this symbol.",
+            "spot_price": spot_price,
+            "pcr_oi": None,
+            "pcr_volume": None,
+            "max_pain_strike": None,
+            "sentiment": "NEUTRAL",
+            "call_oi_total": 0,
+            "put_oi_total": 0,
+            "resistance_strike": None,
+            "support_strike": None,
+            "records_count": 0,
+            "expiries": expiries,
+            "selected_expiry": selected_expiry,
+            "strikes": [],
+            "signals": ["OPTION_CHAIN_UNREACHABLE"],
+        }
+        _OPTION_CHAIN_CACHE[cache_key] = (now, res)
         return res
 
-    res = _calculate_option_metrics_from_records(clean_symbol, records, spot_price)
+    res = _calculate_option_metrics_from_records(
+        symbol=clean_symbol,
+        records=records,
+        spot_price=spot_price,
+        strike_range=strike_range,
+    )
     res["spot_price"] = spot_price
-    _OPTION_CHAIN_CACHE[clean_symbol] = (now, res)
+    res["expiries"] = expiries
+    res["selected_expiry"] = selected_expiry
+    res["timestamp"] = raw_chain.get("timestamp") or datetime.now().isoformat()
+    _OPTION_CHAIN_CACHE[cache_key] = (now, res)
     store_option_chain_snapshot(res, settings)
-    logger.info("[OPTION-CHAIN] [NSE-Live] %s (%d strikes) -> Sentiment: %s, PCR(OI): %s, Max Pain: ₹%s", clean_symbol, len(records), res.get("sentiment"), res.get("pcr_oi"), res.get("max_pain_strike"))
+    logger.info(
+        "[OPTION-CHAIN] [NSE-Live] %s (%d strikes, expiry=%s) -> Sentiment: %s, PCR(OI): %s, Max Pain: ₹%s",
+        clean_symbol,
+        len(res.get("strikes", [])),
+        selected_expiry,
+        res.get("sentiment"),
+        res.get("pcr_oi"),
+        res.get("max_pain_strike"),
+    )
     return res
 
 
@@ -224,16 +296,15 @@ def _calculate_option_metrics_from_records(
     symbol: str,
     records: list[dict[str, Any]],
     spot_price: float | None,
+    strike_range: int | None = 20,
 ) -> dict[str, Any]:
-    """Parse real option chain records into quantitative metrics."""
-    df = pd.DataFrame(records)
+    """Parse real option chain records into quantitative metrics and structured strike ladder."""
+    call_oi = 0.0
+    put_oi = 0.0
+    call_vol = 0.0
+    put_vol = 0.0
 
-    call_oi = 0
-    put_oi = 0
-    call_vol = 0
-    put_vol = 0
-
-    strikes_data = []
+    raw_strikes: list[dict[str, Any]] = []
 
     for r in records:
         strike = float(r.get("strikePrice") or r.get("strike_price") or 0)
@@ -245,24 +316,51 @@ def _calculate_option_metrics_from_records(
         c_vol = float(r.get("CE_totalTradedVolume") or ce.get("totalTradedVolume") or r.get("call_vol") or 0)
         p_vol = float(r.get("PE_totalTradedVolume") or pe.get("totalTradedVolume") or r.get("put_vol") or 0)
 
+        c_chg_oi = float(r.get("CE_changeinOpenInterest") or ce.get("changeinOpenInterest") or ce.get("pchangeinOpenInterest") or 0)
+        p_chg_oi = float(r.get("PE_changeinOpenInterest") or pe.get("changeinOpenInterest") or pe.get("pchangeinOpenInterest") or 0)
+        c_pchange_oi = float(ce.get("pchangeinOpenInterest") or 0)
+        p_pchange_oi = float(pe.get("pchangeinOpenInterest") or 0)
+
+        c_ltp = float(r.get("CE_lastPrice") or ce.get("lastPrice") or 0)
+        p_ltp = float(r.get("PE_lastPrice") or pe.get("lastPrice") or 0)
+
+        c_iv = float(r.get("CE_impliedVolatility") or ce.get("impliedVolatility") or 0)
+        p_iv = float(r.get("PE_impliedVolatility") or pe.get("impliedVolatility") or 0)
+
         call_oi += c_oi
         put_oi += p_oi
         call_vol += c_vol
         put_vol += p_vol
 
         if strike > 0:
-            strikes_data.append({"strike": strike, "call_oi": c_oi, "put_oi": p_oi})
+            raw_strikes.append({
+                "strike": strike,
+                "ce_oi": int(c_oi),
+                "ce_change_oi": int(c_chg_oi),
+                "ce_pchange_oi": round(c_pchange_oi, 2),
+                "ce_ltp": round(c_ltp, 2),
+                "ce_iv": round(c_iv, 2),
+                "ce_vol": int(c_vol),
+                "pe_oi": int(p_oi),
+                "pe_change_oi": int(p_chg_oi),
+                "pe_pchange_oi": round(p_pchange_oi, 2),
+                "pe_ltp": round(p_ltp, 2),
+                "pe_iv": round(p_iv, 2),
+                "pe_vol": int(p_vol),
+                "call_oi": c_oi,
+                "put_oi": p_oi,
+            })
+
+    # Sort strikes ascending
+    raw_strikes.sort(key=lambda x: x["strike"])
 
     pcr_oi = round(put_oi / call_oi, 2) if call_oi > 0 else 1.0
     pcr_vol = round(put_vol / call_vol, 2) if call_vol > 0 else 1.0
 
-    # Max pain calculation
-    max_pain = _calculate_max_pain(strikes_data) if strikes_data else spot_price
+    # Max pain calculation across all strikes
+    max_pain = _calculate_max_pain(raw_strikes) if raw_strikes else (spot_price or 0.0)
 
-    # Sentiment interpretation:
-    # PCR > 1.2 => Bullish (heavy put writing support)
-    # PCR < 0.8 => Bearish (heavy call writing resistance)
-    # 0.8 <= PCR <= 1.2 => Neutral
+    # Sentiment interpretation
     if pcr_oi >= 1.2:
         sentiment = "BULLISH"
     elif pcr_oi <= 0.8:
@@ -270,8 +368,8 @@ def _calculate_option_metrics_from_records(
     else:
         sentiment = "NEUTRAL"
 
-    # Identify key S/R strikes
-    sdf = pd.DataFrame(strikes_data) if strikes_data else pd.DataFrame()
+    # Identify Call Wall (Resistance) and Put Wall (Support)
+    sdf = pd.DataFrame(raw_strikes) if raw_strikes else pd.DataFrame()
     high_call_strike = (
         float(sdf.loc[sdf["call_oi"].idxmax()]["strike"])
         if not sdf.empty and "call_oi" in sdf.columns and sdf["call_oi"].max() > 0
@@ -283,6 +381,57 @@ def _calculate_option_metrics_from_records(
         else None
     )
 
+    # Find ATM strike
+    atm_strike = None
+    if raw_strikes and spot_price and spot_price > 0:
+        atm_strike = min(raw_strikes, key=lambda x: abs(x["strike"] - spot_price))["strike"]
+    elif raw_strikes:
+        atm_strike = raw_strikes[len(raw_strikes) // 2]["strike"]
+
+    # Filter to strike_range around ATM if specified
+    formatted_strikes: list[dict[str, Any]] = []
+    if raw_strikes:
+        atm_idx = 0
+        for i, s in enumerate(raw_strikes):
+            if s["strike"] == atm_strike:
+                atm_idx = i
+                break
+
+        if strike_range and strike_range > 0 and len(raw_strikes) > (strike_range * 2):
+            start_idx = max(0, atm_idx - strike_range)
+            end_idx = min(len(raw_strikes), atm_idx + strike_range + 1)
+            selected_subset = raw_strikes[start_idx:end_idx]
+        else:
+            selected_subset = raw_strikes
+
+        current_spot = spot_price or atm_strike or 0.0
+        for s in selected_subset:
+            stk = s["strike"]
+            is_atm = stk == atm_strike
+            # CE is In-The-Money when Strike < Spot
+            ce_itm = stk < current_spot
+            # PE is In-The-Money when Strike > Spot
+            pe_itm = stk > current_spot
+
+            formatted_strikes.append({
+                "strike": stk,
+                "is_atm": is_atm,
+                "ce_itm": ce_itm,
+                "pe_itm": pe_itm,
+                "ce_oi": s["ce_oi"],
+                "ce_change_oi": s["ce_change_oi"],
+                "ce_pchange_oi": s["ce_pchange_oi"],
+                "ce_ltp": s["ce_ltp"],
+                "ce_iv": s["ce_iv"],
+                "ce_vol": s["ce_vol"],
+                "pe_oi": s["pe_oi"],
+                "pe_change_oi": s["pe_change_oi"],
+                "pe_pchange_oi": s["pe_pchange_oi"],
+                "pe_ltp": s["pe_ltp"],
+                "pe_iv": s["pe_iv"],
+                "pe_vol": s["pe_vol"],
+            })
+
     return {
         "symbol": symbol,
         "pcr_oi": pcr_oi,
@@ -293,6 +442,9 @@ def _calculate_option_metrics_from_records(
         "put_oi_total": int(put_oi),
         "resistance_strike": high_call_strike,
         "support_strike": high_put_strike,
+        "atm_strike": atm_strike,
+        "records_count": len(formatted_strikes),
+        "strikes": formatted_strikes,
         "status": "LIVE",
     }
 

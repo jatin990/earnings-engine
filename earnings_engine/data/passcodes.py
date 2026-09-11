@@ -70,6 +70,7 @@ AVAILABLE_ROUTES: dict[str, dict[str, Any]] = {
             "/api/v1/errors",
             "/api/v1/system",
             "/api/v1/health",
+            "/api/v1/options",
             "/api/v1/config/ratelimits",
             "/api/v1/ratelimits",
             "/api/v1/config/ui-preferences",

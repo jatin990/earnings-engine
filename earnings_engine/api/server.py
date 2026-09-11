@@ -29,6 +29,7 @@ from earnings_engine.api.routers import (
     institutional,
     kronos,
     news,
+    options,
     playground,
     premarket,
     repeaters,
@@ -479,6 +480,7 @@ app.include_router(scanner.router)
 app.include_router(repeaters.router)
 app.include_router(institutional.router)
 app.include_router(tri_confluence.router)
+app.include_router(options.router)
 app.include_router(swing.router)
 app.include_router(trading_agents.router)
 app.include_router(audit.router)

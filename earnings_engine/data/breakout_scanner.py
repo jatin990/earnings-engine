@@ -397,12 +397,12 @@ def save_breakout_pool_to_db(settings: Settings | None = None) -> None:
             compression_score = excluded.compression_score,
             momentum_score = excluded.momentum_score,
             fundamental_score = excluded.fundamental_score,
-            signal_date = CASE WHEN breakout_radar.signal_date IS NOT NULL AND breakout_radar.signal_date != '' THEN breakout_radar.signal_date ELSE excluded.signal_date END,
-            signal_price = CASE WHEN breakout_radar.signal_price IS NOT NULL AND breakout_radar.signal_price > 0 THEN breakout_radar.signal_price ELSE excluded.signal_price END,
-            predicted_value = CASE WHEN breakout_radar.predicted_value IS NOT NULL AND breakout_radar.predicted_value > 0 THEN breakout_radar.predicted_value ELSE excluded.predicted_value END,
-            breakout_trigger = CASE WHEN breakout_radar.breakout_trigger IS NOT NULL AND breakout_radar.breakout_trigger > 0 THEN breakout_radar.breakout_trigger ELSE excluded.breakout_trigger END,
-            target_price = CASE WHEN breakout_radar.target_price IS NOT NULL AND breakout_radar.target_price > 0 THEN breakout_radar.target_price ELSE excluded.target_price END,
-            stop_loss = CASE WHEN breakout_radar.stop_loss IS NOT NULL AND breakout_radar.stop_loss > 0 THEN breakout_radar.stop_loss ELSE excluded.stop_loss END,
+            signal_date = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.signal_date IS NULL OR breakout_radar.signal_date = '' THEN excluded.signal_date ELSE breakout_radar.signal_date END,
+            signal_price = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.signal_price IS NULL OR breakout_radar.signal_price <= 0 THEN excluded.signal_price ELSE breakout_radar.signal_price END,
+            predicted_value = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.predicted_value IS NULL OR breakout_radar.predicted_value <= 0 THEN excluded.predicted_value ELSE breakout_radar.predicted_value END,
+            breakout_trigger = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.breakout_trigger IS NULL OR breakout_radar.breakout_trigger <= 0 THEN excluded.breakout_trigger ELSE breakout_radar.breakout_trigger END,
+            target_price = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.target_price IS NULL OR breakout_radar.target_price <= 0 THEN excluded.target_price ELSE breakout_radar.target_price END,
+            stop_loss = CASE WHEN excluded.signal_date >= breakout_radar.signal_date OR breakout_radar.stop_loss IS NULL OR breakout_radar.stop_loss <= 0 THEN excluded.stop_loss ELSE breakout_radar.stop_loss END,
             risk_reward_ratio = excluded.risk_reward_ratio,
             current_price = excluded.current_price,
             current_date = excluded.current_date,
@@ -2018,8 +2018,37 @@ def get_cached_scan_results(
     return candidates
 
 
-def get_scan_status(universe: str | None = None) -> dict[str, Any]:
-    """Return a lightweight status dict for the API."""
+def get_scan_status(universe: str | None = None, settings: Settings | None = None) -> dict[str, Any]:
+    """Return a lightweight status dict for the API, lazy-loading persisted counts if uninitialized."""
+    settings = settings or Settings()
+    if _pool.get("hot_count", 0) == 0 and _pool.get("warm_count", 0) == 0:
+        try:
+            load_breakout_pool_from_db(settings)
+        except Exception:
+            pass
+        if _pool.get("hot_count", 0) == 0 and _pool.get("warm_count", 0) == 0:
+            try:
+                conn = get_db_connection(settings)
+                cur = conn.execute("SELECT UPPER(tier), COUNT(*) FROM breakout_radar GROUP BY UPPER(tier)")
+                for row in cur.fetchall():
+                    t_tier = str(row[0] or "").upper()
+                    t_cnt = int(row[1] or 0)
+                    if t_tier == "HOT":
+                        _pool["hot_count"] = max(_pool.get("hot_count", 0), t_cnt)
+                    elif t_tier == "WARM":
+                        _pool["warm_count"] = max(_pool.get("warm_count", 0), t_cnt)
+            except Exception:
+                pass
+
+    if not _pool.get("cold_tickers_scanned"):
+        try:
+            conn = get_db_connection(settings)
+            row = conn.execute("SELECT COUNT(DISTINCT ticker) FROM price_history").fetchone()
+            if row and row[0]:
+                _pool["cold_tickers_scanned"] = int(row[0])
+        except Exception:
+            pass
+
     return {
         "status": _pool.get("status", "idle"),
         "is_scanning": _pool.get("status") == "running",

@@ -1,0 +1,241 @@
+<!-- Option Chain & Derivatives Hub Tab -->
+<div id="tab-options" class="tab-content" style="width: 100%; max-width: 100%;">
+    <!-- 1. Header with Symbol Selectors and Controls -->
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+        <div>
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+                <h1 style="font-size:1.5rem;font-weight:800;color:var(--text-primary);letter-spacing:-0.02em;margin:0;">
+                    ⛓️ Option Chain &amp; Derivatives
+                </h1>
+                <span class="badge" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:6px;font-weight:700;">
+                    LIVE NSE F&amp;O
+                </span>
+                <span id="optionsSentimentBadge" class="badge" style="display:none;font-size:0.75rem;padding:0.2rem 0.55rem;border-radius:6px;font-weight:700;">
+                    --
+                </span>
+            </div>
+            <p style="color:var(--text-secondary);font-size:0.875rem;margin:0.35rem 0 0 0;">
+                Comprehensive real-time NSE strike tree, Max Pain, Put-Call Ratio (PCR), Call/Put Open Interest Walls, and historical positioning trends.
+            </p>
+        </div>
+
+        <!-- Controls Toolbar -->
+        <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+            <!-- Search & Dropdown for Symbol -->
+            <div style="position:relative;">
+                <input type="text" id="optionsSymbolInput" placeholder="Symbol (e.g. NIFTY, RELIANCE)"
+                    style="width: 150px; padding: 0.35rem 0.65rem; background: #0a0a0a; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #ededed; font-size: 0.8rem; font-family: var(--font-mono); text-transform: uppercase;"
+                    onkeydown="if(event.key==='Enter') app.switchOptionSymbol(this.value)" />
+                <button class="btn btn-secondary btn-sm" onclick="app.switchOptionSymbol(document.getElementById('optionsSymbolInput').value)" style="padding:0.35rem 0.5rem; margin-left:0.25rem;">Go</button>
+            </div>
+
+            <!-- Expiry Date Filter -->
+            <div style="display:flex;align-items:center;gap:0.35rem;">
+                <label style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;">Expiry:</label>
+                <select id="optionsExpirySelect" onchange="app.onOptionExpiryChange(this.value)"
+                    style="padding: 0.35rem 0.65rem; background: #0a0a0a; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #ededed; font-size: 0.8rem; font-family: var(--font-mono); outline: none;">
+                    <option value="">Nearest Active</option>
+                </select>
+            </div>
+
+            <!-- Strike Range Filter -->
+            <div style="display:flex;align-items:center;gap:0.35rem;">
+                <label style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;">Strikes:</label>
+                <select id="optionsStrikeRangeSelect" onchange="app.onOptionStrikeRangeChange(this.value)"
+                    style="padding: 0.35rem 0.65rem; background: #0a0a0a; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #ededed; font-size: 0.8rem; font-family: var(--font-mono); outline: none;">
+                    <option value="10">±10 ATM</option>
+                    <option value="15">±15 ATM</option>
+                    <option value="20" selected>±20 ATM</option>
+                    <option value="30">±30 ATM</option>
+                    <option value="50">All Available</option>
+                </select>
+            </div>
+
+            <button class="btn btn-primary btn-sm" onclick="app.loadOptionChain(true)" id="optionsRefreshBtn" style="display:flex;align-items:center;gap:0.35rem;">
+                <span>🔄</span> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. Quick Symbol Selector Pills -->
+    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+        <span style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-right:0.25rem;">Quick Select:</span>
+        <button class="btn btn-sm btn-secondary option-sym-pill active" data-sym="NIFTY" onclick="app.switchOptionSymbol('NIFTY')">NIFTY</button>
+        <button class="btn btn-sm btn-secondary option-sym-pill" data-sym="BANKNIFTY" onclick="app.switchOptionSymbol('BANKNIFTY')">BANKNIFTY</button>
+        <button class="btn btn-sm btn-secondary option-sym-pill" data-sym="FINNIFTY" onclick="app.switchOptionSymbol('FINNIFTY')">FINNIFTY</button>
+        <button class="btn btn-sm btn-secondary option-sym-pill" data-sym="MIDCPNIFTY" onclick="app.switchOptionSymbol('MIDCPNIFTY')">MIDCPNIFTY</button>
+        <span style="width:1px;height:18px;background:rgba(255,255,255,0.1);margin:0 0.25rem;"></span>
+        <button class="btn btn-sm btn-secondary option-sym-pill" data-sym="RELIANCE" onclick="app.switchOptionSymbol('RELIANCE')">RELIANCE</button>
+        <button class="btn btn-sm btn-secondary option-sym-pill" data-sym="HDFCBANK" onclick="app.switchOptionSymbol('HDFCBANK')">HDFCBANK</button>
+        <button class="btn btn-sm btn-secondary option-sym-pill" data-sym="ICICIBANK" onclick="app.switchOptionSymbol('ICICIBANK')">ICICIBANK</button>
+        <button class="btn btn-sm btn-secondary option-sym-pill" data-sym="INFY" onclick="app.switchOptionSymbol('INFY')">INFY</button>
+        <button class="btn btn-sm btn-secondary option-sym-pill" data-sym="TCS" onclick="app.switchOptionSymbol('TCS')">TCS</button>
+    </div>
+
+    <!-- Alert / Notice Box if Offline, Non-FNO, or Archived -->
+    <div id="optionsStatusBanner" style="display:none;padding:0.75rem 1rem;border-radius:8px;margin-bottom:1.25rem;font-size:0.82rem;font-weight:600;"></div>
+
+    <!-- 3. Key Derivatives KPI Cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;margin-bottom:1.5rem;">
+        <!-- Spot Price -->
+        <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
+            <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.04em;">Spot Price</div>
+            <div id="optKpiSpotPrice" style="font-size:1.4rem;font-weight:800;color:var(--text-primary);margin-top:0.25rem;font-family:var(--font-mono);">--</div>
+            <div id="optKpiSpotChange" style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.15rem;">Underlying LTP</div>
+        </div>
+
+        <!-- Max Pain Strike -->
+        <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
+            <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;color:#fbbf24;letter-spacing:0.04em;">Max Pain Strike</div>
+            <div id="optKpiMaxPain" style="font-size:1.4rem;font-weight:800;color:#fbbf24;margin-top:0.25rem;font-family:var(--font-mono);">--</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.15rem;">Zero Sum Expiry Level</div>
+        </div>
+
+        <!-- PCR (OI) -->
+        <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
+            <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;color:#38bdf8;letter-spacing:0.04em;">PCR (Open Interest)</div>
+            <div id="optKpiPcrOi" style="font-size:1.4rem;font-weight:800;color:#38bdf8;margin-top:0.25rem;font-family:var(--font-mono);">--</div>
+            <div id="optKpiPcrOiLabel" style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.15rem;">Put OI / Call OI</div>
+        </div>
+
+        <!-- PCR (Volume) -->
+        <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
+            <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;color:#a855f7;letter-spacing:0.04em;">PCR (Volume)</div>
+            <div id="optKpiPcrVol" style="font-size:1.4rem;font-weight:800;color:#a855f7;margin-top:0.25rem;font-family:var(--font-mono);">--</div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.15rem;">Put Vol / Call Vol</div>
+        </div>
+
+        <!-- Call Wall / Resistance -->
+        <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
+            <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;color:#f87171;letter-spacing:0.04em;">Call Wall (Resistance)</div>
+            <div id="optKpiCallWall" style="font-size:1.4rem;font-weight:800;color:#f87171;margin-top:0.25rem;font-family:var(--font-mono);">--</div>
+            <div id="optKpiCallWallOi" style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.15rem;">Peak Call OI</div>
+        </div>
+
+        <!-- Put Wall / Support -->
+        <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
+            <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;color:#34d399;letter-spacing:0.04em;">Put Wall (Support)</div>
+            <div id="optKpiPutWall" style="font-size:1.4rem;font-weight:800;color:#34d399;margin-top:0.25rem;font-family:var(--font-mono);">--</div>
+            <div id="optKpiPutWallOi" style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.15rem;">Peak Put OI</div>
+        </div>
+
+        <!-- ATM IV / Spread -->
+        <div class="metric-card" style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:10px;padding:0.9rem;">
+            <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;color:#e2e8f0;letter-spacing:0.04em;">ATM Straddle / IV</div>
+            <div id="optKpiAtmIv" style="font-size:1.4rem;font-weight:800;color:#e2e8f0;margin-top:0.25rem;font-family:var(--font-mono);">--</div>
+            <div id="optKpiAtmStraddle" style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.15rem;">CE + PE Premium</div>
+        </div>
+    </div>
+
+    <!-- 4. Open Interest Distribution Chart (Calls vs Puts) -->
+    <div style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+            <div>
+                <h3 style="margin:0;font-size:1rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem;">
+                    <span>📊</span> Open Interest Distribution by Strike
+                </h3>
+                <span style="font-size:0.75rem;color:var(--text-secondary);">Green = Put OI (Support) | Red = Call OI (Resistance) | Yellow Dash = Spot ATM</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.75rem;">
+                <span style="display:inline-flex;align-items:center;gap:0.25rem;"><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;"></span> Call OI</span>
+                <span style="display:inline-flex;align-items:center;gap:0.25rem;"><span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:2px;"></span> Put OI</span>
+            </div>
+        </div>
+        <div style="height:280px;width:100%;position:relative;">
+            <canvas id="optionsOiChart"></canvas>
+            <div id="optionsChartLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,10,10,0.6);border-radius:8px;font-size:0.85rem;color:var(--text-secondary);">
+                Loading option chain distribution...
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Complete Strike Tree Matrix -->
+    <div style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+            <div>
+                <h3 style="margin:0;font-size:1rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem;">
+                    <span>🌲</span> Strike Tree Matrix (Calls &amp; Puts)
+                </h3>
+                <span style="font-size:0.75rem;color:var(--text-secondary);">Real-time LTP, IV, Volume, and Open Interest progression across strikes</span>
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-secondary);display:flex;align-items:center;gap:0.75rem;">
+                <span style="display:inline-flex;align-items:center;gap:0.25rem;"><span style="display:inline-block;width:8px;height:8px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:2px;"></span> Call ITM</span>
+                <span style="display:inline-flex;align-items:center;gap:0.25rem;"><span style="display:inline-block;width:8px;height:8px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:2px;"></span> Put ITM</span>
+                <span style="display:inline-flex;align-items:center;gap:0.25rem;"><span style="display:inline-block;width:8px;height:8px;background:rgba(245,158,11,0.25);border:1px solid rgba(245,158,11,0.6);border-radius:2px;"></span> ATM</span>
+            </div>
+        </div>
+
+        <div class="table-responsive" style="max-height:550px;overflow-y:auto;border:1px solid rgba(255,255,255,0.06);border-radius:8px;">
+            <table class="table" id="optionsStrikeTreeTable" style="width:100%;font-size:0.78rem;text-align:right;margin:0;border-collapse:separate;border-spacing:0;">
+                <thead style="position:sticky;top:0;z-index:10;background:#0d0e12;box-shadow:0 2px 4px rgba(0,0,0,0.5);">
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.12);">
+                        <th colspan="5" style="text-align:center;background:rgba(239,68,68,0.08);color:#f87171;font-weight:700;padding:0.4rem;border-right:1px solid rgba(255,255,255,0.1);">CALLS (CE)</th>
+                        <th rowspan="2" style="text-align:center;background:#18181b;color:#fbbf24;font-weight:800;padding:0.4rem;min-width:90px;border-right:1px solid rgba(255,255,255,0.1);border-left:1px solid rgba(255,255,255,0.1);">STRIKE</th>
+                        <th colspan="5" style="text-align:center;background:rgba(16,185,129,0.08);color:#34d399;font-weight:700;padding:0.4rem;">PUTS (PE)</th>
+                    </tr>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                        <th style="padding:0.35rem 0.5rem;font-weight:600;color:var(--text-secondary);">OI</th>
+                        <th style="padding:0.35rem 0.5rem;font-weight:600;color:var(--text-secondary);">Chg OI</th>
+                        <th style="padding:0.35rem 0.5rem;font-weight:600;color:var(--text-secondary);">Vol</th>
+                        <th style="padding:0.35rem 0.5rem;font-weight:600;color:var(--text-secondary);">IV</th>
+                        <th style="padding:0.35rem 0.5rem;font-weight:600;color:#f87171;border-right:1px solid rgba(255,255,255,0.1);">LTP</th>
+
+                        <th style="padding:0.35rem 0.5rem;font-weight:600;color:#34d399;border-left:1px solid rgba(255,255,255,0.1);">LTP</th>
+                        <th style="padding:0.35rem 0.5rem;font-weight:600;color:var(--text-secondary);">IV</th>
+                        <th style="padding:0.35rem 0.5rem;font-weight:600;color:var(--text-secondary);">Vol</th>
+                        <th style="padding:0.35rem 0.5rem;font-weight:600;color:var(--text-secondary);">Chg OI</th>
+                        <th style="padding:0.35rem 0.5rem;font-weight:600;color:var(--text-secondary);">OI</th>
+                    </tr>
+                </thead>
+                <tbody id="optionsStrikeTreeBody">
+                    <tr>
+                        <td colspan="11" style="text-align:center;padding:2rem;color:var(--text-secondary);">
+                            Select a symbol to view option chain...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 6. Multi-Day Historical Positioning Snapshots Table -->
+    <div style="background:var(--card-bg, rgba(24,24,27,0.7));border:1px solid var(--border-color, rgba(255,255,255,0.08));border-radius:12px;padding:1.25rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+            <div>
+                <h3 style="margin:0;font-size:1rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem;">
+                    <span>📜</span> Multi-Day Historical Positioning Snapshots
+                </h3>
+                <span style="font-size:0.75rem;color:var(--text-secondary);">Recorded PCR, Max Pain, and Call/Put walls over recent trading sessions</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="app.fetchOptionHistory()" style="display:flex;align-items:center;gap:0.35rem;">
+                <span>🔄</span> Reload History
+            </button>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table" style="width:100%;font-size:0.8rem;text-align:left;">
+                <thead>
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                        <th>Date (As Of)</th>
+                        <th>Spot Close</th>
+                        <th>Max Pain</th>
+                        <th>PCR (OI)</th>
+                        <th>PCR (Vol)</th>
+                        <th>Sentiment</th>
+                        <th>Resistance (Call Wall)</th>
+                        <th>Support (Put Wall)</th>
+                        <th>Total Call OI</th>
+                        <th>Total Put OI</th>
+                    </tr>
+                </thead>
+                <tbody id="optionsHistoryBody">
+                    <tr>
+                        <td colspan="10" style="text-align:center;padding:1.5rem;color:var(--text-secondary);">
+                            Loading historical snapshots...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

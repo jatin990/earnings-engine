@@ -88,6 +88,16 @@
                     </select>
                 </div>
 
+                <!-- Pool Tier Filter Control -->
+                <div style="display: flex; align-items: center; gap: 0.3rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.2rem 0.45rem; border-radius: 6px;">
+                    <span style="font-size: 0.70rem; color: #71717a;">Tier:</span>
+                    <select id="breakoutTierSelect" onchange="app.onBreakoutTierChange(this.value)" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.72rem; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Filter pool tier">
+                        <option value="ALL" selected>All Pools</option>
+                        <option value="HOT">🔥 Hot Only</option>
+                        <option value="WARM">🟡 Warm Only</option>
+                    </select>
+                </div>
+
                 <!-- Min Score Filter -->
                 <div style="display: flex; align-items: center; gap: 0.3rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.2rem 0.45rem; border-radius: 6px;">
                     <span style="font-size: 0.70rem; color: #71717a;">Min Score:</span>
@@ -273,10 +283,18 @@
                 <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="breakoutStatAvg">—</span></div>
             </div>
 
-            <!-- Universe Count -->
-            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
-                <div id="breakoutKpiLabel4" style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Universe</div>
-                <div style="font-size:1.15rem; font-weight:800; color:#cbd5e1; font-family:var(--font-mono); margin-top:0.15rem;"><span id="breakoutStatScanned">—</span></div>
+            <!-- Hot & Warm Pool / Universe Count -->
+            <div id="breakoutCardPool" onclick="app.cycleBreakoutPoolFilter()" class="card cursor-pointer" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px; cursor:pointer; user-select:none;" title="Click to filter by pool: All → Hot Only → Warm Only">
+                <div id="breakoutKpiLabel4" style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em; display:flex; align-items:center; justify-content:space-between;">
+                    <span>Pool Tiers</span>
+                    <span id="breakoutPoolTierBadge" style="font-size:0.55rem; background:#18181b; color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:0.02rem 0.25rem; border-radius:3px;">ALL</span>
+                </div>
+                <div style="font-size:1.05rem; font-weight:800; color:#cbd5e1; font-family:var(--font-mono); display:flex; align-items:baseline; gap:0.35rem; margin-top:0.15rem; flex-wrap:nowrap;">
+                    <span style="color:#ef4444;" title="Hot Pool Count">🔥 <span id="breakoutStatHotCount">0</span></span>
+                    <span style="color:#52525b; font-size:0.75rem;">/</span>
+                    <span style="color:#eab308;" title="Warm Pool Count">🟡 <span id="breakoutStatWarmCount">0</span></span>
+                    <span style="font-size:0.62rem; color:#71717a; margin-left:auto;" title="Total Monitored Universe">(<span id="breakoutStatScanned">—</span>)</span>
+                </div>
             </div>
 
             <!-- Scan Status / As-Of -->

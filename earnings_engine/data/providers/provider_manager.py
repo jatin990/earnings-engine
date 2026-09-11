@@ -104,14 +104,14 @@ class DataProviderManager:
         logger.warning("[PROVIDER-BHAVCOPY] NSE Direct provider not available for bhavcopy on %s", date_str)
         return pd.DataFrame(columns=["ticker", "open", "high", "low", "close", "volume"])
 
-    def fetch_option_chain(self, symbol: str) -> dict[str, Any]:
+    def fetch_option_chain(self, symbol: str, expiry_date: str | None = None) -> dict[str, Any]:
         """Fetch Option Chain data for an NSE symbol or index."""
         nse_prov = self._providers["nse_direct"]
         if nse_prov.is_available:
-            logger.info("[PROVIDER-OPTIONS] [NSE-Direct] Querying live Option Chain for %s...", symbol)
-            return nse_prov.fetch_option_chain(symbol)
+            logger.info("[PROVIDER-OPTIONS] [NSE-Direct] Querying live Option Chain for %s (expiry=%s)...", symbol, expiry_date)
+            return nse_prov.fetch_option_chain(symbol, expiry_date=expiry_date)
         logger.warning("[PROVIDER-OPTIONS] NSE Direct provider (nselib / jugaad-data) unavailable for Option Chain on %s", symbol)
-        return {"symbol": symbol, "records_count": 0, "data": []}
+        return {"symbol": symbol, "records_count": 0, "data": [], "expiries": [], "selected_expiry": None}
 
     def fetch_index_data(self, index_name: str, start_date: str, end_date: str | None = None) -> pd.DataFrame:
         """Fetch index history (NIFTY 50, NIFTY BANK, etc.)."""

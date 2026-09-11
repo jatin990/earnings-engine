@@ -332,14 +332,30 @@ class NSEDirectProvider(DataProvider):
                 else:
                     raw_chain = nse.equities_option_chain(clean_symbol)
 
-                records = raw_chain.get("filtered", {}).get("data") or raw_chain.get("records", {}).get("data", [])
+                records_dict = raw_chain.get("records", {})
+                all_expiries = records_dict.get("expiryDates", [])
+                timestamp = records_dict.get("timestamp")
+                underlying_value = records_dict.get("underlyingValue") or raw_chain.get("filtered", {}).get("underlyingValue")
+
+                if expiry_date and all_expiries:
+                    all_records = records_dict.get("data", [])
+                    records = [r for r in all_records if r.get("expiryDate") == expiry_date]
+                    selected_expiry = expiry_date
+                else:
+                    records = raw_chain.get("filtered", {}).get("data") or records_dict.get("data", [])
+                    selected_expiry = all_expiries[0] if all_expiries else None
+
                 elapsed_ms = (time.perf_counter() - t0) * 1000
                 if records:
-                    logger.info("[NSE:RESP] option_chain(%s) -> %d strikes (%.1fms)", clean_symbol, len(records), elapsed_ms)
+                    logger.info("[NSE:RESP] option_chain(%s, expiry=%s) -> %d strikes (%.1fms)", clean_symbol, selected_expiry, len(records), elapsed_ms)
                     return {
                         "symbol": clean_symbol,
                         "records_count": len(records),
                         "data": records,
+                        "expiries": all_expiries,
+                        "selected_expiry": selected_expiry,
+                        "underlying_value": underlying_value,
+                        "timestamp": timestamp,
                         "provider": "jugaad_data_live",
                     }
                 else:

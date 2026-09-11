@@ -16,6 +16,7 @@
         app._breakoutSortAsc = false;
         app._breakoutAsofDate = null;
         app._breakoutFilterBreakingOut = false;
+        app._breakoutPoolFilter = 'ALL';
 
         app.isItemBreaking = function(item) {
             if (!item) return false;
@@ -31,6 +32,64 @@
             );
         };
 
+        app.updateBreakoutTierBadge = function() {
+            const badge = document.getElementById('breakoutPoolTierBadge');
+            const card = document.getElementById('breakoutCardPool');
+            const tier = (app._breakoutPoolFilter || 'ALL').toUpperCase();
+            if (badge) {
+                if (tier === 'HOT') {
+                    badge.textContent = 'HOT ONLY';
+                    badge.style.color = '#f87171';
+                    badge.style.background = 'rgba(239,68,68,0.18)';
+                    badge.style.borderColor = 'rgba(239,68,68,0.4)';
+                } else if (tier === 'WARM') {
+                    badge.textContent = 'WARM ONLY';
+                    badge.style.color = '#facc15';
+                    badge.style.background = 'rgba(234,179,8,0.18)';
+                    badge.style.borderColor = 'rgba(234,179,8,0.4)';
+                } else {
+                    badge.textContent = 'ALL';
+                    badge.style.color = '#38bdf8';
+                    badge.style.background = '#18181b';
+                    badge.style.borderColor = 'rgba(56,189,248,0.3)';
+                }
+            }
+            if (card) {
+                if (tier === 'HOT') {
+                    card.style.border = '1px solid rgba(239,68,68,0.35)';
+                } else if (tier === 'WARM') {
+                    card.style.border = '1px solid rgba(234,179,8,0.35)';
+                } else {
+                    card.style.border = '1px solid rgba(255,255,255,0.08)';
+                }
+            }
+        };
+
+        app.cycleBreakoutPoolFilter = function() {
+            const current = (app._breakoutPoolFilter || 'ALL').toUpperCase();
+            if (current === 'ALL') {
+                app._breakoutPoolFilter = 'HOT';
+            } else if (current === 'HOT') {
+                app._breakoutPoolFilter = 'WARM';
+            } else {
+                app._breakoutPoolFilter = 'ALL';
+            }
+            const tierSel = document.getElementById('breakoutTierSelect');
+            if (tierSel) tierSel.value = app._breakoutPoolFilter;
+            app.updateBreakoutTierBadge();
+            app.applyBreakoutFilterAndRender();
+        };
+
+        app.onBreakoutTierChange = function(val) {
+            app._breakoutPoolFilter = (val || 'ALL').toUpperCase();
+            const tierSel = document.getElementById('breakoutTierSelect');
+            if (tierSel && tierSel.value !== app._breakoutPoolFilter) {
+                tierSel.value = app._breakoutPoolFilter;
+            }
+            app.updateBreakoutTierBadge();
+            app.applyBreakoutFilterAndRender();
+        };
+
         app.toggleBreakingOutFilter = function() {
             app._breakoutFilterBreakingOut = !app._breakoutFilterBreakingOut;
             app.applyBreakoutFilterAndRender();
@@ -38,6 +97,10 @@
 
         app.clearBreakoutFilter = function() {
             app._breakoutFilterBreakingOut = false;
+            app._breakoutPoolFilter = 'ALL';
+            const tierSel = document.getElementById('breakoutTierSelect');
+            if (tierSel) tierSel.value = 'ALL';
+            app.updateBreakoutTierBadge();
             app.applyBreakoutFilterAndRender();
         };
 
@@ -61,7 +124,13 @@
             const filterIndicator = document.getElementById('breakoutFilterIndicator');
             const breakingSub = document.getElementById('breakoutStatBreakingSub');
 
-            let list = (app._breakoutData || []).filter(c => !c.tier || c.tier.toUpperCase() === 'HOT');
+            const tierFilter = (app._breakoutPoolFilter || 'ALL').toUpperCase();
+            let list = (app._breakoutData || []);
+            if (tierFilter === 'HOT') {
+                list = list.filter(c => (c.tier || 'HOT').toUpperCase() === 'HOT');
+            } else if (tierFilter === 'WARM') {
+                list = list.filter(c => (c.tier || '').toUpperCase() === 'WARM');
+            }
             const breakingCount = list.filter(app.isItemBreaking).length;
 
             if (app._breakoutRealTrackedOnly) {
@@ -92,6 +161,27 @@
                 if (activeNotice) {
                     activeNotice.style.display = 'inline-flex';
                     activeNotice.innerHTML = `<span>🟢</span> Filtering: <strong>Real Tracked Entries Only (${list.length} setup${list.length === 1 ? '' : 's'})</strong> <button type="button" onclick="app.clearBreakoutRealTrackedFilter(); event.stopPropagation();" style="margin-left:0.45rem;background:#18181b;border:1px solid rgba(255,255,255,0.25);color:#f4f4f5;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕ Show All (${app._breakoutData.length})</button>`;
+                }
+            } else if (tierFilter !== 'ALL') {
+                if (fireCard) {
+                    fireCard.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+                    fireCard.style.boxShadow = 'none';
+                    fireCard.style.background = '#09090b';
+                }
+                if (totalCard) {
+                    totalCard.style.opacity = '1';
+                }
+                if (filterIndicator) {
+                    filterIndicator.style.display = 'none';
+                }
+                if (breakingSub) {
+                    breakingSub.textContent = (app._breakoutAsofDate ? 'Fired' : (breakingCount > 0 ? 'Breached' : 'Active'));
+                }
+                if (activeNotice) {
+                    activeNotice.style.display = 'inline-flex';
+                    const icon = tierFilter === 'HOT' ? '🔥' : '🟡';
+                    const label = tierFilter === 'HOT' ? 'Hot Pool Only' : 'Warm Pool Only';
+                    activeNotice.innerHTML = `<span>${icon}</span> Filtering: <strong>${label} (${list.length} setup${list.length === 1 ? '' : 's'})</strong> <button type="button" onclick="app.onBreakoutTierChange('ALL'); event.stopPropagation();" style="margin-left:0.45rem;background:#18181b;border:1px solid rgba(255,255,255,0.25);color:#f4f4f5;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕ Show All (${app._breakoutData.length})</button>`;
                 }
             } else {
                 if (fireCard) {
