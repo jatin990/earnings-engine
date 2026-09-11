@@ -1171,6 +1171,281 @@ def fetch_live_quote(
     return quote
 
 
+def _fetch_yfinance_batch_quotes(
+    tickers: list[str],
+    settings: Settings | None = None,
+    sync_db: bool = True,
+    chunk_size: int = 50,
+) -> dict[str, dict[str, Any]]:
+    """Fetch live real-time market quotes for multiple tickers in batched HTTP requests.
+
+    Queries Yahoo Finance's multi-ticker endpoint (v7/finance/quote) in chunks of up to
+    50 symbols per single HTTP request, avoiding per-stock sequential or thread-pool overhead.
+    Optionally persists daily bars into price_history and updates tickers.market_cap and
+    prices_fetched_at in single batch SQLite transactions.
+    """
+    settings = settings or Settings()
+    if not tickers:
+        return {}
+
+    unique_tickers = list(dict.fromkeys([t.strip().upper() for t in tickers if t]))
+    results: dict[str, dict[str, Any]] = {}
+
+    for i in range(0, len(unique_tickers), chunk_size):
+        chunk = unique_tickers[i : i + chunk_size]
+        ticker_map: dict[str, list[str]] = {}
+        fetch_syms: list[str] = []
+        for t in chunk:
+            sym = canonical_symbol(t)
+            ticker_map.setdefault(sym, []).append(t)
+            if sym not in fetch_syms:
+                fetch_syms.append(sym)
+
+        symbols_param = ",".join(fetch_syms)
+        t0 = time.perf_counter()
+        raw_items: list[dict[str, Any]] = []
+        try:
+            yf_data = yf.data.YfData()
+            res = yf_data.get_raw_json(
+                "https://query1.finance.yahoo.com/v7/finance/quote",
+                params={"symbols": symbols_param},
+            )
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+            raw_items = res.get("quoteResponse", {}).get("result", [])
+            logger.info(
+                "[YF:BATCH-RESP] Fetched batch quotes for %d symbols in %.1fms (%d results returned)",
+                len(chunk),
+                elapsed_ms,
+                len(raw_items),
+            )
+        except Exception as e:
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+            logger.warning(
+                "[YF:BATCH-FAIL] Batch quote request for %d symbols failed after %.1fms: %s",
+                len(chunk),
+                elapsed_ms,
+                e,
+            )
+            continue
+
+        valid_sync_items: list[dict[str, Any]] = []
+        now_iso = datetime.now().isoformat()
+
+        for item in raw_items:
+            ret_sym = (item.get("symbol") or "").strip().upper()
+            if not ret_sym:
+                continue
+
+            last_p = (
+                item.get("regularMarketPrice")
+                or item.get("fulldayPrice")
+                or item.get("bid")
+                or item.get("ask")
+                or item.get("postMarketPrice")
+                or item.get("preMarketPrice")
+            )
+            try:
+                last_p = float(last_p) if last_p is not None else None
+            except (ValueError, TypeError):
+                last_p = None
+
+            prev_c = item.get("regularMarketPreviousClose")
+            try:
+                prev_c = float(prev_c) if prev_c is not None else None
+            except (ValueError, TypeError):
+                prev_c = None
+
+            open_p = item.get("regularMarketOpen")
+            try:
+                open_p = float(open_p) if open_p is not None else None
+            except (ValueError, TypeError):
+                open_p = None
+
+            day_h = item.get("regularMarketDayHigh")
+            try:
+                day_h = float(day_h) if day_h is not None else None
+            except (ValueError, TypeError):
+                day_h = None
+
+            day_l = item.get("regularMarketDayLow")
+            try:
+                day_l = float(day_l) if day_l is not None else None
+            except (ValueError, TypeError):
+                day_l = None
+
+            yr_h = item.get("fiftyTwoWeekHigh")
+            try:
+                yr_h = float(yr_h) if yr_h is not None else None
+            except (ValueError, TypeError):
+                yr_h = None
+
+            yr_l = item.get("fiftyTwoWeekLow")
+            try:
+                yr_l = float(yr_l) if yr_l is not None else None
+            except (ValueError, TypeError):
+                yr_l = None
+
+            vol = item.get("regularMarketVolume")
+            try:
+                vol = int(vol) if vol is not None else None
+            except (ValueError, TypeError):
+                vol = None
+
+            avg_vol = item.get("averageDailyVolume3Month") or item.get("averageDailyVolume10Day")
+            try:
+                avg_vol = int(avg_vol) if avg_vol is not None else None
+            except (ValueError, TypeError):
+                avg_vol = None
+
+            mcap = item.get("marketCap")
+            try:
+                mcap = float(mcap) if mcap is not None else None
+            except (ValueError, TypeError):
+                mcap = None
+
+            currency = item.get("currency")
+            if not currency:
+                currency = "INR" if market_of(ret_sym) == "IN" else "USD"
+
+            session = _get_market_session_status(ret_sym)
+            is_weekend = session.get("is_weekend", False)
+
+            # If weekend or data missing/identical, anchor to settled trading history
+            if last_p is None or prev_c is None or (is_weekend and prev_c is not None and abs(last_p - prev_c) < 0.001):
+                try:
+                    with _connect(settings) as conn:
+                        p_rows = conn.execute(
+                            "SELECT date, close, open, high, low, volume FROM price_history WHERE ticker = ? AND strftime('%w', date) NOT IN ('0', '6') ORDER BY date DESC LIMIT 2",
+                            (ret_sym,),
+                        ).fetchall()
+                        if p_rows and len(p_rows) >= 1:
+                            last_p = last_p or float(p_rows[0][1] or 0.0)
+                            if len(p_rows) >= 2:
+                                prev_c = float(p_rows[1][1] or 0.0)
+                except Exception:
+                    pass
+
+            if last_p is None or last_p <= 0:
+                continue
+
+            quote: dict[str, Any] = {
+                "ticker": ret_sym,
+                "current_price": round(float(last_p), 2),
+                "previous_close": round(float(prev_c), 2) if prev_c is not None and prev_c > 0 else None,
+                "day_change": round(float(last_p - prev_c), 2) if prev_c is not None and prev_c > 0 else None,
+                "day_change_pct": round(float((last_p / prev_c - 1.0) * 100.0), 2) if prev_c is not None and prev_c > 0 else None,
+                "day_open": round(float(open_p), 2) if open_p is not None else None,
+                "day_high": round(float(day_h), 2) if day_h is not None else None,
+                "day_low": round(float(day_l), 2) if day_l is not None else None,
+                "week_52_high": round(float(yr_h), 2) if yr_h is not None else None,
+                "week_52_low": round(float(yr_l), 2) if yr_l is not None else None,
+                "volume": int(vol) if vol is not None else None,
+                "avg_volume": int(avg_vol) if avg_vol is not None else None,
+                "market_cap": float(mcap) if mcap is not None else None,
+                "currency": currency,
+                "is_live": bool(session.get("is_open", False)),
+                "last_updated": now_iso,
+                "pct_from_52w_high": None,
+                "pct_from_52w_low": None,
+            }
+
+            if quote["week_52_high"] and quote["week_52_high"] > 0:
+                quote["pct_from_52w_high"] = round((quote["current_price"] / quote["week_52_high"] - 1.0) * 100.0, 2)
+            if quote["week_52_low"] and quote["week_52_low"] > 0:
+                quote["pct_from_52w_low"] = round((quote["current_price"] / quote["week_52_low"] - 1.0) * 100.0, 2)
+
+            mapped_tickers = ticker_map.get(ret_sym, [ret_sym])
+            for orig_t in mapped_tickers:
+                t_quote = dict(quote)
+                t_quote["ticker"] = orig_t
+                results[orig_t] = t_quote
+            results[ret_sym] = quote
+
+            valid_sync_items.append({
+                "sym": ret_sym,
+                "last_p": last_p,
+                "prev_c": prev_c,
+                "open_p": open_p,
+                "day_h": day_h,
+                "day_l": day_l,
+                "vol": vol,
+                "mcap": mcap,
+                "is_weekend": is_weekend,
+            })
+
+        if sync_db and valid_sync_items:
+            try:
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                now_str = datetime.now().isoformat(timespec="seconds")
+
+                price_history_rows = [
+                    (
+                        item["sym"],
+                        today_str,
+                        item["open_p"] if item["open_p"] is not None else item["last_p"],
+                        item["day_h"] if item["day_h"] is not None else item["last_p"],
+                        item["day_l"] if item["day_l"] is not None else item["last_p"],
+                        item["last_p"],
+                        item["vol"] if item["vol"] is not None else 0,
+                    )
+                    for item in valid_sync_items
+                    if not item["is_weekend"]
+                ]
+
+                ticker_rows = [
+                    (
+                        item["sym"],
+                        item["mcap"],
+                        now_str if item["mcap"] is not None else None,
+                        now_str,
+                        now_str,
+                    )
+                    for item in valid_sync_items
+                ]
+
+                with _connect(settings) as conn:
+                    if price_history_rows:
+                        try:
+                            conn.executemany(
+                                """INSERT INTO price_history (ticker, date, open, high, low, close, volume)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                                   ON CONFLICT(ticker, date) DO UPDATE SET
+                                       high = MAX(COALESCE(price_history.high, excluded.high), excluded.high),
+                                       low = MIN(COALESCE(price_history.low, excluded.low), excluded.low),
+                                       close = excluded.close,
+                                       volume = COALESCE(excluded.volume, price_history.volume)
+                                """,
+                                price_history_rows,
+                            )
+                        except Exception as e:
+                            logger.debug("[BATCH-QUOTES] price_history batch sync error: %s", e)
+
+                    if ticker_rows:
+                        try:
+                            conn.executemany(
+                                """INSERT INTO tickers (ticker, market_cap, market_cap_updated_at, prices_fetched_at, last_updated)
+                                   VALUES (?, ?, ?, ?, ?)
+                                   ON CONFLICT(ticker) DO UPDATE SET
+                                       market_cap = COALESCE(excluded.market_cap, tickers.market_cap),
+                                       market_cap_updated_at = CASE WHEN excluded.market_cap IS NOT NULL THEN excluded.market_cap_updated_at ELSE tickers.market_cap_updated_at END,
+                                       prices_fetched_at = excluded.prices_fetched_at,
+                                       last_updated = excluded.last_updated
+                                """,
+                                ticker_rows,
+                            )
+                        except Exception as e:
+                            logger.debug("[BATCH-QUOTES] tickers batch sync error: %s", e)
+
+                    conn.commit()
+
+                for item in valid_sync_items:
+                    clear_price_df_cache(item["sym"])
+            except Exception as sync_err:
+                logger.debug("[BATCH-QUOTES] SQLite batch sync failed: %s", sync_err)
+
+    return results
+
+
 def fetch_batch_live_quotes(
     tickers: list[str],
     settings: Settings | None = None,
@@ -1183,8 +1458,9 @@ def fetch_batch_live_quotes(
 
     Uses DB-first TTL caching: queries SQLite price_history and tickers in a single
     batch query. Fresh tickers within TTL (or settled on weekends/post-market) are
-    served immediately (<10ms). Only stale or missing tickers dispatch concurrent
-    network calls via ThreadPoolExecutor.
+    served immediately (<10ms). Stale tickers are fetched in multi-ticker batches
+    via Yahoo Finance quote API (up to 50 tickers per HTTP request), with fallback
+    to concurrent individual fetch_live_quote only for missing or failed tickers.
     """
     settings = settings or Settings()
     if not tickers:
@@ -1213,16 +1489,33 @@ def fetch_batch_live_quotes(
             len(results),
             len(stale_tickers),
         )
-        from concurrent.futures import ThreadPoolExecutor
+        batch_quotes = _fetch_yfinance_batch_quotes(
+            stale_tickers, settings=settings, sync_db=sync_db
+        )
+        for t, q in batch_quotes.items():
+            results[t] = q
 
-        def _worker(t: str) -> tuple[str, dict[str, Any]]:
-            return t, fetch_live_quote(
-                t, settings=settings, sync_db=sync_db, force=True, ttl_minutes=ttl_minutes
+        missing_tickers = [
+            t for t in stale_tickers
+            if t not in results or results[t].get("current_price") is None
+        ]
+        if missing_tickers:
+            logger.info(
+                "[BATCH-QUOTES] %d/%d tickers fetched in batch; falling back to individual fetch for %d tickers",
+                len(stale_tickers) - len(missing_tickers),
+                len(stale_tickers),
+                len(missing_tickers),
             )
+            from concurrent.futures import ThreadPoolExecutor
 
-        with ThreadPoolExecutor(max_workers=min(max_workers, len(stale_tickers))) as executor:
-            for t, q in executor.map(_worker, stale_tickers):
-                results[t] = q
+            def _worker(t: str) -> tuple[str, dict[str, Any]]:
+                return t, fetch_live_quote(
+                    t, settings=settings, sync_db=sync_db, force=True, ttl_minutes=ttl_minutes
+                )
+
+            with ThreadPoolExecutor(max_workers=min(max_workers, len(missing_tickers))) as executor:
+                for t, q in executor.map(_worker, missing_tickers):
+                    results[t] = q
     else:
         logger.debug(
             "[BATCH-QUOTES] All %d tickers served directly from SQLite cache (0 network requests)",

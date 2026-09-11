@@ -9,6 +9,7 @@ import pytest
 from earnings_engine.config import Settings
 from earnings_engine.data.prices import (
     _build_quote_from_cached_record,
+    _fetch_yfinance_batch_quotes,
     _get_market_session_status,
     _is_cached_quote_fresh,
     fetch_batch_live_quotes,
@@ -246,15 +247,121 @@ def test_fetch_batch_live_quotes_partitions_fresh_and_stale():
     }
 
     with patch("earnings_engine.data.prices._get_cached_quotes_batch", return_value=mock_batch), \
-         patch("earnings_engine.data.prices.fetch_live_quote", return_value=mock_stale_quote) as mock_single:
+         patch("earnings_engine.data.prices._fetch_yfinance_batch_quotes", return_value={"STALE.NS": mock_stale_quote}) as mock_batch_fetch, \
+         patch("earnings_engine.data.prices.fetch_live_quote") as mock_single:
 
         quotes = fetch_batch_live_quotes(["FRESH.NS", "STALE.NS"], force=False)
 
-        # Only STALE.NS should have triggered fetch_live_quote
-        assert mock_single.call_count == 1
-        assert mock_single.call_args[0][0] == "STALE.NS"
+        # STALE.NS should have triggered batch fetch, not single fetch
+        assert mock_batch_fetch.call_count == 1
+        assert mock_batch_fetch.call_args[0][0] == ["STALE.NS"]
+        assert mock_single.call_count == 0
 
         assert "FRESH.NS" in quotes
         assert "STALE.NS" in quotes
         assert quotes["FRESH.NS"]["current_price"] == 100.0
         assert quotes["STALE.NS"]["current_price"] == 250.0
+
+
+def test_fetch_batch_live_quotes_fallback_on_missing_or_failed():
+    """Verify fetch_batch_live_quotes falls back to individual fetch only for missing symbols."""
+    mock_batch_fetch_result = {
+        "BATCHED.NS": {
+            "ticker": "BATCHED.NS",
+            "current_price": 500.0,
+            "previous_close": 490.0,
+        }
+    }
+    mock_fallback_quote = {
+        "ticker": "MISSING.NS",
+        "current_price": 300.0,
+        "previous_close": 290.0,
+    }
+
+    with patch("earnings_engine.data.prices._get_cached_quotes_batch", return_value={}), \
+         patch("earnings_engine.data.prices._fetch_yfinance_batch_quotes", return_value=mock_batch_fetch_result) as mock_batch_fetch, \
+         patch("earnings_engine.data.prices.fetch_live_quote", return_value=mock_fallback_quote) as mock_single:
+
+        quotes = fetch_batch_live_quotes(["BATCHED.NS", "MISSING.NS"], force=True)
+
+        assert mock_batch_fetch.call_count == 1
+        assert set(mock_batch_fetch.call_args[0][0]) == {"BATCHED.NS", "MISSING.NS"}
+        # Fallback should only be called for MISSING.NS
+        assert mock_single.call_count == 1
+        assert mock_single.call_args[0][0] == "MISSING.NS"
+
+        assert quotes["BATCHED.NS"]["current_price"] == 500.0
+        assert quotes["MISSING.NS"]["current_price"] == 300.0
+
+
+def test_fetch_yfinance_batch_quotes_parsing_and_metrics():
+    """Verify _fetch_yfinance_batch_quotes correctly parses JSON response and builds quotes."""
+    raw_response = {
+        "quoteResponse": {
+            "result": [
+                {
+                    "symbol": "TCS.NS",
+                    "regularMarketPrice": 4000.0,
+                    "regularMarketPreviousClose": 3950.0,
+                    "regularMarketOpen": 3960.0,
+                    "regularMarketDayHigh": 4020.0,
+                    "regularMarketDayLow": 3955.0,
+                    "fiftyTwoWeekHigh": 4500.0,
+                    "fiftyTwoWeekLow": 3500.0,
+                    "regularMarketVolume": 1500000,
+                    "averageDailyVolume3Month": 1200000,
+                    "marketCap": 14000000000000.0,
+                    "currency": "INR",
+                },
+                {
+                    "symbol": "AAPL",
+                    "regularMarketPrice": 220.0,
+                    "regularMarketPreviousClose": 215.0,
+                    "regularMarketOpen": 216.0,
+                    "regularMarketDayHigh": 222.0,
+                    "regularMarketDayLow": 214.0,
+                    "fiftyTwoWeekHigh": 240.0,
+                    "fiftyTwoWeekLow": 160.0,
+                    "regularMarketVolume": 45000000,
+                    "averageDailyVolume3Month": 50000000,
+                    "marketCap": 3300000000000.0,
+                    "currency": "USD",
+                }
+            ]
+        }
+    }
+
+    mock_yf_data = MagicMock()
+    mock_yf_data.get_raw_json.return_value = raw_response
+
+    with patch("earnings_engine.data.prices.yf.data.YfData", return_value=mock_yf_data), \
+         patch("earnings_engine.data.prices._connect") as mock_conn:
+
+        quotes = _fetch_yfinance_batch_quotes(["TCS.NS", "AAPL"], sync_db=False)
+
+        assert mock_yf_data.get_raw_json.call_count == 1
+        params = mock_yf_data.get_raw_json.call_args[1]["params"]
+        assert "TCS.NS" in params["symbols"]
+        assert "AAPL" in params["symbols"]
+
+        assert "TCS.NS" in quotes
+        assert "AAPL" in quotes
+
+        tcs = quotes["TCS.NS"]
+        assert tcs["current_price"] == 4000.0
+        assert tcs["previous_close"] == 3950.0
+        assert tcs["day_change"] == 50.0
+        assert tcs["day_change_pct"] == round((4000.0 / 3950.0 - 1.0) * 100.0, 2)
+        assert tcs["week_52_high"] == 4500.0
+        assert tcs["week_52_low"] == 3500.0
+        assert tcs["pct_from_52w_high"] == round((4000.0 / 4500.0 - 1.0) * 100.0, 2)
+        assert tcs["pct_from_52w_low"] == round((4000.0 / 3500.0 - 1.0) * 100.0, 2)
+        assert tcs["currency"] == "INR"
+        assert tcs["volume"] == 1500000
+        assert tcs["avg_volume"] == 1200000
+        assert tcs["market_cap"] == 14000000000000.0
+
+        aapl = quotes["AAPL"]
+        assert aapl["current_price"] == 220.0
+        assert aapl["currency"] == "USD"
+
