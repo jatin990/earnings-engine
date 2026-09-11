@@ -21,7 +21,7 @@ import yfinance as yf
 import os
 import shutil
 
-from earnings_engine.config import Settings
+from earnings_engine.config import Settings, market_of
 from earnings_engine.data.db import get_db_connection, is_turso_enabled, _cache_path
 from earnings_engine.logging_utils import get_logger
 
@@ -922,6 +922,7 @@ def fetch_live_quote(
     sync_db: bool = True,
     force: bool = False,
     ttl_minutes: int = 5,
+    silent: bool = False,
 ) -> dict[str, Any]:
     """Fetch authoritative live real-time market quote for a single ticker.
 
@@ -994,7 +995,8 @@ def fetch_live_quote(
                     return fast_obj[fb]
         return None
 
-    logger.info("[YF:REQ] fetch_live_quote(%s via %s, force=%s)", sym, fetch_sym, force)
+    if not silent:
+        logger.info("[YF:REQ] fetch_live_quote(%s via %s, force=%s)", sym, fetch_sym, force)
     t0_quote = time.perf_counter()
     try:
         from earnings_engine.rate_limits import record_request
@@ -1035,7 +1037,8 @@ def fetch_live_quote(
             import urllib.request
             t0_chart = time.perf_counter()
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{fetch_sym}?interval=1d&range=5d"
-            logger.info("[YF:REQ] Direct chart query: %s", url)
+            if not silent:
+                logger.info("[YF:REQ] Direct chart query: %s", url)
             req = urllib.request.Request(
                 url,
                 headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"}
@@ -1044,7 +1047,8 @@ def fetch_live_quote(
                 with urllib.request.urlopen(req, timeout=8) as resp:
                     chart_data = json.loads(resp.read().decode())
                     elapsed_ms_c = (time.perf_counter() - t0_chart) * 1000
-                    logger.info("[YF:RESP] Direct chart query (%s) (%.1fms)", fetch_sym, elapsed_ms_c)
+                    if not silent:
+                        logger.info("[YF:RESP] Direct chart query (%s) (%.1fms)", fetch_sym, elapsed_ms_c)
                     if chart_data and "chart" in chart_data and "result" in chart_data["chart"] and chart_data["chart"]["result"]:
                         res_obj = chart_data["chart"]["result"][0]
                         meta = res_obj.get("meta", {})
@@ -1068,17 +1072,24 @@ def fetch_live_quote(
                         if vols and vols[-1] is not None: vol = vols[-1]
             except Exception as chart_err:
                 elapsed_ms_c = (time.perf_counter() - t0_chart) * 1000
-                logger.warning("[YF:FAIL] Direct chart query (%s) failed after %.1fms: %s", fetch_sym, elapsed_ms_c, chart_err)
+                if not silent:
+                    logger.warning("[YF:FAIL] Direct chart query (%s) failed after %.1fms: %s", fetch_sym, elapsed_ms_c, chart_err)
+                else:
+                    logger.debug("[YF:FAIL] Direct chart query (%s) failed after %.1fms: %s", fetch_sym, elapsed_ms_c, chart_err)
 
         elapsed_ms_q = (time.perf_counter() - t0_quote) * 1000
-        if last_p is not None:
-            logger.info("[YF:RESP] fetch_live_quote(%s) price=%.2f (%.1fms)", sym, last_p, elapsed_ms_q)
-        else:
-            logger.info("[YF:RESP] fetch_live_quote(%s) price=None (%.1fms)", sym, elapsed_ms_q)
+        if not silent:
+            if last_p is not None:
+                logger.info("[YF:RESP] fetch_live_quote(%s) price=%.2f (%.1fms)", sym, last_p, elapsed_ms_q)
+            else:
+                logger.info("[YF:RESP] fetch_live_quote(%s) price=None (%.1fms)", sym, elapsed_ms_q)
 
     except Exception as e:
         elapsed_ms_q = (time.perf_counter() - t0_quote) * 1000
-        logger.warning("[YF:FAIL] fetch_live_quote(%s) failed after %.1fms: %s", sym, elapsed_ms_q, e)
+        if not silent:
+            logger.warning("[YF:FAIL] fetch_live_quote(%s) failed after %.1fms: %s", sym, elapsed_ms_q, e)
+        else:
+            logger.debug("[YF:FAIL] fetch_live_quote(%s) failed after %.1fms: %s", sym, elapsed_ms_q, e)
 
     is_weekend = session.get("is_weekend", False)
 
@@ -1189,6 +1200,16 @@ def _fetch_yfinance_batch_quotes(
         return {}
 
     unique_tickers = list(dict.fromkeys([t.strip().upper() for t in tickers if t]))
+    if not unique_tickers:
+        return {}
+
+    num_chunks = (len(unique_tickers) + chunk_size - 1) // chunk_size
+    logger.info(
+        "[BATCH-QUOTES] Fetching live quotes for %d tickers across %d batch chunk(s)",
+        len(unique_tickers),
+        num_chunks,
+    )
+    t0_all = time.perf_counter()
     results: dict[str, dict[str, Any]] = {}
 
     for i in range(0, len(unique_tickers), chunk_size):
@@ -1212,8 +1233,8 @@ def _fetch_yfinance_batch_quotes(
             )
             elapsed_ms = (time.perf_counter() - t0) * 1000
             raw_items = res.get("quoteResponse", {}).get("result", [])
-            logger.info(
-                "[YF:BATCH-RESP] Fetched batch quotes for %d symbols in %.1fms (%d results returned)",
+            logger.debug(
+                "[BATCH-QUOTES] Chunk fetched quotes for %d symbols in %.1fms (%d results returned)",
                 len(chunk),
                 elapsed_ms,
                 len(raw_items),
@@ -1221,7 +1242,7 @@ def _fetch_yfinance_batch_quotes(
         except Exception as e:
             elapsed_ms = (time.perf_counter() - t0) * 1000
             logger.warning(
-                "[YF:BATCH-FAIL] Batch quote request for %d symbols failed after %.1fms: %s",
+                "[BATCH-QUOTES] Chunk quote request for %d symbols failed after %.1fms: %s",
                 len(chunk),
                 elapsed_ms,
                 e,
@@ -1443,6 +1464,13 @@ def _fetch_yfinance_batch_quotes(
             except Exception as sync_err:
                 logger.debug("[BATCH-QUOTES] SQLite batch sync failed: %s", sync_err)
 
+    elapsed_all_ms = int((time.perf_counter() - t0_all) * 1000)
+    logger.info(
+        "[BATCH-QUOTES] Successfully retrieved quotes for %d/%d tickers in %d ms",
+        len(results),
+        len(unique_tickers),
+        elapsed_all_ms,
+    )
     return results
 
 
@@ -1483,12 +1511,15 @@ def fetch_batch_live_quotes(
     else:
         stale_tickers = list(unique_tickers)
 
+    fresh_count = len(results)
+    stale_count = len(stale_tickers)
+    logger.info(
+        "[BATCH-QUOTES] Cache: %d fresh served from SQLite, %d stale fetched via network",
+        fresh_count,
+        stale_count,
+    )
+
     if stale_tickers:
-        logger.info(
-            "[BATCH-QUOTES] Cache: %d fresh served from SQLite, %d stale to fetch via network",
-            len(results),
-            len(stale_tickers),
-        )
         batch_quotes = _fetch_yfinance_batch_quotes(
             stale_tickers, settings=settings, sync_db=sync_db
         )
@@ -1510,7 +1541,7 @@ def fetch_batch_live_quotes(
 
             def _worker(t: str) -> tuple[str, dict[str, Any]]:
                 return t, fetch_live_quote(
-                    t, settings=settings, sync_db=sync_db, force=True, ttl_minutes=ttl_minutes
+                    t, settings=settings, sync_db=sync_db, force=True, ttl_minutes=ttl_minutes, silent=True
                 )
 
             with ThreadPoolExecutor(max_workers=min(max_workers, len(missing_tickers))) as executor:

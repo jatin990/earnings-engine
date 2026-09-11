@@ -289,6 +289,7 @@ def test_fetch_batch_live_quotes_fallback_on_missing_or_failed():
         # Fallback should only be called for MISSING.NS
         assert mock_single.call_count == 1
         assert mock_single.call_args[0][0] == "MISSING.NS"
+        assert mock_single.call_args.kwargs.get("silent") is True
 
         assert quotes["BATCHED.NS"]["current_price"] == 500.0
         assert quotes["MISSING.NS"]["current_price"] == 300.0
@@ -364,4 +365,78 @@ def test_fetch_yfinance_batch_quotes_parsing_and_metrics():
         aapl = quotes["AAPL"]
         assert aapl["current_price"] == 220.0
         assert aapl["currency"] == "USD"
+
+
+def test_fetch_live_quote_silent_suppresses_logs(caplog):
+    """Verify silent=True suppresses per-ticker [YF:REQ] and [YF:RESP] log lines."""
+    fast_info = MagicMock()
+    fast_info.last_price = 123.0
+    fast_info.previous_close = 120.0
+
+    mock_ticker_inst = MagicMock()
+    mock_ticker_inst.fast_info = fast_info
+
+    import logging
+    with caplog.at_level(logging.INFO):
+        with patch("earnings_engine.data.prices._get_cached_quotes_batch", return_value={}), \
+             patch("earnings_engine.data.prices.yf.Ticker", return_value=mock_ticker_inst), \
+             patch("earnings_engine.data.prices._connect"):
+
+            # 1. silent=True
+            caplog.clear()
+            quote = fetch_live_quote("SILENT.NS", force=True, sync_db=False, silent=True)
+            assert quote["current_price"] == 123.0
+            log_messages = [rec.getMessage() for rec in caplog.records]
+            assert not any("[YF:REQ]" in msg for msg in log_messages)
+            assert not any("[YF:RESP]" in msg for msg in log_messages)
+
+            # 2. silent=False
+            caplog.clear()
+            quote = fetch_live_quote("LOUD.NS", force=True, sync_db=False, silent=False)
+            assert quote["current_price"] == 123.0
+            loud_messages = [rec.getMessage() for rec in caplog.records]
+            assert any("[YF:REQ]" in msg for msg in loud_messages)
+            assert any("[YF:RESP]" in msg for msg in loud_messages)
+
+
+def test_fetch_batch_live_quotes_aggregated_logs(caplog):
+    """Verify aggregated batch lifecycle and cache partition logs are emitted."""
+    fresh_time = (datetime.now() - timedelta(minutes=1)).isoformat()
+    mock_batch = {
+        "FRESH.NS": {
+            "ticker": "FRESH.NS",
+            "cur_close": 100.0,
+            "prev_close": 98.0,
+            "cur_date": "2026-09-11",
+            "prices_fetched_at": fresh_time,
+        }
+    }
+    raw_response = {
+        "quoteResponse": {
+            "result": [
+                {
+                    "symbol": "STALE.NS",
+                    "regularMarketPrice": 250.0,
+                    "regularMarketPreviousClose": 240.0,
+                }
+            ]
+        }
+    }
+    mock_yf_data = MagicMock()
+    mock_yf_data.get_raw_json.return_value = raw_response
+
+    import logging
+    with caplog.at_level(logging.INFO):
+        with patch("earnings_engine.data.prices._get_cached_quotes_batch", return_value=mock_batch), \
+             patch("earnings_engine.data.prices.yf.data.YfData", return_value=mock_yf_data), \
+             patch("earnings_engine.data.prices._connect"):
+
+            caplog.clear()
+            quotes = fetch_batch_live_quotes(["FRESH.NS", "STALE.NS"], force=False, sync_db=False)
+
+            log_messages = [rec.getMessage() for rec in caplog.records]
+            assert any("Cache: 1 fresh served from SQLite, 1 stale fetched via network" in msg for msg in log_messages)
+            assert any("Fetching live quotes for 1 tickers across 1 batch chunk(s)" in msg for msg in log_messages)
+            assert any("Successfully retrieved quotes for 1/1 tickers in" in msg for msg in log_messages)
+
 
