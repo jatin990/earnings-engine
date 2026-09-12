@@ -74,6 +74,11 @@ The system operates on local SQLite (`data/cache/prices/prices.sqlite3` or `earn
 - **Context Hygiene**: Bound tool outputs with `head_limit`, specific `grep` patterns, and line offsets. Avoid dumping large payloads or raw logs.
 - **Memory Persistence**: Persist modified database schemas, table column orders, and API contracts to `.claude/projects/.../memory/` so they survive context compaction.
 
+### 2.11 Model Tiering & Task Allocation Protocol
+- **`claude only`**: Dedicated strictly to architecture planning, system design, quantitative algorithm formulations, and calculations.
+- **`antigravityonly`**: Dedicated to verifying plans/designs, review, and executing implementation and code modifications.
+- **`free only`**: Dedicated to routine tasks that do not require high-tier reasoning models like Gemini or Opus (e.g., mechanical edits, formatting, routine status checks, boilerplate generation).
+
 ---
 
 ## 3. High-Level Architecture & Code Structure
