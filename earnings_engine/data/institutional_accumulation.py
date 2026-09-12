@@ -27,45 +27,117 @@ logger = logging.getLogger(__name__)
 _INST_CACHE: dict[str, tuple[float, Any]] = {}
 _RADAR_TABLE_INITIALIZED: bool = False
 
+_MARQUEE_AMC_KEYWORDS: tuple[str, ...] = (
+    "hdfc", "sbi", "icici pru", "icici prudential", "nippon", "kotak", "axis", "mirae",
+    "parag parikh", "ppfas", "quant", "dsp", "tata", "uti", "bandhan", "motilal oswal",
+    "whiteoak", "vanguard", "blackrock", "gqg", "fidelity", "capital group", "temasek",
+    "gic", "norway", "adia", "cppib", "franklin", "invesco", "schroder", "morgan stanley",
+    "goldman", "jpmorgan", "nomura", "clsa", "macquarie",
+)
+
+
+def _is_super_investor_name(name: str) -> bool:
+    """Check if the given investor or fund entity name matches known Super Investors."""
+    if not name:
+        return False
+    from earnings_engine.data.institutional_catalog import SUPER_INVESTORS_CATALOG
+    name_clean = name.strip().lower()
+    for s in SUPER_INVESTORS_CATALOG:
+        s_clean = s.strip().lower()
+        if s_clean in name_clean or name_clean in s_clean:
+            return True
+    return False
+
+
+def _is_marquee_amc_name(name: str) -> bool:
+    """Check if the given entity name matches marquee flagship asset management companies."""
+    if not name:
+        return False
+    name_clean = name.strip().lower()
+    return any(k in name_clean for k in _MARQUEE_AMC_KEYWORDS)
+
 
 def calculate_institutional_score(
-    accumulating_count: int,
-    selling_count: int,
-    new_buys_count: int,
-    net_flow_cr: float,
-    gross_inflow_cr: float,
-    gross_outflow_cr: float,
-    inst_addition_pct: float,
-    increase_amount_cr: float,
-    total_inst_amount_cr: float,
+    accumulating_count: int = 0,
+    selling_count: int = 0,
+    new_buys_count: int = 0,
+    net_flow_cr: float = 0.0,
+    gross_inflow_cr: float = 0.0,
+    gross_outflow_cr: float = 0.0,
+    inst_addition_pct: float = 0.0,
+    increase_amount_cr: float = 0.0,
+    total_inst_amount_cr: float = 0.0,
+    *,
+    block_deals_net_cr: float = 0.0,
+    block_deals_count: int = 0,
+    super_investor_count: int = 0,
+    super_investor_cr: float = 0.0,
+    marquee_amc_count: int = 0,
+    marquee_amc_cr: float = 0.0,
+    whale_capital_cr: float = 0.0,
 ) -> tuple[float, str, str]:
-    """Calculate institutional conviction score (0-100), verdict, and badge based on both Rupee amount flows and percentage stake shifts."""
+    """
+    Calculate institutional conviction score (0-100), verdict, and badge.
+    Operates across three distinct quantitative tiers:
+      Tier 1: Aggregate Macro Flow (100% corporate supply absorption from BSE/NSE shareholding delta and Rupee flow).
+      Tier 2: Granular Filing Stream & Block Deals (fund breadth and exchange block deal net capital).
+      Tier 3: Whale / Smart Money Conviction (asymmetric conviction booster from Super Investors and Marquee AMCs).
+    """
     score = 50.0
 
-    # 1. Absolute Rupee Amount Flow Component (up to +/- 25 points)
-    if net_flow_cr > 0:
-        amt_boost = math.log10(max(1.0, net_flow_cr)) * 6.0
-        if increase_amount_cr > 0:
-            inc_boost = math.log10(max(1.0, increase_amount_cr)) * 3.0
-            amt_boost = (amt_boost * 0.7) + (inc_boost * 0.3)
-        score += min(25.0, amt_boost)
-    elif net_flow_cr < 0:
-        amt_drag = math.log10(max(1.0, abs(net_flow_cr))) * 6.0
-        score -= min(25.0, amt_drag)
-
-    # 2. Percentage Stake Shift Component (QoQ % Delta, up to +/- 15 points)
+    # -------------------------------------------------------------
+    # Tier 1: Aggregate Macro Flow (up to +/- 30 points)
+    # Measures corporate supply absorption into institutional custody
+    # -------------------------------------------------------------
+    # 1A: Stake Shift Percentage (inst_addition_pct from shareholding patterns, up to +/- 15 pts)
     if inst_addition_pct > 0:
         score += min(15.0, inst_addition_pct * 4.0)
     elif inst_addition_pct < 0:
         score -= min(15.0, abs(inst_addition_pct) * 4.0)
 
-    # 3. Fund Breadth & Actions Component (up to +/- 20 points)
-    if accumulating_count > selling_count:
-        score += min(20.0, (accumulating_count - selling_count) * 4.0 + new_buys_count * 2.5)
-    elif selling_count > accumulating_count:
-        score -= min(20.0, (selling_count - accumulating_count) * 4.0)
+    # 1B: Macro Rupee Supply Absorption (up to +/- 15 pts)
+    macro_flow = increase_amount_cr if increase_amount_cr != 0 else net_flow_cr
+    if macro_flow > 0:
+        score += min(15.0, math.log10(max(1.0, macro_flow)) * 4.0)
+    elif macro_flow < 0:
+        score -= min(15.0, math.log10(max(1.0, abs(macro_flow))) * 4.0)
 
-    # 4. Institutional Scale & Depth Component (Total Holding Value, up to +5 points)
+    # -------------------------------------------------------------
+    # Tier 2: Granular Filing Stream & Block Deals (up to +/- 25 points)
+    # Confirmation across AMFI disclosures and real-time exchange deals
+    # -------------------------------------------------------------
+    # 2A: Fund Breadth (up to +/- 15 pts)
+    if accumulating_count > selling_count:
+        score += min(15.0, (accumulating_count - selling_count) * 2.5 + new_buys_count * 2.0)
+    elif selling_count > accumulating_count:
+        score -= min(15.0, (selling_count - accumulating_count) * 2.5)
+
+    # 2B: Block Deal Net Capital & Velocity (up to +/- 10 pts)
+    if block_deals_net_cr > 0:
+        blk_boost = math.log10(max(1.0, block_deals_net_cr)) * 3.0 + min(2.0, block_deals_count * 0.5)
+        score += min(10.0, blk_boost)
+    elif block_deals_net_cr < 0:
+        blk_drag = math.log10(max(1.0, abs(block_deals_net_cr))) * 3.0
+        score -= min(10.0, blk_drag)
+
+    # -------------------------------------------------------------
+    # Tier 3: Whale / Smart Money Conviction (up to +15 points booster)
+    # Asymmetric conviction booster activated by Marquee AMCs and Whales
+    # -------------------------------------------------------------
+    whale_boost = 0.0
+    if super_investor_count > 0:
+        whale_boost += min(8.0, super_investor_count * 4.0)
+    if marquee_amc_count > 0:
+        whale_boost += min(6.0, marquee_amc_count * 2.0)
+    if whale_capital_cr >= 100.0:
+        whale_boost += 3.0
+    elif whale_capital_cr >= 25.0:
+        whale_boost += 1.5
+    score += min(15.0, whale_boost)
+
+    # -------------------------------------------------------------
+    # Institutional Scale & Depth Component (up to +5 points)
+    # -------------------------------------------------------------
     if total_inst_amount_cr and total_inst_amount_cr > 500.0:
         score += min(5.0, math.log10(total_inst_amount_cr / 500.0) * 2.5)
 
@@ -845,19 +917,58 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
 
             # Block deals processing
             deals = []
+            block_buy_cr = 0.0
+            block_sell_cr = 0.0
             for b in d_rows[:20]:
+                dtype = (b[4] or "").upper()
+                vcr = round(float(b[7] or 0.0), 2)
+                if dtype == "BUY":
+                    block_buy_cr += vcr
+                elif dtype == "SELL":
+                    block_sell_cr += vcr
+
                 deals.append({
                     "id": b[0],
                     "deal_date": b[1],
                     "ticker": b[2],
                     "client_name": b[3],
-                    "deal_type": b[4].upper(),
+                    "deal_type": dtype,
                     "quantity": b[5],
                     "price": round(float(b[6]), 2),
-                    "value_cr": round(float(b[7]), 2),
+                    "value_cr": vcr,
                     "pct_equity": round(float(b[8] or 0.0), 2),
                     "exchange": b[9],
                 })
+            block_net_cr = round(block_buy_cr - block_sell_cr, 2)
+            block_cnt = len(deals)
+
+            # Whale & Marquee conviction analysis from holdings and buy block deals
+            super_investor_names: set[str] = set()
+            marquee_amc_names: set[str] = set()
+            whale_cap_cr = 0.0
+
+            for h in holdings:
+                fname = h.get("fund_name") or ""
+                act = h.get("action") or ""
+                h_val = float(h.get("holding_value_cr") or 0.0)
+                if act in ("NEW BUY", "ACCUMULATED"):
+                    if _is_super_investor_name(fname):
+                        super_investor_names.add(fname)
+                        whale_cap_cr += h_val
+                    if _is_marquee_amc_name(fname):
+                        marquee_amc_names.add(fname)
+                        whale_cap_cr += h_val
+
+            for d in deals:
+                if d.get("deal_type") == "BUY":
+                    cname_d = d.get("client_name") or ""
+                    d_val = float(d.get("value_cr") or 0.0)
+                    if _is_super_investor_name(cname_d):
+                        super_investor_names.add(cname_d)
+                        whale_cap_cr += d_val
+                    if _is_marquee_amc_name(cname_d):
+                        marquee_amc_names.add(cname_d)
+                        whale_cap_cr += d_val
 
             # Market cap and names
             raw_info = names_map.get(sym.upper()) or names_map.get(sym.upper().replace(".NS", "").replace(".BO", "")) or (None, None)
@@ -877,7 +988,7 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
 
             inc_amt_cr = round((inst_addition_pct / 100.0) * mcap_cr, 1) if (mcap_cr and inst_addition_pct != 0) else net_flow_cr
 
-            # Amount-based and percentage-based institutional conviction score
+            # Amount-based, macro supply absorption, and whale conviction score (Tier 1-3 composite)
             score, verdict, verdict_badge = calculate_institutional_score(
                 accumulating_count=accumulating_count,
                 selling_count=selling_count,
@@ -888,6 +999,11 @@ def _recalculate_metrics_internal(conn: Any, settings: Settings) -> dict[str, An
                 inst_addition_pct=inst_addition_pct,
                 increase_amount_cr=inc_amt_cr,
                 total_inst_amount_cr=tot_inst_amt,
+                block_deals_net_cr=block_net_cr,
+                block_deals_count=block_cnt,
+                super_investor_count=len(super_investor_names),
+                marquee_amc_count=len(marquee_amc_names),
+                whale_capital_cr=round(whale_cap_cr, 2),
             )
 
             is_new_fii = False
@@ -1440,7 +1556,41 @@ def get_stock_institutional_activity(
 
         stock_increase_amount_cr = round((inst_addition_pct / 100.0) * mcap_cr, 1) if (mcap_cr and inst_addition_pct != 0) else net_flow_cr
 
-        # Derive institutional accumulation conviction score (0-100) using both amount & percentage
+        # Compute block deal metrics & whale conviction for multi-tier scoring
+        block_buy_cr = sum(float(d.get("value_cr") or 0.0) for d in deals if d.get("deal_type") == "BUY")
+        block_sell_cr = sum(float(d.get("value_cr") or 0.0) for d in deals if d.get("deal_type") == "SELL")
+        block_net_cr = round(block_buy_cr - block_sell_cr, 2)
+        block_cnt = len(deals)
+
+        super_investor_names: set[str] = set()
+        marquee_amc_names: set[str] = set()
+        whale_cap_cr = 0.0
+
+        for h in holdings:
+            fname = h.get("fund_name") or ""
+            act = h.get("action") or ""
+            h_val = float(h.get("holding_value_cr") or 0.0)
+            if act in ("NEW BUY", "ACCUMULATED"):
+                if _is_super_investor_name(fname):
+                    super_investor_names.add(fname)
+                    whale_cap_cr += h_val
+                if _is_marquee_amc_name(fname):
+                    marquee_amc_names.add(fname)
+                    whale_cap_cr += h_val
+
+        for d in deals:
+            if d.get("deal_type") == "BUY":
+                cname_d = d.get("client_name") or ""
+                d_val = float(d.get("value_cr") or 0.0)
+                if _is_super_investor_name(cname_d):
+                    super_investor_names.add(cname_d)
+                    whale_cap_cr += d_val
+                if _is_marquee_amc_name(cname_d):
+                    marquee_amc_names.add(cname_d)
+                    whale_cap_cr += d_val
+
+        # Derive institutional accumulation conviction score (0-100) using 3-tier composite:
+        # Tier 1 (Macro Supply Absorption), Tier 2 (Breadth + Block Deals), Tier 3 (Whale/Marquee Conviction)
         score, verdict, verdict_badge = calculate_institutional_score(
             accumulating_count=accumulating_count,
             selling_count=selling_count,
@@ -1451,6 +1601,11 @@ def get_stock_institutional_activity(
             inst_addition_pct=inst_addition_pct,
             increase_amount_cr=stock_increase_amount_cr,
             total_inst_amount_cr=total_inst_amount_cr,
+            block_deals_net_cr=block_net_cr,
+            block_deals_count=block_cnt,
+            super_investor_count=len(super_investor_names),
+            marquee_amc_count=len(marquee_amc_names),
+            whale_capital_cr=round(whale_cap_cr, 2),
         )
 
         return {
@@ -2483,6 +2638,20 @@ def get_stock_buyers_in_period(
 
         _ensure_institutional_data_for_ticker(sym, conn)
 
+        # Retrieve latest market close price for P&L and cost basis comparisons
+        ltp_row = conn.execute(
+            "SELECT close, date FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 1",
+            (sym,),
+        ).fetchone()
+        if not ltp_row and sym.endswith(".NS"):
+            ltp_row = conn.execute(
+                "SELECT close, date FROM price_history WHERE ticker = ? ORDER BY date DESC LIMIT 1",
+                (sym.replace(".NS", ""),),
+            ).fetchone()
+
+        latest_market_price = round(float(ltp_row[0]), 2) if (ltp_row and ltp_row[0]) else None
+        latest_price_date = str(ltp_row[1]) if (ltp_row and ltp_row[1]) else None
+
         # 2. Parse date range and quarter boundaries
         start_date, end_date, canonical_q = _normalize_query_dates(
             from_date=from_date,
@@ -2580,6 +2749,18 @@ def get_stock_buyers_in_period(
             if min_value_cr > 0 and capital_cr < min_value_cr and holding_val_cr < min_value_cr:
                 continue
 
+            # Resolve implied price / cost basis if explicit price is missing
+            resolved_price = buy_price if buy_price > 0 else None
+            if not resolved_price:
+                if change_shares > 0 and capital_cr > 0:
+                    resolved_price = round((capital_cr * 1e7) / change_shares, 2)
+                elif shares_held and shares_held > 0 and holding_val_cr > 0:
+                    resolved_price = round((holding_val_cr * 1e7) / shares_held, 2)
+
+            unrealized_gain_pct = None
+            if latest_market_price and resolved_price and latest_market_price > 0 and resolved_price > 0:
+                unrealized_gain_pct = round(((latest_market_price - resolved_price) / resolved_price) * 100.0, 2)
+
             filing_buyers.append({
                 "investor_name": fund_name,
                 "buyer_name": fund_name,
@@ -2596,7 +2777,11 @@ def get_stock_buyers_in_period(
                 "stake_pct": stake_pct,
                 "change_pct": change_pct,
                 "shares_added": change_shares if change_shares > 0 else None,
-                "price": buy_price if buy_price > 0 else None,
+                "price": resolved_price,
+                "avg_price": resolved_price,
+                "latest_market_price": latest_market_price,
+                "latest_price_date": latest_price_date,
+                "unrealized_gain_pct": unrealized_gain_pct,
                 "exchange": "AMFI / Disclosures",
             })
 
@@ -2645,6 +2830,11 @@ def get_stock_buyers_in_period(
             if min_value_cr > 0 and val_cr < min_value_cr:
                 continue
 
+            resolved_block_price = price if price > 0 else None
+            unrealized_gain_pct = None
+            if latest_market_price and resolved_block_price and latest_market_price > 0 and resolved_block_price > 0:
+                unrealized_gain_pct = round(((latest_market_price - resolved_block_price) / resolved_block_price) * 100.0, 2)
+
             block_deal_buyers.append({
                 "investor_name": client_name,
                 "buyer_name": client_name,
@@ -2661,7 +2851,11 @@ def get_stock_buyers_in_period(
                 "stake_pct": pct_eq,
                 "change_pct": pct_eq,
                 "shares_added": qty,
-                "price": price,
+                "price": resolved_block_price,
+                "avg_price": resolved_block_price,
+                "latest_market_price": latest_market_price,
+                "latest_price_date": latest_price_date,
+                "unrealized_gain_pct": unrealized_gain_pct,
                 "exchange": exchange or "NSE",
             })
 
@@ -2677,12 +2871,27 @@ def get_stock_buyers_in_period(
         super_inv_buyers = [b for b in all_buyers if b["category"] == "Super Investor"]
         other_buyers = [b for b in all_buyers if b["category"] not in ("FII", "DII", "Super Investor")]
 
+        # Calculate capital-weighted unrealized P&L across buyers with price details
+        priced_buyers = [b for b in all_buyers if b.get("unrealized_gain_pct") is not None and (b.get("capital_deployed_cr") or 0.0) > 0]
+        priced_cap = sum(b["capital_deployed_cr"] for b in priced_buyers)
+        avg_unrealized_gain_pct = (
+            round(sum(b["unrealized_gain_pct"] * b["capital_deployed_cr"] for b in priced_buyers) / priced_cap, 2)
+            if priced_cap > 0 else None
+        )
+        profitable_buyers = sum(1 for b in all_buyers if (b.get("unrealized_gain_pct") or 0.0) > 0)
+        unprofitable_buyers = sum(1 for b in all_buyers if (b.get("unrealized_gain_pct") or 0.0) < 0)
+
         return {
             "success": True,
             "ticker": sym,
             "company_name": comp_name,
             "total_buyers_count": len(all_buyers),
             "total_capital_deployed_cr": round(total_capital, 2),
+            "latest_market_price": latest_market_price,
+            "latest_price_date": latest_price_date,
+            "avg_unrealized_gain_pct": avg_unrealized_gain_pct,
+            "profitable_buyers_count": profitable_buyers,
+            "unprofitable_buyers_count": unprofitable_buyers,
             "time_period": {
                 "from_date": start_date,
                 "to_date": end_date,
@@ -2692,6 +2901,11 @@ def get_stock_buyers_in_period(
             "summary": {
                 "total_buyers_count": len(all_buyers),
                 "total_capital_deployed_cr": round(total_capital, 2),
+                "latest_market_price": latest_market_price,
+                "latest_price_date": latest_price_date,
+                "avg_unrealized_gain_pct": avg_unrealized_gain_pct,
+                "profitable_buyers_count": profitable_buyers,
+                "unprofitable_buyers_count": unprofitable_buyers,
                 "fii_capital_deployed_cr": round(sum(b["capital_deployed_cr"] for b in fii_buyers), 2),
                 "fii_buyers_count": len(fii_buyers),
                 "dii_capital_deployed_cr": round(sum(b["capital_deployed_cr"] for b in dii_buyers), 2),
