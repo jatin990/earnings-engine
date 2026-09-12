@@ -146,3 +146,72 @@ def test_api_modular_market_pulse_endpoints(client: TestClient):
     data_c = r_conf.json()
     assert data_c.get("success") is True
     assert "setups" in data_c
+
+
+def test_get_expected_latest_trading_date():
+    from datetime import datetime, timezone
+    from earnings_engine.data.market_pulse import get_expected_latest_trading_date
+
+    # Saturday UTC 06:30 = Saturday 12:00 IST -> Expected latest trading day is Friday
+    sat_utc = datetime(2026, 9, 12, 6, 30, tzinfo=timezone.utc)
+    assert get_expected_latest_trading_date(sat_utc) == "2026-09-11"
+
+    # Sunday UTC 04:30 = Sunday 10:00 IST -> Expected latest trading day is Friday
+    sun_utc = datetime(2026, 9, 13, 4, 30, tzinfo=timezone.utc)
+    assert get_expected_latest_trading_date(sun_utc) == "2026-09-11"
+
+    # Monday UTC 04:30 = Monday 10:00 IST (pre-18:00 IST cutoff) -> Expected is previous Friday
+    mon_morning_utc = datetime(2026, 9, 14, 4, 30, tzinfo=timezone.utc)
+    assert get_expected_latest_trading_date(mon_morning_utc) == "2026-09-11"
+
+    # Monday UTC 13:30 = Monday 19:00 IST (post-18:00 IST cutoff) -> Expected is Monday
+    mon_evening_utc = datetime(2026, 9, 14, 13, 30, tzinfo=timezone.utc)
+    assert get_expected_latest_trading_date(mon_evening_utc) == "2026-09-14"
+
+    # Tuesday UTC 05:00 = Tuesday 10:30 IST (pre-cutoff) -> Expected is Monday
+    tue_morning_utc = datetime(2026, 9, 15, 5, 0, tzinfo=timezone.utc)
+    assert get_expected_latest_trading_date(tue_morning_utc) == "2026-09-14"
+
+
+def test_fii_dii_missing_checks_and_auto_sync(temp_settings, monkeypatch):
+    from unittest.mock import MagicMock
+    from earnings_engine.data.db import get_db_connection
+    from earnings_engine.data import market_pulse
+
+    conn = get_db_connection(temp_settings)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS institutional_net_flows (
+            date TEXT PRIMARY KEY,
+            day_label TEXT NOT NULL,
+            fii_buy_cr REAL NOT NULL DEFAULT 0.0,
+            fii_sell_cr REAL NOT NULL DEFAULT 0.0,
+            fii_net_cr REAL NOT NULL DEFAULT 0.0,
+            dii_buy_cr REAL NOT NULL DEFAULT 0.0,
+            dii_sell_cr REAL NOT NULL DEFAULT 0.0,
+            dii_net_cr REAL NOT NULL DEFAULT 0.0,
+            total_net_cr REAL NOT NULL DEFAULT 0.0,
+            stance TEXT NOT NULL DEFAULT 'Neutral',
+            updated_at TEXT NOT NULL
+        )
+    """)
+    # Insert older records (latest is 2026-09-08, so missing 2026-09-11)
+    conn.execute("""
+        INSERT OR REPLACE INTO institutional_net_flows (
+            date, day_label, fii_buy_cr, fii_sell_cr, fii_net_cr,
+            dii_buy_cr, dii_sell_cr, dii_net_cr, total_net_cr, stance, updated_at
+        ) VALUES ('2026-09-08', '08 Sep (Tue)', 10000, 9900, 100, 10000, 9500, 500, 600, 'NET INFLOW (BULLISH)', '2026-09-08T18:00:00Z')
+    """)
+    conn.commit()
+
+    # Track if sync_real_fii_dii_cash_flows is invoked automatically when latest day is missing
+    sync_mock = MagicMock(return_value=1)
+    monkeypatch.setattr(market_pulse, "sync_real_fii_dii_cash_flows", sync_mock)
+    monkeypatch.setattr(market_pulse, "_LAST_FII_DII_SYNC_ATTEMPT", 0.0)
+
+    # Calling compute_net_cash_liquidity with force_refresh=False
+    market_pulse._LIQUIDITY_CACHE.clear()
+    liq = market_pulse.compute_net_cash_liquidity(settings=temp_settings, force_refresh=False)
+
+    # Sync MUST have been triggered because 2026-09-08 is older than expected latest trading date
+    assert sync_mock.called, "sync_real_fii_dii_cash_flows should have been automatically triggered due to missing latest trading date"
+

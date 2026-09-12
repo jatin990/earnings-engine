@@ -41,6 +41,7 @@ _INDICES_CACHE: dict[str, Any] = {}
 _SECTORS_CACHE: dict[str, Any] = {}
 _LIQUIDITY_CACHE: dict[str, Any] = {}
 _PULSE_CACHE_TTL: float = 60.0  # 60s cache TTL
+_LAST_FII_DII_SYNC_ATTEMPT: float = 0.0
 
 
 def is_market_open(ts: float) -> bool:
@@ -51,6 +52,39 @@ def is_market_open(ts: float) -> bool:
     # IST is UTC+5:30. Open: 09:15 IST = 03:45 UTC. Close: 15:30 IST = 10:00 UTC.
     time_val = dt.hour + dt.minute / 60.0
     return 3.75 <= time_val < 10.0
+
+
+def get_expected_latest_trading_date(now_dt: datetime | None = None) -> str:
+    """Calculate the expected latest trading day (ISO format YYYY-MM-DD) for which
+    FII/DII cash market settlement figures should be published.
+
+    NSE publishes cash market FII/DII settlements around 17:30 - 18:30 IST (12:00 - 13:00 UTC).
+    Cutoff used: 18:00 IST (12:30 UTC).
+    """
+    if now_dt is None:
+        now_dt = datetime.now(timezone.utc)
+
+    # Convert UTC to IST (+5:30)
+    ist_offset = timedelta(hours=5, minutes=30)
+    ist_dt = now_dt + ist_offset
+
+    weekday = ist_dt.weekday()
+    if weekday == 5:  # Saturday -> Friday
+        target = (ist_dt - timedelta(days=1)).date()
+    elif weekday == 6:  # Sunday -> Friday
+        target = (ist_dt - timedelta(days=2)).date()
+    else:  # Monday - Friday
+        time_val = ist_dt.hour + ist_dt.minute / 60.0
+        # If before 18:00 IST (18.0), today's settlement is not released yet; expect previous trading day
+        if time_val < 18.0:
+            if weekday == 0:  # Monday morning -> previous Friday (3 days ago)
+                target = (ist_dt - timedelta(days=3)).date()
+            else:
+                target = (ist_dt - timedelta(days=1)).date()
+        else:
+            target = ist_dt.date()
+
+    return target.strftime("%Y-%m-%d")
 
 
 # ---------------------------------------------------------------------------
@@ -464,43 +498,54 @@ def sync_real_fii_dii_cash_flows(
     except Exception as e:
         logger.debug("[FII-DII-SYNC] Table setup notice: %s", e)
 
+    global _LAST_FII_DII_SYNC_ATTEMPT
+    _LAST_FII_DII_SYNC_ATTEMPT = time.time()
     now_iso = datetime.now(timezone.utc).isoformat()
     inserted_count = 0
 
-    # 1. Fetch 30-day authentic historical time series from public feed
+    # 1. Fetch 30-day authentic historical time series with real buy/sell/net amounts
     try:
         hist_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         }
-        resp = requests.get("https://stock-market-india.vercel.app/fii-dii", headers=hist_headers, timeout=6)
+        resp = requests.get("https://www.moneycontrol.com/markets/fii-dii-data/cash/", headers=hist_headers, timeout=6)
         if resp.status_code == 200 and "__NEXT_DATA__" in resp.text:
-            m = re.search(r'<script id="__NEXT_DATA__" type="application/json">({.*?})</script>', resp.text)
+            m = re.search(r'<script id="__NEXT_DATA__"[^>]*>({.*?})</script>', resp.text)
             if m:
                 payload = json.loads(m.group(1))
                 page_props = payload.get("props", {}).get("pageProps", {})
                 data_list = page_props.get("FiiDiiData", {}).get("fiiDiiData", [])
-                if isinstance(data_list, list):
+                if isinstance(data_list, list) and data_list:
+                    def _clean_num(val: Any) -> float:
+                        if val is None:
+                            return 0.0
+                        s = str(val).replace(",", "").strip()
+                        try:
+                            return float(s)
+                        except Exception:
+                            return 0.0
+
                     db_inserts = []
                     for item in data_list:
-                        # item format: {'fDate': '06-Mar-2025', 'date': '2025-03-06', 'fiiCM': '-582.99', 'diiCM': '1509.04'}
                         iso_date = item.get("date")
                         if not iso_date:
                             continue
-                        fii_net = float(item.get("fiiCM") or 0.0)
-                        dii_net = float(item.get("diiCM") or 0.0)
+                        fii_buy = _clean_num(item.get("fiiPurchase") or item.get("fii_buy"))
+                        fii_sell = _clean_num(item.get("fiiSales") or item.get("fii_sell"))
+                        fii_net = _clean_num(item.get("fiiNet") or item.get("fii_net") or item.get("fiiCM"))
+
+                        dii_buy = _clean_num(item.get("diiPurchase") or item.get("dii_buy"))
+                        dii_sell = _clean_num(item.get("diiSale") or item.get("dii_sell"))
+                        dii_net = _clean_num(item.get("diiNet") or item.get("dii_net") or item.get("diiCM"))
+
                         tot_net = round(fii_net + dii_net, 2)
 
                         try:
                             d_obj = datetime.strptime(iso_date, "%Y-%m-%d").date()
                             day_label = d_obj.strftime("%d %b (%a)")
                         except Exception:
-                            day_label = item.get("fDate") or iso_date
-
-                        fii_buy = round(abs(fii_net) + 12000.0, 2) if fii_net >= 0 else 12000.0
-                        fii_sell = round(fii_buy - fii_net, 2)
-                        dii_buy = round(abs(dii_net) + 10000.0, 2) if dii_net >= 0 else 10000.0
-                        dii_sell = round(dii_buy - dii_net, 2)
+                            day_label = item.get("graphToolTipRecordDate") or item.get("fDate") or iso_date
 
                         stance = "NET INFLOW (BULLISH)" if tot_net > 0 else ("NET OUTFLOW (DEFENSIVE)" if tot_net < 0 else "BALANCED FLOWS")
 
@@ -519,9 +564,9 @@ def sync_real_fii_dii_cash_flows(
                         """, db_inserts)
                         conn.commit()
                         inserted_count += len(db_inserts)
-                        logger.info("[FII-DII-SYNC] Ingested %d authentic daily records from historical feed", len(db_inserts))
+                        logger.info("[FII-DII-SYNC] Ingested %d authentic daily records from 30-day feed", len(db_inserts))
     except Exception as e:
-        logger.debug("[FII-DII-SYNC] Historical feed notice: %s", e)
+        logger.debug("[FII-DII-SYNC] 30-day feed notice: %s", e)
 
     # 2. Fetch live latest day settlement from official NSE India API
     try:
@@ -618,13 +663,28 @@ def compute_net_cash_liquidity(settings: Settings | None = None, force_refresh: 
     settings = settings or Settings()
     conn = get_db_connection(settings)
 
-    # Trigger background/synchronous real data ingestion if table is empty or forced
-    try:
-        row_count = conn.execute("SELECT COUNT(*) FROM institutional_net_flows").fetchone()
-        if not row_count or row_count[0] < 5 or force_refresh:
+    # Proactively check if the latest expected trading session's settlement is missing or if forced
+    needs_sync = force_refresh
+    if not needs_sync:
+        try:
+            latest_row = conn.execute("SELECT date FROM institutional_net_flows ORDER BY date DESC LIMIT 1").fetchone()
+            if not latest_row:
+                needs_sync = True
+            else:
+                latest_date_in_db = str(latest_row[0])
+                expected_date = get_expected_latest_trading_date()
+                if latest_date_in_db < expected_date:
+                    # Apply cooldown (3 min) to prevent repeated hammering if exchange holiday or delay
+                    if (now_ts - _LAST_FII_DII_SYNC_ATTEMPT) > 180.0:
+                        needs_sync = True
+        except Exception:
+            needs_sync = True
+
+    if needs_sync:
+        try:
             sync_real_fii_dii_cash_flows(settings, days=30, force=force_refresh)
-    except Exception:
-        sync_real_fii_dii_cash_flows(settings, days=30, force=True)
+        except Exception as e:
+            logger.debug("[LIQUIDITY] Auto-sync attempt error: %s", e)
 
     today_dt = datetime.now(timezone.utc).date()
     today_str = today_dt.strftime("%Y-%m-%d")
@@ -2295,7 +2355,11 @@ def get_market_pulse_data(settings: Settings | None = None, force_refresh: bool 
         if (now_ts - cached_ts) < _PULSE_CACHE_TTL:
             return _PULSE_CACHE["data"]
         if not is_market_open(now_ts) and not is_market_open(cached_ts):
-            if (now_ts - cached_ts) < 3 * 24 * 3600:
+            # Off-market cache TTL: 300s (5 min), allowing fresh post-market EOD settlements
+            # (FII/DII, participant OI) to be captured without locking in stale data across weekends.
+            cached_liquidity_date = _PULSE_CACHE.get("data", {}).get("institutional_flows", {}).get("as_of_date", "")
+            expected_date = get_expected_latest_trading_date()
+            if (now_ts - cached_ts) < 300.0 and (not expected_date or cached_liquidity_date >= expected_date):
                 return _PULSE_CACHE["data"]
 
     settings = settings or Settings()
