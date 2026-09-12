@@ -190,6 +190,30 @@ def get_recent_nse_additions(
         except Exception as e:
             logger.debug("[NEW-LISTINGS] Failed querying price_history in batch: %s", e)
 
+    # Auto-hydrate price history in batch for top recent debuts missing from database
+    missing_debuts = [t for t in tickers if t not in price_map and t.replace(".NS", "") not in price_map]
+    if missing_debuts:
+        try:
+            from earnings_engine.data.prices import ensure_prices_batch
+            batch_to_fetch = missing_debuts[:10]
+            fetched_dict = ensure_prices_batch(batch_to_fetch, settings)
+            for m_sym, m_df in fetched_dict.items():
+                if m_df is not None and not m_df.empty:
+                    m_norm = f"{m_sym}.NS" if not m_sym.endswith(".NS") else m_sym
+                    price_map[m_norm] = [
+                        {
+                            "date": idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx),
+                            "open": float(r["open"]) if "open" in r and pd.notna(r["open"]) else None,
+                            "high": float(r["high"]) if "high" in r and pd.notna(r["high"]) else None,
+                            "low": float(r["low"]) if "low" in r and pd.notna(r["low"]) else None,
+                            "close": float(r["close"]) if "close" in r and pd.notna(r["close"]) else None,
+                            "volume": float(r["volume"]) if "volume" in r and pd.notna(r["volume"]) else None,
+                        }
+                        for idx, r in m_df.iterrows()
+                    ]
+        except Exception as e:
+            logger.debug("[NEW-LISTINGS] Batch auto-hydration for missing IPO prices: %s", e)
+
     today = datetime.now().date()
     items: list[dict[str, Any]] = []
 
@@ -433,6 +457,38 @@ def get_ipo_stock_detail(
         except Exception as e:
             logger.debug("[IPO-DETAIL] Failed querying price_history for %s: %s", clean_ticker, e)
 
+    # On-demand price hydration for newly listed equities if price_history is empty
+    if not price_rows:
+        try:
+            from earnings_engine.data.prices import fetch_prices
+            logger.info("[IPO-DETAIL] On-demand hydrating prices for debut ticker %s", clean_ticker)
+            df_fetched = fetch_prices(clean_ticker, settings, force=True)
+            if df_fetched is not None and not df_fetched.empty:
+                if conn is not None:
+                    try:
+                        price_rows = conn.execute("""
+                            SELECT date, open, high, low, close, volume
+                            FROM price_history
+                            WHERE ticker IN (?, ?)
+                            ORDER BY date ASC
+                        """, (clean_ticker, raw_symbol)).fetchall()
+                    except Exception:
+                        price_rows = []
+                if not price_rows:
+                    price_rows = [
+                        (
+                            idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx),
+                            row.get("open"),
+                            row.get("high"),
+                            row.get("low"),
+                            row.get("close"),
+                            row.get("volume"),
+                        )
+                        for idx, row in df_fetched.iterrows()
+                    ]
+        except Exception as e:
+            logger.debug("[IPO-DETAIL] On-demand price fetch encountered: %s", e)
+
     listing_day: dict[str, Any] | None = None
     cmp: float | None = None
     latest_date: str | None = None
@@ -516,18 +572,41 @@ def get_ipo_stock_detail(
             if avg_v20 > 0:
                 volume_ratio_5_20 = round(avg_v5 / avg_v20, 2)
 
-        # Classify IPO Base Stage:
-        # - If ath_distance_pct >= -2.5: "🔥 IPO Base Breakout (At ATH)"
-        # - Else if ath_distance_pct >= -15.0: "🟡 Forming IPO Base (Consolidating near ATH)"
-        # - Else if cmp < listing_price: "❄️ Sub-IPO Drawdown (Trading Below Debut)"
-        # - Else: "📈 Post-Listing Consolidation"
+    # Fallback to live quote if cmp is still missing (e.g., intraday debut or single-day trading)
+    if cmp is None:
+        try:
+            from earnings_engine.data.prices import fetch_live_quote
+            lq = fetch_live_quote(clean_ticker, settings)
+            if lq and lq.get("current_price"):
+                cmp = round(float(lq["current_price"]), 2)
+                if ath_price is None and lq.get("week_52_high"):
+                    ath_price = round(float(lq["week_52_high"]), 2)
+                if atl_price is None and lq.get("week_52_low"):
+                    atl_price = round(float(lq["week_52_low"]), 2)
+                if high_52w is None and lq.get("week_52_high"):
+                    high_52w = round(float(lq["week_52_high"]), 2)
+                if low_52w is None and lq.get("week_52_low"):
+                    low_52w = round(float(lq["week_52_low"]), 2)
+                if listing_price and listing_price > 0 and cmp:
+                    return_since_listing_pct = round(((cmp - listing_price) / listing_price) * 100.0, 2)
+                if ath_price and ath_price > 0 and cmp:
+                    ath_distance_pct = round(((cmp - ath_price) / ath_price) * 100.0, 2)
+        except Exception as e:
+            logger.debug("[IPO-DETAIL] Live quote fallback encountered: %s", e)
+
+    # Classify IPO Base Stage:
+    # - If ath_distance_pct >= -2.5: "🔥 IPO Base Breakout (At ATH)"
+    # - Else if ath_distance_pct >= -15.0: "🟡 Forming IPO Base (Consolidating near ATH)"
+    # - Else if cmp < listing_price: "❄️ Sub-IPO Drawdown (Trading Below Debut)"
+    # - Else: "📈 Post-Listing Consolidation"
+    if cmp is not None:
         if ath_distance_pct >= -2.5:
             stage = "🔥 IPO Base Breakout (At ATH)"
             stage_badge = "emerald"
         elif ath_distance_pct >= -15.0:
             stage = "🟡 Forming IPO Base (Consolidating near ATH)"
             stage_badge = "amber"
-        elif cmp is not None and listing_price is not None and cmp < listing_price:
+        elif listing_price is not None and cmp < listing_price:
             stage = "❄️ Sub-IPO Drawdown (Trading Below Debut)"
             stage_badge = "rose"
         else:

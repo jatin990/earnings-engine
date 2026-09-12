@@ -310,8 +310,11 @@ def test_get_ipo_stock_detail(monkeypatch):
             conn.commit()
 
 
-def test_get_ipo_stock_detail_empty_state():
+def test_get_ipo_stock_detail_empty_state(monkeypatch):
     settings = Settings()
+    # Mock fetch_prices to return empty DataFrame without network overhead
+    monkeypatch.setattr("earnings_engine.data.prices.fetch_prices", lambda *args, **kwargs: pd.DataFrame())
+    monkeypatch.setattr("earnings_engine.data.prices.fetch_live_quote", lambda *args, **kwargs: {})
     detail = get_ipo_stock_detail("NONEXISTENT_IPO.NS", settings=settings)
     assert detail["success"] is True
     assert detail["ticker"] == "NONEXISTENT_IPO.NS"
@@ -321,6 +324,32 @@ def test_get_ipo_stock_detail_empty_state():
     assert detail["earnings_lifecycle"]["result_sequence"]["result_sequence_number"] == 1
     assert detail["institutional"]["mutual_funds"] == []
     assert detail["institutional"]["mutual_funds_count"] == 0
+
+
+def test_get_ipo_stock_detail_on_demand_hydration(monkeypatch):
+    """Verify that an un-cached IPO ticker automatically hydrates technicals via fetch_prices."""
+    settings = Settings()
+    ticker = "TEST_HYDRATE.NS"
+    now = datetime.now()
+
+    # Provide mock price dataframe returned by fetch_prices
+    mock_df = pd.DataFrame([
+        {"open": 200.0, "high": 220.0, "low": 195.0, "close": 210.0, "volume": 500000},
+        {"open": 210.0, "high": 230.0, "low": 205.0, "close": 225.0, "volume": 350000},
+        {"open": 225.0, "high": 240.0, "low": 220.0, "close": 235.0, "volume": 420000},
+    ], index=pd.date_range(now - timedelta(days=3), periods=3, freq="D"))
+
+    monkeypatch.setattr("earnings_engine.data.prices.fetch_prices", lambda *args, **kwargs: mock_df.copy())
+
+    detail = get_ipo_stock_detail(ticker, settings=settings)
+    assert detail["success"] is True
+    assert detail["ticker"] == ticker
+    assert detail["technical"]["cmp"] == 235.0
+    assert detail["technical"]["listing_price"] == 210.0
+    assert detail["technical"]["return_since_listing_pct"] > 0
+    assert detail["technical"]["ath_price"] == 240.0
+    assert detail["technical"]["atl_price"] == 195.0
+    assert "IPO Base" in detail["technical"]["stage"]
 
 
 def test_get_ipo_stock_detail_stages(monkeypatch):
