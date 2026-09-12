@@ -3348,25 +3348,26 @@ def generate_breakout_ai_reasoning(
 
     # Persistent DB Cache Check
     try:
-        from earnings_engine.data.db import get_db_connection
         conn = get_db_connection(settings)
-        cur = conn.execute("SELECT data_json FROM breakout_radar WHERE ticker = ? ORDER BY composite_score DESC LIMIT 1", (sym,))
-        row = cur.fetchone()
-        if row and row[0]:
-            import json
-            data = json.loads(row[0])
-            if "ai_reasoning" in data:
-                ai_data = data["ai_reasoning"]
-                gen_at = ai_data.get("generated_at")
-                # Simple freshness check (e.g. 12 hours)
-                if gen_at:
-                    from datetime import datetime, timezone
-                    gen_dt = datetime.fromisoformat(gen_at)
-                    now_dt = datetime.now(timezone.utc)
-                    if (now_dt - gen_dt).total_seconds() < 12 * 3600:
-                        _AI_REASONING_CACHE[cache_key] = ai_data
-                        return ai_data
-        conn.close()
+        try:
+            cur = conn.execute("SELECT data_json FROM breakout_radar WHERE ticker = ? ORDER BY composite_score DESC LIMIT 1", (sym,))
+            row = cur.fetchone()
+            if row and row[0]:
+                data = json.loads(row[0])
+                if "ai_reasoning" in data:
+                    ai_data = data["ai_reasoning"]
+                    gen_at = ai_data.get("generated_at")
+                    # Simple freshness check (e.g. 12 hours)
+                    if gen_at:
+                        gen_dt = datetime.fromisoformat(gen_at)
+                        if gen_dt.tzinfo is None:
+                            gen_dt = gen_dt.replace(tzinfo=timezone.utc)
+                        now_dt = datetime.now(timezone.utc)
+                        if (now_dt - gen_dt).total_seconds() < 12 * 3600:
+                            _AI_REASONING_CACHE[cache_key] = ai_data
+                            return ai_data
+        finally:
+            conn.close()
     except Exception as e:
         logger.debug("[BREAKOUT-AI] DB cache read failed for %s: %s", sym, e)
 
@@ -3508,16 +3509,25 @@ Evaluate the following breakout setup for {sym} ({company_name}) and provide an 
     # Store in DB to prevent token/compute waste on restart
     try:
         conn = get_db_connection(settings)
-        cur = conn.execute("SELECT data_json FROM breakout_radar WHERE ticker = ? ORDER BY composite_score DESC LIMIT 1", (sym,))
-        row = cur.fetchone()
-        if row and row[0]:
-            import json
-            data = json.loads(row[0])
-            data["ai_reasoning"] = output_dict
-            new_json = json.dumps(data)
-            conn.execute("UPDATE breakout_radar SET data_json = ? WHERE ticker = ?", (new_json, sym))
-            conn.commit()
-        conn.close()
+        try:
+            _init_breakout_db(conn)
+            cur = conn.execute("SELECT data_json FROM breakout_radar WHERE ticker = ? ORDER BY composite_score DESC LIMIT 1", (sym,))
+            row = cur.fetchone()
+            if row is not None:
+                data = json.loads(row[0]) if row[0] else {}
+                data["ai_reasoning"] = output_dict
+                new_json = json.dumps(data)
+                conn.execute("UPDATE breakout_radar SET data_json = ? WHERE ticker = ?", (new_json, sym))
+                conn.commit()
+            else:
+                new_json = json.dumps({"ai_reasoning": output_dict})
+                conn.execute(
+                    "INSERT INTO breakout_radar (ticker, strategy, tier, data_json) VALUES (?, 'CLASSIC_TECHNICAL', 'WARM', ?)",
+                    (sym, new_json),
+                )
+                conn.commit()
+        finally:
+            conn.close()
     except Exception as e:
         logger.debug("[BREAKOUT-AI] DB cache write failed for %s: %s", sym, e)
         

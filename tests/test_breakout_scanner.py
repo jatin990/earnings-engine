@@ -5,6 +5,10 @@ and the API endpoints.
 """
 from __future__ import annotations
 
+import json
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+
 import pandas as pd
 import numpy as np
 import pytest
@@ -432,5 +436,199 @@ class TestBreakoutLateDetection:
         assert notes["ideal_entry_price"] == 0.0
         assert notes["is_late"] is False
         assert notes["entry_delay_pct"] == 0.0
+
+
+class TestBreakoutAIReasoningPersistentCache:
+    """Validate persistent SQLite caching of AI reasoning for breakout candidates."""
+
+    @pytest.fixture(autouse=True)
+    def setup_test_env(self, tmp_path):
+        from unittest.mock import patch
+        from earnings_engine.config import Settings
+        from earnings_engine.data.breakout_scanner import (
+            _init_breakout_db,
+            _AI_REASONING_CACHE,
+        )
+        from earnings_engine.data.db import get_db_connection
+
+        self.settings = Settings(data_dirs={"prices": tmp_path, "earnings": tmp_path})
+        conn = get_db_connection(self.settings)
+        _init_breakout_db(conn)
+        conn.close()
+
+        _AI_REASONING_CACHE.clear()
+        yield
+        _AI_REASONING_CACHE.clear()
+
+    def test_generate_breakout_ai_reasoning_writes_to_sqlite_data_json(self):
+        import json
+        from earnings_engine.data.breakout_scanner import (
+            generate_breakout_ai_reasoning,
+            _AI_REASONING_CACHE,
+        )
+        from earnings_engine.data.db import get_db_connection
+
+        # Seed candidate in breakout_radar with existing custom data_json
+        conn = get_db_connection(self.settings)
+        conn.execute(
+            """
+            INSERT INTO breakout_radar (ticker, strategy, tier, composite_score, breakout_trigger, target_price, stop_loss, data_json)
+            VALUES ('INFY.NS', 'CLASSIC_TECHNICAL', 'HOT', 85.0, 1800.0, 1950.0, 1750.0, ?)
+            """,
+            (json.dumps({"existing_metric": 42}),),
+        )
+        conn.commit()
+        conn.close()
+
+        # Call generate_breakout_ai_reasoning
+        res = generate_breakout_ai_reasoning("INFY.NS", settings=self.settings)
+        assert res is not None
+        assert res["ticker"] == "INFY.NS"
+        assert "verdict" in res
+        assert "confidence_pct" in res
+        assert "generated_at" in res
+
+        # Assert data was written to SQLite data_json preserving existing keys
+        conn = get_db_connection(self.settings)
+        row = conn.execute("SELECT data_json FROM breakout_radar WHERE ticker = 'INFY.NS'").fetchone()
+        conn.close()
+
+        assert row is not None and row[0] is not None
+        saved_data = json.loads(row[0])
+        assert saved_data.get("existing_metric") == 42
+        assert "ai_reasoning" in saved_data
+        ai = saved_data["ai_reasoning"]
+        assert ai["ticker"] == "INFY.NS"
+        assert ai["verdict"] == res["verdict"]
+        assert ai["confidence_pct"] == res["confidence_pct"]
+        assert ai["generated_at"] == res["generated_at"]
+
+    def test_subsequent_call_reads_ai_reasoning_from_sqlite_cache(self):
+        import json
+        from unittest.mock import patch
+        from earnings_engine.data.breakout_scanner import (
+            generate_breakout_ai_reasoning,
+            _AI_REASONING_CACHE,
+        )
+        from earnings_engine.data.db import get_db_connection
+
+        # Populate SQLite with fresh AI reasoning (< 12 hours)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        preset_reasoning = {
+            "verdict": "HIGH_CONVICTION_BREAKOUT",
+            "confidence_pct": 88,
+            "generated_at": now_iso,
+            "ticker": "INFY.NS",
+            "source": "Precomputed SQLite Unit Test",
+        }
+        conn = get_db_connection(self.settings)
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO breakout_radar (ticker, strategy, tier, composite_score, data_json)
+            VALUES ('INFY.NS', 'CLASSIC_TECHNICAL', 'HOT', 88.0, ?)
+            """,
+            (json.dumps({"ai_reasoning": preset_reasoning}),),
+        )
+        conn.commit()
+        conn.close()
+
+        # In-memory cache is cold (cleared)
+        _AI_REASONING_CACHE.clear()
+
+        # Score breakout and price loading should NOT be called on SQLite cache hit
+        with patch("earnings_engine.data.breakout_scanner.score_breakout") as mock_score, \
+             patch("earnings_engine.data.prices.load_prices") as mock_load_prices:
+            cached_res = generate_breakout_ai_reasoning("INFY.NS", settings=self.settings)
+
+            mock_score.assert_not_called()
+            mock_load_prices.assert_not_called()
+
+        assert cached_res["source"] == "Precomputed SQLite Unit Test"
+        assert cached_res["confidence_pct"] == 88
+        assert cached_res["ticker"] == "INFY.NS"
+        # In-memory cache should now be warmed
+        assert "INFY.NS_default" in _AI_REASONING_CACHE
+
+    def test_stale_ai_reasoning_cache_in_sqlite_triggers_recomputation(self):
+        import json
+        from earnings_engine.data.breakout_scanner import (
+            generate_breakout_ai_reasoning,
+            _AI_REASONING_CACHE,
+        )
+        from earnings_engine.data.db import get_db_connection
+
+        # Populate SQLite with stale AI reasoning (13 hours old)
+        stale_dt = datetime.now(timezone.utc) - timedelta(hours=13)
+        stale_reasoning = {
+            "verdict": "STALE_SETUP",
+            "confidence_pct": 50,
+            "generated_at": stale_dt.isoformat(),
+            "ticker": "INFY.NS",
+            "source": "Stale DB Cache",
+        }
+        conn = get_db_connection(self.settings)
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO breakout_radar (ticker, strategy, tier, composite_score, data_json)
+            VALUES ('INFY.NS', 'CLASSIC_TECHNICAL', 'HOT', 80.0, ?)
+            """,
+            (json.dumps({"ai_reasoning": stale_reasoning}),),
+        )
+        conn.commit()
+        conn.close()
+
+        _AI_REASONING_CACHE.clear()
+
+        # Calling generate_breakout_ai_reasoning should bypass stale cache and recompute
+        new_res = generate_breakout_ai_reasoning("INFY.NS", settings=self.settings)
+        assert new_res["source"] != "Stale DB Cache"
+        assert new_res["ticker"] == "INFY.NS"
+
+        # Check SQLite was updated with the fresh timestamp
+        conn = get_db_connection(self.settings)
+        row = conn.execute("SELECT data_json FROM breakout_radar WHERE ticker = 'INFY.NS'").fetchone()
+        conn.close()
+
+        assert row is not None and row[0] is not None
+        saved_data = json.loads(row[0])
+        saved_dt = datetime.fromisoformat(saved_data["ai_reasoning"]["generated_at"])
+        if saved_dt.tzinfo is None:
+            saved_dt = saved_dt.replace(tzinfo=timezone.utc)
+        diff_s = (datetime.now(timezone.utc) - saved_dt).total_seconds()
+        assert diff_s < 30.0
+
+    def test_generate_breakout_ai_reasoning_for_new_ticker_persists_row(self):
+        import json
+        from unittest.mock import patch
+        from earnings_engine.data.breakout_scanner import (
+            generate_breakout_ai_reasoning,
+            _AI_REASONING_CACHE,
+        )
+        from earnings_engine.data.db import get_db_connection
+
+        _AI_REASONING_CACHE.clear()
+
+        # Ticker not initially in breakout_radar
+        res = generate_breakout_ai_reasoning("UNTRACKED.NS", settings=self.settings)
+        assert res["ticker"] == "UNTRACKED.NS"
+
+        # Verify row inserted into breakout_radar
+        conn = get_db_connection(self.settings)
+        row = conn.execute("SELECT data_json FROM breakout_radar WHERE ticker = 'UNTRACKED.NS'").fetchone()
+        conn.close()
+
+        assert row is not None and row[0] is not None
+        saved = json.loads(row[0])
+        assert "ai_reasoning" in saved
+        assert saved["ai_reasoning"]["ticker"] == "UNTRACKED.NS"
+
+        # Clear in-memory cache and verify second call hits SQLite cache
+        _AI_REASONING_CACHE.clear()
+        with patch("earnings_engine.data.breakout_scanner.score_breakout") as mock_score:
+            res_cached = generate_breakout_ai_reasoning("UNTRACKED.NS", settings=self.settings)
+            mock_score.assert_not_called()
+
+        assert res_cached["ticker"] == "UNTRACKED.NS"
+
 
 
