@@ -97,6 +97,15 @@
                 '--red': '#fb7185',
                 '--light': '#f8fafc',
                 '--muted': '#94a3b8'
+            },
+            light: {
+                '--bg': '#f8fafc',
+                '--card': '#ffffff',
+                '--accent': '#0284c7',
+                '--green': '#059669',
+                '--red': '#dc2626',
+                '--light': '#0f172a',
+                '--muted': '#475569'
             }
         };
 
@@ -741,9 +750,21 @@
             app._customizer.activeTheme = themeName;
             app._customizer.customColors = Object.assign({}, palette);
 
+            // Set data-theme attribute on root and body class for high-contrast light mode styling
+            if (themeName === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+                document.body.classList.add('light-mode');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                document.body.classList.remove('light-mode');
+            }
+
             Object.entries(palette).forEach(([varName, val]) => {
                 document.documentElement.style.setProperty(varName, val);
             });
+
+            // Dispatch custom theme change event for Lightweight Charts & Chart.js instances
+            window.dispatchEvent(new CustomEvent('app:theme-changed', { detail: { theme: themeName } }));
 
             if (persist) {
                 try {
@@ -753,6 +774,12 @@
                 app.saveUIPreferencesToBackend();
             }
             app.syncThemePickers();
+        };
+
+        app.toggleTheme = function() {
+            const currentTheme = app._customizer.activeTheme || 'obsidian';
+            const nextTheme = currentTheme === 'light' ? 'obsidian' : 'light';
+            app.applyPresetTheme(nextTheme, true);
         };
 
         app.onCustomColorInput = function(cssVar, hexValue) {

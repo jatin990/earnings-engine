@@ -99,3 +99,30 @@ def test_reports_export_endpoints(client):
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
     assert "NEXUS QUANTITATIVE TERMINAL" in resp.text
+
+
+def test_webhook_ssrf_protection(client):
+    """Verify that private, loopback, and cloud metadata webhook targets are rejected."""
+    bad_urls = [
+        "http://127.0.0.1:8000/internal",
+        "http://localhost:5000/hook",
+        "http://169.254.169.254/latest/meta-data",
+        "http://10.0.0.1/admin",
+        "http://192.168.1.1/router",
+        "http://172.16.0.5/api",
+        "ftp://example.com/hook",
+        "file:///etc/passwd",
+        "gopher://example.com",
+    ]
+    for url in bad_urls:
+        resp = client.post(
+            "/api/v1/alerts/test-dispatch",
+            json={
+                "channel": "webhook",
+                "webhook_url": url,
+                "sample_ticker": "TCS.NS",
+            },
+        )
+        assert resp.status_code == 400, f"Expected 400 for unsafe URL: {url}"
+        assert "Invalid webhook URL" in resp.json()["detail"]
+

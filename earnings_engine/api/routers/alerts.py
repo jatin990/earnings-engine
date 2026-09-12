@@ -9,6 +9,7 @@ import json
 import socket
 from typing import Any
 import urllib.parse
+import urllib.request
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -46,8 +47,26 @@ class TestDispatchPayload(BaseModel):
     sample_surge: float = Field(default=2.8)
 
 
+def _is_safe_ip(ip_obj: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Check if an IP address is safe (public and not internal/cloud metadata/carrier NAT)."""
+    if (
+        ip_obj.is_private
+        or ip_obj.is_loopback
+        or ip_obj.is_link_local
+        or ip_obj.is_reserved
+        or ip_obj.is_multicast
+        or ip_obj.is_unspecified
+    ):
+        return False
+    # Explicitly block Carrier-Grade NAT (100.64.0.0/10) and Cloud Metadata (169.254.0.0/16)
+    if isinstance(ip_obj, ipaddress.IPv4Address):
+        if ip_obj in ipaddress.ip_network("100.64.0.0/10") or ip_obj in ipaddress.ip_network("169.254.0.0/16"):
+            return False
+    return True
+
+
 def _is_safe_webhook_url(url_str: str) -> bool:
-    """Validate that webhook URL uses HTTP/HTTPS and does not target private or local IP ranges."""
+    """Validate that webhook URL uses HTTP/HTTPS and does not target private, local, or cloud metadata IP ranges."""
     try:
         parsed = urllib.parse.urlparse(url_str)
         if parsed.scheme not in ("http", "https"):
@@ -55,22 +74,29 @@ def _is_safe_webhook_url(url_str: str) -> bool:
         hostname = parsed.hostname
         if not hostname:
             return False
-        if hostname.lower() in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+        if hostname.lower() in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "metadata.google.internal"):
             return False
-        # Resolve IP to block internal RFC1918 / loopback / link-local addresses
+        # Resolve IP to block internal RFC1918 / loopback / link-local / cloud metadata addresses
         try:
             ip_info = socket.getaddrinfo(hostname, None)
+            if not ip_info:
+                return False
             for addr_info in ip_info:
                 ip_str = addr_info[4][0]
                 ip_obj = ipaddress.ip_address(ip_str)
-                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved:
+                if not _is_safe_ip(ip_obj):
                     return False
         except Exception:
-            # If DNS resolution fails or format is invalid
             return False
         return True
     except Exception:
         return False
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """HTTP redirect handler that prevents SSRF via automatic redirect following."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def _seed_default_rules_if_empty(conn: Any) -> None:
@@ -262,7 +288,6 @@ async def test_dispatch_alert(payload: TestDispatchPayload):
             raise HTTPException(status_code=400, detail="Webhook URL is required for webhook test dispatch")
         if not _is_safe_webhook_url(payload.webhook_url):
             raise HTTPException(status_code=400, detail="Invalid webhook URL: private, loopback, or non-HTTP endpoints are not allowed.")
-        import urllib.request
         try:
             req_data = json.dumps({
                 "event": "nexus_alert_test",
@@ -274,9 +299,10 @@ async def test_dispatch_alert(payload: TestDispatchPayload):
                 payload.webhook_url,
                 data=req_data,
                 headers={"Content-Type": "application/json", "User-Agent": "Nexus-Alerts/1.0"},
-                method="POST"
+                method="POST",
             )
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            opener = urllib.request.build_opener(_NoRedirectHandler)
+            with opener.open(req, timeout=5) as resp:
                 resp_code = resp.getcode()
             return {"status": "ok", "channel": "webhook", "http_status": resp_code, "message": f"Webhook test delivered to {payload.webhook_url}"}
         except Exception as e:
