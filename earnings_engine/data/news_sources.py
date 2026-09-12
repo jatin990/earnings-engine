@@ -71,6 +71,16 @@ NDTV_FEEDS = [
     ("https://feeds.feedburner.com/ndtvprofit-latest", "NDTV Profit"),
 ]
 
+BUSINESS_TODAY_FEEDS = [
+    ("https://www.businesstoday.in/rss/stocks", "Business Today Stocks"),
+    ("https://www.businesstoday.in/rss/markets", "Business Today Markets"),
+    ("https://www.businesstoday.in/rss/industry", "Business Today Corporate"),
+]
+
+RBI_FEEDS = [
+    ("https://www.rbi.org.in/pressreleases_rss.xml", "RBI Press Releases"),
+]
+
 # Official NSE Static Archive RSS Feeds (https://www.nseindia.com/static/rss-feed)
 NSE_STATIC_RSS_FEEDS = [
     ("https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml", "NSE Announcements", "corporate_disclosure"),
@@ -98,6 +108,10 @@ GOOGLE_BROADBAND_QUERIES = [
     ("Indian stock market when:1d", "Google News Markets"),
     ("BSE NSE corporate announcements when:1d", "Google News Announcements"),
     ("order win acquisition merger dividend India stocks when:1d", "Google News Deals"),
+    ("USFDA pharma inspection EIR 483 India when:1d", "Google News USFDA Pharma"),
+    ("SEBI order OR penalty OR investigation when:1d", "Google News SEBI Enforcement"),
+    ("NCLT insolvency admitted OR IBC India stocks when:1d", "Google News NCLT Insolvency"),
+    ("FII DII buying selling stock market when:1d", "Google News Institutional Flows"),
 ]
 
 
@@ -286,6 +300,27 @@ def fetch_ndtv_profit_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     for feed_url, pub_name in NDTV_FEEDS:
         items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        results.extend(items)
+    return results
+
+
+def fetch_business_today_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
+    """Fetch recent market, corporate, and stock headlines from Business Today RSS feeds."""
+    results: list[dict[str, Any]] = []
+    for feed_url, pub_name in BUSINESS_TODAY_FEEDS:
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        results.extend(items)
+    return results
+
+
+def fetch_rbi_press_releases_rss(timeout: float = 6.0) -> list[dict[str, Any]]:
+    """Fetch authoritative central bank press releases and policy circulars from RBI RSS."""
+    results: list[dict[str, Any]] = []
+    for feed_url, pub_name in RBI_FEEDS:
+        items = _fetch_rss_feed(feed_url, pub_name, timeout=timeout)
+        for it in items:
+            it["category"] = "banking_regulatory"
+            it["source"] = "rbi_rss"
         results.extend(items)
     return results
 
@@ -583,8 +618,12 @@ def fetch_all_broadband_news(timeout: float = 7.0) -> list[dict[str, Any]]:
     - MoneyControl (Latest, Markets, Results, Business)
     - Economic Times (Markets, Earnings, Corporate)
     - LiveMint (Markets, Companies)
+    - Business Standard (Markets, Companies)
+    - Hindu BusinessLine (Markets, Companies)
     - NDTV Profit
-    - Google News (Broad Indian Market Queries)
+    - Business Today (Stocks, Markets, Corporate)
+    - RBI Official Press Releases & Circulars
+    - Google News Targeted Catalyst Feeds (USFDA Pharma, SEBI Orders, NCLT, FII/DII)
     - BSE & NSE Official Corporate Announcements REST API
     - NSE Static Archive RSS Feeds (Announcements, Actions, Insider Trading, Buybacks, Meetings)
 
@@ -597,6 +636,8 @@ def fetch_all_broadband_news(timeout: float = 7.0) -> list[dict[str, Any]]:
         ("BusinessStandard", lambda: fetch_business_standard_rss(timeout=timeout)),
         ("HinduBusinessLine", lambda: fetch_hindu_businessline_rss(timeout=timeout)),
         ("NDTVProfit", lambda: fetch_ndtv_profit_rss(timeout=timeout)),
+        ("BusinessToday", lambda: fetch_business_today_rss(timeout=timeout)),
+        ("RBIPressReleases", lambda: fetch_rbi_press_releases_rss(timeout=timeout)),
         ("GoogleNewsBroadband", lambda: fetch_google_news_broadband(timeout=timeout)),
         ("BSEFilings", lambda: fetch_bse_filings(lookback_days=1, timeout=timeout)),
         ("NSEAnnouncements", lambda: fetch_nse_announcements(lookback_days=1, timeout=timeout)),
