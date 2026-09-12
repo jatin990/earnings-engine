@@ -47,6 +47,165 @@ def context_to_prompt(ctx: dict[str, Any]) -> str:
     return format_standardized_llm_prompt(ctx)
 
 
+def build_customized_prompt(
+    ticker: str,
+    timeframe_days: int = 14,
+    include_technicals: bool = True,
+    include_news: bool = True,
+    include_institutional: bool = True,
+    custom_directives: str | None = None,
+    settings: Settings | None = None,
+    fetch_live: bool = True,
+) -> tuple[str, str, dict[str, Any]]:
+    """Build a customized system and user prompt for OmniRoute analysis with selective toggles.
+
+    Returns:
+        (system_prompt, user_prompt, context_dict)
+    """
+    from earnings_engine.consensus.model_runner import get_horizon_system_prompt
+
+    settings = settings or Settings()
+    sym = ticker.strip().upper()
+
+    ctx = build_context(sym, timeframe_days=timeframe_days, settings=settings, fetch_live=fetch_live)
+
+    # Clean custom directives if blank
+    clean_directives = custom_directives.strip() if (custom_directives and custom_directives.strip()) else None
+
+    # 1. System Prompt tailored for horizon & optional directives
+    system_prompt = get_horizon_system_prompt(timeframe_days=timeframe_days, custom_directives=clean_directives)
+
+    # 2. Extract context elements
+    profile = ctx.get("profile", {})
+    company_name = profile.get("company_name", sym.replace(".NS", ""))
+    sector = profile.get("sector", "General")
+    industry = profile.get("industry", "General")
+    timestamp = ctx.get("generated_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    is_live = ctx.get("is_live", False)
+    live_q = ctx.get("live_quote") or {}
+
+    pa = ctx.get("technical_momentum") or ctx.get("price_action") or {}
+    sw = ctx.get("swing_structure") or ctx.get("swing_channel") or {}
+    inst = ctx.get("institutional_flows") or {}
+    cats = ctx.get("corporate_catalysts") or ctx.get("catalysts") or []
+
+    cmp_val = live_q.get("current_price") or pa.get("current_price") or "N/A"
+    curr_prefix = "₹" if sym.endswith(".NS") else "$"
+
+    # 3. Assemble User Prompt Markdown
+    lines: list[str] = [
+        f"# OmniRoute Market Analysis Context: {sym} ({company_name})",
+        f"- **Sector / Industry:** {sector} | {industry}",
+        f"- **Timeframe / Horizon:** {timeframe_days} Trading Days",
+        f"- **Analysis Timestamp:** {timestamp}",
+        f"- **Market Feed Status:** {'🟢 Live Real-Time authoritative Quote' if is_live else '📊 Daily Historical Snapshot'}",
+        f"- **Current Price (CMP):** {curr_prefix}{cmp_val}",
+        "",
+    ]
+
+    # --- Section: Technical Momentum & Price Structure ---
+    if include_technicals:
+        lines.extend([
+            "---",
+            "## ⚡ Technical Momentum & Price Structure",
+        ])
+        # 52W High / Low
+        h52 = pa.get("high_52w")
+        l52 = pa.get("low_52w")
+        p52w_high = pa.get("pct_from_52w_high")
+        lines.append(f"- **52-Week Range (52W):** Low {curr_prefix}{l52 or 'N/A'} — High {curr_prefix}{h52 or 'N/A'} (Distance to 52W High: {_fmt_pct(p52w_high)})")
+
+        # Returns
+        r7 = pa.get("return_7d")
+        r30 = pa.get("return_30d")
+        r90 = pa.get("return_90d")
+        lines.append(f"- **Multi-Timeframe Returns:** 7D {_fmt_pct(r7)} | 30D {_fmt_pct(r30)} | 90D {_fmt_pct(r90)}")
+
+        # EMAs
+        ema20 = pa.get("ema_20")
+        ema50 = pa.get("ema_50")
+        ema200 = pa.get("ema_200")
+        ema_state = pa.get("ema_alignment", "Neutral")
+        lines.append(f"- **Moving Averages (EMA):** 20 EMA: {ema20 or 'N/A'}, 50 EMA: {ema50 or 'N/A'}, 200 EMA: {ema200 or 'N/A'} (Alignment: {ema_state})")
+
+        # Volume & ATR
+        vol_surge = pa.get("volume_surge_ratio")
+        atr_val = pa.get("atr_14") or pa.get("atr")
+        lines.append(f"- **Volume Surge Ratio:** {f'{vol_surge:.2f}x' if vol_surge is not None else 'N/A'} vs 20-day average")
+        lines.append(f"- **Volatility (ATR):** {curr_prefix}{atr_val or 'N/A'} (14-day Average True Range)")
+
+        # Swing channel support / resistance
+        sup = sw.get("support") or sw.get("lower_bound")
+        res = sw.get("resistance") or sw.get("upper_bound")
+        lines.append(f"- **Swing Range Support / Resistance:** Support {curr_prefix}{sup or 'N/A'} | Resistance {curr_prefix}{res or 'N/A'}")
+        lines.append("")
+
+    # --- Section: Institutional & Smart Money Flows ---
+    if include_institutional:
+        lines.extend([
+            "---",
+            "## 🏛️ Institutional & Smart Money Flows",
+        ])
+        mf_delta = inst.get("mf_holding_delta_qoq") or inst.get("dii_change_qoq")
+        fii_delta = inst.get("fii_holding_delta_qoq") or inst.get("fii_change_qoq")
+        promoter_pct = inst.get("promoter_holding_pct")
+        mf_schemes = inst.get("mf_scheme_count")
+        lines.append(f"- **Mutual Fund (DII) QoQ Delta:** {_fmt_pct(mf_delta)} (Schemes holding: {mf_schemes or 'N/A'})")
+        lines.append(f"- **Foreign Institutional (FII) QoQ Delta:** {_fmt_pct(fii_delta)}")
+        lines.append(f"- **Promoter Shareholding:** {f'{promoter_pct:.2f}%' if promoter_pct is not None else 'N/A'}")
+        lines.append("")
+
+    # --- Section: Corporate Catalysts & Breaking News ---
+    if include_news:
+        lines.extend([
+            "---",
+            "## 📰 Corporate Catalysts & Breaking News",
+        ])
+        if cats:
+            for idx, c in enumerate(cats[:5], start=1):
+                title = c.get("title", "Untitled")
+                pub = c.get("published_at") or c.get("date") or "Recent"
+                impact = c.get("impact_level") or c.get("impact_score") or "Neutral"
+                summary = c.get("summary") or ""
+                lines.append(f"{idx}. **[{impact}] {title}** ({pub})")
+                if summary:
+                    lines.append(f"   _{summary[:200]}_")
+        else:
+            lines.append("No active breaking news catalysts recorded for this symbol.")
+        lines.append("")
+
+    # --- Section: Custom Directives ---
+    if clean_directives:
+        lines.extend([
+            "---",
+            "## 🎯 Custom Focus & Analysis Directives",
+            clean_directives,
+            "",
+        ])
+
+    # --- Section: Required Output Schema ---
+    lines.extend([
+        "---",
+        "## 📋 Required Prediction Schema",
+        "Provide your structured evaluation as a STRICT JSON object in your response:",
+        "```json",
+        "{",
+        '  "direction": "BULLISH" | "BEARISH" | "NEUTRAL",',
+        '  "conviction_score": <integer from 0 to 100>,',
+        '  "target_price": <expected target price as float>,',
+        '  "stop_loss": <invalidation stop loss price as float>,',
+        '  "risk_reward_ratio": <calculated risk-to-reward ratio as float, e.g. 2.5>,',
+        '  "catalyst_summary": "<concise 1-2 sentence core driver>",',
+        '  "thesis": "<detailed 2-3 paragraph trade rationale and technical thesis>",',
+        '  "key_risks": ["<risk 1>", "<risk 2>", "<risk 3>"]',
+        "}",
+        "```",
+    ])
+
+    user_prompt = "\n".join(lines)
+    return system_prompt, user_prompt, ctx
+
+
 def _fmt_pct(val: float | None) -> str:
     if val is None:
         return "N/A"
