@@ -683,4 +683,63 @@
             </div>
         </div>
     </div>
+
+    <!-- ======================================================== -->
+    <!-- 🗓️ RESULTS PER-MONTH DRILLDOWN & EVENT MATRIX MODAL -->
+    <!-- ======================================================== -->
+    <div id="resultsMonthModal" onclick="if(event.target === this) app.closeResultsMonthModal();" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);backdrop-filter:blur(10px);align-items:center;justify-content:center;padding:1rem;">
+        <div style="background:#080911;border:1px solid rgba(255,255,255,0.12);width:100%;max-width:880px;max-height:92vh;border-radius:12px;padding:1.25rem;box-shadow:0 30px 90px rgba(0,0,0,0.95);display:flex;flex-direction:column;gap:0.75rem;overflow:hidden;">
+            <!-- Modal Header -->
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.6rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="font-size:1.3rem;">🗓️</span>
+                    <div>
+                        <div id="resultsMonthModalTitle" style="font-weight:800;font-size:1.1rem;color:#ffffff;font-family:'Space Grotesk',sans-serif;">Month Breakdown</div>
+                        <div id="resultsMonthModalSubtitle" style="font-size:0.72rem;color:#94a3b8;">Corporate earnings catalyst schedule &amp; company roster</div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.4rem;">
+                    <button type="button" id="resultsMonthFilterApplyBtn" onclick="app.filterTableFromMonthModal()" class="btn btn-primary btn-sm" style="font-size:0.72rem;padding:0.2rem 0.6rem;">⚡ Filter Ledger to Month</button>
+                    <button type="button" onclick="app.closeResultsMonthModal()" class="btn-icon" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#ededed;border-radius:6px;width:28px;height:28px;" title="Close (Esc)">✕</button>
+                </div>
+            </div>
+
+            <!-- Summary KPI Pill Bar inside Modal -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.45rem;">
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.4rem 0.6rem;">
+                    <div style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Total Stocks</div>
+                    <div id="resultsMonthModalTotalStocks" style="font-size:1.15rem;font-weight:800;color:#ffffff;font-family:var(--font-mono);">—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.4rem 0.6rem;">
+                    <div style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Scheduled Dates</div>
+                    <div id="resultsMonthModalTotalDates" style="font-size:1.15rem;font-weight:800;color:#60a5fa;font-family:var(--font-mono);">—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.4rem 0.6rem;">
+                    <div style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Large Cap (>1000 Cr)</div>
+                    <div id="resultsMonthModalLargeCap" style="font-size:1.15rem;font-weight:800;color:#34d399;font-family:var(--font-mono);">—</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.4rem 0.6rem;">
+                    <div style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Status</div>
+                    <div id="resultsMonthModalStatusBadge" style="font-size:0.85rem;font-weight:700;color:#cbd5e1;margin-top:2px;">—</div>
+                </div>
+            </div>
+
+            <!-- In-Modal Instant Filter Input -->
+            <div style="display:flex;align-items:center;gap:0.4rem;">
+                <span style="font-size:0.75rem;color:#71717a;">🔍</span>
+                <input type="text" id="resultsMonthModalSearch" oninput="app.filterMonthModalItems(this.value)" placeholder="Filter month stocks by symbol or company..." style="width:100%;height:28px;padding:0 0.5rem;background:#000000;border:1px solid rgba(255,255,255,0.12);border-radius:5px;color:#ffffff;font-size:0.75rem;font-family:var(--font-mono);outline:none;">
+            </div>
+
+            <!-- Scrollable List of Scheduled Dates and Companies -->
+            <div id="resultsMonthModalContent" style="flex:1;overflow-y:auto;max-height:55vh;padding-right:0.3rem;display:flex;flex-direction:column;gap:0.45rem;">
+                <div style="padding:1.5rem;text-align:center;color:#64748b;font-size:0.78rem;">Loading scheduled catalysts...</div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.08);padding-top:0.6rem;">
+                <div style="font-size:0.68rem;color:#64748b;">Click any date or ticker to jump directly into the full analysis</div>
+                <button type="button" onclick="app.closeResultsMonthModal()" class="btn btn-secondary btn-sm" style="font-size:0.75rem;">Close</button>
+            </div>
+        </div>
+    </div>
 

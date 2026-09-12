@@ -1722,6 +1722,184 @@ const API_BASE = window.location.origin;
                 if (nextSubEl) nextSubEl.textContent = nextCount > 0 ? 'Scheduled prints in ' + monthNames[nextMonthDate.getMonth()] : 'Pipeline in ' + monthNames[nextMonthDate.getMonth()];
             },
 
+            // =========================================================================
+            // 🗓️ Month Cards Click & Drilldown Modal Handlers
+            // =========================================================================
+            onMonthCardClick(relativeType) {
+                const now = new Date();
+                let targetDate = now;
+                if (relativeType === 'last') {
+                    targetDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                } else if (relativeType === 'next') {
+                    targetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                }
+                const targetKey = targetDate.toISOString().slice(0, 7);
+
+                // If months are loaded and match, filter the ledger to that month
+                if (this.resultsMonths && this.resultsMonths.some(m => m.month_key === targetKey)) {
+                    this.filterResultsByMonth(targetKey);
+                    // Also scroll smoothly down to the table
+                    const tbl = document.getElementById('resultsReportSections');
+                    if (tbl) tbl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    // Open drilldown modal for detailed breakdown
+                    this.openResultsMonthModal(relativeType);
+                }
+            },
+
+            openResultsMonthModal(monthTarget) {
+                const modal = document.getElementById('resultsMonthModal');
+                if (!modal) return;
+
+                const now = new Date();
+                let targetDate = now;
+                let monthLabel = 'This Month';
+                if (monthTarget === 'last') {
+                    targetDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    monthLabel = 'Last Month';
+                } else if (monthTarget === 'next') {
+                    targetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                    monthLabel = 'Next Month';
+                } else if (typeof monthTarget === 'string' && monthTarget.length === 7) {
+                    const parts = monthTarget.split('-');
+                    targetDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
+                }
+
+                const monthKey = targetDate.toISOString().slice(0, 7);
+                const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                const fullMonthName = monthNames[targetDate.getMonth()] + ' ' + targetDate.getFullYear();
+                this._activeMonthModalKey = monthKey;
+
+                // Set header info
+                const titleEl = document.getElementById('resultsMonthModalTitle');
+                const subEl = document.getElementById('resultsMonthModalSubtitle');
+                if (titleEl) titleEl.textContent = `🗓️ ${fullMonthName} Earnings Catalysts`;
+                if (subEl) subEl.textContent = `Detailed scheduled reports, company roster, and market-cap breakdown for ${monthKey}`;
+
+                // Gather events for this month from resultsDaySectionsMeta
+                let monthItems = (this.resultsDaySectionsMeta || []).filter(m => m.month_key === monthKey || (m.date && m.date.startsWith(monthKey)));
+
+                // If not in current window, check if Month Filter data has it
+                if (!monthItems.length && this.mfDaySectionsMeta && this.mfDaySectionsMeta.length) {
+                    monthItems = this.mfDaySectionsMeta.filter(m => m.month_key === monthKey || (m.date && m.date.startsWith(monthKey)));
+                }
+
+                const totalStocks = monthItems.reduce((acc, m) => acc + (m.stocks_count || 1), 0);
+                const totalDates = monthItems.length;
+
+                // Update KPI Cards
+                const sTotal = document.getElementById('resultsMonthModalTotalStocks');
+                const sDates = document.getElementById('resultsMonthModalTotalDates');
+                const sLarge = document.getElementById('resultsMonthModalLargeCap');
+                const sStatus = document.getElementById('resultsMonthModalStatusBadge');
+                if (sTotal) sTotal.textContent = totalStocks.toLocaleString();
+                if (sDates) sDates.textContent = totalDates.toLocaleString();
+
+                let largeCount = 0;
+                monthItems.forEach(m => {
+                    const matches = (m.html || '').match(/cap-badge-large/g);
+                    if (matches) largeCount += matches.length;
+                });
+                if (sLarge) sLarge.textContent = largeCount > 0 ? largeCount.toLocaleString() : '—';
+
+                const curMonthKey = now.toISOString().slice(0, 7);
+                if (sStatus) {
+                    if (monthKey === curMonthKey) {
+                        sStatus.innerHTML = '<span style="color:#38bdf8;">🟢 Active Season</span>';
+                    } else if (monthKey < curMonthKey) {
+                        sStatus.innerHTML = '<span style="color:#94a3b8;">🕒 Past Results</span>';
+                    } else {
+                        sStatus.innerHTML = '<span style="color:#a7f3d0;">🔮 Future Pipeline</span>';
+                    }
+                }
+
+                // Render Content inside Modal
+                const contentEl = document.getElementById('resultsMonthModalContent');
+                if (contentEl) {
+                    if (monthItems.length) {
+                        contentEl.innerHTML = monthItems.map(m => m.html).join('\n');
+                        // Ensure all day sections are open inside modal
+                        contentEl.querySelectorAll('.day-section').forEach(sec => sec.open = true);
+                    } else {
+                        contentEl.innerHTML = `
+                            <div style="padding:2.5rem 1.5rem;text-align:center;color:var(--text-muted);background:rgba(255,255,255,0.02);border-radius:8px;">
+                                <div style="font-size:1.6rem;margin-bottom:0.5rem;">📅</div>
+                                <div style="font-weight:700;color:#ffffff;margin-bottom:0.35rem;">No Loaded Results for ${fullMonthName}</div>
+                                <p style="font-size:0.75rem;max-width:420px;margin:0 auto 1rem auto;color:#94a3b8;">
+                                    The currently loaded window does not encompass ${fullMonthName}. Choose "±2 Months" or "Custom Range" from the dropdown to ingest this period.
+                                </p>
+                                <button type="button" onclick="app.loadResultsPresetAndFilter('${monthKey}')" class="btn btn-primary btn-sm">⚡ Load ±2 Months Range</button>
+                            </div>
+                        `;
+                    }
+                }
+
+                modal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+
+                // Setup Esc key handler once
+                if (!this._monthModalEscBound) {
+                    this._monthModalEscBound = true;
+                    window.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') {
+                            app.closeResultsMonthModal();
+                        }
+                    });
+                }
+            },
+
+            closeResultsMonthModal() {
+                const modal = document.getElementById('resultsMonthModal');
+                if (modal) modal.style.display = 'none';
+                document.body.style.overflow = '';
+            },
+
+            filterTableFromMonthModal() {
+                if (this._activeMonthModalKey) {
+                    this.filterResultsByMonth(this._activeMonthModalKey);
+                    this.closeResultsMonthModal();
+                    const tbl = document.getElementById('resultsReportSections');
+                    if (tbl) tbl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            },
+
+            loadResultsPresetAndFilter(targetMonthKey) {
+                this.closeResultsMonthModal();
+                const presetEl = document.getElementById('resultsRangePreset');
+                if (presetEl) {
+                    presetEl.value = 'pm60';
+                    this.onResultsPresetChange('pm60');
+                }
+                this.loadResultsReport().then(() => {
+                    if (targetMonthKey) {
+                        setTimeout(() => this.filterResultsByMonth(targetMonthKey), 400);
+                    }
+                });
+            },
+
+            filterMonthModalItems(query) {
+                const q = (query || '').toLowerCase().trim();
+                const container = document.getElementById('resultsMonthModalContent');
+                if (!container) return;
+
+                const rows = container.querySelectorAll('table.results-table tbody tr:not(.row-drawer-tr)');
+                rows.forEach(row => {
+                    if (!q) {
+                        row.style.display = '';
+                        return;
+                    }
+                    const isMatch = row.textContent.toLowerCase().includes(q);
+                    row.style.display = isMatch ? '' : 'none';
+                });
+
+                // Auto hide/show day sections and cap categories based on visible rows
+                container.querySelectorAll('.day-section').forEach(sec => {
+                    const visibleRows = sec.querySelectorAll('table.results-table tbody tr:not([style*="display: none"])');
+                    sec.style.display = (!q || visibleRows.length > 0) ? '' : 'none';
+                    if (q && visibleRows.length > 0) sec.open = true;
+                });
+            },
+
             renderResultsDays() {
                 const el = document.getElementById('resultsReportSections');
                 const shown = (this.resultsDaySections || []).slice(0, this.resultsShowDays);
@@ -1752,12 +1930,13 @@ const API_BASE = window.location.origin;
             },
 
             updateResultsSummaryCards() {
-                const summaryEl = document.getElementById('resultsDatasetSummary');
-                if (!summaryEl) return;
+                const metricsBar = document.getElementById('resultsWindowMetricsBar');
+                if (!metricsBar) return;
 
                 const tableRows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr)');
                 if (!tableRows.length) {
-                    summaryEl.innerHTML = '';
+                    metricsBar.style.display = 'none';
+                    metricsBar.innerHTML = '';
                     return;
                 }
 
@@ -1816,30 +1995,31 @@ const API_BASE = window.location.origin;
                 const avg30D = count30D ? (sum30D / count30D).toFixed(1) : '0.0';
                 const avg30DCls = parseFloat(avg30D) >= 0 ? 'color:#34d399;' : 'color:#f87171;';
                 const beatPct = totalBeatEvalCount ? Math.round((positiveMovesCount / totalBeatEvalCount) * 100) : 0;
-                const winWindow = this.resultsActiveWindowName || '±60D';
+                const winWindow = this.resultsActiveWindowName || 'Selected Window';
 
-                summaryEl.innerHTML = `
-                    <div class="metric">
-                        <span>Total Tracked</span>
-                        <strong style="color:#ffffff;">${totalStocks} <span style="font-size:0.7rem;color:#60a5fa;font-weight:600;">(${winWindow})</span></strong>
+                metricsBar.innerHTML = `
+                    <div class="metric" style="padding:0.25rem 0.45rem;">
+                        <span style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Tracked Window</span>
+                        <strong style="color:#ffffff;font-size:0.95rem;">${totalStocks} <span style="font-size:0.68rem;color:#60a5fa;font-weight:600;">(${winWindow})</span></strong>
                     </div>
-                    <div class="metric">
-                        <span>Avg 30D Momentum</span>
-                        <strong style="${avg30DCls}">${parseFloat(avg30D) > 0 ? '+' : ''}${avg30D}%</strong>
+                    <div class="metric" style="padding:0.25rem 0.45rem;">
+                        <span style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Avg 30D Momentum</span>
+                        <strong style="${avg30DCls}font-size:0.95rem;">${parseFloat(avg30D) > 0 ? '+' : ''}${avg30D}%</strong>
                     </div>
-                    <div class="metric">
-                        <span>Quality Beat Rate</span>
-                        <strong style="color:#38bdf8;">${beatPct}% <span style="font-size:0.7rem;color:#71717a;font-weight:400;">(${positiveMovesCount}/${totalBeatEvalCount})</span></strong>
+                    <div class="metric" style="padding:0.25rem 0.45rem;">
+                        <span style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Quality Beat Rate</span>
+                        <strong style="color:#38bdf8;font-size:0.95rem;">${beatPct}% <span style="font-size:0.68rem;color:#71717a;font-weight:400;">(${positiveMovesCount}/${totalBeatEvalCount})</span></strong>
                     </div>
-                    <div class="metric">
-                        <span>AI Consensus</span>
-                        <strong style="color:#60a5fa;font-size:0.85rem;"><span style="color:#34d399;">${bullConsensusCount} 🐂</span> / <span style="color:#f87171;">${bearConsensusCount} 🐻</span></strong>
+                    <div class="metric" style="padding:0.25rem 0.45rem;">
+                        <span style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">AI Consensus</span>
+                        <strong style="color:#60a5fa;font-size:0.95rem;"><span style="color:#34d399;">${bullConsensusCount} 🐂</span> / <span style="color:#f87171;">${bearConsensusCount} 🐻</span></strong>
                     </div>
-                    <div class="metric">
-                        <span>Imminent (48h)</span>
-                        <strong style="color:#fbbf24;">${imminentCount} <span style="font-size:0.7rem;color:#a1a1aa;font-weight:400;">catalysts</span></strong>
+                    <div class="metric" style="padding:0.25rem 0.45rem;">
+                        <span style="font-size:0.65rem;color:#94a3b8;text-transform:uppercase;">Imminent (48h)</span>
+                        <strong style="color:#fbbf24;font-size:0.95rem;">${imminentCount} <span style="font-size:0.68rem;color:#a1a1aa;font-weight:400;">catalysts</span></strong>
                     </div>
                 `;
+                metricsBar.style.display = 'grid';
             },
 
             filterResultsTable(query) {
