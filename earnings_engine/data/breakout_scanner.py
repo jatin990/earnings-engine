@@ -2302,7 +2302,7 @@ def _score_resistance_proximity(closes: pd.Series) -> tuple[float, float]:
 def _score_volume_surge(volumes: pd.Series) -> tuple[float, float]:
     """Return (score 0-10, vol_ratio).
 
-    Vol today vs 20D avg. Reward moderate accumulation, penalize extreme churn/exhaustion.
+    Vol today vs 20D avg. Reward strong institutional accumulation and breakout volume expansion.
     """
     if len(volumes) < 5:
         return 0.0, float("nan")
@@ -2312,12 +2312,14 @@ def _score_volume_surge(volumes: pd.Series) -> tuple[float, float]:
     if avg_20 <= 0:
         return 0.0, float("nan")
     ratio = today / avg_20
-    if 1.0 <= ratio < 1.5:
+    if ratio >= 2.0:
         score = 10.0
     elif 1.5 <= ratio < 2.0:
-        score = 7.0
-    elif ratio >= 2.0:
-        score = 4.0
+        score = 8.0
+    elif 1.25 <= ratio < 1.5:
+        score = 6.0
+    elif 1.0 <= ratio < 1.25:
+        score = 3.0
     else:
         score = 0.0
     return score, round(ratio, 2)
@@ -2505,6 +2507,101 @@ def _calculate_donchian_ttm_squeeze(closes: pd.Series, highs: pd.Series, lows: p
     return squeeze_on, donchian_55_high, mom_osc, bb_width_pct, kc_width_pct
 
 
+def _detect_vcp_pattern(
+    highs: pd.Series,
+    lows: pd.Series,
+    closes: pd.Series,
+    volumes: pd.Series,
+    lookback: int = 60,
+) -> dict[str, Any]:
+    """Detect Mark Minervini's Volatility Contraction Pattern (VCP).
+
+    Analyzes wave contractions across trailing swing pivots:
+    - Measures contraction depth: (Swing High - Swing Low) / Swing High * 100
+    - Enforces progressive contraction: C1 > C2 > C3...
+    - Detects volume dry-up on the final contraction wave before breakout pivot.
+    """
+    if len(closes) < 30:
+        return {
+            "is_vcp": False,
+            "stage": "None",
+            "num_contractions": 0,
+            "contractions_pct": [],
+            "volume_dry_up": False,
+            "pivot_level": None,
+        }
+
+    w_highs = highs.tail(lookback).values
+    w_lows = lows.tail(lookback).values
+    w_closes = closes.tail(lookback).values
+    w_vols = volumes.tail(lookback).values
+    n = len(w_closes)
+
+    # Identify swing highs (local peaks) and swing lows (local troughs)
+    peaks = []
+    troughs = []
+    order = 3
+    for i in range(order, n - order):
+        if w_highs[i] == max(w_highs[i - order : i + order + 1]):
+            peaks.append((i, float(w_highs[i])))
+        if w_lows[i] == min(w_lows[i - order : i + order + 1]):
+            troughs.append((i, float(w_lows[i])))
+
+    if len(peaks) < 2 or len(troughs) < 2:
+        return {
+            "is_vcp": False,
+            "stage": "None",
+            "num_contractions": 0,
+            "contractions_pct": [],
+            "volume_dry_up": False,
+            "pivot_level": None,
+        }
+
+    contractions = []
+    for i in range(min(len(peaks), len(troughs))):
+        p_price = peaks[i][1]
+        sub_troughs = [t[1] for t in troughs if t[0] >= peaks[i][0]]
+        if sub_troughs:
+            t_price = min(sub_troughs)
+            if p_price > 0:
+                depth = round(((p_price - t_price) / p_price) * 100.0, 1)
+                if depth > 0.5:
+                    contractions.append(depth)
+
+    is_contracting = False
+    valid_contractions = []
+    if len(contractions) >= 2:
+        tail_c = contractions[-4:]
+        if all(tail_c[j] >= tail_c[j+1] * 0.9 for j in range(len(tail_c)-1)) and tail_c[-1] <= 10.0:
+            is_contracting = True
+            valid_contractions = tail_c
+
+    avg_vol_20 = float(np.mean(w_vols[-20:])) if len(w_vols) >= 20 else float(np.mean(w_vols))
+    recent_vol = float(np.mean(w_vols[-5:])) if len(w_vols) >= 5 else avg_vol_20
+    volume_dry_up = bool(avg_vol_20 > 0 and recent_vol <= avg_vol_20 * 0.85)
+
+    is_vcp = bool(is_contracting and len(valid_contractions) >= 2)
+    num_c = len(valid_contractions)
+    pivot_level = round(float(peaks[-1][1]), 2) if peaks else None
+
+    if is_vcp:
+        c_str = " -> ".join(f"{c:.1f}%" for c in valid_contractions)
+        stage = f"VCP {num_c}T Coiled ({c_str})"
+    elif is_contracting:
+        stage = f"VCP Developing ({len(contractions)} Waves)"
+    else:
+        stage = "No VCP"
+
+    return {
+        "is_vcp": is_vcp,
+        "stage": stage,
+        "num_contractions": num_c,
+        "contractions_pct": valid_contractions,
+        "volume_dry_up": volume_dry_up,
+        "pivot_level": pivot_level,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Technical Decision Metrics Extraction
 # ---------------------------------------------------------------------------
@@ -2517,10 +2614,11 @@ def compute_technical_decision_metrics(
     """Compute comprehensive technical decision metrics for email alerts and trading context.
 
     Extracts:
-    - Moving averages: SMA 20, 50, 200 and percentage distances from current price
+    - Moving averages: SMA 20, 50, 200, EMA 8, EMA 21 and percentage distances
     - Trend Alignment: Bullish Golden Stack, Bullish Alignment, Above 200 SMA, Below 200 SMA
+    - Supertrend: 10-period 3.0-multiplier direction and stop level
     - 52-Week Range: High, Low, % from 52W High, % from 52W Low, 20D Range %
-    - Volatility & Squeeze: ATR(14) %, ATR(14) absolute value, John Carter TTM Volatility Squeeze status
+    - Volatility & Squeeze: ATR(14) %, John Carter TTM Volatility Squeeze, Minervini VCP status
     - Momentum & Flow: RSI(14), 20D Volume Surge Ratio, 30D Return %
     """
     settings = settings or Settings()
@@ -2536,13 +2634,22 @@ def compute_technical_decision_metrics(
     if prices_df is None or prices_df.empty or len(prices_df) < 5:
         return {
             "sma_20": None, "sma_50": None, "sma_200": None,
+            "ema_8": None, "ema_21": None,
             "dist_sma_20_pct": None, "dist_sma_50_pct": None, "dist_sma_200_pct": None,
+            "dist_ema_8_pct": None, "dist_ema_21_pct": None,
+            "ema_ribbon_bullish": False,
             "trend_alignment": "Unknown",
+            "supertrend_direction": "UNKNOWN",
+            "supertrend_value": None,
             "high_52w": None, "low_52w": None,
             "dist_52w_high_pct": None, "dist_52w_low_pct": None,
             "range_20d_pct": None,
             "atr_14": None, "atr_14_pct": None,
             "squeeze_on": False,
+            "vcp_pattern": {
+                "is_vcp": False, "stage": "None", "num_contractions": 0,
+                "contractions_pct": [], "volume_dry_up": False, "pivot_level": None,
+            },
             "rsi_14": None,
             "volume_surge_ratio": None,
             "ret_30d_pct": None,
@@ -2552,13 +2659,22 @@ def compute_technical_decision_metrics(
     if closes.empty:
         return {
             "sma_20": None, "sma_50": None, "sma_200": None,
+            "ema_8": None, "ema_21": None,
             "dist_sma_20_pct": None, "dist_sma_50_pct": None, "dist_sma_200_pct": None,
+            "dist_ema_8_pct": None, "dist_ema_21_pct": None,
+            "ema_ribbon_bullish": False,
             "trend_alignment": "Unknown",
+            "supertrend_direction": "UNKNOWN",
+            "supertrend_value": None,
             "high_52w": None, "low_52w": None,
             "dist_52w_high_pct": None, "dist_52w_low_pct": None,
             "range_20d_pct": None,
             "atr_14": None, "atr_14_pct": None,
             "squeeze_on": False,
+            "vcp_pattern": {
+                "is_vcp": False, "stage": "None", "num_contractions": 0,
+                "contractions_pct": [], "volume_dry_up": False, "pivot_level": None,
+            },
             "rsi_14": None,
             "volume_surge_ratio": None,
             "ret_30d_pct": None,
@@ -2571,14 +2687,20 @@ def compute_technical_decision_metrics(
 
     current_price = float(closes.iloc[-1])
 
-    # Moving Averages
+    # Moving Averages (Simple & Exponential)
     sma_20 = float(closes.values[-20:].mean()) if len(closes) >= 20 else float(closes.mean())
     sma_50 = float(closes.tail(50).mean()) if len(closes) >= 50 else (float(closes.mean()) if len(closes) >= 20 else None)
     sma_200 = float(closes.tail(200).mean()) if len(closes) >= 200 else (float(closes.mean()) if len(closes) >= 100 else None)
 
+    ema_8 = float(closes.ewm(span=8, adjust=False).mean().iloc[-1]) if len(closes) >= 8 else None
+    ema_21 = float(closes.ewm(span=21, adjust=False).mean().iloc[-1]) if len(closes) >= 21 else None
+
     dist_sma_20_pct = round(((current_price - sma_20) / sma_20) * 100.0, 2) if sma_20 and sma_20 > 0 else None
     dist_sma_50_pct = round(((current_price - sma_50) / sma_50) * 100.0, 2) if sma_50 and sma_50 > 0 else None
     dist_sma_200_pct = round(((current_price - sma_200) / sma_200) * 100.0, 2) if sma_200 and sma_200 > 0 else None
+    dist_ema_8_pct = round(((current_price - ema_8) / ema_8) * 100.0, 2) if ema_8 and ema_8 > 0 else None
+    dist_ema_21_pct = round(((current_price - ema_21) / ema_21) * 100.0, 2) if ema_21 and ema_21 > 0 else None
+    ema_ribbon_bullish = bool(ema_8 and ema_21 and ema_8 > ema_21 and current_price >= ema_8)
 
     # Trend Alignment
     if sma_20 is not None and sma_50 is not None and sma_200 is not None:
@@ -2612,7 +2734,7 @@ def compute_technical_decision_metrics(
     low_20d = float(lows.tail(w20_len).min())
     range_20d_pct = round(((high_20d - low_20d) / max(0.01, current_price)) * 100.0, 2)
 
-    # ATR(14)
+    # ATR(14) & True Range
     tr1 = (highs - lows).abs()
     tr2 = (highs - closes.shift(1)).abs()
     tr3 = (lows - closes.shift(1)).abs()
@@ -2630,6 +2752,47 @@ def compute_technical_decision_metrics(
         kc_upper = sma_20 + 1.5 * atr_20
         kc_lower = sma_20 - 1.5 * atr_20
         squeeze_on = bool(bb_upper <= kc_upper and bb_lower >= kc_lower)
+
+    # Supertrend (10, 3.0)
+    supertrend_direction = "UNKNOWN"
+    supertrend_value = None
+    if len(closes) >= 15:
+        hl2 = (highs + lows) / 2.0
+        matr = tr.rolling(10).mean()
+        upper_basic = hl2 + (3.0 * matr)
+        lower_basic = hl2 - (3.0 * matr)
+
+        final_upper = upper_basic.copy()
+        final_lower = lower_basic.copy()
+        supertrend = pd.Series(index=closes.index, dtype=float)
+        direction = pd.Series(index=closes.index, dtype=int)
+
+        for i in range(10, len(closes)):
+            if upper_basic.iloc[i] < final_upper.iloc[i-1] or closes.iloc[i-1] > final_upper.iloc[i-1]:
+                final_upper.iloc[i] = upper_basic.iloc[i]
+            else:
+                final_upper.iloc[i] = final_upper.iloc[i-1]
+
+            if lower_basic.iloc[i] > final_lower.iloc[i-1] or closes.iloc[i-1] < final_lower.iloc[i-1]:
+                final_lower.iloc[i] = lower_basic.iloc[i]
+            else:
+                final_lower.iloc[i] = final_lower.iloc[i-1]
+
+            if closes.iloc[i] > final_upper.iloc[i-1]:
+                direction.iloc[i] = 1
+            elif closes.iloc[i] < final_lower.iloc[i-1]:
+                direction.iloc[i] = -1
+            else:
+                direction.iloc[i] = direction.iloc[i-1] if i > 10 else 1
+
+            supertrend.iloc[i] = final_lower.iloc[i] if direction.iloc[i] == 1 else final_upper.iloc[i]
+
+        if not supertrend.dropna().empty:
+            supertrend_value = round(float(supertrend.iloc[-1]), 2)
+            supertrend_direction = "BULLISH" if direction.iloc[-1] == 1 else "BEARISH"
+
+    # VCP Pattern Detection
+    vcp_result = _detect_vcp_pattern(highs, lows, closes, volumes, lookback=60)
 
     # RSI(14)
     rsi_14 = None
@@ -2664,10 +2827,17 @@ def compute_technical_decision_metrics(
         "sma_20": round(sma_20, 2) if sma_20 is not None else None,
         "sma_50": round(sma_50, 2) if sma_50 is not None else None,
         "sma_200": round(sma_200, 2) if sma_200 is not None else None,
+        "ema_8": round(ema_8, 2) if ema_8 is not None else None,
+        "ema_21": round(ema_21, 2) if ema_21 is not None else None,
         "dist_sma_20_pct": dist_sma_20_pct,
         "dist_sma_50_pct": dist_sma_50_pct,
         "dist_sma_200_pct": dist_sma_200_pct,
+        "dist_ema_8_pct": dist_ema_8_pct,
+        "dist_ema_21_pct": dist_ema_21_pct,
+        "ema_ribbon_bullish": ema_ribbon_bullish,
         "trend_alignment": trend_alignment,
+        "supertrend_direction": supertrend_direction,
+        "supertrend_value": supertrend_value,
         "high_52w": round(high_52w, 2),
         "low_52w": round(low_52w, 2),
         "dist_52w_high_pct": dist_52w_high_pct,
@@ -2676,6 +2846,7 @@ def compute_technical_decision_metrics(
         "atr_14": round(atr_14, 2),
         "atr_14_pct": atr_14_pct,
         "squeeze_on": squeeze_on,
+        "vcp_pattern": vcp_result,
         "rsi_14": rsi_14,
         "volume_surge_ratio": volume_surge_ratio,
         "ret_30d_pct": ret_30d_pct,

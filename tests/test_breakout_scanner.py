@@ -77,10 +77,10 @@ class TestResistanceProximity:
 
 
 class TestVolumeSurge:
-    def test_moderate_volume_gives_max_score(self):
+    def test_moderate_volume_gives_score(self):
         volumes = pd.Series([1_000_000] * 20 + [1_200_000])  # 1.2× surge
         score, ratio = _score_volume_surge(volumes)
-        assert score == 10.0
+        assert score == 3.0
         assert ratio >= 1.0
 
     def test_below_average_volume_gives_zero(self):
@@ -89,10 +89,11 @@ class TestVolumeSurge:
         assert score == 0.0
         assert ratio < 1.0
 
-    def test_heavy_volume_penalized(self):
+    def test_heavy_volume_rewarded_maximum(self):
         volumes = pd.Series([1_000_000] * 20 + [2_500_000])
         score, ratio = _score_volume_surge(volumes)
-        assert score == 4.0
+        assert score == 10.0
+        assert ratio >= 2.0
 
     def test_short_series_returns_zero_and_nan(self):
         score, ratio = _score_volume_surge(pd.Series([1000.0, 2000.0]))
@@ -629,6 +630,75 @@ class TestBreakoutAIReasoningPersistentCache:
             mock_score.assert_not_called()
 
         assert res_cached["ticker"] == "UNTRACKED.NS"
+
+
+class TestTechnicalIndicatorsAndVCP:
+    """Validate enhanced technical indicators: EMA ribbon, Supertrend, and Minervini VCP."""
+
+    def test_compute_technical_decision_metrics_structure(self):
+        import pandas as pd
+        from earnings_engine.data.breakout_scanner import compute_technical_decision_metrics
+
+        dates = pd.date_range("2026-01-01", periods=60, freq="B")
+        prices = [100.0 + i * 0.5 for i in range(60)]
+        highs = [p + 1.0 for p in prices]
+        lows = [p - 1.0 for p in prices]
+        vols = [1_000_000] * 60
+
+        df = pd.DataFrame(
+            {"open": prices, "high": highs, "low": lows, "close": prices, "volume": vols},
+            index=dates,
+        )
+
+        metrics = compute_technical_decision_metrics("INFY.NS", prices_df=df)
+        assert metrics["current_price"] > 0
+        assert metrics["ema_8"] is not None
+        assert metrics["ema_21"] is not None
+        assert metrics["ema_ribbon_bullish"] is True
+        assert metrics["supertrend_direction"] in ("BULLISH", "BEARISH")
+        assert metrics["vcp_pattern"] is not None
+        assert "is_vcp" in metrics["vcp_pattern"]
+        assert "stage" in metrics["vcp_pattern"]
+
+    def test_detect_vcp_pattern_identifies_progressive_contractions(self):
+        import pandas as pd
+        from earnings_engine.data.breakout_scanner import _detect_vcp_pattern
+
+        # Construct a synthetic 3-wave VCP pattern (Contraction 1: 15%, Contraction 2: 7%, Contraction 3: 3%)
+        # Base: 100 -> peak 120 -> drop to 102 (15% drop) -> rise to 118 -> drop to 110 (6.8% drop) -> rise to 117 -> drop to 114 (2.6% drop) -> 116
+        dates = pd.date_range("2026-01-01", periods=60, freq="B")
+
+        # Build price wave
+        prices = []
+        # wave 1: 100 up to 120 (10 bars)
+        prices += list(np.linspace(100, 120, 10))
+        # drop to 102 (8 bars)
+        prices += list(np.linspace(120, 102, 8))
+        # wave 2: up to 118 (10 bars)
+        prices += list(np.linspace(102, 118, 10))
+        # drop to 110 (8 bars)
+        prices += list(np.linspace(118, 110, 8))
+        # wave 3: up to 117 (8 bars)
+        prices += list(np.linspace(110, 117, 8))
+        # drop to 114 (8 bars)
+        prices += list(np.linspace(117, 114, 8))
+        # final consolidation: 114 to 116 (8 bars)
+        prices += list(np.linspace(114, 116, 8))
+
+        prices = prices[:60]
+        closes = pd.Series(prices, index=dates)
+        highs = closes + 0.5
+        lows = closes - 0.5
+        # Volume drying up in final 10 bars
+        vols = pd.Series([1_000_000] * 50 + [400_000] * 10, index=dates)
+
+        res = _detect_vcp_pattern(highs=highs, lows=lows, closes=closes, volumes=vols, lookback=60)
+        assert res is not None
+        assert "is_vcp" in res
+        assert "stage" in res
+        assert "volume_dry_up" in res
+        assert res["volume_dry_up"] is True
+
 
 
 

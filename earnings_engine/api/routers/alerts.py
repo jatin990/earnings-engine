@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+import ipaddress
 import json
+import socket
 from typing import Any
+import urllib.parse
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -41,6 +44,33 @@ class TestDispatchPayload(BaseModel):
     sample_strategy: str = Field(default="Breakout Momentum")
     sample_score: float = Field(default=86.5)
     sample_surge: float = Field(default=2.8)
+
+
+def _is_safe_webhook_url(url_str: str) -> bool:
+    """Validate that webhook URL uses HTTP/HTTPS and does not target private or local IP ranges."""
+    try:
+        parsed = urllib.parse.urlparse(url_str)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        if hostname.lower() in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+            return False
+        # Resolve IP to block internal RFC1918 / loopback / link-local addresses
+        try:
+            ip_info = socket.getaddrinfo(hostname, None)
+            for addr_info in ip_info:
+                ip_str = addr_info[4][0]
+                ip_obj = ipaddress.ip_address(ip_str)
+                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved:
+                    return False
+        except Exception:
+            # If DNS resolution fails or format is invalid
+            return False
+        return True
+    except Exception:
+        return False
 
 
 def _seed_default_rules_if_empty(conn: Any) -> None:
@@ -230,6 +260,8 @@ async def test_dispatch_alert(payload: TestDispatchPayload):
     if channel == "webhook":
         if not payload.webhook_url:
             raise HTTPException(status_code=400, detail="Webhook URL is required for webhook test dispatch")
+        if not _is_safe_webhook_url(payload.webhook_url):
+            raise HTTPException(status_code=400, detail="Invalid webhook URL: private, loopback, or non-HTTP endpoints are not allowed.")
         import urllib.request
         try:
             req_data = json.dumps({
@@ -253,8 +285,9 @@ async def test_dispatch_alert(payload: TestDispatchPayload):
 
     elif channel == "email":
         recipients = payload.email_recipients or "configured admin"
-        # Log simulated test dispatch
-        logger.info("[ALERT TEST] Email dispatch simulated for %s -> %s", payload.sample_ticker, recipients)
+        # Log simulated test dispatch with masked/sanitized recipient
+        safe_recipients = recipients.split("@")[0] + "@***" if "@" in recipients else recipients
+        logger.info("[ALERT TEST] Email dispatch simulated for %s -> %s", payload.sample_ticker, safe_recipients)
         return {
             "status": "ok",
             "channel": "email",

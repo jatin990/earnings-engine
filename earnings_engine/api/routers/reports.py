@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import csv
 from datetime import datetime, timezone
+import html
 import io
 import json
+import re
 from typing import Any
 import urllib.parse
 
@@ -136,7 +138,10 @@ async def export_radar_csv(
 
         csv_content = output.getvalue()
         output.close()
-        return csv_content, f"nexus_radar_{radar_type}_{universe.lower()}_{now_date}.csv"
+        safe_radar = re.sub(r'[^a-zA-Z0-9_-]', '', radar_type)
+        safe_universe = re.sub(r'[^a-zA-Z0-9_-]', '', universe.lower())
+        safe_filename = f"nexus_radar_{safe_radar}_{safe_universe}_{now_date}.csv"
+        return csv_content, safe_filename
 
     try:
         csv_data, filename = await asyncio.to_thread(_generate_csv)
@@ -258,7 +263,8 @@ async def export_ticker_bundle(ticker: str):
 @router.get("/api/v1/reports/export/print-pack/{ticker}", response_class=HTMLResponse)
 async def export_printable_research_pack(ticker: str):
     """Render a clean, high-contrast, print-optimized HTML equity research memo for PDF export."""
-    clean_ticker = urllib.parse.unquote(ticker).upper().strip()
+    raw_ticker = urllib.parse.unquote(ticker).upper().strip()
+    clean_ticker = html.escape(raw_ticker)
     now_str = datetime.now(timezone.utc).strftime("%d %b %Y %H:%M UTC")
 
     curr_sym = "₹" if clean_ticker.endswith(".NS") or clean_ticker.endswith(".BO") else "$"
@@ -414,7 +420,7 @@ async def export_printable_research_pack(ticker: str):
         <div class="card-title">🤖 Multi-Model AI Consensus Engine</div>
         <div style="display: flex; gap: 2rem; margin-bottom: 0.75rem;">
             <div><span class="metric-label">Consensus Stance:</span> <strong style="color:#059669; font-size: 1.1rem; margin-left: 0.5rem;">BULLISH (88% Conviction)</strong></div>
-            <div><span class="metric-label">Target Range:</span> <strong class="metric-val" style="font-size: 1.1rem; margin-left: 0.5rem;">{currSym} +7.5% &rarr; +12.0%</strong></div>
+            <div><span class="metric-label">Target Range:</span> <strong class="metric-val" style="font-size: 1.1rem; margin-left: 0.5rem;">{curr_sym} +7.5% &rarr; +12.0%</strong></div>
         </div>
         <p style="font-size: 0.85rem; color: #334155; margin: 0; line-height: 1.6;">
             Multi-model synthesis indicates strong technical alignment with accelerating institutional accumulation flows. The stock is breaking out of a multi-week consolidation channel on volume multiple exceeding 2.5x standard deviations. Risk parameters define primary invalidation below the 20-day exponential moving average.

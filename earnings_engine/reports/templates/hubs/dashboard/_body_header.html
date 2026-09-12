@@ -61,6 +61,21 @@
             <span id="topOpenRouterQuota" style="font-size: 0.7rem; font-weight: 600; color: #e2e8f0; font-family: var(--font-mono); white-space: nowrap;">OmniRoute</span>
         </div>
 
+        <!-- Global Watchlist Slide-Over Drawer Button [Shift+W] -->
+        <button type="button" id="topWatchlistDrawerBtn" onclick="app.toggleWatchlistDrawer()" class="btn-micro" style="background: rgba(234,179,8,0.12); color: #facc15; border: 1px solid rgba(234,179,8,0.3); font-weight: 600; font-size: 0.72rem; padding: 0.25rem 0.55rem; border-radius: 5px; cursor: pointer; white-space: nowrap;" title="Open Global Watchlist Drawer [Shift+W]">
+            ⭐ <span class="desktop-btn-label">Watchlist</span> (<span id="topbarWlCount">0</span>)
+        </button>
+
+        <!-- Custom Alert Rules Engine Button -->
+        <button type="button" id="topAlertRulesBtn" onclick="app.openAlertRulesModal()" class="btn-micro" style="background: rgba(244,63,94,0.12); color: #fb7185; border: 1px solid rgba(244,63,94,0.3); font-weight: 600; font-size: 0.72rem; padding: 0.25rem 0.55rem; border-radius: 5px; cursor: pointer; white-space: nowrap;" title="Configure Custom Breakout & Momentum Alert Rules">
+            ⚡ <span class="desktop-btn-label">Alerts</span>
+        </button>
+
+        <!-- Research Report & Dossier Exporter Button -->
+        <button type="button" id="topExportCenterBtn" onclick="app.openExportPackModal()" class="btn-micro" style="background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.3); font-weight: 600; font-size: 0.72rem; padding: 0.25rem 0.55rem; border-radius: 5px; cursor: pointer; white-space: nowrap;" title="Export Research Dossier (PDF / CSV)">
+            📑 <span class="desktop-btn-label">Export</span>
+        </button>
+
         <!-- Page Guide Button -->
         <button type="button" onclick="app.openPageGuideModal()" class="btn-micro" style="background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); font-weight: 600; font-size: 0.72rem; padding: 0.25rem 0.55rem; border-radius: 5px; cursor: pointer; white-space: nowrap;" title="Explain this page and the quantitative thought behind it">
             💡 <span class="desktop-btn-label">Page Guide</span>

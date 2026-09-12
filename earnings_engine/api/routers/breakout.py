@@ -627,44 +627,6 @@ async def get_breakout_schedules_endpoint():
     return {"success": True, "count": len(breakout_schedules), "schedules": breakout_schedules}
 
 
-@router.get("/api/v1/breakout-radar/status")
-async def get_breakout_status_endpoint(universe: str | None = Query(None)):
-    """Check current background scan execution status and pool metrics."""
-    status = await asyncio.to_thread(breakout_scanner_mod.get_scan_status, universe=universe)
-    return {
-        "success": True,
-        "status": status.get("status", "idle"),
-        "is_scanning": status.get("status") == "running",
-        "last_scan_at": status.get("last_scan_at"),
-        "last_scan_duration_s": status.get("last_scan_duration_s", 0.0),
-        "hot_count": status.get("hot_count", 0),
-        "warm_count": status.get("warm_count", 0),
-        "candidates_count": status.get("candidates_count", 0),
-        "error": status.get("error"),
-    }
-
-
-@router.post("/api/v1/breakout-radar/refresh")
-async def refresh_breakout_radar_endpoint(
-    universe: str | None = Query(None),
-    strategy: str = Query("CLASSIC_TECHNICAL"),
-):
-    """Schedule breakout scan in background."""
-    from earnings_engine.data.scheduler_engine import get_scheduler_engine
-    engine = get_scheduler_engine()
-    job_id = "breakout_all_strategies_parallel" if strategy.upper() in ("ALL", "*") else f"breakout_{strategy.lower()}_scan"
-    if job_id not in engine.handlers:
-        job_id = "breakout_all_strategies_parallel"
-    dispatched = engine.dispatch_job(job_id, _settings)
-    return {
-        "success": True,
-        "status": "scheduled",
-        "job_id": job_id,
-        "dispatched": dispatched,
-        "message": "Breakout scan is scheduled in the background. Please check back in a few moments as data is populated.",
-    }
-
-
 @router.post("/api/v1/breakout-radar/schedules/parallel-scan")
 async def trigger_breakout_parallel_scan_endpoint(
     universe: str | None = Query(None, description="Universe to scan in parallel (e.g. NSE_ALL)"),

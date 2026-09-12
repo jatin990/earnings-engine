@@ -28,10 +28,10 @@ def test_breakout_subscores():
     assert res_score >= 28.0
     assert pct_high >= -1.0
 
-    # 2. Volume surge
+    # 2. Volume surge (2.5x surge rewarded with max score)
     volumes = pd.Series([1000] * 20 + [2500])
     vol_score, vol_ratio = _score_volume_surge(volumes)
-    assert vol_score == 4.0
+    assert vol_score == 10.0
     assert vol_ratio >= 2.0
 
     # 3. Compression
