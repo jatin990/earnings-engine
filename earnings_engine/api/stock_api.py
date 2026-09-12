@@ -1162,4 +1162,15 @@ def refresh_stock_news(
         return {"success": False, "error": str(e)}
 
 
+def get_ipo_stock_detail(
+    ticker: str,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Retrieve deep IPO technical, earnings lifecycle, and institutional backing for a newly listed stock."""
+    from earnings_engine.data.new_listings import get_ipo_stock_detail as _get_ipo_stock_detail
+    settings = settings or Settings()
+    return _get_ipo_stock_detail(ticker=ticker, settings=settings)
+
+
+
 

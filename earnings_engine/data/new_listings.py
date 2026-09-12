@@ -198,7 +198,8 @@ def get_recent_nse_additions(
         ticker = f"{raw_symbol}.NS"
         company_name = str(row.get("NAME OF COMPANY", raw_symbol)).strip()
         series = str(row.get("SERIES", "EQ")).strip()
-        face_value = row.get("FACE VALUE", None)
+        raw_fv = row.get("FACE VALUE", None)
+        face_value = int(raw_fv) if pd.notna(raw_fv) else None
 
         listing_dt = row.get("LISTING_DATE")
         listing_date_str = listing_dt.strftime("%Y-%m-%d") if pd.notna(listing_dt) else "Unknown"
@@ -406,7 +407,8 @@ def get_ipo_stock_detail(
                 r_meta = matched.iloc[0]
                 company_name = str(r_meta.get("NAME OF COMPANY", raw_symbol)).strip()
                 series = str(r_meta.get("SERIES", "EQ")).strip()
-                face_value = r_meta.get("FACE VALUE", None)
+                raw_fv = r_meta.get("FACE VALUE", None)
+                face_value = int(raw_fv) if pd.notna(raw_fv) else None
                 listing_dt = r_meta.get("LISTING_DATE")
                 if pd.notna(listing_dt):
                     listing_date_str = listing_dt.strftime("%Y-%m-%d")

@@ -271,6 +271,19 @@ async def get_market_status_endpoint():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/v1/market/ipo-detail/{ticker}")
+async def get_ipo_detail_endpoint(ticker: str):
+    """Retrieve deep IPO technical, earnings lifecycle, and institutional backing for a newly listed stock."""
+    from earnings_engine.api import stock_api as _stock_api
+    try:
+        data = await asyncio.to_thread(_stock_api.get_ipo_stock_detail, ticker=ticker, settings=_settings)
+        return data
+    except Exception as e:
+        logger.exception("Error fetching IPO detail for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 # ---------------------------------------------------------------------------
 # PARAMETERIZED ROUTES
 # ---------------------------------------------------------------------------
