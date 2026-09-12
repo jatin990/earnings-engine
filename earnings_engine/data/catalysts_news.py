@@ -123,7 +123,8 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
             "bonus share issue", "1:1 bonus", "1:2 bonus", "2:1 bonus", "sub-division of shares",
             "split from rs 10 to", "face value split", "final dividend of rs", "interim dividend of rs",
             "tender offer buyback", "open market buyback", "buyback price of rs", "capital reduction",
-            "fix record date"
+            "fix record date", "daily share buy-back", "daily buyback", "buy-back of equity shares",
+            "corporate action", "ex-date:"
         ],
         "base_impact": 68,
         "default_direction": "BULLISH",
@@ -155,7 +156,9 @@ CATALYST_RULES: dict[str, dict[str, Any]] = {
             "appointed as managing director", "appointed as chief executive officer",
             "revocation of pledge", "release of pledged shares", "promoter increases stake",
             "open market purchase by promoter", "rating downgraded by care", "rating placed on watch negative",
-            "invocation of pledged shares", "rating downgraded", "downgrade by crisil", "pledge invoked", "promoter pledge"
+            "invocation of pledged shares", "rating downgraded", "downgrade by crisil", "pledge invoked", "promoter pledge",
+            "insider trading", "insider trading disclosure", "regulation 7(2)", "regulation 7 (2)",
+            "sast regulation 29", "sast reg 29", "sast regulation 31", "encumbrance of shares", "reason for encumbrance"
         ],
         "base_impact": 72,
         "default_direction": "BULLISH",

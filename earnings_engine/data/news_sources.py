@@ -71,6 +71,29 @@ NDTV_FEEDS = [
     ("https://feeds.feedburner.com/ndtvprofit-latest", "NDTV Profit"),
 ]
 
+# Official NSE Static Archive RSS Feeds (https://www.nseindia.com/static/rss-feed)
+NSE_STATIC_RSS_FEEDS = [
+    ("https://nsearchives.nseindia.com/content/RSS/Online_announcements.xml", "NSE Announcements", "corporate_disclosure"),
+    ("https://nsearchives.nseindia.com/content/RSS/Corporate_action.xml", "NSE Corporate Actions", "corporate_action"),
+    ("https://nsearchives.nseindia.com/content/RSS/InsiderTrading.xml", "NSE Insider Trading", "insider_trading"),
+    ("https://nsearchives.nseindia.com/content/RSS/Daily_Buyback.xml", "NSE Daily Buyback", "buyback"),
+    ("https://nsearchives.nseindia.com/content/RSS/Financial_Results.xml", "NSE Financial Results", "financial_results"),
+    ("https://nsearchives.nseindia.com/content/RSS/Integrated_Filing_Financials.xml", "NSE Integrated Financials", "financial_results"),
+    ("https://nsearchives.nseindia.com/content/RSS/Board_Meetings.xml", "NSE Board Meetings", "board_meeting"),
+    ("https://nsearchives.nseindia.com/content/RSS/Sast_Regulation29.xml", "NSE SAST Reg 29 (Substantial Acquisition)", "takeover_sast"),
+    ("https://nsearchives.nseindia.com/content/RSS/Sast_Regulation31.xml", "NSE SAST Reg 31 (Encumbrance/Pledge)", "promoter_pledge"),
+    ("https://nsearchives.nseindia.com/content/RSS/Sast_ReasonForEncumbrance.xml", "NSE SAST Reason For Encumbrance", "promoter_pledge"),
+    ("https://nsearchives.nseindia.com/content/RSS/Offer_Documents.xml", "NSE Offer Documents", "capital_raising"),
+    ("https://nsearchives.nseindia.com/content/RSS/Related_Party_Trans.xml", "NSE Related Party Transactions", "governance"),
+    ("https://nsearchives.nseindia.com/content/RSS/Secretarial_Compliance.xml", "NSE Secretarial Compliance", "governance"),
+    ("https://nsearchives.nseindia.com/content/RSS/Statement_Of_Deviation.xml", "NSE Statement Of Deviation", "governance"),
+    ("https://nsearchives.nseindia.com/content/RSS/Voting_Results.xml", "NSE Voting Results", "governance"),
+    ("https://nsearchives.nseindia.com/content/RSS/Annual_Reports.xml", "NSE Annual Reports", "annual_report"),
+    ("https://nsearchives.nseindia.com/content/RSS/brsr.xml", "NSE BRSR Reports", "sustainability"),
+    ("https://nsearchives.nseindia.com/content/RSS/Investor_Complaints.xml", "NSE Investor Complaints", "governance"),
+    ("https://nsearchives.nseindia.com/content/RSS/Circulars.xml", "NSE Circulars", "exchange_circular"),
+]
+
 GOOGLE_BROADBAND_QUERIES = [
     ("Indian stock market when:1d", "Google News Markets"),
     ("BSE NSE corporate announcements when:1d", "Google News Announcements"),
@@ -107,6 +130,9 @@ def _parse_rss_date(pub_date_str: str | None) -> str:
     # Common ISO-like or custom formats
     formats = [
         "%Y-%m-%d %H:%M:%S",
+        "%d-%b-%Y %H:%M:%S",
+        "%d-%b-%Y %H:%M",
+        "%d-%m-%Y %H:%M:%S",
         "%Y-%m-%dT%H:%M:%SZ",
         "%Y-%m-%dT%H:%M:%S%z",
         "%d %b %Y %H:%M:%S",
@@ -390,6 +416,166 @@ def fetch_nse_announcements(lookback_days: int = 1, timeout: float = 6.0) -> lis
     return items
 
 
+def fetch_nse_static_rss_feeds(
+    selected_feeds: list[tuple[str, str, str]] | None = None,
+    timeout: float = 6.0,
+) -> list[dict[str, Any]]:
+    """Fetch official structured regulatory and corporate disclosures from NSE static RSS feeds.
+
+    Harvests feeds hosted at https://nsearchives.nseindia.com/content/RSS/*.xml covering:
+    - Announcements, Board Meetings, Corporate Actions (Dividends/Splits)
+    - Insider Trading (Reg 7-2), Daily Share Buybacks, SAST Reg 29/31 & Encumbrances
+    - Financial Results, Annual Reports, and Exchange Circulars.
+    """
+    feeds = selected_feeds or NSE_STATIC_RSS_FEEDS
+    headers = {
+        **DEFAULT_HEADERS,
+        "Referer": "https://www.nseindia.com/static/rss-feed",
+    }
+
+    # Lazy-load company name and symbol caches for entity resolution
+    clean_name_map: dict[str, str] = {}
+    known_symbols: dict[str, str] = {}
+    try:
+        from earnings_engine.data.names import _connect
+        conn = _connect(Settings())
+        for t, n in conn.execute("SELECT ticker, name FROM tickers WHERE name IS NOT NULL").fetchall():
+            norm = re.sub(r"[^a-z0-9]", "", str(n).lower().replace("limited", "").replace("ltd", ""))
+            clean_name_map[norm] = t
+        for r in conn.execute("SELECT ticker FROM tickers").fetchall():
+            sym = r[0].replace(".NS", "").replace(".BO", "").upper()
+            known_symbols[sym] = r[0]
+    except Exception as e:
+        logger.debug("[NEWS-SOURCES] NSE RSS symbol cache initialization notice: %s", e)
+
+    def _resolve_symbol(title_str: str, desc_str: str, link_str: str) -> str | None:
+        """Extract or resolve ticker symbol from NSE RSS metadata."""
+        # 1. Pipe-delimited prefix e.g. "QUESS|Quess Corp Limited|..."
+        pipe_m = re.match(r"^([A-Z0-9_\-]+)\|", desc_str)
+        if pipe_m:
+            c = pipe_m.group(1).upper()
+            if c in known_symbols:
+                return known_symbols[c]
+            return f"{c}.NS"
+
+        # 2. PDF filename prefix e.g. "/corporate/HUBTOWN_12092026..." or "/corporate/SIS_..."
+        link_m = re.search(r"/corporate/([A-Za-z0-9]+)_", link_str)
+        if link_m:
+            cand = link_m.group(1).upper()
+            if cand in known_symbols:
+                return known_symbols[cand]
+            if len(cand) >= 2 and not cand.startswith("XBRL") and not cand.startswith("INDAS"):
+                return f"{cand}.NS"
+
+        # 3. Clean company name from title e.g. "V.S.T Tillers Tractors Limited - Ex-Date: 16-Sep-2026"
+        comp_candidate = title_str.split(" - ")[0].split(" : ")[0].strip()
+        norm_name = re.sub(r"[^a-z0-9]", "", comp_candidate.lower().replace("limited", "").replace("ltd", ""))
+        if norm_name in clean_name_map:
+            return clean_name_map[norm_name]
+
+        # 4. Full title match against clean company names
+        norm_full = re.sub(r"[^a-z0-9]", "", title_str.lower().replace("limited", "").replace("ltd", ""))
+        if norm_full in clean_name_map:
+            return clean_name_map[norm_full]
+
+        return None
+
+    def _fetch_single_nse_feed(feed_url: str, pub_name: str, feed_category: str) -> list[dict[str, Any]]:
+        feed_items: list[dict[str, Any]] = []
+        req = urllib.request.Request(feed_url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                xml_data = resp.read()
+            root = ET.fromstring(xml_data)
+            channel = root.find("channel")
+            raw_nodes = channel.findall("item") if channel is not None else root.findall(".//item")
+
+            for node in raw_nodes:
+                title_node = _find_child(node, ["title"])
+                desc_node = _find_child(node, ["description"])
+                link_node = _find_child(node, ["link"])
+                date_node = _find_child(node, ["pubDate"])
+
+                raw_title = _clean_html_text(title_node.text or "") if title_node is not None else ""
+                raw_desc = _clean_html_text(desc_node.text or "") if desc_node is not None else ""
+                link = (link_node.text or "").strip() if link_node is not None else ""
+                raw_date = (date_node.text or "").strip() if date_node is not None else ""
+
+                if not raw_title and not raw_desc:
+                    continue
+
+                pub_iso = _parse_rss_date(raw_date)
+                sym = _resolve_symbol(raw_title, raw_desc, link)
+
+                # Format human-friendly actionable headline
+                if sym:
+                    clean_sym = sym.replace(".NS", "")
+                    if feed_category == "corporate_action" and "Ex-Date" in raw_title:
+                        purpose_m = re.search(r"PURPOSE:([^\|]+)", raw_desc)
+                        purpose = purpose_m.group(1).strip() if purpose_m else ""
+                        headline = f"{clean_sym}: {purpose}" if purpose else f"{clean_sym}: Corporate Action"
+                        if "Ex-Date" in raw_title:
+                            ex_part = raw_title.split(" - ")[-1].strip()
+                            headline += f" ({ex_part})"
+                    elif feed_category == "insider_trading":
+                        headline = f"{clean_sym}: Insider Trading Disclosure (Reg 7(2))"
+                    elif feed_category == "buyback":
+                        headline = f"{clean_sym}: Daily Share Buy-Back Update"
+                    elif feed_category == "board_meeting":
+                        meeting_m = re.search(r"Meeting Date:\s*([^\|]+)", raw_desc)
+                        m_date = meeting_m.group(1).strip() if meeting_m else ""
+                        headline = f"{clean_sym}: Board Meeting Scheduled {m_date}".strip()
+                    elif raw_title and not raw_title.startswith(clean_sym):
+                        # If description has specific subject
+                        subj_m = re.search(r"SUBJECT:\s*([^\|]+)", raw_desc)
+                        if subj_m:
+                            headline = f"{clean_sym}: {subj_m.group(1).strip()}"
+                        else:
+                            headline = f"{clean_sym}: {raw_title}"
+                    else:
+                        headline = raw_title
+                else:
+                    headline = raw_title or raw_desc
+
+                summary_text = raw_desc if raw_desc else raw_title
+                feed_items.append({
+                    "title": headline[:250],
+                    "summary": summary_text[:1000],
+                    "published_at": pub_iso,
+                    "publisher": pub_name,
+                    "link": link if link else "https://www.nseindia.com",
+                    "source": "nse_rss",
+                    "category": feed_category,
+                    "ticker": sym,
+                    "raw_event": {
+                        "feed_url": feed_url,
+                        "raw_title": raw_title,
+                        "raw_desc": raw_desc,
+                        "raw_date": raw_date,
+                    },
+                })
+        except Exception as e:
+            logger.debug("[NEWS-SOURCES] NSE RSS fetch failed for %s: %s", feed_url, e)
+
+        return feed_items
+
+    results: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=min(10, len(feeds))) as pool:
+        future_map = {
+            pool.submit(_fetch_single_nse_feed, u, pub, cat): pub
+            for u, pub, cat in feeds
+        }
+        for fut in as_completed(future_map):
+            try:
+                res = fut.result()
+                if res:
+                    results.extend(res)
+            except Exception as e:
+                logger.debug("[NEWS-SOURCES] NSE RSS thread failed: %s", e)
+
+    return results
+
+
 def fetch_all_broadband_news(timeout: float = 7.0) -> list[dict[str, Any]]:
     """Execute parallel harvesting across all broadband financial news and filing feeds.
 
@@ -399,7 +585,8 @@ def fetch_all_broadband_news(timeout: float = 7.0) -> list[dict[str, Any]]:
     - LiveMint (Markets, Companies)
     - NDTV Profit
     - Google News (Broad Indian Market Queries)
-    - BSE & NSE Official Corporate Announcements
+    - BSE & NSE Official Corporate Announcements REST API
+    - NSE Static Archive RSS Feeds (Announcements, Actions, Insider Trading, Buybacks, Meetings)
 
     Returns a deduplicated list of standardized raw news event items.
     """
@@ -413,6 +600,7 @@ def fetch_all_broadband_news(timeout: float = 7.0) -> list[dict[str, Any]]:
         ("GoogleNewsBroadband", lambda: fetch_google_news_broadband(timeout=timeout)),
         ("BSEFilings", lambda: fetch_bse_filings(lookback_days=1, timeout=timeout)),
         ("NSEAnnouncements", lambda: fetch_nse_announcements(lookback_days=1, timeout=timeout)),
+        ("NSEStaticRSS", lambda: fetch_nse_static_rss_feeds(timeout=timeout)),
     ]
 
     all_items: list[dict[str, Any]] = []
