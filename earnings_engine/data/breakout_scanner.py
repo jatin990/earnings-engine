@@ -2157,9 +2157,10 @@ def _score_resistance_proximity(closes: pd.Series) -> tuple[float, float]:
     """
     if len(closes) < 2:
         return 0.0, float("nan")
-    current = float(closes.iloc[-1])
-    window = min(len(closes), 252)   # up to 1 year
-    high = float(closes.values[-window:].max())
+    vals = closes.values
+    current = float(vals[-1])
+    window = min(len(vals), 252)   # up to 1 year
+    high = float(vals[-window:].max())
     if high <= 0:
         return 0.0, float("nan")
     pct_from_high = (current - high) / high * 100  # negative = below high
@@ -2236,9 +2237,11 @@ def _score_momentum(closes: pd.Series) -> tuple[float, str]:
     """
     if len(closes) < 20:
         return 0.0, "insufficient"
-    current = float(closes.iloc[-1])
-    sma_20 = float(closes.values[-20:].mean())
-    ret_30 = float((closes.iloc[-1] / closes.iloc[max(0, len(closes) - 31)]) - 1) * 100
+    vals = closes.values
+    current = float(vals[-1])
+    sma_20 = float(vals[-20:].mean())
+    ref_val = float(vals[max(0, len(vals) - 31)])
+    ret_30 = float((current / ref_val) - 1) * 100 if ref_val > 0 else 0.0
 
     above_sma = current > sma_20
     positive_momentum = ret_30 > 0
@@ -2582,8 +2585,8 @@ def _score_classic_technical(
         breakout_trigger = round(resistance_high, 2)
         ideal_entry_price = round(resistance_high, 2)
     daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
-    is_late = bool(ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
-    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
+    is_late = bool(ideal_entry_price and ideal_entry_price > 0 and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
+    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if (is_late and ideal_entry_price and ideal_entry_price > 0) else 0.0
 
     target_price = round(max(breakout_trigger * 1.08, breakout_trigger + 2.0 * atr_val), 2)
     stop_loss = round(min(signal_price * 0.95, signal_price - 1.5 * atr_val), 2)
@@ -2672,8 +2675,16 @@ def _score_nse_delivery_absorption(
     delivery_highs = high_series.loc[high_series.index.isin(top_vol_idx)]
     delivery_resistance = float(delivery_highs.max()) if not delivery_highs.empty else float(closes.tail(20).max())
 
-    daily_range = closes.pct_change().abs()
-    atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
+    if len(closes) >= 15:
+        c_vals = closes.values[-15:]
+        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
+        atr_pct = float(daily_range.mean()) * 100.0
+    elif len(closes) >= 2:
+        c_vals = closes.values
+        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
+        atr_pct = float(daily_range.mean()) * 100.0
+    else:
+        atr_pct = 2.0
     atr_val = signal_price * (atr_pct / 100.0)
 
     ideal_entry_price = round(delivery_resistance, 2)
@@ -2686,8 +2697,8 @@ def _score_nse_delivery_absorption(
     else:
         delivery_trigger = round(delivery_resistance, 2)
     daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
-    is_late = bool(ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
-    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
+    is_late = bool(ideal_entry_price and ideal_entry_price > 0 and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
+    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if (is_late and ideal_entry_price and ideal_entry_price > 0) else 0.0
 
     pct_from_deliv = ((signal_price - delivery_trigger) / delivery_trigger) * 100
     if pct_from_deliv >= -1.0:
@@ -2786,8 +2797,8 @@ def _score_fo_call_wall(
         call_oi_strike = round(signal_price * 1.025, 2)
     ideal_entry_price = orig_call_wall
     daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
-    is_late = bool(ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
-    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
+    is_late = bool(ideal_entry_price and ideal_entry_price > 0 and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
+    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if (is_late and ideal_entry_price and ideal_entry_price > 0) else 0.0
     dist_to_call_wall = ((call_oi_strike - signal_price) / signal_price) * 100
 
     # 1. Call OI Wall Proximity (0-35)
@@ -2902,8 +2913,8 @@ def _score_volume_profile_vah(
     else:
         breakout_trigger = round(vah, 2)
     daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
-    is_late = bool(ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
-    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
+    is_late = bool(ideal_entry_price and ideal_entry_price > 0 and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
+    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if (is_late and ideal_entry_price and ideal_entry_price > 0) else 0.0
 
     target_price = round(breakout_trigger + va_height * 1.5, 2)
     stop_loss = round(min(signal_price * 0.95, poc), 2)
@@ -2979,8 +2990,16 @@ def _score_donchian_squeeze(
 
     composite = round(squeeze_score + donchian_score + mom_score + vol_score, 1)
 
-    daily_range = closes.pct_change().abs()
-    atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
+    if len(closes) >= 15:
+        c_vals = closes.values[-15:]
+        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
+        atr_pct = float(daily_range.mean()) * 100.0
+    elif len(closes) >= 2:
+        c_vals = closes.values
+        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
+        atr_pct = float(daily_range.mean()) * 100.0
+    else:
+        atr_pct = 2.0
     atr_val = signal_price * (atr_pct / 100.0)
 
     prior_donchian = float(high_series.iloc[:-1].tail(55).max()) if len(high_series) > 1 else donchian_55
@@ -2991,8 +3010,8 @@ def _score_donchian_squeeze(
         breakout_trigger = round(donchian_55, 2)
         ideal_entry_price = round(donchian_55, 2)
     daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
-    is_late = bool(ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
-    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
+    is_late = bool(ideal_entry_price and ideal_entry_price > 0 and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
+    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if (is_late and ideal_entry_price and ideal_entry_price > 0) else 0.0
 
     target_price = round(breakout_trigger + 3.0 * atr_val, 2)
     sma_20 = float(closes.values[-20:].mean())
@@ -3234,13 +3253,21 @@ def score_breakout(
 
     pct_from_high = ((signal_price - breakout_trigger) / breakout_trigger) * 100 if breakout_trigger else 0.0
 
-    daily_range = closes.pct_change().abs()
-    atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
+    if len(closes) >= 15:
+        c_vals = closes.values[-15:]
+        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
+        atr_pct = float(daily_range.mean()) * 100.0
+    elif len(closes) >= 2:
+        c_vals = closes.values
+        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
+        atr_pct = float(daily_range.mean()) * 100.0
+    else:
+        atr_pct = 2.0
 
     ideal_entry_price = notes.get("ideal_entry_price") or breakout_trigger
     daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
-    is_late = bool(notes.get("is_late") if notes.get("is_late") is not None else (ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002)))
-    entry_delay_pct = notes.get("entry_delay_pct") if notes.get("entry_delay_pct") is not None else (round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0)
+    is_late = bool(notes.get("is_late") if notes.get("is_late") is not None else (ideal_entry_price and ideal_entry_price > 0 and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002)))
+    entry_delay_pct = notes.get("entry_delay_pct") if notes.get("entry_delay_pct") is not None else (round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if (is_late and ideal_entry_price and ideal_entry_price > 0) else 0.0)
 
     return {
         "ticker": ticker,

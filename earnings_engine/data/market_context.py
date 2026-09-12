@@ -764,9 +764,12 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                     prices = fetch_prices(ticker, settings, force=False)
             else:
                 prices = prices_map.get(ticker)
-                if (prices is None or prices.empty) and force:
+                if prices is None or prices.empty:
                     try:
-                        prices = fetch_prices(ticker, settings, force=True)
+                        from earnings_engine.data.prices import load_prices as _lp
+                        prices = _lp(ticker, settings)
+                        if prices is None or prices.empty:
+                            prices = fetch_prices(ticker, settings, force=False)
                     except Exception:
                         prices = pd.DataFrame(columns=["close"])
             if prices is None:
