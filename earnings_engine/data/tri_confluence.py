@@ -795,10 +795,10 @@ def compute_ticker_tri_confluence(
     r_surp_ret = calculate_pearson_correlation(surprises, returns)
     r_inst_surp = calculate_pearson_correlation(inst_deltas, surprises)
 
-    # Defaults if series variance was 0 or too short
-    r_inst_ret_val = r_inst_ret if r_inst_ret is not None else 0.45
-    r_surp_ret_val = r_surp_ret if r_surp_ret is not None else 0.50
-    r_inst_surp_val = r_inst_surp if r_inst_surp is not None else 0.35
+    # Neutral 0.0 baseline if series variance was 0 or history was too short
+    r_inst_ret_val = r_inst_ret if r_inst_ret is not None else 0.0
+    r_surp_ret_val = r_surp_ret if r_surp_ret is not None else 0.0
+    r_inst_surp_val = r_inst_surp if r_inst_surp is not None else 0.0
 
     # Triple Confluence Hit Rate %
     hit_count = sum(1 for q in sorted_quarters if q["confluence_hit"])

@@ -134,6 +134,8 @@ def aggregate_predictions(
     weighted_support = 0.0
     weighted_resistance = 0.0
     weighted_stop_loss = 0.0
+    target_weight = 0.0
+    return_weight = 0.0
     support_weight = 0.0
     resistance_weight = 0.0
     stop_weight = 0.0
@@ -146,10 +148,12 @@ def aggregate_predictions(
         target_price = p.get("target_price")
         if target_price and float(target_price) > 0:
             weighted_target += float(target_price) * conf
+            target_weight += conf
 
         target_ret = p.get("target_return_pct")
         if target_ret is not None:
             weighted_return += float(target_ret) * conf
+            return_weight += conf
 
         support = p.get("support_level")
         if support and float(support) > 0:
@@ -174,8 +178,8 @@ def aggregate_predictions(
         if act:
             actions.append(str(act).strip().upper())
 
-    consensus_target_price = weighted_target / total_confidence if total_confidence > 0 else as_of_price
-    consensus_return_pct = weighted_return / total_confidence if total_confidence > 0 else 0.0
+    consensus_target_price = (weighted_target / target_weight) if target_weight > 0 else as_of_price
+    consensus_return_pct = (weighted_return / return_weight) if return_weight > 0 else 0.0
     consensus_support = weighted_support / support_weight if support_weight > 0 else None
     consensus_resistance = weighted_resistance / resistance_weight if resistance_weight > 0 else None
     consensus_stop_loss = weighted_stop_loss / stop_weight if stop_weight > 0 else None

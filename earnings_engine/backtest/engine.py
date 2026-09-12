@@ -52,7 +52,11 @@ def run_backtest(dataset: pd.DataFrame, model: DirectionModel, cfg: BacktestConf
 
     parts = []
     for fold_start, fold_end in _make_folds(df, cfg):
-        train = df[df["earnings_date"] < fold_start]
+        # Strict PIT guarantee: an event's label is only knowable after its reaction date.
+        if "reaction_date" in df.columns:
+            train = df[pd.to_datetime(df["reaction_date"]) < fold_start]
+        else:
+            train = df[df["earnings_date"] < fold_start]
         test = df[(df["earnings_date"] >= fold_start) & (df["earnings_date"] < fold_end)]
         if train.empty or test.empty:
             continue

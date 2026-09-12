@@ -381,8 +381,9 @@ def run_breakout_backtest(
         daily_mean = float(eq_df["daily_ret"].mean())
         sharpe = (daily_mean / max(1e-6, daily_std)) * np.sqrt(252) if daily_std > 0 else 0.0
 
-        downside_ret = eq_df.loc[eq_df["daily_ret"] < 0, "daily_ret"]
-        downside_std = float(downside_ret.std()) if not downside_ret.empty else 1e-6
+        # Canonical Sortino: Root-Mean-Square Downside Deviation against 0 threshold
+        neg_rets = np.minimum(0.0, eq_df["daily_ret"].to_numpy())
+        downside_std = float(np.sqrt(np.mean(neg_rets ** 2)))
         sortino = (daily_mean / max(1e-6, downside_std)) * np.sqrt(252) if downside_std > 0 else 0.0
     else:
         max_dd = 0.0

@@ -478,22 +478,3 @@ def _calculate_max_pain(strikes_data: list[dict[str, float]]) -> float:
             best_strike = test_strike
 
     return round(best_strike, 2)
-
-
-def _compute_baseline_option_metrics(symbol: str, spot_price: float) -> dict[str, Any]:
-    """Fallback calculation based on spot price and typical PCR distributions."""
-    step = 50.0 if spot_price > 1000 else 10.0
-    rounded_spot = round(spot_price / step) * step
-
-    return {
-        "symbol": symbol,
-        "pcr_oi": 1.05,
-        "pcr_volume": 1.02,
-        "max_pain_strike": rounded_spot,
-        "sentiment": "NEUTRAL",
-        "call_oi_total": 500000,
-        "put_oi_total": 525000,
-        "resistance_strike": round(rounded_spot * 1.03, 1),
-        "support_strike": round(rounded_spot * 0.97, 1),
-        "status": "ESTIMATED",
-    }
