@@ -33,6 +33,63 @@ _PRICE_DF_MEMORY_CACHE: dict[str, tuple[float, pd.DataFrame]] = {}
 _PRICE_CACHE_LOCK = threading.Lock()
 _PRICE_CACHE_TTL_SECONDS = 120.0
 
+_LIVE_QUOTE_MEMORY_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_LIVE_QUOTE_CACHE_LOCK = threading.Lock()
+
+
+def get_cached_live_quote(
+    ticker: str,
+    session: dict[str, Any] | None = None,
+    ttl_minutes: int = 5,
+) -> dict[str, Any] | None:
+    """Retrieve in-memory cached live quote if valid according to market session rules."""
+    sym = canonical_symbol(ticker)
+    now = time.monotonic()
+    with _LIVE_QUOTE_CACHE_LOCK:
+        item = _LIVE_QUOTE_MEMORY_CACHE.get(sym)
+        if not item:
+            return None
+        ts, quote = item
+        if not quote or quote.get("current_price") is None or float(quote.get("current_price") or 0) <= 0:
+            return None
+        if session is None:
+            session = _get_market_session_status(sym)
+        is_weekend = session.get("is_weekend", False)
+        # On weekends, settled quote for Friday close is valid for the entire weekend once fetched
+        if is_weekend:
+            return dict(quote)
+        # During market hours, enforce ttl_minutes
+        if session.get("is_open", False):
+            if now - ts <= (ttl_minutes * 60):
+                return dict(quote)
+            del _LIVE_QUOTE_MEMORY_CACHE[sym]
+            return None
+        # Closed / pre / post market: valid for 15 minutes
+        if now - ts <= (15 * 60):
+            return dict(quote)
+        del _LIVE_QUOTE_MEMORY_CACHE[sym]
+        return None
+
+
+def set_cached_live_quote(ticker: str, quote: dict[str, Any]) -> None:
+    """Store in-memory cached live quote with current monotonic timestamp."""
+    if not quote or quote.get("current_price") is None:
+        return
+    sym = canonical_symbol(ticker)
+    now = time.monotonic()
+    with _LIVE_QUOTE_CACHE_LOCK:
+        _LIVE_QUOTE_MEMORY_CACHE[sym] = (now, dict(quote))
+
+
+def clear_live_quote_cache(ticker: str | None = None) -> None:
+    """Invalidate in-memory live quote cache for a specific ticker or globally."""
+    with _LIVE_QUOTE_CACHE_LOCK:
+        if ticker:
+            _LIVE_QUOTE_MEMORY_CACHE.pop(canonical_symbol(ticker), None)
+            _LIVE_QUOTE_MEMORY_CACHE.pop(ticker.strip().upper(), None)
+        else:
+            _LIVE_QUOTE_MEMORY_CACHE.clear()
+
 
 def get_cached_price_df(ticker: str) -> pd.DataFrame | None:
     """Retrieve in-memory cached price history DataFrame if within TTL."""
@@ -167,7 +224,27 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
     now = datetime.now()
     # On weekends (Saturday & Sunday), markets are closed and Friday prices are fully settled
     if now.weekday() >= 5:
-        return True
+        session = _get_market_session_status(sym)
+        last_trading_date = session.get("last_trading_date")
+        last_cached = _last_cached_date(sym, settings)
+        if last_cached is not None and last_trading_date:
+            try:
+                if last_cached.strftime("%Y-%m-%d") >= last_trading_date:
+                    return True
+            except Exception:
+                pass
+        fetched = _fetch_log_time(sym, settings)
+        if fetched is not None and last_trading_date:
+            try:
+                fetched_date = fetched.strftime("%Y-%m-%d")
+                close_time = session.get("close_time", dt_time(15, 30))
+                if fetched_date > last_trading_date or (
+                    fetched_date == last_trading_date and fetched.time() >= close_time
+                ):
+                    return True
+            except Exception:
+                pass
+        return False
 
     fetched = _fetch_log_time(sym, settings)
     if fetched is None:
@@ -722,12 +799,36 @@ def _get_market_session_status(ticker: str) -> dict[str, Any]:
         else:
             is_open = True
 
+    if is_weekend:
+        friday_dt = now_local - timedelta(days=weekday - 4)
+        friday_date = friday_dt.strftime("%Y-%m-%d")
+        last_trading_date = friday_date
+        friday_close_dt = friday_dt.replace(hour=close_time.hour, minute=close_time.minute, second=0, microsecond=0)
+    elif is_pre_market:
+        if weekday == 0:
+            prev_dt = now_local - timedelta(days=3)
+            friday_dt = prev_dt
+        else:
+            prev_dt = now_local - timedelta(days=1)
+            friday_dt = now_local - timedelta(days=weekday + 3)
+        friday_date = friday_dt.strftime("%Y-%m-%d")
+        last_trading_date = prev_dt.strftime("%Y-%m-%d")
+        friday_close_dt = friday_dt.replace(hour=close_time.hour, minute=close_time.minute, second=0, microsecond=0)
+    else:
+        friday_dt = now_local - timedelta(days=weekday - 4) if weekday >= 4 else now_local - timedelta(days=weekday + 3)
+        friday_date = friday_dt.strftime("%Y-%m-%d")
+        last_trading_date = market_date
+        friday_close_dt = friday_dt.replace(hour=close_time.hour, minute=close_time.minute, second=0, microsecond=0)
+
     return {
         "is_open": is_open,
         "is_weekend": is_weekend,
         "is_pre_market": is_pre_market,
         "is_post_market": is_post_market,
         "market_date": market_date,
+        "last_trading_date": last_trading_date,
+        "friday_date": friday_date,
+        "friday_close_dt": friday_close_dt,
         "now_local": now_local,
         "open_time": open_time,
         "close_time": close_time,
@@ -831,7 +932,36 @@ def _is_cached_quote_fresh(
             fetched_at_dt = None
 
     if is_weekend:
-        return True
+        friday_date = session.get("friday_date") or session.get("last_trading_date")
+        friday_close_dt = session.get("friday_close_dt")
+        # 1. Price history bar is already settled on or after Friday's date
+        if cur_date and friday_date and cur_date >= friday_date:
+            return True
+        # 2. Or quote was fetched after Friday market close
+        if fetched_at_dt:
+            if friday_close_dt:
+                f_close_cmp = friday_close_dt
+                if fetched_at_dt.tzinfo is not None and f_close_cmp.tzinfo is None:
+                    f_close_cmp = f_close_cmp.replace(tzinfo=fetched_at_dt.tzinfo)
+                elif fetched_at_dt.tzinfo is None and f_close_cmp.tzinfo is not None:
+                    f_close_cmp = f_close_cmp.replace(tzinfo=None)
+                if fetched_at_dt >= f_close_cmp:
+                    return True
+            if friday_date:
+                try:
+                    f_dt = datetime.strptime(friday_date, "%Y-%m-%d").date()
+                    if fetched_at_dt.date() > f_dt:  # fetched on Saturday or Sunday
+                        return True
+                    if fetched_at_dt.date() == f_dt:
+                        close_t = session.get("close_time") or dt_time(15, 30)
+                        if fetched_at_dt.time() >= close_t:
+                            return True
+                except Exception:
+                    pass
+        # Fallback for mock session dicts without friday_date (e.g. legacy test records)
+        if not friday_date:
+            return True
+        return False
 
     if is_post:
         if cur_date == market_date:
