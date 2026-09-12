@@ -221,6 +221,10 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
     or when there is no recorded fetch stamp (legacy/seeded rows).
     """
     sym = canonical_symbol(ticker)
+    fetched = _fetch_log_time(sym, settings)
+    if fetched is None:
+        return True
+
     now = datetime.now()
     # On weekends (Saturday & Sunday), markets are closed and Friday prices are fully settled
     if now.weekday() >= 5:
@@ -233,7 +237,6 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
                     return True
             except Exception:
                 pass
-        fetched = _fetch_log_time(sym, settings)
         if fetched is not None and last_trading_date:
             try:
                 fetched_date = fetched.strftime("%Y-%m-%d")
@@ -246,9 +249,6 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
                 pass
         return False
 
-    fetched = _fetch_log_time(sym, settings)
-    if fetched is None:
-        return True
     if (now - fetched).total_seconds() <= ttl_minutes * 60:
         return True
     if now.hour >= MARKET_CLOSE_HOUR:

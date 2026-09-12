@@ -1211,25 +1211,51 @@
         .day-6 { border-left: 4px solid #2dd4bf !important; background: rgba(45, 212, 191, 0.08) !important; }
         .day-7 { border-left: 4px solid #f87171 !important; background: rgba(248, 113, 113, 0.08) !important; }
 
-        .day-section { margin-top: 0.85rem; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 0.65rem; overflow: hidden; background: #0c0e15; transition: all 0.22s ease; }
-        .day-section:hover { border-color: rgba(99, 102, 241, 0.4); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); }
-        .day-section > summary { cursor: pointer; padding: 0.75rem 1rem; background: #12151f; font-weight: 700; font-size: 0.875rem; display: flex; align-items: center; gap: 0.65rem; list-style: none; }
+        .day-section { margin-top: 0.5rem; border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 0.5rem; overflow: hidden; background: #030408; transition: all 0.2s ease; }
+        .day-section:hover { border-color: rgba(56, 189, 248, 0.35); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6); }
+        .day-section > summary, .day-section-summary { cursor: pointer; padding: 0.42rem 0.75rem !important; background: #070913 !important; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; gap: 0.55rem; list-style: none; user-select: none; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
         .day-section > summary::-webkit-details-marker { display: none; }
-        .day-section > summary:hover { background: #181c29; }
-        .day-section > summary .day-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
-        .day-section > summary .day-count { color: #94a3b8; font-size: 0.75rem; font-weight: 500; font-family: 'JetBrains Mono', monospace; }
-        .day-section > summary .chevron { margin-left: auto; transition: transform 0.2s; }
+        .day-section > summary:hover, .day-section-summary:hover { background: #0c1020 !important; }
+        .day-section > summary .day-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
+        .day-section > summary .day-count { color: #94a3b8; font-size: 0.72rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+        .day-summary-left { display: flex; align-items: center; gap: 0.45rem; }
+        .day-date-text { color: #f1f5f9; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.78rem; }
+        .day-summary-pills { display: flex; gap: 0.3rem; align-items: center; margin-left: 0.4rem; }
+        .day-summary-pill { font-size: 0.62rem; font-family: 'JetBrains Mono', monospace; font-weight: 600; padding: 0.06rem 0.35rem; border-radius: 3px; }
+        .day-summary-pill.large { color: #38bdf8; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.28); }
+        .day-summary-pill.small { color: #34d399; background: rgba(52, 211, 153, 0.12); border: 1px solid rgba(52, 211, 153, 0.28); }
+        .day-section > summary .chevron { margin-left: auto; transition: transform 0.2s; font-size: 0.75rem; color: #64748b; }
         .day-section[open] > summary .chevron { transform: rotate(180deg); }
-        .day-section-body { padding: 0.75rem; }
+        .day-section-body { padding: 0; }
 
-        .cap-section { margin-top: 0.65rem; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 0.65rem; overflow: hidden; background: #0c0e15; }
-        .cap-section > summary { cursor: pointer; padding: 0.6rem 0.95rem; background: #12151f; font-weight: 600; font-size: 0.88rem; display: flex; align-items: center; gap: 0.5rem; list-style: none; }
+        /* Unified High-Density Trading Terminal Grid Styles */
+        .results-terminal-wrapper { max-height: calc(100vh - 185px); overflow-y: auto !important; overflow-x: auto; position: relative; border-radius: 0 0 0.5rem 0.5rem; background: #020204; scrollbar-width: thin; scrollbar-color: rgba(56, 189, 248, 0.25) transparent; }
+        .results-terminal-wrapper::-webkit-scrollbar { width: 5px; height: 5px; }
+        .results-terminal-wrapper::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.25); border-radius: 3px; }
+        .results-terminal-wrapper::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.5); }
+
+        .table-divider-row td { padding: 0.2rem 0.5rem !important; background: #05070f !important; border-top: 1px solid rgba(255, 255, 255, 0.08) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important; user-select: none; }
+        .cap-divider-row td { background: #060914 !important; border-top: 1px solid rgba(56, 189, 248, 0.22) !important; }
+        .industry-divider-row td { background: #04050a !important; border-top: 1px dashed rgba(255, 255, 255, 0.06) !important; }
+        .terminal-cap-divider { display: flex; align-items: center; gap: 0.55rem; line-height: 1.2; }
+        .terminal-divider-meta { font-size: 0.65rem; color: #64748b; font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+        .terminal-ind-divider { display: flex; align-items: center; gap: 0.4rem; padding-left: 0.5rem; line-height: 1.2; }
+        .ind-pill { font-size: 0.65rem; font-weight: 600; color: #94a3b8; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.05rem 0.4rem; border-radius: 3px; }
+        .ind-badge-count { font-size: 0.60rem; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.12); border-radius: 3px; padding: 0.02rem 0.28rem; }
+
+        .cap-badge-large { background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 0.08rem 0.42rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; display: inline-flex; align-items: center; gap: 0.25rem; }
+        .cap-badge-small { background: rgba(52, 211, 153, 0.12); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); padding: 0.08rem 0.42rem; border-radius: 4px; font-size: 0.65rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; display: inline-flex; align-items: center; gap: 0.25rem; }
+
+        .results-table.density-compact th, .results-table.density-compact td { padding: 0.16rem 0.35rem !important; font-size: 0.69rem !important; }
+
+        .cap-section { margin-top: 0.45rem; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 0.5rem; overflow: hidden; background: #0c0e15; }
+        .cap-section > summary { cursor: pointer; padding: 0.5rem 0.85rem; background: #12151f; font-weight: 600; font-size: 0.82rem; display: flex; align-items: center; gap: 0.5rem; list-style: none; }
         .cap-section > summary::-webkit-details-marker { display: none; }
         .cap-section > summary:hover { background: #181c29; }
-        .cap-section > summary .cap-count { color: #94a3b8; font-size: 0.72rem; font-family: 'JetBrains Mono', monospace; }
+        .cap-section > summary .cap-count { color: #94a3b8; font-size: 0.70rem; font-family: 'JetBrains Mono', monospace; }
         .cap-section > summary .chevron { margin-left: auto; transition: transform 0.2s; }
         .cap-section[open] > summary .chevron { transform: rotate(180deg); }
-        .cap-section-body { padding: 0.65rem; }
+        .cap-section-body { padding: 0.5rem; }
 
         .pred-bullish { color: #34d399; font-weight: 700; }
         .pred-bearish { color: #f87171; font-weight: 700; }

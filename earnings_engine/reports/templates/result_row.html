@@ -1,38 +1,40 @@
-<tr class="{day_class} {is_near_results_cls}" id="row_{row_ticker_id}" data-ticker="{ticker}">
+<tr class="{day_class} {is_near_results_cls}" id="row_{row_ticker_id}" data-ticker="{ticker}" data-cap="{cap_tier}">
   <td class="stock-cell">
     <div class="stock-cell-wrap">
-      <span class="stock-ticker-main" onclick="app.toggleRowDrawer('{row_ticker_id}', '{ticker}')" title="Click to view full stock breakdown">
-        <span class="drawer-arrow" id="arrow_{row_ticker_id}" style="font-size:0.62rem;color:#38bdf8;transition:transform 0.15s;">▶</span>
-        {ticker}
-      </span>
-      <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('{ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" onmouseenter="this.style.opacity='1';this.style.color='#7dd3fc';" onmouseleave="this.style.opacity='0.75';this.style.color='#38bdf8';" title="Refresh live price, 7D/30D returns & S/R structure for {ticker}">↻</button>
-      <a href="/stock/{ticker}" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.15rem;font-size:0.75rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
-      {result_sequence_badge_html}
+      <div style="display:flex;align-items:center;gap:0.25rem;">
+        <span class="stock-ticker-main" onclick="app.toggleRowDrawer('{row_ticker_id}', '{ticker}')" title="Click to view full stock breakdown">
+          <span class="drawer-arrow" id="arrow_{row_ticker_id}" style="font-size:0.58rem;color:#38bdf8;transition:transform 0.15s;">▶</span>
+          {ticker}
+        </span>
+        <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('{ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.72rem;padding:0 0.1rem;opacity:0.75;line-height:1;transition:all 0.15s;" onmouseenter="this.style.opacity='1';this.style.color='#7dd3fc';" onmouseleave="this.style.opacity='0.75';this.style.color='#38bdf8';" title="Refresh live price, 7D/30D returns & S/R structure for {ticker}">↻</button>
+        <a href="/stock/{ticker}" target="_blank" style="color:#38bdf8;text-decoration:none;font-size:0.7rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
+        {result_sequence_badge_html}
+      </div>
       <span class="stock-company-sub" title="{company_name}">{company_name}</span>
     </div>
   </td>
-  <td class="cell-earnings-date mono" style="color:#e2e8f0;font-size:0.74rem;">{earnings_date}</td>
-  <td class="cell-market-cap mono" style="color:#cbd5e1;font-size:0.74rem;">{market_cap}</td>
-  <td class="cell-current-price mono" style="color:#ffffff;font-weight:700;font-size:0.75rem;white-space:nowrap;">
+  <td class="cell-earnings-date mono" style="color:#e2e8f0;font-size:0.72rem;">{earnings_date}</td>
+  <td class="cell-market-cap mono" style="color:#cbd5e1;font-size:0.72rem;">{market_cap}</td>
+  <td class="cell-current-price mono" style="color:#ffffff;font-weight:700;font-size:0.74rem;white-space:nowrap;">
     <div style="display:flex;align-items:center;">{live_dot_html}<span>{current_price}</span></div>
   </td>
-  <td class="cell-three-day-return mono" style="font-size:0.74rem;color:#93c5fd;">{three_day_return}</td>
-  <td class="cell-seven-day-return mono" style="font-size:0.74rem;color:#38bdf8;">{seven_day_return}</td>
-  <td class="cell-thirty-day-return mono" style="font-size:0.74rem;">{thirty_day_return}</td>
-  <td class="cell-sr-structure" style="font-size:0.72rem;line-height:1.2;">{range_bar_html}</td>
-  <td class="cell-channel-position mono" style="font-size:0.72rem;color:#cbd5e1;text-align:center;">{channel_position}</td>
-  <td class="cell-pct-52w-hl mono" style="font-size:0.72rem;">{pct_from_52w_high_low}</td>
-  <td class="cell-q1-week-hl mono" style="font-size:0.72rem;line-height:1.2;">{q1_week_hl}</td>
-  <td class="cell-quality-scores mono" style="color:#94a3b8;font-size:0.72rem;" data-quality="{quality_scores_plain}">{quality_scores}</td>
-  <td class="cell-prev-3q-score mono" style="font-weight:700;font-size:0.74rem;">{prev_3q_score}</td>
-  <td class="cell-kronos mono" style="font-size:0.72rem;">{kronos_14d}</td>
+  <td class="cell-three-day-return mono" style="font-size:0.72rem;color:#93c5fd;">{three_day_return}</td>
+  <td class="cell-seven-day-return mono" style="font-size:0.72rem;color:#38bdf8;">{seven_day_return}</td>
+  <td class="cell-thirty-day-return mono" style="font-size:0.72rem;">{thirty_day_return}</td>
+  <td class="cell-sr-structure" style="font-size:0.70rem;line-height:1.15;">{range_bar_html}</td>
+  <td class="cell-channel-position mono" style="font-size:0.70rem;color:#cbd5e1;text-align:center;">{channel_position}</td>
+  <td class="cell-pct-52w-hl mono" style="font-size:0.70rem;">{pct_from_52w_high_low}</td>
+  <td class="cell-q1-week-hl mono" style="font-size:0.70rem;line-height:1.15;">{q1_week_hl}</td>
+  <td class="cell-quality-scores mono" style="color:#94a3b8;font-size:0.70rem;" data-quality="{quality_scores_plain}">{quality_scores}</td>
+  <td class="cell-prev-3q-score mono" style="font-weight:700;font-size:0.72rem;">{prev_3q_score}</td>
+  <td class="cell-kronos mono" style="font-size:0.70rem;">{kronos_14d}</td>
   <td class="cell-ai-consensus" style="text-align:center;">{consensus_badge}</td>
   <td class="cell-actions" style="white-space:nowrap;">
-    <div style="display:flex;gap:0.25rem;align-items:center;justify-content:center;">
-      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.showStockNewsDrawer('{row_ticker_id}', '{ticker}', event)" style="color:#38bdf8;border-color:rgba(56,189,248,0.35);padding:0.12rem 0.4rem;" title="Fetch live news & catalysts for {ticker}">📰 News</button>
-      <button type="button" class="btn-micro btn-micro-primary" onclick="app.recalculateRow('{ticker}', this)" title="Refresh live prices & recalculate metrics">Recalc</button>
-      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.openAddToWatchlistModal('{ticker}')" style="color:#fbbf24;border-color:rgba(251,191,36,0.35);padding:0.12rem 0.35rem;" title="Add {ticker} to Watchlist">⭐</button>
-      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.toggleRowDrawer('{row_ticker_id}', '{ticker}')" title="Expand Technical & Analysis Drawer">🔍</button>
+    <div style="display:flex;gap:0.2rem;align-items:center;justify-content:center;">
+      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.showStockNewsDrawer('{row_ticker_id}', '{ticker}', event)" style="color:#38bdf8;border-color:rgba(56,189,248,0.35);padding:0.1rem 0.35rem;font-size:0.65rem;" title="Fetch live news & catalysts for {ticker}">📰</button>
+      <button type="button" class="btn-micro btn-micro-primary" onclick="app.recalculateRow('{ticker}', this)" style="padding:0.1rem 0.35rem;font-size:0.65rem;" title="Refresh live prices & recalculate metrics">⚡</button>
+      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.openAddToWatchlistModal('{ticker}')" style="color:#fbbf24;border-color:rgba(251,191,36,0.35);padding:0.1rem 0.3rem;font-size:0.65rem;" title="Add {ticker} to Watchlist">⭐</button>
+      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.toggleRowDrawer('{row_ticker_id}', '{ticker}')" style="padding:0.1rem 0.3rem;font-size:0.65rem;" title="Expand Technical & Analysis Drawer">🔍</button>
     </div>
   </td>
 </tr>

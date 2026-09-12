@@ -2043,7 +2043,7 @@ const API_BASE = window.location.origin;
 
             filterResultsTable(query) {
                 const q = (query || '').toLowerCase().trim();
-                const rows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr)');
+                const rows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr):not(.table-divider-row)');
                 const matchEl = document.getElementById('resultsFilterMatchCount');
                 let matchCount = 0;
                 let totalCount = rows.length;
@@ -2068,9 +2068,51 @@ const API_BASE = window.location.origin;
                     if (isMatch) matchCount++;
                 });
 
-                // Also toggle empty cap/industry sections and auto-expand matching day sections
-                document.querySelectorAll('#resultsReportSections .industry-subgroup, #resultsReportSections .cap-section').forEach(sec => {
-                    const visibleTrs = sec.querySelectorAll('tbody tr:not(.row-drawer-tr):not([style*="display: none"])');
+                // Update unified terminal table divider rows (cap & industry)
+                document.querySelectorAll('#resultsReportSections table.results-table').forEach(table => {
+                    const allTrs = Array.from(table.querySelectorAll('tbody tr'));
+                    let currentCapDivider = null;
+                    let currentCapHasVisible = false;
+                    let currentIndDivider = null;
+                    let currentIndHasVisible = false;
+
+                    allTrs.forEach(tr => {
+                        if (tr.classList.contains('cap-divider-row')) {
+                            if (currentIndDivider) {
+                                currentIndDivider.style.display = (!q || currentIndHasVisible) ? '' : 'none';
+                            }
+                            if (currentCapDivider) {
+                                currentCapDivider.style.display = (!q || currentCapHasVisible) ? '' : 'none';
+                            }
+                            currentCapDivider = tr;
+                            currentCapHasVisible = false;
+                            currentIndDivider = null;
+                            currentIndHasVisible = false;
+                        } else if (tr.classList.contains('industry-divider-row')) {
+                            if (currentIndDivider) {
+                                currentIndDivider.style.display = (!q || currentIndHasVisible) ? '' : 'none';
+                            }
+                            currentIndDivider = tr;
+                            currentIndHasVisible = false;
+                        } else if (!tr.classList.contains('row-drawer-tr') && !tr.classList.contains('table-divider-row')) {
+                            if (tr.style.display !== 'none') {
+                                currentCapHasVisible = true;
+                                currentIndHasVisible = true;
+                            }
+                        }
+                    });
+
+                    if (currentIndDivider) {
+                        currentIndDivider.style.display = (!q || currentIndHasVisible) ? '' : 'none';
+                    }
+                    if (currentCapDivider) {
+                        currentCapDivider.style.display = (!q || currentCapHasVisible) ? '' : 'none';
+                    }
+                });
+
+                // Also toggle legacy cap/industry sections if present
+                document.querySelectorAll('#resultsReportSections details.cap-section, #resultsReportSections div.industry-subgroup').forEach(sec => {
+                    const visibleTrs = sec.querySelectorAll('tbody tr:not(.row-drawer-tr):not(.table-divider-row):not([style*="display: none"])');
                     sec.style.display = (!q || visibleTrs.length) ? '' : 'none';
                 });
 
@@ -2078,7 +2120,7 @@ const API_BASE = window.location.origin;
                     if (!q) {
                         daySec.style.display = '';
                     } else {
-                        const visibleTrs = daySec.querySelectorAll('tbody tr:not(.row-drawer-tr):not([style*="display: none"])');
+                        const visibleTrs = daySec.querySelectorAll('tbody tr:not(.row-drawer-tr):not(.table-divider-row):not([style*="display: none"])');
                         if (visibleTrs.length > 0) {
                             daySec.style.display = '';
                             daySec.open = true; // Auto-expand when search query matches tickers inside this day
@@ -2109,8 +2151,8 @@ const API_BASE = window.location.origin;
                 });
                 th.classList.add(newDirection === 'asc' ? 'sort-asc' : 'sort-desc');
 
-                // Get row pairs (main row + drawer row)
-                const rows = Array.from(tbody.querySelectorAll('tr:not(.row-drawer-tr)'));
+                // Get row pairs (main row + drawer row), excluding divider rows
+                const rows = Array.from(tbody.querySelectorAll('tr:not(.row-drawer-tr):not(.table-divider-row)'));
                 const rowPairs = rows.map(row => {
                     const drawerId = row.id ? row.id.replace('row_', 'drawer_') : null;
                     const drawerRow = drawerId ? document.getElementById(drawerId) : null;
@@ -2137,6 +2179,9 @@ const API_BASE = window.location.origin;
                         return newDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
                     }
                 });
+
+                // During custom column sorting across the day, hide dividers so table displays a contiguous sorted rank
+                tbody.querySelectorAll('tr.table-divider-row').forEach(d => d.style.display = 'none');
 
                 rowPairs.forEach(pair => {
                     tbody.appendChild(pair.row);
@@ -2329,7 +2374,7 @@ const API_BASE = window.location.origin;
             },
 
             exportResultsToCsv() {
-                const rows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr):not([style*="display: none"])');
+                const rows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr):not(.table-divider-row):not([style*="display: none"])');
                 if (!rows.length) {
                     alert('No visible rows to export.');
                     return;
@@ -2359,7 +2404,7 @@ const API_BASE = window.location.origin;
             },
 
             exportResultsToJson() {
-                const rows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr):not([style*="display: none"])');
+                const rows = document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr):not(.table-divider-row):not([style*="display: none"])');
                 if (!rows.length) {
                     alert('No visible rows to export.');
                     return;
