@@ -53,9 +53,6 @@ def clear_tri_confluence_cache() -> None:
 
 def _ensure_table(conn: Any) -> None:
     """Ensure the persistent tri_confluence_metrics SQLite table exists."""
-    global _TABLE_INITIALIZED
-    if _TABLE_INITIALIZED:
-        return
     try:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS tri_confluence_metrics (
@@ -96,7 +93,6 @@ def _ensure_table(conn: Any) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tri_conf_grade ON tri_confluence_metrics (grade)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tri_conf_market ON tri_confluence_metrics (market)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tri_conf_updated ON tri_confluence_metrics (updated_at DESC)")
-        _TABLE_INITIALIZED = True
     except Exception as e:
         logger.debug("Failed ensuring tri_confluence_metrics table: %s", e)
 
@@ -127,29 +123,36 @@ def calculate_pearson_correlation(x: list[float], y: list[float]) -> float | Non
 
 def parse_quarter_sort_key(quarter_str: str) -> tuple[int, int]:
     """
-    Parse a quarter string like 'Q1 FY27', 'Q2 FY26', '2024-03-31' into a sortable (year, quarter_num) tuple.
+    Parse a quarter string like 'Q1 FY27', 'Q2 FY26', '2024-03-31' into a sortable (fy_year, quarter_num) tuple.
+    In Indian Fiscal Year: Q1 (Apr-Jun), Q2 (Jul-Sep), Q3 (Oct-Dec), Q4 (Jan-Mar).
+    Sorted monotonically by (fy_year, q_num) in strict chronological sequence.
     """
     if not quarter_str or not isinstance(quarter_str, str):
-        return (2000, 1)
+        return (2020, 1)
 
     q_clean = quarter_str.strip().upper()
 
-    # Pattern: Q1 FY27 / Q2 FY26
+    # Pattern: Q1 FY27 / Q2 FY26 / Q4 2026
     m_fy = re.match(r"Q([1-4])\s*(?:FY)?(\d{2,4})", q_clean)
     if m_fy:
         q_num = int(m_fy.group(1))
         fy_raw = int(m_fy.group(2))
         fy_year = (2000 + fy_raw) if fy_raw < 100 else fy_raw
-        cal_year = fy_year - 1 if q_num in (1, 2, 3) else fy_year
-        return (cal_year, q_num)
+        return (fy_year, q_num)
 
     # Pattern: YYYY-MM-DD or YYYY-MM
     m_date = re.match(r"(\d{4})[-/](\d{1,2})", q_clean)
     if m_date:
         yr = int(m_date.group(1))
         mo = int(m_date.group(2))
-        q_num = (mo - 1) // 3 + 1
-        return (yr, q_num)
+        if 4 <= mo <= 6:
+            return (yr + 1, 1)
+        elif 7 <= mo <= 9:
+            return (yr + 1, 2)
+        elif 10 <= mo <= 12:
+            return (yr + 1, 3)
+        else:  # 1 <= mo <= 3
+            return (yr, 4)
 
     return (2020, 1)
 
