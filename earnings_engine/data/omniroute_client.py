@@ -25,6 +25,46 @@ logger = logging.getLogger("earnings_engine.data.omniroute_client")
 # Standard ports where diegosouzapw/OmniRoute may be hosted
 OMNIROUTE_PROBE_PORTS = [20128, 20129, 8080, 3000]
 
+# Claude Code 4-Model Catalog for direct OmniRoute LLM Market Analysis
+CLAUDE_CODE_OMNIROUTE_MODELS: list[dict[str, Any]] = [
+    {
+        "id": "antigravityonly",
+        "name": "⚡ Antigravity (Claude Sonnet / DeepMind)",
+        "tier": "PRIMARY",
+        "provider": "Anthropic / DeepMind",
+        "description": "Primary high-reasoning coding & quant synthesis model tier.",
+        "recommended": True,
+        "available": True,
+    },
+    {
+        "id": "claude only",
+        "name": "🏛️ Claude Only (Claude 5 / Opus 5)",
+        "tier": "ARCHITECTURE",
+        "provider": "Anthropic",
+        "description": "Frontier architectural design, quantitative formulations & deep audit.",
+        "recommended": True,
+        "available": True,
+    },
+    {
+        "id": "free only",
+        "name": "🚀 Free Only (Haiku / Fast Tier)",
+        "tier": "FAST",
+        "provider": "Anthropic / Fast",
+        "description": "Low-latency, lightweight synthesis and screening.",
+        "recommended": False,
+        "available": True,
+    },
+    {
+        "id": "auto/smart",
+        "name": "🔮 Auto Smart (Smart Coding Gateway)",
+        "tier": "SMART",
+        "provider": "OmniRoute Gateway",
+        "description": "Dynamic OmniRoute smart-routing tier with optimal model allocation.",
+        "recommended": False,
+        "available": True,
+    },
+]
+
 # Global cache to prevent hammering unreachable or unauthenticated local daemon
 _OMNIROUTE_AUTH_FAILURE_CACHE: dict[str, float] = {}
 
@@ -219,6 +259,16 @@ class OmniRouteClient:
         self._detected_endpoint: str | None = None
         self._last_probe_time: float = 0.0
         self._is_online: bool = False
+
+    @property
+    def base_url(self) -> str:
+        """Convenience property for configured base URL."""
+        return self.get_configured_base_url()
+
+    @property
+    def api_key(self) -> str:
+        """Convenience property for resolved API key."""
+        return self.get_api_key()
 
     def get_configured_base_url(self) -> str:
         """Get the base URL from settings or environment."""
@@ -1064,3 +1114,121 @@ class OmniRouteClient:
             "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             "raw_response": json.dumps({"status": "quant_engine", "ticker": ticker, "price": price}, indent=2),
         }
+
+
+def get_claude_code_models(probe_live: bool = True) -> list[dict[str, Any]]:
+    """Return Claude Code 4-model catalog with live gateway availability probe."""
+    client = OmniRouteClient()
+    if not probe_live:
+        return [dict(m) for m in CLAUDE_CODE_OMNIROUTE_MODELS]
+    try:
+        url = f"{client.base_url.rstrip('/')}/models"
+        headers = {"Accept": "application/json"}
+        if client.api_key:
+            headers["Authorization"] = f"Bearer {client.api_key}"
+        resp = requests.get(url, headers=headers, timeout=2.5)
+        if resp.status_code == 200:
+            data = resp.json()
+            items = data.get("data") if isinstance(data, dict) else data
+            if not isinstance(items, list):
+                items = []
+            online_ids = set()
+            for m in items:
+                if isinstance(m, dict):
+                    online_ids.add(m.get("id"))
+                elif isinstance(m, str):
+                    online_ids.add(m)
+            res = []
+            for item in CLAUDE_CODE_OMNIROUTE_MODELS:
+                m_copy = dict(item)
+                m_copy["available"] = item["id"] in online_ids
+                res.append(m_copy)
+            return res
+    except Exception as e:
+        logger.debug("[OMNIROUTE] Live probe for Claude Code models failed: %s", e)
+    return [dict(m) for m in CLAUDE_CODE_OMNIROUTE_MODELS]
+
+
+def execute_omniroute_analysis(
+    model: str = "antigravityonly",
+    system_prompt: str = "",
+    user_prompt: str = "",
+    temperature: float = 0.2,
+    timeout: int = 60,
+) -> dict[str, Any]:
+    """Execute direct quantitative analysis via OmniRoute using specified Claude Code model tier."""
+    client = OmniRouteClient()
+    url = client.get_completions_url()
+    headers = {
+        "Content-Type": "application/json",
+        "X-Title": "Earnings Engine OmniRoute Analysis",
+    }
+    if client.api_key:
+        headers["Authorization"] = f"Bearer {client.api_key}"
+
+    try:
+        from earnings_engine.rate_limits import record_request
+        record_request("omniroute")
+    except Exception:
+        pass
+
+    t0 = time.perf_counter()
+    try:
+        resp = requests.post(
+            url,
+            headers=headers,
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": temperature,
+                "max_tokens": 2048,
+            },
+            timeout=timeout,
+        )
+        latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+        if resp.status_code == 200:
+            data = resp.json()
+            choice = (data.get("choices") or [{}])[0]
+            msg = choice.get("message") or {}
+            content = (msg.get("content") or "").strip()
+            reasoning = (msg.get("reasoning") or msg.get("reasoning_content") or "").strip()
+            tokens = data.get("usage", {}).get("total_tokens", 0)
+
+            if not reasoning and "<think>" in content:
+                think_match = re.search(r"<think>(.*?)</think>", content, flags=re.DOTALL)
+                if think_match:
+                    reasoning = think_match.group(1).strip()
+                    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+
+            return {
+                "status": "success",
+                "raw_text": content,
+                "reasoning_text": reasoning,
+                "tokens_used": tokens,
+                "latency_ms": latency_ms,
+                "model_used": model,
+            }
+        return {
+            "status": "error",
+            "error": f"OmniRoute HTTP {resp.status_code}: {resp.text[:200]}",
+            "raw_text": "",
+            "reasoning_text": "",
+            "tokens_used": 0,
+            "latency_ms": latency_ms,
+            "model_used": model,
+        }
+    except Exception as e:
+        latency_ms = round((time.perf_counter() - t0) * 1000, 1)
+        return {
+            "status": "error",
+            "error": str(e),
+            "raw_text": "",
+            "reasoning_text": "",
+            "tokens_used": 0,
+            "latency_ms": latency_ms,
+            "model_used": model,
+        }
+

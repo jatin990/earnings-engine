@@ -9,9 +9,12 @@ from starlette.testclient import TestClient
 from earnings_engine.api.server import app
 from earnings_engine.config import Settings
 from earnings_engine.data.omniroute_client import (
+    CLAUDE_CODE_OMNIROUTE_MODELS,
     DEFAULT_OMNIROUTER_MODELS,
     OMNIROUTE_PROBE_PORTS,
     OmniRouteClient,
+    execute_omniroute_analysis,
+    get_claude_code_models,
 )
 
 
@@ -214,4 +217,157 @@ def test_omniroute_cascade_on_503_provider_failure():
         assert res["impact_score"] == 80
         assert res["target_price"] == 3100.0
         assert any(m in res["ai_model"] for m in ("antigravity", "openai/gpt-4o-mini"))
+
+
+def test_claude_code_models_catalog():
+    """Verify CLAUDE_CODE_OMNIROUTE_MODELS defines the 4 exact Claude Code model tiers."""
+    model_ids = [m["id"] for m in CLAUDE_CODE_OMNIROUTE_MODELS]
+    assert "antigravityonly" in model_ids
+    assert "claude only" in model_ids
+    assert "free only" in model_ids
+    assert "auto/smart" in model_ids
+
+    names_by_id = {m["id"]: m["name"] for m in CLAUDE_CODE_OMNIROUTE_MODELS}
+    assert "Antigravity" in names_by_id["antigravityonly"]
+    assert "Claude Only" in names_by_id["claude only"]
+    assert "Free Only" in names_by_id["free only"]
+    assert "Auto Smart" in names_by_id["auto/smart"]
+
+
+@patch("requests.get")
+def test_get_claude_code_models_live_probe(mock_get):
+    """Verify live probe marks availability based on endpoint response."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "data": [{"id": "antigravityonly"}, {"id": "claude only"}, {"id": "free only"}, {"id": "auto/smart"}]
+    }
+    mock_get.return_value = mock_resp
+
+    models = get_claude_code_models(probe_live=True)
+    assert len(models) == 4
+    for m in models:
+        assert m["available"] is True
+
+
+@patch("requests.get")
+def test_get_claude_code_models_partial_availability(mock_get):
+    """Verify partial model availability is correctly flagged."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "data": [{"id": "antigravityonly"}]
+    }
+    mock_get.return_value = mock_resp
+
+    models = get_claude_code_models(probe_live=True)
+    assert len(models) == 4
+    avail = {m["id"]: m["available"] for m in models}
+    assert avail["antigravityonly"] is True
+    assert avail["claude only"] is False
+    assert avail["free only"] is False
+    assert avail["auto/smart"] is False
+
+
+@patch("requests.get")
+def test_get_claude_code_models_fallback_on_probe_failure(mock_get):
+    """Verify that when live probe fails, models default to available=True."""
+    mock_get.side_effect = Exception("Daemon unreachable")
+    models = get_claude_code_models(probe_live=True)
+    assert len(models) == 4
+    for m in models:
+        assert m["available"] is True
+
+
+@patch("requests.post")
+def test_execute_omniroute_analysis_success(mock_post):
+    """Verify successful execution returns formatted analysis structure."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "choices": [{
+            "message": {
+                "content": '```json\n{"direction": "BULLISH", "conviction_score": 85}\n```',
+                "reasoning": "Technical structure is breaking out above R1",
+            }
+        }],
+        "usage": {"total_tokens": 420},
+    }
+    mock_post.return_value = mock_resp
+
+    res = execute_omniroute_analysis(
+        model="antigravityonly",
+        system_prompt="You are a quant analyst.",
+        user_prompt="Analyze TATAMOTORS.NS",
+        temperature=0.2,
+        timeout=30,
+    )
+    assert res["status"] == "success"
+    assert res["tokens_used"] == 420
+    assert "Technical structure" in res["reasoning_text"]
+    assert "BULLISH" in res["raw_text"]
+    assert res["model_used"] == "antigravityonly"
+    assert isinstance(res["latency_ms"], (int, float))
+
+
+@patch("requests.post")
+def test_execute_omniroute_analysis_think_tag_extraction(mock_post):
+    """Verify <think> tags are extracted into reasoning_text if reasoning field is empty."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "choices": [{
+            "message": {
+                "content": "<think>\nStep 1: Check moving averages.\nStep 2: Confirm volume surge.\n</think>\n```json\n{\"direction\": \"BULLISH\"}\n```",
+                "reasoning": "",
+            }
+        }],
+        "usage": {"total_tokens": 512},
+    }
+    mock_post.return_value = mock_resp
+
+    res = execute_omniroute_analysis(
+        model="claude only",
+        system_prompt="You are an institutional auditor.",
+        user_prompt="Audit INFY.NS",
+    )
+    assert res["status"] == "success"
+    assert "Step 1: Check moving averages." in res["reasoning_text"]
+    assert '{"direction": "BULLISH"}' in res["raw_text"]
+    assert "<think>" not in res["raw_text"]
+
+
+@patch("requests.post")
+def test_execute_omniroute_analysis_http_error(mock_post):
+    """Verify HTTP error is properly handled and returned as status: error."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 502
+    mock_resp.text = "Bad Gateway from upstream provider"
+    mock_post.return_value = mock_resp
+
+    res = execute_omniroute_analysis(
+        model="free only",
+        system_prompt="System",
+        user_prompt="Prompt",
+    )
+    assert res["status"] == "error"
+    assert "502" in res["error"]
+    assert res["raw_text"] == ""
+    assert res["tokens_used"] == 0
+
+
+@patch("requests.post")
+def test_execute_omniroute_analysis_network_exception(mock_post):
+    """Verify network exception is caught and returned with status: error."""
+    mock_post.side_effect = Exception("Read timed out")
+
+    res = execute_omniroute_analysis(
+        model="auto/smart",
+        system_prompt="System",
+        user_prompt="Prompt",
+    )
+    assert res["status"] == "error"
+    assert "Read timed out" in res["error"]
+    assert res["raw_text"] == ""
+
 
