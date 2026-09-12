@@ -1178,34 +1178,28 @@ def get_stock_breakout_timeline(
 
     # 4. If events are sparse, synthesize the natural lifecycle milestones
     if not events:
+        scan_time_str = snap.get("scanned_at") or snap.get("created_at")
+        if scan_time_str and len(str(scan_time_str)) >= 16:
+            discovery_time_disp = str(scan_time_str).replace("T", " ")[:16]
+            discovery_raw = str(scan_time_str)
+        else:
+            # Explicit EOD or point-in-time timestamp rather than fabricated morning 09:15
+            discovery_time_disp = f"{sig_date} 15:30 EOD"
+            discovery_raw = f"{sig_date}T15:30:00"
+
         # Milestone 1: Initial Discovery
         events.append({
-            "timestamp": f"{sig_date} 09:15",
-            "raw_time": f"{sig_date}T09:15:00",
+            "timestamp": discovery_time_disp,
+            "raw_time": discovery_raw,
             "event_type": "DISCOVERY",
-            "title": "⚡ Setup Discovered in Warm Pool",
-            "badge": "WARM",
-            "badge_color": "#fbbf24",
+            "title": f"⚡ Setup Discovered in {tier} Pool",
+            "badge": tier,
+            "badge_color": "#f87171" if tier == "HOT" else "#fbbf24",
             "price": sig_p,
             "score": comp_score,
             "reason": f"Discovered with composite conviction score {comp_score:.1f}/100. Price compressing ({snap.get('atr_pct', 2.5):.1f}% ATR) within {snap.get('pct_from_high', -2.0):+.1f}% of key resistance.",
             "catalyst_impact": snap.get("catalyst_impact"),
         })
-
-        # Milestone 2: Hot Pool Acceleration
-        if tier == "HOT" or comp_score >= 50 or (snap.get("volume_ratio") or 0) >= 1.5:
-            events.append({
-                "timestamp": f"{sig_date} 11:30",
-                "raw_time": f"{sig_date}T11:30:00",
-                "event_type": "PROMOTED_HOT",
-                "title": "🔥 Promoted to HOT Priority Pool",
-                "badge": "HOT",
-                "badge_color": "#f87171",
-                "price": cur_p,
-                "score": comp_score,
-                "reason": f"Volume expanded to {snap.get('volume_ratio', 1.5):.1f}x with price within {snap.get('pct_from_high', -1.0):+.1f}% of trigger level ₹{trig_p:,.2f}.",
-                "catalyst_impact": None,
-            })
 
     # Milestone 3: Breakout Trigger Breach (if breached/triggered)
     is_breached = bool(snap.get("breakout_happened")) or (cur_p and trig_p and cur_p >= trig_p) or outcome not in ("PENDING", "ACTIVE", "")
@@ -1469,7 +1463,7 @@ def get_tracked_breakouts(
                 sig_date = item_d.get("signal_date")
 
                 # Ensure timestamps and staleness attributes are initialized
-                item_d["signal_time"] = item_d.get("signal_time") or item_d.get("created_at") or (f"{sig_date} 09:15" if sig_date else None)
+                item_d["signal_time"] = item_d.get("signal_time") or item_d.get("created_at") or (f"{sig_date} 15:30" if sig_date else None)
                 item_d["signal_datetime"] = item_d.get("signal_datetime") or item_d.get("created_at") or sig_date
 
                 lq = live_quotes_map.get(t) if live_quotes_map else None

@@ -2,7 +2,7 @@
 <!-- 🖤 VERCEL-STYLE LEFT SIDEBAR NAVIGATION -->
 <!-- ========================================================================= -->
 <aside class="app-sidebar" id="appSidebar">
-    
+
     <!-- 1. Workspace / Account Switcher Header -->
     <div style="padding: 0.75rem 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between;">
         <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
@@ -35,12 +35,12 @@
         </div>
     </div>
 
-    <!-- 3. Scrollable Navigation List -->
-    <div class="sidebar-nav-scroll" style="flex: 1; overflow-y: auto; padding: 0.5rem 0.65rem; display: flex; flex-direction: column; gap: 0.75rem;">
-        
-        <!-- Core Terminal Group -->
+    <!-- 3. Scrollable Navigation List (4 Logical Clusters) -->
+    <div class="sidebar-nav-scroll" style="flex: 1; overflow-y: auto; padding: 0.5rem 0.65rem; display: flex; flex-direction: column; gap: 0.85rem;">
+
+        <!-- CLUSTER 1: 📈 MARKETS & SCANNERS -->
         <div class="sidebar-group">
-            <div class="sidebar-group-title">Terminal & Markets</div>
+            <div class="sidebar-group-title">Markets &amp; Scanners</div>
             <div class="sidebar-group-items">
                 <a class="sidebar-nav-item active" data-tab="home" onclick="app.switchTab('home')">
                     <span class="sidebar-icon">🌐</span>
@@ -51,14 +51,70 @@
                     <span class="sidebar-icon">📊</span>
                     <span class="sidebar-label">Results Ledger</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="monthfilter" onclick="app.switchTab('monthfilter')">
-                    <span class="sidebar-icon">🗓️</span>
-                    <span class="sidebar-label">Month Filter</span>
+
+                <!-- Breakout Radar with Nested Subtabs -->
+                <div class="sidebar-nav-tree" id="sidebarTree-breakout" data-parent-tab="breakout">
+                    <a class="sidebar-nav-item" data-tab="breakout" onclick="app.switchTab('breakout')">
+                        <span class="sidebar-icon">⚡</span>
+                        <span class="sidebar-label">Breakout Radar</span>
+                        <span id="sidebarBreakoutCountBadge" class="sidebar-pill" style="display:none;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:700;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Active Breakout Setups & Candidates">0</span>
+                    </a>
+                    <div class="sidebar-sub-items" id="sidebarBreakoutSubItems">
+                        <a class="sidebar-sub-item active" id="sidebarSubBreakoutScanner" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('scanner');">
+                            <span style="font-size:0.75rem;">⚡</span>
+                            <span>Active Setup Pool</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubBreakoutBacktest" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('backtest');">
+                            <span style="font-size:0.75rem;">📅</span>
+                            <span>Date Backtest</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubBreakoutTracked" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('tracked');">
+                            <span style="font-size:0.75rem;">📜</span>
+                            <span>Tracked History</span>
+                        </a>
+                    </div>
+                </div>
+
+                <a class="sidebar-nav-item" data-tab="swing" onclick="app.switchTab('swing')">
+                    <span class="sidebar-icon">🔄</span>
+                    <span class="sidebar-label">Swing Ranges</span>
                 </a>
-                <a class="sidebar-nav-item" data-tab="scanner" onclick="app.switchTab('scanner')">
-                    <span class="sidebar-icon">🔍</span>
-                    <span class="sidebar-label">Scanner</span>
+
+                <a class="sidebar-nav-item" data-tab="tri-confluence" onclick="app.switchTab('tri-confluence')">
+                    <span class="sidebar-icon">🔗</span>
+                    <span class="sidebar-label">Inst-Earnings Synergy</span>
+                    <span id="sidebarConfluenceBadge" class="sidebar-pill" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">ALPHA</span>
                 </a>
+
+                <a class="sidebar-nav-item" data-tab="options" onclick="app.switchTab('options')">
+                    <span class="sidebar-icon">⛓️</span>
+                    <span class="sidebar-label">Option Chain &amp; F&amp;O</span>
+                    <span class="sidebar-pill" style="background:rgba(56,189,248,0.2);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-weight:700;">Live</span>
+                </a>
+
+                <!-- Gainers & Breakouts with Nested Subtabs -->
+                <div class="sidebar-nav-tree" id="sidebarTree-gainers" data-parent-tab="gainers">
+                    <a class="sidebar-nav-item" data-tab="gainers" onclick="app.switchTab('gainers')">
+                        <span class="sidebar-icon">🚀</span>
+                        <span class="sidebar-label">Gainers &amp; Breakouts</span>
+                        <span id="sidebarGainersCountBadge" class="sidebar-pill" style="display:none;background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">0</span>
+                    </a>
+                    <div class="sidebar-sub-items" id="sidebarGainersSubItems">
+                        <a class="sidebar-sub-item active" id="sidebarSubGainersTop" onclick="app.switchTab('gainers'); app.switchGainersSubTab('gainers');">
+                            <span style="font-size:0.75rem;">🏆</span>
+                            <span>Top Gainers</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubGainersPatterns" onclick="app.switchTab('gainers'); app.switchGainersSubTab('patterns');">
+                            <span style="font-size:0.75rem;">🧩</span>
+                            <span>Pattern Archetypes</span>
+                        </a>
+                        <a class="sidebar-sub-item" id="sidebarSubGainersSetups" onclick="app.switchTab('gainers'); app.switchGainersSubTab('setups');">
+                            <span style="font-size:0.75rem;">🔮</span>
+                            <span>Watchlist Setups</span>
+                        </a>
+                    </div>
+                </div>
+
                 <!-- Catalysts, News & Pre-Market Hub with Nested Subtabs -->
                 <div class="sidebar-nav-tree" id="sidebarTree-catalysts" data-parent-tab="catalysts">
                     <a class="sidebar-nav-item" data-tab="catalysts" onclick="app.switchTab('catalysts')">
@@ -90,52 +146,68 @@
                     </div>
                 </div>
 
-                <!-- Gainers & Breakouts with Nested Subtabs -->
-                <div class="sidebar-nav-tree" id="sidebarTree-gainers" data-parent-tab="gainers">
-                    <a class="sidebar-nav-item" data-tab="gainers" onclick="app.switchTab('gainers')">
-                        <span class="sidebar-icon">🚀</span>
-                        <span class="sidebar-label">Gainers &amp; Breakouts</span>
-                        <span id="sidebarGainersCountBadge" class="sidebar-pill" style="display:none;background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">0</span>
-                    </a>
-                    <div class="sidebar-sub-items" id="sidebarGainersSubItems">
-                        <a class="sidebar-sub-item active" id="sidebarSubGainersTop" onclick="app.switchTab('gainers'); app.switchGainersSubTab('gainers');">
-                            <span style="font-size:0.75rem;">🏆</span>
-                            <span>Top Gainers</span>
-                        </a>
-                        <a class="sidebar-sub-item" id="sidebarSubGainersPatterns" onclick="app.switchTab('gainers'); app.switchGainersSubTab('patterns');">
-                            <span style="font-size:0.75rem;">🧩</span>
-                            <span>Pattern Archetypes</span>
-                        </a>
-                        <a class="sidebar-sub-item" id="sidebarSubGainersSetups" onclick="app.switchTab('gainers'); app.switchGainersSubTab('setups');">
-                            <span style="font-size:0.75rem;">🔮</span>
-                            <span>Watchlist Setups</span>
-                        </a>
-                    </div>
-                </div>
+                <a class="sidebar-nav-item" data-tab="monthfilter" onclick="app.switchTab('monthfilter')">
+                    <span class="sidebar-icon">🗓️</span>
+                    <span class="sidebar-label">Month Filter</span>
+                </a>
+                <a class="sidebar-nav-item" data-tab="scanner" onclick="app.switchTab('scanner')">
+                    <span class="sidebar-icon">🔍</span>
+                    <span class="sidebar-label">Sector Scanner</span>
+                </a>
+            </div>
+        </div>
 
-                <!-- Breakout Radar with Nested Subtabs -->
-                <div class="sidebar-nav-tree" id="sidebarTree-breakout" data-parent-tab="breakout">
-                    <a class="sidebar-nav-item" data-tab="breakout" onclick="app.switchTab('breakout')">
-                        <span class="sidebar-icon">⚡</span>
-                        <span class="sidebar-label">Breakout Radar</span>
-                        <span id="sidebarBreakoutCountBadge" class="sidebar-pill" style="display:none;background:rgba(56,189,248,0.18);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:700;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;" title="Active Breakout Setups & Candidates">0</span>
+        <!-- CLUSTER 2: 🧠 AI & QUANT LAB -->
+        <div class="sidebar-group">
+            <div class="sidebar-group-title">AI &amp; Quant Lab</div>
+            <div class="sidebar-group-items">
+                <a class="sidebar-nav-item" data-tab="consensus" onclick="app.switchTab('consensus')">
+                    <span class="sidebar-icon">🧠</span>
+                    <span class="sidebar-label">4-Model Consensus</span>
+                    <span class="sidebar-pill" style="background:rgba(168,85,247,0.2);color:#c084fc;border:1px solid rgba(168,85,247,0.35);">Omni</span>
+                </a>
+
+                <!-- Kronos 14D Forecast with Nested Subtabs -->
+                <div class="sidebar-nav-tree" id="sidebarTree-kronos" data-parent-tab="kronos">
+                    <a class="sidebar-nav-item" data-tab="kronos" onclick="app.switchTab('kronos')">
+                        <span class="sidebar-icon">🤖</span>
+                        <span class="sidebar-label">Kronos 14D Forecast</span>
                     </a>
-                    <div class="sidebar-sub-items" id="sidebarBreakoutSubItems">
-                        <a class="sidebar-sub-item active" id="sidebarSubBreakoutScanner" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('scanner');">
-                            <span style="font-size:0.75rem;">⚡</span>
-                            <span>Active Setup Pool</span>
+                    <div class="sidebar-sub-items" id="sidebarKronosSubItems">
+                        <a class="sidebar-sub-item active" id="sidebarSubKronosLatest" onclick="app.switchTab('kronos'); app.switchKronosTab('latest');">
+                            <span style="font-size:0.75rem;">📈</span>
+                            <span>Latest Charts</span>
                         </a>
-                        <a class="sidebar-sub-item" id="sidebarSubBreakoutBacktest" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('backtest');">
-                            <span style="font-size:0.75rem;">📅</span>
-                            <span>Date Backtest</span>
+                        <a class="sidebar-sub-item" id="sidebarSubKronosList" onclick="app.switchTab('kronos'); app.switchKronosTab('list');">
+                            <span style="font-size:0.75rem;">📋</span>
+                            <span>Overview List</span>
                         </a>
-                        <a class="sidebar-sub-item" id="sidebarSubBreakoutTracked" onclick="app.switchTab('breakout'); app.switchBreakoutSubtab('tracked');">
+                        <a class="sidebar-sub-item" id="sidebarSubKronosAudit" onclick="app.switchTab('kronos'); app.switchKronosTab('audit');">
                             <span style="font-size:0.75rem;">📜</span>
-                            <span>Tracked History</span>
+                            <span>Audit History</span>
                         </a>
                     </div>
                 </div>
 
+                <a class="sidebar-nav-item" data-tab="buydip" onclick="app.switchTab('buydip')">
+                    <span class="sidebar-icon">🛒</span>
+                    <span class="sidebar-label">Buy the Dip</span>
+                </a>
+                <a class="sidebar-nav-item" data-tab="playground" onclick="app.switchTab('playground')">
+                    <span class="sidebar-icon">🧪</span>
+                    <span class="sidebar-label">Quant Playground</span>
+                </a>
+                <a class="sidebar-nav-item" data-tab="backtest" onclick="app.switchTab('backtest')">
+                    <span class="sidebar-icon">📈</span>
+                    <span class="sidebar-label">Backtest Engine</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- CLUSTER 3: 🏛️ INSTITUTIONAL FORENSICS -->
+        <div class="sidebar-group">
+            <div class="sidebar-group-title">Institutional Forensics</div>
+            <div class="sidebar-group-items">
                 <!-- Institutional Flows with Nested Subtabs -->
                 <div class="sidebar-nav-tree" id="sidebarTree-institutional" data-parent-tab="institutional">
                     <a class="sidebar-nav-item" data-tab="institutional" onclick="app.switchTab('institutional')">
@@ -162,11 +234,7 @@
                         </a>
                     </div>
                 </div>
-                <a class="sidebar-nav-item" data-tab="tri-confluence" onclick="app.switchTab('tri-confluence')">
-                    <span class="sidebar-icon">🔗</span>
-                    <span class="sidebar-label">Inst-Earnings Synergy</span>
-                    <span id="sidebarConfluenceBadge" class="sidebar-pill" style="background:rgba(16,185,129,0.2);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-weight:800;font-family:var(--font-mono);font-size:0.68rem;padding:0.08rem 0.45rem;border-radius:10px;">ALPHA</span>
-                </a>
+
                 <a class="sidebar-nav-item" data-tab="repeaters" onclick="app.switchTab('repeaters')">
                     <span class="sidebar-icon">🔁</span>
                     <span class="sidebar-label">Quarter Repeaters</span>
@@ -174,68 +242,8 @@
                 </a>
                 <a class="sidebar-nav-item" data-tab="new-additions" onclick="app.switchTab('new-additions')">
                     <span class="sidebar-icon">🆕</span>
-                    <span class="sidebar-label">Recent Additions & IPOs</span>
+                    <span class="sidebar-label">Recent Additions &amp; IPOs</span>
                     <span class="sidebar-pill" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);">NSE</span>
-                </a>
-            </div>
-        </div>
-
-        <!-- Strategy & AI Models Group -->
-        <div class="sidebar-group">
-            <div class="sidebar-group-title">Strategy & AI Models</div>
-            <div class="sidebar-group-items">
-                <a class="sidebar-nav-item" data-tab="swing" onclick="app.switchTab('swing')">
-                    <span class="sidebar-icon">🔄</span>
-                    <span class="sidebar-label">Swing Ranges</span>
-                </a>
-
-                <!-- Kronos 14D Forecast with Nested Subtabs -->
-                <div class="sidebar-nav-tree" id="sidebarTree-kronos" data-parent-tab="kronos">
-                    <a class="sidebar-nav-item" data-tab="kronos" onclick="app.switchTab('kronos')">
-                        <span class="sidebar-icon">🤖</span>
-                        <span class="sidebar-label">Kronos 14D Forecast</span>
-                    </a>
-                    <div class="sidebar-sub-items" id="sidebarKronosSubItems">
-                        <a class="sidebar-sub-item active" id="sidebarSubKronosLatest" onclick="app.switchTab('kronos'); app.switchKronosTab('latest');">
-                            <span style="font-size:0.75rem;">📈</span>
-                            <span>Latest Charts</span>
-                        </a>
-                        <a class="sidebar-sub-item" id="sidebarSubKronosList" onclick="app.switchTab('kronos'); app.switchKronosTab('list');">
-                            <span style="font-size:0.75rem;">📋</span>
-                            <span>Overview List</span>
-                        </a>
-                        <a class="sidebar-sub-item" id="sidebarSubKronosAudit" onclick="app.switchTab('kronos'); app.switchKronosTab('audit');">
-                            <span style="font-size:0.75rem;">📜</span>
-                            <span>Audit History</span>
-                        </a>
-                    </div>
-                </div>
-                <a class="sidebar-nav-item" data-tab="consensus" onclick="app.switchTab('consensus')">
-                    <span class="sidebar-icon">🧠</span>
-                    <span class="sidebar-label">4-Model Consensus</span>
-                </a>
-                <a class="sidebar-nav-item" data-tab="buydip" onclick="app.switchTab('buydip')">
-                    <span class="sidebar-icon">🛒</span>
-                    <span class="sidebar-label">Buy the Dip</span>
-                </a>
-                <a class="sidebar-nav-item" data-tab="playground" onclick="app.switchTab('playground')">
-                    <span class="sidebar-icon">🧪</span>
-                    <span class="sidebar-label">Quant Playground</span>
-                </a>
-            </div>
-        </div>
-
-        <!-- Analytics & Infrastructure Group -->
-        <div class="sidebar-group">
-            <div class="sidebar-group-title">Analytics & Watchlists</div>
-            <div class="sidebar-group-items">
-                <a class="sidebar-nav-item" data-tab="watchlist" onclick="app.switchTab('watchlist')">
-                    <span class="sidebar-icon">⭐</span>
-                    <span class="sidebar-label">Watchlist Hub</span>
-                </a>
-                <a class="sidebar-nav-item" data-tab="backtest" onclick="app.switchTab('backtest')">
-                    <span class="sidebar-icon">📈</span>
-                    <span class="sidebar-label">Backtest Engine</span>
                 </a>
                 <a class="sidebar-nav-item" data-tab="coverage" onclick="app.switchTab('coverage')">
                     <span class="sidebar-icon">📊</span>
@@ -243,7 +251,7 @@
                 </a>
                 <a class="sidebar-nav-item" data-tab="industries" onclick="app.switchTab('industries')">
                     <span class="sidebar-icon">🏭</span>
-                    <span class="sidebar-label">Industries & Multiples</span>
+                    <span class="sidebar-label">Industries &amp; Multiples</span>
                 </a>
                 <a class="sidebar-nav-item" data-tab="patterns" onclick="app.switchTab('patterns')">
                     <span class="sidebar-icon">📐</span>
@@ -252,11 +260,42 @@
             </div>
         </div>
 
+        <!-- CLUSTER 4: 💼 OPERATIONS & PORTFOLIOS -->
+        <div class="sidebar-group">
+            <div class="sidebar-group-title">Operations &amp; Portfolios</div>
+            <div class="sidebar-group-items">
+                <a class="sidebar-nav-item" data-tab="watchlist" onclick="app.switchTab('watchlist')">
+                    <span class="sidebar-icon">⭐</span>
+                    <span class="sidebar-label">Watchlist Hub</span>
+                </a>
+                <a href="/net-worth" class="sidebar-nav-item" title="Net Worth Consolidation Hub">
+                    <span class="sidebar-icon">💰</span>
+                    <span class="sidebar-label">Net Worth</span>
+                    <span class="sidebar-pill" style="color:#a1a1aa;">↗</span>
+                </a>
+                <a href="/credit-cards" class="sidebar-nav-item" title="Credit Cards & Rewards Hub">
+                    <span class="sidebar-icon">💳</span>
+                    <span class="sidebar-label">Credit Cards</span>
+                    <span class="sidebar-pill" style="color:#a1a1aa;">↗</span>
+                </a>
+                <a href="/trips" class="sidebar-nav-item" title="Trips & Expense Settlement">
+                    <span class="sidebar-icon">✈️</span>
+                    <span class="sidebar-label">Trips &amp; Travel</span>
+                    <span class="sidebar-pill" style="color:#a1a1aa;">↗</span>
+                </a>
+                <a href="/zepto" class="sidebar-nav-item" title="Zepto Dark Store Operations & P&L">
+                    <span class="sidebar-icon">⚡</span>
+                    <span class="sidebar-label">Zepto Dark Store</span>
+                    <span class="sidebar-pill" style="color:#a1a1aa;">↗</span>
+                </a>
+            </div>
+        </div>
+
     </div>
 
     <!-- 4. Sidebar Footer Utilities -->
     <div style="padding: 0.65rem 0.85rem; border-top: 1px solid rgba(255, 255, 255, 0.08); background: #050505; display: flex; flex-direction: column; gap: 0.35rem;">
-        
+
         <!-- Rate Limits & Quotas Shortcut -->
         <a onclick="app.openCustomizerModal('ratelimits')" class="sidebar-footer-link" title="View Downstream API Quotas & Limits">
             <span style="font-size: 0.8rem;">⚡</span>

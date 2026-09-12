@@ -242,6 +242,14 @@
 
             if (sideSmartMoney) sideSmartMoney.classList.toggle('active', p === 'smart-money');
 
+            const ctxLabel = document.getElementById('instSubtabContextLabel');
+            if (ctxLabel) {
+                if (p === 'investors') ctxLabel.textContent = '💼 Smart Portfolios (AMFI)';
+                else if (p === 'top-additions') ctxLabel.textContent = '🚀 Top Additions & Unwinds';
+                else if (p === 'smart-money') ctxLabel.textContent = '🎯 Smart Money Radar';
+                else ctxLabel.textContent = '🏛️ Equities & Stake Radar';
+            }
+
 
 
             if (p === 'investors') {

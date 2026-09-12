@@ -700,6 +700,13 @@ Object.assign(app, {
                 if (btnList) btnList.classList.remove('active');
                 if (btnAudit) btnAudit.classList.remove('active');
                 
+                const ctxLabel = document.getElementById('kronosSubtabContextLabel');
+                if (ctxLabel) {
+                    if (name === 'audit') ctxLabel.textContent = '📜 Forecast Audit History';
+                    else if (name === 'list') ctxLabel.textContent = '📋 Universe Overview List';
+                    else ctxLabel.textContent = '📈 Latest Forecast Charts';
+                }
+
                 if (name === 'audit') {
                     if (audit) audit.style.display = 'block';
                     if (btnAudit) btnAudit.classList.add('active');

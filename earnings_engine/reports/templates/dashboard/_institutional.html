@@ -8,44 +8,24 @@
 
 
 
-    <!-- Sub-navigation Header: 2 Dedicated Pages -->
-
-    <div style="margin-bottom:1.25rem;">
-
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.75rem;">
-
+    <!-- Header: Institutional Intelligence & Smart Money -->
+    <div style="margin-bottom:0.85rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.65rem;">
             <div style="display:flex;align-items:center;gap:0.75rem;">
-
                 <div style="font-size:1.15rem;font-weight:800;color:#f8fafc;display:flex;align-items:center;gap:0.5rem;letter-spacing:-0.02em;">
-
-                    Institutional Intelligence & Smart Money
-
+                    Institutional Intelligence &amp; Smart Money
                 </div>
-
-                <span class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.65rem;padding:0.15rem 0.5rem;">FII / DII & SUPER INVESTORS</span>
+                <span class="badge" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.25);font-size:0.65rem;padding:0.15rem 0.5rem;">FII / DII &amp; SUPER INVESTORS</span>
 
                 <!-- Institutional Data Integrity & Real-Source Verification Badge -->
                 <button type="button" id="btnInstIntegrityModal" onclick="app.openInstitutionalIntegrityModal()" class="btn btn-sm" style="display:inline-flex;align-items:center;gap:0.4rem;background:#121215;border:1px solid rgba(16,185,129,0.35);color:#10b981;font-size:0.72rem;font-weight:700;padding:0.25rem 0.65rem;border-radius:6px;cursor:pointer;transition:all 0.15s ease;" title="Click to view Institutional Data Health, Multi-Cadence Freshness, Invariant Audits & Cryptographic Provenance Ledger">
                     <span id="instIntegrityIcon">🛡️</span>
                     <span id="instIntegrityBadgeText">Data Integrity: Optimal (100%)</span>
                 </button>
-
             </div>
 
-            <!-- Page Switcher Tabs -->
-            <div style="display:flex;background:#06060a;padding:0.25rem;border-radius:8px;border:1px solid rgba(255,255,255,0.08);gap:0.25rem;flex-wrap:wrap;">
-                <button type="button" id="btnInstPage-equities" onclick="app.switchInstitutionalPage('equities')" class="btn btn-sm" style="background:#18181b;color:#ffffff;border:1px solid rgba(255,255,255,0.3);font-weight:700;padding:0.35rem 0.85rem;font-size:0.76rem;">
-                    Equities & Stake Radar
-                </button>
-                <button type="button" id="btnInstPage-top-additions" onclick="app.switchInstitutionalPage('top-additions')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;">
-                    Top Stocks & Massive Additions
-                </button>
-                <button type="button" id="btnInstPage-investors" onclick="app.switchInstitutionalPage('investors')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;">
-                    Smart Money & Portfolios
-                </button>
-                <button type="button" id="btnInstPage-smart-money" onclick="app.switchInstitutionalPage('smart-money')" class="btn btn-sm" style="background:transparent;color:#94a3b8;border:1px solid transparent;font-weight:500;padding:0.35rem 0.85rem;font-size:0.76rem;display:flex;align-items:center;gap:0.35rem;">
-                    <span>🎯</span> Smart Money Radar
-                </button>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span id="instSubtabContextLabel" style="font-size:0.72rem;color:#94a3b8;font-family:var(--font-mono);background:#09090b;padding:0.25rem 0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.08);">🏛️ Equities &amp; Stake Radar</span>
             </div>
         </div>
     </div>

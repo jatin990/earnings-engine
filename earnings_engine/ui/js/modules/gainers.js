@@ -38,6 +38,13 @@ Object.assign(app, {
                 if (sidePatterns) sidePatterns.classList.toggle('active', subTab === 'patterns');
                 if (sideSetups) sideSetups.classList.toggle('active', subTab === 'setups');
 
+                const ctxLabel = document.getElementById('gainersSubtabContextLabel');
+                if (ctxLabel) {
+                    if (subTab === 'patterns') ctxLabel.textContent = '🧩 Pattern Archetypes';
+                    else if (subTab === 'setups') ctxLabel.textContent = '🔮 Watchlist Setups';
+                    else ctxLabel.textContent = '🏆 Top 10 Gainers';
+                }
+
                 if (subTab === 'patterns' && !this.patternMatrixData.length) {
                     this.loadPatternMatrix();
                 } else if (subTab === 'setups' && !this.upcomingSetupsData.length) {

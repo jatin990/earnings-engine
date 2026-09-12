@@ -31,13 +31,16 @@
                 </div>
             </div>
 
-            <!-- Section Header & Sub-Tab Navigation -->
+            <!-- Section Header -->
             <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem; margin-bottom: 0.75rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
-                            <span>🚀 Top 10 Gainers & Pattern Discovery Engine</span>
-                        </h3>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <h3 style="margin: 0; font-size: 1.05rem; font-family: 'Space Grotesk', sans-serif; display: flex; align-items: center; gap: 0.45rem; color: #ffffff;">
+                                <span>🚀 Top 10 Gainers &amp; Pattern Discovery Engine</span>
+                            </h3>
+                            <span id="gainersSubtabContextLabel" style="font-size: 0.72rem; color: #94a3b8; font-family: var(--font-mono); background: #09090b; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);">🏆 Top 10 Gainers</span>
+                        </div>
                         <p class="timestamp" style="margin: 0.15rem 0 0 0; font-size: 0.72rem; color: var(--text-muted);">Analyze daily top price surges, multi-source driver attribution, and discover recurring pre-breakout patterns.</p>
                     </div>
                     <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
@@ -46,7 +49,7 @@
                             <select id="gainersMarketSelect" onchange="app.onGainersMarketChange(this.value)" style="border: none; background: transparent; color: #ededed; font-size: 0.76rem; font-weight: 500; cursor: pointer; outline: none;" title="Select Market / Universe for Top Gainers">
                                 <optgroup label="🇮🇳 Indian Markets">
                                     <option value="NSE_TOP">🇮🇳 NSE Top Active (~50)</option>
-                                    <option value="NSE_LARGE_CAP">🇮🇳 NSE Large Cap (> 1000 Cr)</option>
+                                    <option value="NSE_LARGE_CAP">🇮🇳 NSE Large Cap (&gt; 1000 Cr)</option>
                                     <option value="NSE_ALL">🇮🇳 All NSE Equities</option>
                                 </optgroup>
                                 <optgroup label="🇺🇸 US Markets">
@@ -55,9 +58,6 @@
                                 </optgroup>
                             </select>
                         </div>
-                        <button type="button" class="tab-btn tab-btn-sm active" onclick="app.switchGainersSubTab('gainers')" id="gainersSubTabBtn_gainers" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🏆 Top 10 Gainers</button>
-                        <button type="button" class="tab-btn tab-btn-sm" onclick="app.switchGainersSubTab('patterns')" id="gainersSubTabBtn_patterns" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🧩 Pattern Archetypes</button>
-                        <button type="button" class="tab-btn tab-btn-sm" onclick="app.switchGainersSubTab('setups')" id="gainersSubTabBtn_setups" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">🔮 Watchlist Setups</button>
                         <button type="button" onclick="app.refreshGainersTab()" class="btn btn-primary btn-sm" style="font-weight:600;">🔄 Refresh</button>
                     </div>
                 </div>
