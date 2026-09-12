@@ -141,9 +141,23 @@ const API_BASE = window.location.origin;
             async openAiDetails(market, ticker, e) {
                 await this.loadScript('/static/js/modules/consensus.js');
                 await this.loadScript('/static/js/modules/swing_range.js');
+                await this.loadScript('/static/js/modules/swing.js');
                 await this.loadScript('/static/js/modules/month_filter.js');
                 if (typeof app.openAiDetails === 'function') {
                     return app.openAiDetails(market, ticker, e);
+                }
+            },
+            async loadSwing(e) {
+                await this.loadScript('/static/js/modules/swing_range.js');
+                await this.loadScript('/static/js/modules/swing.js');
+                if (typeof app.loadSwing === 'function') {
+                    return app.loadSwing(e);
+                }
+            },
+            async filterSwingTable(query) {
+                await this.loadScript('/static/js/modules/swing.js');
+                if (typeof app.filterSwingTable === 'function') {
+                    return app.filterSwingTable(query);
                 }
             },
 
@@ -1156,6 +1170,11 @@ const API_BASE = window.location.origin;
                 if (name === 'patterns') {
                     if (typeof this._restorePatternsControls === 'function') {
                         this._restorePatternsControls();
+                    }
+                }
+                if (name === 'swing') {
+                    if (!this.swingData || !this.swingData.length) {
+                        this.loadSwing();
                     }
                 }
                 this.applyRoleRestrictions();

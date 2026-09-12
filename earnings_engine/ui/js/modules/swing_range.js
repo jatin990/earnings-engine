@@ -655,6 +655,330 @@ Object.assign(app, {
                 return '$' + value.toFixed(2);
             },
 
+            // ---------- Modal AI & Kronos Helpers for Swing Range Modal ----------
+            async runModalKronos() {
+                const ticker = document.getElementById('srModalTicker')?.value;
+                const btn = document.getElementById('srModalKronosRunBtn');
+                if (!ticker) return;
+                if (typeof app.runSwingKronos === 'function') {
+                    await app.runSwingKronos(ticker, btn);
+                }
+            },
+
+            _renderModalKronos(kp) {
+                const badge = document.getElementById('srModalKronosBadge');
+                const content = document.getElementById('srModalKronosContent');
+                if (!badge || !content) return;
+
+                if (kp && (kp.trend || kp.return_pct != null)) {
+                    const trend = kp.trend || 'Neutral';
+                    const isBull = trend === 'Bullish';
+                    const isBear = trend === 'Bearish';
+                    const ret = kp.return_pct != null ? Number(kp.return_pct).toFixed(2) : '—';
+                    const retCls = isBull ? 'price-positive' : isBear ? 'price-negative' : '';
+
+                    badge.style.display = 'inline-block';
+                    badge.textContent = trend + ' (' + (ret >= 0 ? '+' : '') + ret + '%)';
+                    badge.style.background = isBull ? 'rgba(16,185,129,0.25)' : isBear ? 'rgba(239,68,68,0.25)' : 'rgba(251,191,36,0.25)';
+                    badge.style.color = isBull ? '#34d399' : isBear ? '#ef4444' : '#fbbf24';
+
+                    content.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.4rem;margin:0.5rem 0;">' +
+                        '<div class="metric"><span>14D Forecast Return</span><strong class="' + retCls + '">' + (ret >= 0 ? '+' : '') + ret + '%</strong></div>' +
+                        '<div class="metric"><span>Kronos Support</span><strong>₹' + (kp.support ? Number(kp.support).toFixed(2) : '—') + '</strong></div>' +
+                        '<div class="metric"><span>Kronos Resistance</span><strong>₹' + (kp.resistance ? Number(kp.resistance).toFixed(2) : '—') + '</strong></div>' +
+                        '<div class="metric"><span>Target Price</span><strong>₹' + (kp.target_price ? Number(kp.target_price).toFixed(2) : (kp.current_price && kp.return_pct ? (kp.current_price * (1 + kp.return_pct/100)).toFixed(2) : '—')) + '</strong></div>' +
+                        '</div>' +
+                        (kp.explanation ? '<p class="timestamp" style="margin:0.25rem 0 0 0;font-size:0.78rem;">' + kp.explanation + '</p>' : '');
+                } else {
+                    badge.style.display = 'none';
+                    content.innerHTML = '<p class="timestamp" style="margin:0;font-size:0.8rem;">No forecast generated yet. Click <strong>"⚡ Run Kronos AI"</strong> to compute 14-day predictions on demand.</p>';
+                }
+            },
+
+            async runSingleAiForecast(ticker, btn) {
+                ticker = (ticker || '').toUpperCase().trim();
+                if (!ticker) return;
+
+                const origHtml = btn ? btn.innerHTML : '';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading-spinner"></span> Synthesizing...';
+                }
+
+                try {
+                    const item = (this.swingData || []).find(x => x.ticker === ticker) || {};
+                    const res = await fetch(API_BASE + '/api/v1/dashboard/ai-forecast/run', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ticker: ticker,
+                            swing_support: item.current_support || null,
+                            swing_resistance: item.next_resistance || null,
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success && data.prediction) {
+                        const target = (this.swingData || []).find(x => x.ticker === ticker);
+                        if (target) {
+                            target.ai_synthesis = data.prediction;
+                        }
+                        if (typeof this.renderSwing === 'function') this.renderSwing();
+
+                        // If modal is open for this ticker, update its AI section
+                        const modalTicker = document.getElementById('srModalTicker')?.value;
+                        if (modalTicker === ticker) {
+                            this._renderModalAi(data.prediction, ticker);
+                        }
+                    } else {
+                        alert('AI News Synthesis failed: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (e) {
+                    console.error('Error running AI News synthesis for ' + ticker + ':', e);
+                    alert('Network error running AI News synthesis');
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }
+                }
+            },
+
+            async runModalAiForecast() {
+                const ticker = document.getElementById('srModalTicker')?.value;
+                const btn = document.getElementById('srModalAiRunBtn');
+                if (!ticker) return;
+                await this.runSingleAiForecast(ticker, btn);
+            },
+
+            async _renderModalAi(ai, ticker) {
+                const badge = document.getElementById('srModalAiSignalBadge');
+                const content = document.getElementById('srModalAiContent');
+                if (!badge || !content) return;
+
+                if (!ai || !ai.ai_signal) {
+                    badge.style.display = 'none';
+                    content.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin:0.25rem 0;">' +
+                        '<p class="timestamp" style="margin:0;font-size:0.8rem;">Click <strong>"⚡ Run AI Synthesis"</strong> to analyze real-time news headlines, volume surge, and price action.</p>' +
+                        '<button type="button" class="btn btn-sm" onclick="app.runModalAiForecast()" style="font-size:0.75rem;background:rgba(59,130,246,0.25);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);">⚡ Run Now</button>' +
+                        '</div>';
+
+                    if (ticker) {
+                        try {
+                            const nRes = await fetch(API_BASE + '/api/v1/dashboard/ai-forecast/news/' + encodeURIComponent(ticker) + '?limit=4');
+                            const nData = await nRes.json();
+                            if (nData.articles && nData.articles.length) {
+                                content.innerHTML += '<div style="margin-top:0.6rem;border-top:1px dashed rgba(255,255,255,0.08);padding-top:0.5rem;">' +
+                                    '<h5 style="margin:0 0 0.35rem 0;font-size:0.78rem;color:var(--muted);">📰 Live Headlines Feed (' + nData.articles.length + ' articles)</h5>' +
+                                    '<div style="display:flex;flex-direction:column;gap:0.35rem;">' +
+                                    nData.articles.map(a =>
+                                        '<div style="font-size:0.75rem;display:flex;justify-content:space-between;align-items:baseline;background:rgba(255,255,255,0.02);padding:0.25rem 0.4rem;border-radius:0.3rem;">' +
+                                        '<a href="' + (a.link || '#') + '" target="_blank" rel="noopener noreferrer" style="color:#93c5fd;text-decoration:none;flex:1;margin-right:0.5rem;">' + (a.title || 'Headline') + '</a>' +
+                                        '<span class="timestamp" style="font-size:0.68rem;white-space:nowrap;">' + (a.publisher || '') + '</span>' +
+                                        '</div>'
+                                    ).join('') +
+                                    '</div></div>';
+                            }
+                        } catch (e) {}
+                    }
+                    return;
+                }
+
+                const sig = ai.ai_signal || 'Neutral';
+                const isBull = sig.includes('Bullish');
+                const isBear = sig.includes('Bearish');
+                const score = ai.sentiment_score != null ? Number(ai.sentiment_score).toFixed(2) : '0.00';
+                const scoreStr = (ai.sentiment_score >= 0 ? '+' : '') + score;
+                const conf = ai.confidence ? Math.round(ai.confidence * 100) + '%' : '75%';
+
+                badge.style.display = 'inline-block';
+                badge.textContent = sig + ' (' + scoreStr + ' · ' + conf + ' conf)';
+                badge.style.background = isBull ? 'rgba(16,185,129,0.25)' : isBear ? 'rgba(239,68,68,0.25)' : 'rgba(251,191,36,0.25)';
+                badge.style.color = isBull ? '#34d399' : isBear ? '#ef4444' : '#fbbf24';
+
+                const catalystsHtml = (ai.catalysts && ai.catalysts.length)
+                    ? ('<div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:0.4rem;padding:0.5rem;margin-top:0.4rem;">' +
+                       '<strong style="color:#34d399;font-size:0.8rem;display:flex;align-items:center;gap:0.3rem;">🚀 Positive Catalysts & Reasons:</strong>' +
+                       '<ul style="margin:0.25rem 0 0 1.1rem;padding:0;font-size:0.75rem;color:var(--light);line-height:1.45;">' +
+                       ai.catalysts.map(c => '<li style="margin-bottom:0.2rem;">' + c + '</li>').join('') + '</ul></div>')
+                    : '';
+
+                const risksHtml = (ai.risk_factors && ai.risk_factors.length)
+                    ? ('<div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:0.4rem;padding:0.5rem;margin-top:0.4rem;">' +
+                       '<strong style="color:#f87171;font-size:0.8rem;display:flex;align-items:center;gap:0.3rem;">⚠️ Downside Risks & Headwinds:</strong>' +
+                       '<ul style="margin:0.25rem 0 0 1.1rem;padding:0;font-size:0.75rem;color:var(--light);line-height:1.45;">' +
+                       ai.risk_factors.map(r => '<li style="margin-bottom:0.2rem;">' + r + '</li>').join('') + '</ul></div>')
+                    : '';
+
+                const articlesHtml = (ai.articles && ai.articles.length)
+                    ? ('<div style="margin-top:0.75rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:0.6rem;">' +
+                       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">' +
+                       '<h5 style="margin:0;font-size:0.82rem;display:flex;align-items:center;gap:0.3rem;">📰 Big News & World Events Stream <span class="timestamp" style="font-size:0.72rem;">(' + ai.articles.length + ' stories)</span></h5>' +
+                       '<span class="signal-badge" style="font-size:0.68rem;background:' + (ai.news_sentiment_score >= 0.15 ? 'rgba(16,185,129,0.2);color:#34d399;' : ai.news_sentiment_score <= -0.15 ? 'rgba(239,68,68,0.2);color:#f87171;' : 'rgba(251,191,36,0.2);color:#fbbf24;') + '">' +
+                       'News Sentiment: ' + (ai.news_sentiment_label || 'Neutral') + ' (' + (ai.news_sentiment_score >= 0 ? '+' : '') + Number(ai.news_sentiment_score || 0).toFixed(2) + ')' +
+                       '</span></div>' +
+                       '<div style="display:flex;flex-direction:column;gap:0.45rem;max-height:220px;overflow-y:auto;padding-right:0.2rem;">' +
+                       ai.articles.map(a => {
+                           const aScore = a.sentiment_score != null ? a.sentiment_score : 0;
+                           const aLabel = a.sentiment_label || (aScore >= 0.2 ? 'Bullish' : aScore <= -0.2 ? 'Bearish' : 'Neutral');
+                           const aBadgeStyle = aLabel === 'Bullish' ? 'background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.3);' :
+                               aLabel === 'Bearish' ? 'background:rgba(239,68,68,0.18);color:#f87171;border:1px solid rgba(239,68,68,0.3);' :
+                               'background:rgba(255,255,255,0.06);color:var(--muted);';
+                           const topicBadge = (a.topics && a.topics[0])
+                               ? '<span class="signal-badge" style="font-size:0.62rem;background:rgba(59,130,246,0.15);color:#93c5fd;border:1px solid rgba(59,130,246,0.3);">' + a.topics[0] + '</span>'
+                               : '';
+
+                           return '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:0.4rem;padding:0.45rem 0.6rem;">' +
+                               '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">' +
+                               '<a href="' + (a.link || '#') + '" target="_blank" rel="noopener noreferrer" style="color:#60a5fa;text-decoration:none;font-weight:600;font-size:0.78rem;line-height:1.35;flex:1;">' +
+                               (a.title || 'Headline') + ' ↗' +
+                               '</a>' +
+                               '<div style="display:flex;gap:0.3rem;align-items:center;white-space:nowrap;">' +
+                               topicBadge +
+                               '<span class="signal-badge" style="font-size:0.62rem;' + aBadgeStyle + '">' + aLabel + '</span>' +
+                               '</div></div>' +
+                               (a.summary ? '<p style="margin:0.25rem 0 0.15rem 0;font-size:0.72rem;color:var(--muted);line-height:1.35;">' + a.summary + '</p>' : '') +
+                               '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.2rem;font-size:0.68rem;color:var(--muted);">' +
+                               '<span>Source: <strong>' + (a.publisher || 'Financial Media') + '</strong></span>' +
+                               '<span>' + (a.published_at || '') + '</span>' +
+                               '</div></div>';
+                       }).join('') +
+                       '</div></div>')
+                    : '';
+
+                content.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.4rem;margin:0.5rem 0;">' +
+                    '<div class="metric"><span>Multi-Factor AI Score</span><strong style="color:' + (isBull ? '#34d399' : isBear ? '#ef4444' : '#fbbf24') + ';">' + scoreStr + ' (' + sig + ')</strong></div>' +
+                    '<div class="metric"><span>Volume Accumulation</span><strong>' + (ai.volume_status || 'Average Flow') + ' (' + (ai.volume_ratio || 1.0) + 'x)</strong></div>' +
+                    '<div class="metric"><span>7D / 30D Return</span><strong>' + (ai.return_7d >= 0 ? '+' : '') + (ai.return_7d || 0) + '% / ' + (ai.return_30d >= 0 ? '+' : '') + (ai.return_30d || 0) + '%</strong></div>' +
+                    '<div class="metric"><span>News Coverage</span><strong>' + (ai.news_count || 0) + ' articles (' + (ai.news_sentiment_label || 'Neutral') + ')</strong></div>' +
+                    '</div>' +
+                    (ai.thesis ? '<div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.25);border-radius:0.4rem;padding:0.5rem 0.65rem;margin-top:0.4rem;"><strong style="color:#60a5fa;font-size:0.8rem;display:block;margin-bottom:0.2rem;">💡 AI Synthesis Thesis & Reasoning:</strong><p style="margin:0;font-size:0.8rem;line-height:1.45;color:var(--light);">' + ai.thesis + '</p></div>' : '') +
+                    '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:0.5rem;">' + catalystsHtml + risksHtml + '</div>' +
+                    articlesHtml;
+            },
+
+            async runModalConsensus() {
+                const ticker = document.getElementById('srModalTicker')?.value;
+                const btn = document.getElementById('srModalConsensusRunBtn');
+                if (!ticker) return;
+
+                const origHtml = btn ? btn.innerHTML : '⚡ Run AI Consensus';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading-spinner"></span> Synthesizing Models...';
+                }
+
+                try {
+                    const res = await fetch('/api/v1/consensus/predict', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tickers: [ticker] })
+                    });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.detail || 'Consensus generation failed');
+                    }
+                    await this._renderModalConsensus(ticker);
+                } catch (e) {
+                    alert('Error running AI Consensus: ' + e.message);
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }
+                }
+            },
+
+            async _renderModalConsensus(ticker) {
+                const badge = document.getElementById('srModalConsensusBadge');
+                const content = document.getElementById('srModalConsensusContent');
+                if (!content) return;
+
+                if (!ticker) {
+                    if (badge) badge.style.display = 'none';
+                    content.innerHTML = '<p class="timestamp" style="margin:0;font-size:0.8rem;">No ticker specified for consensus.</p>';
+                    return;
+                }
+
+                content.innerHTML = '<p class="timestamp" style="margin:0;font-size:0.8rem;"><span class="loading-spinner"></span> Loading multi-model consensus prediction...</p>';
+
+                try {
+                    const res = await fetch('/api/v1/consensus/predictions/' + encodeURIComponent(ticker));
+                    if (!res.ok) {
+                        throw new Error('Consensus prediction not found for ' + ticker);
+                    }
+                    const data = await res.json();
+                    const consensus = data.prediction || data;
+
+                    if (!consensus || !consensus.consensus_direction) {
+                        if (badge) badge.style.display = 'none';
+                        content.innerHTML = '<p class="timestamp" style="margin:0;font-size:0.8rem;">No AI consensus generated yet. Click <strong>"⚡ Run AI Consensus"</strong> above to dispatch parallel inference.</p>';
+                        return;
+                    }
+
+                    const dir = consensus.consensus_direction || 'NEUTRAL';
+                    const isBull = dir.includes('BUY') || dir.includes('BULL');
+                    const isBear = dir.includes('SELL') || dir.includes('BEAR');
+                    const str = consensus.consensus_strength != null ? Math.round(consensus.consensus_strength) : '—';
+                    const agree = consensus.agreement_ratio != null ? Math.round(consensus.agreement_ratio * 100) + '%' : '—';
+
+                    if (badge) {
+                        badge.style.display = 'inline-block';
+                        badge.textContent = dir + ' (' + str + '% Strength · ' + agree + ' Agreement)';
+                        badge.style.background = isBull ? 'rgba(16,185,129,0.25)' : isBear ? 'rgba(239,68,68,0.25)' : 'rgba(251,191,36,0.25)';
+                        badge.style.color = isBull ? '#34d399' : isBear ? '#ef4444' : '#fbbf24';
+                    }
+
+                    // Render Consensus Breakdown
+                    const targetStr = consensus.target_price ? ('₹' + Number(consensus.target_price).toFixed(2)) : '—';
+                    const stopStr = consensus.stop_loss ? ('₹' + Number(consensus.stop_loss).toFixed(2)) : '—';
+                    const rrrStr = consensus.risk_reward_ratio ? (Number(consensus.risk_reward_ratio).toFixed(1) + 'R') : '—';
+
+                    let actionRibbonHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.4rem;margin:0.5rem 0;">' +
+                        '<div class="metric"><span>Consensus Direction</span><strong style="color:' + (isBull ? '#34d399' : isBear ? '#ef4444' : '#fbbf24') + ';">' + dir + '</strong></div>' +
+                        '<div class="metric"><span>Ensemble Strength</span><strong>' + str + '%</strong></div>' +
+                        '<div class="metric"><span>Model Agreement</span><strong>' + agree + ' (' + (consensus.models_agreed || 0) + '/' + (consensus.models_total || 0) + ')</strong></div>' +
+                        '<div class="metric"><span>Target Price</span><strong>' + targetStr + '</strong></div>' +
+                        '<div class="metric"><span>Stop Loss</span><strong>' + stopStr + '</strong></div>' +
+                        '<div class="metric"><span>Risk/Reward</span><strong>' + rrrStr + '</strong></div>' +
+                        '</div>';
+
+                    let thesisHtml = consensus.synthesis_rationale
+                        ? ('<div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.25);border-radius:0.4rem;padding:0.5rem 0.65rem;margin-top:0.4rem;">' +
+                           '<strong style="color:#60a5fa;font-size:0.8rem;display:block;margin-bottom:0.2rem;">💡 Ensemble Synthesis & Strategic Rationale:</strong>' +
+                           '<p style="margin:0;font-size:0.8rem;line-height:1.45;color:var(--light);">' + consensus.synthesis_rationale + '</p></div>')
+                        : '';
+
+                    let modelCardsHtml = '';
+                    const models = consensus.model_predictions || {};
+                    const modelKeys = Object.keys(models);
+                    if (modelKeys.length) {
+                        const cards = modelKeys.map(k => {
+                            const m = models[k] || {};
+                            const mDir = m.direction || 'PENDING';
+                            const mIsBull = mDir.includes('BUY') || mDir.includes('BULL');
+                            const mIsBear = mDir.includes('SELL') || mDir.includes('BEAR');
+                            const mColor = mIsBull ? '#34d399' : mIsBear ? '#ef4444' : '#fbbf24';
+                            return '<div style="background:#0a0f1e;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:0.5rem 0.6rem;">' +
+                                '<div style="font-size:0.7rem;color:#60a5fa;font-weight:700;margin-bottom:0.15rem;">' + k + '</div>' +
+                                '<div style="font-weight:800;font-size:0.82rem;color:' + mColor + ';">' + mDir + ' (' + (m.confidence != null ? m.confidence + '%' : '—') + ')</div>' +
+                                (m.rationale ? '<p style="font-size:0.72rem;color:#94a3b8;margin:0.2rem 0 0 0;line-height:1.35;">' + m.rationale + '</p>' : '') +
+                                '</div>';
+                        }).join('');
+
+                        modelCardsHtml = '<div>' +
+                            '<strong style="font-size:0.8rem;color:var(--light);display:block;margin:0.75rem 0 0.4rem 0;">🗳️ Individual Model Predictions & Price Action Insights:</strong>' +
+                            '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:0.6rem;">' + cards + '</div>' +
+                            '</div>';
+                    }
+
+                    content.innerHTML = actionRibbonHtml + thesisHtml + modelCardsHtml;
+
+                } catch (err) {
+                    console.error('Error rendering modal consensus:', err);
+                    if (content) content.innerHTML = '<p class="timestamp" style="margin:0;font-size:0.8rem;color:var(--red);">Failed to load consensus data: ' + err.message + '</p>';
+                }
+            },
+
         // [] → extracted to modules/coverage.js
         // [] → extracted to modules/industries.js
         // [] → extracted to modules/buy_dip.js
