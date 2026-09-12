@@ -73,7 +73,7 @@ def render_dashboard(html_path: Path | None = None) -> Path:
         js_content = js_path.read_text(encoding="utf-8")
         html = re.sub(
             r'<script src="/static/js/dashboard\.js[^"]*"></script>',
-            lambda m: f"<script>\n{js_content}\n</script>",
+            lambda m: f"<!-- dashboard.js inline -->\n<script>\n{js_content}\n</script>",
             html,
         )
 
@@ -368,29 +368,36 @@ def _build_card_sections(row: pd.Series, fmt: dict[str, str]) -> str:
 
 
 def _build_ledger_table(rows: list[str], day_class: str = "") -> str:
-    """Build a compact next-gen interactive operations table HTML."""
+    """Build a compact next-gen interactive operations table HTML with grouped headers."""
     if not rows:
         return ""
     return (
         '<div class="table-wrapper">'
         '<table class="results-table">'
-        "<thead><tr>"
+        "<thead>"
+        '<tr class="header-group-row" style="background:#090b12;border-bottom:1px solid rgba(255,255,255,0.1);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;">'
+        '<th colspan="2" style="text-align:left;color:#94a3b8;padding:0.35rem 0.5rem;border-right:1px solid rgba(255,255,255,0.06);">🏢 Stock & Catalyst</th>'
+        '<th colspan="5" style="text-align:center;color:#38bdf8;padding:0.35rem 0.5rem;border-right:1px solid rgba(255,255,255,0.06);">⚡ Live Market & Momentum</th>'
+        '<th colspan="4" style="text-align:center;color:#34d399;padding:0.35rem 0.5rem;border-right:1px solid rgba(255,255,255,0.06);">📐 Technical Price Structure</th>'
+        '<th colspan="4" style="text-align:center;color:#c084fc;padding:0.35rem 0.5rem;border-right:1px solid rgba(255,255,255,0.06);">🎯 Historical Quality & AI</th>'
+        '<th style="text-align:center;color:#fbbf24;padding:0.35rem 0.5rem;">⚡ Controls</th>'
+        "</tr>"
+        "<tr>"
         '<th onclick="app.sortResultsTable(this, 0, \'text\')" title="Sort by Stock Symbol">Stock</th>'
         '<th onclick="app.sortResultsTable(this, 1, \'date\')" title="Sort by Announcement Date">Result Date</th>'
         '<th onclick="app.sortResultsTable(this, 2, \'num\')" title="Sort by Market Cap">Mkt Cap</th>'
         '<th onclick="app.sortResultsTable(this, 3, \'num\')" title="Sort by Current Price">Price</th>'
-        '<th onclick="app.sortResultsTable(this, 4, \'num\')" title="Sort by 30-Day Pre-Event Momentum">30D Ret</th>'
-        '<th onclick="app.sortResultsTable(this, 5, \'text\')" title="Q1 Week Move">Q1 Wk H/L</th>'
-        '<th onclick="app.sortResultsTable(this, 6, \'text\')" title="Q2 Week Move">Q2 Wk H/L</th>'
-        '<th onclick="app.sortResultsTable(this, 7, \'text\')" title="Q3 Week Move">Q3 Wk H/L</th>'
-        '<th onclick="app.sortResultsTable(this, 8, \'text\')" title="52-Week High/Low Distance">52W H/L</th>'
-        '<th onclick="app.sortResultsTable(this, 9, \'text\')" title="Quality Scores">Quality</th>'
-        '<th onclick="app.sortResultsTable(this, 10, \'num\')" title="Previous 3Q Average Score">3Q Avg</th>'
-        '<th onclick="app.sortResultsTable(this, 11, \'num\')" title="Next Overhead Resistance">Resist</th>'
-        '<th onclick="app.sortResultsTable(this, 12, \'num\')" title="Current Base Support">Support</th>'
+        '<th onclick="app.sortResultsTable(this, 4, \'num\')" title="Sort by 3-Day Return">3D Ret</th>'
+        '<th onclick="app.sortResultsTable(this, 5, \'num\')" title="Sort by 7-Day Return">7D Ret</th>'
+        '<th onclick="app.sortResultsTable(this, 6, \'num\')" title="Sort by 30-Day Pre-Event Momentum">30D Ret</th>'
+        '<th onclick="app.sortResultsTable(this, 7, \'text\')" title="Price Channel Structure (Support ⟵ Current ⟶ Resistance)">Support / Resistance</th>'
+        '<th onclick="app.sortResultsTable(this, 8, \'num\')" title="Channel Position % (0%=Support, 100%=Resistance)">Range Pos</th>'
+        '<th onclick="app.sortResultsTable(this, 9, \'text\')" title="52-Week High/Low Distance">52W H/L</th>'
+        '<th onclick="app.sortResultsTable(this, 10, \'text\')" title="Q1 Week Move">Q1 Wk H/L</th>'
+        '<th onclick="app.sortResultsTable(this, 11, \'text\')" title="Quality Scores (Q1 | Q2 | Q3)">Quality</th>'
+        '<th onclick="app.sortResultsTable(this, 12, \'num\')" title="Previous 3Q Average Score">3Q Avg</th>'
         '<th onclick="app.sortResultsTable(this, 13, \'text\')" title="Kronos 14-Day AI Forecast">Kronos 14D</th>'
-        '<th onclick="app.sortResultsTable(this, 14, \'text\')" title="GBM Earnings Direction Classifier">GBM</th>'
-        '<th onclick="app.sortResultsTable(this, 15, \'text\')" style="text-align:center;" title="4-Model AI Consensus Forecast">AI Consensus</th>'
+        '<th onclick="app.sortResultsTable(this, 14, \'text\')" style="text-align:center;" title="4-Model AI Consensus Forecast">AI Consensus</th>'
         '<th style="text-align:center;">Actions</th>'
         "</tr></thead>"
         f"<tbody>{''.join(rows)}</tbody>"
@@ -683,14 +690,68 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
 
         market_cap = _fmt(row.get("market_cap"), suffix="Cr")
         current_price = _fmt(row.get("current_price"))
-        week_change = _fmt(row.get("earnings_week_move_pct"), "%", signed=True)
+        three_day_return = _fmt(row.get("three_day_return_pct"), "%", signed=True)
+        seven_day_return = _fmt(row.get("seven_day_return_pct"), "%", signed=True)
         thirty_day_return = _fmt(row.get("thirty_day_return_pct"), "%", signed=True)
+        week_change = _fmt(row.get("earnings_week_move_pct"), "%", signed=True)
         eps_estimate = _fmt(row.get("eps_estimate"))
         eps_reported = _fmt(row.get("eps_reported"))
         surprise_pct = _fmt(row.get("surprise_pct"), "%", signed=True)
         pct_from_52w_high_low = _fmt_hl_pair(row.get("pct_from_52w_high"), row.get("week_high"),
                                               row.get("pct_from_52w_low"), row.get("week_low"))
         earnings_week_move = _fmt(row.get("earnings_week_move_pct"), "%", signed=True)
+
+        # Structure metrics
+        next_resistance = _fmt(row.get("next_resistance"))
+        current_support = _fmt(row.get("current_support"))
+        channel_pos_val = row.get("channel_position_pct")
+        if channel_pos_val is not None and not pd.isna(channel_pos_val):
+            chan_pos_num = float(channel_pos_val)
+            chan_pos_num = max(0.0, min(100.0, chan_pos_num))
+            chan_pos_label = f"{chan_pos_num:.0f}%"
+        else:
+            chan_pos_num = 50.0
+            chan_pos_label = "—"
+
+        # Check if stock has results in +-3 days for live visual styling
+        is_near_results = False
+        ed_val = row.get("earnings_date")
+        if pd.notna(ed_val):
+            try:
+                days_diff = (pd.Timestamp(ed_val).normalize() - pd.Timestamp.today().normalize()).days
+                is_near_results = abs(days_diff) <= 3
+            except Exception:
+                is_near_results = False
+
+        # Build visual Support / Resistance mini-range bar
+        sup_f = _to_float(row.get("current_support"))
+        res_f = _to_float(row.get("next_resistance"))
+        cur_p = _to_float(row.get("current_price"))
+        if sup_f and res_f and res_f > sup_f and cur_p:
+            dist_sup = ((cur_p - sup_f) / cur_p) * 100.0
+            dist_res = ((res_f - cur_p) / cur_p) * 100.0
+            range_bar_html = (
+                f'<div class="sr-structure-cell" style="display:flex;flex-direction:column;gap:0.18rem;min-width:130px;" title="Support: ₹{sup_f:,.1f} (-{dist_sup:.1f}%) | Resistance: ₹{res_f:,.1f} (+{dist_res:.1f}%)">'
+                f'<div style="display:flex;justify-content:space-between;font-size:0.65rem;font-family:var(--font-mono);line-height:1;">'
+                f'<span style="color:#34d399;font-weight:600;">₹{sup_f:,.0f}</span>'
+                f'<span style="color:#f87171;font-weight:600;">₹{res_f:,.0f}</span>'
+                f'</div>'
+                f'<div style="position:relative;height:5px;background:rgba(255,255,255,0.08);border-radius:9999px;overflow:hidden;">'
+                f'<div style="position:absolute;left:0;top:0;height:100%;width:{chan_pos_num:.0f}%;background:linear-gradient(90deg, #10b981, #38bdf8, #f87171);border-radius:9999px;"></div>'
+                f'</div>'
+                f'<div style="display:flex;justify-content:space-between;font-size:0.62rem;color:#94a3b8;">'
+                f'<span>-{dist_sup:.1f}%</span>'
+                f'<span style="color:#e2e8f0;font-weight:700;">{chan_pos_label}</span>'
+                f'<span>+{dist_res:.1f}%</span>'
+                f'</div>'
+                f'</div>'
+            )
+        else:
+            range_bar_html = (
+                f'<div style="font-size:0.72rem;color:#94a3b8;font-family:var(--font-mono);">'
+                f'S: <span style="color:#34d399;">{current_support}</span> | R: <span style="color:#f87171;">{next_resistance}</span>'
+                f'</div>'
+            )
         
         # Per-quarter week high/low (±4 business days around each earnings date).
         # The earnings date for each quarter is shown so the reader knows WHICH
@@ -945,8 +1006,14 @@ def build_upcoming_results_fragments(enriched: pd.DataFrame,
             "day_class": day_class,
             "market_cap": market_cap,
             "current_price": current_price,
+            "is_near_results_cls": "live-near-results" if is_near_results else "",
+            "live_dot_html": '<span class="live-pulse-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;margin-right:0.35rem;" title="Live Active Session (±3D Results Window)"></span>' if is_near_results else '',
+            "three_day_return": three_day_return,
+            "seven_day_return": seven_day_return,
             "thirty_day_return": thirty_day_return,
             "week_change": week_change,
+            "range_bar_html": range_bar_html,
+            "channel_position": chan_pos_label,
             "q1_week_hl": q1_week_hl,
             "q2_week_hl": q2_week_hl,
             "q3_week_hl": q3_week_hl,

@@ -1906,7 +1906,7 @@ const API_BASE = window.location.origin;
                 });
             },
 
-            toggleRowDrawer(rowTickerId, ticker) {
+            toggleRowDrawer(rowTickerId, ticker, activeTab = 'intel') {
                 const drawerTr = document.getElementById('drawer_' + rowTickerId);
                 const arrow = document.getElementById('arrow_' + rowTickerId);
                 const mainRow = document.getElementById('row_' + rowTickerId);
@@ -1919,16 +1919,14 @@ const API_BASE = window.location.origin;
                     if (mainRow) mainRow.classList.add('row-expanded');
 
                     const bodyTd = document.getElementById('drawer_body_' + rowTickerId);
-                    if (bodyTd && !bodyTd.hasAttribute('data-populated')) {
-                        bodyTd.setAttribute('data-populated', 'true');
-                        
+                    if (bodyTd) {
                         // Extract content from corresponding popup modal if present
                         const popupEl = document.getElementById('popup_' + rowTickerId);
                         let sectionsHtml = '';
                         if (popupEl) {
                             sectionsHtml = popupEl.querySelector('.popup-sections')?.innerHTML || popupEl.querySelector('.popup-body')?.innerHTML || '';
                         }
-                        
+
                         if (!sectionsHtml) {
                             sectionsHtml = `
                                 <div class="drawer-card">
@@ -1936,25 +1934,137 @@ const API_BASE = window.location.origin;
                                     <div style="font-size:0.75rem;color:#a1a1aa;line-height:1.5;">
                                         Comprehensive earnings history, implied volatility breakdown, and 4-model AI consensus predictions.
                                     </div>
-                                    <div style="margin-top:0.5rem;display:flex;gap:0.4rem;align-items:center;">
-                                        <button type="button" class="btn-micro btn-micro-violet" onclick="app.openAiDetails('ALL', '${ticker}', event)">🤖 4-Model AI Breakdown</button>
-                                        <button type="button" class="btn-micro btn-micro-primary" onclick="app.showOhlcvBenchmarkModal('${ticker}')">📈 TradingView Chart</button>
-                                        <button type="button" class="btn-micro btn-micro-neutral" onclick="app.showTickerAuditModal('${ticker}')">📜 Formula Audit</button>
-                                    </div>
                                 </div>
                             `;
                         }
 
                         bodyTd.innerHTML = `
-                            <div class="drawer-content">
-                                ${sectionsHtml}
+                            <div class="ledger-drawer-wrapper" style="padding:0.75rem 1rem;background:#05070e;border-top:1px solid rgba(255,255,255,0.06);">
+                                <!-- Drawer Header Sub-tabs -->
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:0.5rem;flex-wrap:wrap;gap:0.5rem;">
+                                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                                        <button type="button" id="tabbtn_news_${rowTickerId}" onclick="app.switchDrawerTab('${rowTickerId}', '${ticker}', 'news')" class="btn-micro" style="background:${activeTab === 'news' ? 'var(--accent)' : 'rgba(255,255,255,0.08)'};color:#ffffff;font-weight:700;padding:0.25rem 0.6rem;">📰 Live News & Catalysts</button>
+                                        <button type="button" id="tabbtn_intel_${rowTickerId}" onclick="app.switchDrawerTab('${rowTickerId}', '${ticker}', 'intel')" class="btn-micro" style="background:${activeTab === 'intel' ? 'var(--accent)' : 'rgba(255,255,255,0.08)'};color:#ffffff;font-weight:700;padding:0.25rem 0.6rem;">📊 Intelligence & Consensus</button>
+                                    </div>
+                                    <div style="display:flex;gap:0.35rem;align-items:center;">
+                                        <button type="button" class="btn-micro btn-micro-violet" onclick="app.openAiDetails('ALL', '${ticker}', event)">🤖 4-Model AI Breakdown</button>
+                                        <button type="button" class="btn-micro btn-micro-primary" onclick="app.showOhlcvBenchmarkModal('${ticker}')">📈 TradingView Chart</button>
+                                        <button type="button" class="btn-micro btn-micro-neutral" onclick="app.showTickerAuditModal('${ticker}')">📜 Formula Audit</button>
+                                    </div>
+                                </div>
+
+                                <!-- Tab Content: News -->
+                                <div id="drawer_tab_news_${rowTickerId}" style="display:${activeTab === 'news' ? 'block' : 'none'};">
+                                    <div id="drawer_news_content_${rowTickerId}">
+                                        <div style="padding:1.5rem;text-align:center;color:var(--text-muted);"><span class="loading-spinner"></span> Fetching real-time news & catalysts for ${ticker}...</div>
+                                    </div>
+                                </div>
+
+                                <!-- Tab Content: Intel -->
+                                <div id="drawer_tab_intel_${rowTickerId}" style="display:${activeTab === 'intel' ? 'block' : 'none'};">
+                                    <div class="drawer-content">${sectionsHtml}</div>
+                                </div>
                             </div>
                         `;
+
+                        if (activeTab === 'news') {
+                            this.fetchStockNewsForDrawer(rowTickerId, ticker);
+                        }
                     }
                 } else {
                     drawerTr.style.display = 'none';
                     if (arrow) arrow.style.transform = 'rotate(0deg)';
                     if (mainRow) mainRow.classList.remove('row-expanded');
+                }
+            },
+
+            switchDrawerTab(rowTickerId, ticker, tab) {
+                const newsTab = document.getElementById('drawer_tab_news_' + rowTickerId);
+                const intelTab = document.getElementById('drawer_tab_intel_' + rowTickerId);
+                const newsBtn = document.getElementById('tabbtn_news_' + rowTickerId);
+                const intelBtn = document.getElementById('tabbtn_intel_' + rowTickerId);
+
+                if (tab === 'news') {
+                    if (newsTab) newsTab.style.display = 'block';
+                    if (intelTab) intelTab.style.display = 'none';
+                    if (newsBtn) { newsBtn.style.background = 'var(--accent)'; newsBtn.style.color = '#ffffff'; }
+                    if (intelBtn) { intelBtn.style.background = 'rgba(255,255,255,0.08)'; }
+                    this.fetchStockNewsForDrawer(rowTickerId, ticker);
+                } else {
+                    if (newsTab) newsTab.style.display = 'none';
+                    if (intelTab) intelTab.style.display = 'block';
+                    if (intelBtn) { intelBtn.style.background = 'var(--accent)'; intelBtn.style.color = '#ffffff'; }
+                    if (newsBtn) { newsBtn.style.background = 'rgba(255,255,255,0.08)'; }
+                }
+            },
+
+            showStockNewsDrawer(rowTickerId, ticker, event) {
+                if (event) event.stopPropagation();
+                const drawerTr = document.getElementById('drawer_' + rowTickerId);
+                if (!drawerTr || drawerTr.style.display === 'none' || !drawerTr.style.display) {
+                    this.toggleRowDrawer(rowTickerId, ticker, 'news');
+                } else {
+                    this.switchDrawerTab(rowTickerId, ticker, 'news');
+                }
+            },
+
+            async fetchStockNewsForDrawer(rowTickerId, ticker) {
+                const cont = document.getElementById('drawer_news_content_' + rowTickerId);
+                if (!cont) return;
+                if (cont.getAttribute('data-loaded') === 'true') return;
+
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/stock/' + encodeURIComponent(ticker) + '/catalysts');
+                    const data = await res.json();
+                    const catalysts = (data && data.catalysts) ? data.catalysts : [];
+
+                    if (!catalysts.length) {
+                        cont.innerHTML = `
+                            <div style="padding:1.2rem;background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.1);border-radius:0.5rem;text-align:center;color:var(--text-muted);font-size:0.8rem;">
+                                📰 No breaking news catalysts recorded for ${ticker} in the last 7 days.
+                                <div style="margin-top:0.4rem;">
+                                    <a href="https://www.google.com/search?q=${encodeURIComponent(ticker + ' stock news')}" target="_blank" style="color:#38bdf8;text-decoration:none;font-size:0.75rem;">Search Google News ↗</a>
+                                </div>
+                            </div>
+                        `;
+                        cont.setAttribute('data-loaded', 'true');
+                        return;
+                    }
+
+                    let html = '<div style="display:flex;flex-direction:column;gap:0.45rem;">';
+                    catalysts.slice(0, 6).forEach(c => {
+                        const impactColor = (c.impact_score >= 70) ? '#f87171' : (c.impact_score >= 40 ? '#38bdf8' : '#34d399');
+                        const sentimentBg = (c.sentiment === 'positive') ? 'rgba(16,185,129,0.15)' : (c.sentiment === 'negative' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.08)');
+                        const sentimentColor = (c.sentiment === 'positive') ? '#34d399' : (c.sentiment === 'negative' ? '#fca5a5' : '#cbd5e1');
+
+                        html += `
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:0.55rem 0.75rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:0.4rem;gap:0.75rem;">
+                                <div style="flex:1;">
+                                    <div style="font-size:0.82rem;font-weight:600;color:#f1f5f9;line-height:1.4;">
+                                        ${c.url ? `<a href="${c.url}" target="_blank" style="color:#f1f5f9;text-decoration:none;" onmouseover="this.style.color='#38bdf8'" onmouseout="this.style.color='#f1f5f9'">${c.headline} ↗</a>` : c.headline}
+                                    </div>
+                                    <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.25rem;font-size:0.7rem;color:#94a3b8;">
+                                        <span>${c.source || 'News Wire'}</span>
+                                        <span>•</span>
+                                        <span>${c.date ? c.date.slice(0, 16) : 'Recent'}</span>
+                                        ${c.category ? `<span class="signal-badge" style="background:rgba(59,130,246,0.12);color:#93c5fd;font-size:0.62rem;padding:0.05rem 0.35rem;">${c.category}</span>` : ''}
+                                    </div>
+                                </div>
+                                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.2rem;white-space:nowrap;">
+                                    <span style="font-size:0.65rem;font-weight:700;color:${sentimentColor};background:${sentimentBg};padding:0.1rem 0.4rem;border-radius:4px;text-transform:uppercase;">
+                                        ${c.sentiment || 'Neutral'}
+                                    </span>
+                                    ${c.impact_score ? `<span style="font-size:0.65rem;font-family:var(--font-mono);color:${impactColor};">Impact: ${c.impact_score}/100</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+
+                    cont.innerHTML = html;
+                    cont.setAttribute('data-loaded', 'true');
+                } catch (e) {
+                    cont.innerHTML = `<div style="color:#f87171;padding:0.75rem;font-size:0.78rem;">Error fetching news: ${e.message}</div>`;
                 }
             },
 

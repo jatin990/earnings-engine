@@ -63,6 +63,7 @@
                         </span>
                         {{ comps.market_dropdown('resultsMarket', 'ALL', 'app.onResultsMarketChange(this.value)') }}
                         <button type="button" onclick="app.loadResultsReport()" id="resultsLoadBtn" class="btn btn-primary btn-sm">▶ Load Report</button>
+                        <button type="button" onclick="app.recalculateAllVisibleResults(this)" id="resultsRecalcAllBtn" class="btn btn-sm" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Recalculate live prices & metrics for all loaded window stocks">🔄 Recalc Window</button>
                         <button type="button" onclick="app.cancelReportLoad('results')" id="resultsCancelBtn" class="btn btn-danger btn-sm" style="display:none;" title="Cancel pending load request">⏹ Cancel</button>
                         <button type="button" onclick="app.showMoreResultsDays()" id="resultsMoreDaysBtn" class="btn btn-sm" style="display:none;">📅 Next Date</button>
                         <button type="button" onclick="app.summarizeResults()" class="btn btn-sm">✨ LLM Summary</button>

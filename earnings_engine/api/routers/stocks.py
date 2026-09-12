@@ -280,6 +280,29 @@ async def recalculate_ticker_metrics_endpoint(
         raise HTTPException(status_code=500, detail=f"Recalculation error: {str(e)}")
 
 
+@router.post("/api/v1/ticker/recalculate-batch")
+@router.post("/api/v1/dashboard/results/recalculate-batch")
+async def recalculate_ticker_batch_endpoint(
+    request: dict | None = None,
+):
+    """Recalculate metrics for multiple tickers in the Results Ledger."""
+    tickers = (request or {}).get("tickers", [])
+    if isinstance(tickers, str):
+        tickers = [t.strip() for t in tickers.split(",") if t.strip()]
+    if not tickers:
+        raise HTTPException(status_code=400, detail="No tickers provided in payload")
+    try:
+        res = await asyncio.to_thread(
+            recalculate_api.recalculate_batch_metrics,
+            tickers=tickers,
+            settings=_settings,
+        )
+        return res
+    except Exception as e:
+        logger.exception("Error in recalculate_batch_metrics: %s", e)
+        raise HTTPException(status_code=500, detail=f"Batch recalculation error: {str(e)}")
+
+
 @router.post("/api/v1/stock/{ticker}/recalculate")
 @router.post("/api/v1/recalculate/{ticker}")
 async def recalculate_stock_path_endpoint(ticker: str, request: dict | None = None):

@@ -347,6 +347,24 @@ def get_results_report_components(
     if df.empty:
         return {"success": False, "error": "No results found for the selected date window", "day_legend": "", "day_sections": "", "popups": ""}
 
+    # ⚡ Auto-fetch live quotes for all stocks having results in +-3 days
+    try:
+        today_ts = pd.Timestamp.today().normalize()
+        near_tickers = []
+        for _, erow in df.iterrows():
+            ed = erow.get("earnings_date")
+            sym = erow.get("ticker")
+            if sym and pd.notna(ed):
+                diff_days = abs((pd.Timestamp(ed).normalize() - today_ts).days)
+                if diff_days <= 3:
+                    near_tickers.append(str(sym).strip().upper())
+        if near_tickers:
+            unique_near = list(dict.fromkeys(near_tickers))[:60]
+            logger.info("Auto-syncing live quotes for %d near-term (±3D) results stocks", len(unique_near))
+            prices_mod.fetch_batch_live_quotes(unique_near, settings=settings)
+    except Exception as e:
+        logger.debug("Near-term live quotes auto-fetch failed: %s", e)
+
     enriched = enrich_upcoming_results(df)
     if enriched.empty:
         return {"success": False, "error": "Enrichment empty", "day_legend": "", "day_sections": "", "popups": ""}

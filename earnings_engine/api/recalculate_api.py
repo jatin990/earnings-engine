@@ -33,6 +33,8 @@ def _snapshot_ticker_state(ticker: str, settings: Settings) -> dict[str, Any]:
         "pct_from_52w_low": None,
         "thirty_day_return_pct": None,
         "seven_day_return_pct": None,
+        "three_day_return_pct": None,
+        "channel_position_pct": None,
         "earnings_week_move_pct": None,
         "current_support": None,
         "next_resistance": None,
@@ -73,7 +75,8 @@ def _snapshot_ticker_state(ticker: str, settings: Settings) -> dict[str, Any]:
                 for k in [
                     "current_price", "week_high", "week_low", "week_change",
                     "pct_from_52w_high", "pct_from_52w_low", "thirty_day_return_pct",
-                    "seven_day_return_pct", "earnings_week_move_pct",
+                    "seven_day_return_pct", "three_day_return_pct", "channel_position_pct",
+                    "earnings_week_move_pct",
                     "current_support", "next_resistance", "q1_earnings_score",
                     "q2_earnings_score", "q3_earnings_score", "prev_3q_earnings_score",
                     "q1_ai_summary", "q2_ai_summary", "q3_ai_summary",
@@ -165,6 +168,8 @@ def recalculate_ticker_metrics(ticker: str, settings: Settings | None = None) ->
         "pct_from_52w_low": enriched_row.get("pct_from_52w_low"),
         "thirty_day_return_pct": enriched_row.get("thirty_day_return_pct"),
         "seven_day_return_pct": enriched_row.get("seven_day_return_pct"),
+        "three_day_return_pct": enriched_row.get("three_day_return_pct"),
+        "channel_position_pct": enriched_row.get("channel_position_pct"),
         "earnings_week_move_pct": enriched_row.get("earnings_week_move_pct"),
         "current_support": enriched_row.get("current_support"),
         "next_resistance": enriched_row.get("next_resistance"),
@@ -224,6 +229,8 @@ def recalculate_ticker_metrics(ticker: str, settings: Settings | None = None) ->
         "pct_from_52w_low": "% from 52W Low",
         "thirty_day_return_pct": "30D Return",
         "seven_day_return_pct": "7D Return",
+        "three_day_return_pct": "3D Return",
+        "channel_position_pct": "Channel Position %",
         "earnings_week_move_pct": "Result Week Move",
         "current_support": "Support Channel",
         "next_resistance": "Resistance Channel",
@@ -268,3 +275,36 @@ def recalculate_ticker_metrics(ticker: str, settings: Settings | None = None) ->
         "refreshed_at": audit_entry["refreshed_at"],
         "audit_id": audit_entry["id"],
     }
+
+
+def recalculate_batch_metrics(
+    tickers: list[str],
+    settings: Settings | None = None,
+    max_tickers: int = 50,
+) -> dict[str, Any]:
+    """Recalculate metrics for a batch of tickers sequentially and collect diffs."""
+    settings = settings or Settings()
+    clean_tickers = list(dict.fromkeys([t.strip().upper() for t in tickers if t and t.strip()]))[:max_tickers]
+    if not clean_tickers:
+        return {"success": False, "error": "No valid tickers provided"}
+
+    results: list[dict[str, Any]] = []
+    total_changed = 0
+
+    for sym in clean_tickers:
+        try:
+            res = recalculate_ticker_metrics(sym, settings)
+            if res.get("has_changes"):
+                total_changed += 1
+            results.append(res)
+        except Exception as e:
+            logger.warning("Batch recalculation error for %s: %s", sym, e)
+            results.append({"success": False, "ticker": sym, "error": str(e)})
+
+    return {
+        "success": True,
+        "total_requested": len(clean_tickers),
+        "total_changed": total_changed,
+        "results": results,
+    }
+

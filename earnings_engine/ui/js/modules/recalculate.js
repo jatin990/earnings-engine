@@ -35,24 +35,61 @@ Object.assign(app, {
                         const m = data.updated_metrics;
                         const pCell = rowEl.querySelector('.cell-current-price');
                         if (pCell && m.current_price !== null && m.current_price !== undefined) {
-                            pCell.textContent = Number(m.current_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            const liveDot = rowEl.querySelector('.live-pulse-dot') ? '<span class="live-pulse-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;margin-right:0.35rem;" title="Live Active Session (±3D Results Window)"></span>' : '';
+                            pCell.innerHTML = `<div style="display:flex;align-items:center;">${liveDot}<span>${Number(m.current_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>`;
                         }
                         const edCell = rowEl.querySelector('.cell-earnings-date');
                         if (edCell && m.earnings_date) {
                             edCell.textContent = m.earnings_date;
                         }
+                        const ret3Cell = rowEl.querySelector('.cell-three-day-return');
+                        if (ret3Cell && m.three_day_return_pct !== null && m.three_day_return_pct !== undefined) {
+                            const val = Number(m.three_day_return_pct);
+                            ret3Cell.textContent = (val > 0 ? '+' : '') + val.toFixed(2) + '%';
+                            ret3Cell.style.color = val >= 0 ? '#93c5fd' : '#fca5a5';
+                        }
+                        const ret7Cell = rowEl.querySelector('.cell-seven-day-return');
+                        if (ret7Cell && m.seven_day_return_pct !== null && m.seven_day_return_pct !== undefined) {
+                            const val = Number(m.seven_day_return_pct);
+                            ret7Cell.textContent = (val > 0 ? '+' : '') + val.toFixed(2) + '%';
+                            ret7Cell.style.color = val >= 0 ? '#38bdf8' : '#f87171';
+                        }
                         const retCell = rowEl.querySelector('.cell-thirty-day-return');
                         if (retCell && m.thirty_day_return_pct !== null && m.thirty_day_return_pct !== undefined) {
                             const val = Number(m.thirty_day_return_pct);
                             retCell.textContent = (val > 0 ? '+' : '') + val.toFixed(2) + '%';
+                            retCell.style.color = val >= 0 ? '#34d399' : '#f87171';
                         }
-                        const resCell = rowEl.querySelector('.cell-next-resistance');
-                        if (resCell && m.next_resistance !== null && m.next_resistance !== undefined) {
-                            resCell.textContent = Number(m.next_resistance).toFixed(2);
+
+                        // Update support / resistance bar
+                        const srCell = rowEl.querySelector('.cell-sr-structure');
+                        const supVal = m.current_support !== null && m.current_support !== undefined ? Number(m.current_support) : null;
+                        const resVal = m.next_resistance !== null && m.next_resistance !== undefined ? Number(m.next_resistance) : null;
+                        const curP = m.current_price !== null && m.current_price !== undefined ? Number(m.current_price) : null;
+                        let chanPos = m.channel_position_pct !== null && m.channel_position_pct !== undefined ? Number(m.channel_position_pct) : 50;
+                        if (srCell && supVal && resVal && resVal > supVal && curP) {
+                            const distSup = ((curP - supVal) / curP) * 100;
+                            const distRes = ((resVal - curP) / curP) * 100;
+                            srCell.innerHTML = `
+                                <div class="sr-structure-cell" style="display:flex;flex-direction:column;gap:0.18rem;min-width:130px;" title="Support: ₹${supVal.toFixed(1)} (-${distSup.toFixed(1)}%) | Resistance: ₹${resVal.toFixed(1)} (+${distRes.toFixed(1)}%)">
+                                    <div style="display:flex;justify-content:space-between;font-size:0.65rem;font-family:var(--font-mono);line-height:1;">
+                                        <span style="color:#34d399;font-weight:600;">₹${supVal.toLocaleString('en-IN', {maximumFractionDigits:0})}</span>
+                                        <span style="color:#f87171;font-weight:600;">₹${resVal.toLocaleString('en-IN', {maximumFractionDigits:0})}</span>
+                                    </div>
+                                    <div style="position:relative;height:5px;background:rgba(255,255,255,0.08);border-radius:9999px;overflow:hidden;">
+                                        <div style="position:absolute;left:0;top:0;height:100%;width:${Math.max(0, Math.min(100, chanPos))}%;background:linear-gradient(90deg, #10b981, #38bdf8, #f87171);border-radius:9999px;"></div>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:#94a3b8;">
+                                        <span>-${distSup.toFixed(1)}%</span>
+                                        <span style="color:#e2e8f0;font-weight:700;">${chanPos.toFixed(0)}%</span>
+                                        <span>+${distRes.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+                            `;
                         }
-                        const supCell = rowEl.querySelector('.cell-current-support');
-                        if (supCell && m.current_support !== null && m.current_support !== undefined) {
-                            supCell.textContent = Number(m.current_support).toFixed(2);
+                        const chanPosCell = rowEl.querySelector('.cell-channel-position');
+                        if (chanPosCell && m.channel_position_pct !== null && m.channel_position_pct !== undefined) {
+                            chanPosCell.textContent = Number(m.channel_position_pct).toFixed(0) + '%';
                         }
 
                         // Update Recounted Quality Scores with AI Tooltips
@@ -232,8 +269,92 @@ Object.assign(app, {
                     const bodyEl = document.getElementById('auditModalBody');
                     if (bodyEl) bodyEl.innerHTML = '<div style="color:#f87171;padding:1rem;">Failed to load audit history: ' + e.message + '</div>';
                 }
-            
-    
-        }
+            },
+
+            async recalculateAllVisibleResults(btn) {
+                const rows = Array.from(document.querySelectorAll('#resultsReportSections table.results-table tbody tr:not(.row-drawer-tr):not([style*="display: none"])'));
+                if (!rows.length) {
+                    alert('No visible stocks in current report to recalculate.');
+                    return;
+                }
+
+                const tickers = Array.from(new Set(rows.map(r => r.getAttribute('data-ticker')).filter(Boolean)));
+                if (!tickers.length) {
+                    alert('No tickers found to recalculate.');
+                    return;
+                }
+
+                const originalText = btn ? btn.innerHTML : '🔄 Recalc Window';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = `<span class="loading-spinner"></span> Recalculating (0/${tickers.length})...`;
+                }
+
+                let updatedCount = 0;
+                let processed = 0;
+
+                try {
+                    // Process in chunks of 5 to allow live UI updates
+                    const chunkSize = 5;
+                    for (let i = 0; i < tickers.length; i += chunkSize) {
+                        const chunk = tickers.slice(i, i + chunkSize);
+                        const res = await fetch(API_BASE + '/api/v1/ticker/recalculate-batch', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ tickers: chunk })
+                        });
+                        const data = await res.json();
+                        if (data && data.success && Array.isArray(data.results)) {
+                            data.results.forEach(item => {
+                                if (item.has_changes) updatedCount++;
+                                if (item.ticker && item.updated_metrics) {
+                                    const rowId = 'row_' + item.ticker.replace(/[^a-zA-Z0-9]/g, '_');
+                                    const rowEl = document.getElementById(rowId);
+                                    if (rowEl) {
+                                        const m = item.updated_metrics;
+                                        const pCell = rowEl.querySelector('.cell-current-price');
+                                        if (pCell && m.current_price !== null && m.current_price !== undefined) {
+                                            const liveDot = rowEl.querySelector('.live-pulse-dot') ? '<span class="live-pulse-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;margin-right:0.35rem;" title="Live Active Session (±3D Results Window)"></span>' : '';
+                                            pCell.innerHTML = `<div style="display:flex;align-items:center;">${liveDot}<span>${Number(m.current_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>`;
+                                        }
+                                        const ret3Cell = rowEl.querySelector('.cell-three-day-return');
+                                        if (ret3Cell && m.three_day_return_pct !== null && m.three_day_return_pct !== undefined) {
+                                            const val = Number(m.three_day_return_pct);
+                                            ret3Cell.textContent = (val > 0 ? '+' : '') + val.toFixed(2) + '%';
+                                            ret3Cell.style.color = val >= 0 ? '#93c5fd' : '#fca5a5';
+                                        }
+                                        const ret7Cell = rowEl.querySelector('.cell-seven-day-return');
+                                        if (ret7Cell && m.seven_day_return_pct !== null && m.seven_day_return_pct !== undefined) {
+                                            const val = Number(m.seven_day_return_pct);
+                                            ret7Cell.textContent = (val > 0 ? '+' : '') + val.toFixed(2) + '%';
+                                            ret7Cell.style.color = val >= 0 ? '#38bdf8' : '#f87171';
+                                        }
+                                        const retCell = rowEl.querySelector('.cell-thirty-day-return');
+                                        if (retCell && m.thirty_day_return_pct !== null && m.thirty_day_return_pct !== undefined) {
+                                            const val = Number(m.thirty_day_return_pct);
+                                            retCell.textContent = (val > 0 ? '+' : '') + val.toFixed(2) + '%';
+                                            retCell.style.color = val >= 0 ? '#34d399' : '#f87171';
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        processed += chunk.length;
+                        if (btn) {
+                            btn.innerHTML = `<span class="loading-spinner"></span> Recalculating (${processed}/${tickers.length})...`;
+                        }
+                    }
+
+                    alert(`Batch Recalculation Complete: ${processed} stocks refreshed. ${updatedCount} stocks updated with new market metrics.`);
+                } catch (err) {
+                    console.error('Batch recalculation failed:', err);
+                    alert('Batch recalculation error: ' + err.message);
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }
+                }
+            }
 });
 })(); // end recalculate IIFE

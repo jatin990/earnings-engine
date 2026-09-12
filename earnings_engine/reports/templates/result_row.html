@@ -1,4 +1,4 @@
-<tr class="{day_class}" id="row_{row_ticker_id}" data-ticker="{ticker}">
+<tr class="{day_class} {is_near_results_cls}" id="row_{row_ticker_id}" data-ticker="{ticker}">
   <td class="stock-cell">
     <div class="stock-cell-wrap">
       <span class="stock-ticker-main" onclick="app.toggleRowDrawer('{row_ticker_id}', '{ticker}')" title="Click to view full stock breakdown">
@@ -12,28 +12,29 @@
   </td>
   <td class="cell-earnings-date mono" style="color:#e2e8f0;font-size:0.74rem;">{earnings_date}</td>
   <td class="cell-market-cap mono" style="color:#cbd5e1;font-size:0.74rem;">{market_cap}</td>
-  <td class="cell-current-price mono" style="color:#ffffff;font-weight:700;font-size:0.75rem;">{current_price}</td>
+  <td class="cell-current-price mono" style="color:#ffffff;font-weight:700;font-size:0.75rem;white-space:nowrap;">
+    <div style="display:flex;align-items:center;">{live_dot_html}<span>{current_price}</span></div>
+  </td>
+  <td class="cell-three-day-return mono" style="font-size:0.74rem;color:#93c5fd;">{three_day_return}</td>
+  <td class="cell-seven-day-return mono" style="font-size:0.74rem;color:#38bdf8;">{seven_day_return}</td>
   <td class="cell-thirty-day-return mono" style="font-size:0.74rem;">{thirty_day_return}</td>
-  <td class="cell-q1-week-hl mono" style="font-size:0.72rem;line-height:1.2;">{q1_week_hl}</td>
-  <td class="cell-q2-week-hl mono" style="font-size:0.72rem;line-height:1.2;">{q2_week_hl}</td>
-  <td class="cell-q3-week-hl mono" style="font-size:0.72rem;line-height:1.2;">{q3_week_hl}</td>
+  <td class="cell-sr-structure" style="font-size:0.72rem;line-height:1.2;">{range_bar_html}</td>
+  <td class="cell-channel-position mono" style="font-size:0.72rem;color:#cbd5e1;text-align:center;">{channel_position}</td>
   <td class="cell-pct-52w-hl mono" style="font-size:0.72rem;">{pct_from_52w_high_low}</td>
+  <td class="cell-q1-week-hl mono" style="font-size:0.72rem;line-height:1.2;">{q1_week_hl}</td>
   <td class="cell-quality-scores mono" style="color:#94a3b8;font-size:0.72rem;" data-quality="{quality_scores_plain}">{quality_scores}</td>
   <td class="cell-prev-3q-score mono" style="font-weight:700;font-size:0.74rem;">{prev_3q_score}</td>
-  <td class="cell-next-resistance mono" style="color:#f87171;font-size:0.72rem;">{next_resistance}</td>
-  <td class="cell-current-support mono" style="color:#34d399;font-size:0.72rem;">{current_support}</td>
   <td class="cell-kronos mono" style="font-size:0.72rem;">{kronos_14d}</td>
-  <td class="cell-gbm mono" style="font-size:0.72rem;">{gbm_prediction}</td>
   <td class="cell-ai-consensus" style="text-align:center;">{consensus_badge}</td>
   <td class="cell-actions" style="white-space:nowrap;">
-    <div style="display:flex;gap:0.25rem;align-items:center;">
-      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.openAddToWatchlistModal('{ticker}')" style="color:#fbbf24;border-color:rgba(251,191,36,0.35);padding:0.12rem 0.35rem;" title="Add {ticker} to Watchlist">⭐</button>
+    <div style="display:flex;gap:0.25rem;align-items:center;justify-content:center;">
+      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.showStockNewsDrawer('{row_ticker_id}', '{ticker}', event)" style="color:#38bdf8;border-color:rgba(56,189,248,0.35);padding:0.12rem 0.4rem;" title="Fetch live news & catalysts for {ticker}">📰 News</button>
       <button type="button" class="btn-micro btn-micro-primary" onclick="app.recalculateRow('{ticker}', this)" title="Refresh live prices & recalculate metrics">Recalc</button>
-      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.showTickerAuditModal('{ticker}')" title="Audit Log">Audit</button>
-      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.toggleRowDrawer('{row_ticker_id}', '{ticker}')" title="Expand Details Drawer">Inspect</button>
+      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.openAddToWatchlistModal('{ticker}')" style="color:#fbbf24;border-color:rgba(251,191,36,0.35);padding:0.12rem 0.35rem;" title="Add {ticker} to Watchlist">⭐</button>
+      <button type="button" class="btn-micro btn-micro-neutral" onclick="app.toggleRowDrawer('{row_ticker_id}', '{ticker}')" title="Expand Technical & Analysis Drawer">🔍</button>
     </div>
   </td>
 </tr>
 <tr id="drawer_{row_ticker_id}" class="row-drawer-tr" style="display:none;">
-  <td colspan="17" id="drawer_body_{row_ticker_id}" style="padding:0;border-bottom:1px solid rgba(59,130,246,0.3);"></td>
+  <td colspan="16" id="drawer_body_{row_ticker_id}" style="padding:0;border-bottom:1px solid rgba(59,130,246,0.3);background:#070913;"></td>
 </tr>
