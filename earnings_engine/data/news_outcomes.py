@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any
 
@@ -22,6 +23,142 @@ from earnings_engine.data.db import get_db_connection, is_turso_enabled
 from earnings_engine.data import prices as prices_mod
 
 logger = logging.getLogger("earnings_engine.data.news_outcomes")
+
+
+def get_latest_trading_day(market: str = "IN") -> str | None:
+    """Return the most recent completed/active trading day (YYYY-MM-DD) for NSE/NYSE."""
+    try:
+        import pandas_market_calendars as mcal
+
+        cal_name = "NSE" if market == "IN" else "NYSE"
+        cal = mcal.get_calendar(cal_name)
+        now = datetime.now()
+        start = (now - pd.Timedelta(days=14)).strftime("%Y-%m-%d")
+        end = now.strftime("%Y-%m-%d")
+        sched = cal.schedule(start_date=start, end_date=end)
+        if not sched.empty:
+            return sched.index[-1].strftime("%Y-%m-%d")
+    except Exception as e:
+        logger.debug("[NEWS-OUTCOMES] Error resolving calendar: %s", e)
+
+    # Fallback to business day arithmetic
+    today = datetime.now()
+    offset = max(1, (today.weekday() + 6) % 7 - 4) if today.weekday() in (5, 6) else 0
+    return (today - pd.Timedelta(days=offset)).strftime("%Y-%m-%d")
+
+
+def get_recent_price_metrics_batch(
+    tickers: list[str],
+    settings: Settings | None = None,
+    ensure_fresh: bool = True,
+) -> dict[str, dict[str, Any]]:
+    """Batch compute current close, quote date, 7D return, and 30D return for tickers.
+
+    If ensure_fresh is True, checks if any tickers have prices older than 1 trading day
+    and triggers a parallel batch-fetch via prices_mod.fetch_prices.
+    """
+    settings = settings or Settings()
+    if not tickers:
+        return {}
+
+    cleaned = list(dict.fromkeys([t.strip().upper() for t in tickers if t and t.strip()]))
+    canon_map = {t: prices_mod.canonical_symbol(t) for t in cleaned}
+    unique_canons = list(dict.fromkeys(canon_map.values()))
+
+    # Check for stale or missing prices against the latest trading day
+    latest_tday = get_latest_trading_day("IN")
+    if ensure_fresh and latest_tday:
+        stale_tickers: list[str] = []
+        try:
+            with _connect(settings) as conn:
+                for i in range(0, len(unique_canons), 100):
+                    chunk = unique_canons[i : i + 100]
+                    placeholders = ",".join("?" for _ in chunk)
+                    query = f"SELECT ticker, MAX(date) FROM price_history WHERE ticker IN ({placeholders}) AND close IS NOT NULL GROUP BY ticker"
+                    rows = conn.execute(query, chunk).fetchall()
+                    dates = dict(rows)
+                    for sym in chunk:
+                        m_date = dates.get(sym)
+                        if not m_date or m_date < latest_tday:
+                            stale_tickers.append(sym)
+        except Exception as e:
+            logger.debug("[NEWS-OUTCOMES] Error checking price freshness: %s", e)
+
+        # Batch-fetch missing or stale tickers concurrently
+        if stale_tickers:
+            logger.info(
+                "[NEWS-OUTCOMES] Found %d tickers with prices older than 1 trading day (%s). Batch fetching...",
+                len(stale_tickers),
+                latest_tday,
+            )
+            max_workers = min(12, len(stale_tickers))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(prices_mod.fetch_prices, sym, settings, False): sym
+                    for sym in stale_tickers
+                }
+                for fut in as_completed(futures):
+                    sym = futures[fut]
+                    try:
+                        fut.result()
+                    except Exception as exc:
+                        logger.debug("[NEWS-OUTCOMES] Batch price fetch failed for %s: %s", sym, exc)
+
+    # Compute latest close, cur_date, 7D return, and 30D return using window CTE
+    results: dict[str, dict[str, Any]] = {}
+    try:
+        with _connect(settings) as conn:
+            conn.row_factory = sqlite3.Row
+            for i in range(0, len(unique_canons), 100):
+                chunk = unique_canons[i : i + 100]
+                placeholders = ",".join("?" for _ in chunk)
+                sql = f"""
+                    WITH ranked AS (
+                        SELECT ticker, date, close,
+                               ROW_NUMBER() OVER (PARTITION BY ticker ORDER BY date DESC) as rn
+                        FROM price_history
+                        WHERE ticker IN ({placeholders}) AND close IS NOT NULL
+                    )
+                    SELECT
+                        f.ticker,
+                        MAX(CASE WHEN f.rn = 1 THEN f.close END) AS cur_close,
+                        MAX(CASE WHEN f.rn = 1 THEN f.date END) AS cur_date,
+                        MAX(CASE WHEN f.rn = 2 THEN f.close END) AS prev_close,
+                        MAX(CASE WHEN f.rn = 6 THEN f.close END) AS close_5d_prior,
+                        MAX(CASE WHEN f.rn = 23 THEN f.close END) AS close_22d_prior
+                    FROM ranked f
+                    WHERE f.rn <= 25
+                    GROUP BY f.ticker
+                """
+                rows = conn.execute(sql, chunk).fetchall()
+                for r in rows:
+                    d = dict(r)
+                    c = d.get("cur_close")
+                    p5 = d.get("close_5d_prior")
+                    p22 = d.get("close_22d_prior")
+                    ret7 = round((c - p5) / p5 * 100.0, 2) if (c and p5 and p5 > 0) else None
+                    ret30 = round((c - p22) / p22 * 100.0, 2) if (c and p22 and p22 > 0) else None
+                    results[d["ticker"]] = {
+                        "cur_close": c,
+                        "cur_date": d.get("cur_date"),
+                        "return_7d_pct": ret7,
+                        "return_30d_pct": ret30,
+                    }
+    except Exception as e:
+        logger.exception("[NEWS-OUTCOMES] Error computing batch price metrics: %s", e)
+
+    # Map back to original requested tickers
+    final_output: dict[str, dict[str, Any]] = {}
+    for orig in cleaned:
+        c_sym = canon_map.get(orig, orig)
+        final_output[orig] = results.get(c_sym) or results.get(orig) or {
+            "cur_close": None,
+            "cur_date": None,
+            "return_7d_pct": None,
+            "return_30d_pct": None,
+        }
+
+    return final_output
 
 def _ensure_outcomes_table(conn: Any) -> None:
     """Create news_catalyst_outcomes table and indices if they do not exist."""
@@ -325,7 +462,21 @@ def get_verified_catalyst_outcomes(
         params.append(limit)
 
         rows = conn.execute(query, params).fetchall()
-        return [dict(r) for r in rows]
+        outcomes = [dict(r) for r in rows]
+
+        # Attach real-time fresh price metrics (cur_price, cur_price_date, 7D & 30D returns)
+        tickers = list({o["ticker"] for o in outcomes if o.get("ticker")})
+        price_metrics = get_recent_price_metrics_batch(tickers, settings=settings, ensure_fresh=True)
+
+        for o in outcomes:
+            sym = o.get("ticker")
+            m = price_metrics.get(sym) or {}
+            o["cur_price"] = m.get("cur_close")
+            o["cur_price_date"] = m.get("cur_date")
+            o["return_7d_pct"] = m.get("return_7d_pct")
+            o["return_30d_pct"] = m.get("return_30d_pct")
+
+        return outcomes
 
 
 def compute_news_trade_metrics(
@@ -475,6 +626,14 @@ def compute_news_trade_metrics(
         avg_3d = round(float(df["return_3d_pct"].dropna().mean()), 2) if not df["return_3d_pct"].dropna().empty else 0.0
         avg_5d = round(float(df["return_5d_pct"].dropna().mean()), 2) if not df["return_5d_pct"].dropna().empty else 0.0
 
+        # Compute average 7D and 30D returns across current tickers
+        all_tickers = list({r["ticker"] for _, r in df.iterrows() if r.get("ticker")})
+        pm_map = get_recent_price_metrics_batch(all_tickers[:200], settings=settings, ensure_fresh=False)
+        r7_list = [m["return_7d_pct"] for m in pm_map.values() if m.get("return_7d_pct") is not None]
+        r30_list = [m["return_30d_pct"] for m in pm_map.values() if m.get("return_30d_pct") is not None]
+        avg_7d = round(float(np.mean(r7_list)), 2) if r7_list else 0.0
+        avg_30d = round(float(np.mean(r30_list)), 2) if r30_list else 0.0
+
         return {
             "total_evaluated": total,
             "verified_count": len(verified_df),
@@ -493,5 +652,7 @@ def compute_news_trade_metrics(
                 "avg_1d_pct": avg_1d,
                 "avg_3d_pct": avg_3d,
                 "avg_5d_pct": avg_5d,
+                "avg_7d_pct": avg_7d,
+                "avg_30d_pct": avg_30d,
             },
         }

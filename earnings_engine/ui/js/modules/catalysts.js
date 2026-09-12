@@ -239,8 +239,8 @@ Object.assign(app, {
 
             async loadNewsOutcomes() {
                 const tableBody = document.getElementById('outcomesTableBody');
-                if (tableBody) tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading historical verified news outcomes & performance metrics...</td></tr>';
-                
+                if (tableBody) tableBody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--muted);"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading historical verified news outcomes & performance metrics...</td></tr>';
+
                 const fetchFn = (this.apiFetch ? this.apiFetch.bind(this) : fetch);
                 try {
                     const [metricsRes, outcomesRes] = await Promise.all([
@@ -260,7 +260,7 @@ Object.assign(app, {
                 } catch (e) {
                     if (e.name === 'AbortError') return;
                     console.error('Error loading news outcomes:', e);
-                    if (tableBody) tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:1.5rem;color:var(--red);">Failed loading outcomes track record. Click "🎯 Re-Verify Outcomes" to calculate.</td></tr>';
+                    if (tableBody) tableBody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:1.5rem;color:var(--red);">Failed loading outcomes track record. Click "🎯 Re-Verify Outcomes" to calculate.</td></tr>';
                 }
             },
 
@@ -311,9 +311,16 @@ Object.assign(app, {
                     const h1 = m.horizon_performance.avg_1d_pct || 0;
                     const h3 = m.horizon_performance.avg_3d_pct || 0;
                     const h5 = m.horizon_performance.avg_5d_pct || 0;
+                    const h7 = m.horizon_performance.avg_7d_pct || 0;
+                    const h30 = m.horizon_performance.avg_30d_pct || 0;
+                    const h7dEl = document.getElementById('horizon7d');
+                    const h30dEl = document.getElementById('horizon30d');
+
                     if (h1dEl) { h1dEl.textContent = (h1 > 0 ? '+' : '') + h1.toFixed(2) + '%'; h1dEl.style.color = h1 >= 0 ? '#60a5fa' : '#f87171'; }
                     if (h3dEl) { h3dEl.textContent = (h3 > 0 ? '+' : '') + h3.toFixed(2) + '%'; h3dEl.style.color = h3 >= 0 ? '#34d399' : '#f87171'; }
                     if (h5dEl) { h5dEl.textContent = (h5 > 0 ? '+' : '') + h5.toFixed(2) + '%'; h5dEl.style.color = h5 >= 0 ? '#38bdf8' : '#f87171'; }
+                    if (h7dEl) { h7dEl.textContent = (h7 > 0 ? '+' : '') + h7.toFixed(2) + '%'; h7dEl.style.color = h7 >= 0 ? '#a78bfa' : '#f87171'; }
+                    if (h30dEl) { h30dEl.textContent = (h30 > 0 ? '+' : '') + h30.toFixed(2) + '%'; h30dEl.style.color = h30 >= 0 ? '#f472b6' : '#f87171'; }
                 }
 
                 // Render Category Performance Table
@@ -407,7 +414,7 @@ Object.assign(app, {
                 if (countBadge) countBadge.textContent = filtered.length + ' evaluated';
 
                 if (!filtered.length) {
-                    tableBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:2rem;color:var(--muted);">No news outcomes matching selected filters.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:2rem;color:var(--muted);">No news outcomes matching selected filters.</td></tr>';
                     return;
                 }
 
@@ -458,6 +465,7 @@ Object.assign(app, {
                     }
 
                     const entryPx = o.entry_price ? `₹${Number(o.entry_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : '—';
+                    const curPx = o.cur_price ? `₹${Number(o.cur_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : (o.exit_price ? `₹${Number(o.exit_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : '—');
                     const maxGain = o.max_gain_pct != null ? `<span style="color:#38bdf8;font-weight:700;font-family:var(--font-mono);">+${Number(o.max_gain_pct).toFixed(2)}%</span>` : '—';
                     const maxDD = o.max_drawdown_pct != null ? `<span style="color:#f87171;font-weight:600;font-family:var(--font-mono);">${Number(o.max_drawdown_pct).toFixed(2)}%</span>` : '—';
                     const pubDate = o.published_at ? o.published_at.slice(0, 10) : '—';
@@ -490,6 +498,9 @@ Object.assign(app, {
                             <td style="padding: 0.45rem 0.5rem; text-align: right; font-family: var(--font-mono); color: #e2e8f0; font-weight: 600; white-space: nowrap;">
                                 ${entryPx}
                             </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; font-family: var(--font-mono); color: #38bdf8; font-weight: 700; white-space: nowrap;">
+                                ${curPx}
+                            </td>
                             <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
                                 ${fmtRet(o.return_1d_pct)}
                             </td>
@@ -498,6 +509,12 @@ Object.assign(app, {
                             </td>
                             <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
                                 ${fmtRet(o.return_5d_pct)}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${fmtRet(o.return_7d_pct)}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${fmtRet(o.return_30d_pct)}
                             </td>
                             <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
                                 ${maxGain}
@@ -542,6 +559,7 @@ Object.assign(app, {
                     }
 
                     const entryPx = topOutcome.entry_price ? `₹${Number(topOutcome.entry_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : '—';
+                    const curPx = topOutcome.cur_price ? `₹${Number(topOutcome.cur_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : (topOutcome.exit_price ? `₹${Number(topOutcome.exit_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : '—');
                     const maxGain = topOutcome.max_gain_pct != null ? `<span style="color:#38bdf8;font-weight:700;font-family:var(--font-mono);">+${Number(topOutcome.max_gain_pct).toFixed(2)}%</span>` : '—';
                     const maxDD = topOutcome.max_drawdown_pct != null ? `<span style="color:#f87171;font-weight:600;font-family:var(--font-mono);">${Number(topOutcome.max_drawdown_pct).toFixed(2)}%</span>` : '—';
                     const pubDate = topOutcome.published_at ? topOutcome.published_at.slice(0, 10) : '—';
@@ -582,6 +600,9 @@ Object.assign(app, {
                             <td style="padding: 0.45rem 0.5rem; text-align: right; font-family: var(--font-mono); color: #e2e8f0; font-weight: 600; white-space: nowrap;">
                                 ${entryPx}
                             </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; font-family: var(--font-mono); color: #38bdf8; font-weight: 700; white-space: nowrap;">
+                                ${curPx}
+                            </td>
                             <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
                                 ${fmtRet(topOutcome.return_1d_pct)}
                             </td>
@@ -590,6 +611,12 @@ Object.assign(app, {
                             </td>
                             <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
                                 ${fmtRet(topOutcome.return_5d_pct)}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${fmtRet(topOutcome.return_7d_pct)}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${fmtRet(topOutcome.return_30d_pct)}
                             </td>
                             <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
                                 ${maxGain}
@@ -603,7 +630,7 @@ Object.assign(app, {
                         </tr>
                         <!-- Expandable drawer for child news items -->
                         <tr id="outcomeChildRow_${cleanSym}" style="display:none;">
-                            <td colspan="10" style="padding:0;background:#030712;border-bottom:1px solid rgba(56,189,248,0.18);">
+                            <td colspan="13" style="padding:0;background:#030712;border-bottom:1px solid rgba(56,189,248,0.18);">
                                 <div style="padding:0.4rem 0.75rem 0.45rem 0.75rem;background:rgba(56,189,248,0.04);border-top:1px solid rgba(56,189,248,0.12);border-bottom:1px solid rgba(56,189,248,0.12);display:flex;align-items:center;justify-content:space-between;">
                                     <span style="font-size:0.7rem;font-weight:700;color:#38bdf8;font-family:var(--font-mono);">
                                         🔍 All ${count} News Trade Outcomes for ${g.ticker}
