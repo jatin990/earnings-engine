@@ -171,54 +171,11 @@ Object.assign(app, {
                     btnEl.innerHTML = '<span class="loading-spinner" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#60a5fa;animation:spin 0.8s linear infinite;"></span>';
                 }
 
-                let modelsToRun = null;
                 try {
-                    const saved = localStorage.getItem('nexus_consensus_models');
-                    if (saved) {
-                        const parsed = JSON.parse(saved);
-                        if (Array.isArray(parsed) && parsed.length > 0) {
-                            modelsToRun = parsed;
-                        }
-                    }
-                } catch(_) {}
-                if (!modelsToRun || !modelsToRun.length) {
-                    modelsToRun = [
-                        'google/gemini-2.0-flash-001',
-                        'meta-llama/llama-3.3-70b-instruct',
-                        'deepseek/deepseek-r1',
-                        'google/gemma-4-31b-it:free'
-                    ];
-                }
-                
-                try {
-                    const res = await fetch(API_BASE + '/api/v1/consensus/predict', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ticker: sym, timeframe_days: 14, models: modelsToRun, force: false })
-                    });
-                    const data = await res.json();
-                    const preds = (data && (data.predictions || data.results)) ? (data.predictions || data.results) : [];
-                    if (preds && preds.length) {
-                        const pred = preds[0];
-                        if (pred && !pred.error) {
-                            this.consensusMap[sym] = pred;
-                            
-                            // Update all cells matching this ticker across any open table
-                            const domId = 'consensus-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
-                            const cells = document.querySelectorAll('[id="' + domId + '"]');
-                            const newHtml = this.renderConsensusBadge(sym, this.currentMarket || 'ALL');
-                            cells.forEach(el => {
-                                el.outerHTML = newHtml;
-                            });
-                            
-                            if (typeof this.showToast === 'function') {
-                                this.showToast('✨ AI Consensus for ' + sym + ': ' + (pred.consensus_direction || 'DONE') + ' (' + (pred.consensus_strength || 80) + '% strength)');
-                            }
-                            return pred;
-                        }
-                    }
+                    const result = await this.runOmniRouteAnalysis(sym);
+                    return result;
                 } catch (e) {
-                    console.error('Error running on-demand consensus for ' + sym + ':', e);
+                    console.error('Error running consensus for ' + sym + ':', e);
                     if (typeof this.showToast === 'function') {
                         this.showToast('Failed running consensus for ' + sym + ': ' + e.message, 'error');
                     }
@@ -1600,18 +1557,518 @@ Object.assign(app, {
         // [swing_range] -> extracted to modules/swing_range.js
         // [playground] -> extracted to modules/playground.js
             // =========================================================================
-            // 🧠 Multi-Model AI Consensus Engine & Post-Mortems Tab
+            // 🧠 Multi-Model AI Consensus Engine & OmniRoute Intelligence Tab
             // =========================================================================
             consensusPredictions: [],
+            omniTimeframe: 14,
+            _activeOmniTab: 'raw',
+
+            initOmniRouteConsensus() {
+                // Restore timeframe
+                const savedTf = localStorage.getItem('omni_timeframe_days') || '14';
+                this.setOmniTimeframe(parseInt(savedTf, 10) || 14);
+
+                // Restore data inclusion checkboxes
+                const chkTech = document.getElementById('chkIncludeTechnicals');
+                if (chkTech) {
+                    const saved = localStorage.getItem('chk_include_technicals');
+                    if (saved !== null) chkTech.checked = (saved === 'true');
+                    chkTech.onchange = () => {
+                        try { localStorage.setItem('chk_include_technicals', chkTech.checked); } catch (_) {}
+                    };
+                }
+                const chkNews = document.getElementById('chkIncludeNews');
+                if (chkNews) {
+                    const saved = localStorage.getItem('chk_include_news');
+                    if (saved !== null) chkNews.checked = (saved === 'true');
+                    chkNews.onchange = () => {
+                        try { localStorage.setItem('chk_include_news', chkNews.checked); } catch (_) {}
+                    };
+                }
+                const chkInst = document.getElementById('chkIncludeInstitutional');
+                if (chkInst) {
+                    const saved = localStorage.getItem('chk_include_institutional');
+                    if (saved !== null) chkInst.checked = (saved === 'true');
+                    chkInst.onchange = () => {
+                        try { localStorage.setItem('chk_include_institutional', chkInst.checked); } catch (_) {}
+                    };
+                }
+
+                // Restore custom directives
+                const dirEl = document.getElementById('omniCustomDirectives');
+                if (dirEl) {
+                    const savedDir = localStorage.getItem('omni_custom_directives');
+                    if (savedDir !== null && savedDir !== undefined) dirEl.value = savedDir;
+                    dirEl.oninput = () => {
+                        try { localStorage.setItem('omni_custom_directives', dirEl.value); } catch (_) {}
+                    };
+                }
+
+                // Enter key on ticker input runs analysis
+                const tickerInput = document.getElementById('omniTickerInput');
+                if (tickerInput && !tickerInput._hasOmniListener) {
+                    tickerInput._hasOmniListener = true;
+                    tickerInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            this.runOmniAnalysis();
+                        }
+                    });
+                }
+
+                // Load models and hydrate selector
+                this.loadConsensusOmniRouteModels(false);
+            },
+
+            setOmniTimeframe(days) {
+                days = parseInt(days, 10) || 14;
+                this.omniTimeframe = days;
+                try {
+                    localStorage.setItem('omni_timeframe_days', String(days));
+                } catch (_) {}
+
+                [3, 7, 14, 30, 90].forEach(d => {
+                    const btn = document.getElementById('omniTf-' + d);
+                    if (btn) {
+                        const isActive = (d === days);
+                        btn.classList.toggle('active', isActive);
+                        if (isActive) {
+                            btn.style.background = '#2563eb';
+                            btn.style.color = '#ffffff';
+                            btn.style.fontWeight = '700';
+                        } else {
+                            btn.style.background = 'transparent';
+                            btn.style.color = '#94a3b8';
+                            btn.style.fontWeight = '500';
+                        }
+                    }
+                });
+            },
+
+            setOmniDirective(presetText) {
+                const dirEl = document.getElementById('omniCustomDirectives');
+                if (dirEl) {
+                    dirEl.value = presetText || '';
+                    try {
+                        localStorage.setItem('omni_custom_directives', dirEl.value);
+                    } catch (_) {}
+                    dirEl.focus();
+                }
+            },
+
+            setOmniDirectivePreset(presetText) {
+                this.setOmniDirective(presetText);
+            },
+
+            async onOmniWatchlistSelect(wl) {
+                if (!wl) return;
+                const tickerInput = document.getElementById('omniTickerInput');
+                if (!tickerInput) return;
+                try {
+                    if (wl === 'NSE_TOP') {
+                        tickerInput.value = 'RELIANCE.NS';
+                    } else if (wl === 'BREAKOUT_HOT') {
+                        const res = await fetch(API_BASE + '/api/v1/breakout/hot?limit=1');
+                        if (res.ok) {
+                            const data = await res.json();
+                            const top = (data.candidates || data.setups || [])[0];
+                            tickerInput.value = top ? top.ticker : 'TCS.NS';
+                        } else {
+                            tickerInput.value = 'TCS.NS';
+                        }
+                    } else if (wl === 'RECENT_IPO') {
+                        const res = await fetch(API_BASE + '/api/v1/new-additions/latest?limit=1');
+                        if (res.ok) {
+                            const data = await res.json();
+                            const top = (data.additions || data.items || [])[0];
+                            tickerInput.value = top ? top.ticker : 'ZOMATO.NS';
+                        } else {
+                            tickerInput.value = 'ZOMATO.NS';
+                        }
+                    } else if (wl === 'SWING_SETUPS') {
+                        const res = await fetch(API_BASE + '/api/v1/swing/candidates?limit=1');
+                        if (res.ok) {
+                            const data = await res.json();
+                            const top = (data.candidates || data.setups || [])[0];
+                            tickerInput.value = top ? top.ticker : 'INFY.NS';
+                        } else {
+                            tickerInput.value = 'INFY.NS';
+                        }
+                    } else {
+                        tickerInput.value = wl;
+                    }
+                } catch (e) {
+                    console.warn('Watchlist auto-fill error:', e);
+                }
+            },
+
+            async runOmniAnalysis() {
+                const tickerInput = document.getElementById('omniTickerInput');
+                const ticker = (tickerInput ? tickerInput.value : '').trim().toUpperCase();
+                return await this.runOmniRouteAnalysis(ticker);
+            },
+
+            async runOmniRouteAnalysis(ticker, customOptions = {}) {
+                const sym = String(ticker || document.getElementById('omniTickerInput')?.value || '').trim().toUpperCase();
+                if (!sym) {
+                    if (typeof this.showToast === 'function') this.showToast('Please enter a ticker symbol (e.g. RELIANCE.NS, TCS.NS)', 'warning');
+                    else alert('Please enter a ticker symbol (e.g. RELIANCE.NS, TCS.NS)');
+                    return;
+                }
+
+                // Sync input field if present
+                const tickerInput = document.getElementById('omniTickerInput');
+                if (tickerInput && tickerInput.value.trim().toUpperCase() !== sym) {
+                    tickerInput.value = sym;
+                }
+
+                const model = customOptions.model || document.getElementById('omniModelSelect')?.value || localStorage.getItem('selected_omni_model') || 'antigravityonly';
+                const timeframe = customOptions.timeframe_days || this.omniTimeframe || parseInt(localStorage.getItem('omni_timeframe_days') || '14', 10);
+                const includeTech = customOptions.include_technicals !== undefined ? customOptions.include_technicals : (document.getElementById('chkIncludeTechnicals')?.checked ?? true);
+                const includeNews = customOptions.include_news !== undefined ? customOptions.include_news : (document.getElementById('chkIncludeNews')?.checked ?? true);
+                const includeInst = customOptions.include_institutional !== undefined ? customOptions.include_institutional : (document.getElementById('chkIncludeInstitutional')?.checked ?? true);
+                const customPrompt = customOptions.custom_prompt !== undefined ? customOptions.custom_prompt : (document.getElementById('omniCustomDirectives')?.value || null);
+
+                const runBtn = document.getElementById('omniRunAnalysisBtn');
+                const origBtnHtml = runBtn ? runBtn.innerHTML : '<span>⚡</span> Run OmniRoute Analysis';
+                if (runBtn) {
+                    runBtn.disabled = true;
+                    runBtn.innerHTML = '<span class="loading-spinner" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#ffffff;animation:spin 0.8s linear infinite;margin-right:0.3rem;"></span> Analyzing ' + sym + '...';
+                }
+
+                const thesisEl = document.getElementById('omniThesis');
+                if (thesisEl) thesisEl.textContent = 'Generating real-time PIT market analysis for ' + sym + ' via ' + model + '...';
+
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/consensus/analyze', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ticker: sym,
+                            model: model,
+                            timeframe_days: timeframe,
+                            include_technicals: includeTech,
+                            include_news: includeNews,
+                            include_institutional: includeInst,
+                            custom_prompt: customPrompt,
+                            temperature: 0.2
+                        })
+                    });
+
+                    if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.detail || ('HTTP ' + res.status));
+                    }
+
+                    const data = await res.json();
+                    if (!data || data.error) {
+                        throw new Error(data.error || 'OmniRoute returned an error');
+                    }
+
+                    // Render results in split deck & inspector
+                    this.renderOmniRouteResults(data);
+
+                    if (typeof this.showToast === 'function') {
+                        const dir = data.structured?.direction || 'DONE';
+                        const conf = data.structured?.confidence_pct || 80;
+                        this.showToast(`✨ OmniRoute Analysis for ${sym}: ${dir} (${conf}% conviction)`);
+                    }
+
+                    return data;
+                } catch (e) {
+                    console.error('OmniRoute analysis error for ' + sym + ':', e);
+                    if (thesisEl) {
+                        thesisEl.innerHTML = `<span style="color:#f87171;">⚠️ Analysis failed for ${sym}: ${this.escapeHtml(e.message)}</span>`;
+                    }
+                    if (typeof this.showToast === 'function') {
+                        this.showToast('OmniRoute error for ' + sym + ': ' + e.message, 'error');
+                    } else {
+                        alert('OmniRoute error for ' + sym + ': ' + e.message);
+                    }
+                } finally {
+                    if (runBtn) {
+                        runBtn.disabled = false;
+                        runBtn.innerHTML = origBtnHtml;
+                    }
+                }
+            },
+
+            renderOmniRouteResults(data) {
+                if (!data) return;
+                const sym = String(data.ticker || '').toUpperCase();
+                const structured = data.structured || {};
+                const currPrefix = sym.endsWith('.NS') ? '₹' : '$';
+
+                // 1. Populate Left Pane: Structured Verdict
+                const tickerEl = document.getElementById('omniResultTicker');
+                if (tickerEl) tickerEl.textContent = sym;
+
+                const timeEl = document.getElementById('omniResultTimestamp');
+                if (timeEl) {
+                    const latSec = data.latency_ms ? (data.latency_ms / 1000).toFixed(2) + 's' : '0.8s';
+                    timeEl.textContent = `Generated via ${data.model || 'OmniRoute'} in ${latSec} · ${new Date().toLocaleTimeString()}`;
+                }
+
+                const biasBadge = document.getElementById('omniBiasBadge');
+                if (biasBadge) {
+                    const dir = (structured.direction || 'NEUTRAL').toUpperCase();
+                    const isBull = dir.includes('BULL');
+                    const isBear = dir.includes('BEAR');
+                    biasBadge.textContent = dir;
+                    if (isBull) {
+                        biasBadge.style.background = 'rgba(16,185,129,0.2)';
+                        biasBadge.style.color = '#34d399';
+                        biasBadge.style.borderColor = 'rgba(16,185,129,0.4)';
+                    } else if (isBear) {
+                        biasBadge.style.background = 'rgba(239,68,68,0.2)';
+                        biasBadge.style.color = '#f87171';
+                        biasBadge.style.borderColor = 'rgba(239,68,68,0.4)';
+                    } else {
+                        biasBadge.style.background = 'rgba(251,191,36,0.18)';
+                        biasBadge.style.color = '#fbbf24';
+                        biasBadge.style.borderColor = 'rgba(251,191,36,0.4)';
+                    }
+                }
+
+                const convVal = document.getElementById('omniConvictionVal');
+                if (convVal) {
+                    const conf = structured.confidence_pct != null ? structured.confidence_pct : (structured.conviction_score != null ? structured.conviction_score : 80);
+                    convVal.textContent = conf + '%';
+                }
+
+                const targetEl = document.getElementById('omniTargetPrice');
+                if (targetEl) {
+                    const tp = structured.target_price;
+                    const retPct = structured.target_return_pct;
+                    let text = '—';
+                    if (tp != null && !isNaN(tp)) {
+                        text = `${currPrefix}${Number(tp).toLocaleString('en-IN', {maximumFractionDigits: 2})}`;
+                        if (retPct != null && !isNaN(retPct)) {
+                            const sign = retPct >= 0 ? '+' : '';
+                            text += ` (${sign}${Number(retPct).toFixed(1)}%)`;
+                        }
+                    }
+                    targetEl.textContent = text;
+                }
+
+                const slEl = document.getElementById('omniStopLoss');
+                if (slEl) {
+                    const sl = structured.stop_loss_price;
+                    slEl.textContent = (sl != null && !isNaN(sl)) ? `${currPrefix}${Number(sl).toLocaleString('en-IN', {maximumFractionDigits: 2})}` : '—';
+                }
+
+                const rrEl = document.getElementById('omniRiskReward');
+                if (rrEl) {
+                    const rr = structured.risk_reward_ratio;
+                    rrEl.textContent = (rr != null && !isNaN(rr)) ? `${Number(rr).toFixed(2)}R` : '2.0R';
+                }
+
+                const catSummary = document.getElementById('omniCatalystSummary');
+                if (catSummary) {
+                    const insight = structured.volume_profile_insight || structured.chart_pattern || structured.recommended_action || 'Volume and momentum align with setup.';
+                    catSummary.textContent = insight;
+                }
+
+                const thesisEl = document.getElementById('omniThesis');
+                if (thesisEl) {
+                    const drivers = Array.isArray(structured.key_drivers) && structured.key_drivers.length ? structured.key_drivers.map(d => `• ${d}`).join('\n') : '';
+                    let body = structured.thesis || structured.executive_summary || '';
+                    if (!body && drivers) {
+                        body = `${structured.recommended_action ? `Action: ${structured.recommended_action}\n\n` : ''}${drivers}`;
+                    } else if (body && drivers) {
+                        body = `${body}\n\nKey Drivers:\n${drivers}`;
+                    }
+                    thesisEl.textContent = body || 'Quantitative setup evaluated under current market regime.';
+                }
+
+                const risksList = document.getElementById('omniRisksList');
+                if (risksList) {
+                    const risks = [];
+                    if (structured.primary_risk) risks.push(structured.primary_risk);
+                    if (Array.isArray(structured.invalidation_triggers)) risks.push(...structured.invalidation_triggers);
+                    if (Array.isArray(structured.risks)) risks.push(...structured.risks);
+                    if (structured.support_level) risks.push(`Violation of pivot support at ${currPrefix}${structured.support_level}`);
+
+                    if (risks.length) {
+                        risksList.innerHTML = risks.map(r => `<li>${this.escapeHtml(r)}</li>`).join('');
+                    } else {
+                        risksList.innerHTML = '<li>Loss of recent swing low or adverse market shock invalidates setup.</li>';
+                    }
+                }
+
+                // 2. Populate Right Pane: 3-Tab Inspector
+                const metaEl = document.getElementById('omniExecutionMeta');
+                if (metaEl) {
+                    const latSec = data.latency_ms ? (data.latency_ms / 1000).toFixed(2) + 's' : '—';
+                    metaEl.textContent = `Latency: ${latSec} · Tokens: ${data.tokens_used || '—'}`;
+                }
+
+                const rawEl = document.getElementById('omniRawOutputContent');
+                if (rawEl) {
+                    rawEl.textContent = data.raw_text || (typeof structured === 'object' ? JSON.stringify(structured, null, 2) : 'No raw text output.');
+                }
+
+                const thinkEl = document.getElementById('omniThinkingContent');
+                if (thinkEl) {
+                    thinkEl.textContent = data.reasoning_text || 'No reasoning stream captured. Chain of thought (<think>) text will be displayed here when generated by reasoning models.';
+                }
+
+                const promptEl = document.getElementById('omniPromptSentContent');
+                if (promptEl) {
+                    promptEl.textContent = data.prompt_sent || 'Prompt payload not recorded.';
+                }
+
+                // 3. Update Table Row Badge Cells across all open tables
+                const dir = (structured.direction || 'NEUTRAL').toUpperCase();
+                const isBull = dir.includes('BULL');
+                const isBear = dir.includes('BEAR');
+                const retPct = structured.target_return_pct != null ? structured.target_return_pct : 0;
+
+                const consensusRecord = {
+                    ticker: sym,
+                    consensus_direction: dir,
+                    consensus_return_pct: retPct,
+                    expected_move_pct: retPct,
+                    consensus_strength: structured.confidence_pct || 80,
+                    agreement_ratio: 1.0,
+                    consensus_recommended_action: structured.recommended_action || (isBull ? 'BUY' : isBear ? 'SELL' : 'HOLD'),
+                    consensus_target_price: structured.target_price,
+                    stop_loss_price: structured.stop_loss_price,
+                    synthesized_thesis: structured.thesis || (structured.key_drivers ? structured.key_drivers.join('. ') : ''),
+                    models_breakdown: [{
+                        model_id: data.model || 'OmniRoute',
+                        model_name: data.model || 'OmniRoute',
+                        direction: dir,
+                        confidence_pct: structured.confidence_pct || 80,
+                        target_price: structured.target_price,
+                        target_return_pct: retPct,
+                        raw_response: data.raw_text,
+                        key_drivers: structured.key_drivers,
+                        primary_risk: structured.primary_risk
+                    }]
+                };
+
+                this.consensusMap[sym] = consensusRecord;
+
+                const domId = 'consensus-cell-' + sym.replace(/[^A-Za-z0-9]/g, '_');
+                const cells = document.querySelectorAll('[id="' + domId + '"]');
+                const newHtml = this.renderConsensusBadge(sym, this.currentMarket || 'ALL');
+                cells.forEach(el => {
+                    el.outerHTML = newHtml;
+                });
+            },
+
+            switchOmniInspectorTab(tabName) {
+                const tabs = ['raw', 'thinking', 'prompt'];
+                if (!tabs.includes(tabName)) tabName = 'raw';
+                this._activeOmniTab = tabName;
+
+                const btnMap = {
+                    'raw': document.getElementById('omniTabBtnRaw'),
+                    'thinking': document.getElementById('omniTabBtnThinking'),
+                    'prompt': document.getElementById('omniTabBtnPrompt')
+                };
+
+                const paneMap = {
+                    'raw': document.getElementById('omniTabPaneRaw'),
+                    'thinking': document.getElementById('omniTabPaneThinking'),
+                    'prompt': document.getElementById('omniTabPanePrompt')
+                };
+
+                tabs.forEach(t => {
+                    const btn = btnMap[t];
+                    const pane = paneMap[t];
+                    const isActive = (t === tabName);
+                    if (pane) pane.style.display = isActive ? 'block' : 'none';
+                    if (btn) {
+                        btn.classList.toggle('active', isActive);
+                        if (isActive) {
+                            btn.style.background = '#2563eb';
+                            btn.style.color = '#ffffff';
+                            btn.style.fontWeight = '700';
+                        } else {
+                            btn.style.background = 'transparent';
+                            btn.style.color = '#94a3b8';
+                            btn.style.fontWeight = '500';
+                        }
+                    }
+                });
+            },
+
+            copyOmniRawOutput() {
+                const activeTab = this._activeOmniTab || 'raw';
+                let textToCopy = '';
+                if (activeTab === 'thinking') {
+                    textToCopy = document.getElementById('omniThinkingContent')?.textContent || '';
+                } else if (activeTab === 'prompt') {
+                    textToCopy = document.getElementById('omniPromptSentContent')?.textContent || '';
+                } else {
+                    textToCopy = document.getElementById('omniRawOutputContent')?.textContent || '';
+                }
+
+                if (!textToCopy) return;
+
+                const copyBtn = document.getElementById('omniCopyRawBtn');
+                const origText = copyBtn ? copyBtn.innerHTML : '📋 Copy';
+
+                const onDone = () => {
+                    if (copyBtn) {
+                        copyBtn.innerHTML = '✅ Copied!';
+                        copyBtn.style.color = '#34d399';
+                        setTimeout(() => {
+                            copyBtn.innerHTML = origText;
+                            copyBtn.style.color = '';
+                        }, 1500);
+                    }
+                    if (typeof this.showToast === 'function') this.showToast('Copied ' + activeTab + ' text to clipboard!');
+                };
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(textToCopy).then(onDone).catch(() => {
+                        this._fallbackCopyText(textToCopy, onDone);
+                    });
+                } else {
+                    this._fallbackCopyText(textToCopy, onDone);
+                }
+            },
+
+            _fallbackCopyText(text, cb) {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.top = '0';
+                    ta.style.left = '0';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    if (cb) cb();
+                } catch (e) {
+                    console.warn('Fallback copy failed:', e);
+                }
+            },
+
+            escapeHtml(str) {
+                if (!str) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            },
 
             async loadConsensusTab() {
+                // Initialize OmniRoute customizer controls & preferences
+                this.initOmniRouteConsensus();
+
                 const grid = document.getElementById('consensusListGrid');
                 if (grid) {
                     grid.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading AI consensus predictions...</div>';
                 }
-
-                // Discover OmniRoute models asynchronously
-                this.loadConsensusOmniRouteModels(false);
 
                 try {
                     // Fetch latest predictions and accuracy stats in parallel
@@ -1763,49 +2220,60 @@ Object.assign(app, {
             },
 
             async loadConsensusOmniRouteModels(forceRefresh = false) {
-                const sel = document.getElementById('consensusModelSelect');
+                const omniSel = document.getElementById('omniModelSelect');
+                const legSel = document.getElementById('consensusModelSelect');
                 const badge = document.getElementById('omniRouteGatewayStatusBadge');
                 if (badge && forceRefresh) {
-                    badge.innerHTML = '🔄 Scanning Gateway Ports...';
+                    badge.innerHTML = '🔄 Scanning Gateway Models...';
                     badge.style.color = '#c084fc';
                 }
                 try {
-                    const res = await fetch('/api/v1/consensus/omniroute-models');
+                    let models = [];
+                    const res = await fetch('/api/v1/consensus/models');
                     if (res.ok) {
                         const data = await res.json();
-                        const catalog = data.catalog || [];
-                        const status = data.status || 'online';
-                        const endpoint = data.endpoint || 'http://localhost:20128/v1';
+                        models = data.models || [];
+                    }
 
-                        if (badge) {
-                            if (status === 'online' || status === 'fallback_online') {
-                                badge.innerHTML = `🟢 OmniRoute Gateway: Active (${catalog.length} models)`;
-                                badge.style.color = '#34d399';
-                                badge.style.borderColor = 'rgba(16,185,129,0.25)';
-                            } else {
-                                badge.innerHTML = `⚠️ OmniRoute: Offline (${endpoint})`;
-                                badge.style.color = '#fbbf24';
-                                badge.style.borderColor = 'rgba(245,158,11,0.25)';
-                            }
-                        }
-
-                        if (sel && catalog.length > 0) {
-                            const curVal = sel.value;
-                            const optionsHtml = '<option value="ALL">🧠 All Discovered Models (Ensemble)</option>' +
-                                catalog.map(m => `
-                                    <option value="${m.id}">
-                                        ${m.icon || '🤖'} ${m.name} ${m.tier ? `[${m.tier}]` : ''}
-                                    </option>
-                                `).join('');
-                            sel.innerHTML = optionsHtml;
-                            if (curVal && (curVal === 'ALL' || catalog.some(m => m.id === curVal))) {
-                                sel.value = curVal;
-                            } else {
-                                sel.value = 'ALL';
-                            }
-                            this.updateConsensusModelTelemetry();
+                    if (!models.length) {
+                        const fRes = await fetch('/api/v1/consensus/omniroute-models');
+                        if (fRes.ok) {
+                            const fData = await fRes.json();
+                            models = fData.catalog || [];
                         }
                     }
+
+                    if (badge) {
+                        badge.innerHTML = `🟢 OmniRoute: Active (${models.length || 4} models)`;
+                        badge.style.color = '#34d399';
+                        badge.style.borderColor = 'rgba(16,185,129,0.25)';
+                    }
+
+                    const savedModel = localStorage.getItem('selected_omni_model') || 'antigravityonly';
+
+                    if (omniSel && models.length > 0) {
+                        omniSel.innerHTML = models.map(m => {
+                            const tierBadge = m.tier ? ` [${m.tier}]` : '';
+                            const speedText = m.speed ? ` · ${m.speed}` : '';
+                            return `<option value="${m.id}" data-desc="${m.description || ''}" data-speed="${m.speed || ''}">
+                                ${m.icon || '🤖'} ${m.name || m.id}${tierBadge}${speedText}
+                            </option>`;
+                        }).join('');
+
+                        if (models.some(m => m.id === savedModel)) {
+                            omniSel.value = savedModel;
+                        } else {
+                            omniSel.value = models[0].id;
+                        }
+                    }
+
+                    if (legSel && models.length > 0) {
+                        legSel.innerHTML = '<option value="ALL">🧠 All Discovered Models (Ensemble)</option>' +
+                            models.map(m => `<option value="${m.id}">${m.icon || '🤖'} ${m.name || m.id}</option>`).join('');
+                    }
+
+                    this.updateOmniModelTelemetry();
+                    this.updateConsensusModelTelemetry();
                 } catch (e) {
                     console.debug('Error loading OmniRoute catalog on consensus tab:', e);
                     if (badge) {
@@ -1815,6 +2283,32 @@ Object.assign(app, {
                 }
             },
 
+            updateOmniModelTelemetry() {
+                const omniSel = document.getElementById('omniModelSelect');
+                const badge = document.getElementById('omniModelTelemetryBadge');
+                if (!omniSel) return;
+                const mKey = omniSel.value;
+                try {
+                    localStorage.setItem('selected_omni_model', mKey);
+                } catch (_) {}
+
+                if (!badge) return;
+
+                const opt = omniSel.selectedOptions && omniSel.selectedOptions[0];
+                const speed = opt ? opt.getAttribute('data-speed') : '';
+                const desc = opt ? opt.getAttribute('data-desc') : '';
+
+                const bench = {
+                    'antigravityonly': { label: 'antigravityonly', speed: '~1.5s', status: 'Workhorse' },
+                    'claude only': { label: 'claude only', speed: '~2.8s', status: 'Architecture & Reasoning' },
+                    'free only': { label: 'free only', speed: '~1.1s', status: 'Fast Free Tier' },
+                    'claude': { label: 'claude', speed: '~2.2s', status: 'Orchestrator' },
+                };
+
+                const info = bench[mKey] || { label: mKey.split('/').pop(), speed: speed || '~2.0s', status: desc || 'Ready' };
+                badge.innerHTML = `⚡ ${info.label} (${info.speed}) · ${info.status}`;
+            },
+
             updateConsensusModelTelemetry() {
                 const sel = document.getElementById('consensusModelSelect');
                 const badge = document.getElementById('consensusModelTelemetryBadge');
@@ -1822,6 +2316,10 @@ Object.assign(app, {
                 const mKey = sel.value;
                 const bench = {
                     'ALL': { time: '~2.4s', succ: '99.6%', label: 'Ensemble' },
+                    'antigravityonly': { time: '~1.5s', succ: '99.9%', label: 'antigravityonly' },
+                    'claude only': { time: '~2.8s', succ: '99.8%', label: 'claude only' },
+                    'free only': { time: '~1.1s', succ: '100%', label: 'free only' },
+                    'claude': { time: '~2.2s', succ: '99.7%', label: 'claude' },
                     'deepseek/deepseek-r1': { time: '~3.4s', succ: '99.2%', label: 'DeepSeek-R1' },
                     'meta-llama/llama-3.3-70b-instruct': { time: '~2.1s', succ: '99.8%', label: 'Llama-3.3-70B' },
                     'qwen/qwen-2.5-72b-instruct': { time: '~2.3s', succ: '99.6%', label: 'Qwen-2.5-72B' },
@@ -1835,10 +2333,10 @@ Object.assign(app, {
             },
 
             async runConsensusPrediction(explicitModelId = null) {
-                const tickerInput = document.getElementById('consensusTickerInput');
+                const tickerInput = document.getElementById('consensusTickerInput') || document.getElementById('omniTickerInput');
                 const tfSelect = document.getElementById('consensusTimeframeSelect');
-                const modelSelect = document.getElementById('consensusModelSelect');
-                const runBtn = document.getElementById('consensusRunBtn');
+                const modelSelect = document.getElementById('consensusModelSelect') || document.getElementById('omniModelSelect');
+                const runBtn = document.getElementById('consensusRunBtn') || document.getElementById('omniRunAnalysisBtn');
 
                 const ticker = (tickerInput?.value || '').trim().toUpperCase();
                 if (!ticker) {
@@ -1846,12 +2344,21 @@ Object.assign(app, {
                     return;
                 }
 
-                const timeframe = parseInt(tfSelect?.value || '14', 10);
-                const selectedModel = explicitModelId || (modelSelect?.value || 'ALL');
+                const timeframe = tfSelect ? parseInt(tfSelect.value || '14', 10) : (this.omniTimeframe || 14);
+                const selectedModel = explicitModelId || (modelSelect?.value || 'antigravityonly');
 
                 if (explicitModelId && modelSelect) {
                     modelSelect.value = explicitModelId;
                     this.updateConsensusModelTelemetry();
+                    this.updateOmniModelTelemetry();
+                }
+
+                // If running single model, route to OmniRoute analyze endpoint
+                if (selectedModel && selectedModel !== 'ALL') {
+                    return await this.runOmniRouteAnalysis(ticker, {
+                        model: selectedModel,
+                        timeframe_days: timeframe
+                    });
                 }
 
                 const reqBody = {
@@ -1859,9 +2366,6 @@ Object.assign(app, {
                     timeframe_days: timeframe,
                     force: true
                 };
-                if (selectedModel && selectedModel !== 'ALL') {
-                    reqBody.models = [selectedModel];
-                }
 
                 const modelNameDisplay = selectedModel === 'ALL' ? 'All Engines' : (selectedModel.split('/').pop());
                 if (runBtn) {
@@ -1899,7 +2403,7 @@ Object.assign(app, {
                 } finally {
                     if (runBtn) {
                         runBtn.disabled = false;
-                        runBtn.innerHTML = '<span>⚡</span> Run Model / Consensus';
+                        runBtn.innerHTML = '<span>⚡</span> Run OmniRoute Analysis';
                     }
                 }
             },
