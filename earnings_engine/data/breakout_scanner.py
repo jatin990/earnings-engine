@@ -2159,7 +2159,7 @@ def _score_resistance_proximity(closes: pd.Series) -> tuple[float, float]:
         return 0.0, float("nan")
     current = float(closes.iloc[-1])
     window = min(len(closes), 252)   # up to 1 year
-    high = float(closes.tail(window).max())
+    high = float(closes.values[-window:].max())
     if high <= 0:
         return 0.0, float("nan")
     pct_from_high = (current - high) / high * 100  # negative = below high
@@ -2187,8 +2187,9 @@ def _score_volume_surge(volumes: pd.Series) -> tuple[float, float]:
     """
     if len(volumes) < 5:
         return 0.0, float("nan")
-    avg_20 = float(volumes.tail(21).iloc[:-1].mean()) if len(volumes) >= 21 else float(volumes.mean())
-    today = float(volumes.iloc[-1])
+    vals = volumes.values
+    avg_20 = float(vals[-21:-1].mean()) if len(vals) >= 21 else float(vals.mean())
+    today = float(vals[-1])
     if avg_20 <= 0:
         return 0.0, float("nan")
     ratio = today / avg_20
@@ -2210,8 +2211,9 @@ def _score_price_compression(closes: pd.Series) -> tuple[float, float]:
     """
     if len(closes) < 15:
         return 0.0, float("nan")
-    daily_range = closes.pct_change().abs()
-    atr_pct = float(daily_range.tail(14).mean()) * 100   # as % of price
+    vals = closes.values[-15:]
+    daily_range = abs(vals[1:] - vals[:-1]) / vals[:-1]
+    atr_pct = float(daily_range.mean()) * 100   # as % of price
     if atr_pct <= 0:
         return 0.0, float("nan")
     if atr_pct < 0.5:
@@ -2235,7 +2237,7 @@ def _score_momentum(closes: pd.Series) -> tuple[float, str]:
     if len(closes) < 20:
         return 0.0, "insufficient"
     current = float(closes.iloc[-1])
-    sma_20 = float(closes.tail(20).mean())
+    sma_20 = float(closes.values[-20:].mean())
     ret_30 = float((closes.iloc[-1] / closes.iloc[max(0, len(closes) - 31)]) - 1) * 100
 
     above_sma = current > sma_20
@@ -2279,7 +2281,8 @@ def _calculate_volume_profile(df: pd.DataFrame, num_bins: int = 30) -> tuple[flo
         p = float(closes.iloc[-1]) if not closes.empty else 0.0
         return p, p, p, 1.0
 
-    volumes = pd.to_numeric(df["volume"], errors="coerce").fillna(0) if "volume" in df.columns else pd.Series(1.0, index=closes.index)
+    volumes = pd.to_numeric(df["volume"], errors="coerce") if "volume" in df.columns else pd.Series(1.0, index=closes.index)
+    volumes.fillna(0, inplace=True)
 
     p_min = float(closes.min())
     p_max = float(closes.max())
@@ -2430,12 +2433,13 @@ def compute_technical_decision_metrics(
 
     highs = pd.to_numeric(prices_df["high"], errors="coerce").dropna() if "high" in prices_df.columns else closes
     lows = pd.to_numeric(prices_df["low"], errors="coerce").dropna() if "low" in prices_df.columns else closes
-    volumes = pd.to_numeric(prices_df["volume"], errors="coerce").fillna(0) if "volume" in prices_df.columns else pd.Series(0.0, index=closes.index)
+    volumes = pd.to_numeric(prices_df["volume"], errors="coerce") if "volume" in prices_df.columns else pd.Series(0.0, index=closes.index)
+    volumes.fillna(0, inplace=True)
 
     current_price = float(closes.iloc[-1])
 
     # Moving Averages
-    sma_20 = float(closes.tail(20).mean()) if len(closes) >= 20 else float(closes.mean())
+    sma_20 = float(closes.values[-20:].mean()) if len(closes) >= 20 else float(closes.mean())
     sma_50 = float(closes.tail(50).mean()) if len(closes) >= 50 else (float(closes.mean()) if len(closes) >= 20 else None)
     sma_200 = float(closes.tail(200).mean()) if len(closes) >= 200 else (float(closes.mean()) if len(closes) >= 100 else None)
 
@@ -2577,8 +2581,9 @@ def _score_classic_technical(
     else:
         breakout_trigger = round(resistance_high, 2)
         ideal_entry_price = round(resistance_high, 2)
-    is_late = bool(ideal_entry_price and signal_price > ideal_entry_price * 1.002)
-    entry_delay_pct = round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
+    daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
+    is_late = bool(ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
+    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
 
     target_price = round(max(breakout_trigger * 1.08, breakout_trigger + 2.0 * atr_val), 2)
     stop_loss = round(min(signal_price * 0.95, signal_price - 1.5 * atr_val), 2)
@@ -2680,8 +2685,9 @@ def _score_nse_delivery_absorption(
             delivery_trigger = round(signal_price + max(signal_price * 0.008, 0.75 * atr_val), 2)
     else:
         delivery_trigger = round(delivery_resistance, 2)
-    is_late = bool(ideal_entry_price and signal_price > ideal_entry_price * 1.002)
-    entry_delay_pct = round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
+    daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
+    is_late = bool(ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
+    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
 
     pct_from_deliv = ((signal_price - delivery_trigger) / delivery_trigger) * 100
     if pct_from_deliv >= -1.0:
@@ -2779,8 +2785,9 @@ def _score_fo_call_wall(
     if call_oi_strike <= signal_price:
         call_oi_strike = round(signal_price * 1.025, 2)
     ideal_entry_price = orig_call_wall
-    is_late = bool(ideal_entry_price and signal_price > ideal_entry_price * 1.002)
-    entry_delay_pct = round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
+    daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
+    is_late = bool(ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
+    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
     dist_to_call_wall = ((call_oi_strike - signal_price) / signal_price) * 100
 
     # 1. Call OI Wall Proximity (0-35)
@@ -2851,7 +2858,7 @@ def _score_volume_profile_vah(
 ) -> tuple[float, float, float, float, dict[str, float], str, dict[str, Any]]:
     """Strategy 4: Volume Profile & Value Area High (VAH) Expansion."""
     signal_price = float(closes.iloc[-1])
-    poc, vah, val, lvn_ratio = _calculate_volume_profile(df.tail(63))
+    poc, vah, val, lvn_ratio = _calculate_volume_profile(df.iloc[-63:])
 
     pct_from_vah = ((signal_price - vah) / max(0.01, vah)) * 100
 
@@ -2894,8 +2901,9 @@ def _score_volume_profile_vah(
         breakout_trigger = round(signal_price + max(signal_price * 0.008, va_height * 0.25), 2)
     else:
         breakout_trigger = round(vah, 2)
-    is_late = bool(ideal_entry_price and signal_price > ideal_entry_price * 1.002)
-    entry_delay_pct = round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
+    daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
+    is_late = bool(ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
+    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
 
     target_price = round(breakout_trigger + va_height * 1.5, 2)
     stop_loss = round(min(signal_price * 0.95, poc), 2)
@@ -2982,11 +2990,12 @@ def _score_donchian_squeeze(
     else:
         breakout_trigger = round(donchian_55, 2)
         ideal_entry_price = round(donchian_55, 2)
-    is_late = bool(ideal_entry_price and signal_price > ideal_entry_price * 1.002)
-    entry_delay_pct = round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
+    daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
+    is_late = bool(ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002))
+    entry_delay_pct = round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0
 
     target_price = round(breakout_trigger + 3.0 * atr_val, 2)
-    sma_20 = float(closes.tail(20).mean())
+    sma_20 = float(closes.values[-20:].mean())
     stop_loss = round(min(signal_price * 0.95, sma_20), 2)
 
     archetype = "🌪️ TTM Donchian Volatility Squeeze" if squeeze_on else "🚀 55-Day Channel Breakout"
@@ -3061,7 +3070,8 @@ def score_breakout(
 
     high_series = pd.to_numeric(hist_df["high"], errors="coerce") if "high" in hist_df.columns else closes
     low_series = pd.to_numeric(hist_df["low"], errors="coerce") if "low" in hist_df.columns else closes
-    volumes = pd.to_numeric(hist_df["volume"], errors="coerce").fillna(0) if "volume" in hist_df.columns else pd.Series(1.0, index=closes.index)
+    volumes = pd.to_numeric(hist_df["volume"], errors="coerce") if "volume" in hist_df.columns else pd.Series(1.0, index=closes.index)
+    volumes.fillna(0, inplace=True)
     volumes = volumes.reindex(closes.index, fill_value=0)
 
     strategy_clean = (strategy or "CLASSIC_TECHNICAL").upper().strip()
@@ -3323,6 +3333,30 @@ def generate_breakout_ai_reasoning(
     if cache_key in _AI_REASONING_CACHE:
         return _AI_REASONING_CACHE[cache_key]
 
+    # Persistent DB Cache Check
+    try:
+        from earnings_engine.data.db import get_db_connection
+        conn = get_db_connection(settings)
+        cur = conn.execute("SELECT data_json FROM breakout_radar WHERE ticker = ? ORDER BY composite_score DESC LIMIT 1", (sym,))
+        row = cur.fetchone()
+        if row and row[0]:
+            import json
+            data = json.loads(row[0])
+            if "ai_reasoning" in data:
+                ai_data = data["ai_reasoning"]
+                gen_at = ai_data.get("generated_at")
+                # Simple freshness check (e.g. 12 hours)
+                if gen_at:
+                    from datetime import datetime, timezone
+                    gen_dt = datetime.fromisoformat(gen_at)
+                    now_dt = datetime.now(timezone.utc)
+                    if (now_dt - gen_dt).total_seconds() < 12 * 3600:
+                        _AI_REASONING_CACHE[cache_key] = ai_data
+                        return ai_data
+        conn.close()
+    except Exception as e:
+        logger.debug("[BREAKOUT-AI] DB cache read failed for %s: %s", sym, e)
+
     # Get scored candidate details
     from earnings_engine.data.prices import load_prices, load_price_metrics
     prices_df = load_prices(sym, settings)
@@ -3457,6 +3491,23 @@ Evaluate the following breakout setup for {sym} ({company_name}) and provide an 
     output_dict["generated_at"] = datetime.now(timezone.utc).isoformat()
 
     _AI_REASONING_CACHE[cache_key] = output_dict
+    
+    # Store in DB to prevent token/compute waste on restart
+    try:
+        conn = get_db_connection(settings)
+        cur = conn.execute("SELECT data_json FROM breakout_radar WHERE ticker = ? ORDER BY composite_score DESC LIMIT 1", (sym,))
+        row = cur.fetchone()
+        if row and row[0]:
+            import json
+            data = json.loads(row[0])
+            data["ai_reasoning"] = output_dict
+            new_json = json.dumps(data)
+            conn.execute("UPDATE breakout_radar SET data_json = ? WHERE ticker = ?", (new_json, sym))
+            conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.debug("[BREAKOUT-AI] DB cache write failed for %s: %s", sym, e)
+        
     return output_dict
 
 
