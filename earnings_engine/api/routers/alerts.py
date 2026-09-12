@@ -36,6 +36,12 @@ class AlertRulePayload(BaseModel):
     email_recipients: str | None = None
     is_active: bool = True
 
+    @classmethod
+    def validate_webhook(cls, url: str | None) -> str | None:
+        if url:
+            return _validate_safe_webhook_url(url)
+        return None
+
 
 class TestDispatchPayload(BaseModel):
     channel: str = Field(..., description="browser, webhook, or email")
@@ -48,7 +54,7 @@ class TestDispatchPayload(BaseModel):
 
 
 def _is_safe_ip(ip_obj: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    """Check if an IP address is safe (public and not internal/cloud metadata/carrier NAT)."""
+    """Check if an IP address is safe (public and not internal/cloud metadata/carrier NAT/reserved)."""
     if (
         ip_obj.is_private
         or ip_obj.is_loopback
@@ -65,32 +71,37 @@ def _is_safe_ip(ip_obj: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     return True
 
 
-def _is_safe_webhook_url(url_str: str) -> bool:
-    """Validate that webhook URL uses HTTP/HTTPS and does not target private, local, or cloud metadata IP ranges."""
+def _validate_safe_webhook_url(url_str: str | None) -> str | None:
+    """Validate webhook URL scheme, host, and destination IP range to prevent SSRF vulnerabilities."""
+    if not url_str:
+        return None
+    url_str = url_str.strip()
+    if not url_str:
+        return None
     try:
         parsed = urllib.parse.urlparse(url_str)
         if parsed.scheme not in ("http", "https"):
-            return False
+            raise ValueError("Webhook URL must use http or https scheme")
         hostname = parsed.hostname
         if not hostname:
-            return False
+            raise ValueError("Webhook URL missing valid hostname")
         if hostname.lower() in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "metadata.google.internal"):
-            return False
+            raise ValueError("Localhost and cloud metadata endpoints are prohibited")
         # Resolve IP to block internal RFC1918 / loopback / link-local / cloud metadata addresses
         try:
             ip_info = socket.getaddrinfo(hostname, None)
             if not ip_info:
-                return False
+                raise ValueError("Could not resolve webhook host")
             for addr_info in ip_info:
                 ip_str = addr_info[4][0]
                 ip_obj = ipaddress.ip_address(ip_str)
                 if not _is_safe_ip(ip_obj):
-                    return False
-        except Exception:
-            return False
-        return True
-    except Exception:
-        return False
+                    raise ValueError("Webhook destination targets private/internal IP address range")
+        except socket.gaierror:
+            raise ValueError("Could not resolve webhook host")
+        return url_str
+    except Exception as e:
+        raise ValueError(f"Invalid webhook URL: {e}") from e
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -227,6 +238,12 @@ async def get_alert_rules():
 @router.post("/api/v1/alerts/rules")
 async def create_alert_rule(payload: AlertRulePayload):
     """Create a new custom alert rule."""
+    if payload.webhook_url:
+        try:
+            _validate_safe_webhook_url(payload.webhook_url)
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve))
+
     def _create():
         now_iso = datetime.now(timezone.utc).isoformat()
         rule_id = f"rule_{uuid.uuid4().hex[:10]}"
@@ -263,6 +280,8 @@ async def create_alert_rule(payload: AlertRulePayload):
 
     try:
         return await asyncio.to_thread(_create)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error creating alert rule: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -286,8 +305,10 @@ async def test_dispatch_alert(payload: TestDispatchPayload):
     if channel == "webhook":
         if not payload.webhook_url:
             raise HTTPException(status_code=400, detail="Webhook URL is required for webhook test dispatch")
-        if not _is_safe_webhook_url(payload.webhook_url):
-            raise HTTPException(status_code=400, detail="Invalid webhook URL: private, loopback, or non-HTTP endpoints are not allowed.")
+        try:
+            _validate_safe_webhook_url(payload.webhook_url)
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve))
         try:
             req_data = json.dumps({
                 "event": "nexus_alert_test",
@@ -390,6 +411,12 @@ async def get_alert_logs(
 @router.put("/api/v1/alerts/rules/{rule_id}")
 async def update_alert_rule(rule_id: str, payload: AlertRulePayload):
     """Update an existing alert rule or toggle active state."""
+    if payload.webhook_url:
+        try:
+            _validate_safe_webhook_url(payload.webhook_url)
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve))
+
     def _update():
         now_iso = datetime.now(timezone.utc).isoformat()
         actions_str = json.dumps(payload.actions_json) if isinstance(payload.actions_json, list) else str(payload.actions_json)
