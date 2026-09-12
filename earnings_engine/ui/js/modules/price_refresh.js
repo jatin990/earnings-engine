@@ -54,11 +54,14 @@
      */
     app.triggerGlobalPriceRefresh = async function(manual = false) {
         const btn = document.getElementById('topRefreshPricesBtn');
-        const iconEl = btn ? (btn.querySelector('#topRefreshPricesIcon') || btn.querySelector('.refresh-icon') || btn) : null;
+        const iconEl = btn ? (btn.querySelector('#topRefreshPricesIcon') || btn.querySelector('.refresh-icon')) : null;
         const textEl = btn ? btn.querySelector('#topRefreshPricesText') : null;
         const originalText = textEl ? textEl.textContent : '';
 
-        if (btn) btn.disabled = true;
+        if (btn) {
+            btn.disabled = true;
+            btn.style.animation = '';
+        }
         if (iconEl) iconEl.style.animation = 'spin 0.8s linear infinite';
         if (textEl) textEl.textContent = 'Refreshing...';
 
@@ -111,7 +114,7 @@
             } else if (activeTab === 'repeaters') {
                 if (typeof this.loadQuarterRepeaters === 'function') await this.loadQuarterRepeaters(true);
             } else if (activeTab === 'new-additions') {
-                if (typeof this.loadRecentAdditions === 'function') await this.loadRecentAdditions();
+                if (typeof this.loadRecentAdditions === 'function') await this.loadRecentAdditions(true);
             } else if (activeTab === 'swing') {
                 if (typeof this.loadSwing === 'function') await this.loadSwing();
             } else if (activeTab === 'watchlist') {
@@ -157,9 +160,12 @@
         } finally {
             if (btn) {
                 btn.disabled = false;
+                btn.style.animation = '';
             }
-            if (iconEl) iconEl.style.animation = '';
-            if (textEl) textEl.textContent = originalText || 'Refresh Prices';
+            const liveIcon = btn ? (btn.querySelector('#topRefreshPricesIcon') || btn.querySelector('.refresh-icon')) : document.getElementById('topRefreshPricesIcon');
+            if (liveIcon) liveIcon.style.animation = '';
+            const liveText = btn ? btn.querySelector('#topRefreshPricesText') : document.getElementById('topRefreshPricesText');
+            if (liveText) liveText.textContent = originalText || 'Refresh Prices';
         }
     };
 

@@ -250,11 +250,12 @@ async def get_universe_names_endpoint():
 async def get_recent_market_additions_endpoint(
     days: int = Query(180, ge=1, le=365, description="Look-back window in days"),
     limit: int = Query(100, ge=1, le=500),
+    force: bool = Query(False, description="Force refresh equity directory and market prices"),
 ):
     """Retrieve recently listed or re-listed equities added to market."""
     try:
         from earnings_engine.api import stock_api as _stock_api
-        return await asyncio.to_thread(_stock_api.get_recent_market_additions, days=days, limit=limit, settings=_settings)
+        return await asyncio.to_thread(_stock_api.get_recent_market_additions, days=days, limit=limit, force=force, settings=_settings)
     except Exception as e:
         logger.exception("Error in get_recent_market_additions: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -272,11 +273,14 @@ async def get_market_status_endpoint():
 
 
 @router.get("/api/v1/market/ipo-detail/{ticker}")
-async def get_ipo_detail_endpoint(ticker: str):
+async def get_ipo_detail_endpoint(
+    ticker: str,
+    force: bool = Query(False, description="Force refresh live quotes and price history"),
+):
     """Retrieve deep IPO technical, earnings lifecycle, and institutional backing for a newly listed stock."""
     from earnings_engine.api import stock_api as _stock_api
     try:
-        data = await asyncio.to_thread(_stock_api.get_ipo_stock_detail, ticker=ticker, settings=_settings)
+        data = await asyncio.to_thread(_stock_api.get_ipo_stock_detail, ticker=ticker, force=force, settings=_settings)
         return data
     except Exception as e:
         logger.exception("Error fetching IPO detail for %s: %s", ticker, e)

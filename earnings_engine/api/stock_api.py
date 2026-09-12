@@ -1101,12 +1101,13 @@ def get_stock_intelligence_note(
 def get_recent_market_additions(
     days: int = 180,
     limit: int = 100,
+    force: bool = False,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Retrieve recent IPOs and market additions listed on the NSE."""
     from earnings_engine.data.new_listings import get_recent_nse_additions
     settings = settings or Settings()
-    items = get_recent_nse_additions(days=days, limit=limit, settings=settings)
+    items = get_recent_nse_additions(days=days, limit=limit, force=force, settings=settings)
     return {
         "success": True,
         "count": len(items),
@@ -1164,12 +1165,13 @@ def refresh_stock_news(
 
 def get_ipo_stock_detail(
     ticker: str,
+    force: bool = False,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Retrieve deep IPO technical, earnings lifecycle, and institutional backing for a newly listed stock."""
     from earnings_engine.data.new_listings import get_ipo_stock_detail as _get_ipo_stock_detail
     settings = settings or Settings()
-    return _get_ipo_stock_detail(ticker=ticker, settings=settings)
+    return _get_ipo_stock_detail(ticker=ticker, force=force, settings=settings)
 
 
 

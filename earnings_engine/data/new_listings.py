@@ -24,15 +24,104 @@ _EQUITY_LIST_CACHE: dict[str, Any] = {"timestamp": None, "data": None}
 CACHE_TTL_SECONDS = 3600  # 1 hour TTL
 
 
-def fetch_all_nse_equities_cached() -> pd.DataFrame:
+def compute_calendar_return(records: list[Any], cmp: float | None, days: int) -> float | None:
+    """Compute percentage return from `days` calendar days ago to `cmp`.
+
+    If total available history is shorter than `days` calendar days, falls back
+    to the earliest available record (debut listing price).
+
+    `records` can be:
+      - list of dicts with keys 'date' and 'close'
+      - list of tuples where record[0] is date (YYYY-MM-DD) and record[4] is close
+    """
+    if not records or cmp is None or cmp <= 0:
+        return None
+
+    def get_dt_and_close(r: Any) -> tuple[datetime | None, float | None]:
+        if isinstance(r, dict):
+            d_str = r.get("date")
+            c_val = r.get("close")
+        elif isinstance(r, (list, tuple)) and len(r) >= 5:
+            d_str = r[0]
+            c_val = r[4]
+        else:
+            return None, None
+
+        if c_val is None:
+            return None, None
+        try:
+            c_flt = float(c_val)
+            if c_flt <= 0:
+                return None, None
+        except (ValueError, TypeError):
+            return None, None
+
+        if not d_str:
+            return None, c_flt
+        try:
+            if isinstance(d_str, datetime):
+                dt = d_str
+            else:
+                dt = datetime.strptime(str(d_str)[:10], "%Y-%m-%d")
+            return dt, c_flt
+        except Exception:
+            return None, c_flt
+
+    parsed_bars = []
+    for r in records:
+        dt, c = get_dt_and_close(r)
+        if c is not None:
+            parsed_bars.append((dt, c))
+
+    if not parsed_bars:
+        return None
+
+    if all(b[0] is not None for b in parsed_bars):
+        parsed_bars.sort(key=lambda b: b[0])
+
+    latest_dt, _ = parsed_bars[-1]
+
+    # Single bar on record: return against debut close
+    if len(parsed_bars) == 1:
+        base_close = parsed_bars[0][1]
+        return round(((cmp - base_close) / base_close) * 100.0, 2)
+
+    if latest_dt is None:
+        bar_idx = min(days // 7 * 5 if days <= 7 else int(days * 0.7), len(parsed_bars) - 1)
+        base_close = parsed_bars[-1 - bar_idx][1]
+        return round(((cmp - base_close) / base_close) * 100.0, 2)
+
+    target_dt = latest_dt - timedelta(days=days)
+
+    base_close = None
+    for dt, close_val in reversed(parsed_bars):
+        if dt is not None and dt <= target_dt:
+            base_close = close_val
+            break
+
+    # If history is shorter than `days` calendar days, use the debut listing close
+    if base_close is None:
+        base_close = parsed_bars[0][1]
+
+    if base_close and base_close > 0:
+        return round(((cmp - base_close) / base_close) * 100.0, 2)
+    return None
+
+
+def fetch_all_nse_equities_cached(force: bool = False, *args: Any, **kwargs: Any) -> pd.DataFrame:
     """Fetch all listed equities from official NSE directory with in-memory caching."""
     now = datetime.now()
     if (
-        _EQUITY_LIST_CACHE["timestamp"] is not None
+        not force
+        and _EQUITY_LIST_CACHE["timestamp"] is not None
         and _EQUITY_LIST_CACHE["data"] is not None
         and (now - _EQUITY_LIST_CACHE["timestamp"]).total_seconds() < CACHE_TTL_SECONDS
     ):
         return _EQUITY_LIST_CACHE["data"].copy()
+
+    if force:
+        _EQUITY_LIST_CACHE["timestamp"] = None
+        _EQUITY_LIST_CACHE["data"] = None
 
     # 1. Try nselib if installed
     logger.info("[NSELIB:REQ] capital_market.equity_list()")
@@ -107,6 +196,7 @@ def fetch_all_nse_equities_cached() -> pd.DataFrame:
 def get_recent_nse_additions(
     days: int = 180,
     limit: int = 100,
+    force: bool = False,
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
     """Retrieve recent market additions / IPOs listed within the last `days` days.
@@ -118,9 +208,13 @@ def get_recent_nse_additions(
     - Watchlist presence status
     - Next earnings date (if available)
     - Result sequence (1st Result / 2nd Result / 3rd Result)
+    - Live CMP, ATH distance, and 7D/30D calendar momentum returns
     """
     settings = settings or Settings()
-    df = fetch_all_nse_equities_cached()
+    try:
+        df = fetch_all_nse_equities_cached(force=force)
+    except TypeError:
+        df = fetch_all_nse_equities_cached()
     if df.empty or "LISTING_DATE" not in df.columns:
         return []
 
@@ -190,13 +284,12 @@ def get_recent_nse_additions(
         except Exception as e:
             logger.debug("[NEW-LISTINGS] Failed querying price_history in batch: %s", e)
 
-    # Auto-hydrate price history in batch for top recent debuts missing from database
+    # Auto-hydrate price history in batch for recent debuts missing from database or on force refresh
     missing_debuts = [t for t in tickers if t not in price_map and t.replace(".NS", "") not in price_map]
     if missing_debuts:
         try:
             from earnings_engine.data.prices import ensure_prices_batch
-            batch_to_fetch = missing_debuts[:10]
-            fetched_dict = ensure_prices_batch(batch_to_fetch, settings)
+            fetched_dict = ensure_prices_batch(missing_debuts, settings, force=force)
             for m_sym, m_df in fetched_dict.items():
                 if m_df is not None and not m_df.empty:
                     m_norm = f"{m_sym}.NS" if not m_sym.endswith(".NS") else m_sym
@@ -213,6 +306,14 @@ def get_recent_nse_additions(
                     ]
         except Exception as e:
             logger.debug("[NEW-LISTINGS] Batch auto-hydration for missing IPO prices: %s", e)
+
+    # Fetch live quotes for active screen tickers to ensure up-to-the-minute CMP
+    live_quotes: dict[str, dict[str, Any]] = {}
+    try:
+        from earnings_engine.data.prices import fetch_batch_live_quotes
+        live_quotes = fetch_batch_live_quotes(tickers[:limit], settings=settings, sync_db=True, force=force)
+    except Exception as e:
+        logger.debug("[NEW-LISTINGS] Failed fetching batch live quotes: %s", e)
 
     today = datetime.now().date()
     items: list[dict[str, Any]] = []
@@ -251,6 +352,7 @@ def get_recent_nse_additions(
 
         # Price history calculations
         p_history = price_map.get(ticker, [])
+        lq = live_quotes.get(ticker) or live_quotes.get(raw_symbol) or {}
         cmp = None
         listing_price = None
         return_since_listing_pct = 0.0
@@ -282,24 +384,6 @@ def get_recent_nse_additions(
             elif cmp is not None:
                 atl_price = cmp
 
-            if cmp is not None and listing_price is not None and listing_price > 0:
-                return_since_listing_pct = round(((cmp - listing_price) / listing_price) * 100.0, 2)
-
-            if cmp is not None and ath_price is not None and ath_price > 0:
-                ath_distance_pct = round(((cmp - ath_price) / ath_price) * 100.0, 2)
-
-            if len(p_history) >= 6:
-                idx_7 = min(7, len(p_history) - 1)
-                p_7d = p_history[-1 - idx_7].get("close")
-                if p_7d is not None and p_7d > 0 and cmp is not None:
-                    return_7d_pct = round(((cmp - p_7d) / p_7d) * 100.0, 2)
-
-            if len(p_history) >= 21:
-                idx_30 = min(30, len(p_history) - 1)
-                p_30d = p_history[-1 - idx_30].get("close")
-                if p_30d is not None and p_30d > 0 and cmp is not None:
-                    return_30d_pct = round(((cmp - p_30d) / p_30d) * 100.0, 2)
-
             if len(p_history) >= 5:
                 v5 = [h["volume"] for h in p_history[-5:] if h["volume"] is not None]
                 v20 = [h["volume"] for h in p_history[-20:] if h["volume"] is not None]
@@ -307,6 +391,28 @@ def get_recent_nse_additions(
                 avg_v20 = sum(v20) / len(v20) if v20 else 0.0
                 if avg_v20 > 0:
                     volume_ratio_5_20 = round(avg_v5 / avg_v20, 2)
+
+        # Enhance with live quote if available
+        if lq and lq.get("current_price"):
+            live_cmp = round(float(lq["current_price"]), 2)
+            cmp = live_cmp
+            if lq.get("week_52_high"):
+                lq_high = round(float(lq["week_52_high"]), 2)
+                ath_price = max(ath_price, lq_high) if ath_price is not None else lq_high
+            if lq.get("week_52_low"):
+                lq_low = round(float(lq["week_52_low"]), 2)
+                atl_price = min(atl_price, lq_low) if atl_price is not None else lq_low
+
+        if cmp is not None and listing_price is not None and listing_price > 0:
+            return_since_listing_pct = round(((cmp - listing_price) / listing_price) * 100.0, 2)
+
+        if cmp is not None and ath_price is not None and ath_price > 0:
+            ath_distance_pct = round(((cmp - ath_price) / ath_price) * 100.0, 2)
+
+        # Calendar-based 7D and 30D returns (falls back to debut close if history < window)
+        if p_history and cmp is not None:
+            return_7d_pct = compute_calendar_return(p_history, cmp, 7)
+            return_30d_pct = compute_calendar_return(p_history, cmp, 30)
 
         items.append({
             "ticker": ticker,
@@ -390,6 +496,7 @@ def compute_ticker_result_sequence(
 
 def get_ipo_stock_detail(
     ticker: str,
+    force: bool = False,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Retrieve comprehensive technical, earnings lifecycle, and institutional intelligence for an IPO stock.
@@ -424,7 +531,10 @@ def get_ipo_stock_detail(
     today = datetime.now().date()
 
     try:
-        df = fetch_all_nse_equities_cached()
+        try:
+            df = fetch_all_nse_equities_cached(force=force)
+        except TypeError:
+            df = fetch_all_nse_equities_cached()
         if not df.empty and "SYMBOL" in df.columns:
             matched = df[df["SYMBOL"].str.strip().str.upper() == raw_symbol]
             if not matched.empty:
@@ -446,7 +556,7 @@ def get_ipo_stock_detail(
 
     # 2. Query price_history ordered by date ASC
     price_rows: list[Any] = []
-    if conn is not None:
+    if conn is not None and not force:
         try:
             price_rows = conn.execute("""
                 SELECT date, open, high, low, close, volume
@@ -457,11 +567,11 @@ def get_ipo_stock_detail(
         except Exception as e:
             logger.debug("[IPO-DETAIL] Failed querying price_history for %s: %s", clean_ticker, e)
 
-    # On-demand price hydration for newly listed equities if price_history is empty
-    if not price_rows:
+    # On-demand price hydration for newly listed equities if price_history is empty or force=True
+    if not price_rows or force:
         try:
             from earnings_engine.data.prices import fetch_prices
-            logger.info("[IPO-DETAIL] On-demand hydrating prices for debut ticker %s", clean_ticker)
+            logger.info("[IPO-DETAIL] On-demand hydrating prices for debut ticker %s (force=%s)", clean_ticker, force)
             df_fetched = fetch_prices(clean_ticker, settings, force=True)
             if df_fetched is not None and not df_fetched.empty:
                 if conn is not None:
@@ -547,17 +657,8 @@ def get_ipo_stock_detail(
         if cmp is not None and ath_price is not None and ath_price > 0:
             ath_distance_pct = round(((cmp - ath_price) / ath_price) * 100.0, 2)
 
-        if len(price_rows) >= 6:
-            idx_7 = min(7, len(price_rows) - 1)
-            p_7d = price_rows[-1 - idx_7][4]
-            if p_7d is not None and float(p_7d) > 0 and cmp is not None:
-                return_7d_pct = round(((cmp - float(p_7d)) / float(p_7d)) * 100.0, 2)
-
-        if len(price_rows) >= 21:
-            idx_30 = min(30, len(price_rows) - 1)
-            p_30d = price_rows[-1 - idx_30][4]
-            if p_30d is not None and float(p_30d) > 0 and cmp is not None:
-                return_30d_pct = round(((cmp - float(p_30d)) / float(p_30d)) * 100.0, 2)
+        return_7d_pct = compute_calendar_return(price_rows, cmp, 7)
+        return_30d_pct = compute_calendar_return(price_rows, cmp, 30)
 
         if len(price_rows) >= 20:
             closes_20 = [float(r[4]) for r in price_rows[-20:] if r[4] is not None]
@@ -572,11 +673,11 @@ def get_ipo_stock_detail(
             if avg_v20 > 0:
                 volume_ratio_5_20 = round(avg_v5 / avg_v20, 2)
 
-    # Fallback to live quote if cmp is still missing (e.g., intraday debut or single-day trading)
-    if cmp is None:
+    # Fallback or refresh live quote for up-to-the-minute CMP
+    if cmp is None or force:
         try:
             from earnings_engine.data.prices import fetch_live_quote
-            lq = fetch_live_quote(clean_ticker, settings)
+            lq = fetch_live_quote(clean_ticker, settings, force=force)
             if lq and lq.get("current_price"):
                 cmp = round(float(lq["current_price"]), 2)
                 if ath_price is None and lq.get("week_52_high"):
@@ -591,6 +692,11 @@ def get_ipo_stock_detail(
                     return_since_listing_pct = round(((cmp - listing_price) / listing_price) * 100.0, 2)
                 if ath_price and ath_price > 0 and cmp:
                     ath_distance_pct = round(((cmp - ath_price) / ath_price) * 100.0, 2)
+                if price_rows and cmp:
+                    return_7d_pct = compute_calendar_return(price_rows, cmp, 7)
+                    return_30d_pct = compute_calendar_return(price_rows, cmp, 30)
+        except Exception as e:
+            logger.debug("[IPO-DETAIL] Live quote fallback encountered: %s", e)
         except Exception as e:
             logger.debug("[IPO-DETAIL] Live quote fallback encountered: %s", e)
 

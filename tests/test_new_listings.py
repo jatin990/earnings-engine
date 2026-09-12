@@ -7,6 +7,7 @@ from earnings_engine.data.new_listings import (
     get_recent_nse_additions,
     get_ipo_stock_detail,
     compute_ticker_result_sequence,
+    compute_calendar_return,
     _EQUITY_LIST_CACHE,
 )
 from earnings_engine.api.stock_api import get_recent_market_additions, sync_recent_additions_to_watchlist
@@ -377,5 +378,109 @@ def test_get_ipo_stock_detail_stages(monkeypatch):
         conn.execute("DELETE FROM price_history WHERE ticker = ?", (ticker,))
         if hasattr(conn, "commit"):
             conn.commit()
+
+
+def test_compute_calendar_return_full_history():
+    """Verify 7D and 30D returns accurately identify historical baseline bars."""
+    now = datetime(2026, 9, 11)
+    # Generate 45 daily records (close prices rising from 100 to 145)
+    records = []
+    for i in range(45):
+        d_str = (now - timedelta(days=44 - i)).strftime("%Y-%m-%d")
+        records.append({"date": d_str, "close": 100.0 + i})
+
+    cmp = 145.0
+    # 7D target: 2026-09-04 (7 days before 2026-09-11).
+    # 44 - i = 7 -> i = 37 -> close = 100 + 37 = 137.0
+    # ((145 - 137) / 137) * 100 = 5.84%
+    ret_7d = compute_calendar_return(records, cmp, 7)
+    assert ret_7d == pytest.approx(5.84, rel=1e-2)
+
+    # 30D target: 2026-08-12 (30 days before 2026-09-11).
+    # 44 - i = 30 -> i = 14 -> close = 100 + 14 = 114.0
+    # ((145 - 114) / 114) * 100 = 27.19%
+    ret_30d = compute_calendar_return(records, cmp, 30)
+    assert ret_30d == pytest.approx(27.19, rel=1e-2)
+
+
+def test_compute_calendar_return_short_history_debut_fallback():
+    """Verify newly listed stock with 4 days history falls back to debut listing price for 7D and 30D."""
+    now = datetime(2026, 9, 11)
+    # Debut on 2026-09-08 (4 calendar days ago) at 500.0, current price 550.0
+    records = [
+        {"date": "2026-09-08", "close": 500.0},
+        {"date": "2026-09-09", "close": 510.0},
+        {"date": "2026-09-10", "close": 530.0},
+        {"date": "2026-09-11", "close": 550.0},
+    ]
+    cmp = 550.0
+
+    # 7D: history < 7 days -> falls back to debut close (500.0) -> +10.0%
+    ret_7d = compute_calendar_return(records, cmp, 7)
+    assert ret_7d == 10.0
+
+    # 30D: history < 30 days -> falls back to debut close (500.0) -> +10.0%
+    ret_30d = compute_calendar_return(records, cmp, 30)
+    assert ret_30d == 10.0
+
+
+def test_compute_calendar_return_tuple_format():
+    """Verify compute_calendar_return handles tuple format (date, open, high, low, close, volume)."""
+    records = [
+        ("2026-09-01", 100.0, 105.0, 95.0, 100.0, 1000),
+        ("2026-09-08", 110.0, 115.0, 108.0, 112.0, 1200),
+        ("2026-09-11", 120.0, 125.0, 118.0, 120.0, 1500),
+    ]
+    cmp = 120.0
+    # 7D target: 2026-09-04 -> closest before is 2026-09-01 (close 100.0) -> ((120-100)/100)*100 = 20.0%
+    ret_7d = compute_calendar_return(records, cmp, 7)
+    assert ret_7d == 20.0
+
+
+def test_compute_calendar_return_single_day_and_invalid():
+    """Verify single day history returns 0.0% vs debut, and invalid inputs return None."""
+    records_single = [{"date": "2026-09-11", "close": 250.0}]
+    assert compute_calendar_return(records_single, 250.0, 7) == 0.0
+    assert compute_calendar_return(records_single, 275.0, 30) == 10.0
+
+    assert compute_calendar_return([], 250.0, 7) is None
+    assert compute_calendar_return(records_single, None, 7) is None
+    assert compute_calendar_return(records_single, -10.0, 7) is None
+
+
+def test_get_recent_nse_additions_force_refresh(monkeypatch):
+    """Verify force=True flushes cache and passes through to new additions fetch."""
+    now = datetime.now()
+    mock_df = pd.DataFrame([
+        {
+            "SYMBOL": "TEST_FORCE",
+            "NAME OF COMPANY": "Test Force Company Ltd",
+            "SERIES": "EQ",
+            "DATE OF LISTING": (now - timedelta(days=2)).strftime("%d-%b-%Y"),
+            "LISTING_DATE": now - timedelta(days=2),
+            "FACE VALUE": 10,
+        }
+    ])
+
+    call_count = {"count": 0}
+
+    def mock_fetch(force=False, *args, **kwargs):
+        call_count["count"] += 1
+        return mock_df.copy()
+
+    monkeypatch.setattr("earnings_engine.data.new_listings.fetch_all_nse_equities_cached", mock_fetch)
+    monkeypatch.setattr("earnings_engine.data.prices.fetch_batch_live_quotes", lambda *args, **kwargs: {})
+
+    res1 = get_recent_nse_additions(days=10, limit=5, force=True, settings=Settings())
+    assert len(res1) == 1
+    assert res1[0]["ticker"] == "TEST_FORCE.NS"
+    assert call_count["count"] == 1
+
+
+def test_api_recent_market_additions_force_parameter(monkeypatch):
+    """Verify API endpoint wrapper accepts and forwards force parameter."""
+    res = get_recent_market_additions(days=90, limit=5, force=True, settings=Settings())
+    assert res["success"] is True
+    assert "items" in res
 
 

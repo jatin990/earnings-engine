@@ -65,8 +65,10 @@ Object.assign(app, {
                     for (let i = 0; i < cleanTickers.length; i += chunkSize) {
                         const chunk = cleanTickers.slice(i, i + chunkSize);
                         if (triggerBtn) {
-                            const textEl = triggerBtn.querySelector('#topRefreshPricesText') || triggerBtn;
-                            textEl.textContent = `Refreshing (${processed}/${cleanTickers.length})...`;
+                            const textEl = triggerBtn.querySelector('#topRefreshPricesText');
+                            if (textEl) {
+                                textEl.textContent = `Refreshing (${processed}/${cleanTickers.length})...`;
+                            }
                         }
 
                         const res = await fetch(API_BASE + '/api/v1/ticker/recalculate-batch', {
@@ -110,7 +112,15 @@ Object.assign(app, {
                 } finally {
                     if (triggerBtn) {
                         triggerBtn.disabled = false;
-                        triggerBtn.innerHTML = origTriggerHtml;
+                        triggerBtn.style.animation = '';
+                        const iconEl = triggerBtn.querySelector('#topRefreshPricesIcon') || triggerBtn.querySelector('.refresh-icon');
+                        if (iconEl) iconEl.style.animation = '';
+                        const textEl = triggerBtn.querySelector('#topRefreshPricesText');
+                        if (textEl) {
+                            textEl.textContent = 'Refresh Prices';
+                        } else if (origTriggerHtml) {
+                            triggerBtn.innerHTML = origTriggerHtml;
+                        }
                     }
                     if (buttonMap) {
                         buttonMap.forEach(b => {

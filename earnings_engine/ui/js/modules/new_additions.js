@@ -36,11 +36,16 @@
 
         /**
          * Fetch recent listings from the backend API.
+         * @param {boolean} force - Force refresh and invalidate cache
          */
-        async loadRecentAdditions() {
+        async loadRecentAdditions(force = false) {
             const daysSelect = document.getElementById('newAdditionsDaysSelect');
             const days = daysSelect ? daysSelect.value : '180';
             const tbody = document.getElementById('newAdditionsTableBody');
+
+            if (force) {
+                this._ipoDetailCache.clear();
+            }
 
             // Restore split layout preference
             this.restoreNewAdditionsSplitLayout();
@@ -49,14 +54,15 @@
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="8" style="padding:2.5rem;text-align:center;color:#60a5fa;">
-                            <span class="spinner" style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</span> Fetching official NSE newly listed equities...
+                            <span class="spinner" style="display:inline-block;animation:spin 1s linear infinite;margin-right:0.4rem;">⏳</span> ${force ? 'Refreshing official NSE additions & quotes...' : 'Fetching official NSE newly listed equities...'}
                         </td>
                     </tr>
                 `;
             }
 
             try {
-                const res = await fetch(API_BASE + `/api/v1/market/recent-additions?days=${encodeURIComponent(days)}&limit=200`);
+                const forceParam = force ? '&force=true' : '';
+                const res = await fetch(API_BASE + `/api/v1/market/recent-additions?days=${encodeURIComponent(days)}&limit=200${forceParam}`);
                 if (res.ok) {
                     const data = await res.json();
                     this._recentAdditionsData = data.items || [];
@@ -203,13 +209,14 @@
 
                 return `
                     <tr id="row-new-addition-${it.ticker.replace(/[^a-zA-Z0-9]/g, '')}"
+                        data-ticker="${it.ticker}"
                         onclick="app.inspectNewAdditionStock('${it.ticker}')"
                         style="border-bottom:1px solid ${rowBorder};background:${rowBg};cursor:pointer;transition:background 0.15s;"
                         onmouseover="if(app._selectedTicker !== '${it.ticker}') this.style.background='rgba(255,255,255,0.03)'"
                         onmouseout="if(app._selectedTicker !== '${it.ticker}') this.style.background='${rowBg}'">
                         <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-weight:700;white-space:nowrap;">
                             <div style="display:flex;flex-direction:column;">
-                                <span style="color:#38bdf8;font-size:0.76rem;">${it.ticker.split('.')[0]}</span>
+                                <span class="stock-ticker-main" style="color:#38bdf8;font-size:0.76rem;">${it.ticker.split('.')[0]}</span>
                                 <span style="color:#64748b;font-size:0.62rem;font-weight:450;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${it.company_name}">${it.company_name}</span>
                             </div>
                         </td>
@@ -218,12 +225,12 @@
                             <div style="color:#cbd5e1;font-size:0.68rem;">${it.listing_date}</div>
                             <div style="color:#64748b;font-size:0.6rem;">${it.days_on_market}d ago</div>
                         </td>
-                        <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);white-space:nowrap;">
+                        <td class="cell-current-price" style="padding:0.55rem 0.5rem;font-family:var(--font-mono);white-space:nowrap;">
                             <span style="color:#ffffff;font-weight:700;">${cmpStr}</span>
                             ${debutHtml}
                         </td>
                         <td style="padding:0.55rem 0.5rem;font-family:var(--font-mono);font-size:0.68rem;white-space:nowrap;">
-                            ${ret7dStr} <span style="color:#475569;">/</span> ${ret30dStr}
+                            <span class="cell-seven-day-return">${ret7dStr}</span> <span style="color:#475569;">/</span> <span class="cell-thirty-day-return">${ret30dStr}</span>
                         </td>
                         <td style="padding:0.55rem 0.5rem;white-space:nowrap;">
                             ${athDistHtml}
@@ -250,8 +257,9 @@
          * Inspect a newly listed stock, pulling deep IPO technical, earnings lifecycle, and institutional backing.
          * @param {string} ticker
          * @param {boolean} autoScroll
+         * @param {boolean} force
          */
-        async inspectNewAdditionStock(ticker, autoScroll = false) {
+        async inspectNewAdditionStock(ticker, autoScroll = false, force = false) {
             if (!ticker) return;
 
             // Ensure .NS suffix for NSE equities if no exchange suffix present
@@ -306,15 +314,18 @@
                 selLinkEl.href = `/stock/${encodeURIComponent(cleanTicker)}`;
             }
 
-            // Check cache
-            if (this._ipoDetailCache.has(cleanTicker)) {
+            // Check cache unless force refresh requested
+            if (force) {
+                this._ipoDetailCache.delete(cleanTicker);
+            } else if (this._ipoDetailCache.has(cleanTicker)) {
                 this.renderIpoDetail(this._ipoDetailCache.get(cleanTicker));
                 return;
             }
 
             // Fetch live IPO detail from API
             try {
-                const res = await fetch(API_BASE + `/api/v1/market/ipo-detail/${encodeURIComponent(cleanTicker)}`);
+                const forceQuery = force ? '?force=true' : '';
+                const res = await fetch(API_BASE + `/api/v1/market/ipo-detail/${encodeURIComponent(cleanTicker)}${forceQuery}`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.success) {
