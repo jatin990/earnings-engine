@@ -1192,14 +1192,29 @@
                 const s7d = s.change_7d ?? 0;
                 const s30d = s.change_30d ?? 0;
 
-                const gainerHtml = s.top_gainer ? `
-                    <span style="font-size:0.60rem;padding:0.1rem 0.3rem;border-radius:3px;background:rgba(16,185,129,0.12);color:#34d399;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48%;">
-                        ▲ ${s.top_gainer}
-                    </span>` : '';
-                const loserHtml = s.top_loser ? `
-                    <span style="font-size:0.60rem;padding:0.1rem 0.3rem;border-radius:3px;background:rgba(239,68,68,0.12);color:#f87171;font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48%;">
-                        ▼ ${s.top_loser}
-                    </span>` : '';
+                const formatConstituentChip = (item, isGainer) => {
+                    if (!item) return '';
+                    if (typeof item === 'string') {
+                        const icon = isGainer ? '▲' : '▼';
+                        return `
+                            <span style="font-size:0.60rem;padding:0.1rem 0.35rem;border-radius:3px;background:${isGainer ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)'};color:${isGainer ? '#34d399' : '#f87171'};font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48%;" title="${item}">
+                                ${icon} ${item}
+                            </span>`;
+                    }
+                    if (typeof item === 'object' && item.ticker) {
+                        const icon = isGainer ? '▲' : '▼';
+                        const ticker = item.ticker.replace(/\.NS$/i, '');
+                        const pctStr = item.change_pct !== undefined && item.change_pct !== null ? ` ${item.change_pct >= 0 ? '+' : ''}${item.change_pct}%` : '';
+                        return `
+                            <span style="font-size:0.60rem;padding:0.1rem 0.35rem;border-radius:3px;background:${isGainer ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)'};color:${isGainer ? '#34d399' : '#f87171'};font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48%;" title="${ticker}${pctStr}">
+                                ${icon} ${ticker}${pctStr}
+                            </span>`;
+                    }
+                    return '';
+                };
+
+                const gainerHtml = formatConstituentChip(s.top_gainer, true);
+                const loserHtml = formatConstituentChip(s.top_loser, false);
 
                 return `
                     <div style="background:${bg};border:1px solid ${border};border-radius:7px;padding:0.65rem 0.75rem;display:flex;flex-direction:column;gap:0.35rem;transition:all 0.2s ease;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
