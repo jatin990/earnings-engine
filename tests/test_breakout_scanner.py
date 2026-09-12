@@ -351,4 +351,26 @@ class TestBreakoutLateDetection:
         assert item["is_late"] is True
         assert item["entry_delay_pct"] == 5.0
 
+    def test_late_detection_with_intraday_high_spike(self):
+        import pandas as pd
+        from earnings_engine.data.breakout_scanner import score_breakout
+
+        dates = pd.date_range("2026-01-01", periods=65, freq="B")
+        prices = [99.0] * 64 + [100.1]
+        highs = [100.0] * 64 + [103.0]
+        lows = [98.0] * 64 + [99.0]
+        opens = [99.0] * 65
+        volumes = [1_000_000] * 65
+
+        df = pd.DataFrame(
+            {"open": opens, "high": highs, "low": lows, "close": prices, "volume": volumes},
+            index=dates,
+        )
+
+        res = score_breakout("TEST.NS", df, settings=self.settings)
+        assert res is not None
+        assert res["ideal_entry_price"] == 100.0
+        assert res["is_late"] is True
+        assert res["entry_delay_pct"] == 3.0
+
 

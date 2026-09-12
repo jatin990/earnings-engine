@@ -3238,8 +3238,9 @@ def score_breakout(
     atr_pct = float(daily_range.tail(14).mean()) * 100 if len(closes) >= 14 else 2.0
 
     ideal_entry_price = notes.get("ideal_entry_price") or breakout_trigger
-    is_late = bool(notes.get("is_late") or (ideal_entry_price and signal_price > ideal_entry_price * 1.002))
-    entry_delay_pct = notes.get("entry_delay_pct") if notes.get("entry_delay_pct") is not None else (round(((signal_price - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0)
+    daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price
+    is_late = bool(notes.get("is_late") if notes.get("is_late") is not None else (ideal_entry_price and (signal_price > ideal_entry_price * 1.002 or daily_high > ideal_entry_price * 1.002)))
+    entry_delay_pct = notes.get("entry_delay_pct") if notes.get("entry_delay_pct") is not None else (round(((daily_high - ideal_entry_price) / ideal_entry_price) * 100, 1) if is_late else 0.0)
 
     return {
         "ticker": ticker,
