@@ -104,10 +104,83 @@ def _validate_safe_webhook_url(url_str: str | None) -> str | None:
         raise ValueError(f"Invalid webhook URL: {e}") from e
 
 
-class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    """HTTP redirect handler that prevents SSRF via automatic redirect following."""
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+def _send_safe_webhook(url: str, payload_data: dict[str, Any], timeout: float = 5.0) -> int:
+    """Send webhook payload directly to pre-validated IP to eliminate DNS-rebinding and SSRF risks."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("Only http and https webhook URLs are supported")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("Missing hostname in webhook URL")
+    if hostname.lower() in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "metadata.google.internal"):
+        raise ValueError("Localhost and internal metadata endpoints are prohibited")
+
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+
+    # Resolve IP addresses and verify safety
+    try:
+        addr_info = socket.getaddrinfo(hostname, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+    except socket.gaierror as ge:
+        raise ValueError(f"Could not resolve host '{hostname}': {ge}") from ge
+
+    if not addr_info:
+        raise ValueError(f"No address found for host '{hostname}'")
+
+    selected_ip = None
+    family = socket.AF_INET
+    for family_type, _, _, _, sockaddr in addr_info:
+        ip_str = sockaddr[0]
+        ip_obj = ipaddress.ip_address(ip_str)
+        if not _is_safe_ip(ip_obj):
+            raise ValueError(f"Webhook target IP '{ip_str}' belongs to private/restricted range")
+        if selected_ip is None:
+            selected_ip = ip_str
+            family = family_type
+
+    if not selected_ip:
+        raise ValueError("No valid public IP found for webhook target")
+
+    # Connect directly to selected validated IP using http.client
+    req_body = json.dumps(payload_data).encode("utf-8")
+    path_and_query = parsed.path or "/"
+    if parsed.query:
+        path_and_query += f"?{parsed.query}"
+
+    headers = {
+        "Host": hostname if (parsed.port is None or parsed.port in (80, 443)) else f"{hostname}:{port}",
+        "Content-Type": "application/json",
+        "User-Agent": "Nexus-Alerts/1.0",
+        "Content-Length": str(len(req_body)),
+        "Connection": "close",
+    }
+
+    import http.client
+    import ssl
+
+    if parsed.scheme == "https":
+        ssl_ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection(
+            selected_ip,
+            port=port,
+            timeout=timeout,
+            context=ssl_ctx,
+            server_hostname=hostname,  # SNI and TLS cert verification
+        )
+    else:
+        conn = http.client.HTTPConnection(
+            selected_ip,
+            port=port,
+            timeout=timeout,
+        )
+
+    try:
+        conn.request("POST", path_and_query, body=req_body, headers=headers)
+        resp = conn.getresponse()
+        status_code = resp.status
+        resp.read()  # drain response
+        return status_code
+    finally:
+        conn.close()
 
 
 def _seed_default_rules_if_empty(conn: Any) -> None:
@@ -310,21 +383,13 @@ async def test_dispatch_alert(payload: TestDispatchPayload):
         except ValueError as ve:
             raise HTTPException(status_code=400, detail=str(ve))
         try:
-            req_data = json.dumps({
+            webhook_payload = {
                 "event": "nexus_alert_test",
                 "title": f"⚡ Nexus Test Alert: {payload.sample_ticker}",
                 "message": f"Rule triggered for {payload.sample_ticker} ({payload.sample_strategy}) with Score {payload.sample_score} and Volume Surge {payload.sample_surge:.1f}x",
                 "data": details,
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                payload.webhook_url,
-                data=req_data,
-                headers={"Content-Type": "application/json", "User-Agent": "Nexus-Alerts/1.0"},
-                method="POST",
-            )
-            opener = urllib.request.build_opener(_NoRedirectHandler)
-            with opener.open(req, timeout=5) as resp:
-                resp_code = resp.getcode()
+            }
+            resp_code = _send_safe_webhook(payload.webhook_url, webhook_payload, timeout=5.0)
             return {"status": "ok", "channel": "webhook", "http_status": resp_code, "message": f"Webhook test delivered to {payload.webhook_url}"}
         except Exception as e:
             logger.warning("Webhook test dispatch failed: %s", e)
