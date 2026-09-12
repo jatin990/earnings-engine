@@ -299,6 +299,28 @@ python playground/03_kronos_playground.py
 python playground/04_api_playground.py
 ```
 
+## Error Ledger & Diagnostics
+
+```bash
+# Inspect open unresolved exceptions
+python scripts/error_ledger.py open
+
+# Scan active real-time error stream and flush
+python scripts/error_ledger.py scan
+
+# View summary counts
+python scripts/error_ledger.py summary
+
+# Run pre/post-task health check gate
+python scripts/error_ledger.py check
+
+# Resolve an issue
+python scripts/error_ledger.py resolve <error_id> "<resolution description>"
+
+# Full-system data audit and live-sync runner
+python scripts/verify_and_sync_all_data.py
+```
+
 ## Quick Reference — Market Options
 
 | Market | Description |
