@@ -17,6 +17,7 @@
         app._breakoutAsofDate = null;
         app._breakoutFilterBreakingOut = false;
         app._breakoutPoolFilter = 'ALL';
+        app._breakoutFilterLate = false;
         app._selectedBreakoutTicker = null;
         app._breakoutSelectedIndex = 0;
         app._breakoutSplitActive = true;
@@ -96,11 +97,19 @@
 
         app.toggleBreakingOutFilter = function() {
             app._breakoutFilterBreakingOut = !app._breakoutFilterBreakingOut;
+            if (app._breakoutFilterBreakingOut) app._breakoutFilterLate = false;
+            app.applyBreakoutFilterAndRender();
+        };
+
+        app.toggleBreakoutLateFilter = function() {
+            app._breakoutFilterLate = !app._breakoutFilterLate;
+            if (app._breakoutFilterLate) app._breakoutFilterBreakingOut = false;
             app.applyBreakoutFilterAndRender();
         };
 
         app.clearBreakoutFilter = function() {
             app._breakoutFilterBreakingOut = false;
+            app._breakoutFilterLate = false;
             app._breakoutPoolFilter = 'ALL';
             const tierSel = document.getElementById('breakoutTierSelect');
             if (tierSel) tierSel.value = 'ALL';
@@ -124,6 +133,8 @@
         app.applyBreakoutFilterAndRender = function() {
             const fireCard = document.getElementById('breakoutCardOnFire');
             const totalCard = document.getElementById('breakoutCardTotal');
+            const lateCard = document.getElementById('breakoutCardLate');
+            const lateIndicator = document.getElementById('breakoutLateFilterIndicator');
             const activeNotice = document.getElementById('breakoutFilterNotice');
             const filterIndicator = document.getElementById('breakoutFilterIndicator');
             const breakingSub = document.getElementById('breakoutStatBreakingSub');
@@ -139,6 +150,19 @@
 
             if (app._breakoutRealTrackedOnly) {
                 list = list.filter(item => Boolean(item.is_real_tracked));
+            }
+
+            if (lateCard) {
+                if (app._breakoutFilterLate) {
+                    lateCard.style.border = '1px solid rgba(245, 158, 11, 0.5)';
+                    lateCard.style.background = '#18181b';
+                } else {
+                    lateCard.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+                    lateCard.style.background = '#09090b';
+                }
+            }
+            if (lateIndicator) {
+                lateIndicator.style.display = app._breakoutFilterLate ? 'inline-block' : 'none';
             }
 
             if (app._breakoutFilterBreakingOut) {
@@ -160,6 +184,18 @@
                 if (activeNotice) {
                     activeNotice.style.display = 'inline-flex';
                     activeNotice.innerHTML = `<span>⚡</span> Filtering: <strong>Breaking Out Only (${list.length} setup${list.length === 1 ? '' : 's'})</strong> <button type="button" onclick="app.clearBreakoutFilter(); event.stopPropagation();" style="margin-left:0.45rem;background:#18181b;border:1px solid rgba(255,255,255,0.25);color:#f4f4f5;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕ Show All (${app._breakoutData.length})</button>`;
+                }
+            } else if (app._breakoutFilterLate) {
+                list = list.filter(item => Boolean(item.is_late || (item.entry_delay_pct != null && item.entry_delay_pct > 0.2)));
+                if (totalCard) {
+                    totalCard.style.opacity = '0.75';
+                }
+                if (filterIndicator) {
+                    filterIndicator.style.display = 'none';
+                }
+                if (activeNotice) {
+                    activeNotice.style.display = 'inline-flex';
+                    activeNotice.innerHTML = `<span>⚡</span> Filtering: <strong>Late Entries Only (${list.length} setup${list.length === 1 ? '' : 's'})</strong> <button type="button" onclick="app.clearBreakoutFilter(); event.stopPropagation();" style="margin-left:0.45rem;background:#18181b;border:1px solid rgba(255,255,255,0.25);color:#f4f4f5;cursor:pointer;font-weight:700;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.65rem;">✕ Show All (${app._breakoutData.length})</button>`;
                 }
             } else if (app._breakoutRealTrackedOnly) {
                 if (activeNotice) {
@@ -638,6 +674,7 @@
                 app._breakoutData = data.candidates || [];
                 const status = data.scan_status || {};
                 const summary = data.backtest_summary || {};
+                const poolStats = data.pool_stats || {};
                 const total = app._breakoutData.length;
                 const topCandidate = total > 0 ? app._breakoutData[0] : null;
                 const avgScore = total > 0
@@ -645,9 +682,23 @@
                     : '\u2014';
 
                 const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-                
+
                 // Update KPI Cards
                 setEl('breakoutStatTotal', total);
+
+                // Update Hot/Warm Pool Stats & Universe Monitored
+                const hotCount = poolStats.hot_count != null ? poolStats.hot_count : (app._breakoutData.filter(c => (c.tier || 'HOT').toUpperCase() === 'HOT').length);
+                const warmCount = poolStats.warm_count != null ? poolStats.warm_count : (app._breakoutData.filter(c => (c.tier || '').toUpperCase() === 'WARM').length);
+                const totalPool = poolStats.total_pool != null ? poolStats.total_pool : (hotCount + warmCount);
+                setEl('breakoutStatHotCount', hotCount.toLocaleString());
+                setEl('breakoutStatWarmCount', warmCount.toLocaleString());
+                setEl('breakoutStatScanned', poolStats.total_pool ? poolStats.total_pool.toLocaleString() : (status.total_monitored || total));
+
+                // Update Late Entry Stats
+                const lateCount = poolStats.late_entries_count != null ? poolStats.late_entries_count : (app._breakoutData.filter(c => c.is_late || (c.entry_delay_pct != null && c.entry_delay_pct > 0.2)).length);
+                const lateDelay = poolStats.avg_entry_delay_pct != null ? poolStats.avg_entry_delay_pct : 0.0;
+                setEl('breakoutStatLateCount', lateCount.toLocaleString());
+                setEl('breakoutStatLateDelay', `(+${Number(lateDelay).toFixed(1)}% avg)`);
 
                 // Calculate breaking out count across all candidates
                 const isItemBreaking = (item) => {

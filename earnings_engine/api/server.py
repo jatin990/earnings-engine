@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from earnings_engine.api.cancellation import cancellation_manager
 from earnings_engine.api.dependencies import _resolve_session, _settings, _templates_dir
 from earnings_engine.api.routers import (
+    alerts,
     audit,
     auth,
     breakout,
@@ -33,6 +34,7 @@ from earnings_engine.api.routers import (
     playground,
     premarket,
     repeaters,
+    reports,
     scanner,
     stocks,
     swing,
@@ -499,6 +501,8 @@ app.include_router(tri_confluence.router)
 app.include_router(options.router)
 app.include_router(swing.router)
 app.include_router(trading_agents.router)
+app.include_router(alerts.router)
+app.include_router(reports.router)
 app.include_router(audit.router)
 app.include_router(playground.router)
 

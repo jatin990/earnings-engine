@@ -65,6 +65,9 @@ SYNC_TABLES = [
     "stock_rating_snapshots",
     "trading_agents_reports",
     "ticker_audit_log",
+    # Custom Alert Rules & Notifications
+    "alert_rules",
+    "alert_rule_logs",
     # Macro, Market Pulse & Liquidity
     "institutional_net_flows",
     "participant_oi_positioning",
@@ -163,6 +166,7 @@ WATERMARK_CANDIDATE_COLUMNS = [
     "started_at",
     "run_at",
     "predicted_at",
+    "triggered_at",
     "added_at",
     "attached_at",
     "last_login_at",

@@ -1034,6 +1034,130 @@ def get_breakout_audit_log_count(
     return total
 
 
+def get_breakout_audit_summary_stats(
+    strategy: str | None = None,
+    settings: Settings | None = None,
+) -> dict[str, int]:
+    """Return aggregated transition totals (Cold->Hot, Cold->Warm, Warm->Hot, Exits, Total)."""
+    settings = settings or Settings()
+    summary = {
+        "total_events": 0,
+        "cold_to_hot": 0,
+        "cold_to_warm": 0,
+        "warm_to_hot": 0,
+        "hot_to_cold": 0,
+        "warm_to_cold": 0,
+        "exits": 0,
+    }
+    try:
+        from earnings_engine.data.migrations import apply_migrations
+        apply_migrations(settings)
+        conn = get_db_connection(settings)
+        wheres: list[str] = [
+            "UPPER(ticker) NOT LIKE '%TEST%' AND UPPER(ticker) NOT LIKE '%MOCK%' AND UPPER(ticker) NOT LIKE '%DUMMY%'"
+        ]
+        params: list[Any] = []
+        if strategy and strategy.upper() not in ("ALL", "*"):
+            wheres.append("(UPPER(strategy) = ? OR UPPER(strategy) = ?)")
+            params.extend([strategy.upper(), strategy.replace("_", " ").upper()])
+
+        where_clause = f"WHERE {' AND '.join(wheres)}"
+        sql = f"""
+            SELECT
+                COUNT(*) as total_events,
+                SUM(CASE WHEN from_tier = 'COLD' AND to_tier = 'HOT' THEN 1 ELSE 0 END) as cold_to_hot,
+                SUM(CASE WHEN from_tier = 'COLD' AND to_tier = 'WARM' THEN 1 ELSE 0 END) as cold_to_warm,
+                SUM(CASE WHEN from_tier = 'WARM' AND to_tier = 'HOT' THEN 1 ELSE 0 END) as warm_to_hot,
+                SUM(CASE WHEN from_tier = 'HOT' AND to_tier = 'COLD' THEN 1 ELSE 0 END) as hot_to_cold,
+                SUM(CASE WHEN from_tier = 'WARM' AND to_tier = 'COLD' THEN 1 ELSE 0 END) as warm_to_cold,
+                SUM(CASE WHEN to_tier = 'COLD' THEN 1 ELSE 0 END) as exits
+            FROM breakout_audit_log
+            {where_clause}
+        """
+        row = conn.execute(sql, tuple(params)).fetchone()
+        if row:
+            summary["total_events"] = int(row[0] or 0)
+            summary["cold_to_hot"] = int(row[1] or 0)
+            summary["cold_to_warm"] = int(row[2] or 0)
+            summary["warm_to_hot"] = int(row[3] or 0)
+            summary["hot_to_cold"] = int(row[4] or 0)
+            summary["warm_to_cold"] = int(row[5] or 0)
+            summary["exits"] = int(row[6] or 0)
+    except Exception as e:
+        logger.warning("[BREAKOUT-AUDIT] Failed querying audit summary stats: %s", e)
+    return summary
+
+
+def get_breakout_pool_stats(settings: Settings | None = None) -> dict[str, Any]:
+    """Retrieve global pool counts (Hot vs Warm) and late entry counts from active radar pool."""
+    settings = settings or Settings()
+    stats = {
+        "hot_count": 0,
+        "warm_count": 0,
+        "total_count": 0,
+        "late_count": 0,
+        "avg_late_delay_pct": 0.0,
+        "strategies": {},
+    }
+    try:
+        from earnings_engine.data.migrations import apply_migrations
+        apply_migrations(settings)
+        conn = get_db_connection(settings)
+
+        # 1. Pool counts by tier
+        cur = conn.execute("""
+            SELECT tier, COUNT(DISTINCT ticker)
+            FROM breakout_radar
+            WHERE UPPER(ticker) NOT LIKE '%TEST%' AND UPPER(ticker) NOT LIKE '%MOCK%' AND UPPER(ticker) NOT LIKE '%DUMMY%'
+            GROUP BY tier
+        """)
+        for r in cur.fetchall():
+            t = str(r[0] or "").upper()
+            c = int(r[1] or 0)
+            if t == "HOT":
+                stats["hot_count"] = c
+            elif t == "WARM":
+                stats["warm_count"] = c
+
+        stats["total_count"] = stats["hot_count"] + stats["warm_count"]
+
+        # 2. Late entries
+        cur2 = conn.execute("""
+            SELECT
+                SUM(CASE WHEN is_late = 1 THEN 1 ELSE 0 END) as late_count,
+                AVG(CASE WHEN is_late = 1 THEN entry_delay_pct ELSE NULL END) as avg_delay
+            FROM breakout_radar
+            WHERE UPPER(ticker) NOT LIKE '%TEST%' AND UPPER(ticker) NOT LIKE '%MOCK%' AND UPPER(ticker) NOT LIKE '%DUMMY%'
+        """)
+        row2 = cur2.fetchone()
+        if row2:
+            stats["late_count"] = int(row2[0] or 0)
+            stats["avg_late_delay_pct"] = round(float(row2[1] or 0.0), 1)
+
+        # 3. Counts by strategy
+        cur3 = conn.execute("""
+            SELECT strategy, tier, COUNT(*)
+            FROM breakout_radar
+            WHERE UPPER(ticker) NOT LIKE '%TEST%' AND UPPER(ticker) NOT LIKE '%MOCK%' AND UPPER(ticker) NOT LIKE '%DUMMY%'
+            GROUP BY strategy, tier
+        """)
+        for r in cur3.fetchall():
+            s = str(r[0] or "CLASSIC_TECHNICAL").upper()
+            t = str(r[1] or "WARM").upper()
+            c = int(r[2] or 0)
+            if s not in stats["strategies"]:
+                stats["strategies"][s] = {"hot": 0, "warm": 0, "total": 0}
+            if t == "HOT":
+                stats["strategies"][s]["hot"] += c
+            else:
+                stats["strategies"][s]["warm"] += c
+            stats["strategies"][s]["total"] += c
+
+    except Exception as e:
+        logger.warning("[BREAKOUT-POOL-STATS] Failed querying pool stats: %s", e)
+    return stats
+
+
 def prune_breakout_audit_log(days: int = 30, settings: Settings | None = None) -> int:
     """Prune breakout audit log entries older than N days (default 30d)."""
     settings = settings or Settings()

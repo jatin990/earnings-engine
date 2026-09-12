@@ -1761,6 +1761,50 @@ def _migration_037_breakout_late_detection_fields(conn: Any) -> None:
 
 
 
+def _migration_038_alert_rules_engine(conn: Any) -> None:
+    """Create alert_rules and alert_rule_logs tables for custom multi-channel notifications."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS alert_rules (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            strategy TEXT DEFAULT 'ALL',
+            min_score REAL DEFAULT 70.0,
+            min_volume_surge REAL DEFAULT 1.5,
+            tier TEXT DEFAULT 'ALL',
+            target_universe TEXT DEFAULT 'ALL',
+            max_entry_delay_pct REAL DEFAULT 3.0,
+            actions_json TEXT NOT NULL DEFAULT '["browser"]',
+            webhook_url TEXT,
+            email_recipients TEXT,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            last_triggered_at TEXT,
+            trigger_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS alert_rule_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rule_id TEXT NOT NULL,
+            ticker TEXT NOT NULL,
+            strategy TEXT,
+            score REAL,
+            volume_surge REAL,
+            channels_dispatched TEXT,
+            status TEXT NOT NULL,
+            details TEXT,
+            triggered_at TEXT NOT NULL,
+            FOREIGN KEY(rule_id) REFERENCES alert_rules(id) ON DELETE CASCADE
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_alert_rules_active ON alert_rules(is_active)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_alert_rule_logs_rule ON alert_rule_logs(rule_id, triggered_at)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1800,6 +1844,7 @@ MIGRATIONS: list[Migration] = [
     Migration(35, "035_purge_non_fno_fo_call_wall", _migration_035_purge_non_fno_fo_call_wall),
     Migration(36, "036_sync_breakout_radar_signal_columns", _migration_036_sync_breakout_radar_signal_columns),
     Migration(37, "037_breakout_late_detection_fields", _migration_037_breakout_late_detection_fields),
+    Migration(38, "038_alert_rules_engine", _migration_038_alert_rules_engine),
 ]
 
 

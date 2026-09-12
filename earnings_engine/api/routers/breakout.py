@@ -298,6 +298,9 @@ async def get_breakout_radar_endpoint(
         # Limit
         candidates = candidates[:limit]
 
+        # Retrieve global pool counts (Hot vs Warm) and late metrics from database
+        pool_stats = await asyncio.to_thread(breakout_scanner_mod.get_breakout_pool_stats, settings=_settings)
+
         return {
             "success": True,
             "count": len(candidates),
@@ -307,6 +310,7 @@ async def get_breakout_radar_endpoint(
             "setups": candidates,
             "universe": universe or "ALL",
             "scan_status": status,
+            "pool_stats": pool_stats,
             "backtest_summary": backtest_summary,
         }
     except Exception as e:
@@ -407,7 +411,18 @@ async def get_breakout_audit_log_endpoint(
             strategy=strategy,
             settings=_settings,
         )
-        return {"success": True, "count": len(logs), "total_count": total_count, "logs": logs}
+        summary_stats = await asyncio.to_thread(
+            breakout_scanner_mod.get_breakout_audit_summary_stats,
+            strategy=strategy,
+            settings=_settings,
+        )
+        return {
+            "success": True,
+            "count": len(logs),
+            "total_count": total_count,
+            "summary_stats": summary_stats,
+            "logs": logs,
+        }
     except Exception as e:
         logger.exception("Error in get_breakout_audit_log: %s", e)
         raise HTTPException(status_code=500, detail=f"Error fetching breakout audit log: {str(e)}")

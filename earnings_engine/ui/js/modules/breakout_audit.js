@@ -40,6 +40,17 @@ Object.assign(app, {
                         const totalCount = (data.total_count !== undefined && data.total_count !== null) ? data.total_count : logs.length;
                         if (countBadge) countBadge.textContent = `(${totalCount.toLocaleString()} events)`;
 
+                        // Hydrate Transition Macro Summary Chips if summary_stats present
+                        const summary = data.summary_stats || {};
+                        const setSummaryEl = (id, val) => {
+                            const el = document.getElementById(id);
+                            if (el) el.textContent = Number(val || 0).toLocaleString();
+                        };
+                        setSummaryEl('breakoutAuditColdHot', summary.cold_to_hot);
+                        setSummaryEl('breakoutAuditColdWarm', summary.cold_to_warm);
+                        setSummaryEl('breakoutAuditWarmHot', summary.warm_to_hot);
+                        setSummaryEl('breakoutAuditExits', summary.exits);
+
                         if (!logs.length) {
                             listEl.innerHTML = '<div style="text-align:center;color:#64748b;font-size:0.72rem;padding:0.75rem;">No recent tier movement events recorded yet. Transitions will appear automatically during scan cycles.</div>';
                             return;
