@@ -13,9 +13,9 @@ app.updateSidebarBadges = async function() {
                 if (res.ok) {
                     const data = await res.json();
 
-                    // 1. High-Impact Catalysts (>70% impact)
+                    // 1. High-Impact Catalysts & Pre-Market (>70% impact)
                     const catBadge = document.getElementById('sidebarCatalystCountBadge');
-                    const catCount = data.high_impact_news_70 || data.catalysts_count || 0;
+                    const catCount = (data.high_impact_news_70 || data.catalysts_count || 0) + (data.premarket_high_impact_70 || data.premarket_count || 0);
                     if (catBadge) {
                         if (catCount > 0) {
                             catBadge.textContent = catCount > 99 ? '99+' : String(catCount);
@@ -25,7 +25,7 @@ app.updateSidebarBadges = async function() {
                         }
                     }
 
-                    // 2. Pre-Market Setups (>70% impact news & filings)
+                    // 2. Pre-Market Setups (>70% impact news & filings) - legacy / sub-badge
                     const pmBadge = document.getElementById('sidebarPremarketCountBadge');
                     const pmCount = data.premarket_high_impact_70 || data.premarket_count || 0;
                     if (pmBadge) {

@@ -9,8 +9,89 @@
 Object.assign(app, {
             catalystsData: [],
             catalystsActiveView: 'feed',
+            catalystsSubtab: 'feed',
             outcomesData: [],
             outcomesMetrics: {},
+
+            switchCatalystsSubtab(subtab) {
+                subtab = subtab || 'feed';
+                this.catalystsSubtab = subtab;
+                try {
+                    localStorage.setItem('subtab_catalysts', subtab);
+                    if (!app._subtabState) app._subtabState = {};
+                    app._subtabState['catalysts'] = subtab;
+                } catch (e) {}
+
+                // Update sidebar sub-item active states
+                const subItemMap = {
+                    'feed': 'sidebarSubCatFeed',
+                    'impact70': 'sidebarSubCatImpact',
+                    'outcomes': 'sidebarSubCatOutcomes',
+                    'premarket': 'sidebarSubCatPremarket',
+                    'premarket-outcomes': 'sidebarSubCatPremarketOutcomes'
+                };
+                Object.keys(subItemMap).forEach(key => {
+                    const el = document.getElementById(subItemMap[key]);
+                    if (el) el.classList.toggle('active', key === subtab);
+                });
+
+                const tabCat = document.getElementById('tab-catalysts');
+                const tabPm = document.getElementById('tab-premarket');
+
+                if (subtab === 'premarket' || subtab === 'premarket-outcomes') {
+                    // Show premarket tab container, hide catalysts container
+                    if (tabCat) tabCat.classList.remove('active');
+                    if (tabPm) tabPm.classList.add('active');
+
+                    const pmView = (subtab === 'premarket') ? 'active' : 'outcomes';
+                    if (typeof this.switchPremarketView === 'function') {
+                        this.switchPremarketView(pmView);
+                    }
+                    if (pmView === 'active' && typeof this.loadPremarketSetups === 'function') {
+                        this.loadPremarketSetups();
+                    } else if (pmView === 'outcomes' && typeof this.loadPremarketOutcomes === 'function') {
+                        this.loadPremarketOutcomes();
+                    }
+                } else {
+                    // Show catalysts tab container, hide premarket container
+                    if (tabPm) tabPm.classList.remove('active');
+                    if (tabCat) tabCat.classList.add('active');
+
+                    if (subtab === 'feed') {
+                        // Reset high impact 70 filter
+                        this.setCatalystsHighImpact70Filter(false);
+                        this.switchCatalystsView('feed');
+                        if (!this.catalystsData || !this.catalystsData.length) {
+                            this.loadCatalysts();
+                        }
+                    } else if (subtab === 'impact70') {
+                        // Activate high impact 70 filter
+                        this.switchCatalystsView('feed');
+                        this.setCatalystsHighImpact70Filter(true);
+                        if (!this.catalystsData || !this.catalystsData.length) {
+                            this.loadCatalysts();
+                        }
+                    } else if (subtab === 'outcomes') {
+                        this.switchCatalystsView('outcomes');
+                    }
+                }
+            },
+
+            setCatalystsHighImpact70Filter(enable) {
+                this._highImpact70Only = !!enable;
+                const impactSelect = document.getElementById('catImpactFilter');
+                if (impactSelect) {
+                    impactSelect.value = this._highImpact70Only ? 'HIGH' : 'ALL';
+                }
+                const btn = document.getElementById('catViewHighImpactBtn');
+                if (btn) {
+                    btn.style.background = this._highImpact70Only ? 'rgba(251, 191, 36, 0.2)' : 'transparent';
+                    btn.style.color = '#fbbf24';
+                    btn.style.borderColor = this._highImpact70Only ? 'rgba(251, 191, 36, 0.4)' : 'transparent';
+                    btn.style.fontWeight = this._highImpact70Only ? '700' : '600';
+                }
+                this.renderCatalysts();
+            },
 
             switchCatalystsView(view) {
                 this.catalystsActiveView = view;
@@ -46,28 +127,7 @@ Object.assign(app, {
             },
 
             filterCatalystsHighImpact70() {
-                const impactSelect = document.getElementById('catImpactFilter');
-                const btn = document.getElementById('catViewHighImpactBtn');
-                if (!this._highImpact70Only) {
-                    this._highImpact70Only = true;
-                    if (impactSelect) impactSelect.value = 'HIGH';
-                    if (btn) {
-                        btn.style.background = 'rgba(251, 191, 36, 0.2)';
-                        btn.style.color = '#fbbf24';
-                        btn.style.borderColor = 'rgba(251, 191, 36, 0.4)';
-                        btn.style.fontWeight = '700';
-                    }
-                } else {
-                    this._highImpact70Only = false;
-                    if (impactSelect) impactSelect.value = 'ALL';
-                    if (btn) {
-                        btn.style.background = 'transparent';
-                        btn.style.color = '#fbbf24';
-                        btn.style.borderColor = 'transparent';
-                        btn.style.fontWeight = '600';
-                    }
-                }
-                this.renderCatalysts();
+                this.setCatalystsHighImpact70Filter(!this._highImpact70Only);
             },
 
             async loadCatalysts(watchlist, days) {
@@ -289,6 +349,27 @@ Object.assign(app, {
                 this.renderNewsOutcomes();
             },
 
+            toggleNewsOutcomeGroup(cleanSym) {
+                const childRow = document.getElementById(`outcomeChildRow_${cleanSym}`);
+                const chevron = document.getElementById(`outcomeChevron_${cleanSym}`);
+                if (!childRow) return;
+
+                const isHidden = childRow.style.display === 'none' || !childRow.style.display;
+                if (isHidden) {
+                    childRow.style.display = 'table-row';
+                    if (chevron) {
+                        chevron.innerHTML = '&#9660;';
+                        chevron.style.color = '#38bdf8';
+                    }
+                } else {
+                    childRow.style.display = 'none';
+                    if (chevron) {
+                        chevron.innerHTML = '&#9654;';
+                        chevron.style.color = '#94a3b8';
+                    }
+                }
+            },
+
             renderNewsOutcomes() {
                 const tableBody = document.getElementById('outcomesTableBody');
                 const countBadge = document.getElementById('outcomesCountBadge');
@@ -330,7 +411,32 @@ Object.assign(app, {
                     return;
                 }
 
-                tableBody.innerHTML = filtered.map(o => {
+                // Group outcomes by ticker
+                const groupedMap = new Map();
+                filtered.forEach(item => {
+                    const sym = item.ticker || 'UNKNOWN';
+                    if (!groupedMap.has(sym)) {
+                        groupedMap.set(sym, {
+                            ticker: sym,
+                            stock_name: item.stock_name || '',
+                            outcomes: []
+                        });
+                    }
+                    const g = groupedMap.get(sym);
+                    if (item.stock_name && !g.stock_name) g.stock_name = item.stock_name;
+                    g.outcomes.push(item);
+                });
+
+                const groupedList = Array.from(groupedMap.values());
+
+                const fmtRet = (val) => {
+                    if (val == null || isNaN(val)) return '—';
+                    const sign = val > 0 ? '+' : '';
+                    const col = val > 0 ? '#34d399' : (val < 0 ? '#f87171' : '#94a3b8');
+                    return `<span style="color:${col};font-weight:600;font-family:var(--font-mono);">${sign}${Number(val).toFixed(2)}%</span>`;
+                };
+
+                const renderSingleRow = (o, isSub = false) => {
                     const isBull = o.direction === 'BULLISH';
                     const isMet = Boolean(o.predicted_met);
                     const isVerified = o.status === 'VERIFIED';
@@ -351,38 +457,34 @@ Object.assign(app, {
                         outcomeBadge = `<span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">⏳ ACTIVE</span>`;
                     }
 
-                    const fmtRet = (val) => {
-                        if (val == null || isNaN(val)) return '—';
-                        const sign = val > 0 ? '+' : '';
-                        const col = val > 0 ? '#34d399' : (val < 0 ? '#f87171' : '#94a3b8');
-                        return `<span style="color:${col};font-weight:600;font-family:var(--font-mono);">${sign}${Number(val).toFixed(2)}%</span>`;
-                    };
-
                     const entryPx = o.entry_price ? `₹${Number(o.entry_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : '—';
                     const maxGain = o.max_gain_pct != null ? `<span style="color:#38bdf8;font-weight:700;font-family:var(--font-mono);">+${Number(o.max_gain_pct).toFixed(2)}%</span>` : '—';
                     const maxDD = o.max_drawdown_pct != null ? `<span style="color:#f87171;font-weight:600;font-family:var(--font-mono);">${Number(o.max_drawdown_pct).toFixed(2)}%</span>` : '—';
-
                     const pubDate = o.published_at ? o.published_at.slice(0, 10) : '—';
 
+                    const rowBg = isSub ? 'background:rgba(15,23,42,0.6);' : '';
+                    const rowBorder = isSub ? 'border-bottom: 1px solid rgba(255,255,255,0.03);' : 'border-bottom: 1px solid rgba(255,255,255,0.05);';
+
                     return `
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.12s ease;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
-                            <td style="padding: 0.45rem 0.5rem; white-space: nowrap;">
+                        <tr style="${rowBg}${rowBorder}transition: background 0.12s ease;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='${isSub ? 'rgba(15,23,42,0.6)' : 'transparent'}'">
+                            <td style="padding: 0.4rem 0.5rem; white-space: nowrap; ${isSub ? 'padding-left:1.4rem;' : ''}">
+                                ${isSub ? `<span style="color:#64748b;font-family:var(--font-mono);font-size:0.65rem;margin-right:0.25rem;">↳</span>` : ''}
                                 <a href="/stock/${encodeURIComponent(o.ticker)}" target="_blank" style="font-weight:700;color:#60a5fa;text-decoration:none;font-family:var(--font-mono);" title="Open stock intelligence page">
                                     ${o.ticker} ↗
                                 </a>
                                 <div style="font-size:0.68rem;color:#71717a;">${o.stock_name || ''}</div>
                             </td>
-                            <td style="padding: 0.45rem 0.5rem; white-space: nowrap; color: #a1a1aa; font-family: var(--font-mono); font-size: 0.72rem;">
+                            <td style="padding: 0.4rem 0.5rem; white-space: nowrap; color: #a1a1aa; font-family: var(--font-mono); font-size: 0.72rem;">
                                 ${pubDate}
                             </td>
-                            <td style="padding: 0.45rem 0.5rem; max-width: 320px;">
+                            <td style="padding: 0.4rem 0.5rem; max-width: 320px;">
                                 <div style="font-weight: 600; color: #f8fafc; font-size: 0.78rem; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${(o.title || '').replace(/"/g, '&quot;')}">
                                     ${o.title}
                                 </div>
                                 <div style="display: flex; gap: 0.35rem; align-items: center; margin-top: 0.15rem;">
                                     <span style="font-size: 0.65rem; color: ${dirColor}; font-weight: 700;">${dirIcon}</span>
                                     <span style="font-size: 0.65rem; background: rgba(255,255,255,0.06); color: #94a3b8; padding: 0.05rem 0.3rem; border-radius: 3px;">${o.category}</span>
-                                    <span style="font-size: 0.65rem; color: #fbbf24;">⚡ ${o.impact_score}%</span>
+                                    <span style="font-size: 0.65rem; color: #fbbf24;">⚡ ${o.impact_score || 0}%</span>
                                 </div>
                             </td>
                             <td style="padding: 0.45rem 0.5rem; text-align: right; font-family: var(--font-mono); color: #e2e8f0; font-weight: 600; white-space: nowrap;">
@@ -405,6 +507,116 @@ Object.assign(app, {
                             </td>
                             <td style="padding: 0.45rem 0.5rem; text-align: center; white-space: nowrap;">
                                 ${outcomeBadge}
+                            </td>
+                        </tr>
+                    `;
+                };
+
+                tableBody.innerHTML = groupedList.map(g => {
+                    const cleanSym = (g.ticker || 'UNKNOWN').replace(/[^a-zA-Z0-9]/g, '_');
+                    const count = g.outcomes.length;
+                    const topOutcome = g.outcomes[0];
+
+                    if (count === 1) {
+                        return renderSingleRow(topOutcome, false);
+                    }
+
+                    // Multi-outcomes parent row
+                    const isBull = topOutcome.direction === 'BULLISH';
+                    const isMet = Boolean(topOutcome.predicted_met);
+                    const isVerified = topOutcome.status === 'VERIFIED';
+                    const dirColor = isBull ? '#34d399' : '#f87171';
+                    const dirIcon = isBull ? '🟢 Bull' : '🔴 Bear';
+
+                    let topOutcomeBadge = '';
+                    if (isVerified) {
+                        if (isMet) {
+                            const retStr = topOutcome.net_return_pct != null ? (topOutcome.net_return_pct > 0 ? '+' : '') + topOutcome.net_return_pct.toFixed(1) + '%' : 'MET';
+                            topOutcomeBadge = `<span class="signal-badge" style="background:rgba(16,185,129,0.15);color:#34d399;font-weight:700;border:1px solid rgba(16,185,129,0.3);">✅ MET (${retStr})</span>`;
+                        } else {
+                            const retStr = topOutcome.net_return_pct != null ? topOutcome.net_return_pct.toFixed(1) + '%' : 'FAILED';
+                            topOutcomeBadge = `<span class="signal-badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-weight:700;border:1px solid rgba(239,68,68,0.3);">❌ MISSED (${retStr})</span>`;
+                        }
+                    } else {
+                        topOutcomeBadge = `<span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);">⏳ ACTIVE</span>`;
+                    }
+
+                    const entryPx = topOutcome.entry_price ? `₹${Number(topOutcome.entry_price).toLocaleString('en-IN', {minimumFractionDigits:1, maximumFractionDigits:2})}` : '—';
+                    const maxGain = topOutcome.max_gain_pct != null ? `<span style="color:#38bdf8;font-weight:700;font-family:var(--font-mono);">+${Number(topOutcome.max_gain_pct).toFixed(2)}%</span>` : '—';
+                    const maxDD = topOutcome.max_drawdown_pct != null ? `<span style="color:#f87171;font-weight:600;font-family:var(--font-mono);">${Number(topOutcome.max_drawdown_pct).toFixed(2)}%</span>` : '—';
+                    const pubDate = topOutcome.published_at ? topOutcome.published_at.slice(0, 10) : '—';
+
+                    // Child rows
+                    const childRowsHtml = g.outcomes.map(child => renderSingleRow(child, true)).join('');
+
+                    return `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.01); transition: background 0.12s ease;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='rgba(255,255,255,0.01)'">
+                            <td style="padding: 0.45rem 0.5rem; white-space: nowrap;">
+                                <div style="display:flex;align-items:center;gap:0.35rem;">
+                                    <button type="button" onclick="app.toggleNewsOutcomeGroup('${cleanSym}')" id="outcomeToggleBtn_${cleanSym}" style="background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.3);color:#38bdf8;font-size:0.62rem;width:18px;height:18px;border-radius:3px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;line-height:1;" title="Expand / Collapse ${count} news outcomes">
+                                        <span id="outcomeChevron_${cleanSym}">&#9654;</span>
+                                    </button>
+                                    <a href="/stock/${encodeURIComponent(g.ticker)}" target="_blank" style="font-weight:700;color:#60a5fa;text-decoration:none;font-family:var(--font-mono);" title="Open stock intelligence page">
+                                        ${g.ticker} ↗
+                                    </a>
+                                    <span style="font-size:0.6rem;background:rgba(249,115,22,0.18);color:#fb923c;border:1px solid rgba(249,115,22,0.35);padding:0.04rem 0.35rem;border-radius:3px;font-weight:700;" title="${count} news trade outcomes recorded">
+                                        ${count} News
+                                    </span>
+                                </div>
+                                <div style="font-size:0.68rem;color:#71717a;margin-left:1.45rem;">${g.stock_name || ''}</div>
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; white-space: nowrap; color: #a1a1aa; font-family: var(--font-mono); font-size: 0.72rem;">
+                                ${pubDate}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; max-width: 320px;">
+                                <div style="font-weight: 600; color: #f8fafc; font-size: 0.78rem; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${(topOutcome.title || '').replace(/"/g, '&quot;')}">
+                                    ${topOutcome.title}
+                                </div>
+                                <div style="display: flex; gap: 0.35rem; align-items: center; margin-top: 0.15rem;">
+                                    <span style="font-size: 0.65rem; color: ${dirColor}; font-weight: 700;">${dirIcon}</span>
+                                    <span style="font-size: 0.65rem; background: rgba(255,255,255,0.06); color: #94a3b8; padding: 0.05rem 0.3rem; border-radius: 3px;">${topOutcome.category}</span>
+                                    <span style="font-size: 0.65rem; color: #fbbf24;">⚡ ${topOutcome.impact_score || 0}%</span>
+                                    <span style="font-size:0.62rem;color:#38bdf8;cursor:pointer;margin-left:0.25rem;" onclick="app.toggleNewsOutcomeGroup('${cleanSym}')">+${count - 1} more ▾</span>
+                                </div>
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; font-family: var(--font-mono); color: #e2e8f0; font-weight: 600; white-space: nowrap;">
+                                ${entryPx}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${fmtRet(topOutcome.return_1d_pct)}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${fmtRet(topOutcome.return_3d_pct)}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${fmtRet(topOutcome.return_5d_pct)}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${maxGain}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: right; white-space: nowrap;">
+                                ${maxDD}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: center; white-space: nowrap;">
+                                ${topOutcomeBadge}
+                            </td>
+                        </tr>
+                        <!-- Expandable drawer for child news items -->
+                        <tr id="outcomeChildRow_${cleanSym}" style="display:none;">
+                            <td colspan="10" style="padding:0;background:#030712;border-bottom:1px solid rgba(56,189,248,0.18);">
+                                <div style="padding:0.4rem 0.75rem 0.45rem 0.75rem;background:rgba(56,189,248,0.04);border-top:1px solid rgba(56,189,248,0.12);border-bottom:1px solid rgba(56,189,248,0.12);display:flex;align-items:center;justify-content:space-between;">
+                                    <span style="font-size:0.7rem;font-weight:700;color:#38bdf8;font-family:var(--font-mono);">
+                                        🔍 All ${count} News Trade Outcomes for ${g.ticker}
+                                    </span>
+                                    <button type="button" onclick="app.toggleNewsOutcomeGroup('${cleanSym}')" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:0.68rem;">
+                                        ✕ Close
+                                    </button>
+                                </div>
+                                <table style="width:100%;border-collapse:collapse;font-size:0.72rem;">
+                                    <tbody>
+                                        ${childRowsHtml}
+                                    </tbody>
+                                </table>
                             </td>
                         </tr>
                     `;

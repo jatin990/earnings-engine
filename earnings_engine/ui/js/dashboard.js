@@ -947,6 +947,7 @@ const API_BASE = window.location.origin;
                 // Subtab state registry
                 if (!app._subtabState) {
                     app._subtabState = {
+                        catalysts: localStorage.getItem('subtab_catalysts') || 'feed',
                         breakout: localStorage.getItem('subtab_breakout') || 'scanner',
                         premarket: localStorage.getItem('subtab_premarket') || 'active',
                         gainers: localStorage.getItem('subtab_gainers') || 'gainers',
@@ -1080,14 +1081,26 @@ const API_BASE = window.location.origin;
                 }
                 if (name === 'catalysts') {
                     this.loadAutomationSchedules();
+                    const activeSub = (app._subtabState && app._subtabState['catalysts']) || localStorage.getItem('subtab_catalysts') || 'feed';
+                    if (typeof this.switchCatalystsSubtab === 'function') {
+                        this.switchCatalystsSubtab(activeSub);
+                    } else if (typeof this.loadCatalysts === 'function') {
+                        this.loadCatalysts();
+                    }
                 }
                 if (name === 'premarket') {
-                    const activeSub = (app._subtabState && app._subtabState['premarket']) || localStorage.getItem('subtab_premarket') || 'active';
-                    if (typeof this.switchPremarketView === 'function') {
-                        this.switchPremarketView(activeSub);
-                    }
-                    if (typeof this.loadPremarketSetups === 'function') {
-                        this.loadPremarketSetups();
+                    // Redirect premarket tab to catalysts hub with premarket subtab
+                    const activeSub = (app._subtabState && app._subtabState['premarket'] === 'outcomes') ? 'premarket-outcomes' : 'premarket';
+                    if (typeof this.switchCatalystsSubtab === 'function') {
+                        this.switchCatalystsSubtab(activeSub);
+                    } else {
+                        const pmSub = (app._subtabState && app._subtabState['premarket']) || localStorage.getItem('subtab_premarket') || 'active';
+                        if (typeof this.switchPremarketView === 'function') {
+                            this.switchPremarketView(pmSub);
+                        }
+                        if (typeof this.loadPremarketSetups === 'function') {
+                            this.loadPremarketSetups();
+                        }
                     }
                 }
                 if (name === 'options') {

@@ -699,6 +699,8 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
             pct_from_52w_low = None
             thirty_day_return_pct = None
             seven_day_return_pct = None
+            three_day_return_pct = None
+            channel_position_pct = None
             earnings_week_move_pct = None
             earnings_week_high_pct = None
             earnings_week_low_pct = None
@@ -750,6 +752,8 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 earnings_week_move_pct = cached_metrics.get("earnings_week_move_pct")
                 if market_cap is None:
                     market_cap = cached_metrics.get("market_cap")
+                if three_day_return_pct is None:
+                    three_day_return_pct = cached_metrics.get("three_day_return_pct")
 
             # Load prices from preloaded cache or fallback to load_prices/fetch_prices
             if fetch_prices is not _ORIGINAL_FETCH_PRICES:
@@ -804,6 +808,13 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                         if prior_7 is None:
                             prior_7 = float(closes.iloc[0])
                         seven_day_return_pct = ((latest - prior_7) / prior_7) * 100 if prior_7 else None
+                    if three_day_return_pct is None:
+                        prior_3 = _close_n_calendar_days_ago(closes, _last_date, 3)
+                        if prior_3 is None and len(closes) >= 4:
+                            prior_3 = float(closes.iloc[-4])
+                        elif prior_3 is None:
+                            prior_3 = float(closes.iloc[0])
+                        three_day_return_pct = ((latest - prior_3) / prior_3) * 100 if prior_3 else None
 
                     if len(closes) >= 5:
                         prior_week = float(closes.iloc[-5])
@@ -828,6 +839,12 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
 
                     # Auto-detect swing range
                     auto_rng = detect_swing_range(closes)
+                    if current_price is not None and current_support is not None and next_resistance is not None:
+                        span = next_resistance - current_support
+                        if span > 0:
+                            channel_position_pct = round(((current_price - current_support) / span) * 100.0, 1)
+                        else:
+                            channel_position_pct = 50.0
 
             if load_earnings is not _ORIGINAL_LOAD_EARNINGS:
                 earnings = load_earnings(ticker, settings)
@@ -1000,6 +1017,8 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "pct_from_52w_low": pct_from_low,
                 "thirty_day_return_pct": thirty_day_return_pct,
                 "seven_day_return_pct": seven_day_return_pct,
+                "three_day_return_pct": three_day_return_pct,
+                "channel_position_pct": channel_position_pct,
                 "earnings_week_move_pct": earnings_week_move_pct,
                 "earnings_week_high_pct": earnings_week_high_pct,
                 "earnings_week_low_pct": earnings_week_low_pct,
@@ -1069,6 +1088,8 @@ def enrich_upcoming_results(df: pd.DataFrame, settings: Settings | None = None, 
                 "pct_from_52w_low": pct_from_low,
                 "thirty_day_return_pct": thirty_day_return_pct,
                 "seven_day_return_pct": seven_day_return_pct,
+                "three_day_return_pct": three_day_return_pct,
+                "channel_position_pct": channel_position_pct,
                 "earnings_week_move_pct": earnings_week_move_pct,
                 "earnings_week_high_pct": earnings_week_high_pct,
                 "earnings_week_low_pct": earnings_week_low_pct,

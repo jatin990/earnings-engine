@@ -1,22 +1,8 @@
         <!-- ================= PRE-MARKET SETUPS & OVERNIGHT FILINGS TAB ================= -->
         <div id="tab-premarket" class="tab-content" style="width: 100%; max-width: 100%;">
-            
-            <!-- ⚡ Top Header & View Switcher -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                <div style="display: flex; align-items: center; gap: 0.6rem;">
-                    <div style="display: inline-flex; background: #0a0a10; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 3px; gap: 2px;">
-                        <button type="button" id="pmViewActiveBtn" onclick="app.switchPremarketView('active')" class="btn-micro" style="background: rgba(249, 115, 22, 0.2); color: #fb923c; font-weight: 700; border-radius: 6px; padding: 0.35rem 0.85rem; font-size: 0.76rem; border: 1px solid rgba(249, 115, 22, 0.35);">
-                            🌅 Active Pre-Market Setups
-                        </button>
-                        <button type="button" id="pmViewOutcomesBtn" onclick="app.switchPremarketView('outcomes')" class="btn-micro" style="background: transparent; color: #a1a1aa; font-weight: 600; border-radius: 6px; padding: 0.35rem 0.85rem; font-size: 0.76rem; border: 1px solid transparent;">
-                            📊 Outcomes &amp; Accuracy Track Record
-                        </button>
-                        <button type="button" onclick="app.switchTab('catalysts')" class="btn-micro" style="background: rgba(59, 130, 246, 0.1); color: #60a5fa; font-weight: 600; border-radius: 6px; padding: 0.35rem 0.85rem; font-size: 0.76rem; border: 1px solid rgba(59, 130, 246, 0.3);" title="Switch to 24/7 Catalyst News Stream">
-                            ⚡ All Catalysts &amp; News
-                        </button>
-                    </div>
-                </div>
 
+            <!-- ⚡ Top Header & Operations Toolbar -->
+            <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
                 <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
                     <select id="pmWindowModeSelect" onchange="app.onPremarketFilterChange()" style="height:32px;padding:0 0.65rem;font-size:0.75rem;background:#090d16;color:#ededed;border:1px solid rgba(249,115,22,0.3);border-radius:6px;font-weight:600;outline:none;" title="Select overnight timing window">
                         <option value="full_post_market" selected>🌙 Full Post-Market (3:15 PM – 9:15 AM)</option>

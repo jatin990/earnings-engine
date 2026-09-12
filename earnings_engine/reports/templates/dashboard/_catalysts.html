@@ -1,23 +1,8 @@
         <!-- ================= SHORT-TERM CATALYSTS & NEWS TAB ================= -->
         <div id="tab-catalysts" class="tab-content" style="width: 100%; max-width: 100%;">
 
-            <!-- ⚡ Top View Switcher (Live Feed vs Trade Outcomes vs Pre-Market Setups) -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-                <div style="display: inline-flex; background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 3px; gap: 2px;">
-                    <button type="button" id="catViewFeedBtn" onclick="app.switchCatalystsView('feed')" class="btn-micro" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; font-weight: 700; border-radius: 6px; padding: 0.35rem 0.85rem; font-size: 0.76rem; border: 1px solid rgba(59, 130, 246, 0.35);">
-                        📰 Live Catalyst Feed
-                    </button>
-                    <button type="button" id="catViewHighImpactBtn" onclick="app.filterCatalystsHighImpact70()" class="btn-micro" style="background: transparent; color: #fbbf24; font-weight: 600; border-radius: 6px; padding: 0.35rem 0.85rem; font-size: 0.76rem; border: 1px solid transparent;" title="Filter to High-Impact News (Score >= 70)">
-                        🔥 Impact &gt;= 70
-                    </button>
-                    <button type="button" id="catViewOutcomesBtn" onclick="app.switchCatalystsView('outcomes')" class="btn-micro" style="background: transparent; color: #a1a1aa; font-weight: 600; border-radius: 6px; padding: 0.35rem 0.85rem; font-size: 0.76rem; border: 1px solid transparent;">
-                        📊 Trade Outcomes
-                    </button>
-                    <button type="button" onclick="app.switchTab('premarket')" class="btn-micro" style="background: rgba(249, 115, 22, 0.1); color: #fb923c; font-weight: 600; border-radius: 6px; padding: 0.35rem 0.85rem; font-size: 0.76rem; border: 1px solid rgba(249, 115, 22, 0.3);" title="Switch to Pre-Market Overnight Setups">
-                        🌅 Overnight Setups
-                    </button>
-                </div>
-
+            <!-- ⚡ Top Operations Control Toolbar -->
+            <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
                 <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
                     <select id="catWatchlistSelect" onchange="app.onCatWatchlistChange(this.value)" style="height:30px;padding:0 0.55rem;font-size:0.75rem;background:#000000;color:#ededed;border:1px solid rgba(255,255,255,0.15);border-radius:6px;font-weight:500;outline:none;" title="Select Watchlist / Universe to scan">
                         <option value="GLOBAL" selected>⭐ Active Watchlist</option>
