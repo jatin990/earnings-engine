@@ -78,11 +78,11 @@
                 <div id="srModalHistoryContent"></div>
             </div>
 
-            <!-- ================= AI MULTI-MODEL CONSENSUS SECTION ================= -->
+            <!-- ================= AI MULTI-MODEL CONSENSUS & OMNIROUTE SECTION ================= -->
             <div id="srModalConsensusSection" style="margin-top:0.75rem;border-top:1px solid rgba(255,255,255,0.1);padding-top:0.75rem;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;flex-wrap:wrap;gap:0.5rem;">
                     <h4 style="margin:0;font-size:0.95rem;display:flex;align-items:center;gap:0.4rem;">
-                        <span>🧠 AI Multi-Model Consensus (DeepSeek · Llama · Qwen · Mistral · Local)</span>
+                        <span>🧠 OmniRoute AI Intelligence (Claude Code Engine)</span>
                         <span id="srModalConsensusBadge" class="signal-badge" style="font-size:0.7rem;display:none;"></span>
                     </h4>
                     <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
@@ -96,6 +96,20 @@
                             <button type="button" class="btn btn-sm" onclick="app.setModalTimeframe(90)" id="modalTfBtn-90" style="padding:0.15rem 0.4rem;font-size:0.68rem;background:transparent;border:none;color:#94a3b8;cursor:pointer;">90D</button>
                         </div>
 
+                        <!-- OmniRoute 4-Model Catalog Buttons -->
+                        <button type="button" id="btnModalModel-antigravity" onclick="app.runModalConsensus('antigravityonly')" class="btn-model-opt antigravity" style="background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.35);color:#38bdf8;font-weight:700;padding:0.2rem 0.5rem;font-size:0.7rem;border-radius:3px;cursor:pointer;" title="Run antigravityonly workhorse model">
+                            <span>⚡</span> Antigravity
+                        </button>
+                        <button type="button" id="btnModalModel-claude-only" onclick="app.runModalConsensus('claude only')" class="btn-model-opt claude-only" style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);color:#c7d2fe;font-weight:700;padding:0.2rem 0.5rem;font-size:0.7rem;border-radius:3px;cursor:pointer;" title="Run claude only architecture & reasoning model">
+                            <span>🧠</span> Claude Only
+                        </button>
+                        <button type="button" id="btnModalModel-free-only" onclick="app.runModalConsensus('free only')" class="btn-model-opt free-only" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-weight:700;padding:0.2rem 0.5rem;font-size:0.7rem;border-radius:3px;cursor:pointer;" title="Run free only lightweight model">
+                            <span>💎</span> Free Tier
+                        </button>
+                        <button type="button" id="btnModalModel-claude" onclick="app.runModalConsensus('claude')" class="btn-model-opt claude" style="background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.35);color:#e9d5ff;font-weight:700;padding:0.2rem 0.5rem;font-size:0.7rem;border-radius:3px;cursor:pointer;" title="Run claude orchestrator model">
+                            <span>🤖</span> Claude
+                        </button>
+
                         <!-- Local Models Group -->
                         <div style="display:inline-flex;align-items:center;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);border-radius:4px;padding:1px 2px;gap:2px;">
                             <button type="button" id="btnModalModel-local" onclick="app.openDashboardLocalModelModal()" class="btn-model-opt local" style="border:none;background:transparent;padding:0.2rem 0.4rem;color:#34d399;font-weight:700;font-size:0.72rem;" title="Open Local Models hub (choose active models & run individually or in parallel)">
@@ -107,34 +121,14 @@
                             <button type="button" onclick="app.openDashboardLocalModelModal()" style="background:transparent;border:none;color:#6ee7b7;font-size:0.72rem;padding:0.15rem 0.3rem;cursor:pointer;" title="Configure local models, host & active list">⚙️</button>
                         </div>
 
-                        <!-- Individual Cloud AI Model Action Buttons -->
-                        <button type="button" id="btnModalModel-deepseek" onclick="app.runModalConsensus('deepseek/deepseek-r1')" class="btn-model-opt deepseek" title="Run DeepSeek-R1 reasoning engine (Chain of thought)">
-                            <span>🤖</span> DeepSeek-R1
-                        </button>
-                        <button type="button" id="btnModalModel-llama" onclick="app.runModalConsensus('meta-llama/llama-3.3-70b-instruct')" class="btn-model-opt llama" title="Run Meta Llama-3.3-70B institutional model">
-                            <span>🦙</span> Llama-70B
-                        </button>
-                        <button type="button" id="btnModalModel-qwen" onclick="app.runModalConsensus('qwen/qwen-2.5-72b-instruct')" class="btn-model-opt qwen" title="Run Alibaba Qwen-2.5-72B algorithmic model">
-                            <span>🌐</span> Qwen-72B
-                        </button>
-                        <button type="button" id="btnModalModel-mistral" onclick="app.runModalConsensus('mistralai/mistral-large')" class="btn-model-opt mistral" title="Run Mistral-Large catalyst model">
-                            <span>⚡</span> Mistral
-                        </button>
-                        <button type="button" id="btnModalModel-gemma" onclick="app.runModalConsensus('google/gemma-4-31b-it:free')" class="btn-model-opt gemma" title="Run Google Gemma-4-31B multimodal reasoning model (Free tier)">
-                            <span>💎</span> Gemma-31B
-                        </button>
-                        <button type="button" id="btnModalModel-glm" onclick="app.runModalConsensus('z-ai/glm-5.2')" class="btn-model-opt glm" title="Run Z.ai GLM-5.2 flagship 753B long-horizon reasoning model">
-                            <span>🐉</span> GLM-5.2
-                        </button>
-
                         <!-- Master Run All Consensus Button -->
-                        <button type="button" id="srModalConsensusRunBtn" onclick="app.runModalConsensus(null)" class="btn btn-sm" style="background:linear-gradient(135deg, #2563eb, #3b82f6);color:#fff;border:none;font-size:0.75rem;font-weight:700;display:flex;align-items:center;gap:0.3rem;box-shadow:0 2px 8px rgba(37,99,235,0.3);" title="Run all AI engines in parallel and synthesize consensus">
-                            🧠 All Consensus
+                        <button type="button" id="srModalConsensusRunBtn" onclick="app.runModalConsensus(null)" class="btn btn-sm" style="background:linear-gradient(135deg, #2563eb, #3b82f6);color:#fff;border:none;font-size:0.75rem;font-weight:700;display:flex;align-items:center;gap:0.3rem;box-shadow:0 2px 8px rgba(37,99,235,0.3);" title="Run all OmniRoute engines in parallel and synthesize consensus">
+                            🧠 All Models
                         </button>
                     </div>
                 </div>
                 <div id="srModalConsensusContent">
-                    <p class="timestamp" style="margin:0;font-size:0.8rem;">Click any AI Model button above or "🧠 All Consensus" to trigger multi-model ensemble reasoning across DeepSeek-R1, Llama-3.3-70B, Qwen-2.5-72B, Mistral, Gemma-4-31B, GLM-5.2, and Local Models.</p>
+                    <p class="timestamp" style="margin:0;font-size:0.8rem;">Click any AI Model button above or "🧠 All Models" to trigger OmniRoute reasoning across antigravityonly, claude only, free only, and claude tiers.</p>
                 </div>
             </div>
 
@@ -337,18 +331,16 @@
             <!-- Model Selection Buttons Toolbar & Rate Limits Tracking -->
             <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);padding:0.45rem 0.75rem;border-radius:8px;margin-bottom:0.75rem;">
                 <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
-                    <span style="font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-right:0.2rem;">AI Engine:</span>
-                    <button type="button" id="modalBtn-gemini" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['google/gemini-2.0-flash-001'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.35);color:#38bdf8;font-weight:700;" title="Run Antigravity / Gemini-2.0-Flash (~1.2s Fast)">⚡ Gemini Flash</button>
-                    <button type="button" id="modalBtn-gemma" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['google/gemma-4-31b-it:free'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.35);color:#a5f3fc;font-weight:700;" title="Run Google Gemma-4-31B Free (0 tokens)">💎 Gemma Free</button>
+                    <span style="font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-right:0.2rem;">OmniRoute Model:</span>
+                    <button type="button" id="modalBtn-antigravity" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['antigravityonly'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.35);color:#38bdf8;font-weight:700;" title="Run Antigravity Workhorse (~1.2s Fast)">⚡ antigravityonly</button>
+                    <button type="button" id="modalBtn-claude-only" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['claude only'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);color:#c7d2fe;font-weight:700;" title="Run Claude Only (Architecture & System Design)">🧠 claude only</button>
+                    <button type="button" id="modalBtn-free-only" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['free only'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-weight:700;" title="Run Free Tier (Fast / Routine)">💎 free only</button>
+                    <button type="button" id="modalBtn-claude" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['claude'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.35);color:#e9d5ff;font-weight:700;" title="Run Claude Orchestrator">🤖 claude</button>
                     <button type="button" id="modalBtn-local" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['local/deepseek-r1:8b'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-weight:700;" title="Run Local-AI (Offline Free)">💻 Local-AI</button>
-                    <button type="button" id="modalBtn-deepseek" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['deepseek/deepseek-r1'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);color:#c7d2fe;" title="Run DeepSeek-R1 (Best Reasoning)">🤖 DeepSeek-R1</button>
-                    <button type="button" id="modalBtn-llama" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['meta-llama/llama-3.3-70b-instruct'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.35);color:#bae6fd;" title="Run Llama-3.3-70B (Best Institutional)">🦙 Llama-70B</button>
-                    <button type="button" id="modalBtn-qwen" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['qwen/qwen-2.5-72b-instruct'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.35);color:#e9d5ff;" title="Run Qwen-2.5-72B (Best Algorithmic)">🌐 Qwen-72B</button>
-                    <button type="button" id="modalBtn-fast" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, ['google/gemini-2.0-flash-001', 'google/gemma-4-31b-it:free', 'local/deepseek-r1:8b'], true)" class="btn btn-sm" style="font-size:0.7rem;padding:0.2rem 0.55rem;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.5);color:#6ee7b7;font-weight:700;" title="Run Antigravity & Free Ensemble (Fastest)">⚡ Free & Antigravity</button>
-                    <button type="button" id="modalBtn-all" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, null, true)" class="btn btn-primary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.6rem;" title="Run curated core ensemble in parallel">🧠 Best Ensemble</button>
+                    <button type="button" id="modalBtn-all" onclick="app.runConsensusForStock(app.activeCatConsensusTicker, null, true)" class="btn btn-primary btn-sm" style="font-size:0.7rem;padding:0.2rem 0.6rem;" title="Run OmniRoute 4-Model Catalog in Parallel">🧠 All Models</button>
                 </div>
                 <div id="modalRatelimitStatus" style="font-size:0.68rem;font-family:var(--font-mono);color:#34d399;background:rgba(16,185,129,0.1);padding:0.2rem 0.5rem;border-radius:4px;border:1px solid rgba(16,185,129,0.3);" title="Real-time OmniRoute AI Gateway & model rate limits tracking">
-                    🟢 OmniRoute: Ready
+                    🟢 OmniRoute: Active (Port 20128)
                 </div>
             </div>
 
