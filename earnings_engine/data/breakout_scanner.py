@@ -2205,6 +2205,20 @@ def _score_volume_surge(volumes: pd.Series) -> tuple[float, float]:
     return score, round(ratio, 2)
 
 
+def _calc_atr_pct(closes: pd.Series, default: float = 2.0) -> float:
+    """Calculate 14-day average true range as percentage of price using vectorized numpy.
+
+    Guards against division by zero on non-positive prices and handles NaN values gracefully.
+    """
+    if closes is None or len(closes) < 15:
+        return default
+    vals = closes.values[-15:]
+    denom = np.where(vals[:-1] == 0, 1.0, vals[:-1])
+    daily_range = abs(vals[1:] - vals[:-1]) / denom
+    atr = float(daily_range.mean()) * 100.0
+    return atr if (atr > 0 and not np.isnan(atr)) else default
+
+
 def _score_price_compression(closes: pd.Series) -> tuple[float, float]:
     """Return (score 0-10, atr_pct).
 
@@ -2212,10 +2226,8 @@ def _score_price_compression(closes: pd.Series) -> tuple[float, float]:
     """
     if len(closes) < 15:
         return 0.0, float("nan")
-    vals = closes.values[-15:]
-    daily_range = abs(vals[1:] - vals[:-1]) / vals[:-1]
-    atr_pct = float(daily_range.mean()) * 100   # as % of price
-    if atr_pct <= 0:
+    atr_pct = _calc_atr_pct(closes, default=float("nan"))
+    if np.isnan(atr_pct) or atr_pct <= 0:
         return 0.0, float("nan")
     if atr_pct < 0.5:
         score = 10.0
@@ -2675,16 +2687,7 @@ def _score_nse_delivery_absorption(
     delivery_highs = high_series.loc[high_series.index.isin(top_vol_idx)]
     delivery_resistance = float(delivery_highs.max()) if not delivery_highs.empty else float(closes.tail(20).max())
 
-    if len(closes) >= 15:
-        c_vals = closes.values[-15:]
-        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
-        atr_pct = float(daily_range.mean()) * 100.0
-    elif len(closes) >= 2:
-        c_vals = closes.values
-        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
-        atr_pct = float(daily_range.mean()) * 100.0
-    else:
-        atr_pct = 2.0
+    atr_pct = _calc_atr_pct(closes, default=2.0)
     atr_val = signal_price * (atr_pct / 100.0)
 
     ideal_entry_price = round(delivery_resistance, 2)
@@ -2990,16 +2993,7 @@ def _score_donchian_squeeze(
 
     composite = round(squeeze_score + donchian_score + mom_score + vol_score, 1)
 
-    if len(closes) >= 15:
-        c_vals = closes.values[-15:]
-        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
-        atr_pct = float(daily_range.mean()) * 100.0
-    elif len(closes) >= 2:
-        c_vals = closes.values
-        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
-        atr_pct = float(daily_range.mean()) * 100.0
-    else:
-        atr_pct = 2.0
+    atr_pct = _calc_atr_pct(closes, default=2.0)
     atr_val = signal_price * (atr_pct / 100.0)
 
     prior_donchian = float(high_series.iloc[:-1].tail(55).max()) if len(high_series) > 1 else donchian_55
@@ -3253,16 +3247,7 @@ def score_breakout(
 
     pct_from_high = ((signal_price - breakout_trigger) / breakout_trigger) * 100 if breakout_trigger else 0.0
 
-    if len(closes) >= 15:
-        c_vals = closes.values[-15:]
-        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
-        atr_pct = float(daily_range.mean()) * 100.0
-    elif len(closes) >= 2:
-        c_vals = closes.values
-        daily_range = abs(c_vals[1:] - c_vals[:-1]) / c_vals[:-1]
-        atr_pct = float(daily_range.mean()) * 100.0
-    else:
-        atr_pct = 2.0
+    atr_pct = _calc_atr_pct(closes, default=2.0)
 
     ideal_entry_price = notes.get("ideal_entry_price") or breakout_trigger
     daily_high = float(high_series.iloc[-1]) if high_series is not None and len(high_series) > 0 else signal_price

@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from earnings_engine.data.breakout_scanner import (
     score_breakout,
+    _calc_atr_pct,
     _score_resistance_proximity,
     _score_volume_surge,
     _score_price_compression,
@@ -119,6 +120,20 @@ class TestPriceCompression:
         vals = closes.values[-15:]
         expected_atr = round(float((abs(vals[1:] - vals[:-1]) / vals[:-1]).mean()) * 100, 3)
         assert atr == expected_atr
+
+    def test_calc_atr_pct_helper_handles_defaults_and_zero_values(self):
+        # Series too short
+        assert _calc_atr_pct(pd.Series([100.0] * 10), default=2.5) == 2.5
+        # None closes
+        assert _calc_atr_pct(None, default=3.0) == 3.0
+        # Zero prices in series guarded against zero division
+        zeros = pd.Series([0.0] * 20)
+        assert _calc_atr_pct(zeros, default=2.0) == 2.0
+        # Valid calculation
+        valid_series = pd.Series([100.0 + i * 0.5 for i in range(25)])
+        atr = _calc_atr_pct(valid_series)
+        assert atr > 0.0
+        assert not np.isnan(atr)
 
 
 class TestMomentum:
