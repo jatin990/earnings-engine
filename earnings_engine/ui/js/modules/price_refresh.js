@@ -7,170 +7,137 @@
     window.app = window.app || {};
     const app = window.app;
 
-    // =========================================================================
-    // ⏱️ Global Ticker Price Refresh Engine (Configurable Interval, Default 5m)
-    // =========================================================================
-    app._globalPriceRefreshTimer = null;
     app._lastGlobalPriceRefresh = null;
-    app._visibilityBound = false;
 
-    app.getGlobalPriceRefreshInterval = function() {
-        const stored = localStorage.getItem('nexus_price_refresh_interval');
-        if (stored !== null) {
-            const parsed = parseInt(stored, 10);
-            if (!isNaN(parsed)) return parsed;
-        }
-        if (window.APP_CONFIG && typeof window.APP_CONFIG.live_refresh_interval_sec === 'number') {
-            return window.APP_CONFIG.live_refresh_interval_sec;
-        }
-        return 300; // 5 minutes default
-    };
+    /**
+     * Inspect active tab/container and return unique visible stock tickers.
+     */
+    app.getVisibleTickersOnActiveTab = function() {
+        const activeTab = this.currentTab || window.app?.currentTab || 'home';
+        const container = document.getElementById('tab-' + activeTab) || document.querySelector('.tab-content.active') || document.body;
+        const tickerSet = new Set();
 
-    app.initGlobalPriceRefresh = function() {
-        const sec = this.getGlobalPriceRefreshInterval();
-        const selectEl = document.getElementById('globalPriceRefreshSelect');
-        if (selectEl) selectEl.value = String(sec);
+        // 1. Elements with explicit data-ticker attribute
+        container.querySelectorAll('[data-ticker]').forEach(el => {
+            if (el.offsetParent !== null || el.style.display !== 'none') {
+                const t = el.getAttribute('data-ticker');
+                if (t && t.length > 1 && !t.includes('{')) tickerSet.add(t.trim().toUpperCase());
+            }
+        });
 
-        this.startGlobalPriceRefreshLoop(sec);
-        this.syncSubmoduleIntervals(sec);
-
-        // Resume refresh when tab becomes visible if stale
-        if (!this._visibilityBound && typeof document !== 'undefined') {
-            this._visibilityBound = true;
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') {
-                    const currentSec = this.getGlobalPriceRefreshInterval();
-                    if (currentSec > 0 && this._lastGlobalPriceRefresh) {
-                        const elapsedSec = (Date.now() - this._lastGlobalPriceRefresh.getTime()) / 1000;
-                        if (elapsedSec >= currentSec) {
-                            this.triggerGlobalPriceRefresh(false);
-                        }
-                    }
+        // 2. Links to stock profile /stock/XYZ
+        container.querySelectorAll('a[href*="/stock/"]').forEach(a => {
+            if (a.offsetParent !== null) {
+                const match = a.getAttribute('href').match(/\/stock\/([^\/\?#]+)/);
+                if (match && match[1]) {
+                    const sym = decodeURIComponent(match[1]).trim().toUpperCase();
+                    if (sym && sym.length > 1 && !sym.includes('{')) tickerSet.add(sym);
                 }
-            });
+            }
+        });
 
-            window.addEventListener('online', () => {
-                this.triggerGlobalPriceRefresh(false);
-            });
-        }
-    };
-
-    app.syncSubmoduleIntervals = function(sec) {
-        const ms = sec > 0 ? sec * 1000 : 300000;
-        if (this.watchlistTab && typeof this.watchlistTab.setLiveInterval === 'function') {
-            const wlSel = document.getElementById('wlLiveIntervalSelect');
-            if (wlSel) wlSel.value = String(ms);
-            this.watchlistTab.liveIntervalMs = ms;
-        }
-        if (typeof this.setBreakoutLiveInterval === 'function') {
-            const boSel = document.getElementById('breakoutLiveIntervalSelect');
-            if (boSel) boSel.value = String(ms);
-            this.breakoutLiveIntervalMs = ms;
-        }
-    };
-
-    app.setGlobalPriceRefreshInterval = function(secondsStr) {
-        const seconds = parseInt(secondsStr, 10) || 0;
-        localStorage.setItem('nexus_price_refresh_interval', String(seconds));
-        const selectEl = document.getElementById('globalPriceRefreshSelect');
-        if (selectEl && selectEl.value !== String(seconds)) selectEl.value = String(seconds);
-
-        this.startGlobalPriceRefreshLoop(seconds);
-        this.syncSubmoduleIntervals(seconds);
-
-        const label = seconds === 0 ? 'Manual (Auto-refresh Off)' : `${Math.round(seconds / 60)} min${seconds > 60 ? 's' : ''}`;
-        if (typeof this.showToast === 'function') {
-            this.showToast(`⏱️ Price refresh interval set to ${label}`, 'success');
-        }
-    };
-
-    app.startGlobalPriceRefreshLoop = function(intervalSeconds) {
-        if (this._globalPriceRefreshTimer) {
-            clearInterval(this._globalPriceRefreshTimer);
-            this._globalPriceRefreshTimer = null;
-        }
-        const sec = (intervalSeconds !== undefined) ? intervalSeconds : this.getGlobalPriceRefreshInterval();
-        if (sec > 0) {
-            this._globalPriceRefreshTimer = setInterval(() => {
-                if (typeof document === 'undefined' || document.visibilityState === 'visible') {
-                    this.triggerGlobalPriceRefresh(false);
+        // 3. Ticker elements with common class names
+        container.querySelectorAll('.stock-ticker-main, .ticker-symbol').forEach(el => {
+            if (el.offsetParent !== null) {
+                const txt = el.textContent.trim().replace(/^▶\s*/, '').trim().toUpperCase();
+                if (txt && txt.length > 1 && !txt.includes(' ') && !txt.includes('{')) {
+                    tickerSet.add(txt);
                 }
-            }, sec * 1000);
-        }
+            }
+        });
+
+        return Array.from(tickerSet);
     };
 
+    /**
+     * Trigger global price & metric refresh across the active screen.
+     */
     app.triggerGlobalPriceRefresh = async function(manual = false) {
         const btn = document.getElementById('topRefreshPricesBtn');
-        if (btn) {
-            btn.style.animation = 'spin 1s linear infinite';
-            btn.disabled = true;
-        }
+        const iconEl = btn ? (btn.querySelector('#topRefreshPricesIcon') || btn.querySelector('.refresh-icon') || btn) : null;
+        const textEl = btn ? btn.querySelector('#topRefreshPricesText') : null;
+        const originalText = textEl ? textEl.textContent : '';
+
+        if (btn) btn.disabled = true;
+        if (iconEl) iconEl.style.animation = 'spin 0.8s linear infinite';
+        if (textEl) textEl.textContent = 'Refreshing...';
+
         try {
             const activeTab = this.currentTab || window.app?.currentTab || 'home';
 
-            // Dispatch live refresh based on active screen
+            // 1. Gather all visible tickers on the active tab and batch update prices/metrics
+            const visibleTickers = typeof this.getVisibleTickersOnActiveTab === 'function'
+                ? this.getVisibleTickersOnActiveTab()
+                : [];
+
+            if (visibleTickers.length > 0 && typeof this.refreshStocksBatch === 'function') {
+                await this.refreshStocksBatch(visibleTickers, btn);
+            }
+
+            // 2. Dispatch page-specific data refresh based on temporal freshness rules
             if (activeTab === 'home' || activeTab === 'pulse') {
                 if (typeof this.loadMarketPulseData === 'function') await this.loadMarketPulseData();
                 else if (typeof this.loadPulseData === 'function') await this.loadPulseData();
             } else if (activeTab === 'results' || activeTab === 'upcoming') {
                 if (typeof this.updateResultsMonthSummaryCards === 'function') this.updateResultsMonthSummaryCards();
-                if (typeof this.loadUpcoming === 'function') await this.loadUpcoming();
+                if (typeof this.loadResultsReport === 'function') await this.loadResultsReport();
             } else if (activeTab === 'monthfilter') {
-                if (typeof this.loadMonthFilter === 'function') await this.loadMonthFilter();
-                else if (typeof this.loadResultsMonthView === 'function') await this.loadResultsMonthView();
+                if (typeof this.loadMonthFilterTab === 'function') await this.loadMonthFilterTab(true);
+                else if (typeof this.loadMonthFilter === 'function') await this.loadMonthFilter();
             } else if (activeTab === 'scanner' || activeTab === 'category') {
                 if (typeof this.loadScanner === 'function') await this.loadScanner();
-                else if (typeof this.loadCategoryScanner === 'function') await this.loadCategoryScanner();
             } else if (activeTab === 'catalysts') {
                 if (typeof this.loadCatalysts === 'function') await this.loadCatalysts();
-                if (typeof this.loadAutomationSchedules === 'function') this.loadAutomationSchedules();
             } else if (activeTab === 'premarket') {
-                if (typeof this.loadPremarketSetups === 'function') await this.loadPremarketSetups();
+                if (typeof this.refreshPremarketQuotes === 'function') await this.refreshPremarketQuotes();
+                else if (typeof this.loadPremarketSetups === 'function') await this.loadPremarketSetups();
             } else if (activeTab === 'gainers') {
                 if (typeof this.refreshGainersTab === 'function') await this.refreshGainersTab();
                 else if (typeof this.loadGainers === 'function') await this.loadGainers();
             } else if (activeTab === 'breakout') {
                 if (this._activeBreakoutSubtab === 'tracked' && typeof this.loadTrackedBreakouts === 'function') {
-                    await this.loadTrackedBreakouts();
+                    await this.loadTrackedBreakouts(true);
                 } else if (typeof this.loadBreakoutRadar === 'function') {
                     await this.loadBreakoutRadar(true, true);
                 }
-                if (typeof this.loadAutomationSchedules === 'function') this.loadAutomationSchedules();
             } else if (activeTab === 'institutional' || activeTab === 'super-investor') {
-                if (typeof this.loadInstitutionalFlows === 'function') await this.loadInstitutionalFlows();
+                if (this._institutionalSubpage === 'smart-money' && typeof this.loadSmartMoneyRadar === 'function') {
+                    await this.loadSmartMoneyRadar(true);
+                } else if (typeof this.loadInstitutionalData === 'function') {
+                    await this.loadInstitutionalData();
+                }
             } else if (activeTab === 'tri-confluence' || activeTab === 'confluence') {
-                if (typeof this.loadTriConfluence === 'function') await this.loadTriConfluence();
-                else if (typeof this.loadConfluence === 'function') await this.loadConfluence();
+                if (typeof this.loadTriConfluence === 'function') await this.loadTriConfluence(true);
             } else if (activeTab === 'repeaters') {
-                if (typeof this.loadQuarterRepeaters === 'function') await this.loadQuarterRepeaters();
+                if (typeof this.loadQuarterRepeaters === 'function') await this.loadQuarterRepeaters(true);
             } else if (activeTab === 'new-additions') {
                 if (typeof this.loadRecentAdditions === 'function') await this.loadRecentAdditions();
             } else if (activeTab === 'swing') {
-                if (typeof this.loadSwingRanges === 'function') await this.loadSwingRanges();
+                if (typeof this.loadSwing === 'function') await this.loadSwing();
             } else if (activeTab === 'watchlist') {
-                if (typeof this.loadWatchlist === 'function') await this.loadWatchlist();
-                if (typeof this.watchlistTab?.loadActiveQuotes === 'function') await this.watchlistTab.loadActiveQuotes(true, true);
+                if (typeof this.watchlistTab?.loadActiveQuotes === 'function') {
+                    await this.watchlistTab.loadActiveQuotes(true, true);
+                } else if (typeof this.loadWatchlist === 'function') {
+                    await this.loadWatchlist();
+                }
+            } else if (activeTab === 'options') {
+                if (typeof this.loadOptionChain === 'function') await this.loadOptionChain(true);
             } else if (activeTab === 'kronos') {
                 if (typeof this.loadKronosLatest === 'function') await this.loadKronosLatest();
             } else if (activeTab === 'consensus') {
-                if (typeof this.loadConsensus === 'function') await this.loadConsensus();
+                if (typeof this.loadConsensusTab === 'function') await this.loadConsensusTab();
             } else if (activeTab === 'buydip' || activeTab === 'recent-results') {
                 if (typeof this.loadRecentResults === 'function') await this.loadRecentResults();
                 else if (typeof this.loadBuyDip === 'function') await this.loadBuyDip();
             } else if (activeTab === 'coverage') {
-                if (typeof this.loadCoverage === 'function') await this.loadCoverage();
+                if (typeof this.loadDataCoverage === 'function') await this.loadDataCoverage();
             } else if (activeTab === 'industries') {
-                if (typeof this.loadIndustries === 'function') await this.loadIndustries();
+                if (typeof this.loadIndustryMoves === 'function') await this.loadIndustryMoves();
             } else if (activeTab === 'patterns') {
                 if (typeof this.loadPatterns === 'function') await this.loadPatterns();
-            } else if (activeTab === 'allstocks') {
-                if (typeof this.loadAllStocks === 'function') await this.loadAllStocks();
-            } else if (activeTab === 'playground') {
-                if (typeof this.loadPlaygroundApiUsage === 'function') this.loadPlaygroundApiUsage();
-                if (typeof this.loadAutomationSchedules === 'function') this.loadAutomationSchedules();
             }
 
-            // Also refresh active open stock modal quote if visible
+            // 3. Refresh active open stock detail modal if currently displayed
             const modal = document.getElementById('stockDetailModal');
             if (modal && modal.style.display !== 'none' && this.currentModalTicker) {
                 if (typeof this.refreshStockModalLivePrice === 'function') {
@@ -180,15 +147,19 @@
 
             this._lastGlobalPriceRefresh = new Date();
             if (manual && typeof this.showToast === 'function') {
-                this.showToast('🟢 Ticker prices refreshed across active page', 'success');
+                this.showToast('🟢 Live prices & technical metrics refreshed', 'success');
             }
         } catch (e) {
-            console.debug('[PRICE-REFRESH] Auto-refresh error:', e);
+            console.error('[PRICE-REFRESH] Refresh error:', e);
+            if (typeof this.showToast === 'function') {
+                this.showToast('⚠️ Error refreshing prices: ' + e.message, 'error');
+            }
         } finally {
             if (btn) {
-                btn.style.animation = '';
                 btn.disabled = false;
             }
+            if (iconEl) iconEl.style.animation = '';
+            if (textEl) textEl.textContent = originalText || 'Refresh Prices';
         }
     };
 

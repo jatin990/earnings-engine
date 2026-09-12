@@ -5,7 +5,8 @@
         <span class="drawer-arrow" id="arrow_{row_ticker_id}" style="font-size:0.62rem;color:#38bdf8;transition:transform 0.15s;">▶</span>
         {ticker}
       </span>
-      <a href="/stock/{ticker}" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
+      <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('{ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" onmouseenter="this.style.opacity='1';this.style.color='#7dd3fc';" onmouseleave="this.style.opacity='0.75';this.style.color='#38bdf8';" title="Refresh live price, 7D/30D returns & S/R structure for {ticker}">↻</button>
+      <a href="/stock/{ticker}" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.15rem;font-size:0.75rem;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
       {result_sequence_badge_html}
       <span class="stock-company-sub" title="{company_name}">{company_name}</span>
     </div>

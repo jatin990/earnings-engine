@@ -282,24 +282,43 @@ def recalculate_batch_metrics(
     settings: Settings | None = None,
     max_tickers: int = 50,
 ) -> dict[str, Any]:
-    """Recalculate metrics for a batch of tickers sequentially and collect diffs."""
+    """Recalculate metrics for a batch of tickers concurrently and collect diffs."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     settings = settings or Settings()
     clean_tickers = list(dict.fromkeys([t.strip().upper() for t in tickers if t and t.strip()]))[:max_tickers]
     if not clean_tickers:
         return {"success": False, "error": "No valid tickers provided"}
 
-    results: list[dict[str, Any]] = []
+    # 1. Warm cache by fetching live quotes in parallel for all requested tickers
+    try:
+        prices_mod.fetch_batch_live_quotes(clean_tickers, settings=settings, sync_db=True, max_workers=10)
+    except Exception as e:
+        logger.warning("Batch live quote fetch warning during recalculation: %s", e)
+
+    # 2. Recalculate metrics concurrently across thread pool
+    results_map: dict[str, dict[str, Any]] = {}
     total_changed = 0
 
-    for sym in clean_tickers:
-        try:
-            res = recalculate_ticker_metrics(sym, settings)
-            if res.get("has_changes"):
-                total_changed += 1
-            results.append(res)
-        except Exception as e:
-            logger.warning("Batch recalculation error for %s: %s", sym, e)
-            results.append({"success": False, "ticker": sym, "error": str(e)})
+    max_workers = min(10, max(1, len(clean_tickers)))
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_sym = {
+            executor.submit(recalculate_ticker_metrics, sym, settings): sym
+            for sym in clean_tickers
+        }
+        for future in as_completed(future_to_sym):
+            sym = future_to_sym[future]
+            try:
+                res = future.result()
+                if res.get("has_changes"):
+                    total_changed += 1
+                results_map[sym] = res
+            except Exception as e:
+                logger.warning("Batch recalculation error for %s: %s", sym, e)
+                results_map[sym] = {"success": False, "ticker": sym, "error": str(e)}
+
+    # Preserve original order of tickers
+    results = [results_map[sym] for sym in clean_tickers if sym in results_map]
 
     return {
         "success": True,

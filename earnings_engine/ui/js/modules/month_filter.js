@@ -634,20 +634,21 @@ Object.assign(app, {
                         const origBg = isBz ? 'rgba(16,185,129,0.06)' : '';
 
                         return `
-                            <tr style="${rowStyle}cursor:pointer;" onmouseenter="this.style.background='${hoverBg}'" onmouseleave="this.style.background='${origBg}'" onclick="app.openSwingRangeModal('${currentMarket.replace(/'/g, "\\'")}', '${(r.ticker || '').replace(/'/g, "\\'")}')" title="Click to open Support/Resistance Channel Editor">
+                            <tr style="${rowStyle}cursor:pointer;" data-ticker="${r.ticker || ''}" onmouseenter="this.style.background='${hoverBg}'" onmouseleave="this.style.background='${origBg}'" onclick="app.openSwingRangeModal('${currentMarket.replace(/'/g, "\\'")}', '${(r.ticker || '').replace(/'/g, "\\'")}')" title="Click to open Support/Resistance Channel Editor">
                                 <!-- Col 1: Ticker -->
                                 <td style="padding:0.55rem 0.65rem;">
                                     <div style="display:flex;align-items:center;gap:0.3rem;">
                                         <strong style="color:#ffffff;font-size:0.92rem;font-family:var(--font-heading);">${r.ticker || '?'}</strong>
+                                        <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${r.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" onmouseenter="this.style.opacity='1';this.style.color='#7dd3fc';" onmouseleave="this.style.opacity='0.75';this.style.color='#38bdf8';" title="Refresh live price & technical metrics for ${r.ticker}">↻</button>
                                         <a href="/stock/${encodeURIComponent(r.ticker)}" target="_blank" onclick="event.stopPropagation();" style="color:#38bdf8;font-size:0.75rem;text-decoration:none;" title="Open profile">↗</a>
                                     </div>
                                     <div style="font-size:0.65rem;color:#64748b;margin-top:0.1rem;">${r.industry || 'NSE Equity'}</div>
                                 </td>
 
                                 <!-- Col 2: Price & 30D Move -->
-                                <td style="padding:0.55rem 0.65rem;">
+                                <td class="cell-current-price" style="padding:0.55rem 0.65rem;">
                                     <div style="font-weight:800;font-size:0.92rem;${isBz ? 'color:#34d399;' : 'color:#f8fafc;'}font-family:var(--font-mono);">${curPriceStr}</div>
-                                    <div class="${momCls}" style="font-size:0.68rem;font-weight:600;margin-top:0.1rem;">30D: ${momStr}</div>
+                                    <div class="${momCls} cell-thirty-day-return" style="font-size:0.68rem;font-weight:600;margin-top:0.1rem;">30D: ${momStr}</div>
                                 </td>
 
                                 <!-- Col 3: Tier & Signal -->
@@ -659,7 +660,7 @@ Object.assign(app, {
                                 </td>
 
                                 <!-- Col 4: Consolidated Trading Channel (S/R) -->
-                                <td style="padding:0.55rem 0.65rem;">
+                                <td class="cell-sr-structure" style="padding:0.55rem 0.65rem;">
                                     <div style="display:flex;justify-content:space-between;align-items:center;">
                                         <span style="font-weight:700;color:#f8fafc;font-family:var(--font-mono);">₹${srLower} – ₹${srUpper}</span>
                                         <span class="signal-badge" style="${srSourceCls}font-size:0.60rem;padding:0.05rem 0.3rem;">${srSource}</span>

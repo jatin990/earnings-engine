@@ -205,11 +205,11 @@ Object.assign(app, {
                     const confScore = c.confidence_score || 75;
                     const confColor = confScore >= 85 ? '#34d399' : (confScore >= 70 ? '#38bdf8' : '#fbbf24');
 
-                    return '<tr>' +
+                    return '<tr data-ticker="' + c.ticker + '">' +
                         '<td style="text-align:center;color:var(--muted);font-weight:700;">' + rank + '</td>' +
                         '<td style="padding:0.5rem 0.65rem;">' +
                             '<div><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="font-weight:700;font-size:0.85rem;color:var(--light);text-decoration:none;">' + (c.stock_name || c.ticker) + '</a></div>' +
-                            '<div style="font-size:0.72rem;color:var(--muted);margin-top:1px;"><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + c.ticker + '</a><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
+                            '<div style="font-size:0.72rem;color:var(--muted);margin-top:1px;"><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + c.ticker + '</a><button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice(\'' + c.ticker + '\', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;margin-left:0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" title="Refresh live price for ' + c.ticker + '">↻</button><a href="/stock/' + encodeURIComponent(c.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.15rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
                         '</td>' +
                         '<td style="padding:0.5rem 0.65rem;max-width:340px;">' +
                             '<div style="display:flex;align-items:center;gap:0.35rem;margin-bottom:0.2rem;">' +
@@ -223,7 +223,7 @@ Object.assign(app, {
                             '<div style="font-weight:700;">' + sigPriceStr + '</div>' +
                             '<div style="font-size:0.62rem;color:#64748b;">Signal Base</div>' +
                         '</td>' +
-                        '<td style="text-align:right;padding:0.5rem 0.65rem;font-family:var(--font-mono);font-size:0.76rem;white-space:nowrap;">' +
+                        '<td class="cell-current-price" style="text-align:right;padding:0.5rem 0.65rem;font-family:var(--font-mono);font-size:0.76rem;white-space:nowrap;">' +
                             '<div style="font-weight:800;color:#f8fafc;font-size:0.84rem;">' + curPriceStr + '</div>' +
                             '<div style="font-size:0.62rem;color:#94a3b8;">Live Price</div>' +
                         '</td>' +

@@ -659,6 +659,7 @@
                         <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-weight:700;cursor:pointer;" onclick="app.searchInstitutionalStock('${it.ticker}')">
 
                             <span style="color:#38bdf8;">${it.ticker.replace('.NS', '')}</span>
+                            <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${it.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;margin-left:0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" title="Refresh live price for ${it.ticker}">↻</button>
 
                             <div style="font-size:0.65rem;color:#94a3b8;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;">${it.company_name || ''}</div>
 
@@ -737,6 +738,7 @@
                         <td style="padding:0.55rem 0.6rem;font-family:var(--font-mono);font-weight:700;color:#f87171;cursor:pointer;" onclick="app.searchInstitutionalStock('${it.ticker}')">
 
                             <span>${it.ticker.replace('.NS', '')}</span>
+                            <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${it.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;margin-left:0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" title="Refresh live price for ${it.ticker}">↻</button>
 
                             <div style="font-size:0.65rem;color:#94a3b8;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;">${it.company_name || ''}</div>
 
@@ -2563,6 +2565,7 @@
                         <td style="padding:0.45rem 0.6rem;">
                             <div style="font-weight:800;color:#ffffff;font-family:var(--font-mono);font-size:0.8rem;display:flex;align-items:center;gap:0.3rem;">
                                 <span>${cleanTicker}</span>
+                                <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${s.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" title="Refresh live price for ${s.ticker}">↻</button>
                                 <span style="font-size:0.6rem;color:#71717a;font-weight:600;">${s.cap_category || ''}</span>
                             </div>
                             <div style="font-size:0.65rem;color:#a1a1aa;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">

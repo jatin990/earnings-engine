@@ -101,13 +101,13 @@ Object.assign(app, {
                     const volColor = g.volume_multiple >= 3.0 ? '#f87171' : (g.volume_multiple >= 2.0 ? '#fbbf24' : '#34d399');
                     const currSym = (g.ticker.endsWith('.NS') || g.ticker.endsWith('.BO')) ? '₹' : '$';
 
-                    return '<tr>' +
+                    return '<tr data-ticker="' + g.ticker + '">' +
                         '<td style="text-align:center;"><span style="background:' + rankBadgeBg + ';color:' + rankColor + ';width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:0.75rem;">' + rank + '</span></td>' +
                         '<td>' +
                             '<div><a href="/stock/' + encodeURIComponent(g.ticker) + '" target="_blank" style="font-weight:700;font-size:0.85rem;color:var(--light);text-decoration:none;">' + (g.stock_name || g.ticker) + '</a></div>' +
-                            '<div style="font-size:0.72rem;color:var(--muted);"><a href="/stock/' + encodeURIComponent(g.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + g.ticker + '</a><a href="/stock/' + encodeURIComponent(g.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
+                            '<div style="font-size:0.72rem;color:var(--muted);"><a href="/stock/' + encodeURIComponent(g.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + g.ticker + '</a><button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice(\'' + g.ticker + '\', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;margin-left:0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" title="Refresh live price for ' + g.ticker + '">↻</button><a href="/stock/' + encodeURIComponent(g.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.15rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
                         '</td>' +
-                        '<td><strong>' + currSym + (g.close_price ? Number(g.close_price).toFixed(2) : '—') + '</strong></td>' +
+                        '<td class="cell-current-price"><strong>' + currSym + (g.close_price ? Number(g.close_price).toFixed(2) : '—') + '</strong></td>' +
                         '<td><strong class="price-positive" style="font-size:0.95rem;">+' + Number(g.return_pct).toFixed(2) + '%</strong></td>' +
                         '<td><strong style="color:' + volColor + ';">' + volMult + 'x</strong> <span style="font-size:0.7rem;color:var(--muted);">20D Avg</span></td>' +
                         '<td>' + status52w + '</td>' +
@@ -199,12 +199,12 @@ Object.assign(app, {
 
                 tbody.innerHTML = items.map(s => {
                     const currSym = (s.ticker.endsWith('.NS') || s.ticker.endsWith('.BO')) ? '₹' : '$';
-                    return '<tr>' +
+                    return '<tr data-ticker="' + s.ticker + '">' +
                         '<td>' +
                             '<div><a href="/stock/' + encodeURIComponent(s.ticker) + '" target="_blank" style="font-weight:700;font-size:0.85rem;color:var(--light);text-decoration:none;">' + (s.stock_name || s.ticker) + '</a></div>' +
-                            '<div style="font-size:0.72rem;color:var(--muted);"><a href="/stock/' + encodeURIComponent(s.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + s.ticker + '</a><a href="/stock/' + encodeURIComponent(s.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
+                            '<div style="font-size:0.72rem;color:var(--muted);"><a href="/stock/' + encodeURIComponent(s.ticker) + '" target="_blank" style="color:#60a5fa;text-decoration:none;font-family:var(--font-mono);">' + s.ticker + '</a><button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice(\'' + s.ticker + '\', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;margin-left:0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" title="Refresh live price for ' + s.ticker + '">↻</button><a href="/stock/' + encodeURIComponent(s.ticker) + '" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.15rem;font-size:0.75rem;" title="Open profile in new tab">↗</a></div>' +
                         '</td>' +
-                        '<td><strong>' + currSym + (s.current_price ? Number(s.current_price).toFixed(2) : '—') + '</strong></td>' +
+                        '<td class="cell-current-price"><strong>' + currSym + (s.current_price ? Number(s.current_price).toFixed(2) : '—') + '</strong></td>' +
                         '<td><span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:0.2rem 0.5rem;border-radius:0.3rem;font-size:0.72rem;font-weight:600;">' + s.matching_pattern + '</span></td>' +
                         '<td><span style="background:rgba(59,130,246,0.2);color:#60a5fa;padding:0.2rem 0.5rem;border-radius:0.3rem;font-size:0.72rem;font-weight:600;">' + s.setup_stage + '</span></td>' +
                         '<td><strong style="color:#fbbf24;font-size:0.85rem;">' + currSym + Number(s.trigger_level).toFixed(2) + '</strong></td>' +

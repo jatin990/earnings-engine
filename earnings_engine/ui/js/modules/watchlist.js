@@ -473,19 +473,20 @@ app.watchlistTab = {
                             rangeCellHtml = `<button type="button" onclick="app.watchlistTab.autoDetectRowRange('${it.ticker}', this)" class="btn-micro" style="font-size:0.7rem;font-weight:700;cursor:pointer;color:#fbbf24;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:0.15rem 0.45rem;display:inline-flex;align-items:center;gap:0.2rem;" title="Auto-detect support & resistance range"><span>⚡</span> Auto Detect</button>`;
                         }
 
-                        return `<tr class="interactive-row">
+                        return `<tr class="interactive-row" data-ticker="${it.ticker}">
                             <td>
                                 <div style="display:flex;align-items:center;gap:0.4rem;">
                                     <button type="button" onclick="app.openAddToWatchlistModal('${it.ticker}')" class="btn-micro" style="color:#fbbf24;border:none;background:transparent;padding:0;font-size:0.85rem;cursor:pointer;" title="Manage Watchlists">⭐</button>
                                     <div>
                                         <strong onclick="app.openSwingRangeModal('${activeWl}','${it.ticker}')" style="color:#ffffff;font-size:0.85rem;cursor:pointer;" class="hover-underline" title="Inspect & edit swing range">${it.ticker}</strong>
-                                        <a href="/stock/${encodeURIComponent(it.ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.25rem;font-size:0.75rem;cursor:pointer;" title="Open profile in new tab">↗</a>
+                                        <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${it.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" onmouseenter="this.style.opacity='1';this.style.color='#7dd3fc';" onmouseleave="this.style.opacity='0.75';this.style.color='#38bdf8';" title="Refresh live price & technical metrics for ${it.ticker}">↻</button>
+                                        <a href="/stock/${encodeURIComponent(it.ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;margin-left:0.15rem;font-size:0.75rem;cursor:pointer;" title="Open profile in new tab">↗</a>
                                         <div style="font-size:0.7rem;color:#a1a1aa;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.company_name || it.ticker}</div>
                                         ${it.funds_buying > 0 ? `<div style="font-size:0.64rem;color:#34d399;font-weight:700;margin-top:2px;" title="Institutional Accumulation (+${it.funds_buying} Funds Buying)">🏛️ +${it.funds_buying} Funds Buying</div>` : (it.funds_selling > 0 ? `<div style="font-size:0.64rem;color:#f87171;font-weight:700;margin-top:2px;" title="Institutional Distribution (-${it.funds_selling} Funds Selling)">🏛️ -${it.funds_selling} Funds Selling</div>` : '')}
                                     </div>
                                 </div>
                             </td>
-                            <td style="text-align:right;"><strong style="font-size:0.88rem;color:#ffffff;font-family:var(--font-mono);">${p}</strong></td>
+                            <td class="cell-current-price" style="text-align:right;"><strong style="font-size:0.88rem;color:#ffffff;font-family:var(--font-mono);">${p}</strong></td>
                             <td style="text-align:right;"><span style="background:${chgBadgeBg};color:${chgColor};padding:0.15rem 0.45rem;border-radius:4px;font-size:0.75rem;font-weight:700;font-family:var(--font-mono);">${chgStr}</span></td>
                             <td style="text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#cbd5e1;">${openStr}</td>
                             <td style="text-align:right;font-family:var(--font-mono);font-size:0.75rem;color:#34d399;">${highStr}</td>

@@ -174,11 +174,12 @@
             const retColor = ret > 0 ? '#34d399' : (ret < 0 ? '#f87171' : 'var(--text-secondary)');
 
             html += `
-                <tr style="border-bottom:1px solid var(--border-color, rgba(255,255,255,0.05));transition:background 0.15s ease;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                <tr style="border-bottom:1px solid var(--border-color, rgba(255,255,255,0.05));transition:background 0.15s ease;" data-ticker="${item.ticker}" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
                     <td style="padding:0.75rem 1rem;color:var(--text-secondary);font-family:var(--font-mono);font-size:0.75rem;">${idx + 1}</td>
                     <td style="padding:0.75rem 1rem;">
-                        <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <div style="display:flex;align-items:center;gap:0.4rem;">
                             <span onclick="app.openStockModal('${item.ticker}')" style="font-weight:700;color:#fff;cursor:pointer;font-family:var(--font-mono);hover:underline;" title="Open Ticker Analysis">${item.clean_ticker || item.ticker}</span>
+                            <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${item.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" title="Refresh live price for ${item.ticker}">↻</button>
                             <span style="font-size:0.7rem;color:var(--text-secondary);background:rgba(255,255,255,0.05);padding:0.1rem 0.35rem;border-radius:4px;">${item.sector || 'Equity'}</span>
                         </div>
                         <div style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.15rem;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">

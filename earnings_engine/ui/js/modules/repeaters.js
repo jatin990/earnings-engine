@@ -107,15 +107,16 @@
                         : `<span style="background:rgba(59,130,246,0.12);color:#60a5fa;border:1px solid rgba(59,130,246,0.25);font-size:0.7rem;padding:0.15rem 0.45rem;border-radius:4px;">1Q Beat</span>`);
 
                 return `
-                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background 0.15s ease;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background 0.15s ease;" data-ticker="${ticker}" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
                     <td style="padding:0.75rem 0.85rem;">
-                        <div style="font-weight:700;color:#f1f5f9;font-family:var(--font-mono);">
+                        <div style="font-weight:700;color:#f1f5f9;font-family:var(--font-mono);display:flex;align-items:center;gap:0.35rem;">
                             <a href="/stock/${encodeURIComponent(ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${ticker}</a>
+                            <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" title="Refresh live price for ${ticker}">↻</button>
                         </div>
                         <div style="font-size:0.7rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;">${compName}</div>
                         <div style="margin-top:0.25rem;"><span style="font-size:0.65rem;background:rgba(168,85,247,0.12);color:#c084fc;border:1px solid rgba(168,85,247,0.25);padding:0.1rem 0.35rem;border-radius:3px;display:inline-block;">${buzz}</span></div>
                     </td>
-                    <td style="padding:0.75rem 0.85rem;font-family:var(--font-mono);font-weight:700;color:#e2e8f0;white-space:nowrap;">
+                    <td class="cell-current-price" style="padding:0.75rem 0.85rem;font-family:var(--font-mono);font-weight:700;color:#e2e8f0;white-space:nowrap;">
                         ${curPrice}
                         ${ret30Html}
                     </td>

@@ -576,6 +576,7 @@
                             <a href="/stock/${encodeURIComponent(sym)}" target="_blank" style="font-weight:700;color:#f8fafc;font-size:0.85rem;text-decoration:none;letter-spacing:-0.01em;" onmouseenter="this.style.color='#38bdf8'" onmouseleave="this.style.color='#f8fafc'">
                                 ${sym}
                             </a>
+                            <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${sym}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" onmouseenter="this.style.opacity='1';this.style.color='#7dd3fc';" onmouseleave="this.style.opacity='0.75';this.style.color='#38bdf8';" title="Refresh live price & technical metrics for ${sym}">↻</button>
                             ${setupCountBadge}
                             ${horizonBadge}
                         </div>
