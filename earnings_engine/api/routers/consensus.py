@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+import json
 import os
+import re
 from typing import Any
 import requests
 
@@ -14,6 +16,8 @@ from earnings_engine.api.dependencies import (
     _settings,
     ConsensusPredictRequest,
     ConsensusSettleRequest,
+    OmniRouteAnalyzeRequest,
+    OmniRouteAnalyzeResponse,
 )
 from earnings_engine.consensus.aggregator import (
     aggregate_predictions,
@@ -100,20 +104,124 @@ def _scan_and_cache_local_models(host: str | None = None) -> dict[str, Any]:
     return result
 
 
+def _extract_structured_json(raw_text: str) -> dict[str, Any]:
+    """Parse JSON payload from raw LLM output, extracting from markdown fences or fallback."""
+    if not raw_text or not raw_text.strip():
+        return {"direction": "UNKNOWN", "thesis": raw_text or ""}
+
+    text = raw_text.strip()
+
+    # 1. Match markdown code fence ```json ... ``` or ``` ... ```
+    fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+    if fence_match:
+        content = fence_match.group(1).strip()
+        try:
+            data = json.loads(content)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+
+    # 2. Try parsing raw text directly
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+
+    # 3. Try finding first '{' and last '}'
+    first_brace = text.find("{")
+    last_brace = text.rfind("}")
+    if first_brace != -1 and last_brace > first_brace:
+        try:
+            data = json.loads(text[first_brace : last_brace + 1])
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+
+    return {
+        "direction": "UNKNOWN",
+        "thesis": raw_text,
+    }
+
+
 @router.get("/api/v1/consensus/models")
 async def get_consensus_models():
-    """Return available AI models, their display metadata, and live rate limit quotas."""
+    """Return available OmniRoute Claude Code models catalog, display metadata, and live rate limits."""
     try:
+        from earnings_engine.data.omniroute_client import get_claude_code_models
         from earnings_engine.rate_limits import get_ratelimits_summary
-        models = get_models_rate_limits()
+
+        models = await asyncio.to_thread(get_claude_code_models, probe_live=True)
         return {
             "success": True,
             "models": models,
-            "default_models": DEFAULT_MODELS,
+            "count": len(models),
             "rate_limits": get_ratelimits_summary(_settings),
         }
     except Exception as e:
         logger.exception("Error fetching consensus models: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/consensus/analyze", response_model=OmniRouteAnalyzeResponse)
+async def analyze_with_omniroute(req: OmniRouteAnalyzeRequest):
+    """Execute direct quantitative analysis via OmniRoute using selected model and customized context."""
+    from earnings_engine.consensus.context_builder import build_customized_prompt
+    from earnings_engine.data.omniroute_client import execute_omniroute_analysis
+
+    ticker = req.ticker.strip().upper()
+    if not ticker:
+        raise HTTPException(status_code=400, detail="Must provide ticker symbol.")
+
+    try:
+        system_prompt, user_prompt, _ = await asyncio.to_thread(
+            build_customized_prompt,
+            ticker=ticker,
+            timeframe_days=req.timeframe_days,
+            include_technicals=req.include_technicals,
+            include_news=req.include_news,
+            include_institutional=req.include_institutional,
+            custom_directives=req.custom_prompt,
+            settings=_settings,
+        )
+
+        analysis = await asyncio.to_thread(
+            execute_omniroute_analysis,
+            model=req.model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            temperature=req.temperature,
+        )
+
+        raw_text = analysis.get("raw_text", "")
+        reasoning_text = analysis.get("reasoning_text", "")
+        status = analysis.get("status", "success")
+        error = analysis.get("error")
+        latency_ms = float(analysis.get("latency_ms", 0.0))
+        tokens_used = int(analysis.get("tokens_used", 0))
+
+        structured = _extract_structured_json(raw_text)
+        prompt_sent = f"--- SYSTEM PROMPT ---\n{system_prompt}\n\n--- USER PROMPT ---\n{user_prompt}"
+
+        return OmniRouteAnalyzeResponse(
+            ticker=ticker,
+            model=req.model,
+            structured=structured,
+            raw_text=raw_text,
+            reasoning_text=reasoning_text,
+            prompt_sent=prompt_sent,
+            latency_ms=latency_ms,
+            tokens_used=tokens_used,
+            status=status,
+            error=error,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error executing OmniRoute analysis for %s: %s", ticker, e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

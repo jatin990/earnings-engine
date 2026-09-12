@@ -180,6 +180,30 @@ class CalculateEpsRequest(BaseModel):
     override_reported: float | None = None
 
 
+class OmniRouteAnalyzeRequest(BaseModel):
+    ticker: str
+    model: str = "antigravityonly"
+    timeframe_days: int = 14
+    include_technicals: bool = True
+    include_news: bool = True
+    include_institutional: bool = True
+    custom_prompt: str | None = None
+    temperature: float = 0.2
+
+
+class OmniRouteAnalyzeResponse(BaseModel):
+    ticker: str
+    model: str
+    structured: dict[str, Any]
+    raw_text: str
+    reasoning_text: str = ""
+    prompt_sent: str
+    latency_ms: float = 0.0
+    tokens_used: int = 0
+    status: str = "success"
+    error: str | None = None
+
+
 class ConsensusPredictRequest(BaseModel):
     ticker: str | None = None
     tickers: list[str] | None = None
