@@ -1766,7 +1766,7 @@
                     const res = await fetch(API_BASE + '/api/v1/market-pulse/glossary');
                     if (res.ok) {
                         const data = await res.json();
-                        this._glossaryData = data.categories || data;
+                        this._glossaryData = data.glossary?.categories || data.categories || (data.glossary && Array.isArray(data.glossary) ? data.glossary : (Array.isArray(data) ? data : data));
                     }
                 } catch (e) {
                     console.error('[GLOSSARY] Error fetching metric glossary:', e);
@@ -1831,29 +1831,68 @@
             const body = document.getElementById('pulseGlossaryBody');
             if (!body) return;
 
-            let categories = this._glossaryData;
-            if (!categories) {
+            let raw = this._glossaryData;
+            if (!raw) {
                 body.innerHTML = '<div style="color:#64748b;text-align:center;padding:2rem;">Glossary data loading...</div>';
                 return;
             }
 
+            let categories = raw;
+            if (categories && categories.glossary) {
+                categories = categories.glossary.categories || categories.glossary;
+            }
+            if (categories && categories.categories) {
+                categories = categories.categories;
+            }
             if (!Array.isArray(categories) && typeof categories === 'object') {
-                categories = categories.categories || Object.values(categories);
+                categories = Object.values(categories);
             }
 
             const catFilter = this._currentGlossaryCategory;
             const search = this._currentGlossarySearch;
 
             let matchingCards = [];
-            categories.forEach(cat => {
-                if (catFilter !== 'all' && cat.category_id !== catFilter) return;
+            (categories || []).forEach(cat => {
+                if (!cat || typeof cat !== 'object') return;
+                const catId = cat.id || cat.category_id || '';
+                const catTitle = cat.title || cat.name || catId;
+                if (catFilter !== 'all' && catId !== catFilter) return;
 
                 (cat.metrics || []).forEach(m => {
+                    if (!m) return;
+                    const mId = m.id || m.metric_id || '';
+                    const mTitle = m.name || m.title || mId;
+                    const mSummary = m.summary || '';
+                    const mFormula = m.formula || '';
+                    const mPlaybook = m.next_day_playbook || m.playbook || '';
+                    const mTrap = m.trap_warning || m.trap || '';
+
+                    let benchmarksText = '';
+                    if (m.benchmarks && typeof m.benchmarks === 'object') {
+                        benchmarksText = Object.entries(m.benchmarks).map(([k, v]) => `${k} ${v}`).join(' ');
+                    } else {
+                        benchmarksText = `${m.bullish_benchmark || ''} ${m.bearish_benchmark || ''}`;
+                    }
+
                     if (search) {
-                        const str = `${m.title} ${m.metric_id} ${m.summary} ${m.formula} ${m.bullish_benchmark} ${m.bearish_benchmark} ${m.next_day_playbook} ${m.trap_warning}`.toLowerCase();
+                        const str = `${mTitle} ${mId} ${mSummary} ${mFormula} ${benchmarksText} ${mPlaybook} ${mTrap} ${catTitle} ${catId}`.toLowerCase();
                         if (!str.includes(search)) return;
                     }
-                    matchingCards.push({ ...m, catTitle: cat.title, catId: cat.category_id });
+
+                    matchingCards.push({
+                        ...m,
+                        metric_id: mId,
+                        title: mTitle,
+                        summary: mSummary,
+                        formula: mFormula,
+                        benchmarks: m.benchmarks || {},
+                        bullish_benchmark: m.benchmarks?.bullish || m.bullish_benchmark || '',
+                        bearish_benchmark: m.benchmarks?.bearish || m.bearish_benchmark || '',
+                        next_day_playbook: mPlaybook,
+                        trap_warning: mTrap,
+                        catTitle: catTitle,
+                        catId: catId,
+                    });
                 });
             });
 
@@ -1868,6 +1907,53 @@
             }
 
             body.innerHTML = matchingCards.map(m => {
+                let benchmarksHtml = '';
+                if (m.benchmarks && typeof m.benchmarks === 'object' && Object.keys(m.benchmarks).length > 0) {
+                    benchmarksHtml = `
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:0.5rem;font-size:0.70rem;">
+                            ${Object.entries(m.benchmarks).map(([k, v]) => {
+                                const label = k.replace(/_/g, ' ').toUpperCase();
+                                let col = '#38bdf8';
+                                let bg = 'rgba(56,189,248,0.06)';
+                                let border = 'rgba(56,189,248,0.2)';
+                                const lk = k.toLowerCase();
+                                if (lk.includes('bull') || lk.includes('long') || lk.includes('greed') || lk.includes('complacent') || lk.includes('inflow') || lk.includes('thrust') || lk.includes('squeeze')) {
+                                    col = '#34d399';
+                                    bg = 'rgba(16,185,129,0.06)';
+                                    border = 'rgba(16,185,129,0.2)';
+                                } else if (lk.includes('bear') || lk.includes('short') || lk.includes('panic') || lk.includes('fear') || lk.includes('elevated') || lk.includes('liquidation') || lk.includes('unwinding') || lk.includes('distribution') || lk.includes('trap')) {
+                                    col = '#f87171';
+                                    bg = 'rgba(239,68,68,0.06)';
+                                    border = 'rgba(239,68,68,0.2)';
+                                } else if (lk.includes('neutral') || lk.includes('normal') || lk.includes('balanced') || lk.includes('absorption')) {
+                                    col = '#fbbf24';
+                                    bg = 'rgba(251,191,36,0.06)';
+                                    border = 'rgba(251,191,36,0.2)';
+                                }
+                                return `
+                                    <div style="background:${bg};border:1px solid ${border};padding:0.5rem 0.65rem;border-radius:6px;">
+                                        <div style="color:${col};font-weight:800;margin-bottom:0.15rem;font-size:0.68rem;text-transform:capitalize;">${label}</div>
+                                        <div style="color:#cbd5e1;line-height:1.35;">${v}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                } else if (m.bullish_benchmark || m.bearish_benchmark) {
+                    benchmarksHtml = `
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.70rem;">
+                            <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);padding:0.5rem 0.65rem;border-radius:6px;">
+                                <div style="color:#34d399;font-weight:800;margin-bottom:0.15rem;">🟢 Bullish Benchmark</div>
+                                <div style="color:#cbd5e1;line-height:1.35;">${m.bullish_benchmark || '—'}</div>
+                            </div>
+                            <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);padding:0.5rem 0.65rem;border-radius:6px;">
+                                <div style="color:#f87171;font-weight:800;margin-bottom:0.15rem;">🔴 Bearish Benchmark</div>
+                                <div style="color:#cbd5e1;line-height:1.35;">${m.bearish_benchmark || '—'}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 return `
                     <div id="glossary-card-${m.metric_id}" class="card" style="padding:1.15rem;background:#0b1329;border:1px solid rgba(255,255,255,0.08);border-radius:8px;display:flex;flex-direction:column;gap:0.75rem;">
                         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.5rem;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:0.6rem;">
@@ -1901,37 +1987,32 @@
                             </div>
                         ` : ''}
 
-                        <!-- Bullish vs Bearish Benchmarks Grid -->
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.70rem;">
-                            <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);padding:0.5rem 0.65rem;border-radius:6px;">
-                                <div style="color:#34d399;font-weight:800;margin-bottom:0.15rem;">🟢 Bullish Benchmark</div>
-                                <div style="color:#cbd5e1;line-height:1.35;">${m.bullish_benchmark}</div>
-                            </div>
-                            <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);padding:0.5rem 0.65rem;border-radius:6px;">
-                                <div style="color:#f87171;font-weight:800;margin-bottom:0.15rem;">🔴 Bearish Benchmark</div>
-                                <div style="color:#cbd5e1;line-height:1.35;">${m.bearish_benchmark}</div>
-                            </div>
-                        </div>
+                        <!-- Dynamic Benchmarks Grid -->
+                        ${benchmarksHtml}
 
                         <!-- Next-Day Playbook Directive -->
-                        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);padding:0.6rem 0.75rem;border-radius:6px;font-size:0.72rem;">
-                            <div style="color:#60a5fa;font-weight:800;margin-bottom:0.2rem;display:flex;align-items:center;gap:0.3rem;">
-                                <span>🎯</span> Next-Day Market Application &amp; Trading Strategy:
+                        ${m.next_day_playbook ? `
+                            <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);padding:0.6rem 0.75rem;border-radius:6px;font-size:0.72rem;">
+                                <div style="color:#60a5fa;font-weight:800;margin-bottom:0.2rem;display:flex;align-items:center;gap:0.3rem;">
+                                    <span>🎯</span> Next-Day Market Application &amp; Trading Strategy:
+                                </div>
+                                <div style="color:#e2e8f0;line-height:1.4;">
+                                    ${m.next_day_playbook}
+                                </div>
                             </div>
-                            <div style="color:#e2e8f0;line-height:1.4;">
-                                ${m.next_day_playbook}
-                            </div>
-                        </div>
+                        ` : ''}
 
                         <!-- Trap Warning Alert -->
-                        <div style="background:rgba(244,63,94,0.06);border:1px solid rgba(244,63,94,0.2);padding:0.5rem 0.75rem;border-radius:6px;font-size:0.70rem;">
-                            <div style="color:#fb7185;font-weight:800;margin-bottom:0.15rem;display:flex;align-items:center;gap:0.3rem;">
-                                <span>⚠️</span> Trap Warning &amp; Pitfalls:
+                        ${m.trap_warning ? `
+                            <div style="background:rgba(244,63,94,0.06);border:1px solid rgba(244,63,94,0.2);padding:0.5rem 0.75rem;border-radius:6px;font-size:0.70rem;">
+                                <div style="color:#fb7185;font-weight:800;margin-bottom:0.15rem;display:flex;align-items:center;gap:0.3rem;">
+                                    <span>⚠️</span> Trap Warning &amp; Pitfalls:
+                                </div>
+                                <div style="color:#cbd5e1;line-height:1.35;">
+                                    ${m.trap_warning}
+                                </div>
                             </div>
-                            <div style="color:#cbd5e1;line-height:1.35;">
-                                ${m.trap_warning}
-                            </div>
-                        </div>
+                        ` : ''}
                     </div>
                 `;
             }).join('');
