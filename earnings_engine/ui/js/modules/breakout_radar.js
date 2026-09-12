@@ -17,6 +17,10 @@
         app._breakoutAsofDate = null;
         app._breakoutFilterBreakingOut = false;
         app._breakoutPoolFilter = 'ALL';
+        app._selectedBreakoutTicker = null;
+        app._breakoutSelectedIndex = 0;
+        app._breakoutSplitActive = true;
+        app._currentRenderedBreakoutList = [];
 
         app.isItemBreaking = function(item) {
             if (!item) return false;
@@ -1161,9 +1165,16 @@
             if (!tbody) return;
 
             const cols = app.getBreakoutColumnOrder();
+            app._currentRenderedBreakoutList = candidates || [];
+
+            const footerCountEl = document.getElementById('breakoutFooterCount');
+            if (footerCountEl) {
+                footerCountEl.textContent = (candidates || []).length;
+            }
 
             if (!candidates || candidates.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="${cols.length}" style="padding:2.5rem;text-align:center;color:#334155;font-size:0.82rem;">\u26a1 No candidates found for ${asofDate ? 'date ' + asofDate : 'current scan'} above score threshold.<br><span style="font-size:0.72rem;color:#1e293b;">Try lowering the Min Score or selecting another universe.</span></td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${cols.length}" style="padding:2.5rem;text-align:center;color:#52525b;font-size:0.82rem;">⚡ No candidates found for ${asofDate ? 'date ' + asofDate : 'current scan'} above score threshold.<br><span style="font-size:0.72rem;color:#71717a;">Try lowering the Min Score or selecting another universe.</span></td></tr>`;
+                app.renderBreakoutSetupInspector(null);
                 return;
             }
 
@@ -1181,22 +1192,22 @@
                 return `<span style="display:inline-block;background:${style.bg};color:${style.text};border:1px solid ${style.border};font-size:0.65rem;font-weight:700;padding:0.12rem 0.45rem;border-radius:4px;white-space:nowrap;">${label}</span>`;
             };
 
-            const rows = candidates.map((c) => {
+            const rows = candidates.map((c, index) => {
                 const score = c.composite_score || 0;
                 const scoreColor = score >= 75 ? '#fde68a' : score >= 55 ? '#34d399' : '#60a5fa';
                 const scoreBg = score >= 75 ? 'rgba(234,179,8,0.18)' : score >= 55 ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.12)';
 
-                const ticker = c.ticker || '\u2014';
+                const ticker = c.ticker || '—';
                 const company = (c.company_name || ticker).substring(0, 20);
-                const industry = (c.industry || '\u2014').substring(0, 16);
+                const industry = (c.industry || '—').substring(0, 16);
 
                 const sigPrice = c.predicted_value || c.signal_price || c.current_price;
-                const sigPriceStr = sigPrice != null ? `\u20b9${Number(sigPrice).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
-                
-                const curPriceStr = c.current_price != null ? `\u20b9${Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
-                const triggerStr = c.breakout_trigger != null ? `\u20b9${Number(c.breakout_trigger).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
-                const targetStr = c.target_price != null ? `\u20b9${Number(c.target_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
-                const stopStr = c.stop_loss != null ? `\u20b9${Number(c.stop_loss).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '\u2014';
+                const sigPriceStr = sigPrice != null ? `₹${Number(sigPrice).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+
+                const curPriceStr = c.current_price != null ? `₹${Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+                const triggerStr = c.breakout_trigger != null ? `₹${Number(c.breakout_trigger).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+                const targetStr = c.target_price != null ? `₹${Number(c.target_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+                const stopStr = c.stop_loss != null ? `₹${Number(c.stop_loss).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
 
                 // Compute Color-Coded Prediction Status & Current Price Styling
                 let curPriceColor = '#e2e8f0';
@@ -1316,11 +1327,307 @@
                     rowClass += ' bk-row-warm';
                 }
 
-                return `<tr class="${rowClass}${isBreakingOut ? ' breakout-row-on-fire' : ''}" data-ticker="${ticker}">${cellsHtml}</tr>`;
+                const isSelected = app._selectedBreakoutTicker === ticker;
+                if (isSelected) {
+                    rowClass += ' bk-row-selected';
+                }
+
+                return `<tr class="${rowClass}${isBreakingOut ? ' breakout-row-on-fire' : ''}" data-ticker="${ticker}" onclick="app.selectBreakoutCandidate('${ticker}')" style="cursor:pointer;">${cellsHtml}</tr>`;
             });
 
             tbody.innerHTML = rows.join('');
+
+            // Auto-select candidate if none is selected or selected candidate is in list
+            if (candidates.length > 0) {
+                const targetTicker = (app._selectedBreakoutTicker && candidates.some(c => c.ticker === app._selectedBreakoutTicker))
+                    ? app._selectedBreakoutTicker
+                    : candidates[0].ticker;
+                app.selectBreakoutCandidate(targetTicker, false);
+            }
         };
+
+        // ==========================================
+        // 🎯 CANDIDATE SELECTION & SETUP INSPECTOR
+        // ==========================================
+        app.selectBreakoutCandidate = function(ticker, autoScroll) {
+            if (!ticker) return;
+            app._selectedBreakoutTicker = ticker;
+
+            // Update row styling
+            const rows = document.querySelectorAll('#breakoutTableBody tr[data-ticker]');
+            rows.forEach((row, idx) => {
+                const rowTicker = row.getAttribute('data-ticker');
+                if (rowTicker === ticker) {
+                    row.classList.add('bk-row-selected');
+                    app._breakoutSelectedIndex = idx;
+                    if (autoScroll) {
+                        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                } else {
+                    row.classList.remove('bk-row-selected');
+                }
+            });
+
+            // Find candidate data from active rendered list or cached list
+            const candidate = (app._currentRenderedBreakoutList || []).find(c => c.ticker === ticker)
+                || (app._breakoutData || []).find(c => c.ticker === ticker)
+                || { ticker: ticker };
+
+            app.renderBreakoutSetupInspector(candidate);
+        };
+
+        app.inspectBreakoutStock = function(ticker, autoScroll) {
+            app.selectBreakoutCandidate(ticker, autoScroll !== false);
+        };
+
+        app.renderBreakoutSetupInspector = function(candidate) {
+            const emptyState = document.getElementById('breakoutInspectorEmptyState');
+            const content = document.getElementById('breakoutInspectorContent');
+            if (!emptyState || !content) return;
+
+            if (!candidate || !candidate.ticker) {
+                emptyState.style.display = 'block';
+                content.style.display = 'none';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            content.style.display = 'block';
+
+            const ticker = candidate.ticker;
+            const currency = ticker.endsWith('.NS') || ticker.endsWith('.BO') ? '₹' : '$';
+
+            // 1. Header Information
+            const tickerEl = document.getElementById('bkInspTicker');
+            const tierBadge = document.getElementById('bkInspTierBadge');
+            const stratBadge = document.getElementById('bkInspStrategyBadge');
+            const compEl = document.getElementById('bkInspCompany');
+            const priceEl = document.getElementById('bkInspPrice');
+            const changeEl = document.getElementById('bkInspChange');
+
+            if (tickerEl) tickerEl.textContent = ticker;
+            if (compEl) compEl.textContent = `${candidate.company_name || ticker} · ${candidate.industry || 'Equities'}`;
+
+            const tier = (candidate.tier || 'HOT').toUpperCase();
+            if (tierBadge) {
+                tierBadge.textContent = tier;
+                tierBadge.className = 'badge';
+                if (tier === 'HOT') {
+                    tierBadge.style.background = 'rgba(239,68,68,0.2)';
+                    tierBadge.style.color = '#f87171';
+                    tierBadge.style.border = '1px solid rgba(239,68,68,0.4)';
+                } else {
+                    tierBadge.style.background = 'rgba(234,179,8,0.2)';
+                    tierBadge.style.color = '#fbbf24';
+                    tierBadge.style.border = '1px solid rgba(234,179,8,0.4)';
+                }
+            }
+
+            if (stratBadge) {
+                stratBadge.textContent = (candidate.strategy || 'CLASSIC').replace(/_/g, ' ');
+            }
+
+            const curPrice = candidate.current_price != null ? Number(candidate.current_price) : (candidate.signal_price != null ? Number(candidate.signal_price) : 0);
+            if (priceEl) priceEl.textContent = `${currency}${curPrice.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            const retPct = candidate.realized_return_pct != null ? Number(candidate.realized_return_pct) : 0;
+            if (changeEl) {
+                changeEl.textContent = `${retPct >= 0 ? '+' : ''}${retPct.toFixed(2)}% (1D Return)`;
+                changeEl.style.color = retPct >= 0 ? '#22c55e' : '#ef4444';
+            }
+
+            // 2. Execution Blueprint (SL, Price, Trigger, Target)
+            const trigger = candidate.breakout_trigger != null ? Number(candidate.breakout_trigger) : curPrice;
+            const target = candidate.target_price != null ? Number(candidate.target_price) : (trigger * 1.08);
+            const stopLoss = candidate.stop_loss != null ? Number(candidate.stop_loss) : (curPrice * 0.95);
+
+            const slEl = document.getElementById('bkInspSl');
+            const trigEl = document.getElementById('bkInspTrigger');
+            const targEl = document.getElementById('bkInspTarget');
+            const slPctEl = document.getElementById('bkInspSlPct');
+            const gapPctEl = document.getElementById('bkInspGapPct');
+            const targPctEl = document.getElementById('bkInspTargetPct');
+            const rrBadge = document.getElementById('bkInspRrBadge');
+
+            if (slEl) slEl.textContent = `${currency}${stopLoss.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            if (trigEl) trigEl.textContent = `${currency}${trigger.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            if (targEl) targEl.textContent = `${currency}${target.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            const risk = curPrice - stopLoss;
+            const reward = target - curPrice;
+            const rrRatio = risk > 0 ? (reward / risk) : 2.0;
+
+            if (rrBadge) {
+                rrBadge.textContent = `R:R ${rrRatio.toFixed(1)}x`;
+            }
+
+            if (slPctEl) {
+                const slPct = curPrice > 0 ? ((stopLoss - curPrice) / curPrice * 100) : -5.0;
+                slPctEl.textContent = `${slPct.toFixed(1)}%`;
+            }
+            if (gapPctEl) {
+                const gapPct = curPrice > 0 ? ((trigger - curPrice) / curPrice * 100) : 0.0;
+                gapPctEl.textContent = `${gapPct >= 0 ? '+' : ''}${gapPct.toFixed(1)}% to ceiling`;
+            }
+            if (targPctEl) {
+                const tPct = curPrice > 0 ? ((target - curPrice) / curPrice * 100) : 8.0;
+                targPctEl.textContent = `+${tPct.toFixed(1)}% ATR`;
+            }
+
+            // Visual Multi-Point Execution Range Bar
+            const barSl = document.getElementById('bkInspBarSl');
+            const barPrice = document.getElementById('bkInspBarPrice');
+            const barTrigger = document.getElementById('bkInspBarTrigger');
+            const barTarget = document.getElementById('bkInspBarTarget');
+            const priceMarker = document.getElementById('bkInspBarPriceMarker');
+            const trigMarker = document.getElementById('bkInspBarTriggerMarker');
+
+            if (barSl) barSl.textContent = `${currency}${Math.round(stopLoss)}`;
+            if (barPrice) barPrice.textContent = `${currency}${Math.round(curPrice)}`;
+            if (barTrigger) barTrigger.textContent = `${currency}${Math.round(trigger)}`;
+            if (barTarget) barTarget.textContent = `${currency}${Math.round(target)}`;
+
+            const totalRange = Math.max(1, target - stopLoss);
+            const pricePosPct = Math.min(100, Math.max(0, ((curPrice - stopLoss) / totalRange) * 100));
+            const trigPosPct = Math.min(100, Math.max(0, ((trigger - stopLoss) / totalRange) * 100));
+
+            if (priceMarker) priceMarker.style.left = `${pricePosPct}%`;
+            if (trigMarker) trigMarker.style.left = `${trigPosPct}%`;
+
+            // 3. 5-Pillar Scores
+            const compScore = candidate.composite_score || 0;
+            const resScore = candidate.resistance_score || (candidate.calculation_notes && candidate.calculation_notes.resistance_proximity ? candidate.calculation_notes.resistance_proximity.score : 0) || 0;
+            const volScore = candidate.volume_score || (candidate.calculation_notes && candidate.calculation_notes.volume_surge ? candidate.calculation_notes.volume_surge.score : 0) || 0;
+            const squeezeScore = candidate.compression_score || (candidate.calculation_notes && candidate.calculation_notes.price_compression ? candidate.calculation_notes.price_compression.score : 0) || 0;
+            const momScore = candidate.momentum_score || (candidate.calculation_notes && candidate.calculation_notes.trend_momentum ? candidate.calculation_notes.trend_momentum.score : 0) || 0;
+            const fundScore = candidate.fundamental_score || (candidate.calculation_notes && candidate.calculation_notes.fundamental_quality ? candidate.calculation_notes.fundamental_quality.score : 0) || 0;
+
+            const scoreEl = document.getElementById('bkInspCompositeScore');
+            if (scoreEl) scoreEl.textContent = compScore;
+
+            const setPillar = (scoreVal, maxVal, textId, barId) => {
+                const tEl = document.getElementById(textId);
+                const bEl = document.getElementById(barId);
+                if (tEl) tEl.textContent = scoreVal;
+                if (bEl) {
+                    const pct = Math.min(100, Math.max(0, (scoreVal / maxVal) * 100));
+                    bEl.style.width = `${pct}%`;
+                }
+            };
+
+            setPillar(resScore, 40, 'bkInspScoreRes', 'bkInspBarRes');
+            setPillar(volScore, 10, 'bkInspScoreVol', 'bkInspBarVol');
+            setPillar(squeezeScore, 10, 'bkInspScoreComp', 'bkInspBarComp');
+            setPillar(momScore, 25, 'bkInspScoreMom', 'bkInspBarMom');
+            setPillar(fundScore, 15, 'bkInspScoreFund', 'bkInspBarFund');
+
+            // 4. Catalyst Notes
+            const catalystEl = document.getElementById('bkInspCatalystText');
+            if (catalystEl) {
+                catalystEl.textContent = candidate.what_happened_summary || candidate.explanation_one_liner ||
+                    (candidate.strategy ? `Quantitative detection by ${candidate.strategy.replace(/_/g, ' ')} engine. Setup displays volatility squeeze coiling near historical resistance.` : 'Coiling near resistance ceiling with expanding accumulation flow.');
+            }
+
+            // 5. Links
+            const detailLink = document.getElementById('bkInspStockDetailLink');
+            if (detailLink) {
+                detailLink.href = `/stock/${encodeURIComponent(ticker)}`;
+            }
+        };
+
+        app.copyCurrentBreakoutLevels = function() {
+            const ticker = app._selectedBreakoutTicker;
+            if (!ticker) return;
+
+            const candidate = (app._currentRenderedBreakoutList || []).find(c => c.ticker === ticker)
+                || (app._breakoutData || []).find(c => c.ticker === ticker);
+
+            if (!candidate) return;
+
+            const curPrice = candidate.current_price || candidate.signal_price || 0;
+            const trigger = candidate.breakout_trigger || curPrice;
+            const target = candidate.target_price || (trigger * 1.08);
+            const stopLoss = candidate.stop_loss || (curPrice * 0.95);
+
+            const text = `${ticker} Breakout Setup:
+• Current Price: ₹${Number(curPrice).toFixed(2)}
+• Trigger: ₹${Number(trigger).toFixed(2)}
+• Target: ₹${Number(target).toFixed(2)}
+• Stop Loss: ₹${Number(stopLoss).toFixed(2)}
+• Score: ${candidate.composite_score || 0}/100`;
+
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('bkInspCopyLevelsBtn');
+                if (btn) {
+                    const prev = btn.textContent;
+                    btn.textContent = '✓ Copied!';
+                    btn.style.color = '#34d399';
+                    setTimeout(() => {
+                        btn.textContent = prev;
+                        btn.style.color = '#f4f4f5';
+                    }, 1500);
+                }
+            }).catch(err => {
+                console.error('[BREAKOUT] Copy failed:', err);
+            });
+        };
+
+        app.openSelectedBreakoutHistory = function() {
+            if (app._selectedBreakoutTicker) {
+                app.openBreakoutHistoryModal(app._selectedBreakoutTicker);
+            }
+        };
+
+        app.toggleBreakoutSplitLayout = function() {
+            app._breakoutSplitActive = !app._breakoutSplitActive;
+            const grid = document.getElementById('breakoutSplitGrid');
+            const rightPane = document.getElementById('breakoutSplitRight');
+            const toggleBtn = document.getElementById('btnToggleBreakoutSplit');
+
+            if (grid && rightPane) {
+                if (app._breakoutSplitActive) {
+                    grid.style.gridTemplateColumns = 'minmax(0, 1.05fr) minmax(0, 0.95fr)';
+                    rightPane.style.display = 'block';
+                    if (toggleBtn) toggleBtn.textContent = '◫ 50-50 Split';
+                } else {
+                    grid.style.gridTemplateColumns = '1fr';
+                    rightPane.style.display = 'none';
+                    if (toggleBtn) toggleBtn.textContent = '◫ Full Width';
+                }
+            }
+        };
+
+        // Keyboard Navigation (ArrowUp / ArrowDown / Enter)
+        if (!app._breakoutKeyNavAttached) {
+            app._breakoutKeyNavAttached = true;
+            document.addEventListener('keydown', function(e) {
+                const tab = document.getElementById('tab-breakout');
+                if (!tab || tab.style.display === 'none' || tab.offsetParent === null) return;
+
+                // Check if focus is inside an active text input or textarea
+                const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+                if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') return;
+
+                const list = app._currentRenderedBreakoutList || [];
+                if (list.length === 0) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    app._breakoutSelectedIndex = (app._breakoutSelectedIndex + 1) % list.length;
+                    const nextTicker = list[app._breakoutSelectedIndex].ticker;
+                    app.selectBreakoutCandidate(nextTicker, true);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    app._breakoutSelectedIndex = (app._breakoutSelectedIndex - 1 + list.length) % list.length;
+                    const prevTicker = list[app._breakoutSelectedIndex].ticker;
+                    app.selectBreakoutCandidate(prevTicker, true);
+                } else if (e.key === 'Enter') {
+                    if (app._selectedBreakoutTicker) {
+                        window.open(`/stock/${encodeURIComponent(app._selectedBreakoutTicker)}`, '_blank');
+                    }
+                }
+            });
+        }
 
         app.openBreakoutNotesModal = async function(ticker) {
             const candidate = (app._breakoutData || []).find(c => c.ticker === ticker) || { ticker: ticker };
@@ -1815,6 +2122,9 @@
         };
 
         app.renderBreakoutEvaluatedCard = function(c) {
+            if (c && c.ticker) {
+                app.selectBreakoutCandidate(c.ticker, true);
+            }
             const card = document.getElementById('breakoutEvaluatedStockCard');
             if (!card) return;
 

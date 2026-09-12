@@ -59,7 +59,7 @@ Object.assign(app, {
 
                 let totalUpdated = 0;
                 let processed = 0;
-                const chunkSize = 10;
+                const chunkSize = 50;
 
                 try {
                     for (let i = 0; i < cleanTickers.length; i += chunkSize) {
@@ -71,17 +71,28 @@ Object.assign(app, {
                             }
                         }
 
-                        const res = await fetch(API_BASE + '/api/v1/ticker/recalculate-batch', {
+                        const res = await fetch(API_BASE + '/api/v1/watchlist/quotes', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ tickers: chunk })
+                            body: JSON.stringify({ tickers: chunk, live: true })
                         });
                         const data = await res.json();
-                        if (data && data.success && Array.isArray(data.results)) {
-                            data.results.forEach(item => {
-                                if (item.ticker && item.updated_metrics) {
-                                    if (item.has_changes) totalUpdated++;
-                                    this.updateDomRowWithMetrics(item.ticker, item.updated_metrics);
+                        if (data && data.success && Array.isArray(data.items)) {
+                            data.items.forEach(item => {
+                                if (item.ticker && item.current_price !== null && item.current_price !== undefined) {
+                                    totalUpdated++;
+                                    const mappedMetrics = {
+                                        current_price: item.current_price,
+                                        previous_close: item.previous_close,
+                                        week_high: item.year_high,
+                                        week_low: item.year_low,
+                                        pct_from_52w_high: item.pct_from_52w_high,
+                                        pct_from_52w_low: item.pct_from_52w_low,
+                                        current_support: item.support,
+                                        next_resistance: item.resistance,
+                                        channel_position_pct: item.swing_position_pct,
+                                    };
+                                    this.updateDomRowWithMetrics(item.ticker, mappedMetrics);
                                 }
 
                                 if (buttonMap && buttonMap.has(item.ticker)) {

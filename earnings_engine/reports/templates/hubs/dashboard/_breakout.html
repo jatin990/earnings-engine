@@ -17,7 +17,7 @@
             <!-- Page Switcher Tabs -->
             <div style="display: flex; background: #09090b; padding: 0.25rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); gap: 0.25rem; flex-wrap: wrap;">
                 <button type="button" id="btnBreakoutSubtabScanner" onclick="app.switchBreakoutSubtab('scanner')" class="btn btn-sm bk-subtab-btn bk-subtab-active" style="background:#18181b; color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-weight:700; padding:0.35rem 0.85rem; font-size:0.76rem;">
-                    🔥 Hot Momentum Radar
+                    Equities & Active Radar
                 </button>
                 <button type="button" id="btnBreakoutSubtabBacktest" onclick="app.switchBreakoutSubtab('backtest')" class="btn btn-sm bk-subtab-btn" style="background:transparent; color:#94a3b8; border:1px solid transparent; font-weight:500; padding:0.35rem 0.85rem; font-size:0.76rem;">
                     Quick Date Backtest
@@ -35,13 +35,35 @@
     <div id="breakoutLiveScannerContainer" class="breakout-subview">
 
         <!-- Top Obsidian Control Toolbar -->
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.75rem; background: #09090b; padding: 0.55rem 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
-            <!-- Left: Strategy & Universe Pickers -->
-            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.65rem; background: #09090b; padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <!-- Left: Strategy & Universe Pickers + Ticker Evaluator Search -->
+            <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                <!-- Quick Ticker Search / Evaluator Box with Autocomplete -->
+                <div style="position: relative; display: flex; align-items: center;">
+                    <input
+                        id="breakoutTickerInput"
+                        type="text"
+                        placeholder="Evaluate ticker..."
+                        autocomplete="off"
+                        style="width: 145px; padding: 0.25rem 1.6rem 0.25rem 0.55rem; background: #06060a; border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; color: #f8fafc; font-size: 0.72rem; font-family: var(--font-mono); outline: none;"
+                        onfocus="this.style.borderColor='rgba(56,189,248,0.5)'"
+                        onblur="this.style.borderColor='rgba(255,255,255,0.15)'"
+                        onkeydown="if(event.key==='Enter') app.evaluateCurrentBreakoutInput()"
+                    />
+                    <button type="button" id="breakoutClearInputBtn" onclick="app.clearBreakoutEvaluator()" style="display:none; position:absolute; right:0.35rem; top:50%; transform:translateY(-50%); background:transparent; border:none; color:#71717a; font-size:0.7rem; cursor:pointer;">✕</button>
+                    <button type="button" id="breakoutEvaluateBtn" onclick="app.evaluateCurrentBreakoutInput()" class="btn btn-sm" style="margin-left:0.25rem; padding:0.25rem 0.5rem; font-size:0.7rem; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.35); font-weight:700; cursor:pointer; border-radius:4px;" title="Evaluate ticker setup">
+                        <span id="breakoutEvaluateIcon">⚡</span>
+                    </button>
+
+                    <!-- Dynamic Autocomplete Dropdown -->
+                    <div id="breakoutAutocompleteDropdown" style="display:none; position:absolute; top:100%; left:0; width:220px; margin-top:3px; background:#09090b; border:1px solid rgba(255,255,255,0.12); border-radius:6px; box-shadow:0 12px 28px rgba(0,0,0,0.85); z-index:999; max-height:220px; overflow-y:auto;">
+                    </div>
+                </div>
+
                 <!-- Strategy Selector -->
-                <div style="display: flex; align-items: center; gap: 0.35rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.55rem; border-radius: 6px;">
-                    <span style="font-size: 0.72rem; color: #a1a1aa;">🎯 Strategy:</span>
-                    <select id="breakoutStrategySelect" onchange="app.onBreakoutStrategyChange(this.value)" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.73rem; font-weight: 600; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Breakout Strategy Engine">
+                <div style="display: flex; align-items: center; gap: 0.3rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.18rem 0.45rem; border-radius: 5px;">
+                    <span style="font-size: 0.70rem; color: #a1a1aa;">🎯 Strategy:</span>
+                    <select id="breakoutStrategySelect" onchange="app.onBreakoutStrategyChange(this.value)" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.72rem; font-weight: 600; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Breakout Strategy Engine">
                         <option value="ALL" selected>🌟 All Strategies (Aggregated)</option>
                         <option value="CLASSIC_TECHNICAL">⚡ Classic Coiling (52W+ATR)</option>
                         <option value="NSE_DELIVERY_ABSORPTION">🏛️ NSE Delivery Absorption</option>
@@ -52,9 +74,9 @@
                 </div>
 
                 <!-- Universe Selector (Default: NSE Large Cap) -->
-                <div style="display: flex; align-items: center; gap: 0.35rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.2rem 0.55rem; border-radius: 6px;">
-                    <span style="font-size: 0.72rem; color: #a1a1aa;">🏛️ Universe:</span>
-                    <select id="breakoutUniverseSelect" onchange="app.onBreakoutUniverseChange(this.value)" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.73rem; font-weight: 600; font-family: var(--font-mono); cursor: pointer; outline: none;">
+                <div style="display: flex; align-items: center; gap: 0.3rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); padding: 0.18rem 0.45rem; border-radius: 5px;">
+                    <span style="font-size: 0.70rem; color: #a1a1aa;">🏛️</span>
+                    <select id="breakoutUniverseSelect" onchange="app.onBreakoutUniverseChange(this.value)" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.72rem; font-weight: 600; font-family: var(--font-mono); cursor: pointer; outline: none;">
                         <optgroup label="🚀 Market Cap Segments">
                             <option value="nse_large_cap" selected>🏛️ NSE Large Cap</option>
                             <option value="all">🌐 All Monitored (~2,000)</option>
@@ -76,116 +98,88 @@
                 </div>
 
                 <!-- Sort Control -->
-                <div style="display: flex; align-items: center; gap: 0.3rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.2rem 0.45rem; border-radius: 6px;">
-                    <span style="font-size: 0.70rem; color: #71717a;">Sort:</span>
-                    <select id="breakoutSortBy" onchange="app.loadBreakoutRadar()" style="background: transparent; border: none; color: #d4d4d8; font-size: 0.72rem; font-family: var(--font-mono); cursor: pointer; outline: none;">
-                        <option value="composite_score">↓ Composite Score</option>
-                        <option value="realized_return_pct">↓ Realized Return %</option>
-                        <option value="fundamental_score">↓ Fundamental</option>
-                        <option value="resistance_score">↓ Resistance</option>
-                        <option value="volume_score">↓ Volume Surge</option>
-                        <option value="momentum_score">↓ Momentum</option>
+                <div style="display: flex; align-items: center; gap: 0.25rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.18rem 0.4rem; border-radius: 5px;">
+                    <span style="font-size: 0.68rem; color: #71717a;">Sort:</span>
+                    <select id="breakoutSortBy" onchange="app.loadBreakoutRadar()" style="background: transparent; border: none; color: #d4d4d8; font-size: 0.70rem; font-family: var(--font-mono); cursor: pointer; outline: none;">
+                        <option value="composite_score">↓ Score</option>
+                        <option value="realized_return_pct">↓ Return %</option>
+                        <option value="fundamental_score">↓ Fund</option>
+                        <option value="resistance_score">↓ Res</option>
+                        <option value="volume_score">↓ Vol</option>
+                        <option value="momentum_score">↓ Mom</option>
                     </select>
                 </div>
 
                 <!-- Pool Tier Filter Control -->
-                <div style="display: flex; align-items: center; gap: 0.3rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.2rem 0.45rem; border-radius: 6px;">
-                    <span style="font-size: 0.70rem; color: #71717a;">Tier:</span>
-                    <select id="breakoutTierSelect" onchange="app.onBreakoutTierChange(this.value)" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.72rem; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Filter pool tier">
-                        <option value="ALL" selected>All Pools</option>
-                        <option value="HOT">🔥 Hot Only</option>
-                        <option value="WARM">🟡 Warm Only</option>
+                <div style="display: flex; align-items: center; gap: 0.25rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.18rem 0.4rem; border-radius: 5px;">
+                    <span style="font-size: 0.68rem; color: #71717a;">Tier:</span>
+                    <select id="breakoutTierSelect" onchange="app.onBreakoutTierChange(this.value)" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.70rem; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Filter pool tier">
+                        <option value="ALL" selected>All</option>
+                        <option value="HOT">🔥 Hot</option>
+                        <option value="WARM">🟡 Warm</option>
                     </select>
                 </div>
 
                 <!-- Min Score Filter -->
-                <div style="display: flex; align-items: center; gap: 0.3rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.2rem 0.45rem; border-radius: 6px;">
-                    <span style="font-size: 0.70rem; color: #71717a;">Min Score:</span>
-                    <input id="breakoutMinScore" type="number" min="0" max="100" value="45" onchange="app.loadBreakoutRadar()" style="width: 44px; background: transparent; border: none; color: #f4f4f5; font-size: 0.72rem; font-family: var(--font-mono); text-align: center; outline: none;">
+                <div style="display: flex; align-items: center; gap: 0.25rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.18rem 0.4rem; border-radius: 5px;">
+                    <span style="font-size: 0.68rem; color: #71717a;">Min:</span>
+                    <input id="breakoutMinScore" type="number" min="0" max="100" value="35" onchange="app.loadBreakoutRadar()" style="width: 36px; background: transparent; border: none; color: #f4f4f5; font-size: 0.70rem; font-family: var(--font-mono); text-align: center; outline: none;">
                 </div>
 
                 <!-- Limit Selector -->
-                <div style="display: flex; align-items: center; gap: 0.3rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.2rem 0.45rem; border-radius: 6px;">
-                    <span style="font-size: 0.70rem; color: #71717a;">Show:</span>
-                    <select id="breakoutLimitSelect" onchange="app.loadBreakoutRadar()" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.72rem; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Limit number of candidate rows">
-                        <option value="all" selected>All Setups</option>
-                        <option value="50">Top 50</option>
-                        <option value="20">Top 20</option>
-                        <option value="10">Top 10</option>
-                        <option value="5">Top 5</option>
+                <div style="display: flex; align-items: center; gap: 0.25rem; background: #06060a; border: 1px solid rgba(255,255,255,0.10); padding: 0.18rem 0.4rem; border-radius: 5px;">
+                    <span style="font-size: 0.68rem; color: #71717a;">Limit:</span>
+                    <select id="breakoutLimitSelect" onchange="app.loadBreakoutRadar()" style="background: transparent; border: none; color: #f4f4f5; font-size: 0.70rem; font-family: var(--font-mono); cursor: pointer; outline: none;" title="Limit candidate rows">
+                        <option value="all" selected>All</option>
+                        <option value="50">50</option>
+                        <option value="20">20</option>
+                        <option value="10">10</option>
                     </select>
                 </div>
             </div>
 
-            <!-- Right: Action Buttons & Modals -->
-            <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+            <!-- Right: Action Buttons & Drawers/Layout Toggles -->
+            <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
                 <!-- Live Price Polling Switch -->
-                <button type="button" id="breakoutLiveToggleBtn" onclick="app.toggleBreakoutLiveTracking()" class="btn btn-sm" style="background:#18181b; color:#a1a1aa; border:1px solid rgba(255,255,255,0.15); font-size:0.72rem; padding:0.25rem 0.6rem; display:flex; align-items:center; gap:0.35rem;" title="Toggle automatic real-time quotes background polling">
-                    <span id="breakoutLiveIndicator" style="width:6px; height:6px; border-radius:50%; background:#71717a; display:inline-block;"></span>
-                    <span id="breakoutLiveBtnText">⏱️ Track Live Prices</span>
+                <button type="button" id="breakoutLiveToggleBtn" onclick="app.toggleBreakoutLiveTracking()" class="btn btn-sm" style="background:#18181b; color:#a1a1aa; border:1px solid rgba(255,255,255,0.15); font-size:0.70rem; padding:0.22rem 0.55rem; display:flex; align-items:center; gap:0.3rem;" title="Toggle automatic real-time quotes background polling">
+                    <span id="breakoutLiveIndicator" style="width:5px; height:5px; border-radius:50%; background:#71717a; display:inline-block;"></span>
+                    <span id="breakoutLiveBtnText">Live Quotes</span>
+                </button>
+
+                <!-- Activity Log Drawer Toggle -->
+                <button type="button" id="btnToggleBreakoutAudit" onclick="app.toggleBreakoutAuditLog()" class="btn btn-sm" style="background:#18181b; color:#d4d4d8; border:1px solid rgba(255,255,255,0.15); font-size:0.70rem; padding:0.22rem 0.5rem; display:flex; align-items:center; gap:0.25rem;" title="Toggle tier movement activity log">
+                    <span>🔄</span> Activity <span id="breakoutAuditBadgeCount" style="font-size:0.62rem; color:#71717a; font-family:var(--font-mono);">(0)</span>
                 </button>
 
                 <!-- Formula / Explainer Toggle -->
-                <button type="button" onclick="app.toggleBreakoutExplainer()" class="btn btn-sm" style="background:#18181b; color:#d4d4d8; border:1px solid rgba(255,255,255,0.15); font-size:0.72rem; padding:0.25rem 0.55rem; display:flex; align-items:center; gap:0.25rem;" title="View mathematical scoring breakdown & weights">
+                <button type="button" onclick="app.toggleBreakoutExplainer()" class="btn btn-sm" style="background:#18181b; color:#d4d4d8; border:1px solid rgba(255,255,255,0.15); font-size:0.70rem; padding:0.22rem 0.5rem; display:flex; align-items:center; gap:0.2rem;" title="View mathematical scoring breakdown & weights">
                     <span>📐</span> Logic
                 </button>
 
                 <!-- Schedules Modal Trigger -->
-                <button type="button" onclick="app.openBreakoutScheduleModal()" class="btn btn-sm" style="background:#18181b; color:#d4d4d8; border:1px solid rgba(255,255,255,0.15); font-size:0.72rem; padding:0.25rem 0.55rem; display:flex; align-items:center; gap:0.25rem;" title="Configure autonomous scan cadence">
-                    <span>⏱️</span> Schedules
+                <button type="button" onclick="app.openBreakoutScheduleModal()" class="btn btn-sm" style="background:#18181b; color:#d4d4d8; border:1px solid rgba(255,255,255,0.15); font-size:0.70rem; padding:0.22rem 0.5rem; display:flex; align-items:center; gap:0.2rem;" title="Configure autonomous scan cadence">
+                    <span>⏱️</span>
                 </button>
 
                 <!-- Single Scan Trigger -->
-                <button type="button" id="breakoutRefreshBtn" onclick="app.refreshBreakoutScan()" class="btn btn-sm" style="background:#18181b; color:#f4f4f5; border:1px solid rgba(255,255,255,0.22); font-size:0.72rem; padding:0.25rem 0.65rem; display:flex; align-items:center; gap:0.3rem;" title="Execute scan for selected strategy">
+                <button type="button" id="breakoutRefreshBtn" onclick="app.refreshBreakoutScan()" class="btn btn-sm" style="background:#18181b; color:#f4f4f5; border:1px solid rgba(255,255,255,0.22); font-size:0.70rem; padding:0.22rem 0.55rem; display:flex; align-items:center; gap:0.25rem;" title="Execute scan for selected strategy">
                     <span id="breakoutRefreshIcon">🔄</span> Scan
                 </button>
 
                 <!-- Parallel 5-Strategy Master Sweep -->
-                <button type="button" id="breakoutParallelScanBtn" onclick="app.triggerAllBreakoutStrategiesParallel()" class="btn btn-sm" style="background:#18181b; color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-weight:600; font-size:0.72rem; padding:0.25rem 0.75rem; display:flex; align-items:center; gap:0.3rem;" title="Dispatch all 5 quantitative breakout engines concurrently">
-                    <span id="breakoutParallelIcon">⚡</span> Parallel Sweep
+                <button type="button" id="breakoutParallelScanBtn" onclick="app.triggerAllBreakoutStrategiesParallel()" class="btn btn-sm" style="background:#18181b; color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-weight:600; font-size:0.70rem; padding:0.22rem 0.65rem; display:flex; align-items:center; gap:0.25rem;" title="Dispatch all 5 quantitative breakout engines concurrently">
+                    <span id="breakoutParallelIcon">⚡</span> Parallel
+                </button>
+
+                <!-- 50-50 Split Layout Toggle -->
+                <button type="button" id="btnToggleBreakoutSplit" onclick="app.toggleBreakoutSplitLayout()" class="btn btn-secondary btn-sm" style="font-size: 0.70rem; padding: 0.22rem 0.55rem; color: #cbd5e1; background: #18181b; border: 1px solid rgba(255,255,255,0.18);" title="Toggle 50-50 split vs full width">
+                    ◫ 50-50 Split
                 </button>
             </div>
         </div>
 
-        <!-- 🎯 Compact On-Demand Stock Evaluator -->
-        <div style="background: #09090b; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 0.65rem 0.9rem; margin-bottom: 0.75rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem;">
-                <div style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.78rem; font-weight: 700; color: #f8fafc;">
-                    <span>🎯</span> Stock Breakout Evaluator
-                    <span class="badge" style="background:#18181b; color:#f4f4f5; border:1px solid rgba(255,255,255,0.2); font-size:0.62rem; padding:0.1rem 0.4rem; font-family:var(--font-mono);">ON-DEMAND AUDIT</span>
-                </div>
-                <div style="font-size: 0.68rem; color: #94a3b8; font-family: var(--font-mono);">
-                    Point-in-time compression, volume surge multiple, resistance ceiling & targets
-                </div>
-            </div>
-
-            <!-- Search Input Container -->
-            <div style="display: flex; align-items: center; gap: 0.45rem; position: relative;">
-                <div style="position: relative; flex: 1;">
-                    <input
-                        id="breakoutTickerInput"
-                        type="text"
-                        placeholder="Evaluate stock (e.g. RELIANCE, TCS, INFY, TATAMOTORS, DIXON)..."
-                        autocomplete="off"
-                        style="width: 100%; padding: 0.35rem 1.8rem 0.35rem 0.65rem; background: #06060a; border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; color: #f8fafc; font-size: 0.76rem; font-family: var(--font-mono); outline: none;"
-                        onfocus="this.style.borderColor='rgba(255,255,255,0.35)'"
-                        onblur="this.style.borderColor='rgba(255,255,255,0.12)'"
-                    />
-                    <button type="button" id="breakoutClearInputBtn" onclick="app.clearBreakoutEvaluator()" style="display:none; position:absolute; right:0.5rem; top:50%; transform:translateY(-50%); background:transparent; border:none; color:#71717a; font-size:0.75rem; cursor:pointer;">✕</button>
-
-                    <!-- Dynamic Autocomplete Dropdown -->
-                    <div id="breakoutAutocompleteDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; margin-top:3px; background:#09090b; border:1px solid rgba(255,255,255,0.12); border-radius:6px; box-shadow:0 12px 28px rgba(0,0,0,0.85); z-index:999; max-height:220px; overflow-y:auto;">
-                    </div>
-                </div>
-
-                <button type="button" id="breakoutEvaluateBtn" onclick="app.evaluateCurrentBreakoutInput()" class="btn btn-sm" style="background:#18181b; color:#ffffff; border:1px solid rgba(255,255,255,0.2); font-weight:700; font-size:0.74rem; padding:0.35rem 0.85rem; display:flex; align-items:center; gap:0.3rem; white-space:nowrap;">
-                    <span id="breakoutEvaluateIcon">⚡</span> Evaluate
-                </button>
-            </div>
-        </div>
-
-        <!-- Deep Evaluated Stock Result Container -->
-        <div id="breakoutEvaluatedStockCard" style="display:none; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:0.85rem 1rem; margin-bottom:0.75rem;">
+        <!-- Deep Evaluated Stock Result Container (Bridge Hook) -->
+        <div id="breakoutEvaluatedStockCard" style="display:none; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:0.65rem 0.85rem; margin-bottom:0.65rem;">
         </div>
 
         <!-- 🔄 Movement & Activity Audit Feed -->
@@ -320,28 +314,209 @@
             </div>
         </div>
 
-        <!-- High-Density Candidates Table -->
-        <div class="table-wrapper breakout-table-wrapper" style="overflow:auto; max-height:calc(100vh - 240px); min-height:360px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:#000000;">
-            <table id="breakoutTable" style="width:100%; border-collapse:collapse; font-size:0.72rem;">
-                <thead>
-                    <tr id="breakoutTableHeaderRow" style="background:#000000; border-bottom:1px solid rgba(255,255,255,0.08); font-family:var(--font-mono); font-size:0.66rem;">
-                        <!-- Rendered dynamically by app.renderBreakoutTableHeader() -->
-                    </tr>
-                </thead>
-                <tbody id="breakoutTableBody">
-                    <tr>
-                        <td colspan="9" style="padding:2.5rem; text-align:center; color:#64748b; font-size:0.8rem;">
-                            <div style="display:inline-block; animation:spin 1s linear infinite; margin-right:0.4rem;">⏳</div> Loading breakout setups...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <!-- 50-50 Split-Window Layout Grid Container -->
+        <div id="breakoutSplitGrid" style="display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 0.85rem; align-items: start;">
 
-        <!-- Sub-footer Info -->
-        <div style="margin-top:0.55rem; font-size:0.68rem; color:#64748b; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.4rem;">
-            <span>🔄 Active Setup Pool tracks real-time coiling candidates &amp; auto-synchronizes prices.</span>
-            <span>Click any ticker for deep AI consensus &amp; trajectory forecast.</span>
+            <!-- Left Pane: Dense Candidates Table & Quick Controls -->
+            <div id="breakoutSplitLeft" style="min-width: 0;">
+                <div class="table-wrapper breakout-table-wrapper" style="overflow:auto; max-height:calc(100vh - 200px); min-height:420px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:#000000;">
+                    <table id="breakoutTable" style="width:100%; border-collapse:collapse; font-size:0.72rem;">
+                        <thead>
+                            <tr id="breakoutTableHeaderRow" style="background:#000000; border-bottom:1px solid rgba(255,255,255,0.08); font-family:var(--font-mono); font-size:0.66rem; position:sticky; top:0; z-index:10;">
+                                <!-- Rendered dynamically by app.renderBreakoutTableHeader() -->
+                            </tr>
+                        </thead>
+                        <tbody id="breakoutTableBody">
+                            <tr>
+                                <td colspan="9" style="padding:2.5rem; text-align:center; color:#64748b; font-size:0.8rem;">
+                                    <div style="display:inline-block; animation:spin 1s linear infinite; margin-right:0.4rem;">⏳</div> Loading breakout setups...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Sub-footer Info & Navigation Guide -->
+                <div style="margin-top:0.45rem; font-size:0.66rem; color:#71717a; font-family:var(--font-mono); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.4rem; padding:0 0.2rem;">
+                    <span>⚡ <span id="breakoutFooterCount">0</span> setups loaded · <span style="color:#a1a1aa;">↑/↓ Select</span> · <span style="color:#a1a1aa;">Enter Details</span></span>
+                    <span id="breakoutLastScanTime" style="color:#52525b;">Scanning…</span>
+                </div>
+            </div>
+
+            <!-- Right Pane: Sticky Setup Inspector HUD -->
+            <div id="breakoutSplitRight" style="position: sticky; top: 0.75rem; max-height: calc(100vh - 120px); overflow-y: auto; padding-right: 2px;">
+                <div id="breakoutSetupInspector" style="background: #09090b; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 0.95rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);">
+                    <!-- Default Empty State -->
+                    <div id="breakoutInspectorEmptyState" style="text-align: center; padding: 3rem 1.5rem; color: #52525b;">
+                        <div style="font-size: 2.2rem; margin-bottom: 0.6rem; opacity: 0.7;">⚡</div>
+                        <div style="font-size: 0.88rem; font-weight: 700; color: #a1a1aa; margin-bottom: 0.35rem;">No Candidate Selected</div>
+                        <div style="font-size: 0.72rem; color: #71717a; line-height: 1.4; max-width: 320px; margin: 0 auto;">
+                            Click any setup row in the radar or evaluate a stock to inspect its point-in-time mathematical score decomposition, multi-point execution blueprint, and transition lifecycle.
+                        </div>
+                    </div>
+
+                    <!-- Populated Inspector Content -->
+                    <div id="breakoutInspectorContent" style="display: none;">
+                        <!-- Header Card -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.75rem; margin-bottom: 0.85rem;">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                    <span id="bkInspTicker" style="font-size: 1.25rem; font-weight: 800; color: #f8fafc; font-family: var(--font-mono); letter-spacing: -0.02em;">TICKER</span>
+                                    <span id="bkInspTierBadge" class="badge" style="font-size: 0.65rem; padding: 0.15rem 0.45rem; font-weight: 700;">HOT</span>
+                                    <span id="bkInspStrategyBadge" class="badge" style="background: rgba(255,255,255,0.06); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.12); font-size: 0.65rem; padding: 0.15rem 0.45rem; font-family: var(--font-mono);">CLASSIC</span>
+                                </div>
+                                <div id="bkInspCompany" style="font-size: 0.76rem; color: #94a3b8; margin-top: 0.15rem; font-weight: 500;">Company Name · Sector</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div id="bkInspPrice" style="font-size: 1.25rem; font-weight: 800; color: #ffffff; font-family: var(--font-mono);">₹0.00</div>
+                                <div id="bkInspChange" style="font-size: 0.72rem; font-weight: 700; font-family: var(--font-mono); color: #22c55e;">+0.00% (1D)</div>
+                            </div>
+                        </div>
+
+                        <!-- 📐 Execution Blueprint & Risk-Reward Card -->
+                        <div style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.75rem 0.85rem; margin-bottom: 0.85rem;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.55rem;">
+                                <div style="font-size: 0.68rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono);">
+                                    🎯 Execution Blueprint (PIT)
+                                </div>
+                                <div id="bkInspRrBadge" style="font-size: 0.68rem; font-weight: 700; color: #38bdf8; font-family: var(--font-mono); background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.25); padding: 0.1rem 0.4rem; border-radius: 3px;">
+                                    R:R 2.5x
+                                </div>
+                            </div>
+
+                            <!-- Visual Multi-Point Execution Range Bar -->
+                            <div style="margin-bottom: 0.75rem; padding: 0 0.2rem;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.62rem; color: #71717a; font-family: var(--font-mono); margin-bottom: 0.25rem;">
+                                    <span style="color: #ef4444;">SL: <span id="bkInspBarSl">₹0</span></span>
+                                    <span style="color: #cbd5e1;">Price: <span id="bkInspBarPrice">₹0</span></span>
+                                    <span style="color: #fbbf24;">Trigger: <span id="bkInspBarTrigger">₹0</span></span>
+                                    <span style="color: #22c55e;">Target: <span id="bkInspBarTarget">₹0</span></span>
+                                </div>
+                                <div style="position: relative; height: 7px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: visible; margin: 0.4rem 0;">
+                                    <!-- Stop loss to Target track zone -->
+                                    <div id="bkInspBarZone" style="position: absolute; left: 0%; right: 0%; height: 100%; background: linear-gradient(90deg, rgba(239,68,68,0.25) 0%, rgba(251,191,36,0.3) 50%, rgba(34,197,94,0.3) 100%); border-radius: 4px;"></div>
+                                    <!-- Price marker pin -->
+                                    <div id="bkInspBarPriceMarker" style="position: absolute; left: 45%; top: -3px; width: 3px; height: 13px; background: #ffffff; border-radius: 2px; box-shadow: 0 0 6px #ffffff; transform: translateX(-50%);" title="Current Price"></div>
+                                    <!-- Trigger marker pin -->
+                                    <div id="bkInspBarTriggerMarker" style="position: absolute; left: 55%; top: -2px; width: 2px; height: 11px; background: #fbbf24; border-radius: 1px; transform: translateX(-50%);" title="Breakout Trigger"></div>
+                                </div>
+                            </div>
+
+                            <!-- Detailed Metrics Grid -->
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45rem; text-align: center; font-family: var(--font-mono);">
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.35rem; border-radius: 4px;">
+                                    <div style="font-size: 0.60rem; color: #71717a; text-transform: uppercase;">Stop Loss</div>
+                                    <div id="bkInspSl" style="font-size: 0.78rem; font-weight: 700; color: #ef4444; margin-top: 0.1rem;">₹0.00</div>
+                                    <div id="bkInspSlPct" style="font-size: 0.58rem; color: #71717a;">-0.0%</div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.35rem; border-radius: 4px;">
+                                    <div style="font-size: 0.60rem; color: #71717a; text-transform: uppercase;">Trigger / Gap</div>
+                                    <div id="bkInspTrigger" style="font-size: 0.78rem; font-weight: 700; color: #fbbf24; margin-top: 0.1rem;">₹0.00</div>
+                                    <div id="bkInspGapPct" style="font-size: 0.58rem; color: #fbbf24;">+0.0%</div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 0.35rem; border-radius: 4px;">
+                                    <div style="font-size: 0.60rem; color: #71717a; text-transform: uppercase;">Target (ATR)</div>
+                                    <div id="bkInspTarget" style="font-size: 0.78rem; font-weight: 700; color: #22c55e; margin-top: 0.1rem;">₹0.00</div>
+                                    <div id="bkInspTargetPct" style="font-size: 0.58rem; color: #22c55e;">+0.0%</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ⚡ 5-Pillar Score Meters Card -->
+                        <div style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.75rem 0.85rem; margin-bottom: 0.85rem;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.55rem;">
+                                <div style="font-size: 0.68rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono);">
+                                    ⚡ 5-Pillar Score Decomposition
+                                </div>
+                                <div style="display: flex; align-items: baseline; gap: 0.25rem;">
+                                    <span id="bkInspCompositeScore" style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; font-family: var(--font-mono);">0</span>
+                                    <span style="font-size: 0.65rem; color: #71717a; font-family: var(--font-mono);">/ 100</span>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; flex-direction: column; gap: 0.45rem; font-family: var(--font-mono);">
+                                <!-- Pillar 1: Resistance Proximity -->
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.64rem; margin-bottom: 0.15rem;">
+                                        <span style="color: #cbd5e1;">🎯 Resistance Ceiling</span>
+                                        <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreRes">0</span> <span style="color: #52525b;">/ 40</span></span>
+                                    </div>
+                                    <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
+                                        <div id="bkInspBarRes" style="height: 100%; width: 0%; background: #38bdf8; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Pillar 2: Volume Expansion -->
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.64rem; margin-bottom: 0.15rem;">
+                                        <span style="color: #cbd5e1;">📊 Volume Surge</span>
+                                        <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreVol">0</span> <span style="color: #52525b;">/ 10</span></span>
+                                    </div>
+                                    <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
+                                        <div id="bkInspBarVol" style="height: 100%; width: 0%; background: #a855f7; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Pillar 3: Price Volatility Compression -->
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.64rem; margin-bottom: 0.15rem;">
+                                        <span style="color: #cbd5e1;">🗜️ Price Compression</span>
+                                        <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreComp">0</span> <span style="color: #52525b;">/ 10</span></span>
+                                    </div>
+                                    <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
+                                        <div id="bkInspBarComp" style="height: 100%; width: 0%; background: #f59e0b; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Pillar 4: Trend Momentum -->
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.64rem; margin-bottom: 0.15rem;">
+                                        <span style="color: #cbd5e1;">🚀 Trend Momentum</span>
+                                        <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreMom">0</span> <span style="color: #52525b;">/ 25</span></span>
+                                    </div>
+                                    <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
+                                        <div id="bkInspBarMom" style="height: 100%; width: 0%; background: #10b981; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Pillar 5: Fundamental Quality -->
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.64rem; margin-bottom: 0.15rem;">
+                                        <span style="color: #cbd5e1;">📈 Fundamental Quality</span>
+                                        <span style="color: #f8fafc; font-weight: 700;"><span id="bkInspScoreFund">0</span> <span style="color: #52525b;">/ 15</span></span>
+                                    </div>
+                                    <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
+                                        <div id="bkInspBarFund" style="height: 100%; width: 0%; background: #ec4899; border-radius: 2px; transition: width 0.3s ease;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 🔄 Catalyst & Lifecycle Notes -->
+                        <div id="bkInspCatalystCard" style="background: #000000; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.65rem 0.8rem; margin-bottom: 0.85rem; font-size: 0.70rem;">
+                            <div style="font-size: 0.64rem; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); margin-bottom: 0.3rem;">
+                                💡 Setup Catalyst &amp; Context
+                            </div>
+                            <div id="bkInspCatalystText" style="color: #cbd5e1; line-height: 1.45;">
+                                Coiling near 52-week resistance ceiling with volume expansion.
+                            </div>
+                        </div>
+
+                        <!-- 🛠️ Quick Action Buttons -->
+                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                            <a id="bkInspStockDetailLink" href="#" target="_blank" class="btn btn-sm" style="flex: 1; text-align: center; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.35); font-size: 0.72rem; font-weight: 700; padding: 0.3rem 0.5rem; border-radius: 4px; text-decoration: none;">
+                                ↗ Full Stock Detail
+                            </a>
+                            <button type="button" id="bkInspCopyLevelsBtn" onclick="app.copyCurrentBreakoutLevels()" class="btn btn-sm" style="background: #18181b; color: #f4f4f5; border: 1px solid rgba(255,255,255,0.18); font-size: 0.72rem; padding: 0.3rem 0.6rem; border-radius: 4px;" title="Copy execution parameters to clipboard">
+                                📋 Copy Levels
+                            </button>
+                            <button type="button" id="bkInspHistoryBtn" onclick="app.openSelectedBreakoutHistory()" class="btn btn-sm" style="background: #18181b; color: #a1a1aa; border: 1px solid rgba(255,255,255,0.18); font-size: 0.72rem; padding: 0.3rem 0.55rem; border-radius: 4px;" title="View transition audit history">
+                                📜 Audit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -915,10 +1090,24 @@
     background: #18181b !important;
     border-color: rgba(255, 255, 255, 0.2);
 }
-.bk-preset-btn.bk-preset-active, .bk-tracked-preset.bk-preset-active {
-    background: #18181b !important;
+/* Active Row Selection & Split Inspector Sync */
+.bk-row-selected {
+    background: rgba(56, 189, 248, 0.14) !important;
+    border-left: 3px solid #38bdf8 !important;
+}
+
+.bk-row-selected td {
     color: #ffffff !important;
-    border-color: rgba(255, 255, 255, 0.25) !important;
-    font-weight: 700;
+}
+
+/* Responsive Split Collapse */
+@media (max-width: 1024px) {
+    #breakoutSplitGrid {
+        grid-template-columns: 1fr !important;
+    }
+    #breakoutSplitRight {
+        position: static !important;
+        max-height: none !important;
+    }
 }
 </style>

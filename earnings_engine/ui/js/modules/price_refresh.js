@@ -46,7 +46,7 @@
             }
         });
 
-        return Array.from(tickerSet);
+        return Array.from(tickerSet).slice(0, 100);
     };
 
     /**
