@@ -52,5 +52,7 @@
   "search.exclude": {
     "**/.venv": true,
     "**/__pycache__": true
-  }
+  },
+  "terminal.integrated.scrollback": 3000,
+  "terminal.integrated.persistentSessionReviveProcess": "never"
 }

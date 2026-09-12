@@ -267,3 +267,88 @@ class TestBreakoutRadarEndpoints:
             assert "prediction_color" in c
             assert c["prediction_color"] in ("green", "red", "brown", "blue")
 
+
+class TestBreakoutLateDetection:
+    """Validate late breakout tracking, persistence, and contract fields."""
+
+    @pytest.fixture(autouse=True)
+    def setup_client_and_db(self, tmp_path):
+        from earnings_engine.config import Settings
+        from earnings_engine.data.breakout_scanner import (
+            _pool,
+            save_breakout_pool_to_db,
+            get_tracked_breakouts,
+        )
+        from earnings_engine.data.migrations import apply_migrations
+
+        db_file = tmp_path / "prices.sqlite3"
+        self.settings = Settings(data_dirs={"prices": tmp_path, "earnings": tmp_path})
+        apply_migrations(self.settings)
+
+        from fastapi.testclient import TestClient
+        from earnings_engine.api.server import app
+
+        self.client = TestClient(app, raise_server_exceptions=False)
+
+    def test_score_breakout_setup_calculates_late_detection(self):
+        import pandas as pd
+        import numpy as np
+        from earnings_engine.data.breakout_scanner import score_breakout
+
+        dates = pd.date_range("2026-01-01", periods=65, freq="B")
+        prices = [100.0 + i * 0.5 for i in range(65)]
+        df = pd.DataFrame({
+            "open": prices,
+            "high": [p + 1.0 for p in prices],
+            "low": [p - 1.0 for p in prices],
+            "close": prices,
+            "volume": [1_000_000] * 65,
+        }, index=dates)
+
+        res = score_breakout("RELIANCE.NS", df, settings=self.settings)
+        assert res is not None
+        assert "ideal_entry_price" in res
+        assert "is_late" in res
+        assert "entry_delay_pct" in res
+        assert isinstance(res["is_late"], bool)
+        assert isinstance(res["entry_delay_pct"], float)
+
+    def test_tracked_breakouts_persistence_and_query_late_fields(self):
+        from earnings_engine.data.breakout_scanner import (
+            _pool,
+            save_breakout_pool_to_db,
+            get_tracked_breakouts,
+        )
+
+        _pool["hot"]["TESTLATE.NS::CLASSIC_TECHNICAL"] = {
+            "result": {
+                "ticker": "TESTLATE.NS",
+                "strategy": "CLASSIC_TECHNICAL",
+                "tier": "HOT",
+                "company_name": "Test Late Co",
+                "composite_score": 85.0,
+                "signal_date": "2026-09-01",
+                "signal_price": 105.0,
+                "breakout_trigger": 100.0,
+                "ideal_entry_price": 100.0,
+                "is_late": True,
+                "entry_delay_pct": 5.0,
+                "breakout_happened": 1,
+                "outcome": "TRIGGERED",
+                "current_price": 105.0,
+            },
+            "consecutive_low": 0,
+        }
+
+        save_breakout_pool_to_db(self.settings)
+        res = get_tracked_breakouts(limit=50, settings=self.settings)
+
+        assert res["success"] is True
+        matched = [it for it in res["items"] if it["ticker"] == "TESTLATE.NS"]
+        assert len(matched) == 1
+        item = matched[0]
+        assert item["ideal_entry_price"] == 100.0
+        assert item["is_late"] is True
+        assert item["entry_delay_pct"] == 5.0
+
+

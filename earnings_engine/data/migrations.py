@@ -1678,6 +1678,89 @@ def _migration_036_sync_breakout_radar_signal_columns(conn: Any) -> None:
         logger.debug("[MIGRATION-036] Execution notice: %s", e)
 
 
+def _migration_037_breakout_late_detection_fields(conn: Any) -> None:
+    """Add ideal_entry_price, is_late, and entry_delay_pct fields to breakout_radar and breakout_tracked_signals."""
+    for tbl in ["breakout_radar", "breakout_tracked_signals"]:
+        _add_column_if_missing(conn, tbl, "ideal_entry_price", "REAL")
+        _add_column_if_missing(conn, tbl, "is_late", "INTEGER DEFAULT 0")
+        _add_column_if_missing(conn, tbl, "entry_delay_pct", "REAL DEFAULT 0.0")
+
+    # Backfill late detection metrics from existing data_json payloads where available
+    # Note: breakout_radar has composite primary key (ticker, strategy), while breakout_tracked_signals has integer primary key (id).
+    # 1. Backfill breakout_radar
+    try:
+        cur = conn.execute("SELECT ticker, strategy, signal_price, breakout_trigger, data_json FROM breakout_radar WHERE data_json IS NOT NULL AND data_json != ''")
+        rows = cur.fetchall()
+        for ticker, strat, sig_p, trig_p, d_json in rows:
+            try:
+                import json
+                d = json.loads(d_json)
+                if not isinstance(d, dict):
+                    continue
+                notes = d.get("calculation_notes") or {}
+                ideal_p = d.get("ideal_entry_price") or notes.get("ideal_entry_price")
+                if ideal_p is None:
+                    ideal_p = trig_p
+
+                if ideal_p is not None:
+                    ideal_p = round(float(ideal_p), 2)
+                    s_price = float(sig_p) if sig_p is not None else float(d.get("signal_price", 0) or 0)
+                    t_trigger = float(trig_p) if trig_p is not None else float(d.get("breakout_trigger", 0) or 0)
+
+                    is_late_val = 1 if (
+                        (t_trigger > 0 and s_price >= t_trigger)
+                        or (ideal_p > 0 and s_price > ideal_p * 1.002)
+                    ) else 0
+
+                    delay_pct = round(((s_price - ideal_p) / ideal_p) * 100, 2) if (is_late_val and ideal_p > 0) else 0.0
+
+                    conn.execute(
+                        "UPDATE breakout_radar SET ideal_entry_price = ?, is_late = ?, entry_delay_pct = ? WHERE ticker = ? AND strategy = ?",
+                        (ideal_p, is_late_val, delay_pct, ticker, strat),
+                    )
+            except Exception:
+                continue
+    except Exception as e:
+        logger.debug("[MIGRATION-037] Backfill notice for breakout_radar: %s", e)
+
+    # 2. Backfill breakout_tracked_signals
+    try:
+        cur = conn.execute("SELECT id, ticker, signal_price, breakout_trigger, data_json FROM breakout_tracked_signals WHERE data_json IS NOT NULL AND data_json != ''")
+        rows = cur.fetchall()
+        for r_id, ticker, sig_p, trig_p, d_json in rows:
+            try:
+                import json
+                d = json.loads(d_json)
+                if not isinstance(d, dict):
+                    continue
+                notes = d.get("calculation_notes") or {}
+                ideal_p = d.get("ideal_entry_price") or notes.get("ideal_entry_price")
+                if ideal_p is None:
+                    ideal_p = trig_p
+
+                if ideal_p is not None:
+                    ideal_p = round(float(ideal_p), 2)
+                    s_price = float(sig_p) if sig_p is not None else float(d.get("signal_price", 0) or 0)
+                    t_trigger = float(trig_p) if trig_p is not None else float(d.get("breakout_trigger", 0) or 0)
+
+                    is_late_val = 1 if (
+                        (t_trigger > 0 and s_price >= t_trigger)
+                        or (ideal_p > 0 and s_price > ideal_p * 1.002)
+                    ) else 0
+
+                    delay_pct = round(((s_price - ideal_p) / ideal_p) * 100, 2) if (is_late_val and ideal_p > 0) else 0.0
+
+                    conn.execute(
+                        "UPDATE breakout_tracked_signals SET ideal_entry_price = ?, is_late = ?, entry_delay_pct = ? WHERE id = ?",
+                        (ideal_p, is_late_val, delay_pct, r_id),
+                    )
+            except Exception:
+                continue
+    except Exception as e:
+        logger.debug("[MIGRATION-037] Backfill notice for breakout_tracked_signals: %s", e)
+
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1716,6 +1799,7 @@ MIGRATIONS: list[Migration] = [
     Migration(34, "034_institutional_query_indexes", _migration_034_institutional_query_indexes),
     Migration(35, "035_purge_non_fno_fo_call_wall", _migration_035_purge_non_fno_fo_call_wall),
     Migration(36, "036_sync_breakout_radar_signal_columns", _migration_036_sync_breakout_radar_signal_columns),
+    Migration(37, "037_breakout_late_detection_fields", _migration_037_breakout_late_detection_fields),
 ]
 
 
