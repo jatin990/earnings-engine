@@ -1431,6 +1431,45 @@ const API_BASE = window.location.origin;
                 }
             },
 
+            async summarizeResults(event) {
+                const btn = (event && event.target) || document.querySelector('button[onclick*="summarizeResults"]');
+                const origHtml = btn ? btn.innerHTML : '✨ LLM Summary';
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading-spinner"></span> Summarizing...';
+                }
+                try {
+                    const days = document.getElementById('resultsDays')?.value || 14;
+                    const market = document.getElementById('resultsMarket')?.value || 'ALL';
+                    const res = await fetch(API_BASE + '/api/v1/dashboard/results/summarize?days=' + encodeURIComponent(days) + '&market=' + encodeURIComponent(market));
+                    const data = await res.json();
+                    if (data && (data.summary || data.text)) {
+                        alert('✨ Corporate Results AI Synthesis:\n\n' + (data.summary || data.text));
+                    } else if (data && data.total_events !== undefined) {
+                        const s = `📊 Results Dataset Summary (${market}):\n• Total Events in Window: ${data.total_events || 0}\n• Beat Rate: ${(data.overall_beat_rate ? (data.overall_beat_rate * 100).toFixed(1) + '%' : '—')}\n• Upward Reactions: ${(data.overall_up_rate ? (data.overall_up_rate * 100).toFixed(1) + '%' : '—')}\n• Top Volume Surge: ${(data.top_picks && data.top_picks[0] ? data.top_picks[0].ticker : '—')}`;
+                        alert(s);
+                    } else {
+                        alert('Failed to generate summary: ' + (data.error || 'Unknown error'));
+                    }
+                } catch (e) {
+                    console.error('Error summarizing results:', e);
+                    alert('Error generating results summary: ' + (e.message || e));
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    }
+                }
+            },
+
+            async refreshResults() {
+                try {
+                    await this.loadResultsReport();
+                } catch (e) {
+                    console.error('Error refreshing results feed:', e);
+                }
+            },
+
             renderResultsMonthTabs() {
                 let el = document.getElementById('resultsMonthTabs');
                 if (!el) {
