@@ -65,6 +65,11 @@ class TestResistanceProximity:
         assert score >= 25.0
         assert pct == pytest.approx(-2.0, abs=0.01)
 
+    def test_short_series_returns_zero_and_nan(self):
+        score, pct = _score_resistance_proximity(pd.Series([100.0]))
+        assert score == 0.0
+        assert np.isnan(pct)
+
 
 class TestVolumeSurge:
     def test_moderate_volume_gives_max_score(self):
@@ -84,6 +89,11 @@ class TestVolumeSurge:
         score, ratio = _score_volume_surge(volumes)
         assert score == 4.0
 
+    def test_short_series_returns_zero_and_nan(self):
+        score, ratio = _score_volume_surge(pd.Series([1000.0, 2000.0]))
+        assert score == 0.0
+        assert np.isnan(ratio)
+
 
 class TestPriceCompression:
     def test_very_tight_range_gives_high_score(self):
@@ -98,6 +108,18 @@ class TestPriceCompression:
         score, atr = _score_price_compression(closes)
         assert score == 0.0 or atr > 2.5
 
+    def test_short_series_returns_zero_and_nan(self):
+        score, atr = _score_price_compression(pd.Series([100.0] * 10))
+        assert score == 0.0
+        assert np.isnan(atr)
+
+    def test_price_compression_vectorized_equivalence(self):
+        closes = pd.Series([100.0 + i * 0.2 for i in range(30)])
+        score, atr = _score_price_compression(closes)
+        vals = closes.values[-15:]
+        expected_atr = round(float((abs(vals[1:] - vals[:-1]) / vals[:-1]).mean()) * 100, 3)
+        assert atr == expected_atr
+
 
 class TestMomentum:
     def test_strong_uptrend_above_sma_scores_25(self):
@@ -111,6 +133,11 @@ class TestMomentum:
         score, signal = _score_momentum(closes)
         assert score == 0.0
         assert signal == "None"
+
+    def test_short_series_returns_zero_and_insufficient(self):
+        score, signal = _score_momentum(pd.Series([100.0] * 10))
+        assert score == 0.0
+        assert signal == "insufficient"
 
 
 class TestFundamental:
@@ -372,5 +399,23 @@ class TestBreakoutLateDetection:
         assert res["ideal_entry_price"] == 100.0
         assert res["is_late"] is True
         assert res["entry_delay_pct"] == 3.0
+
+    def test_late_detection_with_zero_or_none_ideal_entry_price_handles_gracefully(self):
+        from earnings_engine.data.breakout_scanner import _score_classic_technical
+        import pandas as pd
+
+        closes = pd.Series([100.0] * 20)
+        volumes = pd.Series([1_000_000] * 20)
+        highs = pd.Series([0.0] * 20)
+
+        composite, trigger, target, stop, subscores, archetype, notes = _score_classic_technical(
+            closes=closes,
+            volumes=volumes,
+            high_series=highs,
+            quality_scores=[8.0],
+        )
+        assert notes["ideal_entry_price"] == 0.0
+        assert notes["is_late"] is False
+        assert notes["entry_delay_pct"] == 0.0
 
 
