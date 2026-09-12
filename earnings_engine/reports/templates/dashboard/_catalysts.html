@@ -32,11 +32,36 @@
                     </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+                    <button type="button" onclick="app.toggleFeedsDrawer()" id="btnToggleFeedsDrawer" class="btn btn-sm" style="padding:0.25rem 0.65rem;font-size:0.7rem;background:rgba(255,255,255,0.04);color:#e2e8f0;border:1px solid rgba(255,255,255,0.12);" title="Toggle Collapsible List of Active News & Filing Feeds">
+                        <span>📡</span> Active Feeds (<span id="catActiveFeedsCountBadge">46</span>) <span id="feedsDrawerChevron">▼</span>
+                    </button>
                     <div id="omnirouteGatewayStatusPill" onclick="app.probeOmniRouteGateway(true)" style="cursor:pointer;display:inline-flex;align-items:center;gap:0.35rem;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.3);padding:0.2rem 0.55rem;border-radius:6px;font-size:0.68rem;font-family:var(--font-mono);color:#c084fc;" title="Click to probe diegosouzapw/OmniRoute gateway health (port 20128)">
                         <span id="omnirouteStatusDot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;"></span>
                         <span id="omnirouteStatusText">OmniRoute: localhost:20128</span>
                     </div>
                     <button type="button" onclick="app.triggerScheduleJob('news_catalyst_harvest')" class="btn btn-sm" style="padding:0.25rem 0.65rem;font-size:0.7rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.35);">⚡ Harvest Now</button>
+                </div>
+            </div>
+
+            <!-- 📡 Collapsible News Feeds & Source Health Drawer -->
+            <div id="catalystsFeedsDrawer" class="card" style="display:none;padding:0.75rem 0.95rem;background:#030712;border:1px solid rgba(56,189,248,0.25);border-radius:8px;margin-bottom:0.75rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.65rem;padding-bottom:0.45rem;border-bottom:1px solid rgba(255,255,255,0.08);flex-wrap:wrap;gap:0.4rem;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span style="font-size:0.95rem;">📡</span>
+                        <div>
+                            <div style="font-size:0.78rem;font-weight:700;color:#f8fafc;">Live Exchange, Regulatory & Media Feed Registry</div>
+                            <div style="font-size:0.68rem;color:#94a3b8;font-family:var(--font-mono);" id="feedsDrawerSummaryLine">
+                                Monitoring 46 streams across NSE India, RBI, Financial Dailies & Regulatory Topics
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                        <input type="text" id="feedsDrawerSearch" oninput="app.filterFeedsDrawer(this.value)" placeholder="Search feed or agency..." style="padding:0.18rem 0.45rem;font-size:0.68rem;background:#000000;color:#f8fafc;border:1px solid rgba(255,255,255,0.12);border-radius:4px;width:150px;outline:none;">
+                        <button type="button" onclick="app.loadFeedsStatus(true)" class="btn btn-sm" style="padding:0.18rem 0.45rem;font-size:0.68rem;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);" title="Refresh feed statuses and last fetch times">🔄 Sync Status</button>
+                    </div>
+                </div>
+                <div id="feedsDrawerContainer" style="max-height:360px;overflow-y:auto;overflow-x:auto;">
+                    <div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:0.75rem;">Loading active feeds telemetry...</div>
                 </div>
             </div>
 

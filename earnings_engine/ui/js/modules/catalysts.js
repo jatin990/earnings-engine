@@ -12,6 +12,139 @@ Object.assign(app, {
             catalystsSubtab: 'feed',
             outcomesData: [],
             outcomesMetrics: {},
+            feedsStatusData: null,
+            isFeedsDrawerOpen: false,
+
+            async toggleFeedsDrawer() {
+                const drawer = document.getElementById('catalystsFeedsDrawer');
+                const chevron = document.getElementById('feedsDrawerChevron');
+                if (!drawer) return;
+                this.isFeedsDrawerOpen = !this.isFeedsDrawerOpen;
+                drawer.style.display = this.isFeedsDrawerOpen ? 'block' : 'none';
+                if (chevron) chevron.textContent = this.isFeedsDrawerOpen ? '▲' : '▼';
+                if (this.isFeedsDrawerOpen && (!this.feedsStatusData || !this.feedsStatusData.feeds)) {
+                    await this.loadFeedsStatus();
+                }
+            },
+
+            async loadFeedsStatus(force = false) {
+                const container = document.getElementById('feedsDrawerContainer');
+                if (container && (!this.feedsStatusData || force)) {
+                    container.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:0.75rem;"><div style="display:inline-block;animation:spin 1s linear infinite;">⏳</div> Loading active feeds and source telemetry...</div>';
+                }
+                try {
+                    const res = await fetch(API_BASE + '/api/v1/news/feeds-status');
+                    if (res.ok) {
+                        this.feedsStatusData = await res.json();
+                        const badge = document.getElementById('catActiveFeedsCountBadge');
+                        if (badge && this.feedsStatusData.total_feeds) {
+                            badge.textContent = this.feedsStatusData.total_feeds;
+                        }
+                        this.renderFeedsDrawer();
+                    }
+                } catch (e) {
+                    console.error('Error loading feeds status:', e);
+                    if (container) {
+                        container.innerHTML = '<div style="text-align:center;padding:1.5rem;color:#f87171;font-size:0.75rem;">Failed loading feed status.</div>';
+                    }
+                }
+            },
+
+            filterFeedsDrawer(q) {
+                this._feedsSearchQuery = (q || '').toLowerCase().trim();
+                this.renderFeedsDrawer();
+            },
+
+            renderFeedsDrawer() {
+                const container = document.getElementById('feedsDrawerContainer');
+                const summaryLine = document.getElementById('feedsDrawerSummaryLine');
+                if (!container || !this.feedsStatusData) return;
+
+                const feeds = this.feedsStatusData.feeds || [];
+                const sched = this.feedsStatusData.harvester_schedule || {};
+                const q = this._feedsSearchQuery || '';
+
+                if (summaryLine && sched.last_run_at) {
+                    const dt = new Date(sched.last_run_at);
+                    const lastRunFmt = !isNaN(dt.getTime()) ? dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : sched.last_run_at;
+                    summaryLine.innerHTML = `Monitoring <strong>${feeds.length}</strong> streams across NSE India, RBI, Financial Dailies & Regulatory Topics | Last harvest: <span style="color:#38bdf8;font-weight:600;">${lastRunFmt}</span>`;
+                }
+
+                const filtered = feeds.filter(f => {
+                    if (!q) return true;
+                    return (f.name && f.name.toLowerCase().includes(q)) ||
+                           (f.group && f.group.toLowerCase().includes(q)) ||
+                           (f.category && f.category.toLowerCase().includes(q)) ||
+                           (f.type && f.type.toLowerCase().includes(q)) ||
+                           (f.url && f.url.toLowerCase().includes(q));
+                });
+
+                if (!filtered.length) {
+                    container.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:0.75rem;">No feeds matching search.</div>';
+                    return;
+                }
+
+                // Group feeds
+                const groups = {};
+                filtered.forEach(f => {
+                    const g = f.group || 'Other';
+                    if (!groups[g]) groups[g] = [];
+                    groups[g].push(f);
+                });
+
+                let html = '';
+                for (const [grpName, grpFeeds] of Object.entries(groups)) {
+                    html += `
+                        <div style="margin-bottom:0.75rem;">
+                            <div style="font-size:0.7rem;font-weight:700;color:#38bdf8;text-transform:uppercase;letter-spacing:0.04em;padding:0.25rem 0.4rem;background:rgba(56,189,248,0.06);border-left:3px solid #38bdf8;margin-bottom:0.35rem;display:flex;justify-content:space-between;align-items:center;">
+                                <span>${grpName}</span>
+                                <span style="color:#94a3b8;font-family:var(--font-mono);font-size:0.65rem;">${grpFeeds.length} active feeds</span>
+                            </div>
+                            <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:0.45rem;">
+                    `;
+
+                    grpFeeds.forEach(f => {
+                        const lastIng = f.last_ingested_at ? this.formatExactTime(f.last_ingested_at) : 'Active / Scheduled';
+                        const typeColor = f.type.includes('XML') ? '#34d399' : (f.type.includes('API') ? '#c084fc' : '#60a5fa');
+                        html += `
+                            <div style="padding:0.45rem 0.6rem;background:#050508;border:1px solid rgba(255,255,255,0.06);border-radius:5px;display:flex;flex-direction:column;gap:0.25rem;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;gap:0.3rem;">
+                                    <span style="font-size:0.75rem;font-weight:600;color:#f8fafc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.name}">${f.name}</span>
+                                    <span style="font-size:0.6rem;font-family:var(--font-mono);padding:0.05rem 0.3rem;border-radius:3px;background:rgba(255,255,255,0.04);color:${typeColor};border:1px solid rgba(255,255,255,0.08);">${f.type}</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.66rem;color:#71717a;font-family:var(--font-mono);">
+                                    <span>${f.category}</span>
+                                    <a href="${f.url}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;text-decoration:none;" title="Open Feed Source">Source ↗</a>
+                                </div>
+                                <div style="font-size:0.64rem;color:#94a3b8;font-family:var(--font-mono);border-top:1px dashed rgba(255,255,255,0.06);padding-top:0.2rem;display:flex;justify-content:space-between;align-items:center;">
+                                    <span style="color:#64748b;">Last Ingest:</span>
+                                    <span style="color:#e2e8f0;">${lastIng}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = html;
+            },
+
+            formatExactTime(dateStr) {
+                if (!dateStr) return '—';
+                try {
+                    const cleanStr = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+                    const d = new Date(cleanStr);
+                    if (isNaN(d.getTime())) return dateStr;
+                    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + ' ' +
+                           d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                } catch (e) {
+                    return dateStr;
+                }
+            },
 
             switchCatalystsSubtab(subtab) {
                 subtab = subtab || 'feed';
@@ -838,6 +971,7 @@ Object.assign(app, {
                         : '<span style="font-weight:600;font-size:0.86rem;color:#f4f4f5;line-height:1.4;">' + c.title + '</span>';
 
                     const dateDisplay = this.formatNewsDate(c.published_at);
+                    const ingestDisplay = c.created_at ? this.formatExactTime(c.created_at) : null;
 
                     const sigPrice = (c.signal_price != null && c.signal_price > 0) ? '₹' + Number(c.signal_price).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : null;
                     const curPrice = (c.current_price != null && c.current_price > 0) ? '₹' + Number(c.current_price).toLocaleString('en-IN', {minimumFractionDigits: 1, maximumFractionDigits: 2}) : null;
@@ -846,17 +980,21 @@ Object.assign(app, {
                     const chgSign = chgPct > 0 ? '+' : '';
 
                     const priceBadge = (sigPrice && curPrice) ? `
-                        <div style="display:inline-flex;align-items:center;gap:0.35rem;font-family:var(--font-mono);font-size:0.72rem;" title="Benchmark Signal Price at disclosure vs Latest Live Price">
-                            <span style="color:#71717a;">Signal: <strong style="color:#d4d4d8;font-weight:600;">${sigPrice}</strong></span>
+                        <div style="display:inline-flex;align-items:center;gap:0.35rem;font-family:var(--font-mono);font-size:0.72rem;" title="Benchmark Signal Price at Ingestion vs Latest Live Price">
+                            <span style="color:#94a3b8;">Signal Px (at ingest): <strong style="color:#38bdf8;font-weight:700;">${sigPrice}</strong></span>
                             <span style="color:#52525b;">→</span>
                             <span style="color:#71717a;">Live: <strong style="color:#f4f4f5;font-weight:600;">${curPrice}</strong></span>
                             <span style="color:${chgColor};font-weight:700;margin-left:0.1rem;">(${chgSign}${chgPct.toFixed(2)}%)</span>
+                        </div>
+                    ` : (sigPrice ? `
+                        <div style="display:inline-flex;align-items:center;gap:0.35rem;font-family:var(--font-mono);font-size:0.72rem;" title="Benchmark Signal Price recorded at ingestion">
+                            <span style="color:#94a3b8;">Signal Px (at ingest): <strong style="color:#38bdf8;font-weight:700;">${sigPrice}</strong></span>
                         </div>
                     ` : (curPrice ? `
                         <div style="display:inline-flex;align-items:center;gap:0.35rem;font-family:var(--font-mono);font-size:0.72rem;">
                             <span style="color:#71717a;">Live: <strong style="color:#f4f4f5;font-weight:600;">${curPrice}</strong></span>
                         </div>
-                    ` : '');
+                    ` : ''));
 
                     const aiTargetBadge = (c.ai_target != null && c.ai_target > 0) ? `
                         <div style="display:inline-flex;align-items:center;gap:0.35rem;font-family:var(--font-mono);font-size:0.72rem;padding-left:0.5rem;border-left:1px solid rgba(255,255,255,0.08);" title="OmniRouter AI Target Price & Defensive Invalidation Stop">
@@ -953,10 +1091,14 @@ Object.assign(app, {
                                 ${origBadge}
                             </div>
 
-                            <div style="font-size:0.7rem;color:#71717a;font-family:var(--font-mono);display:flex;align-items:center;gap:0.35rem;margin-left:auto;">
+                            <div style="font-size:0.7rem;color:#71717a;font-family:var(--font-mono);display:flex;align-items:center;gap:0.35rem;margin-left:auto;flex-wrap:wrap;">
                                 <span style="color:#a1a1aa;">${c.publisher || 'News'}</span>
                                 <span>•</span>
-                                <span>${dateDisplay}</span>
+                                <span title="Publication time as reported by source">${dateDisplay}</span>
+                                ${ingestDisplay ? `
+                                    <span style="color:#3f3f46;">|</span>
+                                    <span style="color:#38bdf8;font-size:0.65rem;" title="Exact database ingestion timestamp: ${c.created_at}">📥 Ingest: ${ingestDisplay}</span>
+                                ` : ''}
                             </div>
                         </div>
 

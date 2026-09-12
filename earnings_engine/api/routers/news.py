@@ -187,6 +187,77 @@ async def run_news_scan_endpoint(request: dict | None = None):
         raise HTTPException(status_code=500, detail=f"News scan failed: {str(e)}")
 
 
+@router.get("/api/v1/news/feeds-status")
+async def get_news_feeds_status():
+    """Return all configured news, regulatory, and corporate filing feeds with health & last fetch telemetry."""
+    try:
+        from earnings_engine.data.news_sources import get_all_feed_metadata
+        from earnings_engine.data.catalysts_news import _connect
+        import sqlite3
+
+        feeds = get_all_feed_metadata()
+
+        # Query harvester schedule status
+        sched_info: dict[str, Any] = {}
+        src_stats: dict[str, dict[str, Any]] = {}
+        try:
+            with _connect(_settings) as conn:
+                conn.row_factory = sqlite3.Row
+                sched_row = conn.execute(
+                    "SELECT * FROM automation_schedules WHERE job_id = ?",
+                    ("news_catalyst_harvest",),
+                ).fetchone()
+                if sched_row:
+                    sched_info = dict(sched_row)
+
+                stat_rows = conn.execute(
+                    """
+                    SELECT source, COUNT(*) as count,
+                           MAX(created_at) as last_ingested_at,
+                           MAX(published_at) as last_published_at
+                    FROM news_catalysts
+                    GROUP BY source
+                    """
+                ).fetchall()
+                for r in stat_rows:
+                    src_stats[r["source"]] = dict(r)
+        except Exception as e:
+            logger.debug("Failed querying news feed DB stats: %s", e)
+
+        # Enhance feeds with operational telemetry
+        for f in feeds:
+            s_key = f.get("source_key")
+            stat = src_stats.get(s_key) or {}
+            f["last_ingested_at"] = stat.get("last_ingested_at") or sched_info.get("last_run_at")
+            f["last_published_at"] = stat.get("last_published_at")
+            f["total_ingested_for_source"] = stat.get("count", 0)
+
+        # Count groups
+        groups_summary: dict[str, int] = {}
+        for f in feeds:
+            grp = f.get("group", "Other")
+            groups_summary[grp] = groups_summary.get(grp, 0) + 1
+
+        return {
+            "success": True,
+            "total_feeds": len(feeds),
+            "groups_summary": groups_summary,
+            "harvester_schedule": {
+                "job_id": sched_info.get("job_id"),
+                "job_name": sched_info.get("job_name"),
+                "last_run_at": sched_info.get("last_run_at"),
+                "next_run_at": sched_info.get("next_run_at"),
+                "interval_seconds": sched_info.get("interval_seconds", 600),
+                "is_enabled": bool(sched_info.get("is_enabled", 1)),
+                "last_summary": sched_info.get("last_summary"),
+            },
+            "feeds": feeds,
+        }
+    except Exception as e:
+        logger.exception("Error in get_news_feeds_status: %s", e)
+        raise HTTPException(status_code=500, detail=f"Failed loading feeds status: {str(e)}")
+
+
 @router.get("/api/v1/news/activity")
 async def get_news_activity_stream(limit: int = Query(50, ge=1, le=200)):
     """Retrieve real-time live activity stream of breaking market filings."""

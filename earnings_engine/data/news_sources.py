@@ -672,3 +672,112 @@ def fetch_all_broadband_news(timeout: float = 7.0) -> list[dict[str, Any]]:
 
     logger.info("[NEWS-SOURCES] Harvested %d broadband news items (%d unique)", len(all_items), len(deduped))
     return deduped
+
+
+def get_all_feed_metadata() -> list[dict[str, Any]]:
+    """Return structured metadata for all registered news, filing, and regulatory feeds.
+
+    Covers:
+    - 19 Official NSE Static RSS Feeds (Announcements, Corporate Actions, Insider Trading, etc.)
+    - Financial Media RSS Feeds (MoneyControl, ET, Mint, Business Standard, Business Today, etc.)
+    - Official Regulatory Feeds (RBI Press Releases, BSE/NSE APIs)
+    - Targeted Topic Streams (USFDA, SEBI, NCLT, FII/DII)
+    """
+    feeds: list[dict[str, Any]] = []
+
+    # 1. NSE Static Archive Feeds (Official Exchange XML)
+    for url, name, cat in NSE_STATIC_RSS_FEEDS:
+        slug = url.split("/")[-1].replace(".xml", "").lower()
+        feeds.append({
+            "id": f"nse_rss_{slug}",
+            "name": name,
+            "group": "NSE Exchange Disclosures",
+            "category": cat.replace("_", " ").title(),
+            "type": "Exchange XML",
+            "url": url,
+            "source_key": "nse_rss",
+            "status": "Active",
+            "description": f"Official NSE exchange XML feed for {name}",
+        })
+
+    # 2. Financial Portals & Media Feeds
+    portal_groups = [
+        ("MoneyControl", MONEYCONTROL_FEEDS, "Financial Portal"),
+        ("Economic Times", ET_FEEDS, "Financial Newspaper"),
+        ("LiveMint", LIVEMINT_FEEDS, "Financial Daily"),
+        ("Business Standard", BUSINESS_STANDARD_FEEDS, "Financial Daily"),
+        ("Hindu BusinessLine", HINDU_BUSINESSLINE_FEEDS, "Financial Daily"),
+        ("NDTV Profit", NDTV_FEEDS, "Financial News Broadcast"),
+        ("Business Today", BUSINESS_TODAY_FEEDS, "Business Magazine & Portal"),
+    ]
+    for publisher, feed_list, ftype in portal_groups:
+        for url, name in feed_list:
+            slug = re.sub(r"[^a-z0-9]", "_", name.lower())
+            feeds.append({
+                "id": f"media_{slug}",
+                "name": name,
+                "group": "Financial Media & Portals",
+                "category": "Corporate & Market News",
+                "type": "Portal RSS",
+                "url": url,
+                "source_key": "rss",
+                "status": "Active",
+                "description": f"{publisher} live RSS stream: {name}",
+            })
+
+    # 3. Regulatory & Official Institutional Feeds
+    for url, name in RBI_FEEDS:
+        feeds.append({
+            "id": "rbi_press_releases",
+            "name": name,
+            "group": "Official Regulatory & Exchange",
+            "category": "Monetary Policy & Circulars",
+            "type": "Central Bank RSS",
+            "url": url,
+            "source_key": "rbi_rss",
+            "status": "Active",
+            "description": "Reserve Bank of India official press releases, notifications, and policy directives",
+        })
+
+    feeds.append({
+        "id": "bse_announcements_api",
+        "name": "BSE Corporate Announcements API",
+        "group": "Official Regulatory & Exchange",
+        "category": "Corporate Filings",
+        "type": "Exchange REST API",
+        "url": "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w",
+        "source_key": "bse_filings",
+        "status": "Active",
+        "description": "Bombay Stock Exchange real-time corporate filing stream",
+    })
+
+    feeds.append({
+        "id": "nse_announcements_api",
+        "name": "NSE Corporate Announcements API",
+        "group": "Official Regulatory & Exchange",
+        "category": "Corporate Filings",
+        "type": "Exchange REST API",
+        "url": "https://www.nseindia.com/api/corporate-announcements",
+        "source_key": "nse_announcements",
+        "status": "Active",
+        "description": "National Stock Exchange real-time corporate announcements API",
+    })
+
+    # 4. Targeted Catalyst & Event Topic Streams
+    for query, name in GOOGLE_BROADBAND_QUERIES:
+        slug = re.sub(r"[^a-z0-9]", "_", name.lower())
+        encoded_q = urllib.parse.quote(query)
+        feed_url = f"https://news.google.com/rss/search?q={encoded_q}&hl=en-IN&gl=IN&ceid=IN:en"
+        feeds.append({
+            "id": f"topic_{slug}",
+            "name": name,
+            "group": "Targeted Regulatory Monitors",
+            "category": "Regulatory & Market Flows",
+            "type": "Topic RSS Stream",
+            "url": feed_url,
+            "source_key": "google_rss",
+            "status": "Active",
+            "description": f"Real-time event monitor for: '{query}'",
+        })
+
+    return feeds
