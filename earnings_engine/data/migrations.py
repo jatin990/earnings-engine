@@ -822,7 +822,7 @@ def _migration_013_automation_and_institutional(conn: Any) -> None:
             avg_price REAL DEFAULT 0.0,
             recent_buy_price REAL DEFAULT 0.0,
             reported_date TEXT,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL DEFAULT (DATETIME('now'))
         )
     """)
     _add_column_if_missing(conn, "institutional_holdings", "avg_price", "REAL DEFAULT 0.0")
@@ -846,7 +846,7 @@ def _migration_013_automation_and_institutional(conn: Any) -> None:
             value_cr REAL NOT NULL,
             pct_equity REAL,
             exchange TEXT NOT NULL DEFAULT 'NSE',
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL DEFAULT (DATETIME('now'))
         )
     """)
     try:
@@ -1478,7 +1478,7 @@ def _migration_032_institutional_radar_signals(conn: Any) -> None:
             current_return_pct REAL,
             peak_price REAL,
             max_gain_pct REAL,
-            last_seen_date TEXT NOT NULL,
+            last_seen_date TEXT NOT NULL DEFAULT (DATE('now')),
             is_active INTEGER DEFAULT 1,
             created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
             updated_at TEXT NOT NULL DEFAULT (DATETIME('now')),
@@ -1916,21 +1916,35 @@ def _migration_041_smart_money_strategies_and_financials(conn: Any) -> None:
             period_end_date TEXT,
             revenue_cr REAL,
             net_profit_cr REAL,
+            operating_profit_cr REAL,
             operating_margin_pct REAL,
+            net_margin_pct REAL,
             eps REAL,
             sales_growth_yoy_pct REAL,
             profit_growth_yoy_pct REAL,
+            yoy_revenue_growth_pct REAL,
+            yoy_pat_growth_pct REAL,
             raw_payload_json TEXT,
             created_at TEXT NOT NULL DEFAULT (DATETIME('now')),
             updated_at TEXT NOT NULL DEFAULT (DATETIME('now')),
             UNIQUE(ticker, quarter)
         )
     """)
+    for col, col_type in [
+        ("operating_profit_cr", "REAL"),
+        ("net_margin_pct", "REAL"),
+        ("yoy_revenue_growth_pct", "REAL"),
+        ("yoy_pat_growth_pct", "REAL"),
+        ("sales_growth_yoy_pct", "REAL"),
+        ("profit_growth_yoy_pct", "REAL"),
+    ]:
+        _add_column_if_missing(conn, "quarterly_financials", col, col_type)
+
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_qfin_ticker_quarter ON quarterly_financials(ticker, quarter)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_qfin_period_end ON quarterly_financials(period_end_date DESC)")
     except Exception as e:
-        logger.debug("[MIGRATION-041] Index notice for quarterly_financials: %s", e)
+        logger.debug("[MIGRATION-035] Index notice for quarterly_financials: %s", e)
 
 
 # Migration Registry (ordered by version)
