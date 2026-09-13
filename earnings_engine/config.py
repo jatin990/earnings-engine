@@ -257,6 +257,13 @@ def market_of(ticker: str) -> str:
 BREAKOUT_MCAP_LARGE_MIN_CR = 20_000.0
 BREAKOUT_MCAP_MID_MIN_CR = 500.0
 
+# Market cap class boundaries in RAW INR (1 Cr = 10,000,000 INR):
+#   large_cap >= 2,000,000,000,000 INR (₹200B)
+#   mid_cap   >= 5,000,000,000 INR (₹5B) and < 2,000,000,000,000 INR
+#   small_cap  < 5,000,000,000 INR
+BREAKOUT_MCAP_LARGE_MIN_RAW = 20_000.0 * 1e7  # 2e12 INR
+BREAKOUT_MCAP_MID_MIN_RAW = 500.0 * 1e7        # 5e9 INR
+
 # Volume ratio threshold for "elevated volume" filter
 BREAKOUT_ELEVATED_VOLUME_RATIO = 1.5  # 1.5x vs 20-day average
 

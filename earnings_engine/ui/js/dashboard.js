@@ -48,7 +48,7 @@ const API_BASE = window.location.origin;
                 if (this._scriptPromises && this._scriptPromises[cleanSrc]) {
                     return this._scriptPromises[cleanSrc];
                 }
-                const version = '20260828_v23_modular';
+                const version = '20260913_v24_breakout_filters';
                 const versionedSrc = cleanSrc + (cleanSrc.includes('?') ? '&' : '?') + 'v=' + version;
 
                 const p = new Promise((resolve, reject) => {

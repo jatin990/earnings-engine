@@ -77,9 +77,13 @@ async def get_breakout_radar_endpoint(
             target_tier = tier.upper().strip()
             candidates = [c for c in candidates if (c.get("tier") or "HOT").upper() == target_tier]
 
-        # --- Market Cap Enrichment (only if a mcap filter is requested) ---
+        # --- Market Cap Normalization + Enrichment ---
+        # NOTE: `market_cap_cr` in breakout_radar dicts holds RAW INR (e.g.
+        # HEROMOTOCO.NS = 1047639097344), NOT Crores. Normalize to Crores here so the
+        # filter thresholds (expressed in Crores) compare against consistent units.
         _has_mcap_filter = any([mcap_min is not None, mcap_max is not None, mcap_class is not None])
         if _has_mcap_filter:
+            # Enrich candidates missing market cap from the authoritative tickers table
             _bulk_caps: dict[str, float] = {}
             try:
                 from earnings_engine.data.universe import load_all_market_caps
@@ -87,32 +91,44 @@ async def get_breakout_radar_endpoint(
             except Exception as _mcap_err:
                 logger.debug("Bulk market cap load skipped: %s", _mcap_err)
             for c in candidates:
-                if c.get("market_cap_cr") is None:
-                    t = c.get("ticker", "")
-                    # load_all_market_caps returns raw units (rupees); convert to Cr if present
-                    raw_cap = _bulk_caps.get(t) or _bulk_caps.get(t.replace(".NS", ""))
-                    if raw_cap is not None:
-                        try:
-                            c["market_cap_cr"] = round(float(raw_cap) / 1e7, 2)  # INR → Cr
-                        except (TypeError, ValueError):
-                            pass
+                t = c.get("ticker", "")
+                _raw_cap = None
+                stored = c.get("market_cap_cr")
+                if stored is not None:
+                    try:
+                        _raw_cap = float(stored)
+                    except (TypeError, ValueError):
+                        _raw_cap = None
+                else:
+                    # load_all_market_caps returns RAW INR (rupees)
+                    _raw_cap = _bulk_caps.get(t) or _bulk_caps.get(t.replace(".NS", ""))
+                    try:
+                        _raw_cap = float(_raw_cap)
+                    except (TypeError, ValueError):
+                        _raw_cap = None
+                if _raw_cap is not None:
+                    # market_cap_cr from the breakout scanner ALWAYS holds RAW INR
+                    # (load_price_metrics returns market_cap in rupees; market_cap_cr is
+                    # always None). 1 Cr = 10,000,000 INR, so divide by 1e7 to get Crores.
+                    # Example: HEROMOTOCO 1,117,388,358,681 INR = 111,738 Cr; SIMBHALS
+                    # 357,784,471 INR = 35.78 Cr (micro-cap). Always divide — no magnitude
+                    # heuristic, since raw INR and Crores overlap in value range.
+                    c["market_cap_cr"] = round(_raw_cap / 1e7, 2)
 
         # Apply market cap minimum threshold (Crores, NSE tickers only)
-        if mcap_min is not None:
+        if mcap_min is not None and _has_mcap_filter:
             candidates = [
                 c for c in candidates
-                if c.get("market_cap_cr") is None  # pass non-NSE tickers that have no mcap
-                or ".NS" in str(c.get("ticker", "")).upper()
-                and float(c.get("market_cap_cr")) >= mcap_min
+                if ".NS" not in str(c.get("ticker", "")).upper()
+                or (c.get("market_cap_cr") is not None and float(c.get("market_cap_cr")) >= mcap_min)
             ]
 
         # Apply market cap maximum threshold (Crores, NSE tickers only)
-        if mcap_max is not None:
+        if mcap_max is not None and _has_mcap_filter:
             candidates = [
                 c for c in candidates
-                if c.get("market_cap_cr") is None  # pass non-NSE tickers that have no mcap
-                or ".NS" in str(c.get("ticker", "")).upper()
-                and float(c.get("market_cap_cr")) <= mcap_max
+                if ".NS" not in str(c.get("ticker", "")).upper()
+                or (c.get("market_cap_cr") is not None and float(c.get("market_cap_cr")) <= mcap_max)
             ]
 
         # Apply named market cap class band
@@ -121,23 +137,21 @@ async def get_breakout_radar_endpoint(
             if _class_lower == "large_cap":
                 candidates = [
                     c for c in candidates
-                    if c.get("market_cap_cr") is None  # pass non-NSE tickers that have no mcap
-                    or ".NS" in str(c.get("ticker", "")).upper()
-                    and float(c.get("market_cap_cr")) >= BREAKOUT_MCAP_LARGE_MIN_CR
+                    if ".NS" not in str(c.get("ticker", "")).upper()
+                    or (c.get("market_cap_cr") is not None and float(c.get("market_cap_cr")) >= BREAKOUT_MCAP_LARGE_MIN_CR)
                 ]
             elif _class_lower == "mid_cap":
                 candidates = [
                     c for c in candidates
-                    if c.get("market_cap_cr") is None  # pass non-NSE tickers that have no mcap
-                    or ".NS" in str(c.get("ticker", "")).upper()
-                    and BREAKOUT_MCAP_MID_MIN_CR <= float(c.get("market_cap_cr")) < BREAKOUT_MCAP_LARGE_MIN_CR
+                    if ".NS" not in str(c.get("ticker", "")).upper()
+                    or (c.get("market_cap_cr") is not None
+                        and BREAKOUT_MCAP_MID_MIN_CR <= float(c.get("market_cap_cr")) < BREAKOUT_MCAP_LARGE_MIN_CR)
                 ]
             elif _class_lower == "small_cap":
                 candidates = [
                     c for c in candidates
-                    if c.get("market_cap_cr") is None  # pass non-NSE tickers that have no mcap
-                    or ".NS" in str(c.get("ticker", "")).upper()
-                    and float(c.get("market_cap_cr")) < BREAKOUT_MCAP_MID_MIN_CR
+                    if ".NS" not in str(c.get("ticker", "")).upper()
+                    or (c.get("market_cap_cr") is not None and float(c.get("market_cap_cr")) < BREAKOUT_MCAP_MID_MIN_CR)
                 ]
 
         # Apply elevated volume ratio filter
