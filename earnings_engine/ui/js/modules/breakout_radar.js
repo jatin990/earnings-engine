@@ -2646,10 +2646,13 @@
             function draw() {
                 const rect = wrapper.getBoundingClientRect();
                 const dpr = window.devicePixelRatio || 1;
-                const width = rect.width;
-                const height = rect.height;
+                let width = rect.width || wrapper.clientWidth || 600;
+                let height = rect.height || wrapper.clientHeight || 420;
 
-                if (width <= 0 || height <= 0) return;
+                if (width <= 0 || height <= 0) {
+                    setTimeout(() => requestAnimationFrame(draw), 80);
+                    return;
+                }
 
                 canvas.width = width * dpr;
                 canvas.height = height * dpr;
@@ -2829,12 +2832,12 @@
                     ctx.strokeRect(cx - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
 
                     // Intra-bar Footprint Cluster Blocks if width allows
-                    if (candleWidth >= 22 && Array.isArray(bar.clusters) && bar.clusters.length > 0) {
-                        const clusterH = Math.max(3, bodyHeight / bar.clusters.length);
+                    if (candleWidth >= 12 && Array.isArray(bar.clusters) && bar.clusters.length > 0) {
+                        const clusterH = Math.max(2, bodyHeight / bar.clusters.length);
                         bar.clusters.forEach((cl, cIdx) => {
                             const clY = bodyTop + cIdx * clusterH;
-                            const buyV = cl.buy || 0;
-                            const sellV = cl.sell || 0;
+                            const buyV = cl.buy_vol ?? cl.buy ?? 0;
+                            const sellV = cl.sell_vol ?? cl.sell ?? 0;
                             const isBuyImb = buyV > sellV * 1.5;
                             const isSellImb = sellV > buyV * 1.5;
 
@@ -2854,8 +2857,9 @@
                     let minCvd = Infinity;
                     let maxCvd = -Infinity;
                     cvdBars.forEach(cb => {
-                        if (cb.cvd < minCvd) minCvd = cb.cvd;
-                        if (cb.cvd > maxCvd) maxCvd = cb.cvd;
+                        const val = cb.cvd != null ? cb.cvd : (cb.cumulative_delta || 0);
+                        if (val < minCvd) minCvd = val;
+                        if (val > maxCvd) maxCvd = val;
                     });
                     const cvdPad = Math.max(10, (maxCvd - minCvd) * 0.1);
                     minCvd -= cvdPad;
@@ -2880,7 +2884,8 @@
                     ctx.moveTo(0, zeroY);
                     cvdBars.forEach((cb, idx) => {
                         const cbX = idx * barSpacing + barSpacing / 2;
-                        const cbY = cvdToY(cb.cvd);
+                        const val = cb.cvd != null ? cb.cvd : (cb.cumulative_delta || 0);
+                        const cbY = cvdToY(val);
                         ctx.lineTo(cbX, cbY);
                     });
                     ctx.lineTo(cvdBars.length * barSpacing, zeroY);
@@ -2898,7 +2903,8 @@
                     ctx.beginPath();
                     cvdBars.forEach((cb, idx) => {
                         const cbX = idx * barSpacing + barSpacing / 2;
-                        const cbY = cvdToY(cb.cvd);
+                        const val = cb.cvd != null ? cb.cvd : (cb.cumulative_delta || 0);
+                        const cbY = cvdToY(val);
                         if (idx === 0) ctx.moveTo(cbX, cbY);
                         else ctx.lineTo(cbX, cbY);
                     });
@@ -2961,6 +2967,7 @@
                         tooltip.style.left = tipX + 'px';
                         tooltip.style.top = tipY + 'px';
 
+                        const cvdDisplay = (cvdItem.cvd != null ? cvdItem.cvd : cvdItem.cumulative_delta);
                         tooltip.innerHTML = `
                             <div style="color: #fbbf24; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px; margin-bottom: 3px;">
                                 ${b.date || 'SESSION'} · ₹${Number(b.close).toFixed(2)}
@@ -2973,7 +2980,7 @@
                             </div>
                             <div style="margin-top: 3px; padding-top: 2px; border-top: 1px solid rgba(255,255,255,0.06);">
                                 <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8;">Bar Delta:</span><b style="color:${b.delta >= 0 ? '#34d399' : '#f87171'};">${b.delta >= 0 ? '+' : ''}${Math.round(b.delta).toLocaleString()}</b></div>
-                                <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8;">CVD:</span><b style="color:#38bdf8;">${cvdItem.cvd ? Math.round(cvdItem.cvd).toLocaleString() : '—'}</b></div>
+                                <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8;">CVD:</span><b style="color:#38bdf8;">${cvdDisplay != null ? Math.round(cvdDisplay).toLocaleString() : '—'}</b></div>
                                 <div style="display:flex; justify-content:space-between;"><span style="color:#94a3b8;">Volume:</span><b style="color:#e2e8f0;">${(b.volume || 0).toLocaleString()}</b></div>
                             </div>
                         `;
@@ -3004,8 +3011,10 @@
             });
             ro.observe(wrapper);
 
-            // Initial render
+            // Initial render and delayed passes for transitions
             requestAnimationFrame(draw);
+            setTimeout(() => requestAnimationFrame(draw), 50);
+            setTimeout(() => requestAnimationFrame(draw), 250);
         }
 
         app.initBreakoutTradingViewWidget = function(ticker) {

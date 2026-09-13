@@ -3451,14 +3451,19 @@ def get_order_flow_analytics(
         nse_sym = f"NSE:{raw_sym}"
         canon_sym = canonical_symbol(sym)
 
-    # 1. Load price data
+    # 1. Load price data with fallback cascade
     df = load_prices(canon_sym, settings)
-    if (df is None or df.empty) and canon_sym.endswith(".BO"):
-        ns_sym = canonical_symbol(f"{raw_sym}.NS")
-        df = load_prices(ns_sym, settings)
-    elif (df is None or df.empty) and canon_sym.endswith(".NS"):
-        bo_sym = canonical_symbol(f"{raw_sym}.BO")
-        df = load_prices(bo_sym, settings)
+    if (df is None or df.empty):
+        if not canon_sym.endswith(".NS"):
+            ns_sym = canonical_symbol(f"{raw_sym}.NS")
+            df = load_prices(ns_sym, settings)
+            if df is not None and not df.empty:
+                canon_sym = ns_sym
+        if (df is None or df.empty) and not canon_sym.endswith(".BO"):
+            bo_sym = canonical_symbol(f"{raw_sym}.BO")
+            df = load_prices(bo_sym, settings)
+            if df is not None and not df.empty:
+                canon_sym = bo_sym
 
     live_q = fetch_live_quote(canon_sym, settings) or {}
     cur_p = float(live_q.get("current_price") or 0.0)
@@ -3512,6 +3517,7 @@ def get_order_flow_analytics(
                 "sell_volume": int(bar_sell),
                 "delta": int(bar_delta),
                 "cumulative_delta": int(cum_delta),
+                "cvd": int(cum_delta),
             })
 
     total_vol = buy_vol + sell_vol
@@ -3519,9 +3525,10 @@ def get_order_flow_analytics(
     sell_pct = round((sell_vol / max(1.0, total_vol)) * 100, 1)
     delta_bias = "ACCUMULATION" if buy_pct >= 55.0 else ("DISTRIBUTION" if sell_pct >= 55.0 else "NEUTRAL")
 
-    # 4. Compute Footprint Matrix for Recent 5 Bars (Price Tier Cluster Decomposition)
+    # 4. Compute Footprint Matrix for Recent 20 Bars (Synchronized 1:1 with CVD lookback window)
     footprint_matrix: list[dict[str, Any]] = []
-    for b in cvd_bars[-5:]:
+    lookback_footprint = cvd_bars[-20:] if len(cvd_bars) >= 20 else cvd_bars
+    for b in lookback_footprint:
         b_h = b.get("high", b.get("close", 0.0))
         b_l = b.get("low", b.get("close", 0.0))
         b_v = b.get("volume", 0)
@@ -3540,6 +3547,8 @@ def get_order_flow_analytics(
                 "price": lvl_p,
                 "buy_vol": lvl_bv,
                 "sell_vol": lvl_sv,
+                "buy": lvl_bv,
+                "sell": lvl_sv,
                 "delta": lvl_bv - lvl_sv,
                 "imbalance": "BUY_IMBALANCE" if lvl_bv > lvl_sv * 2.5 else ("SELL_IMBALANCE" if lvl_sv > lvl_bv * 2.5 else "BALANCED"),
             })
@@ -3550,6 +3559,8 @@ def get_order_flow_analytics(
             "low": b_l,
             "close": b["close"],
             "volume": b_v,
+            "buy_volume": b_bv,
+            "sell_volume": b_sv,
             "delta": b["delta"],
             "cvd": b.get("cvd", 0),
             "clusters": clusters,
