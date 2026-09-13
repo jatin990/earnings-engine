@@ -11,10 +11,16 @@
 }
 
 html {
-    font-size: 15px; /* Base 1440p / 2K scale */
+    font-size: 16.5px; /* Base 1440p / 2K ergonomic scale */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     color-scheme: dark;
+}
+
+@media (min-width: 2560px) {
+    html {
+        font-size: 17px;
+    }
 }
 
 body {

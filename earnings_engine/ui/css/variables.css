@@ -84,14 +84,15 @@
     --purple-dark: #0f121a;
 
     /* ─── 2K Fluid Typography Scale (Calibrated for ~92 PPI / 1440p) ───── */
-    --font-size-2xs: clamp(0.75rem, 0.72rem + 0.15vw, 0.8125rem);  /* 12.0px - 13.0px (Floor) */
-    --font-size-xs: clamp(0.8125rem, 0.78rem + 0.18vw, 0.875rem);   /* 13.0px - 14.0px */
-    --font-size-sm: clamp(0.875rem, 0.84rem + 0.20vw, 0.9375rem);   /* 14.0px - 15.0px */
-    --font-size-base: clamp(0.9375rem, 0.90rem + 0.25vw, 1.0625rem);/* 15.0px - 17.0px */
-    --font-size-md: clamp(1.0625rem, 1.00rem + 0.35vw, 1.1875rem);  /* 17.0px - 19.0px */
-    --font-size-lg: clamp(1.20rem, 1.12rem + 0.45vw, 1.40rem);     /* 19.2px - 22.4px */
-    --font-size-xl: clamp(1.40rem, 1.25rem + 0.65vw, 1.75rem);     /* 22.4px - 28.0px */
-    --font-size-2xl: clamp(1.75rem, 1.50rem + 1.00vw, 2.25rem);    /* 28.0px - 36.0px */
+    --font-size-2xs: clamp(0.8125rem, 0.78rem + 0.15vw, 0.875rem);  /* 13.5px - 14.5px (Micro Floor) */
+    --font-size-xs: clamp(0.875rem, 0.84rem + 0.18vw, 0.9375rem);   /* 14.5px - 15.5px */
+    --font-size-sm: clamp(0.9375rem, 0.90rem + 0.20vw, 1.00rem);    /* 15.5px - 16.5px */
+    --font-size-base: clamp(1.00rem, 0.96rem + 0.25vw, 1.125rem);  /* 16.5px - 18.5px (Body Root) */
+    --font-size-md: clamp(1.125rem, 1.08rem + 0.35vw, 1.25rem);    /* 18.5px - 20.5px */
+    --font-size-lg: clamp(1.25rem, 1.18rem + 0.45vw, 1.45rem);     /* 20.5px - 24.0px */
+    --font-size-xl: clamp(1.45rem, 1.35rem + 0.65vw, 1.80rem);     /* 24.0px - 29.5px */
+    --font-size-2xl: clamp(1.85rem, 1.65rem + 1.00vw, 2.35rem);    /* 30.5px - 38.5px */
+    --font-size-3xl: clamp(2.25rem, 1.95rem + 1.40vw, 3.00rem);    /* 37.0px - 49.5px */
 
     /* ─── Font Stacks ──────────────────────────────────────────────────── */
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
