@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 import threading
 import time
@@ -256,7 +257,21 @@ def prices_recent_enough(ticker: str, settings: Settings, ttl_minutes: int = FET
     return False
 
 
+def _sanitize_numeric(val: Any) -> float | None:
+    """Safely convert a value to float, returning None if NaN, Inf, or unparseable."""
+    if val is None or pd.isna(val):
+        return None
+    try:
+        f = float(val)
+        if math.isnan(f) or math.isinf(f):
+            return None
+        return f
+    except (ValueError, TypeError):
+        return None
+
+
 def _write_prices(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
+    """Overwrite cached price rows for a single ticker in SQLite with strict NaN/Null sanitization."""
     if df.empty:
         return
 
@@ -266,30 +281,42 @@ def _write_prices(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
         if ts.weekday() >= 5:  # Strictly skip weekend non-trading days (Sat/Sun)
             continue
         date_value = ts.strftime("%Y-%m-%d")
+
+        c = _sanitize_numeric(row.get("close"))
+        if c is None or c <= 0:
+            continue
+
+        o = _sanitize_numeric(row.get("open"))
+        h = _sanitize_numeric(row.get("high"))
+        l = _sanitize_numeric(row.get("low"))
+        v_num = _sanitize_numeric(row.get("volume"))
+        v = int(v_num) if v_num is not None and v_num >= 0 else 0
+
         rows.append(
             (
                 ticker,
                 date_value,
-                float(row.get("open")) if pd.notna(row.get("open")) else None,
-                float(row.get("high")) if pd.notna(row.get("high")) else None,
-                float(row.get("low")) if pd.notna(row.get("low")) else None,
-                float(row.get("close")) if pd.notna(row.get("close")) else None,
-                float(row.get("volume")) if pd.notna(row.get("volume")) else None,
+                o if o is not None else c,
+                h if h is not None else max(o or c, c),
+                l if l is not None else min(o or c, c),
+                c,
+                v,
             )
         )
 
     with _connect(settings) as connection:
         connection.execute("DELETE FROM price_history WHERE ticker = ?", (ticker,))
-        connection.executemany(
-            "INSERT INTO price_history (ticker, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            rows,
-        )
+        if rows:
+            connection.executemany(
+                "INSERT INTO price_history (ticker, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                rows,
+            )
         connection.commit()
     _mark_fetched(ticker, settings)
 
 
 def _merge_prices(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
-    """Upsert new price rows into the cache, preserving existing history."""
+    """Upsert new price rows into the cache, preserving existing history with strict NaN/Null sanitization."""
     if df.empty:
         return
 
@@ -299,24 +326,36 @@ def _merge_prices(ticker: str, settings: Settings, df: pd.DataFrame) -> None:
         if ts.weekday() >= 5:  # Strictly skip weekend non-trading days (Sat/Sun)
             continue
         date_value = ts.strftime("%Y-%m-%d")
+
+        c = _sanitize_numeric(row.get("close"))
+        if c is None or c <= 0:
+            continue
+
+        o = _sanitize_numeric(row.get("open"))
+        h = _sanitize_numeric(row.get("high"))
+        l = _sanitize_numeric(row.get("low"))
+        v_num = _sanitize_numeric(row.get("volume"))
+        v = int(v_num) if v_num is not None and v_num >= 0 else 0
+
         rows.append(
             (
                 ticker,
                 date_value,
-                float(row.get("open")) if pd.notna(row.get("open")) else None,
-                float(row.get("high")) if pd.notna(row.get("high")) else None,
-                float(row.get("low")) if pd.notna(row.get("low")) else None,
-                float(row.get("close")) if pd.notna(row.get("close")) else None,
-                float(row.get("volume")) if pd.notna(row.get("volume")) else None,
+                o if o is not None else c,
+                h if h is not None else max(o or c, c),
+                l if l is not None else min(o or c, c),
+                c,
+                v,
             )
         )
 
-    with _connect(settings) as connection:
-        connection.executemany(
-            "INSERT OR REPLACE INTO price_history (ticker, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            rows,
-        )
-        connection.commit()
+    if rows:
+        with _connect(settings) as connection:
+            connection.executemany(
+                "INSERT OR REPLACE INTO price_history (ticker, date, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                rows,
+            )
+            connection.commit()
     _mark_fetched(ticker, settings)
 
 
@@ -465,18 +504,30 @@ def load_prices_batch(
                 chunk = missing[i : i + CHUNK_SIZE]
                 placeholders = ",".join("?" for _ in chunk)
                 if since_date:
-                    query = f"SELECT ticker, date, open, high, low, close, volume FROM price_history WHERE ticker IN ({placeholders}) AND date >= ? ORDER BY ticker, date ASC"
+                    query = (
+                        f"SELECT ticker, date, open, high, low, close, volume "
+                        f"FROM price_history "
+                        f"WHERE ticker IN ({placeholders}) AND date >= ? AND close IS NOT NULL AND close > 0 "
+                        f"ORDER BY ticker, date ASC"
+                    )
                     params = [*chunk, since_date]
                 else:
-                    query = f"SELECT ticker, date, open, high, low, close, volume FROM price_history WHERE ticker IN ({placeholders}) ORDER BY ticker, date ASC"
+                    query = (
+                        f"SELECT ticker, date, open, high, low, close, volume "
+                        f"FROM price_history "
+                        f"WHERE ticker IN ({placeholders}) AND close IS NOT NULL AND close > 0 "
+                        f"ORDER BY ticker, date ASC"
+                    )
                     params = chunk
                 rows = connection.execute(query, params).fetchall()
 
                 if rows:
                     all_df = pd.DataFrame(rows, columns=["ticker", "date", *COLUMNS])
+                    all_df = all_df.dropna(subset=["close"])
                     all_df["date"] = pd.to_datetime(all_df["date"])
                     for col in COLUMNS:
                         all_df[col] = pd.to_numeric(all_df[col], errors="coerce")
+                    all_df = all_df[all_df["close"].notna() & (all_df["close"] > 0)]
                     all_df = all_df.astype({"volume": "Int64"}, errors="ignore")
                     for sym, g in all_df.groupby("ticker", sort=False):
                         g = g.drop(columns=["ticker"]).set_index("date")

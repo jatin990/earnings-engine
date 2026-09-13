@@ -1865,6 +1865,16 @@ def _migration_039_strategy_tier_audit_and_swing_radar(conn: Any) -> None:
         pass
 
 
+def _migration_040_purge_invalid_price_history_nan_records(conn: Any) -> None:
+    """Purge corrupt, null, and non-positive close records from price_history table."""
+    try:
+        conn.execute("DELETE FROM price_history WHERE close IS NULL OR close <= 0")
+        conn.execute("DELETE FROM price_history WHERE open IS NULL AND high IS NULL AND low IS NULL AND close IS NULL")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_price_history_ticker_date_close ON price_history(ticker, date, close)")
+    except Exception as e:
+        logger.debug("[MIGRATION-040] Price history purge notice: %s", e)
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1906,6 +1916,7 @@ MIGRATIONS: list[Migration] = [
     Migration(37, "037_breakout_late_detection_fields", _migration_037_breakout_late_detection_fields),
     Migration(38, "038_alert_rules_engine", _migration_038_alert_rules_engine),
     Migration(39, "039_strategy_tier_audit_and_swing_radar", _migration_039_strategy_tier_audit_and_swing_radar),
+    Migration(40, "040_purge_invalid_price_history_nan_records", _migration_040_purge_invalid_price_history_nan_records),
 ]
 
 

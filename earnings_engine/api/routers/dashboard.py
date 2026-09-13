@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date, datetime, timedelta, timezone
+import math
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
+import pandas as pd
 
 from earnings_engine.api.dependencies import (
     _get_current_session,
@@ -700,32 +702,60 @@ async def get_single_market_cap(
 @router.get("/api/v1/stock/{ticker}/price-history")
 async def get_price_history(
     ticker: str,
-    start_date: str | None = Query(None, description="Start date (YYYY-MM-DD)"),
-    end_date: str | None = Query(None, description="End date (YYYY-MM-DD)"),
-    force_refresh: bool = Query(False, description="Force refresh from yfinance"),
+    start_date: str | None = Query(default=None, description="Start date (YYYY-MM-DD)"),
+    end_date: str | None = Query(default=None, description="End date (YYYY-MM-DD)"),
+    force_refresh: bool = Query(default=False, description="Force refresh from yfinance"),
 ):
-    """Get OHLCV price history for a ticker."""
+    """Get OHLCV price history for a ticker with strict NaN and zero-value safety."""
     try:
-        from earnings_engine.data import prices as prices_mod
-        df = await asyncio.to_thread(prices_mod.fetch_prices, ticker, _settings, force=force_refresh)
-        if df.empty:
-            return []
-        if start_date:
-            df = df[df.index >= start_date]
-        if end_date:
-            df = df[df.index <= end_date]
+        from urllib.parse import unquote
         import math
+        clean_ticker = unquote(ticker).strip()
+        force_val = force_refresh if isinstance(force_refresh, bool) else False
+        from earnings_engine.data import prices as prices_mod
+        df = await asyncio.to_thread(prices_mod.fetch_prices, clean_ticker, _settings, force=force_val)
+        if df is None or df.empty:
+            return []
+        if isinstance(start_date, str) and start_date.strip():
+            df = df[df.index >= start_date.strip()]
+        if isinstance(end_date, str) and end_date.strip():
+            df = df[df.index <= end_date.strip()]
+
         records = []
         for dt, row in df.iterrows():
             try:
-                o = float(row.get("open", 0.0))
-                h = float(row.get("high", 0.0))
-                l = float(row.get("low", 0.0))
-                c = float(row.get("close", 0.0))
-                v_raw = row.get("volume", 0)
-                v = int(v_raw) if (v_raw is not None and not (isinstance(v_raw, float) and math.isnan(v_raw))) else 0
-                if math.isnan(o) or math.isnan(h) or math.isnan(l) or math.isnan(c) or c <= 0:
+                c_raw = row.get("close")
+                if c_raw is None or pd.isna(c_raw):
                     continue
+                c = float(c_raw)
+                if math.isnan(c) or math.isinf(c) or c <= 0:
+                    continue
+
+                o_raw = row.get("open")
+                o = float(o_raw) if o_raw is not None and not pd.isna(o_raw) else c
+                if math.isnan(o) or math.isinf(o) or o <= 0:
+                    o = c
+
+                h_raw = row.get("high")
+                h = float(h_raw) if h_raw is not None and not pd.isna(h_raw) else max(o, c)
+                if math.isnan(h) or math.isinf(h) or h <= 0:
+                    h = max(o, c)
+
+                l_raw = row.get("low")
+                l = float(l_raw) if l_raw is not None and not pd.isna(l_raw) else min(o, c)
+                if math.isnan(l) or math.isinf(l) or l <= 0:
+                    l = min(o, c)
+
+                v_raw = row.get("volume", 0)
+                if v_raw is not None and not pd.isna(v_raw):
+                    try:
+                        v_flt = float(v_raw)
+                        v = int(v_flt) if not (math.isnan(v_flt) or math.isinf(v_flt)) else 0
+                    except (ValueError, TypeError):
+                        v = 0
+                else:
+                    v = 0
+
                 records.append({
                     "date": dt.strftime("%Y-%m-%d") if hasattr(dt, "strftime") else str(dt),
                     "open": round(o, 2),
