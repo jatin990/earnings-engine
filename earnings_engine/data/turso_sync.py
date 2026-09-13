@@ -54,6 +54,7 @@ SYNC_TABLES = [
     "kronos_predictions",
     "strategy_predictions",
     "strategy_audit_logs",
+    "strategy_tier_audit_log",
     "ai_news_predictions",
     "news_catalysts",
     "news_catalysts_tickers",

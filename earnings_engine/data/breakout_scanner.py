@@ -1410,6 +1410,7 @@ def get_tracked_breakouts(
     sort_by: str = "signal_date",
     limit: int = 200,
     live: bool = False,
+    capital: float = 1000000.0,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Query permanently tracked breakout signals from breakout_tracked_signals with filtering and summary metrics."""
@@ -1767,8 +1768,44 @@ def get_tracked_breakouts(
                     filtered_items.append(it)
             items = filtered_items
 
-        # 6. Summary metrics calculation
+        # 6. Summary metrics calculation & 10L Portfolio Capital Simulation
         total_tracked = len(items)
+        initial_capital = float(capital) if capital and capital > 0 else 1000000.0
+        alloc_per_trade = (initial_capital / total_tracked) if total_tracked > 0 else 0.0
+
+        for it in items:
+            out_str = str(it.get("outcome") or "").upper()
+            sig_p = it.get("signal_price") or it.get("breakout_trigger")
+            target_p = it.get("target_price")
+            stop_p = it.get("stop_loss")
+            cur_p = it.get("current_price")
+            max_g = float(it.get("max_gain_pct") or 0.0)
+
+            if out_str == "TARGET_HIT":
+                target_ret = round(((target_p - sig_p) / sig_p * 100.0), 2) if (sig_p and target_p and sig_p > 0) else float(it.get("realized_return_pct") or 0.0)
+                peak_ret = max(target_ret, max_g)
+                # 70% booked at target, 30% booked at peak
+                sim_ret = round(0.70 * target_ret + 0.30 * peak_ret, 2)
+                book_note = f"70% @ Target (+{target_ret:.1f}%), 30% @ Peak (+{peak_ret:.1f}%)"
+            elif out_str in ("STOP_HIT", "STOP_LOSS_HIT"):
+                stop_ret = round(((stop_p - sig_p) / sig_p * 100.0), 2) if (sig_p and stop_p and sig_p > 0) else float(it.get("realized_return_pct") or -5.0)
+                if stop_ret > 0:
+                    stop_ret = -abs(stop_ret)
+                sim_ret = round(stop_ret, 2)
+                book_note = f"100% Stop Loss Hit ({stop_ret:.1f}%)"
+            elif out_str in ("ACTIVE", "PENDING", "COILING_IN_PROFIT", "COILING_IN_RANGE"):
+                sim_ret = round(float(it.get("realized_return_pct") or 0.0), 2)
+                book_note = f"MTM Live ({sim_ret:+.1f}%)"
+            else:
+                sim_ret = round(float(it.get("realized_return_pct") or 0.0), 2)
+                book_note = f"14D Settled ({sim_ret:+.1f}%)"
+
+            sim_pnl = round(alloc_per_trade * (sim_ret / 100.0), 2)
+            it["simulated_return_pct"] = sim_ret
+            it["simulated_allocation"] = round(alloc_per_trade, 2)
+            it["simulated_pnl"] = sim_pnl
+            it["simulated_booking_note"] = book_note
+
         positive_count = sum(1 for it in items if (it.get("realized_return_pct") or 0) > 0 or it.get("outcome") in ("TARGET_HIT", "BREAKOUT_SUCCEEDED"))
         win_rate_pct = round((positive_count / total_tracked) * 100, 1) if total_tracked > 0 else 0.0
 
@@ -1784,6 +1821,28 @@ def get_tracked_breakouts(
         stop_hit_count = sum(1 for it in items if it.get("outcome") in ("STOP_HIT", "STOP_LOSS_HIT"))
         setup_failed_count = sum(1 for it in items if it.get("outcome") in ("SETUP_FAILED", "BREAKOUT_FAILED"))
         active_count = sum(1 for it in items if not it.get("settled_14d", False) and (it.get("days_elapsed") or 0) < 14)
+
+        # Portfolio simulation aggregation
+        total_sim_profit = round(sum(it.get("simulated_pnl", 0.0) for it in items if (it.get("simulated_pnl") or 0.0) > 0), 2)
+        total_sim_loss = round(sum(abs(it.get("simulated_pnl", 0.0)) for it in items if (it.get("simulated_pnl") or 0.0) < 0), 2)
+        net_sim_pnl = round(sum(it.get("simulated_pnl", 0.0) for it in items), 2)
+        final_sim_capital = round(initial_capital + net_sim_pnl, 2)
+        sim_return_pct = round((net_sim_pnl / initial_capital) * 100.0, 2) if initial_capital > 0 else 0.0
+        profit_factor = round(total_sim_profit / total_sim_loss, 2) if total_sim_loss > 0 else (99.0 if total_sim_profit > 0 else 0.0)
+
+        portfolio_sim = {
+            "initial_capital": initial_capital,
+            "final_capital": final_sim_capital,
+            "net_pnl": net_sim_pnl,
+            "return_pct": sim_return_pct,
+            "total_profit": total_sim_profit,
+            "total_loss": total_sim_loss,
+            "profit_factor": profit_factor,
+            "allocation_per_trade": round(alloc_per_trade, 2),
+            "winning_trades": sum(1 for it in items if (it.get("simulated_return_pct") or 0) > 0),
+            "losing_trades": sum(1 for it in items if (it.get("simulated_return_pct") or 0) < 0),
+            "breakeven_trades": sum(1 for it in items if (it.get("simulated_return_pct") or 0) == 0),
+        }
 
         return {
             "success": True,
@@ -1805,6 +1864,7 @@ def get_tracked_breakouts(
                 "target_hit_count": target_hit_count,
                 "stop_hit_count": stop_hit_count,
                 "setup_failed_count": setup_failed_count,
+                "portfolio_simulation": portfolio_sim,
             },
             "items": items,
         }

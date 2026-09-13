@@ -457,8 +457,9 @@ async def get_tracked_breakouts_endpoint(
     sort_by: str = Query("signal_date", description="Sort field (signal_date, return_pct, max_gain, score, days_elapsed)"),
     limit: int = Query(200, ge=1, le=500, description="Max records to return"),
     live: bool = Query(False, description="Optionally refresh current prices and realized returns"),
+    capital: float = Query(1000000.0, ge=1000.0, description="Initial portfolio capital for simulation (default ₹10,00,000 / 10L)"),
 ):
-    """Retrieve permanently tracked breakout setups over customizable timeframes and date ranges."""
+    """Retrieve permanently tracked breakout setups over customizable timeframes and date ranges with portfolio capital simulation."""
     try:
         data = await asyncio.to_thread(
             breakout_scanner_mod.get_tracked_breakouts,
@@ -471,6 +472,7 @@ async def get_tracked_breakouts_endpoint(
             sort_by=sort_by,
             limit=limit,
             live=live,
+            capital=capital,
             settings=_settings,
         )
         return data

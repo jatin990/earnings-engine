@@ -169,6 +169,68 @@ async def get_swing_status_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/api/v1/dashboard/swing/pool-stats")
+@router.get("/api/v1/swing/pool-stats")
+async def get_swing_pool_stats_endpoint():
+    """Return tier pool statistics for the swing radar."""
+    try:
+        stats = await asyncio.to_thread(
+            swing_scanner_mod.get_swing_pool_stats,
+            settings=_get_settings(),
+        )
+        return {"success": True, "stats": stats}
+    except Exception as e:
+        logger.exception("Error in get_swing_pool_stats: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/dashboard/swing/audit-log")
+@router.get("/api/v1/swing/audit-log")
+async def get_swing_audit_log_endpoint(
+    ticker: str | None = Query(None, description="Optional ticker filter"),
+    limit: int = Query(50, ge=1, le=500, description="Max entries to return"),
+):
+    """Retrieve audit log transitions for swing tier promotions and demotions."""
+    try:
+        log_data = await asyncio.to_thread(
+            swing_scanner_mod.get_swing_audit_log,
+            ticker=ticker,
+            limit=limit,
+            settings=_get_settings(),
+        )
+        return {"success": True, **log_data}
+    except Exception as e:
+        logger.exception("Error in get_swing_audit_log: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/v1/dashboard/swing/tier")
+@router.post("/api/v1/swing/tier")
+async def set_swing_manual_tier_endpoint(request: dict):
+    """Manually assign or override a stock's swing pool tier (HOT, WARM, COLD)."""
+    ticker = request.get("ticker")
+    tier = request.get("tier", "").upper()
+    strategy = request.get("strategy", "SWING")
+    reason = request.get("reason", "Manual UI assignment")
+
+    if not ticker or tier not in ("HOT", "WARM", "COLD"):
+        raise HTTPException(status_code=400, detail="Invalid ticker or tier. Must be HOT, WARM, or COLD.")
+
+    try:
+        success = await asyncio.to_thread(
+            swing_scanner_mod.set_swing_manual_tier,
+            ticker=ticker,
+            tier=tier,
+            strategy=strategy,
+            reason=reason,
+            settings=_get_settings(),
+        )
+        return {"success": success, "ticker": ticker, "tier": tier}
+    except Exception as e:
+        logger.exception("Error setting swing manual tier for %s: %s", ticker, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/api/v1/dashboard/swing/scan")
 @router.post("/api/v1/swing/scan")
 async def run_swing_scan_endpoint(request: dict | None = None):
@@ -190,6 +252,7 @@ async def run_swing_scan_endpoint(request: dict | None = None):
 @router.get("/api/v1/dashboard/swing/setups")
 async def get_swing_setups_endpoint(
     market: str | None = Query(None, description="Market universe filter"),
+    tier: str = Query("ALL", description="Tier filter: HOT, WARM, or ALL"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """Retrieve active swing setups with channel bounds, risk/reward, and cycle indicators."""
@@ -197,6 +260,7 @@ async def get_swing_setups_endpoint(
         # First try fast retrieval from tiered swing_scanner cache
         cached = await asyncio.to_thread(
             swing_scanner_mod.get_cached_swing_results,
+            tier=tier,
             universe=market,
             settings=_get_settings(),
         )

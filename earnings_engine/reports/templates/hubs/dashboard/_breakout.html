@@ -733,30 +733,77 @@
             </div>
         </div>
 
-        <!-- Tracked Performance Summary Cards -->
-        <div id="breakoutTrackedKpiCards" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0.45rem; margin-bottom:0.75rem;">
-            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
-                <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Total Tracked</div>
-                <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiTotal">—</span></div>
-            </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
-                <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Win / Target Hit</div>
-                <div style="font-size:1.15rem; font-weight:800; color:#ffffff; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiWinRate">—</span></div>
-            </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
-                <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Avg Return</div>
-                <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiAvgReturn">—</span></div>
-            </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
-                <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Top Return</div>
-                <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); display:flex; align-items:baseline; gap:0.3rem; margin-top:0.15rem;">
-                    <span id="bkTrackedKpiMaxReturn">—</span>
-                    <span id="bkTrackedKpiTopTicker" style="font-size:0.62rem; color:#94a3b8; font-family:var(--font-mono);"></span>
+        <!-- 💼 Realized Portfolio Capital Simulator (10L Default / Custom) -->
+        <div id="breakoutPortfolioSimulatorBox" style="background:linear-gradient(180deg, #09090b 0%, #030712 100%); border:1px solid rgba(56,189,248,0.25); border-radius:8px; padding:0.75rem 0.95rem; margin-bottom:0.75rem; box-shadow:0 4px 20px -5px rgba(0,0,0,0.5);">
+            <!-- Simulator Header & Capital Switcher -->
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.65rem; margin-bottom:0.65rem; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:0.55rem;">
+                <div style="display:flex; align-items:center; gap:0.55rem;">
+                    <div style="width:28px; height:28px; border-radius:6px; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.35); color:#38bdf8; display:flex; align-items:center; justify-content:center; font-size:0.95rem; font-weight:800;">💼</div>
+                    <div>
+                        <div style="font-size:0.82rem; font-weight:800; color:#f8fafc; letter-spacing:-0.01em; display:flex; align-items:center; gap:0.45rem;">
+                            <span>Portfolio Capital Simulator</span>
+                            <span style="font-size:0.60rem; background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.35); padding:0.04rem 0.35rem; border-radius:3px; font-weight:700;">Audited Simulation</span>
+                        </div>
+                        <div style="font-size:0.66rem; color:#94a3b8; font-family:var(--font-mono); margin-top:1px;">
+                            Execution: <strong style="color:#e2e8f0;">70% @ Target · 30% @ Peak</strong> | <strong style="color:#f87171;">100% Stop Loss</strong> | <strong style="color:#38bdf8;">Live MTM</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Capital Quick Selectors & Custom Input -->
+                <div style="display:flex; align-items:center; gap:0.35rem; flex-wrap:wrap;">
+                    <span style="font-size:0.68rem; color:#71717a; font-weight:700; margin-right:0.15rem;">💰 Starting Capital:</span>
+                    <button type="button" id="btnBkCap_100000" onclick="app.setTrackedBreakoutCapital(100000)" class="btn-micro bk-cap-preset" data-capital="100000">₹1L</button>
+                    <button type="button" id="btnBkCap_500000" onclick="app.setTrackedBreakoutCapital(500000)" class="btn-micro bk-cap-preset" data-capital="500000">₹5L</button>
+                    <button type="button" id="btnBkCap_1000000" onclick="app.setTrackedBreakoutCapital(1000000)" class="btn-micro bk-cap-preset bk-cap-active" data-capital="1000000">₹10L</button>
+                    <button type="button" id="btnBkCap_2500000" onclick="app.setTrackedBreakoutCapital(2500000)" class="btn-micro bk-cap-preset" data-capital="2500000">₹25L</button>
+                    <button type="button" id="btnBkCap_5000000" onclick="app.setTrackedBreakoutCapital(5000000)" class="btn-micro bk-cap-preset" data-capital="5000000">₹50L</button>
+                    <div style="display:inline-flex; align-items:center; background:#06060a; border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:0.1rem 0.35rem; margin-left:0.2rem;">
+                        <span style="font-size:0.68rem; color:#71717a; margin-right:0.2rem;">₹</span>
+                        <input id="breakoutTrackedCapitalInput" type="number" min="1000" step="10000" value="1000000" onchange="app.onTrackedCapitalInputChange(this.value)" style="background:transparent; border:none; color:#f8fafc; font-size:0.70rem; font-family:var(--font-mono); width:90px; outline:none; font-weight:700;" title="Enter custom capital in ₹" />
+                    </div>
                 </div>
             </div>
-            <div class="card" style="padding:0.45rem 0.65rem; background:#09090b; border:1px solid rgba(255,255,255,0.08); border-radius:6px;">
-                <div style="font-size:0.60rem; color:#94a3b8; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Fired &amp; Active</div>
-                <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkTrackedKpiActiveCount">—</span></div>
+
+            <!-- 5 KPI Tiles for Portfolio Capital -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0.45rem;">
+                <!-- Portfolio Ending Value -->
+                <div class="card" style="padding:0.4rem 0.6rem; background:#040711; border:1px solid rgba(56,189,248,0.25); border-radius:6px;">
+                    <div style="font-size:0.58rem; color:#38bdf8; text-transform:uppercase; font-weight:800; letter-spacing:0.04em;">Portfolio Value</div>
+                    <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkPortStatValue">₹10,00,000</span></div>
+                    <div style="font-size:0.58rem; color:#64748b; font-family:var(--font-mono); margin-top:1px;">Start: <span id="bkPortStatStart">₹10,00,000</span></div>
+                </div>
+
+                <!-- Net P&L & Return % -->
+                <div class="card" style="padding:0.4rem 0.6rem; background:#040711; border:1px solid rgba(255,255,255,0.1); border-radius:6px;">
+                    <div style="font-size:0.58rem; color:#94a3b8; text-transform:uppercase; font-weight:800; letter-spacing:0.04em;">Net Portfolio P&amp;L</div>
+                    <div style="font-size:1.15rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); display:flex; align-items:baseline; gap:0.35rem; margin-top:0.15rem;">
+                        <span id="bkPortStatNetPnl">₹0</span>
+                        <span id="bkPortStatNetRet" style="font-size:0.68rem; font-weight:700; color:#94a3b8;">(+0.0%)</span>
+                    </div>
+                    <div style="font-size:0.58rem; color:#64748b; font-family:var(--font-mono); margin-top:1px;">All realized &amp; active</div>
+                </div>
+
+                <!-- Realized Profits -->
+                <div class="card" style="padding:0.4rem 0.6rem; background:#040711; border:1px solid rgba(16,185,129,0.2); border-radius:6px;">
+                    <div style="font-size:0.58rem; color:#34d399; text-transform:uppercase; font-weight:800; letter-spacing:0.04em;">Gross Wins</div>
+                    <div style="font-size:1.10rem; font-weight:800; color:#34d399; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkPortStatWins">₹0</span></div>
+                    <div style="font-size:0.58rem; color:#64748b; font-family:var(--font-mono); margin-top:1px;"><span id="bkPortStatWinCount">0</span> winning setups</div>
+                </div>
+
+                <!-- Realized Losses -->
+                <div class="card" style="padding:0.4rem 0.6rem; background:#040711; border:1px solid rgba(239,68,68,0.2); border-radius:6px;">
+                    <div style="font-size:0.58rem; color:#f87171; text-transform:uppercase; font-weight:800; letter-spacing:0.04em;">Gross Losses</div>
+                    <div style="font-size:1.10rem; font-weight:800; color:#f87171; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkPortStatLosses">₹0</span></div>
+                    <div style="font-size:0.58rem; color:#64748b; font-family:var(--font-mono); margin-top:1px;"><span id="bkPortStatLossCount">0</span> stop hits / drops</div>
+                </div>
+
+                <!-- Profit Factor & Sizing -->
+                <div class="card" style="padding:0.4rem 0.6rem; background:#040711; border:1px solid rgba(255,255,255,0.1); border-radius:6px;">
+                    <div style="font-size:0.58rem; color:#94a3b8; text-transform:uppercase; font-weight:800; letter-spacing:0.04em;">Profit Factor &amp; Size</div>
+                    <div style="font-size:1.10rem; font-weight:800; color:#f8fafc; font-family:var(--font-mono); margin-top:0.15rem;"><span id="bkPortStatPF">—</span></div>
+                    <div style="font-size:0.58rem; color:#64748b; font-family:var(--font-mono); margin-top:1px;"><span id="bkPortStatAlloc">₹0</span> / setup</div>
+                </div>
             </div>
         </div>
 
@@ -773,7 +820,7 @@
                         <th style="padding:0.55rem 0.65rem; text-align:right; color:#94a3b8; font-weight:700;">Target Price</th>
                         <th style="padding:0.55rem 0.65rem; text-align:right; color:#94a3b8; font-weight:700;">Stop Loss</th>
                         <th style="padding:0.55rem 0.65rem; text-align:right; color:#94a3b8; font-weight:700;">Current Price</th>
-                        <th style="padding:0.55rem 0.65rem; text-align:right; color:#94a3b8; font-weight:700;">Return %</th>
+                        <th style="padding:0.55rem 0.65rem; text-align:right; color:#94a3b8; font-weight:700;">Return &amp; Booked P&amp;L</th>
                         <th style="padding:0.55rem 0.65rem; text-align:right; color:#94a3b8; font-weight:700;">Max Gain %</th>
                         <th style="padding:0.55rem 0.65rem; text-align:center; color:#94a3b8; font-weight:700;">Outcome Status</th>
                         <th style="padding:0.55rem 0.55rem; text-align:center; color:#94a3b8; font-weight:700;">Score</th>
@@ -1025,6 +1072,29 @@
 
 #breakoutTable tbody tr:hover, #breakoutTrackedTable tbody tr:hover, #breakoutBacktestTable tbody tr:hover {
     background: #18181b !important;
+}
+
+.bk-cap-preset {
+    background: #09090b;
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-mono);
+}
+.bk-cap-preset:hover {
+    background: #18181b;
+    color: #f8fafc;
+    border-color: rgba(56, 189, 248, 0.4);
+}
+.bk-cap-active {
+    background: rgba(56, 189, 248, 0.2) !important;
+    color: #38bdf8 !important;
+    border: 1px solid #38bdf8 !important;
+    font-weight: 800 !important;
 }
 
 /* Executive Monochrome Row Tier Indicators */

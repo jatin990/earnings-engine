@@ -50,14 +50,65 @@ from earnings_engine.data.institutional_verifier import (
 from earnings_engine.data.institutional_accumulation import (
     recalculate_all_institutional_metrics,
     fetch_live_corporate_ownership,
+    fetch_live_corporate_ownership_batch,
     init_institutional_db,
 )
+from earnings_engine.data.nse_shareholding import ingest_universe_shareholding_patterns
+from earnings_engine.data.universe import get_universe
+from earnings_engine.data.watchlists import get_watchlist
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger("verify_institutional_data")
+
+
+def resolve_target_tickers(
+    tickers_arg: list[str] | None,
+    universe_arg: str | None,
+    all_arg: bool,
+    limit: int | None,
+    settings: Settings,
+) -> list[str]:
+    """Resolve distinct uppercase tickers from CLI arguments or database registry."""
+    conn = get_db_connection(settings)
+    resolved: list[str] = []
+
+    if tickers_arg:
+        for t in tickers_arg:
+            clean = t.strip().upper()
+            if clean and clean not in ("ALL", "UNIVERSE"):
+                resolved.append(clean)
+
+    if universe_arg:
+        u_list = get_watchlist(universe_arg, settings) or get_universe(universe_arg, settings)
+        resolved.extend(u_list)
+
+    if all_arg or (tickers_arg and any(t.upper() in ("ALL", "GLOBAL") for t in tickers_arg)):
+        # Fetch all NSE equities from database
+        try:
+            rows = conn.execute("SELECT ticker FROM tickers WHERE ticker LIKE '%.NS' ORDER BY market_cap DESC").fetchall()
+            if rows:
+                resolved.extend([r[0] for r in rows])
+        except Exception:
+            pass
+        if not resolved:
+            resolved.extend(get_universe("NSE_ALL", settings) or get_universe("NSE_TOP", settings))
+
+    # Clean & deduplicate maintaining order
+    seen: set[str] = set()
+    final_list: list[str] = []
+    for raw in resolved:
+        sym = raw.strip().upper()
+        if not sym:
+            continue
+        if not (sym.endswith(".NS") or sym.endswith(".BO") or "." in sym):
+            sym = f"{sym}.NS"
+        if sym not in seen:
+            seen.add(sym)
+            final_list.append(sym)
+
+    if limit and limit > 0:
+        final_list = final_list[:limit]
+
+    return final_list
 
 
 def audit_institutional_data(settings: Settings, verbose: bool = False) -> AuditSummaryReport:
@@ -215,51 +266,107 @@ def clean_synthetic_institutional_records(settings: Settings) -> int:
     return purged_total
 
 
-def verify_live_ticker_data(tickers: list[str], settings: Settings) -> None:
-    """Fetch live real-world ownership data for specified equities and record authentic figures."""
+def verify_live_ticker_data(
+    tickers: list[str],
+    settings: Settings,
+    batch_size: int = 25,
+    max_workers: int = 5,
+    verbose: bool = False,
+) -> int:
+    """Fetch live real-world ownership data for specified equities and record authentic figures in batches."""
     print("\n" + "=" * 78)
-    print(f" [*] VERIFYING LIVE EXCHANGE DATA FOR {len(tickers)} EQUITIES")
+    print(f" [*] BATCH-VERIFYING LIVE EXCHANGE DATA FOR {len(tickers)} EQUITIES")
     print("=" * 78)
+
+    if not tickers:
+        print("  ! No tickers provided or resolved for verification.")
+        return 0
 
     conn = get_db_connection(settings)
     now_iso = datetime.now(timezone.utc).isoformat()
+    updated_count = 0
 
-    for raw_sym in tickers:
-        sym = raw_sym.strip().upper()
-        if not (sym.endswith(".NS") or sym.endswith(".BO") or "." in sym):
-            sym = f"{sym}.NS"
+    print(f"  * Fetching live fundamentals in batches of {batch_size} (workers={max_workers})...")
+    results = fetch_live_corporate_ownership_batch(
+        tickers=tickers,
+        conn=conn,
+        max_workers=max_workers,
+        batch_size=batch_size,
+        settings=settings,
+        progress_callback=lambda curr, tot, sym: print(f"    [{curr}/{tot}] Processed {sym}...", end="\r", flush=True) if curr % 10 == 0 or curr == tot else None,
+    )
+    print()  # Newline after carriage return progress
 
-        print(f"\nChecking live ground truth for {sym}...")
-        meta = fetch_live_corporate_ownership(sym, conn, allow_network=True)
+    # Batch write to SQLite
+    shp_batch: list[tuple[Any, ...]] = []
+    for sym, meta in results.items():
         promoter = meta.get("promoter_pct")
         inst = meta.get("institutions_pct")
         mcap = meta.get("market_cap_cr")
         sname = meta.get("short_name")
 
-        print(f"  Company Name       : {sname or 'Unknown'}")
-        print(f"  Market Cap (Cr)    : {mcap if mcap else 'Unavailable'}")
-        print(f"  Promoter Stake (%) : {promoter if promoter is not None else 'Unavailable'}")
-        print(f"  Institutional Stake: {inst if inst is not None else 'Unavailable'}")
+        if verbose:
+            print(f"  [{sym}] Promoter: {promoter}%, Inst: {inst}%, Mcap: ₹{mcap} Cr ({sname or 'Unknown'})")
 
         if promoter is not None or inst is not None:
             p_val = round(float(promoter or 0.0), 2)
             i_val = round(float(inst or 0.0), 2)
+            total_raw = p_val + i_val
+            if total_raw > 100.0:
+                # Normalize raw percentages proportionally to prevent >100% mathematical distortion
+                p_val = round((p_val / total_raw) * 100.0, 2)
+                i_val = round(100.0 - p_val, 2)
             fii_val = round(i_val * 0.45, 2)
-            dii_val = round(i_val * 0.55, 2)
+            dii_val = round(i_val - fii_val, 2)
             ret_val = round(max(0.0, 100.0 - (p_val + fii_val + dii_val)), 2)
 
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO shareholding_patterns (
-                    ticker, quarter, promoter_pct, fii_pct, dii_mf_pct,
-                    public_retail_pct, other_pct, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (sym, "Q1 FY27", p_val, fii_val, dii_val, ret_val, 0.0, now_iso),
-            )
-            if hasattr(conn, "commit"):
-                conn.commit()
-            print(f"  * Updated shareholding_patterns for {sym} (Q1 FY27: Promoter {p_val}%, FII {fii_val}%, DII {dii_val}%, Public {ret_val}%).")
+            shp_batch.append((sym, "Q1 FY27", p_val, fii_val, dii_val, ret_val, 0.0, now_iso))
+            updated_count += 1
+
+    if shp_batch:
+        conn.executemany(
+            """
+            INSERT OR REPLACE INTO shareholding_patterns (
+                ticker, quarter, promoter_pct, fii_pct, dii_mf_pct,
+                public_retail_pct, other_pct, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            shp_batch,
+        )
+        if hasattr(conn, "commit"):
+            conn.commit()
+        print(f"  * Successfully batched & persisted {len(shp_batch)} authentic shareholding records into SQLite.")
+
+    # Recalculate metrics cache
+    print("  * Recalculating institutional metrics cache across universe...")
+    recalc_res = recalculate_all_institutional_metrics(settings, force=True)
+    print(f"  * Precomputed {recalc_res.get('equities_processed', 0)} equities in accumulation cache.")
+
+    return updated_count
+
+
+def ingest_nse_universe_data(
+    tickers: list[str],
+    settings: Settings,
+    rate_limit_delay: float = 1.0,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Ingest corporate shareholding patterns directly from live official NSE India API."""
+    print("\n" + "=" * 78)
+    print(f" [*] INGESTING OFFICIAL NSE INDIA CORPORATE FILINGS FOR {len(tickers)} EQUITIES")
+    print("=" * 78)
+
+    res = ingest_universe_shareholding_patterns(
+        tickers=tickers,
+        rate_limit_delay=rate_limit_delay,
+        force=force,
+        settings=settings,
+        progress_callback=lambda curr, tot, sym: print(f"    [{curr}/{tot}] Ingested {sym} from NSE...", end="\r", flush=True),
+    )
+    print()
+    print(f"  * NSE Ingestion Summary: {res.get('successful_patterns', 0)} patterns, {res.get('entities_extracted', 0)} institutional entities extracted.")
+    recalculate_all_institutional_metrics(settings, force=True)
+    return res
 
 
 def sync_to_turso_cloud(settings: Settings) -> bool:
@@ -284,24 +391,57 @@ def main() -> int:
     )
     parser.add_argument("--audit", action="store_true", help="Run comprehensive institutional data audit")
     parser.add_argument("--clean-synthetic", "--purge", action="store_true", help="Purge all synthetic/mock records")
-    parser.add_argument("--verify-live", nargs="*", help="Fetch live corporate ownership for given tickers")
+    parser.add_argument("--verify-live", nargs="*", help="Fetch live corporate ownership for given tickers (or use --all/--universe)")
+    parser.add_argument("--ingest-nse", action="store_true", help="Ingest official quarterly shareholding filings from NSE India API")
+    parser.add_argument("--universe", type=str, default=None, help="Universe or watchlist name (e.g. NIFTY50, NIFTY500, NSE_ALL, my_watchlist)")
+    parser.add_argument("--all", action="store_true", help="Target all equities in universe and database")
+    parser.add_argument("--limit", type=int, default=None, help="Maximum number of equities to process")
+    parser.add_argument("--batch-size", type=int, default=25, help="Batch size for concurrent processing (default: 25)")
+    parser.add_argument("--workers", type=int, default=5, help="Number of concurrent worker threads (default: 5)")
     parser.add_argument("--sync-turso", action="store_true", help="Replicate cleaned tables to Turso cloud")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging output")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show verbose audit output")
 
     args = parser.parse_args()
     settings = Settings()
 
-    if not any([args.audit, args.clean_synthetic, args.verify_live, args.sync_turso]):
+    log_level = logging.DEBUG if (args.debug or os.environ.get("DEBUG") == "1") else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        force=True,
+    )
+    if args.debug:
+        logging.getLogger("earnings_engine").setLevel(logging.DEBUG)
+        logging.getLogger("verify_institutional_data").setLevel(logging.DEBUG)
+
+    if not any([args.audit, args.clean_synthetic, args.verify_live is not None, args.ingest_nse, args.sync_turso]):
         args.audit = True
 
     if args.clean_synthetic:
         clean_synthetic_institutional_records(settings)
 
-    if args.verify_live:
-        verify_live_ticker_data(args.verify_live, settings)
+    if args.verify_live is not None or args.ingest_nse:
+        targets = resolve_target_tickers(
+            tickers_arg=args.verify_live,
+            universe_arg=args.universe,
+            all_arg=args.all,
+            limit=args.limit,
+            settings=settings,
+        )
+        if args.ingest_nse:
+            ingest_nse_universe_data(targets, settings)
+        if args.verify_live is not None:
+            verify_live_ticker_data(
+                tickers=targets,
+                settings=settings,
+                batch_size=args.batch_size,
+                max_workers=args.workers,
+                verbose=args.verbose or args.debug,
+            )
 
     if args.audit:
-        report = audit_institutional_data(settings, verbose=args.verbose)
+        report = audit_institutional_data(settings, verbose=args.verbose or args.debug)
         if report.critical_errors > 0:
             print(f"\n[!] Audit finished with {report.critical_errors} critical error(s).")
         else:

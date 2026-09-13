@@ -1805,6 +1805,66 @@ def _migration_038_alert_rules_engine(conn: Any) -> None:
         pass
 
 
+def _migration_039_strategy_tier_audit_and_swing_radar(conn: Any) -> None:
+    """Create universal strategy_tier_audit_log and swing_radar tables for graduated tier pooling."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS strategy_tier_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            domain TEXT NOT NULL,
+            ticker TEXT NOT NULL,
+            company_name TEXT,
+            strategy TEXT NOT NULL DEFAULT 'DEFAULT',
+            event_type TEXT NOT NULL,
+            from_tier TEXT,
+            to_tier TEXT,
+            score_before REAL,
+            score_after REAL,
+            price REAL,
+            trigger_price REAL,
+            target_price REAL,
+            stop_loss REAL,
+            risk_reward_ratio REAL,
+            volume_ratio REAL,
+            reason TEXT,
+            catalyst_impact TEXT,
+            counter INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_strat_tier_audit_dt ON strategy_tier_audit_log (domain, ticker, strategy, id DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_strat_tier_audit_ds ON strategy_tier_audit_log (domain, strategy, id DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_strat_tier_audit_created ON strategy_tier_audit_log (created_at DESC)")
+    except Exception:
+        pass
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS swing_radar (
+            ticker TEXT NOT NULL,
+            tier TEXT NOT NULL DEFAULT 'WARM',
+            composite_score REAL NOT NULL DEFAULT 0.0,
+            swing_signal TEXT,
+            channel_lower REAL,
+            channel_upper REAL,
+            dist_to_support_pct REAL,
+            dist_to_resistance_pct REAL,
+            risk_reward_ratio REAL,
+            current_price REAL,
+            data_json TEXT,
+            scanned_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (ticker)
+        )
+    """)
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_swing_radar_tier ON swing_radar (tier)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_swing_radar_score ON swing_radar (composite_score DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_swing_radar_scanned ON swing_radar (scanned_at DESC)")
+    except Exception:
+        pass
+
+
 # Migration Registry (ordered by version)
 MIGRATIONS: list[Migration] = [
     Migration(1, "001_core_schema", _migration_001_core_schema),
@@ -1845,6 +1905,7 @@ MIGRATIONS: list[Migration] = [
     Migration(36, "036_sync_breakout_radar_signal_columns", _migration_036_sync_breakout_radar_signal_columns),
     Migration(37, "037_breakout_late_detection_fields", _migration_037_breakout_late_detection_fields),
     Migration(38, "038_alert_rules_engine", _migration_038_alert_rules_engine),
+    Migration(39, "039_strategy_tier_audit_and_swing_radar", _migration_039_strategy_tier_audit_and_swing_radar),
 ]
 
 

@@ -222,7 +222,7 @@ def fetch_live_corporate_ownership(
 
     # 2. Try yfinance only if explicitly permitted, not in testing, and not in serverless environment
     is_serverless = is_server_environment() or os.environ.get("VERCEL") == "1" or os.environ.get("SERVERLESS") == "1"
-    if allow_network and not os.environ.get("PYTEST_CURRENT_TEST") and not is_serverless and (mcap_cr is None or mcap_cr <= 0):
+    if allow_network and not os.environ.get("PYTEST_CURRENT_TEST") and not is_serverless and (promoter_pct is None or inst_pct is None or mcap_cr is None or mcap_cr <= 0):
         try:
             from earnings_engine.rate_limits import record_request
             try:
@@ -230,6 +230,7 @@ def fetch_live_corporate_ownership(
             except Exception:
                 pass
             import yfinance as yf
+            logger.debug("[INSTITUTIONAL] Fetching live ground truth via yfinance for %s...", sym)
             t = yf.Ticker(sym)
             info = t.info or {}
             insiders = info.get("heldPercentInsiders")
@@ -246,6 +247,10 @@ def fetch_live_corporate_ownership(
                 shares_out = int(shares)
             if mcap is not None:
                 mcap_cr = round(float(mcap) / 1e7, 1)
+            logger.debug(
+                "[INSTITUTIONAL] Live info for %s: Promoter=%s%%, Inst=%s%%, Mcap=₹%s Cr",
+                sym, promoter_pct, inst_pct, mcap_cr,
+            )
         except Exception as e:
             logger.debug("[INSTITUTIONAL] Live yfinance fetch exception for %s: %s", sym, e)
 
@@ -257,6 +262,53 @@ def fetch_live_corporate_ownership(
         "market_cap_cr": mcap_cr,
         "short_name": short_name,
     }
+
+
+def fetch_live_corporate_ownership_batch(
+    tickers: list[str],
+    conn: Any = None,
+    max_workers: int = 5,
+    batch_size: int = 25,
+    settings: Any = None,
+    progress_callback: Any = None,
+) -> dict[str, dict[str, Any]]:
+    """Batch-fetch live corporate ownership for multiple tickers using bounded concurrent workers."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    settings = settings or Settings()
+    if conn is None:
+        conn = get_db_connection(settings)
+
+    results: dict[str, dict[str, Any]] = {}
+    total = len(tickers)
+    logger.info("[INSTITUTIONAL] Starting batched live corporate ownership ingestion for %d tickers (workers=%d)", total, max_workers)
+
+    # Process in chunks to prevent unbounded memory/socket accumulation
+    for chunk_idx in range(0, total, batch_size):
+        chunk = tickers[chunk_idx : chunk_idx + batch_size]
+        logger.debug("[INSTITUTIONAL] Processing chunk %d/%d (%d tickers)", (chunk_idx // batch_size) + 1, math.ceil(total / batch_size), len(chunk))
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_sym = {
+                executor.submit(fetch_live_corporate_ownership, sym, conn, True, settings=settings): sym
+                for sym in chunk
+            }
+            for future in as_completed(future_to_sym):
+                sym = future_to_sym[future]
+                try:
+                    res = future.result()
+                    results[sym] = res
+                except Exception as ex:
+                    logger.debug("[INSTITUTIONAL] Error fetching live ownership for %s: %s", sym, ex)
+                    results[sym] = {"promoter_pct": None, "institutions_pct": None, "market_cap_cr": None}
+
+                if progress_callback:
+                    try:
+                        progress_callback(len(results), total, sym)
+                    except Exception:
+                        pass
+
+    return results
 
 
 _TICKER_RETURNS_MEMO: dict[str, tuple[float, tuple[float | None, float | None, float | None]]] = {}

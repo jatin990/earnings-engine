@@ -1,11 +1,11 @@
 {% import 'dashboard/_components.html' as comps %}
         <div id="tab-swing" class="tab-content" style="width: 100%; max-width: 100%;">
-            
+
             <!-- ⚡ Top Metric KPI Cards with Interactive Filtering -->
-            <div id="swingSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
-                
+            <div id="swingSummaryCards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.65rem; margin-bottom: 0.75rem;">
+
                 <!-- 1. Monitored Universe -->
-                <div id="swingCardAll" onclick="app.clearSwingFilter()" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(59,130,246,0.25); border-top:2px solid #3b82f6; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to show all candidates">
+                <div id="swingCardAll" onclick="app.setSwingTierFilter('ALL'); app.clearSwingFilter()" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(59,130,246,0.25); border-top:2px solid #3b82f6; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to show all candidates">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
                         <span style="font-size:0.68rem;color:#60a5fa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Monitored Universe</span>
                         <span class="signal-badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.60rem;">Show All</span>
@@ -14,7 +14,27 @@
                     <div id="swingKpiSubAll" style="font-size:0.67rem;color:#64748b;margin-top:0.15rem;">Cycle Oscillators & Bands</div>
                 </div>
 
-                <!-- 2. Active Buy Zone (Hot) -->
+                <!-- 2. 🔥 Hot Tier Pool -->
+                <div id="swingCardHot" onclick="app.setSwingTierFilter('HOT')" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(239,68,68,0.3); border-top:2px solid #ef4444; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to filter to HOT tier swing setups">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.68rem;color:#f87171;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">🔥 Hot Pool</span>
+                        <span class="signal-badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.60rem;">T2 Fast Loop</span>
+                    </div>
+                    <div style="font-size:1.55rem;font-weight:800;color:#f87171;font-family:var(--font-heading);"><span id="count-hot-pool">0</span> <span style="font-size:0.80rem;color:#fca5a5;font-weight:500;">Hot</span></div>
+                    <div style="font-size:0.67rem;color:#991b1b;margin-top:0.15rem;">High Velocity · Rescore 5m</div>
+                </div>
+
+                <!-- 3. ⚡ Warm Tier Pool -->
+                <div id="swingCardWarm" onclick="app.setSwingTierFilter('WARM')" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(245,158,11,0.3); border-top:2px solid #f59e0b; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to filter to WARM tier swing setups">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+                        <span style="font-size:0.68rem;color:#fbbf24;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">⚡ Warm Pool</span>
+                        <span class="signal-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;font-size:0.60rem;">T1 Setup Loop</span>
+                    </div>
+                    <div style="font-size:1.55rem;font-weight:800;color:#fbbf24;font-family:var(--font-heading);"><span id="count-warm-pool">0</span> <span style="font-size:0.80rem;color:#fde68a;font-weight:500;">Warm</span></div>
+                    <div style="font-size:0.67rem;color:#92400e;margin-top:0.15rem;">Coiling Channel · Rescore 15m</div>
+                </div>
+
+                <!-- 4. Active Buy Zone -->
                 <div id="swingCardBuyZone" onclick="app.toggleSwingBuyZoneFilter()" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(16,185,129,0.3); border-top:2px solid #10b981; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to filter table to In Buy Zone setups only">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
                         <span style="font-size:0.68rem;color:#34d399;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;display:flex;align-items:center;gap:0.3rem;">
@@ -27,7 +47,7 @@
                     <div id="swingKpiSubBz" style="font-size:0.67rem;color:#065f46;margin-top:0.15rem;">0–3% from Floor • Click to Filter</div>
                 </div>
 
-                <!-- 3. Strong Buy (High Quality Grade A+) -->
+                <!-- 5. Strong Buy (High Quality Grade A+) -->
                 <div id="swingCardStrongBuy" onclick="app.filterSwing('strongbuy')" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(56,189,248,0.25); border-top:2px solid #38bdf8; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to filter table to Strong Buy setups only">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
                         <span style="font-size:0.68rem;color:#38bdf8;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Strong Buy</span>
@@ -37,7 +57,7 @@
                     <div style="font-size:0.67rem;color:#0369a1;margin-top:0.15rem;">High Beat Rate + Buy Zone</div>
                 </div>
 
-                <!-- 4. Custom User Ranges -->
+                <!-- 6. Custom User Ranges -->
                 <div id="swingCardCustom" onclick="app.filterSwing('custom')" class="card cursor-pointer" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(245,158,11,0.25); border-top:2px solid #f59e0b; cursor:pointer; transition:all 0.25s ease; user-select:none;" title="Click to filter table to Custom User-defined ranges">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
                         <span style="font-size:0.68rem;color:#fbbf24;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Custom Ranges</span>
@@ -46,23 +66,11 @@
                     <div style="font-size:1.55rem;font-weight:800;color:#fbbf24;font-family:var(--font-heading);"><span id="count-custom">0</span> <span style="font-size:0.80rem;color:#fde68a;font-weight:500;">Custom</span></div>
                     <div style="font-size:0.67rem;color:#78350f;margin-top:0.15rem;">Protected Trading Channels</div>
                 </div>
-
-                <!-- 5. Tiered Scan Mode & Freshness -->
-                <div class="card" style="padding:0.75rem 0.9rem; margin-bottom: 0; background:#0f172a; border:1px solid rgba(139,92,246,0.2); border-top:2px solid #8b5cf6;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-                        <span style="font-size:0.68rem;color:#a78bfa;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Scan Intervals</span>
-                        <span class="signal-badge" style="background:rgba(139,92,246,0.15);color:#a78bfa;font-size:0.60rem;">Graduated Pool</span>
-                    </div>
-                    <div style="font-size:1.15rem;font-weight:800;color:#c4b5fd;font-family:var(--font-heading);line-height:1.4;">
-                        <span id="swingStatIntervals">Hot 5m · Warm 15m · Cold 60m</span>
-                    </div>
-                    <div id="swingStatLastScan" style="font-size:0.67rem;color:#4c1d95;margin-top:0.15rem;">Point-in-Time Status</div>
-                </div>
             </div>
 
-            <!-- 📊 Main Swing Trading Section -->
+            <!-- Main Swing Trading Section -->
             <section class="card" style="padding: 0.85rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: #060609; border-radius: 0.75rem;">
-                
+
                 <!-- Header & Action Controls Bar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.5rem;">
                     <div>
@@ -76,30 +84,39 @@
                     <!-- Right Controls -->
                     <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
                         {{ comps.market_dropdown('swingMarket', 'ALL', 'app.onGlobalWatchlistChange(this.value); app.loadSwing();') }}
-                        <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" title="Load and refresh swing setups">🔄 Refresh Setups</button>
-                        <button type="button" onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-sm" title="Compute Kronos AI predictions for all stocks in the selected watchlist">🔮 Predict All</button>
-                        <button type="button" onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-sm" title="Run Multi-Modal AI News & Synthesis">🧠 AI Thesis</button>
-                        <button type="button" onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-sm" title="Run 4-Model AI Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral)">🤖 Consensus</button>
+                        <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-sm btn-tactile" title="Load and refresh swing setups">🔄 Refresh Setups</button>
+                        <button type="button" onclick="app.predictAllSwing(event)" id="swingPredictAllBtn" class="btn btn-sm btn-tactile" title="Compute Kronos AI predictions for all stocks in the selected watchlist">🔮 Predict All</button>
+                        <button type="button" onclick="app.predictAllAiSynthesis(event)" id="swingAiThesisAllBtn" class="btn btn-sm btn-tactile" title="Run Multi-Modal AI News & Synthesis">🧠 AI Thesis</button>
+                        <button type="button" onclick="app.predictAllConsensus(event)" id="swingConsensusAllBtn" class="btn btn-sm btn-tactile" title="Run 4-Model AI Consensus (DeepSeek-R1, Llama-3.3, Qwen-2.5, Mistral)">🤖 Consensus</button>
                     </div>
                 </div>
 
-                <!-- 🛠️ Operations Toolbar: Filter Pills, Search, View Switcher -->
+                <!-- Operations Toolbar: Filter Pills, Search, View Switcher -->
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: #0a0a10; border: 1px solid rgba(255,255,255,0.08); border-radius: 0.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.45rem;">
-                    
-                    <!-- Filter Pills -->
-                    <div id="swingFilterPills" style="display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center;">
-                        <button type="button" onclick="app.filterSwing('all')" id="swingFilter-all" class="btn btn-primary btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;font-weight:700;">🌐 All (<span id="count-all-pill">0</span>)</button>
-                        <button type="button" onclick="app.filterSwing('buyzone')" id="swingFilter-buyzone" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#34d399;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);">🟢 In Buy Zone (<span id="count-buyzone-pill">0</span>)</button>
-                        <button type="button" onclick="app.filterSwing('strongbuy')" id="swingFilter-strongbuy" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#38bdf8;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);">⭐ Strong Buy (<span id="count-strongbuy-pill">0</span>)</button>
-                        <button type="button" onclick="app.filterSwing('custom')" id="swingFilter-custom" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.72rem;color:#fbbf24;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);">🔒 Custom (<span id="count-custom-pill">0</span>)</button>
+
+                    <!-- Left: Tier Selection Pills & Strategy Filter Pills -->
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                        <!-- Tier Filter Pills -->
+                        <div id="swingTierPillsContainer" style="display:inline-flex;align-items:center;background:#030305;border:1px solid rgba(255,255,255,0.1);border-radius:0.4rem;padding:2px;gap:2px;">
+                            <button type="button" onclick="app.setSwingTierFilter('ALL')" id="swingTierPill-ALL" class="btn-micro btn-primary" style="padding:0.2rem 0.55rem;font-size:0.70rem;font-weight:700;border-radius:0.3rem;background:#2563eb;color:#ffffff;border:none;cursor:pointer;" title="View all tracked candidates">🌐 All (<span id="count-all-pill">0</span>)</button>
+                            <button type="button" onclick="app.setSwingTierFilter('HOT')" id="swingTierPill-HOT" class="btn-micro" style="padding:0.2rem 0.55rem;font-size:0.70rem;font-weight:500;border-radius:0.3rem;background:transparent;color:#f87171;border:none;cursor:pointer;" title="Hot Tier: High velocity immediate action candidates">🔥 Hot (<span id="count-hot-pill">0</span>)</button>
+                            <button type="button" onclick="app.setSwingTierFilter('WARM')" id="swingTierPill-WARM" class="btn-micro" style="padding:0.2rem 0.55rem;font-size:0.70rem;font-weight:500;border-radius:0.3rem;background:transparent;color:#fbbf24;border:none;cursor:pointer;" title="Warm Tier: Coiling setup / compression candidates">⚡ Warm (<span id="count-warm-pill">0</span>)</button>
+                        </div>
+
+                        <!-- Strategy Setup Pills -->
+                        <div id="swingFilterPills" style="display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center;">
+                            <button type="button" onclick="app.filterSwing('buyzone')" id="swingFilter-buyzone" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.70rem;color:#34d399;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);">🟢 In Buy Zone (<span id="count-buyzone-pill">0</span>)</button>
+                            <button type="button" onclick="app.filterSwing('strongbuy')" id="swingFilter-strongbuy" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.70rem;color:#38bdf8;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.25);">⭐ Strong Buy (<span id="count-strongbuy-pill">0</span>)</button>
+                            <button type="button" onclick="app.filterSwing('custom')" id="swingFilter-custom" class="btn btn-xs" style="padding:0.2rem 0.55rem;font-size:0.70rem;color:#fbbf24;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);">🔒 Custom (<span id="count-custom-pill">0</span>)</button>
+                        </div>
                     </div>
 
                     <!-- Search & View Toggle -->
                     <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
                         <input type="text" id="swingSearchInput" oninput="app.filterSwingTable(this.value)" placeholder="🔍 Search symbol, zone, signal..." style="width: 190px; padding: 0.25rem 0.5rem; background: #030305; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.35rem; color: #ffffff; font-size: 0.72rem; font-family: var(--font-mono); outline: none;">
                         <div style="display: flex; align-items: center; background: #030305; border: 1px solid rgba(255,255,255,0.1); border-radius: 0.35rem; padding: 1px;">
-                            <button type="button" onclick="app.setSwingView('table')" id="swingViewBtn-table" class="btn-micro" style="background:rgba(255,255,255,0.12);color:#ffffff;font-size:0.65rem;" title="Table View">📋 Table</button>
-                            <button type="button" onclick="app.setSwingView('cards')" id="swingViewBtn-cards" class="btn-micro" style="background:transparent;color:#71717a;font-size:0.65rem;" title="Cards View">🎴 Cards</button>
+                            <button type="button" onclick="app.setSwingView('table')" id="swingViewBtn-table" class="btn-micro btn-tactile" style="background:rgba(255,255,255,0.12);color:#ffffff;font-size:0.65rem;" title="Table View">📋 Table</button>
+                            <button type="button" onclick="app.setSwingView('cards')" id="swingViewBtn-cards" class="btn-micro btn-tactile" style="background:transparent;color:#71717a;font-size:0.65rem;" title="Cards View">🎴 Cards</button>
                         </div>
                     </div>
                 </div>
@@ -133,7 +150,7 @@
                                     <div style="font-size:2rem;margin-bottom:0.5rem;">🔄</div>
                                     <h4 style="margin:0 0 0.3rem 0;color:var(--light);font-size:1.05rem;">Swing Trading Matrix Ready</h4>
                                     <p style="font-size:0.8rem;margin:0 0 1rem 0;color:var(--text-muted);">Select your universe above and click <strong>Load Setups</strong> to scan trading bands and buy zones.</p>
-                                    <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-sm" style="font-weight:600;">▶ Load Swing Setups</button>
+                                    <button type="button" onclick="app.loadSwing(event)" class="btn btn-primary btn-sm btn-tactile" style="font-weight:600;">▶ Load Swing Setups</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -142,6 +159,23 @@
 
                 <!-- Cards View Container (hidden by default) -->
                 <div id="swingWidgets" class="widget-grid" style="display:none;margin-top:0.75rem;"></div>
+
+                <!-- 🔄 Tier Movement Audit Log Accordion -->
+                <div style="margin-top:0.65rem;border:1px solid rgba(255,255,255,0.08);border-radius:0.5rem;background:#030305;overflow:hidden;">
+                    <div onclick="app.toggleSwingAuditLog()" style="display:flex;justify-content:space-between;align-items:center;padding:0.45rem 0.75rem;background:#090d16;cursor:pointer;user-select:none;">
+                        <div style="display:flex;align-items:center;gap:0.45rem;">
+                            <span style="font-size:0.85rem;">🔄</span>
+                            <span style="font-size:0.75rem;font-weight:700;color:#ffffff;">Swing Tier Movement & Transition Audit Log</span>
+                            <span id="swingAuditBadgeCount" style="font-size:0.65rem;color:#94a3b8;font-family:var(--font-mono);">(0 events)</span>
+                        </div>
+                        <span id="swingAuditToggleIcon" style="font-size:0.70rem;color:#60a5fa;font-weight:600;">▼ Show Log</span>
+                    </div>
+                    <div id="swingAuditContainer" style="display:none;padding:0.6rem 0.75rem;border-top:1px solid rgba(255,255,255,0.06);">
+                        <div id="swingAuditList" style="max-height:280px;overflow-y:auto;">
+                            <div style="text-align:center;color:#64748b;font-size:0.72rem;padding:0.75rem;">Loading audit transitions...</div>
+                        </div>
+                    </div>
+                </div>
             </section>
         </div>
 

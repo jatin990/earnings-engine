@@ -42,6 +42,11 @@ import pandas as pd
 from earnings_engine.config import Settings
 from earnings_engine.data.db import get_db_connection
 from earnings_engine.data import swing_ranges as swing_ranges_mod
+from earnings_engine.data.tier_pools import (
+    TierPoolConfig,
+    TierPoolManager,
+    PoolEntry,
+)
 from earnings_engine.logging_utils import get_logger
 
 logger = get_logger("earnings_engine.data.swing_scanner")
@@ -63,40 +68,49 @@ SWING_COLD_INTERVAL_MIN: int = int(os.environ.get("SWING_COLD_INTERVAL_MIN", "60
 SWING_WARM_INTERVAL_MIN: int = int(os.environ.get("SWING_WARM_INTERVAL_MIN", "15"))
 SWING_HOT_INTERVAL_MIN: int = int(os.environ.get("SWING_HOT_INTERVAL_MIN", "5"))
 
-# ---------------------------------------------------------------------------
-# Tiered in-memory pool
-# ---------------------------------------------------------------------------
-_pool: dict[str, Any] = {
-    "hot": {},               # ticker -> {"result": dict, "consecutive_low": 0}
-    "warm": {},              # ticker -> {"result": dict, "consecutive_low": 0}
-    "candidates": [],        # merged sorted list for API (score >= SWING_MIN_SCORE)
-    "last_cold_scan_at": None,
-    "last_warm_scan_at": None,
-    "last_hot_scan_at": None,
-    "last_scan_at": None,
-    "last_scan_duration_s": 0.0,
-    "cold_tickers_scanned": 0,
-    "hot_count": 0,
-    "warm_count": 0,
-    "status": "idle",        # "idle" | "running" | "done" | "error"
-    "error": None,
-}
+
+def _custom_swing_hot_qualifier(candidate: dict[str, Any]) -> bool:
+    """Fast-track into HOT tier if in Strong Buy or immediate Support Zone (0-3% distance with volume)."""
+    sig = candidate.get("swing_signal") or candidate.get("signal") or ""
+    dist_pct = float(candidate.get("dist_to_support_pct", 99.0) or 99.0)
+    vol_score = float(candidate.get("volume_score", 0.0) or 0.0)
+    return (
+        sig in ("Strong Buy", "Buy Zone")
+        or (0.0 <= dist_pct <= 3.0 and vol_score >= 10.0)
+    )
+
+
+def _custom_swing_hot_demotion_guard(candidate: dict[str, Any]) -> bool:
+    """Guard against HOT demotion if price is currently hovering tightly on support (dist <= 2.5%)."""
+    dist_pct = float(candidate.get("dist_to_support_pct", 99.0) or 99.0)
+    return 0.0 <= dist_pct <= 2.5
+
+
+swing_tier_config = TierPoolConfig(
+    domain="swing",
+    hot_threshold=float(SWING_HOT_THRESHOLD),
+    warm_threshold=float(SWING_WARM_THRESHOLD),
+    hot_demotion_threshold=float(SWING_HOT_DEMOTION_THRESHOLD),
+    warm_demotion_threshold=float(SWING_WARM_DEMOTION_THRESHOLD),
+    demotion_strikes=2,
+    max_candidates=SWING_MAX_CANDIDATES,
+    min_score=float(SWING_MIN_SCORE),
+    table_name="swing_radar",
+    audit_table_name="strategy_tier_audit_log",
+    custom_hot_qualifier=_custom_swing_hot_qualifier,
+    custom_hot_demotion_guard=_custom_swing_hot_demotion_guard,
+    key_builder=lambda ticker, strat: ticker.upper(),
+)
+
+swing_tier_manager = TierPoolManager(swing_tier_config)
+
+# Share in-memory pool state directly with TierPoolManager
+_pool: dict[str, Any] = swing_tier_manager._pool
 
 
 def _rebuild_candidates() -> None:
     """Merge hot + warm pools into a deduplicated, sorted candidates list."""
-    merged: dict[str, dict] = {}
-    for ticker, entry in _pool["hot"].items():
-        merged[ticker] = entry["result"]
-    for ticker, entry in _pool["warm"].items():
-        if ticker not in merged:
-            merged[ticker] = entry["result"]
-
-    candidates = [r for r in merged.values() if r.get("composite_score", 0) >= SWING_MIN_SCORE]
-    candidates.sort(key=lambda x: x.get("composite_score", 0), reverse=True)
-    _pool["candidates"] = candidates[:SWING_MAX_CANDIDATES]
-    _pool["hot_count"] = len(_pool["hot"])
-    _pool["warm_count"] = len(_pool["warm"])
+    swing_tier_manager._rebuild_candidates()
 
 
 def _init_swing_radar_db(conn: Any) -> None:
@@ -321,10 +335,16 @@ def load_swing_pool_from_db(settings: Settings | None = None) -> None:
                 }
             }
 
+            entry = PoolEntry(
+                result=item,
+                consecutive_low=0,
+                tier=str(d.get("tier", "WARM")).upper(),
+                last_scored_at=d.get("scanned_at") or datetime.now(timezone.utc).isoformat(),
+            )
             if d.get("tier") == "HOT":
-                hot[sym] = {"result": item, "consecutive_low": 0}
+                hot[sym] = entry
             else:
-                warm[sym] = {"result": item, "consecutive_low": 0}
+                warm[sym] = entry
 
         _pool["hot"] = hot
         _pool["warm"] = warm
@@ -613,14 +633,13 @@ def run_hot_rescore(settings: Settings) -> None:
         return
     logger.info("[SWING-HOT] Rescoring %d Hot candidates", len(_pool["hot"]))
     t0 = time.time()
-    demote: list[str] = []
 
     hot_symbols = list(_pool["hot"].keys())
     from earnings_engine.data.prices import load_prices_batch
     prices_map = load_prices_batch(hot_symbols, settings, days=120)
     ranges_map = swing_ranges_mod.get_swing_ranges_batch("ALL", hot_symbols, settings)
 
-    for sym, entry in list(_pool["hot"].items()):
+    for sym in hot_symbols:
         res = evaluate_stock_swing(
             sym,
             settings,
@@ -630,30 +649,9 @@ def run_hot_rescore(settings: Settings) -> None:
         if res is None:
             continue
 
-        score = res.get("composite_score", 0)
-        is_still_hot = (
-            score >= SWING_HOT_DEMOTION_THRESHOLD or
-            res.get("swing_signal") in ("Strong Buy", "Buy Zone") or
-            (0.0 <= res.get("dist_to_support_pct", 99) <= 3.5)
-        )
+        swing_tier_manager.check_hot_demotion(sym, res, settings=settings)
 
-        if is_still_hot:
-            entry["consecutive_low"] = 0
-            entry["result"] = res
-        else:
-            entry["consecutive_low"] += 1
-            if entry["consecutive_low"] >= 2:
-                demote.append(sym)
-            else:
-                entry["result"] = res
-
-    for sym in demote:
-        entry = _pool["hot"].pop(sym)
-        entry["result"]["tier"] = "WARM"
-        _pool["warm"][sym] = {"result": entry["result"], "consecutive_low": 0}
-        logger.info("[SWING-HOT] Demoted %s to WARM (2 low cycles)", sym)
-
-    _rebuild_candidates()
+    swing_tier_manager._rebuild_candidates()
     _pool["last_hot_scan_at"] = datetime.now(timezone.utc).isoformat()
     _pool["last_scan_at"] = _pool["last_hot_scan_at"]
     _pool["last_scan_duration_s"] = round(time.time() - t0, 2)
@@ -666,15 +664,13 @@ def run_warm_rescore(settings: Settings) -> None:
         return
     logger.info("[SWING-WARM] Rescoring %d Warm candidates", len(_pool["warm"]))
     t0 = time.time()
-    promote: list[str] = []
-    drop: list[str] = []
 
     warm_symbols = list(_pool["warm"].keys())
     from earnings_engine.data.prices import load_prices_batch
     prices_map = load_prices_batch(warm_symbols, settings, days=120)
     ranges_map = swing_ranges_mod.get_swing_ranges_batch("ALL", warm_symbols, settings)
 
-    for sym, entry in list(_pool["warm"].items()):
+    for sym in warm_symbols:
         res = evaluate_stock_swing(
             sym,
             settings,
@@ -684,37 +680,13 @@ def run_warm_rescore(settings: Settings) -> None:
         if res is None:
             continue
 
-        score = res.get("composite_score", 0)
-        is_hot = (
-            score >= SWING_HOT_THRESHOLD or
-            res.get("swing_signal") in ("Strong Buy", "Buy Zone") or
-            (0.0 <= res.get("dist_to_support_pct", 99) <= 3.0)
-        )
-
-        if is_hot:
-            promote.append(sym)
-            entry["result"] = res
-        elif score < SWING_WARM_DEMOTION_THRESHOLD:
-            entry["consecutive_low"] += 1
-            if entry["consecutive_low"] >= 2:
-                drop.append(sym)
-            else:
-                entry["result"] = res
+        tier = swing_tier_manager.evaluate_tier(res)
+        if tier == "HOT":
+            swing_tier_manager.promote_or_update(res, settings=settings, force_tier="HOT")
         else:
-            entry["consecutive_low"] = 0
-            entry["result"] = res
+            swing_tier_manager.check_warm_demotion(sym, res, settings=settings)
 
-    for sym in promote:
-        entry = _pool["warm"].pop(sym)
-        entry["result"]["tier"] = "HOT"
-        _pool["hot"][sym] = {"result": entry["result"], "consecutive_low": 0}
-        logger.info("[SWING-WARM] Promoted %s to HOT", sym)
-
-    for sym in drop:
-        _pool["warm"].pop(sym, None)
-        logger.info("[SWING-WARM] Dropped %s to COLD (2 low cycles)", sym)
-
-    _rebuild_candidates()
+    swing_tier_manager._rebuild_candidates()
     _pool["last_warm_scan_at"] = datetime.now(timezone.utc).isoformat()
     _pool["last_scan_at"] = _pool["last_warm_scan_at"]
     _pool["last_scan_duration_s"] = round(time.time() - t0, 2)
@@ -774,8 +746,6 @@ def run_cold_scan(
             logger.warning("[SWING-SCANNER] Failed batch loading prices: %s", e)
             prices_map = {}
 
-        hot_candidates: dict[str, dict] = {}
-        warm_candidates: dict[str, dict] = {}
         scanned_count = 0
 
         for ticker in tickers:
@@ -790,20 +760,10 @@ def run_cold_scan(
             if res is None:
                 continue
 
-            score = res.get("composite_score", 0)
-            tier = res.get("tier")
+            swing_tier_manager.promote_or_update(res, settings=settings)
 
-            if tier == "HOT" or score >= SWING_HOT_THRESHOLD:
-                res["tier"] = "HOT"
-                hot_candidates[ticker] = {"result": res, "consecutive_low": 0}
-            elif tier == "WARM" or score >= SWING_WARM_THRESHOLD:
-                res["tier"] = "WARM"
-                warm_candidates[ticker] = {"result": res, "consecutive_low": 0}
-
-        _pool["hot"] = hot_candidates
-        _pool["warm"] = warm_candidates
         _pool["cold_tickers_scanned"] = scanned_count
-        _rebuild_candidates()
+        swing_tier_manager._rebuild_candidates()
 
         now_iso = datetime.now(timezone.utc).isoformat()
         _pool["last_cold_scan_at"] = now_iso
@@ -813,7 +773,7 @@ def run_cold_scan(
 
         save_swing_pool_to_db(settings)
         logger.info("[SWING-COLD] Full scan complete: %d tickers scanned -> %d HOT, %d WARM in %.2fs",
-                    scanned_count, len(hot_candidates), len(warm_candidates), _pool["last_scan_duration_s"])
+                    scanned_count, len(_pool["hot"]), len(_pool["warm"]), _pool["last_scan_duration_s"])
         return list(_pool["candidates"])
     except Exception as e:
         logger.exception("[SWING-COLD] Scan failed: %s", e)
@@ -826,18 +786,52 @@ def run_cold_scan(
 # Public APIs & Async Background Loop
 # ---------------------------------------------------------------------------
 
+def get_swing_pool_stats(settings: Settings | None = None) -> dict[str, Any]:
+    """Return aggregate pool metrics from database or in-memory state."""
+    return swing_tier_manager.get_pool_stats(settings=settings)
+
+
+def get_swing_audit_log(
+    ticker: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Fetch historical transition event log for swing trading setups."""
+    return swing_tier_manager.get_audit_log(ticker=ticker, limit=limit, offset=offset, settings=settings)
+
+
+def set_swing_manual_tier(
+    ticker: str,
+    tier: str,
+    settings: Settings | None = None,
+) -> dict[str, Any]:
+    """Manually assign or override the tier of a stock in the swing radar."""
+    t = swing_tier_manager.set_manual_tier(ticker, tier, settings=settings)
+    save_swing_pool_to_db(settings)
+    return {"success": True, "ticker": ticker, "tier": t}
+
+
 def get_cached_swing_results(
     universe: str | None = None,
+    tier: str | None = "ALL",
     settings: Settings | None = None,
 ) -> list[dict[str, Any]]:
-    """Return cached swing setups, optionally filtered by universe / watchlist."""
+    """Return cached swing setups, optionally filtered by tier and universe / watchlist."""
     settings = settings or Settings()
-    if not _pool.get("candidates"):
+    if not _pool.get("candidates") and not _pool.get("hot") and not _pool.get("warm"):
         load_swing_pool_from_db(settings)
 
-    all_candidates = list(_pool["candidates"])
+    tier_filter = (tier or "ALL").upper().strip()
+    if tier_filter == "HOT":
+        candidates = [e.result for e in _pool["hot"].values()]
+    elif tier_filter == "WARM":
+        candidates = [e.result for e in _pool["warm"].values()]
+    else:
+        candidates = list(_pool["candidates"])
+
     if not universe or universe.lower() in ("all", "any", "global", "monitored"):
-        return all_candidates
+        return candidates
 
     try:
         from earnings_engine.data.universe import load_universe
@@ -860,11 +854,11 @@ def get_cached_swing_results(
 
         if uni_tickers:
             uni_norm = {t.upper() for t in uni_tickers}
-            return [c for c in all_candidates if c.get("ticker", "").upper() in uni_norm]
+            return [c for c in candidates if c.get("ticker", "").upper() in uni_norm]
     except Exception as e:
         logger.debug("[SWING] Error filtering by universe %s: %s", universe, e)
 
-    return all_candidates
+    return candidates
 
 
 def get_scan_status(universe: str | None = None) -> dict[str, Any]:

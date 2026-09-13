@@ -8,12 +8,64 @@
         swingData: [],
         swingView: 'table',
         swingFilter: 'all',
+        swingTierFilter: 'ALL',
         swingSortKey: 'ticker',
         swingSortDir: 'asc',
+        _swingAuditOpen: false,
 
         // -------------------------------------------------------------------------
         // View & Filter Controllers
         // -------------------------------------------------------------------------
+        setSwingTierFilter(tier) {
+            this.swingTierFilter = (tier || 'ALL').toUpperCase();
+            ['ALL', 'HOT', 'WARM'].forEach(t => {
+                const btn = document.getElementById(`swingTierPill-${t}`);
+                if (btn) {
+                    const isActive = t === this.swingTierFilter;
+                    btn.className = `btn-micro ${isActive ? 'btn-primary' : ''}`;
+                    btn.style.fontWeight = isActive ? '700' : '500';
+                    btn.style.background = isActive
+                        ? (t === 'HOT' ? '#dc2626' : t === 'WARM' ? '#d97706' : '#2563eb')
+                        : 'transparent';
+                    btn.style.color = isActive
+                        ? '#ffffff'
+                        : (t === 'HOT' ? '#f87171' : t === 'WARM' ? '#fbbf24' : '#94a3b8');
+                }
+            });
+            this.renderSwing();
+        },
+
+        toggleSwingAuditLog() {
+            const container = document.getElementById('swingAuditContainer');
+            const toggleIcon = document.getElementById('swingAuditToggleIcon');
+            if (!container) return;
+
+            this._swingAuditOpen = !this._swingAuditOpen;
+            container.style.display = this._swingAuditOpen ? 'block' : 'none';
+            if (toggleIcon) toggleIcon.textContent = this._swingAuditOpen ? '▲ Hide Log' : '▼ Show Log';
+
+            if (this._swingAuditOpen) {
+                this.loadSwingAuditLog();
+            }
+        },
+
+        async loadSwingAuditLog(ticker = null) {
+            if (window.TierPoolUI) {
+                await window.TierPoolUI.loadAuditLog({
+                    domain: 'swing',
+                    ticker: ticker,
+                    containerId: 'swingAuditList',
+                    countBadgeId: 'swingAuditBadgeCount',
+                    summaryElements: {
+                        coldToHot: 'swingAuditColdHot',
+                        coldToWarm: 'swingAuditColdWarm',
+                        warmToHot: 'swingAuditWarmHot',
+                        exits: 'swingAuditExits'
+                    }
+                });
+            }
+        },
+
         setSwingView(view) {
             this.swingView = view;
             const tbl = document.getElementById('swingTableContainer');
@@ -151,29 +203,52 @@
         async loadSwing(e) {
             const marketEl = document.getElementById('swingMarket');
             const market = marketEl ? marketEl.value : 'ALL';
-            const url = API_BASE + '/api/v1/dashboard/swing?limit=50' + (market ? '&market=' + encodeURIComponent(market) : '');
+            const url = API_BASE + '/api/v1/dashboard/swing?limit=150' + (market ? '&market=' + encodeURIComponent(market) : '');
+            const statsUrl = API_BASE + '/api/v1/dashboard/swing/pool-stats';
             const btn = (e && e.target) ? e.target : (typeof window !== 'undefined' && window.event ? window.event.target : null);
             if (btn && btn.tagName === 'BUTTON') { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span> Loading...'; }
             try {
-                const res = await fetch(url);
+                const [res, statsRes] = await Promise.all([
+                    fetch(url),
+                    fetch(statsUrl).catch(() => null)
+                ]);
                 const data = await res.json();
                 this.swingData = Array.isArray(data) ? data : [];
 
+                let poolStats = null;
+                if (statsRes && statsRes.ok) {
+                    const statsJson = await statsRes.json();
+                    poolStats = statsJson.stats || statsJson;
+                }
+
                 // Update summary counts
                 const countAll = this.swingData.length;
-                const countBuyZone = this.swingData.filter(r => this.isSwingInBuyZone(r) || r.tier === 'HOT').length;
+                const countBuyZone = this.swingData.filter(r => this.isSwingInBuyZone(r) || (r.tier || '').toUpperCase() === 'HOT').length;
                 const countStrongBuy = this.swingData.filter(r => r.swing_signal === 'Strong Buy').length;
                 const countCustom = this.swingData.filter(r => (r.swing_range && r.swing_range.source === 'user') || r.source === 'user').length;
+
+                const countHot = (poolStats && poolStats.hot_count !== undefined)
+                    ? poolStats.hot_count
+                    : this.swingData.filter(r => (r.tier || '').toUpperCase() === 'HOT' || this.isSwingInBuyZone(r)).length;
+                const countWarm = (poolStats && poolStats.warm_count !== undefined)
+                    ? poolStats.warm_count
+                    : this.swingData.filter(r => (r.tier || '').toUpperCase() === 'WARM').length;
 
                 const elAll = document.getElementById('count-all'); if (elAll) elAll.textContent = countAll;
                 const elBz = document.getElementById('count-buyzone'); if (elBz) elBz.textContent = countBuyZone;
                 const elSb = document.getElementById('count-strongbuy'); if (elSb) elSb.textContent = countStrongBuy;
                 const elCust = document.getElementById('count-custom'); if (elCust) elCust.textContent = countCustom;
 
+                const elHot = document.getElementById('count-hot-pool'); if (elHot) elHot.textContent = countHot;
+                const elWarm = document.getElementById('count-warm-pool'); if (elWarm) elWarm.textContent = countWarm;
+
                 const pAll = document.getElementById('count-all-pill'); if (pAll) pAll.textContent = countAll;
                 const pBz = document.getElementById('count-buyzone-pill'); if (pBz) pBz.textContent = countBuyZone;
                 const pSb = document.getElementById('count-strongbuy-pill'); if (pSb) pSb.textContent = countStrongBuy;
                 const pCust = document.getElementById('count-custom-pill'); if (pCust) pCust.textContent = countCustom;
+
+                const pHot = document.getElementById('count-hot-pill'); if (pHot) pHot.textContent = countHot;
+                const pWarm = document.getElementById('count-warm-pill'); if (pWarm) pWarm.textContent = countWarm;
 
                 this.renderSwing();
             } catch (e) {
@@ -205,8 +280,17 @@
 
             // Filter
             let list = [...this.swingData];
+
+            // Tier Filter (Hot / Warm / All)
+            if (this.swingTierFilter === 'HOT') {
+                list = list.filter(r => (r.tier || '').toUpperCase() === 'HOT' || this.isSwingInBuyZone(r));
+            } else if (this.swingTierFilter === 'WARM') {
+                list = list.filter(r => (r.tier || '').toUpperCase() === 'WARM');
+            }
+
+            // Strategy / Setup archetype Filter
             if (this.swingFilter === 'buyzone') {
-                list = list.filter(r => this.isSwingInBuyZone(r) || r.tier === 'HOT');
+                list = list.filter(r => this.isSwingInBuyZone(r) || (r.tier || '').toUpperCase() === 'HOT');
             } else if (this.swingFilter === 'strongbuy') {
                 list = list.filter(r => r.swing_signal === 'Strong Buy');
             } else if (this.swingFilter === 'custom') {
@@ -302,10 +386,12 @@
                     const spreadStr = r.spread_pct ? `${r.spread_pct}% spread` : (hasSr && sr.lower_bound > 0 ? `${(((sr.upper_bound - sr.lower_bound)/sr.lower_bound)*100).toFixed(1)}% spread` : '');
 
                     // Tier Pill
-                    const tier = r.tier || (isBz ? 'HOT' : 'WARM');
-                    const tierBadge = tier === 'HOT'
-                        ? '<span class="signal-badge" style="background:rgba(249,115,22,0.2);color:#fdba74;border:1px solid rgba(249,115,22,0.4);font-size:0.65rem;font-weight:800;padding:0.1rem 0.35rem;">🔥 HOT</span>'
-                        : '<span class="signal-badge" style="background:rgba(148,163,184,0.15);color:#cbd5e1;font-size:0.65rem;padding:0.1rem 0.35rem;">🟡 WARM</span>';
+                    const tier = (r.tier || (isBz ? 'HOT' : 'WARM')).toUpperCase();
+                    const tierBadge = window.TierPoolUI
+                        ? window.TierPoolUI.renderTierBadge(tier)
+                        : (tier === 'HOT'
+                            ? '<span class="signal-badge" style="background:rgba(239,68,68,0.18);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-size:0.62rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:3px;">🔥 HOT</span>'
+                            : '<span class="signal-badge" style="background:rgba(245,158,11,0.18);color:#fbbf24;border:1px solid rgba(245,158,11,0.4);font-size:0.62rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:3px;">⚡ WARM</span>');
 
                     // Signal Badge
                     let signalBadge = '';
