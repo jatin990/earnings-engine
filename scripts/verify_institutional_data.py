@@ -52,6 +52,8 @@ from earnings_engine.data.institutional_accumulation import (
     fetch_live_corporate_ownership,
     fetch_live_corporate_ownership_batch,
     init_institutional_db,
+    evaluate_and_track_strategy_signals,
+    get_tracked_smart_money_signals,
 )
 from earnings_engine.data.nse_shareholding import (
     ingest_universe_shareholding_patterns,
@@ -440,6 +442,7 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=25, help="Batch size for concurrent processing (default: 25)")
     parser.add_argument("--workers", type=int, default=5, help="Number of concurrent worker threads (default: 5)")
     parser.add_argument("--sync-turso", action="store_true", help="Replicate cleaned tables to Turso cloud")
+    parser.add_argument("--eval-signals", action="store_true", help="Run strategy signal evaluation and lifecycle tracking across the institutional universe")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging output")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show verbose audit output")
 
@@ -460,11 +463,27 @@ def main() -> int:
     if (args.all or args.universe or args.verify_live is not None) and not (args.ingest_nse or args.ingest_quarters or args.clean_synthetic or args.audit):
         args.ingest_quarters = True
 
-    if not any([args.audit, args.clean_synthetic, args.verify_live is not None, args.ingest_nse, args.ingest_quarters, args.sync_turso, args.all, args.universe]):
+    if not any([args.audit, args.clean_synthetic, args.verify_live is not None, args.ingest_nse, args.ingest_quarters, args.sync_turso, args.eval_signals, args.all, args.universe]):
         args.audit = True
 
     if args.clean_synthetic:
         clean_synthetic_institutional_records(settings)
+
+    if args.eval_signals:
+        logger.info("🧭 Running Smart Money Strategy Signal Evaluation & Lifecycle Tracking...")
+        result = evaluate_and_track_strategy_signals(settings=settings)
+        logger.info(f"✅ Signal Evaluation Complete: {result.get('total_signals', 0)} signals tracked, {result.get('new_signals', 0)} newly discovered")
+        for strategy, count in result.get("by_strategy", {}).items():
+            logger.info(f"   {strategy}: {count} signals")
+
+        signals_data = get_tracked_smart_money_signals(strategy="ALL_STRATEGIES", status="active", limit=10, settings=settings)
+        signals = signals_data.get("signals", [])
+        logger.info(f"📡 Top 10 Active Smart Money Signals:")
+        for sig in signals:
+            logger.info(
+                f"   {sig['ticker']} [{sig.get('strategy','?')}] | Discovered: {sig.get('signal_date','?')} @ ₹{sig.get('signal_price','?')} | "
+                f"Current: ₹{sig.get('current_price','?')} | Return: {sig.get('outcome_return_pct',0):+.2f}% | Status: {sig.get('lifecycle_status','?')}"
+            )
 
     if args.verify_live is not None or args.ingest_nse or args.ingest_quarters or args.all or args.universe:
         targets = resolve_target_tickers(
