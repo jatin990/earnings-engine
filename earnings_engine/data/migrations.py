@@ -1645,36 +1645,58 @@ def _migration_035_purge_non_fno_fo_call_wall(conn: Any) -> None:
 
 
 def _migration_036_sync_breakout_radar_signal_columns(conn: Any) -> None:
-    """Sync stale breakout_radar signal columns (signal_date, signal_price, etc.) from candidate data_json payload."""
+    """Sync stale breakout_radar signal columns (signal_date, signal_price, etc.) from candidate data_json payload.
+
+    Uses batch executemany for speed — avoids N individual UPDATE round-trips.
+    """
     try:
-        cur = conn.execute("SELECT ticker, strategy, data_json FROM breakout_radar WHERE data_json IS NOT NULL AND data_json != ''")
+        cur = conn.execute(
+            "SELECT ticker, strategy, data_json FROM breakout_radar "
+            "WHERE data_json IS NOT NULL AND data_json != ''"
+        )
         rows = cur.fetchall()
+        if not rows:
+            return
+
+        import json
+
+        batch: list[tuple] = []
         for ticker, strategy, data_json_str in rows:
             try:
-                import json
                 d = json.loads(data_json_str)
                 if not isinstance(d, dict):
                     continue
                 s_date = d.get("signal_date")
-                s_price = d.get("signal_price")
-                pred_val = d.get("predicted_value")
-                trigger = d.get("breakout_trigger")
-                target = d.get("target_price")
-                sl = d.get("stop_loss")
+                if not s_date:
+                    continue
+                batch.append((
+                    s_date,
+                    d.get("signal_price"),
+                    d.get("predicted_value"),
+                    d.get("breakout_trigger"),
+                    d.get("target_price"),
+                    d.get("stop_loss"),
+                    ticker,
+                    strategy,
+                ))
+            except Exception:
+                continue
 
-                if s_date:
-                    conn.execute("""
-                        UPDATE breakout_radar
-                        SET signal_date = ?,
-                            signal_price = COALESCE(?, signal_price),
-                            predicted_value = COALESCE(?, predicted_value),
-                            breakout_trigger = COALESCE(?, breakout_trigger),
-                            target_price = COALESCE(?, target_price),
-                            stop_loss = COALESCE(?, stop_loss)
-                        WHERE ticker = ? AND strategy = ?
-                    """, (s_date, s_price, pred_val, trigger, target, sl, ticker, strategy))
-            except Exception as row_err:
-                logger.debug("[MIGRATION-036] Row update notice for %s %s: %s", ticker, strategy, row_err)
+        if batch:
+            conn.executemany(
+                """
+                UPDATE breakout_radar
+                SET signal_date = ?,
+                    signal_price = COALESCE(?, signal_price),
+                    predicted_value = COALESCE(?, predicted_value),
+                    breakout_trigger = COALESCE(?, breakout_trigger),
+                    target_price = COALESCE(?, target_price),
+                    stop_loss = COALESCE(?, stop_loss)
+                WHERE ticker = ? AND strategy = ?
+                """,
+                batch,
+            )
+            logger.debug("[MIGRATION-036] Batch-updated %d breakout_radar rows.", len(batch))
     except Exception as e:
         logger.debug("[MIGRATION-036] Execution notice: %s", e)
 
@@ -1688,14 +1710,16 @@ def _migration_037_breakout_late_detection_fields(conn: Any) -> None:
 
     # Backfill late detection metrics from existing data_json payloads where available
     # Note: breakout_radar has composite primary key (ticker, strategy), while breakout_tracked_signals has integer primary key (id).
+    import json as _json
+
     # 1. Backfill breakout_radar
     try:
         cur = conn.execute("SELECT ticker, strategy, signal_price, breakout_trigger, data_json FROM breakout_radar WHERE data_json IS NOT NULL AND data_json != ''")
         rows = cur.fetchall()
+        batch: list[tuple] = []
         for ticker, strat, sig_p, trig_p, d_json in rows:
             try:
-                import json
-                d = json.loads(d_json)
+                d = _json.loads(d_json)
                 if not isinstance(d, dict):
                     continue
                 notes = d.get("calculation_notes") or {}
@@ -1715,12 +1739,14 @@ def _migration_037_breakout_late_detection_fields(conn: Any) -> None:
 
                     delay_pct = round(((s_price - ideal_p) / ideal_p) * 100, 2) if (is_late_val and ideal_p > 0) else 0.0
 
-                    conn.execute(
-                        "UPDATE breakout_radar SET ideal_entry_price = ?, is_late = ?, entry_delay_pct = ? WHERE ticker = ? AND strategy = ?",
-                        (ideal_p, is_late_val, delay_pct, ticker, strat),
-                    )
+                    batch.append((ideal_p, is_late_val, delay_pct, ticker, strat))
             except Exception:
                 continue
+        if batch:
+            conn.executemany(
+                "UPDATE breakout_radar SET ideal_entry_price = ?, is_late = ?, entry_delay_pct = ? WHERE ticker = ? AND strategy = ?",
+                batch,
+            )
     except Exception as e:
         logger.debug("[MIGRATION-037] Backfill notice for breakout_radar: %s", e)
 
@@ -1728,10 +1754,10 @@ def _migration_037_breakout_late_detection_fields(conn: Any) -> None:
     try:
         cur = conn.execute("SELECT id, ticker, signal_price, breakout_trigger, data_json FROM breakout_tracked_signals WHERE data_json IS NOT NULL AND data_json != ''")
         rows = cur.fetchall()
+        batch = []
         for r_id, ticker, sig_p, trig_p, d_json in rows:
             try:
-                import json
-                d = json.loads(d_json)
+                d = _json.loads(d_json)
                 if not isinstance(d, dict):
                     continue
                 notes = d.get("calculation_notes") or {}
@@ -1751,12 +1777,14 @@ def _migration_037_breakout_late_detection_fields(conn: Any) -> None:
 
                     delay_pct = round(((s_price - ideal_p) / ideal_p) * 100, 2) if (is_late_val and ideal_p > 0) else 0.0
 
-                    conn.execute(
-                        "UPDATE breakout_tracked_signals SET ideal_entry_price = ?, is_late = ?, entry_delay_pct = ? WHERE id = ?",
-                        (ideal_p, is_late_val, delay_pct, r_id),
-                    )
+                    batch.append((ideal_p, is_late_val, delay_pct, r_id))
             except Exception:
                 continue
+        if batch:
+            conn.executemany(
+                "UPDATE breakout_tracked_signals SET ideal_entry_price = ?, is_late = ?, entry_delay_pct = ? WHERE id = ?",
+                batch,
+            )
     except Exception as e:
         logger.debug("[MIGRATION-037] Backfill notice for breakout_tracked_signals: %s", e)
 

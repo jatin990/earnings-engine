@@ -77,14 +77,32 @@ async def lifespan(app: FastAPI):
     logger.info("[STARTUP] Initializing Earnings Engine Platform lifecycle...")
 
     # STAGE 1: Database Migrations & Storage Integrity
-    try:
-        applied = apply_migrations(_settings)
-        if applied:
-            logger.info("[STARTUP:1/5] Database migrations applied: %s", ", ".join(applied))
-        else:
-            logger.info("[STARTUP:1/5] Database schema verified and up-to-date.")
-    except Exception as e:
-        logger.warning("[STARTUP:1/5] Database migration check warning: %s", e)
+    # In serverless mode, run migrations in a background thread so the lifespan
+    # yields immediately — heavy backfill migrations (e.g. 036 row-by-row JSON
+    # parsing) can exceed Vercel's 60 s cold-start timeout when run synchronously.
+    if is_serverless:
+        async def _run_startup_migrations():
+            try:
+                loop = asyncio.get_running_loop()
+                applied = await loop.run_in_executor(None, apply_migrations, _settings)
+                if applied:
+                    logger.info("[STARTUP:1/5] Serverless DB migrations applied: %s", ", ".join(applied))
+                else:
+                    logger.info("[STARTUP:1/5] Serverless DB schema verified and up-to-date.")
+            except Exception as sync_err:
+                logger.warning("[STARTUP:1/5] Serverless migration background warning: %s", sync_err)
+
+        asyncio.create_task(_run_startup_migrations(), name="serverless_db_migrations")
+        logger.info("[STARTUP:1/5] Database migrations dispatched to background thread (serverless).")
+    else:
+        try:
+            applied = apply_migrations(_settings)
+            if applied:
+                logger.info("[STARTUP:1/5] Database migrations applied: %s", ", ".join(applied))
+            else:
+                logger.info("[STARTUP:1/5] Database schema verified and up-to-date.")
+        except Exception as e:
+            logger.warning("[STARTUP:1/5] Database migration check warning: %s", e)
 
     log_startup_diagnostics(logger)
 
