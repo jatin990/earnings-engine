@@ -813,34 +813,34 @@
                     <td style="padding:0.46rem 0.65rem;border-right:1px solid rgba(255,255,255,0.03);">
                         <div style="display:flex;flex-direction:column;gap:0.12rem;">
                             <div style="display:flex;align-items:center;gap:0.35rem;flex-wrap:nowrap;">
-                                <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="font-weight:800;color:#ffffff;font-family:var(--font-mono);font-size:0.82rem;text-decoration:none;letter-spacing:-0.01em;" title="Open ${ctx.ticker} stock intelligence in new tab" onmouseenter="this.style.color='#38bdf8'" onmouseleave="this.style.color='#ffffff'">${ctx.ticker}</a>
-                                <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${ctx.ticker}', this, event);" style="background:transparent;border:none;color:#38bdf8;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" onmouseenter="this.style.opacity='1';this.style.color='#7dd3fc';" onmouseleave="this.style.opacity='0.75';this.style.color='#38bdf8';" title="Refresh live price & technical metrics for ${ctx.ticker}">↻</button>
-                                <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="color:#38bdf8;text-decoration:none;font-size:0.7rem;opacity:0.8;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
+                                <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="font-weight:800;color:#ffffff;font-family:var(--font-mono);font-size:0.82rem;text-decoration:none;letter-spacing:-0.01em;" title="Open ${ctx.ticker} stock intelligence in new tab" onmouseenter="this.style.color='#cbd5e1'" onmouseleave="this.style.color='#ffffff'">${ctx.ticker}</a>
+                                <button type="button" class="btn-ticker-refresh" onclick="event.stopPropagation(); app.refreshSingleStockPrice('${ctx.ticker}', this, event);" style="background:transparent;border:none;color:#a1a1aa;cursor:pointer;font-size:0.75rem;padding:0 0.15rem;opacity:0.75;line-height:1;transition:all 0.15s;" onmouseenter="this.style.opacity='1';this.style.color='#ffffff';" onmouseleave="this.style.opacity='0.75';this.style.color='#a1a1aa';" title="Refresh live price & technical metrics for ${ctx.ticker}">↻</button>
+                                <a href="/stock/${encodeURIComponent(ctx.ticker)}" target="_blank" style="color:#a1a1aa;text-decoration:none;font-size:0.7rem;opacity:0.8;" onclick="event.stopPropagation();" title="Open profile in new tab">↗</a>
                                 ${c.confirmation_badge ? `
-                                    <span style="font-size:0.58rem;background:rgba(255,255,255,0.05);color:${c.confirmation_color || '#38bdf8'};border:1px solid ${c.confirmation_color || '#38bdf8'}40;padding:0.04rem 0.35rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Volume expansion and fakeout protection indicator">
+                                    <span style="font-size:0.58rem;background:#18181b;color:#f8fafc;border:1px solid rgba(255,255,255,0.2);padding:0.04rem 0.35rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Volume expansion and fakeout protection indicator">
                                         ${c.confirmation_badge}
                                     </span>
                                 ` : (ctx.isBreakingOut ? `
-                                    <span style="font-size:0.58rem;background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.04rem 0.35rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Price crossed above resistance trigger">
-                                        🚀 Resistance Breached
+                                    <span style="font-size:0.58rem;background:#27272a;color:#ffffff;border:1px solid rgba(255,255,255,0.25);padding:0.04rem 0.35rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Price crossed above resistance trigger">
+                                        ⚡ Resistance Breached
                                     </span>
                                 ` : '')}
                             </div>
                             <div style="font-size:0.67rem;color:#94a3b8;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.company_name || ctx.ticker}">${ctx.company}</div>
                             <div style="margin-top:0.1rem;display:flex;gap:0.25rem;flex-wrap:wrap;align-items:center;">
-                                <span style="font-size:0.60rem;background:rgba(239,68,68,0.18);color:#f87171;border:1px solid rgba(239,68,68,0.35);padding:0.04rem 0.32rem;border-radius:3px;font-weight:800;" title="Tier: Elite Hot Breakout Pool">🔥 HOT</span>
-                                <span style="font-size:0.60rem;background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.25);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;">${ctx.archetype}</span>
-                                ${c.strategy ? `<span style="font-size:0.60rem;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-weight:700;" title="Strategy Model: ${c.strategy}">🎯 ${String(c.strategy).replace(/_/g, ' ')}</span>` : ''}
-                                <button type="button" onclick="app.openBreakoutHistoryModal('${ctx.ticker}', event)" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-size:0.60rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.2rem;" title="View Transition Lifecycle & Notes Timeline (Warm ➔ Hot ➔ Breakout)">
+                                <span style="font-size:0.60rem;background:#27272a;color:#ffffff;border:1px solid rgba(255,255,255,0.25);padding:0.04rem 0.32rem;border-radius:3px;font-weight:800;" title="Tier: Elite Hot Breakout Pool">⚡ HOT</span>
+                                <span style="font-size:0.60rem;background:#18181b;color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;">${ctx.archetype}</span>
+                                ${c.strategy ? `<span style="font-size:0.60rem;background:#18181b;color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);padding:0.04rem 0.32rem;border-radius:3px;font-weight:700;" title="Strategy Model: ${c.strategy}">🎯 ${String(c.strategy).replace(/_/g, ' ')}</span>` : ''}
+                                <button type="button" onclick="app.openBreakoutHistoryModal('${ctx.ticker}', event)" style="background:#18181b;color:#cbd5e1;border:1px solid rgba(255,255,255,0.15);padding:0.04rem 0.32rem;border-radius:3px;font-size:0.60rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:0.2rem;" title="View Transition Lifecycle & Notes Timeline (Warm ➔ Hot ➔ Breakout)">
                                     📜 History
                                 </button>
-                                ${(c.institutional_flow && c.institutional_flow.funds_in > 0) ? `<span style="font-size:0.60rem;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);padding:0.04rem 0.3rem;border-radius:3px;font-weight:700;" title="Institutional Accumulation: +${c.institutional_flow.funds_in} Funds Buying">🏛️ +${c.institutional_flow.funds_in}</span>` : ''}
+                                ${(c.institutional_flow && c.institutional_flow.funds_in > 0) ? `<span style="font-size:0.60rem;background:#18181b;color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);padding:0.04rem 0.3rem;border-radius:3px;font-weight:700;" title="Institutional Accumulation: +${c.institutional_flow.funds_in} Funds Buying">🏛️ +${c.institutional_flow.funds_in}</span>` : ''}
                                 ${c.is_real_tracked ? `
-                                    <span style="font-size:0.60rem;background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.4);padding:0.04rem 0.32rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Real-Time Tracked Entry recorded in SQLite database archive">
-                                        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;"></span> REAL TRACKED
+                                    <span style="font-size:0.60rem;background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.2);padding:0.04rem 0.32rem;border-radius:3px;font-weight:800;display:inline-flex;align-items:center;gap:0.2rem;" title="Real-Time Tracked Entry recorded in SQLite database archive">
+                                        <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#ffffff;"></span> REAL TRACKED
                                     </span>
                                 ` : `
-                                    <span style="font-size:0.60rem;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;display:inline-flex;align-items:center;gap:0.2rem;" title="Dynamic live scan setup">
+                                    <span style="font-size:0.60rem;background:#18181b;color:#a1a1aa;border:1px solid rgba(255,255,255,0.1);padding:0.04rem 0.32rem;border-radius:3px;font-weight:600;display:inline-flex;align-items:center;gap:0.2rem;" title="Dynamic live scan setup">
                                         📊 DYNAMIC SCAN
                                     </span>
                                 `}
@@ -854,7 +854,7 @@
                 label: 'Signal Price',
                 sortKey: 'predicted_value',
                 align: 'right',
-                headerStyle: 'color:#60a5fa;',
+                headerStyle: 'color:#94a3b8;',
                 render: (c, ctx) => {
                     const idealEntry = c.ideal_entry_price != null ? Number(c.ideal_entry_price) : (c.calculation_notes?.ideal_entry_price != null ? Number(c.calculation_notes.ideal_entry_price) : null);
                     const sigVal = c.signal_price != null ? Number(c.signal_price) : (c.predicted_value != null ? Number(c.predicted_value) : (c.current_price != null ? Number(c.current_price) : null));
@@ -862,9 +862,9 @@
                     const delayPct = c.entry_delay_pct != null ? Number(c.entry_delay_pct) : (idealEntry != null && sigVal != null ? ((sigVal - idealEntry) / idealEntry * 100) : 0);
 
                     const subLateHtml = (isLate && idealEntry != null)
-                        ? `<div style="font-size:0.62rem;color:#f59e0b;margin-top:2px;line-height:1.2;" title="Late Detection: Signal was detected after breakout occurred. Ideal strategy entry was ₹${idealEntry.toFixed(2)} (+${delayPct.toFixed(1)}% earlier)">
+                        ? `<div style="font-size:0.62rem;color:#a1a1aa;margin-top:2px;line-height:1.2;" title="Late Detection: Signal was detected after breakout occurred. Ideal strategy entry was ₹${idealEntry.toFixed(2)} (+${delayPct.toFixed(1)}% earlier)">
                              <sub>⚡ Ideal: ₹${idealEntry.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</sub>
-                             <sub style="color:${delayPct > 5 ? '#f87171' : '#fbbf24'};font-weight:700;">(+${delayPct.toFixed(1)}% late)</sub>
+                             <sub style="color:#ffffff;font-weight:700;">(+${delayPct.toFixed(1)}% late)</sub>
                            </div>`
                         : '';
 
@@ -874,7 +874,7 @@
 
                     return `
                     <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
-                        <div style="font-weight:700;color:#93c5fd;">${ctx.sigPriceStr}</div>
+                        <div style="font-weight:700;color:#f8fafc;">${ctx.sigPriceStr}</div>
                         ${subLateHtml}
                         <div style="font-size:0.62rem;color:#64748b;margin-top:1px;" title="Signal detection exact date & time">📅 ${sigDateTimeLabel}</div>
                     </td>
@@ -886,7 +886,7 @@
                 label: 'Current Price',
                 sortKey: 'current_price',
                 align: 'right',
-                headerStyle: 'color:#e2e8f0;',
+                headerStyle: 'color:#94a3b8;',
                 render: (c, ctx) => {
                     const rawTs = c.quote_timestamp || c.current_price_time || c.current_date || c.asof_date || ctx.asofDate || '';
                     let asOfLabel = rawTs;
@@ -907,25 +907,25 @@
                     if (!asOfLabel) asOfLabel = 'Today';
 
                     const delayStatus = (c.price_delay_status || (c.is_live ? 'LIVE' : 'DELAYED')).toUpperCase();
-                    let delayBg = 'rgba(59,130,246,0.15)';
-                    let delayColor = '#60a5fa';
-                    let delayBorder = 'rgba(59,130,246,0.3)';
+                    let delayBg = '#18181b';
+                    let delayColor = '#a1a1aa';
+                    let delayBorder = 'rgba(255,255,255,0.12)';
                     if (delayStatus === 'LIVE') {
-                        delayBg = 'rgba(16,185,129,0.18)';
-                        delayColor = '#34d399';
-                        delayBorder = 'rgba(16,185,129,0.4)';
+                        delayBg = '#27272a';
+                        delayColor = '#ffffff';
+                        delayBorder = 'rgba(255,255,255,0.25)';
                     } else if (delayStatus === 'MARKET CLOSED') {
-                        delayBg = 'rgba(148,163,184,0.15)';
+                        delayBg = '#18181b';
                         delayColor = '#94a3b8';
-                        delayBorder = 'rgba(148,163,184,0.3)';
+                        delayBorder = 'rgba(255,255,255,0.1)';
                     } else if (delayStatus === 'STALE') {
-                        delayBg = 'rgba(239,68,68,0.18)';
-                        delayColor = '#f87171';
-                        delayBorder = 'rgba(239,68,68,0.4)';
+                        delayBg = '#18181b';
+                        delayColor = '#71717a';
+                        delayBorder = 'rgba(255,255,255,0.1)';
                     } else if (delayStatus === 'DELAYED') {
-                        delayBg = 'rgba(245,158,11,0.15)';
-                        delayColor = '#fbbf24';
-                        delayBorder = 'rgba(245,158,11,0.35)';
+                        delayBg = '#18181b';
+                        delayColor = '#d4d4d8';
+                        delayBorder = 'rgba(255,255,255,0.15)';
                     }
 
                     return `
@@ -945,7 +945,7 @@
                 label: 'Trigger (Res)',
                 sortKey: 'breakout_trigger',
                 align: 'right',
-                headerStyle: 'color:#fbbf24;',
+                headerStyle: 'color:#94a3b8;',
                 render: (c, ctx) => {
                     const idealEntry = c.ideal_entry_price != null ? Number(c.ideal_entry_price) : (c.calculation_notes?.ideal_entry_price != null ? Number(c.calculation_notes.ideal_entry_price) : null);
                     const trigVal = c.breakout_trigger != null ? Number(c.breakout_trigger) : null;
@@ -956,7 +956,7 @@
 
                     return `
                     <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-size:0.75rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
-                        <div style="font-weight:700;color:#fde047;">${ctx.triggerStr}</div>
+                        <div style="font-weight:700;color:#f8fafc;">${ctx.triggerStr}</div>
                         ${baseSub}
                         <div style="font-size:0.62rem;margin-top:1px;">${ctx.gapPct}</div>
                     </td>
@@ -968,12 +968,12 @@
                 label: 'Target / Stop',
                 sortKey: null,
                 align: 'right',
-                headerStyle: 'color:#38bdf8;',
+                headerStyle: 'color:#94a3b8;',
                 render: (c, ctx) => `
                     <td style="padding:0.46rem 0.65rem;text-align:right;font-family:var(--font-mono);font-size:0.70rem;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
-                        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:0.2rem 0.4rem;border-radius:4px;display:inline-flex;flex-direction:column;gap:1px;text-align:right;">
-                            <div style="color:#34d399;font-weight:700;" title="Target Price">T: ${ctx.targetStr}</div>
-                            <div style="color:#f87171;font-weight:600;" title="Stop Loss">SL: ${ctx.stopStr}</div>
+                        <div style="background:#09090b;border:1px solid rgba(255,255,255,0.08);padding:0.2rem 0.4rem;border-radius:4px;display:inline-flex;flex-direction:column;gap:1px;text-align:right;">
+                            <div style="color:#ffffff;font-weight:700;" title="Target Price">T: ${ctx.targetStr}</div>
+                            <div style="color:#a1a1aa;font-weight:600;" title="Stop Loss">SL: ${ctx.stopStr}</div>
                         </div>
                     </td>
                 `
@@ -983,7 +983,7 @@
                 label: 'Return & Peak',
                 sortKey: 'realized_return_pct',
                 align: 'right',
-                headerStyle: 'color:#34d399;',
+                headerStyle: 'color:#94a3b8;',
                 render: (c, ctx) => {
                     const peakP = c.post_high != null ? c.post_high : (c.peak_price != null ? c.peak_price : null);
                     const peakGain = c.max_gain_pct != null ? c.max_gain_pct : (c.peak_gain_pct != null ? c.peak_gain_pct : null);
@@ -995,7 +995,7 @@
                         ${ctx.retStr}
                         ${peakGain != null ? `
                             <div style="font-size:0.62rem;color:#94a3b8;font-family:var(--font-mono);margin-top:2px;" title="Peak price reached after breakout signal">
-                                Peak: <span style="color:#34d399;font-weight:800;">+${peakGain}%</span> <span style="color:#cbd5e1;">(${peakStr})</span>
+                                Peak: <span style="color:#ffffff;font-weight:800;">+${peakGain}%</span> <span style="color:#cbd5e1;">(${peakStr})</span>
                             </div>
                         ` : ''}
                     </td>
@@ -1007,7 +1007,7 @@
                 label: 'Outcome & Summary',
                 sortKey: null,
                 align: 'left',
-                headerStyle: 'color:#fbbf24;',
+                headerStyle: 'color:#94a3b8;',
                 render: (c, ctx) => {
                     const expl = c.what_happened_summary || c.explanation_one_liner;
                     return `
@@ -1029,10 +1029,10 @@
                 label: '⚡ Score',
                 sortKey: 'composite_score',
                 align: 'center',
-                headerStyle: 'color:#f1f5f9;',
+                headerStyle: 'color:#94a3b8;',
                 render: (c, ctx) => `
                     <td style="padding:0.46rem 0.65rem;text-align:center;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.03);">
-                        <span style="display:inline-block;background:${ctx.scoreBg};color:${ctx.scoreColor};border:1px solid ${ctx.scoreColor}44;font-size:0.78rem;font-weight:800;font-family:var(--font-mono);padding:0.12rem 0.45rem;border-radius:5px;" title="Resistance: ${c.resistance_score || 0} • Volume: ${c.volume_score || 0} • Compression: ${c.compression_score || 0} • Momentum: ${c.momentum_score || 0} • Fundamental: ${c.fundamental_score || 0}">
+                        <span style="display:inline-block;background:${ctx.scoreBg};color:${ctx.scoreColor};border:1px solid rgba(255,255,255,0.2);font-size:0.78rem;font-weight:800;font-family:var(--font-mono);padding:0.12rem 0.45rem;border-radius:5px;" title="Resistance: ${c.resistance_score || 0} • Volume: ${c.volume_score || 0} • Compression: ${c.compression_score || 0} • Momentum: ${c.momentum_score || 0} • Fundamental: ${c.fundamental_score || 0}">
                             ${ctx.score}
                         </span>
                     </td>
@@ -1043,20 +1043,20 @@
                 label: 'Actions',
                 sortKey: null,
                 align: 'center',
-                headerStyle: 'color:#64748b;',
+                headerStyle: 'color:#94a3b8;',
                 render: (c, ctx) => `
                     <td style="padding:0.46rem 0.65rem;text-align:center;white-space:nowrap;">
                         <div style="display:flex;align-items:center;justify-content:center;gap:0.25rem;">
-                            <button type="button" onclick="app.openBreakoutHistoryModal('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:0.65rem;padding:0.18rem 0.45rem;border-radius:4px;cursor:pointer;" title="View Transition Lifecycle & Notes Timeline (Warm ➔ Hot ➔ Breakout)">
+                            <button type="button" onclick="app.openBreakoutHistoryModal('${ctx.ticker}')" class="btn btn-sm" style="background:#18181b;color:#cbd5e1;border:1px solid rgba(255,255,255,0.15);font-size:0.65rem;padding:0.18rem 0.45rem;border-radius:4px;cursor:pointer;" title="View Transition Lifecycle & Notes Timeline (Warm ➔ Hot ➔ Breakout)">
                                 📜 History
                             </button>
-                            <button type="button" id="btnReeval-${ctx.ticker.replace(/[^a-zA-Z0-9]/g, '_')}" onclick="app.reevaluateBreakoutStock('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(234,179,8,0.15);color:#fbbf24;border:1px solid rgba(234,179,8,0.3);font-size:0.65rem;padding:0.18rem 0.42rem;border-radius:4px;cursor:pointer;" title="Re-evaluate with fresh market prices and recalculate conviction">
+                            <button type="button" id="btnReeval-${ctx.ticker.replace(/[^a-zA-Z0-9]/g, '_')}" onclick="app.reevaluateBreakoutStock('${ctx.ticker}')" class="btn btn-sm" style="background:#18181b;color:#f4f4f5;border:1px solid rgba(255,255,255,0.18);font-size:0.65rem;padding:0.18rem 0.42rem;border-radius:4px;cursor:pointer;" title="Re-evaluate with fresh market prices and recalculate conviction">
                                 ⚡ Re-eval
                             </button>
-                            <button type="button" onclick="app.openBreakoutNotesModal('${ctx.ticker}')" class="btn btn-sm" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);font-size:0.65rem;padding:0.18rem 0.45rem;border-radius:4px;cursor:pointer;" title="View Mathematical Calculation Notes & Ollama AI Reasoning">
+                            <button type="button" onclick="app.openBreakoutNotesModal('${ctx.ticker}')" class="btn btn-sm" style="background:#18181b;color:#cbd5e1;border:1px solid rgba(255,255,255,0.15);font-size:0.65rem;padding:0.18rem 0.45rem;border-radius:4px;cursor:pointer;" title="View Mathematical Calculation Notes & Ollama AI Reasoning">
                                 🧠 Reasoning
                             </button>
-                            <button type="button" onclick="app.openSwingRangeModal('ALL','${ctx.ticker}')" class="btn btn-sm" style="background:#1e293b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);font-size:0.65rem;padding:0.18rem 0.42rem;border-radius:4px;" title="Analyse ${ctx.ticker}">
+                            <button type="button" onclick="app.openSwingRangeModal('ALL','${ctx.ticker}')" class="btn btn-sm" style="background:#18181b;color:#e2e8f0;border:1px solid rgba(255,255,255,0.15);font-size:0.65rem;padding:0.18rem 0.42rem;border-radius:4px;" title="Analyse ${ctx.ticker}">
                                 📊
                             </button>
                         </div>
@@ -1231,13 +1231,13 @@
 
             const outcomeBadgeHtml = (c) => {
                 const badge = c.outcome_badge || 'blue';
-                const label = c.outcome_label || (c.breakout_happened ? 'Breakout Succeeded ✅' : 'Pending ⏳');
+                const label = c.outcome_label || (c.breakout_happened ? 'Breakout Succeeded' : 'Pending');
                 const colors = {
-                    emerald: { bg: 'rgba(16,185,129,0.15)', text: '#34d399', border: 'rgba(16,185,129,0.3)' },
-                    amber: { bg: 'rgba(234,179,8,0.15)', text: '#fbbf24', border: 'rgba(234,179,8,0.3)' },
-                    rose: { bg: 'rgba(239,68,68,0.15)', text: '#f87171', border: 'rgba(239,68,68,0.3)' },
-                    slate: { bg: 'rgba(71,85,105,0.15)', text: '#94a3b8', border: 'rgba(71,85,105,0.3)' },
-                    blue: { bg: 'rgba(59,130,246,0.15)', text: '#60a5fa', border: 'rgba(59,130,246,0.3)' }
+                    emerald: { bg: '#27272a', text: '#ffffff', border: 'rgba(255,255,255,0.25)' },
+                    amber: { bg: '#18181b', text: '#d4d4d8', border: 'rgba(255,255,255,0.15)' },
+                    rose: { bg: '#18181b', text: '#a1a1aa', border: 'rgba(255,255,255,0.15)' },
+                    slate: { bg: '#18181b', text: '#94a3b8', border: 'rgba(255,255,255,0.1)' },
+                    blue: { bg: '#18181b', text: '#cbd5e1', border: 'rgba(255,255,255,0.15)' }
                 };
                 const style = colors[badge] || colors.blue;
                 return `<span style="display:inline-block;background:${style.bg};color:${style.text};border:1px solid ${style.border};font-size:0.65rem;font-weight:700;padding:0.12rem 0.45rem;border-radius:4px;white-space:nowrap;">${label}</span>`;
@@ -1245,8 +1245,8 @@
 
             const rows = candidates.map((c, index) => {
                 const score = c.composite_score || 0;
-                const scoreColor = score >= 75 ? '#fde68a' : score >= 55 ? '#34d399' : '#60a5fa';
-                const scoreBg = score >= 75 ? 'rgba(234,179,8,0.18)' : score >= 55 ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.12)';
+                const scoreColor = score >= 75 ? '#ffffff' : score >= 55 ? '#f4f4f5' : '#a1a1aa';
+                const scoreBg = score >= 75 ? '#27272a' : '#18181b';
 
                 const ticker = c.ticker || '—';
                 const company = (c.company_name || ticker).substring(0, 20);
@@ -1260,12 +1260,12 @@
                 const targetStr = c.target_price != null ? `₹${Number(c.target_price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
                 const stopStr = c.stop_loss != null ? `₹${Number(c.stop_loss).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
 
-                // Compute Color-Coded Prediction Status & Current Price Styling
-                let curPriceColor = '#e2e8f0';
-                let curPriceBadgeBg = 'rgba(255,255,255,0.05)';
+                // Compute Color-Coded Prediction Status & Current Price Styling (Executive Monochrome)
+                let curPriceColor = '#f8fafc';
+                let curPriceBadgeBg = '#18181b';
                 let curPriceBadgeBorder = 'rgba(255,255,255,0.12)';
                 let curPriceBadgeText = '#94a3b8';
-                let curPriceBadgeLabel = 'Pending ⏳';
+                let curPriceBadgeLabel = 'Pending';
 
                 const curVal = c.current_price != null ? Number(c.current_price) : null;
                 const trigVal = c.breakout_trigger != null ? Number(c.breakout_trigger) : null;
@@ -1274,42 +1274,42 @@
 
                 if (curVal != null) {
                     if (targetVal != null && curVal >= targetVal) {
-                        curPriceColor = '#34d399';
-                        curPriceBadgeBg = 'rgba(16,185,129,0.2)';
-                        curPriceBadgeBorder = 'rgba(16,185,129,0.5)';
-                        curPriceBadgeText = '#34d399';
+                        curPriceColor = '#ffffff';
+                        curPriceBadgeBg = '#27272a';
+                        curPriceBadgeBorder = 'rgba(255,255,255,0.25)';
+                        curPriceBadgeText = '#ffffff';
                         curPriceBadgeLabel = '🎯 Target Hit';
                     } else if (trigVal != null && curVal >= trigVal * 1.002) {
-                        curPriceColor = '#34d399';
-                        curPriceBadgeBg = 'rgba(16,185,129,0.18)';
-                        curPriceBadgeBorder = 'rgba(16,185,129,0.45)';
-                        curPriceBadgeText = '#34d399';
-                        curPriceBadgeLabel = '🟢 Breakout Fired';
+                        curPriceColor = '#ffffff';
+                        curPriceBadgeBg = '#27272a';
+                        curPriceBadgeBorder = 'rgba(255,255,255,0.25)';
+                        curPriceBadgeText = '#ffffff';
+                        curPriceBadgeLabel = '⚡ Breakout Fired';
                     } else if (stopVal != null && curVal <= stopVal) {
-                        curPriceColor = '#f87171';
-                        curPriceBadgeBg = 'rgba(239,68,68,0.2)';
-                        curPriceBadgeBorder = 'rgba(239,68,68,0.5)';
-                        curPriceBadgeText = '#f87171';
-                        curPriceBadgeLabel = '🔴 SL Hit';
+                        curPriceColor = '#a1a1aa';
+                        curPriceBadgeBg = '#18181b';
+                        curPriceBadgeBorder = 'rgba(255,255,255,0.15)';
+                        curPriceBadgeText = '#a1a1aa';
+                        curPriceBadgeLabel = 'SL Hit';
                     } else if (trigVal != null && curVal >= trigVal * 0.985) {
-                        curPriceColor = '#fcd34d';
-                        curPriceBadgeBg = 'rgba(146,64,14,0.28)';
-                        curPriceBadgeBorder = 'rgba(217,119,6,0.45)';
-                        curPriceBadgeText = '#fcd34d';
-                        curPriceBadgeLabel = '🟤 Coiling';
+                        curPriceColor = '#f4f4f5';
+                        curPriceBadgeBg = '#18181b';
+                        curPriceBadgeBorder = 'rgba(255,255,255,0.18)';
+                        curPriceBadgeText = '#f4f4f5';
+                        curPriceBadgeLabel = 'Coiling';
                     } else {
-                        curPriceColor = '#93c5fd';
-                        curPriceBadgeBg = 'rgba(59,130,246,0.15)';
-                        curPriceBadgeBorder = 'rgba(59,130,246,0.35)';
-                        curPriceBadgeText = '#93c5fd';
-                        curPriceBadgeLabel = '⏳ Active Setup';
+                        curPriceColor = '#d4d4d8';
+                        curPriceBadgeBg = '#18181b';
+                        curPriceBadgeBorder = 'rgba(255,255,255,0.12)';
+                        curPriceBadgeText = '#d4d4d8';
+                        curPriceBadgeLabel = 'Active Setup';
                     }
                 }
 
                 const retPct = c.realized_return_pct;
-                const retColor = retPct > 0 ? '#34d399' : (retPct < 0 ? '#f87171' : '#94a3b8');
-                const retBg = retPct > 0 ? 'rgba(16,185,129,0.15)' : (retPct < 0 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)');
-                const retBorder = retPct > 0 ? 'rgba(16,185,129,0.3)' : (retPct < 0 ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)');
+                const retColor = retPct > 0 ? '#ffffff' : (retPct < 0 ? '#a1a1aa' : '#71717a');
+                const retBg = retPct > 0 ? '#27272a' : '#18181b';
+                const retBorder = retPct > 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.12)';
                 const retStr = retPct != null
                     ? `<span style="display:inline-block;font-weight:800;color:${retColor};background:${retBg};border:1px solid ${retBorder};font-family:var(--font-mono);font-size:0.76rem;padding:0.12rem 0.42rem;border-radius:4px;">${retPct >= 0 ? '+' : ''}${Number(retPct).toFixed(2)}%</span>`
                     : '<span style="color:#64748b;">—</span>';
@@ -1318,15 +1318,15 @@
                 if (curVal != null && trigVal != null && trigVal > 0) {
                     const diffPct = ((curVal - trigVal) / trigVal) * 100;
                     if (diffPct >= 0.2) {
-                        gapPct = `<span style="font-size:0.62rem;color:#34d399;font-weight:700;">(+${diffPct.toFixed(1)}% breached)</span>`;
+                        gapPct = `<span style="font-size:0.62rem;color:#ffffff;font-weight:700;">(+${diffPct.toFixed(1)}% breached)</span>`;
                     } else {
-                        gapPct = `<span style="font-size:0.62rem;color:#fbbf24;font-weight:600;">(${diffPct.toFixed(1)}% to trigger)</span>`;
+                        gapPct = `<span style="font-size:0.62rem;color:#a1a1aa;font-weight:600;">(${diffPct.toFixed(1)}% to trigger)</span>`;
                     }
                 } else if (c.pct_from_high != null) {
-                    gapPct = `<span style="font-size:0.62rem;color:${c.pct_from_high >= 0 ? '#34d399' : '#f87171'};font-weight:600;">(${c.pct_from_high >= 0 ? '+' : ''}${c.pct_from_high.toFixed(1)}%)</span>`;
+                    gapPct = `<span style="font-size:0.62rem;color:${c.pct_from_high >= 0 ? '#ffffff' : '#a1a1aa'};font-weight:600;">(${c.pct_from_high >= 0 ? '+' : ''}${c.pct_from_high.toFixed(1)}%)</span>`;
                 }
 
-                const archetype = c.setup_archetype || (score >= 60 ? '🔥 Strong Breakout' : '📈 Resistance Coil');
+                const archetype = c.setup_archetype || (score >= 60 ? '⚡ Strong Breakout' : '📈 Resistance Coil');
 
                 const postHighVal = c.post_high != null ? Number(c.post_high) : null;
                 const isBreakingOut = Boolean(
@@ -1464,13 +1464,13 @@
                 tierBadge.textContent = tier;
                 tierBadge.className = 'badge';
                 if (tier === 'HOT') {
-                    tierBadge.style.background = 'rgba(239,68,68,0.2)';
-                    tierBadge.style.color = '#f87171';
-                    tierBadge.style.border = '1px solid rgba(239,68,68,0.4)';
+                    tierBadge.style.background = '#27272a';
+                    tierBadge.style.color = '#ffffff';
+                    tierBadge.style.border = '1px solid rgba(255,255,255,0.25)';
                 } else {
-                    tierBadge.style.background = 'rgba(234,179,8,0.2)';
-                    tierBadge.style.color = '#fbbf24';
-                    tierBadge.style.border = '1px solid rgba(234,179,8,0.4)';
+                    tierBadge.style.background = '#18181b';
+                    tierBadge.style.color = '#cbd5e1';
+                    tierBadge.style.border = '1px solid rgba(255,255,255,0.15)';
                 }
             }
 
@@ -1484,7 +1484,7 @@
             const retPct = candidate.realized_return_pct != null ? Number(candidate.realized_return_pct) : 0;
             if (changeEl) {
                 changeEl.textContent = `${retPct >= 0 ? '+' : ''}${retPct.toFixed(2)}% (1D Return)`;
-                changeEl.style.color = retPct >= 0 ? '#22c55e' : '#ef4444';
+                changeEl.style.color = retPct >= 0 ? '#ffffff' : '#a1a1aa';
             }
 
             // 2. Execution Blueprint (SL, Price, Trigger, Target)
