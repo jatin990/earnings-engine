@@ -2460,12 +2460,6 @@
             const gcPopout = document.getElementById('bkInspGoChartingPopoutLink');
             if (gcPopout) gcPopout.href = `https://gocharting.com/terminal?ticker=${encodeURIComponent(gcSymbol)}`;
 
-            // Notice element for exchange restrictions (BSE streams seamlessly)
-            const noticeEl = document.createElement('div');
-            noticeEl.id = 'bkInspTvNotice';
-            noticeEl.style.cssText = `display: flex; position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(18,20,28,0.92); border: 1px solid rgba(255,255,255,0.12); padding: 0.35rem 0.6rem; border-radius: 4px; font-size: 0.62rem; color: #cbd5e1; font-family: var(--font-mono); z-index: 10; align-items: center; justify-content: space-between;`;
-            noticeEl.innerHTML = `<span>TradingView stream active for <strong>${tvSymbol}</strong>. Click <a href="${tvUrl}" target="_blank" style="color: #38bdf8; text-decoration: underline;">TV ↗ Popout</a> or <a href="https://gocharting.com/terminal?ticker=${encodeURIComponent(gcSymbol)}" target="_blank" style="color: #fbbf24; text-decoration: underline;">GoCharting Terminal</a> for order flow workspace.</span>`;
-
             try {
                 const widgetWrap = document.createElement('div');
                 widgetWrap.className = 'tradingview-widget-container';
@@ -2478,7 +2472,6 @@
                 widgetInner.style.width = '100%';
                 widgetInner.style.height = '100%';
                 widgetWrap.appendChild(widgetInner);
-                widgetWrap.appendChild(noticeEl);
 
                 const script = document.createElement('script');
                 script.type = 'text/javascript';
