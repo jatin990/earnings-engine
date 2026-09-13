@@ -1432,11 +1432,32 @@
         // ==========================================
         // 🎯 CANDIDATE SELECTION & SETUP INSPECTOR DRAWER
         // ==========================================
+        app.setBreakoutDrawerWidth = function(width) {
+            const drawer = document.getElementById('breakoutInspectorDrawer');
+            if (!drawer) return;
+            const wStr = typeof width === 'number' ? `${width}px` : String(width);
+            drawer.style.width = wStr;
+            try {
+                localStorage.setItem('breakout_inspector_drawer_width', wStr);
+            } catch (e) {}
+            if (app.resizeBreakoutChart) {
+                setTimeout(app.resizeBreakoutChart, 50);
+            }
+        };
+
         app.openBreakoutInspectorDrawer = function() {
             const drawer = document.getElementById('breakoutInspectorDrawer');
             const backdrop = document.getElementById('breakoutInspectorBackdrop');
             if (drawer) {
+                let savedWidth = '540px';
+                try {
+                    savedWidth = localStorage.getItem('breakout_inspector_drawer_width') || '540px';
+                } catch (e) {}
+                drawer.style.width = savedWidth;
                 drawer.style.right = '0px';
+                if (app.resizeBreakoutChart) {
+                    setTimeout(app.resizeBreakoutChart, 80);
+                }
             }
             if (backdrop) {
                 backdrop.style.display = 'block';
@@ -1448,7 +1469,8 @@
             const drawer = document.getElementById('breakoutInspectorDrawer');
             const backdrop = document.getElementById('breakoutInspectorBackdrop');
             if (drawer) {
-                drawer.style.right = '-540px';
+                const curWidth = drawer.offsetWidth || 540;
+                drawer.style.right = `-${curWidth + 40}px`;
             }
             if (backdrop) {
                 backdrop.style.opacity = '0';
@@ -1465,44 +1487,531 @@
             }
         };
 
-        app.selectBreakoutCandidate = function(ticker, autoScroll, openDrawer) {
-            if (!ticker) return;
-            app._selectedBreakoutTicker = ticker;
+        // Drawer Drag-to-Resize Listener Setup
+        if (!app._bkDrawerResizeAttached) {
+            app._bkDrawerResizeAttached = true;
+            document.addEventListener('DOMContentLoaded', () => {
+                initDrawerResizer();
+            });
+            setTimeout(initDrawerResizer, 500);
+        }
 
-            // Update row styling
-            const rows = document.querySelectorAll('#breakoutTableBody tr[data-ticker]');
-            rows.forEach((row, idx) => {
-                const rowTicker = row.getAttribute('data-ticker');
-                if (rowTicker === ticker) {
-                    row.classList.add('bk-row-selected');
-                    app._breakoutSelectedIndex = idx;
-                    if (autoScroll) {
-                        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    }
-                } else {
-                    row.classList.remove('bk-row-selected');
+        function initDrawerResizer() {
+            const resizer = document.getElementById('breakoutDrawerResizer');
+            const drawer = document.getElementById('breakoutInspectorDrawer');
+            if (!resizer || !drawer || resizer._attached) return;
+            resizer._attached = true;
+
+            let isResizing = false;
+            let startX = 0;
+            let startWidth = 0;
+
+            resizer.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                isResizing = true;
+                window._bkResizing = true;
+                startX = e.clientX;
+                startWidth = drawer.offsetWidth;
+                document.body.style.cursor = 'ew-resize';
+                document.body.style.userSelect = 'none';
+                resizer.style.background = 'rgba(56,189,248,0.5)';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+                const deltaX = startX - e.clientX;
+                const maxAllowed = Math.floor(window.innerWidth * 0.96);
+                const newWidth = Math.min(maxAllowed, Math.max(420, startWidth + deltaX));
+                drawer.style.width = `${newWidth}px`;
+                if (app.resizeBreakoutChart) {
+                    app.resizeBreakoutChart();
                 }
             });
 
-            // Find candidate data from active rendered list or cached list
-            const candidate = (app._currentRenderedBreakoutList || []).find(c => c.ticker === ticker)
-                || (app._breakoutData || []).find(c => c.ticker === ticker)
-                || { ticker: ticker };
+            document.addEventListener('mouseup', function() {
+                if (!isResizing) return;
+                isResizing = false;
+                window._bkResizing = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                resizer.style.background = 'transparent';
+                try {
+                    localStorage.setItem('breakout_inspector_drawer_width', drawer.style.width);
+                } catch (e) {}
+                if (app.resizeBreakoutChart) {
+                    setTimeout(app.resizeBreakoutChart, 50);
+                }
+            });
+        }
 
-            app.renderBreakoutSetupInspector(candidate);
+        // =========================================================================
+        // 📈 INTERACTIVE QUANTUM CHART & ORDER BOOK WALLS CONTROLLER
+        // =========================================================================
+        app._bkChartMode = app._bkChartMode || 'native';
+        app._bkLightweightChart = null;
+        app._bkCandleSeries = null;
+        app._bkVolumeSeries = null;
+        app._bkSma20Series = null;
+        app._bkSma50Series = null;
+        app._bkChartPriceLines = [];
 
-            if (openDrawer) {
-                app.openBreakoutInspectorDrawer();
+        app.switchBreakoutChartMode = function(mode) {
+            app._bkChartMode = mode;
+            const nativeWrap = document.getElementById('bkInspLightweightChartWrap');
+            const tvContainer = document.getElementById('bkInspTradingViewContainer');
+            const nativeBtn = document.getElementById('bkChartModeNativeBtn');
+            const tvBtn = document.getElementById('bkChartModeTvBtn');
+
+            if (mode === 'tv') {
+                if (nativeWrap) nativeWrap.style.display = 'none';
+                if (tvContainer) tvContainer.style.display = 'block';
+                if (nativeBtn) {
+                    nativeBtn.style.background = 'transparent';
+                    nativeBtn.style.color = '#94a3b8';
+                    nativeBtn.style.fontWeight = '400';
+                }
+                if (tvBtn) {
+                    tvBtn.style.background = 'rgba(56,189,248,0.18)';
+                    tvBtn.style.color = '#38bdf8';
+                    tvBtn.style.fontWeight = '700';
+                }
+                if (app._selectedBreakoutTicker) {
+                    app.initBreakoutTradingViewWidget(app._selectedBreakoutTicker);
+                }
+            } else {
+                if (nativeWrap) nativeWrap.style.display = 'block';
+                if (tvContainer) tvContainer.style.display = 'none';
+                if (nativeBtn) {
+                    nativeBtn.style.background = 'rgba(56,189,248,0.18)';
+                    nativeBtn.style.color = '#38bdf8';
+                    nativeBtn.style.fontWeight = '700';
+                }
+                if (tvBtn) {
+                    tvBtn.style.background = 'transparent';
+                    tvBtn.style.color = '#94a3b8';
+                    tvBtn.style.fontWeight = '400';
+                }
+                if (app.resizeBreakoutChart) {
+                    setTimeout(app.resizeBreakoutChart, 50);
+                }
             }
         };
 
-        app.inspectBreakoutStock = function(ticker, autoScroll) {
-            app.selectBreakoutCandidate(ticker, autoScroll !== false, true);
+        app.resizeBreakoutChart = function() {
+            const container = document.getElementById('bkInspLightweightChartContainer');
+            if (app._bkLightweightChart && container) {
+                const w = container.clientWidth;
+                if (w > 0) {
+                    app._bkLightweightChart.applyOptions({ width: w });
+                }
+            }
         };
 
-        // =========================================================================
-        // 📈 TRADINGVIEW ADVANCED CHART EMBED & INSPECTOR CONTROLLER
-        // =========================================================================
+        function calculateSMA(data, period) {
+            const result = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) continue;
+                let sum = 0;
+                for (let j = 0; j < period; j++) {
+                    sum += data[i - j].close;
+                }
+                result.push({
+                    time: data[i].time,
+                    value: parseFloat((sum / period).toFixed(2)),
+                });
+            }
+            return result;
+        }
+
+        app.initBreakoutQuantumChart = async function(ticker, candidate, wallsData) {
+            const container = document.getElementById('bkInspLightweightChartContainer');
+            const loadingOverlay = document.getElementById('bkInspChartLoadingOverlay');
+            const badge = document.getElementById('bkInspChartSymbolBadge');
+            const popout = document.getElementById('bkInspTvPopoutLink');
+
+            if (!container || !ticker) return;
+
+            const tvSymbol = formatTradingViewSymbol(ticker);
+            if (badge) badge.textContent = ticker;
+            if (popout) popout.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`;
+
+            if (loadingOverlay) loadingOverlay.style.display = 'flex';
+
+            // Clean up existing chart instance
+            if (app._bkLightweightChart) {
+                try {
+                    app._bkLightweightChart.remove();
+                } catch (e) {}
+                app._bkLightweightChart = null;
+            }
+            container.innerHTML = '';
+
+            if (!window.LightweightCharts) {
+                if (loadingOverlay) loadingOverlay.style.display = 'none';
+                container.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#94a3b8;font-family:var(--font-mono);font-size:0.75rem;">Chart engine ready for ${ticker}</div>`;
+                return;
+            }
+
+            try {
+                const chartWidth = container.clientWidth || 480;
+                const chart = window.LightweightCharts.createChart(container, {
+                    width: chartWidth,
+                    height: 300,
+                    layout: {
+                        background: { type: 'solid', color: '#050508' },
+                        textColor: '#94a3b8',
+                        fontFamily: 'JetBrains Mono, monospace',
+                        fontSize: 10,
+                    },
+                    grid: {
+                        vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                        horzLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                    },
+                    crosshair: {
+                        mode: window.LightweightCharts.CrosshairMode.Normal,
+                    },
+                    timeScale: {
+                        borderColor: 'rgba(255, 255, 255, 0.08)',
+                        timeVisible: true,
+                        secondsVisible: false,
+                    },
+                    rightPriceScale: {
+                        borderColor: 'rgba(255, 255, 255, 0.08)',
+                        scaleMargins: { top: 0.1, bottom: 0.15 },
+                    }
+                });
+
+                app._bkLightweightChart = chart;
+
+                // Candlestick Series
+                const candleSeries = chart.addCandlestickSeries({
+                    upColor: '#10b981',
+                    downColor: '#ef4444',
+                    borderUpColor: '#10b981',
+                    borderDownColor: '#ef4444',
+                    wickUpColor: '#10b981',
+                    wickDownColor: '#ef4444',
+                });
+                app._bkCandleSeries = candleSeries;
+
+                // Volume Histogram Series
+                const volumeSeries = chart.addHistogramSeries({
+                    priceFormat: { type: 'volume' },
+                    priceScaleId: '',
+                    scaleMargins: { top: 0.82, bottom: 0 },
+                });
+                app._bkVolumeSeries = volumeSeries;
+
+                // SMA 20 & SMA 50
+                const sma20Series = chart.addLineSeries({
+                    color: '#38bdf8',
+                    lineWidth: 1,
+                    title: 'SMA 20',
+                });
+                const sma50Series = chart.addLineSeries({
+                    color: '#fbbf24',
+                    lineWidth: 1,
+                    title: 'SMA 50',
+                });
+
+                // Fetch historical bars
+                const res = await fetch(`/api/v1/price-history/${encodeURIComponent(ticker)}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const rawBars = await res.json();
+
+                if (!rawBars || rawBars.length === 0) {
+                    if (loadingOverlay) loadingOverlay.style.display = 'none';
+                    return;
+                }
+
+                const candles = [];
+                const volumes = [];
+                rawBars.forEach(r => {
+                    const itemTime = r.date || r.time;
+                    candles.push({
+                        time: itemTime,
+                        open: Number(r.open),
+                        high: Number(r.high),
+                        low: Number(r.low),
+                        close: Number(r.close),
+                    });
+                    volumes.push({
+                        time: itemTime,
+                        value: Number(r.volume || 0),
+                        color: Number(r.close) >= Number(r.open) ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)',
+                    });
+                });
+
+                candleSeries.setData(candles);
+                volumeSeries.setData(volumes);
+                sma20Series.setData(calculateSMA(candles, 20));
+                sma50Series.setData(calculateSMA(candles, 50));
+
+                // Overlay Key Execution Lines & Order Book Walls
+                const curPrice = candidate?.current_price || (candles.length > 0 ? candles[candles.length - 1].close : 0);
+                const trigger = candidate?.breakout_trigger != null ? Number(candidate.breakout_trigger) : null;
+                const target = candidate?.target_price != null ? Number(candidate.target_price) : (trigger ? trigger * 1.08 : null);
+                const stopLoss = candidate?.stop_loss != null ? Number(candidate.stop_loss) : (curPrice ? curPrice * 0.95 : null);
+
+                // 1. Breakout Trigger Line
+                if (trigger) {
+                    candleSeries.createPriceLine({
+                        price: trigger,
+                        color: '#38bdf8',
+                        lineWidth: 2,
+                        lineStyle: window.LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title: `TRIGGER: ₹${trigger.toFixed(1)}`,
+                    });
+                }
+
+                // 2. Stop Loss Line
+                if (stopLoss) {
+                    candleSeries.createPriceLine({
+                        price: stopLoss,
+                        color: '#f87171',
+                        lineWidth: 2,
+                        lineStyle: window.LightweightCharts.LineStyle.Solid,
+                        axisLabelVisible: true,
+                        title: `SL: ₹${stopLoss.toFixed(1)}`,
+                    });
+                }
+
+                // 3. Target Line
+                if (target) {
+                    candleSeries.createPriceLine({
+                        price: target,
+                        color: '#34d399',
+                        lineWidth: 2,
+                        lineStyle: window.LightweightCharts.LineStyle.Solid,
+                        axisLabelVisible: true,
+                        title: `TARGET: ₹${target.toFixed(1)}`,
+                    });
+                }
+
+                // 4. Order Book Walls Overlays (Sell Wall / Resistance & Buy Wall / Support)
+                if (wallsData) {
+                    if (wallsData.resistance_strike && Math.abs(wallsData.resistance_strike - (trigger || 0)) > 2) {
+                        candleSeries.createPriceLine({
+                            price: Number(wallsData.resistance_strike),
+                            color: '#ef4444',
+                            lineWidth: 2,
+                            lineStyle: window.LightweightCharts.LineStyle.Dotted,
+                            axisLabelVisible: true,
+                            title: `SELL WALL: ₹${wallsData.resistance_strike}`,
+                        });
+                    }
+                    if (wallsData.support_strike) {
+                        candleSeries.createPriceLine({
+                            price: Number(wallsData.support_strike),
+                            color: '#10b981',
+                            lineWidth: 2,
+                            lineStyle: window.LightweightCharts.LineStyle.Dotted,
+                            axisLabelVisible: true,
+                            title: `BUY WALL: ₹${wallsData.support_strike}`,
+                        });
+                    }
+                    if (wallsData.max_pain_strike) {
+                        candleSeries.createPriceLine({
+                            price: Number(wallsData.max_pain_strike),
+                            color: '#a855f7',
+                            lineWidth: 1,
+                            lineStyle: window.LightweightCharts.LineStyle.LargeDashed,
+                            axisLabelVisible: true,
+                            title: `MAX PAIN: ₹${wallsData.max_pain_strike}`,
+                        });
+                    }
+                }
+
+                chart.timeScale().fitContent();
+            } catch (err) {
+                console.warn('[BREAKOUT] Error initializing quantum chart:', err);
+            } finally {
+                if (loadingOverlay) loadingOverlay.style.display = 'none';
+            }
+        };
+
+        app.loadBreakoutOrderBookWalls = async function(ticker, candidate) {
+            const ladderList = document.getElementById('bkInspStrikeLadderList');
+            const buyWallEl = document.getElementById('bkInspBuyWallStrike');
+            const buyDistEl = document.getElementById('bkInspBuyWallDist');
+            const sellWallEl = document.getElementById('bkInspSellWallStrike');
+            const sellDistEl = document.getElementById('bkInspSellWallDist');
+            const maxPainEl = document.getElementById('bkInspMaxPainStrike');
+            const maxPainDistEl = document.getElementById('bkInspMaxPainDist');
+            const pcrOiEl = document.getElementById('bkInspPcrOi');
+            const pcrVolEl = document.getElementById('bkInspPcrVol');
+            const sentBadge = document.getElementById('bkInspWallsSentimentBadge');
+
+            if (!ladderList || !ticker) return;
+
+            ladderList.innerHTML = `<div style="color:#71717a;font-style:italic;text-align:center;padding:0.4rem;">Analyzing real-time order book walls &amp; derivative positioning...</div>`;
+
+            const curPrice = candidate?.current_price != null ? Number(candidate.current_price) : (candidate?.signal_price ? Number(candidate.signal_price) : 0);
+            const cleanSym = ticker.replace('.NS', '').replace('.BO', '').toUpperCase();
+
+            try {
+                const res = await fetch(`/api/v1/options/chain?symbol=${encodeURIComponent(cleanSym)}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+                const data = json.data || {};
+
+                if (data.status === 'LIVE' || data.status === 'ARCHIVED') {
+                    // Update Summary Numbers
+                    const buyWall = data.support_strike != null ? Number(data.support_strike) : (curPrice * 0.96);
+                    const sellWall = data.resistance_strike != null ? Number(data.resistance_strike) : (curPrice * 1.05);
+                    const maxPain = data.max_pain_strike != null ? Number(data.max_pain_strike) : curPrice;
+                    const pcrOi = data.pcr_oi != null ? Number(data.pcr_oi) : 1.0;
+                    const pcrVol = data.pcr_volume != null ? Number(data.pcr_volume) : 1.0;
+
+                    if (buyWallEl) buyWallEl.textContent = `₹${Math.round(buyWall)}`;
+                    if (buyDistEl) {
+                        const dist = curPrice > 0 ? ((buyWall - curPrice) / curPrice * 100) : -4.0;
+                        buyDistEl.textContent = `${dist.toFixed(1)}%`;
+                    }
+
+                    if (sellWallEl) sellWallEl.textContent = `₹${Math.round(sellWall)}`;
+                    if (sellDistEl) {
+                        const dist = curPrice > 0 ? ((sellWall - curPrice) / curPrice * 100) : 5.0;
+                        sellDistEl.textContent = `+${dist.toFixed(1)}%`;
+                    }
+
+                    if (maxPainEl) maxPainEl.textContent = `₹${Math.round(maxPain)}`;
+                    if (maxPainDistEl) {
+                        const dist = curPrice > 0 ? ((maxPain - curPrice) / curPrice * 100) : 0.0;
+                        maxPainDistEl.textContent = `${dist >= 0 ? '+' : ''}${dist.toFixed(1)}%`;
+                    }
+
+                    if (pcrOiEl) pcrOiEl.textContent = pcrOi.toFixed(2);
+                    if (pcrVolEl) pcrVolEl.textContent = `Vol: ${pcrVol.toFixed(2)}`;
+
+                    const sentiment = (data.sentiment || (pcrOi >= 1.2 ? 'BULLISH' : (pcrOi <= 0.8 ? 'BEARISH' : 'NEUTRAL'))).toUpperCase();
+                    if (sentBadge) {
+                        sentBadge.textContent = `${sentiment} (PCR ${pcrOi.toFixed(2)})`;
+                        if (sentiment.includes('BULL')) {
+                            sentBadge.style.color = '#34d399';
+                            sentBadge.style.borderColor = 'rgba(16,185,129,0.3)';
+                            sentBadge.style.background = 'rgba(16,185,129,0.1)';
+                        } else if (sentiment.includes('BEAR')) {
+                            sentBadge.style.color = '#f87171';
+                            sentBadge.style.borderColor = 'rgba(239,68,68,0.3)';
+                            sentBadge.style.background = 'rgba(239,68,68,0.1)';
+                        } else {
+                            sentBadge.style.color = '#38bdf8';
+                            sentBadge.style.borderColor = 'rgba(56,189,248,0.3)';
+                            sentBadge.style.background = 'rgba(56,189,248,0.1)';
+                        }
+                    }
+
+                    // Render Strike Ladder Depth
+                    const strikes = data.strikes || [];
+                    if (strikes.length > 0) {
+                        // Find strikes near spot
+                        const sortedStrikes = [...strikes].sort((a, b) => a.strike - b.strike);
+                        const atmIdx = sortedStrikes.findIndex(s => s.strike >= curPrice);
+                        const centerIdx = atmIdx >= 0 ? atmIdx : Math.floor(sortedStrikes.length / 2);
+                        const sliceStart = Math.max(0, centerIdx - 4);
+                        const sliceEnd = Math.min(sortedStrikes.length, centerIdx + 5);
+                        const windowStrikes = sortedStrikes.slice(sliceStart, sliceEnd);
+
+                        const maxOi = Math.max(...windowStrikes.map(s => Math.max(s.put_oi || 0, s.call_oi || 0)), 1);
+
+                        ladderList.innerHTML = windowStrikes.map(s => {
+                            const isAtm = Math.abs(s.strike - curPrice) <= (curPrice * 0.007);
+                            const putPct = Math.min(100, Math.round(((s.put_oi || 0) / maxOi) * 100));
+                            const callPct = Math.min(100, Math.round(((s.call_oi || 0) / maxOi) * 100));
+                            const isBuyWall = s.strike === buyWall;
+                            const isSellWall = s.strike === sellWall;
+
+                            return `
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:0.35rem;background:${isAtm ? 'rgba(56,189,248,0.08)' : 'rgba(255,255,255,0.015)'};border:${isAtm ? '1px solid rgba(56,189,248,0.3)' : '1px solid rgba(255,255,255,0.04)'};padding:0.2rem 0.35rem;border-radius:3px;">
+                                    <!-- Put Support Bar (Buy Wall) -->
+                                    <div style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:0.25rem;">
+                                        <span style="font-size:0.58rem;color:${isBuyWall ? '#34d399' : '#94a3b8'};font-weight:${isBuyWall ? '800' : '400'};">${(s.put_oi || 0).toLocaleString('en-IN')}</span>
+                                        <div style="width:45px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;direction:rtl;">
+                                            <div style="height:100%;width:${putPct}%;background:${isBuyWall ? '#10b981' : '#34d39988'};border-radius:2px;"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Strike Price Center Column -->
+                                    <div style="width:72px;text-align:center;">
+                                        <span style="font-weight:700;color:${isAtm ? '#38bdf8' : '#f8fafc'};font-size:0.64rem;">₹${s.strike}</span>
+                                        ${isBuyWall ? '<span style="font-size:0.50rem;color:#34d399;display:block;line-height:1;">BUY WALL</span>' : ''}
+                                        ${isSellWall ? '<span style="font-size:0.50rem;color:#f87171;display:block;line-height:1;">SELL WALL</span>' : ''}
+                                        ${isAtm && !isBuyWall && !isSellWall ? '<span style="font-size:0.50rem;color:#38bdf8;display:block;line-height:1;">ATM SPOT</span>' : ''}
+                                    </div>
+
+                                    <!-- Call Resistance Bar (Sell Wall) -->
+                                    <div style="flex:1;display:flex;align-items:center;justify-content:flex-start;gap:0.25rem;">
+                                        <div style="width:45px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+                                            <div style="height:100%;width:${callPct}%;background:${isSellWall ? '#ef4444' : '#f8717188'};border-radius:2px;"></div>
+                                        </div>
+                                        <span style="font-size:0.58rem;color:${isSellWall ? '#f87171' : '#94a3b8'};font-weight:${isSellWall ? '800' : '400'};">${(s.call_oi || 0).toLocaleString('en-IN')}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+
+                        // Also re-render chart lines with exact wall strikes
+                        if (app._bkChartMode === 'native') {
+                            app.initBreakoutQuantumChart(ticker, candidate, {
+                                resistance_strike: sellWall,
+                                support_strike: buyWall,
+                                max_pain_strike: maxPain,
+                            });
+                        }
+                        return;
+                    }
+                }
+
+                // Cash Market / Non-F&O fallback (Deterministic Technical Point-in-Time depth)
+                const supportFloor = candidate?.stop_loss != null ? Number(candidate.stop_loss) : (curPrice * 0.95);
+                const resCeiling = candidate?.breakout_trigger != null ? Number(candidate.breakout_trigger) : (curPrice * 1.04);
+                const targetCeil = candidate?.target_price != null ? Number(candidate.target_price) : (resCeiling * 1.08);
+
+                if (buyWallEl) buyWallEl.textContent = `₹${Math.round(supportFloor)}`;
+                if (buyDistEl) buyDistEl.textContent = `${(((supportFloor - curPrice) / curPrice) * 100).toFixed(1)}%`;
+                if (sellWallEl) sellWallEl.textContent = `₹${Math.round(resCeiling)}`;
+                if (sellDistEl) sellDistEl.textContent = `+${(((resCeiling - curPrice) / curPrice) * 100).toFixed(1)}%`;
+                if (maxPainEl) maxPainEl.textContent = `₹${Math.round(curPrice)}`;
+                if (maxPainDistEl) maxPainDistEl.textContent = 'SPOT';
+                if (pcrOiEl) pcrOiEl.textContent = 'N/A';
+                if (pcrVolEl) pcrVolEl.textContent = 'Cash Market';
+
+                if (sentBadge) {
+                    sentBadge.textContent = 'CASH ORDER FLOW (DELIVERY)';
+                    sentBadge.style.color = '#38bdf8';
+                    sentBadge.style.borderColor = 'rgba(56,189,248,0.25)';
+                    sentBadge.style.background = 'rgba(56,189,248,0.08)';
+                }
+
+                ladderList.innerHTML = `
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);padding:0.35rem 0.5rem;border-radius:4px;text-align:center;">
+                        <div style="color:#f8fafc;font-weight:700;font-size:0.65rem;">Equity Cash Market Order Depth</div>
+                        <div style="color:#94a3b8;font-size:0.60rem;margin-top:0.15rem;">
+                            Support Floor: <span style="color:#34d399;font-weight:700;">₹${supportFloor.toFixed(2)}</span> &middot;
+                            Breakout Trigger: <span style="color:#38bdf8;font-weight:700;">₹${resCeiling.toFixed(2)}</span> &middot;
+                            Target: <span style="color:#a78bfa;font-weight:700;">₹${targetCeil.toFixed(2)}</span>
+                        </div>
+                    </div>
+                `;
+
+                if (app._bkChartMode === 'native') {
+                    app.initBreakoutQuantumChart(ticker, candidate, {
+                        resistance_strike: resCeiling,
+                        support_strike: supportFloor,
+                        max_pain_strike: null,
+                    });
+                }
+            } catch (err) {
+                console.warn('[BREAKOUT] Error loading order book walls:', err);
+                ladderList.innerHTML = `<div style="color:#71717a;font-size:0.62rem;text-align:center;">Order book depth unavailable (${err.message})</div>`;
+                if (app._bkChartMode === 'native') {
+                    app.initBreakoutQuantumChart(ticker, candidate, null);
+                }
+            }
+        };
+
         function formatTradingViewSymbol(sym) {
             if (!sym) return 'NSE:NIFTY';
             const clean = String(sym).trim().toUpperCase();
@@ -1729,8 +2238,11 @@
                 freshEl.style.color = isLive ? '#34d399' : '#94a3b8';
             }
 
-            // 2. Interactive TradingView Chart Initialization
-            app.initBreakoutTradingViewWidget(ticker);
+            // 2. Interactive Quantum Chart & Real-Time Order Book Walls Initialization
+            app.loadBreakoutOrderBookWalls(ticker, candidate);
+            if (app._bkChartMode === 'tv') {
+                app.initBreakoutTradingViewWidget(ticker);
+            }
 
             // 3. Actionable Setup Verdict Banner
             const trigger = candidate.breakout_trigger != null ? Number(candidate.breakout_trigger) : curPrice;
