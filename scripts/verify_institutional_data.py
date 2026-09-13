@@ -456,13 +456,17 @@ def main() -> int:
         logging.getLogger("earnings_engine").setLevel(logging.DEBUG)
         logging.getLogger("verify_institutional_data").setLevel(logging.DEBUG)
 
-    if not any([args.audit, args.clean_synthetic, args.verify_live is not None, args.ingest_nse, args.ingest_quarters, args.sync_turso]):
+    # If user specified --all or --universe or positional tickers without explicit sub-action, default to multi-quarter ingestion
+    if (args.all or args.universe or args.verify_live is not None) and not (args.ingest_nse or args.ingest_quarters or args.clean_synthetic or args.audit):
+        args.ingest_quarters = True
+
+    if not any([args.audit, args.clean_synthetic, args.verify_live is not None, args.ingest_nse, args.ingest_quarters, args.sync_turso, args.all, args.universe]):
         args.audit = True
 
     if args.clean_synthetic:
         clean_synthetic_institutional_records(settings)
 
-    if args.verify_live is not None or args.ingest_nse or args.ingest_quarters:
+    if args.verify_live is not None or args.ingest_nse or args.ingest_quarters or args.all or args.universe:
         targets = resolve_target_tickers(
             tickers_arg=args.verify_live,
             universe_arg=args.universe,
@@ -470,7 +474,7 @@ def main() -> int:
             limit=args.limit,
             settings=settings,
         )
-        if args.ingest_quarters:
+        if args.ingest_quarters or (not args.ingest_nse and args.verify_live is None):
             ingest_multi_quarter_data(
                 tickers=targets,
                 settings=settings,
