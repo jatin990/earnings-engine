@@ -1,8 +1,12 @@
 {
   "version": 2,
+  "git": {
+    "deploymentEnabled": true
+  },
   "github": {
     "autoJobCancellation": true
   },
+  "ignoreCommand": "bash scripts/vercel_ignore_step.sh",
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
